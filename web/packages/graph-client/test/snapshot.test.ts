@@ -205,6 +205,26 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
     expect(snapshot.reconstructionScenes![0]!.islandId).toBeNull();
     expect(snapshot.islands.every((island) => island.reconstructionSceneId === null)).toBe(true);
   });
+
+  it('builds one scene-backed island when reconstruction is the only durable grouping', () => {
+    const snapshot = adaptSnapshot({
+      ...PAYLOAD,
+      entities: [],
+      occurrences: [],
+      proposals: [],
+      scene_groups: [],
+      reconstruction_scenes: [scene],
+    });
+
+    expect(snapshot.islands).toEqual([
+      expect.objectContaining({
+        islandId: 'scene-1',
+        captureIds: ['c1', 'c2'],
+        reconstructionSceneId: 'scene-1',
+      }),
+    ]);
+    expect(snapshot.reconstructionScenes![0]!.islandId).toBe('scene-1');
+  });
 });
 
 describe('a timestamp the client cannot read', () => {

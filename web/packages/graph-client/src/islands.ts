@@ -42,6 +42,16 @@ export function groupIslands(payload: GraphPayload): IslandOf {
       byCapture.set(captureId, group.group_id as IslandIdRef);
     }
   }
+  // An operator-authorized exact set can reconstruct photographs whose honest metadata did not
+  // qualify for automatic scene grouping. When every member is still ungrouped, the immutable
+  // reconstruction scene is their one durable shared identity. A partially grouped set remains
+  // split instead of letting the reconstruction override a measured grouping decision.
+  for (const scene of payload.reconstruction_scenes) {
+    if (scene.members.some((member) => byCapture.has(member.capture_id))) continue;
+    for (const member of scene.members) {
+      byCapture.set(member.capture_id, scene.scene_id as IslandIdRef);
+    }
+  }
   return (captureId) => byCapture.get(captureId) ?? (captureId as IslandIdRef);
 }
 
@@ -91,6 +101,13 @@ export function buildIslands(
       if (contributing === undefined) groupsByIsland.set(islandId, [group]);
       else if (!contributing.includes(group)) contributing.push(group);
     }
+  }
+
+  // Reconstruction-only workspaces can have no entities, occurrences, or automatic scene group.
+  // Their capture set still has to enter the island list or the layout solver receives an empty
+  // world before the authenticated geometry loader gets a chance to run.
+  for (const scene of payload.reconstruction_scenes) {
+    for (const member of scene.members) place(member.capture_id);
   }
 
   // The times a region carries when no single group speaks for it. They are the times its own
