@@ -41,3 +41,15 @@ def test_depth_image_forward_record_does_not_claim_normal_worker_or_host_perform
     assert record["execution"]["production_adapter"].endswith("MoGeDepthModel")
     assert record["execution"]["production_worker_orchestration"] is False
     assert any("do not represent a production host" in item for item in record["limitations"])
+
+
+def test_retained_screenshots_match_the_artifact_bound_into_their_record():
+    for path in _records():
+        record = json.loads(path.read_bytes())["record"]
+        screenshot = record.get("screenshot")
+        if screenshot is None:
+            continue
+        image = path.parent / screenshot["path"]
+        data = image.read_bytes()
+        assert len(data) == screenshot["byte_size"], image
+        assert hashlib.sha256(data).hexdigest() == screenshot["sha256"], image

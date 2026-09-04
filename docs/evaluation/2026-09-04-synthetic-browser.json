@@ -1,0 +1,133 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.browser-reconstruction-evaluation/v1",
+    "measured_at": "2026-09-04T22:22:30.852Z",
+    "corpus_class": "synthetic",
+    "notice": "Synthetic production-plumbing and browser-rendering evidence only. This is not benchmark performance or personal-media acceptance.",
+    "source": {
+      "source_manifest_sha256": "a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f",
+      "camera_manifest_sha256": "b3d3eba249f4a52045f8a29c9f6216ee4f1086c090c56a73d7d0cc593e29af59",
+      "synthetic_scene_manifest_sha256": "bfd2d09b2d2059fc3ae0a5273a9b3e67440244198cfc643f9abbdadaaef246ea",
+      "synthetic_pose_evaluation_sha256": "dc0680b24fc85ba3ebe2ed55d3ed92a10e9ea161ded9701b73014c336808c5d7"
+    },
+    "source_build": {
+      "git_head": "bb43b0e51b2c45067f3ec1ad372d4dd4441676f6",
+      "repository_dirty": true,
+      "measured_app_scope_dirty": false,
+      "browser_measurement_implementation_commit": "bb43b0e51b2c45067f3ec1ad372d4dd4441676f6"
+    },
+    "reconstruction": {
+      "scene_id": "ebb62349-8429-5423-a4c8-202eb7b402c4",
+      "build_job_id": "806ee8aa-e53a-533b-bf47-3ed83a47ac55",
+      "build_input_sha256": "1f3e373665b7c6de2e21b548a9f33171352338a3672d65c384dbdaefb3af991c",
+      "privacy_admission_sha256": "8151792548fd09b2ab236461b69f34e9ab26b24bd1f9b366e00af4d84082331d",
+      "depth_model": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+      "depth_execution": "native host MPS production worker; no runtime image digest",
+      "pose_model": "pycolmap 4.2.0",
+      "pose_code_revision": "32f5b818000c7442c1d170e417c253fa49eb22f4",
+      "pose_execution_image": "exulanica-validation-pose@sha256:99bb3b8a8cf38ffd0890ba25c944af57cebf7d20075d7a9f5c3c8f7f349b4a7f",
+      "registered_member_count": 8,
+      "excluded_member_count": 0,
+      "registration_fraction_millionths": 1000000,
+      "pose_receipt_sha256": "804aae628d5e597fdcb9a1a920690499e0197c5a0e4edd664876d702bdc5adea",
+      "placement_receipt_sha256": "dea6dc980fe0bb3dd2886e2e02a99b30de97b33249f34d77a1dcaaf5f8ae1bdf",
+      "scene_gate_sha256": "5b06fc7fce9cbd842648635acd48bc23f10975d2ff0bec737b0f7663dcaf1821"
+    },
+    "assertion_presentation": {
+      "recorded_rung": 3,
+      "displayed_rung": 3,
+      "rendering_substrate": "posed_point_maps",
+      "withholding_reasons": [
+        "Rung 1 withheld: no reviewed splat receipt is available.",
+        "Rung 2 withheld: no physically validated scale receipt is available.",
+        "Rung 2 withheld: no measured coverage receipt is available.",
+        "Rung 2 withheld: no measured corridor receipt is available.",
+        "Pose gate: minimum registered-image fraction is unmeasured",
+        "Pose gate: maximum mean reprojection error is unmeasured",
+        "Pose gate: minimum recovered camera translation is unmeasured"
+      ]
+    },
+    "browser_runtime": {
+      "browser": "Google Chrome 152.0.0.0",
+      "operating_system": "macOS 26.5.1 build 25F80",
+      "cpu": "Apple M3 Pro",
+      "logical_cpu_count": 12,
+      "physical_unified_memory_bytes": 19327352832,
+      "browser_reported_device_memory_gb": 16,
+      "gpu": "ANGLE Metal Renderer: Apple M3 Pro",
+      "engine": "PlayCanvas 2.21.4",
+      "viewport_css_px": [1280, 720],
+      "canvas_px": [1280, 720],
+      "device_pixel_ratio_millionths": 1000000
+    },
+    "measurement": {
+      "driver": "requestAnimationFrame",
+      "warmup_milliseconds": 1000,
+      "duration_milliseconds": 5000,
+      "frame_count": 599,
+      "first_meaningful_render_microseconds": 1257700,
+      "time_to_full_detail_microseconds": 1257700,
+      "geometry_load_microseconds": 709100,
+      "frame_mean_microseconds": 8350,
+      "frame_p50_microseconds": 8300,
+      "frame_p95_microseconds": 9300,
+      "frame_p99_microseconds": 9400,
+      "fps_one_percent_low_milli": 106380,
+      "frames_over_16_7_milliseconds": 0,
+      "frame_over_16_7_milliseconds_fraction_millionths": 0,
+      "hidden_during_run": false,
+      "peak_js_heap_mib_hundredths": 60882
+    },
+    "geometry": {
+      "placed_point_map_count": 8,
+      "rendered_point_map_count": 8,
+      "rendered_point_count": 1510263,
+      "authenticated_network_bytes": 30215932,
+      "loads": [
+        {"artifact_id": "f05532c7-5922-5206-9ad4-eada60a1f6b3", "capture_id": "01a06e52-e45a-71ce-8f2d-8afe307c0702", "byte_size": 3897624, "fetch_microseconds": 104300, "verify_microseconds": 3400, "decode_microseconds": 200},
+        {"artifact_id": "8eea0298-5029-5cd2-84b8-07563396d221", "capture_id": "01a06e52-e48d-7373-8c17-db9b768663e6", "byte_size": 3901984, "fetch_microseconds": 48300, "verify_microseconds": 2400, "decode_microseconds": 100},
+        {"artifact_id": "70496635-25b9-5663-b802-360704c7edbd", "capture_id": "01a06e52-e4a4-7683-a64c-2128afa00c35", "byte_size": 3712108, "fetch_microseconds": 173900, "verify_microseconds": 5800, "decode_microseconds": 200},
+        {"artifact_id": "c9a2b735-d7c7-5566-8500-07c7f614fd2d", "capture_id": "01a06e52-e4be-71c7-ad35-5de9bc585400", "byte_size": 3714628, "fetch_microseconds": 150100, "verify_microseconds": 2700, "decode_microseconds": 100},
+        {"artifact_id": "9fcb69a4-dfae-5300-8d6e-9207f29787b4", "capture_id": "01a06e52-e4d2-735b-b55a-3f77eb633e6e", "byte_size": 3726668, "fetch_microseconds": 43600, "verify_microseconds": 1700, "decode_microseconds": 100},
+        {"artifact_id": "e9bad4d4-ca46-5e64-93ab-0d48505adbd3", "capture_id": "01a06e52-e4ed-740d-9299-e828ef4836b0", "byte_size": 3695648, "fetch_microseconds": 30100, "verify_microseconds": 1900, "decode_microseconds": 100},
+        {"artifact_id": "9d4c7941-bf87-5ddc-8c14-271cf7fd3d9b", "capture_id": "01a06e52-e506-7c24-bc25-527fc78b2836", "byte_size": 3662744, "fetch_microseconds": 55600, "verify_microseconds": 1700, "decode_microseconds": 200},
+        {"artifact_id": "86e7efcd-ed48-56c6-bf79-42cb7fd66028", "capture_id": "01a06e52-e519-76a3-86d5-d77e32829c19", "byte_size": 3904528, "fetch_microseconds": 36800, "verify_microseconds": 2000, "decode_microseconds": 100}
+      ],
+      "placement_max_error_nanometres": [177, 2291, 5881, 1577, 5777, 2201, 7080, 6149],
+      "issues": []
+    },
+    "network": {
+      "transfer_bytes": 30287427,
+      "decoded_body_bytes": 39594152,
+      "resource_count": 177
+    },
+    "renderer": {
+      "maximum_draw_calls": 21,
+      "gpu_error": 0,
+      "render_valid": true,
+      "renderer_success_promoted_rung": false
+    },
+    "screenshot": {
+      "path": "2026-09-04-synthetic-browser.png",
+      "sha256": "e526ecdebca122fa1eed1d75398fac34e710adbcc450562ee7cba892ed765043",
+      "byte_size": 645627,
+      "capture_mode": "separate headless Chrome visual capture; not the source of timing metrics"
+    },
+    "automated_recovery_evidence": {
+      "digest_refusal": "web/packages/app/test/geometry-api.test.ts",
+      "per_member_corrupt_fallback": "web/packages/app/test/geometry-api.test.ts",
+      "assertion_derived_rung": "web/packages/app/test/status-rungs.test.ts"
+    },
+    "limitations": [
+      "This is one five-second static-view observation, not the fixed 60-second camera-path run required for M14 acceptance.",
+      "No deliberately weak machine, ten-minute leak session, or user-agent-specific memory measurement was included.",
+      "The hardware is a personal local workstation, not the eventual production host.",
+      "Synthetic rendered inputs are easier than real photographs and do not establish benchmark quality.",
+      "The native MPS depth run has no runtime image digest; the separate amd64 image record proves the locked image forward path.",
+      "The screenshot was captured separately and is visual evidence only, not a timing source.",
+      "No personal media was admitted or evaluated."
+    ]
+  },
+  "record_sha256": "78d3d531b3cb61f6e831b79a50398d4fa557d4a59623dcfd8304c351babfd294"
+}

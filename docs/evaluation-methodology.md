@@ -667,6 +667,18 @@ Settled by: measuring the source-first and splat rungs on the actual development
 weak machine, then setting bars from those measurements. Until then, no rendering number is a target,
 only an observation.
 
+**VERIFIED observation 2026-09-04, below M14 acceptance scope.** The production browser rendered the
+eight-member synthetic posed-point-map scene at rung 3 on an Apple M3 Pro in Chrome 152 at 1280x720.
+During one visible five-second static-view run after a one-second warmup, 599 animation frames had a
+9.3 ms p95 frame time and 0 of 599 frames exceeded 16.7 ms. The one-percent-low rate was 106.38 FPS,
+time to first meaningful render and full detail was 1,257.7 ms, geometry load was 709.1 ms, peak JS
+heap was 608.82 MiB, and authenticated geometry totalled 30,215,932 bytes. The digest-bound
+[machine record](evaluation/2026-09-04-synthetic-browser.json) and separately captured
+[visual evidence](evaluation/2026-09-04-synthetic-browser.png) identify the exact build, browser,
+hardware, inputs, artifacts, integrity timings, and rung withholding reasons. This does not satisfy
+M14: it lacks the fixed 60-second camera path, a deliberately weak machine, a ten-minute leak run,
+and user-agent-specific memory. It licenses no pass claim and sets no target.
+
 ---
 
 ### M15. Capture-time window exact-match
