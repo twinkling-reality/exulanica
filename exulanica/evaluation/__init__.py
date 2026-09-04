@@ -47,6 +47,10 @@ from exulanica.evaluation.replay import (
     run_clean_replay,
 )
 from exulanica.evaluation.report import BANNED, banned_words_in, render_report
+from exulanica.evaluation.synthetic_pose import (
+    SyntheticPoseEvaluation,
+    evaluate_synthetic_pose,
+)
 
 __all__ = [
     "BANNED",
@@ -68,9 +72,11 @@ __all__ = [
     "ReplayError",
     "ReplayReceipt",
     "Sample",
+    "SyntheticPoseEvaluation",
     "assert_pristine_database",
     "banned_words_in",
     "create_archive",
+    "evaluate_synthetic_pose",
     "execution_snapshot",
     "render",
     "render_report",
