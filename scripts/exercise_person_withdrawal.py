@@ -29,6 +29,7 @@ def main() -> None:
     parser.add_argument("--git-head", required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--resume-started-git-head")
     args = parser.parse_args()
     result = exercise_synthetic_person_withdrawal(
         PersonWithdrawalExercise(
@@ -45,6 +46,7 @@ def main() -> None:
             git_head=args.git_head,
             output_directory=args.output_directory,
             report_path=args.report,
+            interrupted_run_git_head=args.resume_started_git_head,
         )
     )
     print(json.dumps({"record_sha256": result["record_sha256"]}, sort_keys=True))

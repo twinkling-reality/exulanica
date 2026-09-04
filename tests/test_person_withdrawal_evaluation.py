@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from exulanica.errors import TombstonedError
 from exulanica.evaluation.person_withdrawal import (
+    _late_publication_refusal,
     assert_exulanica_store_root,
     assert_test_database_url,
 )
@@ -32,3 +36,22 @@ def test_person_withdrawal_evaluation_never_uses_historical_orimera_storage(tmp_
     for unsafe in (tmp_path / "blobs", tmp_path / ".orimera" / "blobs"):
         with pytest.raises(ValueError, match=r"under \.exulanica"):
             assert_exulanica_store_root(unsafe)
+
+
+def test_late_publication_probe_records_the_repository_tombstone_error():
+    class RefusingRepository:
+        @contextmanager
+        def transaction(self):
+            yield
+
+        def insert_scene_artifact(self, **_values):
+            raise TombstonedError("tombstoned: write refused for artifact")
+
+    result = _late_publication_refusal(RefusingRepository(), uuid.uuid4())
+
+    assert result == {
+        "refused": True,
+        "error_class": "TombstonedError",
+        "sqlstate": None,
+        "reason": "tombstoned: write refused for artifact",
+    }

@@ -12,6 +12,7 @@ contain a person, not a privacy screening result, and not evidence about persona
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import urllib.parse
@@ -26,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
 from exulanica.deletion.worker import PurgeWorker
+from exulanica.errors import TombstonedError
 from exulanica.evidence import EvidenceAddress
 from exulanica.evidence.blob import BlobId
 from exulanica.graph import scene_rung_rows
@@ -67,6 +69,14 @@ class PersonWithdrawalExercise:
     git_head: str
     output_directory: Path
     report_path: Path
+    interrupted_run_git_head: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _SyntheticIdentity:
+    entity_id: uuid.UUID
+    link_id: uuid.UUID
+    assertion_id: uuid.UUID
 
 
 def assert_test_database_url(value: str) -> None:
@@ -111,8 +121,15 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
     output_directory.mkdir(parents=True, exist_ok=True)
     before_path = output_directory / "before-withdrawal.wmp"
     after_path = output_directory / "after-withdrawal.wmp"
-    if before_path.exists() or after_path.exists():
-        raise ValueError("refusing to overwrite a prior World Memory Package observation")
+    resuming = before_path.is_dir() and not after_path.exists()
+    if before_path.exists() and not resuming:
+        raise ValueError("refusing to overwrite a completed World Memory Package observation")
+    if after_path.exists():
+        raise ValueError("refusing to overwrite a completed World Memory Package observation")
+    if resuming and spec.interrupted_run_git_head is None:
+        raise ValueError("an interrupted exercise requires its original git head to resume")
+    if not resuming and spec.interrupted_run_git_head is not None:
+        raise ValueError("an original git head is valid only when resuming an interrupted exercise")
 
     store = LocalContentAddressedStore(store_root)
     owner_database = Database(spec.database_url)
@@ -120,8 +137,14 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
 
     with owner_database.session(spec.workspace_id) as connection:
         repository = IngestRepository(connection, spec.workspace_id)
-        target = _target(repository, spec)
-        occurrence_id, named = _install_simulated_identity(repository, spec, target)
+        target = _target(repository, spec, require_clean=not resuming)
+        if resuming:
+            occurrence_id, named, tombstone_id = _existing_simulated_identity(
+                connection, spec
+            )
+        else:
+            occurrence_id, named = _install_simulated_identity(repository, spec, target)
+            tombstone_id = None
         dependencies = _dependencies(connection, spec.workspace_id, named.entity_id, store)
         if not any(
             item["target_kind"] == "artifact"
@@ -136,27 +159,31 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
         ):
             raise RuntimeError("the confirmed synthetic occurrence did not reach its scene")
 
-        before_graph = _graph_state(connection, spec, store)
-        before_package = _project_package(
-            connection,
-            spec,
-            before_path,
-            signing_key,
-            parent=None,
-        )
         retained_controls = _retained_controls(
             connection,
             spec,
             store,
             dependencies,
         )
-
-        tombstone_id = repository.insert_tombstone(
-            scope="entity",
-            entity_id=named.entity_id,
-            requested_by=spec.actor_id,
-            reason="synthetic evaluation subject withdrew from derivative use",
-        )
+        if resuming:
+            before_package = _read_package(before_path)
+            before_graph = _graph_from_package(before_path, spec)
+        else:
+            before_graph = _graph_state(connection, spec, store)
+            before_package = _project_package(
+                connection,
+                spec,
+                before_path,
+                signing_key,
+                parent=None,
+            )
+            tombstone_id = repository.insert_tombstone(
+                scope="entity",
+                entity_id=named.entity_id,
+                requested_by=spec.actor_id,
+                reason="synthetic evaluation subject withdrew from derivative use",
+            )
+        assert tombstone_id is not None
         withdrawal_receipt = _withdrawal_receipt(connection, tombstone_id)
         immediate_graph = _graph_state(connection, spec, store)
         late_publish_refusal = _late_publication_refusal(repository, spec.scene_id)
@@ -203,7 +230,9 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
             "result, or a consent event."
         ),
         "source_build": {
-            "git_head": spec.git_head,
+            "exercise_started_git_head": spec.interrupted_run_git_head or spec.git_head,
+            "record_completed_git_head": spec.git_head,
+            "interrupted_and_resumed": resuming,
             "repository_dirty": True,
             "measured_implementation_scope_dirty": False,
         },
@@ -261,6 +290,18 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
                 "The browser disappearance observation is retained separately after this "
                 "database and object-store exercise."
             ),
+            *(
+                [
+                    (
+                        "The first evaluator process stopped after the tombstone commit when its "
+                        "late-write probe caught the database exception below the repository's "
+                        "domain-error boundary. No purge job ran before the corrected evaluator "
+                        "resumed the durable tombstone and queue."
+                    )
+                ]
+                if resuming
+                else []
+            ),
         ],
     }
     record_bytes = canonical_json(record)
@@ -275,7 +316,10 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
 
 
 def _target(
-    repository: IngestRepository, spec: PersonWithdrawalExercise
+    repository: IngestRepository,
+    spec: PersonWithdrawalExercise,
+    *,
+    require_clean: bool,
 ) -> dict[str, Any]:
     connection = repository.connection
     row = connection.execute(
@@ -340,7 +384,7 @@ def _target(
         "and class='person'",
         (spec.workspace_id, spec.capture_id),
     ).fetchone()
-    if existing is None or int(existing["n"]) != 0:
+    if require_clean and (existing is None or int(existing["n"]) != 0):
         raise ValueError("the target already has a person occurrence and is not a clean fixture")
 
     point_maps = {
@@ -373,7 +417,7 @@ def _install_simulated_identity(
     repository: IngestRepository,
     spec: PersonWithdrawalExercise,
     target: dict[str, Any],
-) -> tuple[uuid.UUID, Any]:
+) -> tuple[uuid.UUID, _SyntheticIdentity]:
     row = repository.connection.execute(
         "select s.span_id,r.run_id from capture c "
         "join evidence_span s on s.blob_sha256=c.blob_sha256 "
@@ -414,7 +458,41 @@ def _install_simulated_identity(
         display_name="Synthetic Withdrawal Fixture Subject",
         actor=spec.actor_id,
     )
-    return occurrence_id, named
+    return occurrence_id, _SyntheticIdentity(
+        entity_id=named.entity_id,
+        link_id=named.link_id,
+        assertion_id=named.assertion_id,
+    )
+
+
+def _existing_simulated_identity(
+    connection: psycopg.Connection,
+    spec: PersonWithdrawalExercise,
+) -> tuple[uuid.UUID, _SyntheticIdentity, uuid.UUID]:
+    row = connection.execute(
+        "select o.occurrence_id,l.entity_id,l.link_id,a.assertion_id,t.tombstone_id "
+        "from occurrence o join entity_link l on l.workspace_id=o.workspace_id "
+        "and l.occurrence_id=o.occurrence_id and l.state='confirmed' "
+        "join assertion a on a.workspace_id=o.workspace_id "
+        "and a.subject_ref->>'type'='entity' "
+        "and a.subject_ref->>'id'=l.entity_id::text "
+        "join predicate p on p.predicate_id=a.predicate_id and p.key='name_is' "
+        "join tombstone t on t.workspace_id=o.workspace_id and t.scope='entity' "
+        "and t.entity_id=l.entity_id where o.workspace_id=%s and o.capture_id=%s "
+        "and o.detector_version=%s order by t.effective_at desc limit 1",
+        (spec.workspace_id, spec.capture_id, _SIMULATION_PROFILE),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("the interrupted exercise has no durable simulated withdrawal state")
+    return (
+        row["occurrence_id"],
+        _SyntheticIdentity(
+            entity_id=row["entity_id"],
+            link_id=row["link_id"],
+            assertion_id=row["assertion_id"],
+        ),
+        row["tombstone_id"],
+    )
 
 
 def _dependencies(
@@ -483,15 +561,65 @@ def _project_package(
         parent_merkle_root_sha256=parent,
     )
     reconstruction = json.loads((output / "reconstruction/artifacts.json").read_bytes())
+    graph = json.loads((output / "memory/graph.json").read_bytes())
     return {
         "profile_version": "exulanica-wmp-1.0",
         "merkle_root_sha256": result.merkle_root_sha256,
         "manifest_sha256": result.manifest_sha256,
         "signing_public_key_sha256": result.signing_public_key_sha256,
         "scene_count": len(reconstruction["scenes"]),
-        "rung_claim_count": len(reconstruction["rung_claims"]),
+        "scene_rung_claim_count": sum(
+            item["predicate"] == "reconstruction_scene_rung_is"
+            for item in graph["assertions"]
+        ),
+        "all_reconstruction_rung_claim_count": len(reconstruction["rung_claims"]),
         "artifact_descriptor_count": len(reconstruction["items"]),
         "local_output_name": output.name,
+    }
+
+
+def _read_package(output: Path) -> dict[str, Any]:
+    manifest_bytes = (output / "wmp/manifest.json").read_bytes()
+    manifest = json.loads(manifest_bytes)
+    signature = json.loads((output / "wmp/signature.json").read_bytes())
+    reconstruction = json.loads((output / "reconstruction/artifacts.json").read_bytes())
+    graph = json.loads((output / "memory/graph.json").read_bytes())
+    public_key = base64.b64decode(signature["public_key_base64"])
+    return {
+        "profile_version": manifest["profile_version"],
+        "merkle_root_sha256": manifest["merkle_root_sha256"],
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "signing_public_key_sha256": hashlib.sha256(public_key).hexdigest(),
+        "scene_count": len(reconstruction["scenes"]),
+        "scene_rung_claim_count": sum(
+            item["predicate"] == "reconstruction_scene_rung_is"
+            for item in graph["assertions"]
+        ),
+        "all_reconstruction_rung_claim_count": len(reconstruction["rung_claims"]),
+        "artifact_descriptor_count": len(reconstruction["items"]),
+        "local_output_name": output.name,
+    }
+
+
+def _graph_from_package(output: Path, spec: PersonWithdrawalExercise) -> dict[str, Any]:
+    reconstruction = json.loads((output / "reconstruction/artifacts.json").read_bytes())
+    graph = json.loads((output / "memory/graph.json").read_bytes())
+    scene_rungs = sum(
+        item["predicate"] == "reconstruction_scene_rung_is"
+        for item in graph["assertions"]
+    )
+    if len(reconstruction["scenes"]) != 1 or scene_rungs != 1:
+        raise RuntimeError(
+            "the interrupted pre-withdrawal package is not the exact one-scene state"
+        )
+    return {
+        "scene_ids": [str(spec.scene_id)],
+        "scene_count": 1,
+        "rung_scene_ids": [str(spec.scene_id)],
+        "rung_count": 1,
+        "target_scene_present": True,
+        "target_rung_present": True,
+        "recovered_from_signed_pre_withdrawal_package": True,
     }
 
 
@@ -573,11 +701,21 @@ def _late_publication_refusal(
                 byte_size=1,
                 produced_by_event=None,
             )
+    except TombstonedError as error:
+        cause = error.__cause__
+        sqlstate = cause.sqlstate if isinstance(cause, psycopg.Error) else None
+        return {
+            "refused": True,
+            "error_class": type(error).__name__,
+            "sqlstate": sqlstate,
+            "reason": str(error).splitlines()[0],
+        }
     except psycopg.IntegrityError as error:
         return {
             "refused": True,
+            "error_class": type(error).__name__,
             "sqlstate": error.sqlstate,
-            "reason": error.diag.message_primary,
+            "reason": error.diag.message_primary or str(error).splitlines()[0],
         }
     raise RuntimeError("a late scene artifact published after person withdrawal")
 
@@ -664,11 +802,14 @@ def _require_success(
     failures = []
     if not before_graph["target_scene_present"] or not before_graph["target_rung_present"]:
         failures.append("target scene or rung was absent before withdrawal")
-    if before_package["scene_count"] < 1 or before_package["rung_claim_count"] < 1:
+    if before_package["scene_count"] < 1 or before_package["scene_rung_claim_count"] < 1:
         failures.append("World Memory Package lacked the live scene before withdrawal")
     if immediate_graph["target_scene_present"] or immediate_graph["target_rung_present"]:
         failures.append("graph or rung still served the withdrawn scene")
-    if after_package["scene_count"] != 0 or after_package["rung_claim_count"] != 0:
+    if (
+        after_package["scene_count"] != 0
+        or after_package["scene_rung_claim_count"] != 0
+    ):
         failures.append("World Memory Package retained the withdrawn scene")
     if not late_refusal["refused"] or "tombstoned" not in late_refusal["reason"]:
         failures.append("late publication was not refused by the tombstone guard")
