@@ -81,6 +81,7 @@ import { createCompanionController } from './companion.js';
 import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
+import { buildEmptyWorld } from './ui/empty-world.js';
 import { el, replace } from './ui/dom.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
@@ -537,6 +538,27 @@ async function mount(): Promise<void> {
   // Rebuilding it would discard the memory of what has already been asked, and the Companion
   // would open every refresh by asking the question the user just answered.
   currentCompanion.observeSnapshot(current);
+
+  const emptyWorld = buildEmptyWorld(current);
+  if (emptyWorld !== null) {
+    // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
+    // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
+    mountedCompanionStage?.dispose();
+    mountedCompanionStage = null;
+    stopWatching?.();
+    stopWatching = null;
+    mountListeners?.abort();
+    mountListeners = null;
+    atlas?.dispose();
+    atlas = null;
+    settingsStylePreviewId = null;
+    canvas!.hidden = true;
+    shell!.setAttribute('data-world-state', 'empty');
+    replace(shell!, [emptyWorld]);
+    return;
+  }
+  canvas!.hidden = false;
+  shell!.removeAttribute('data-world-state');
 
   const built = buildScene(
     current,

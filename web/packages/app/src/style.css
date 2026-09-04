@@ -43,6 +43,10 @@ body {
   z-index: 0;
 }
 
+#atlas[hidden] {
+  display: none;
+}
+
 /*
  * THE WORLD IS THE PRODUCT. The shell is a layer of chrome floating over it, not a frame it sits
  * inside.
@@ -88,6 +92,48 @@ body {
     color-mix(in srgb, var(--ui-vignette) 88%, transparent) 118%
   );
   transition: opacity var(--motion-standard) var(--motion-easing);
+}
+
+/* A graph with no live regions has no Atlas scene. This is a complete state rather than an
+ * error overlay: the renderer is disposed and the retained-source boundary is stated without
+ * implying that source retention and live reconstruction are the same policy. */
+.atlas-empty {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: max(2rem, 8vw);
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--raised) 56%, transparent), transparent 42%),
+    var(--ground);
+}
+
+.atlas-empty-kicker,
+.atlas-empty-note,
+.atlas-empty h1 {
+  margin: 0;
+}
+
+.atlas-empty-kicker {
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.atlas-empty h1 {
+  max-width: 18ch;
+  font: 500 clamp(1.8rem, 4vw, 3.4rem)/1.05 var(--ui-font-display);
+  letter-spacing: -0.025em;
+}
+
+.atlas-empty-note {
+  max-width: 46rem;
+  color: var(--ink-faint);
 }
 
 #shell[data-mode='traverse'][data-moving='true'][data-vignette='subtle']::after { opacity: 0.28; }
