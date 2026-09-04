@@ -1,0 +1,67 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.depth-image-forward-smoke/v1",
+    "measured_at": "2026-09-04T22:14:17Z",
+    "corpus_class": "synthetic",
+    "notice": "Image compatibility evidence only. This is not a benchmark or personal-media acceptance run.",
+    "source": {
+      "source_manifest_sha256": "a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f",
+      "source_image_sha256": "c080d6d58a9b0a67f9c4a7de85b0720ddb8c696ff5bab8406aa667a00e065820",
+      "synthetic_marking": "SYNTHETIC EXULANICA MULTI-VIEW FIXTURE"
+    },
+    "source_build": {
+      "code_revision": "4c8a87778af24966bf896906f3ee7d5d323c86ac",
+      "repository_dirty": true,
+      "included_image_source_dirty": false,
+      "included_paths": [
+        "Dockerfile",
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "exulanica",
+        "pyproject.toml",
+        "uv.lock"
+      ]
+    },
+    "runtime_image": {
+      "image_id": "sha256:b6fe271f7ebc714268806c5513b63453979cc45d5b2445183b56b5e07f479d99",
+      "os": "linux",
+      "architecture": "amd64",
+      "machine_reported": "x86_64",
+      "byte_size": 5483317747,
+      "user": "exulanica",
+      "python_platform": "Linux-6.4.16-linuxkit-x86_64-with-glibc2.41",
+      "torch_version": "2.13.0+cu130",
+      "cuda_available": false
+    },
+    "checkpoint": {
+      "model_id": "Ruicheng/moge-2-vitl",
+      "revision": "39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+      "cached_bytes": 1305030700,
+      "offline_load": true,
+      "device": "cpu"
+    },
+    "result": {
+      "width_px": 512,
+      "height_px": 384,
+      "point_count": 196608,
+      "valid_count": 196583,
+      "metric": true,
+      "fov_y_millidegrees": 39693,
+      "checkpoint_load_milliseconds": 200250,
+      "inference_milliseconds": 93171
+    },
+    "execution": {
+      "production_adapter": "exulanica.reconstruction.moge.MoGeDepthModel",
+      "production_worker_orchestration": false,
+      "network_enabled_for_checkpoint": false
+    },
+    "limitations": [
+      "The amd64 container ran under Apple Silicon instruction emulation, so its timings do not represent a production host.",
+      "No GPU was available and the model ran on CPU.",
+      "The direct production adapter was exercised to close the image execution gap; normal queued orchestration was exercised separately on native MPS.",
+      "Torch reported that CPU autocast to float32 is unsupported and disabled autocast. The forward pass completed."
+    ]
+  },
+  "record_sha256": "1c31b75940435eb19e6c39df91088403ee32a56d8afbd14a2e1537282e044143"
+}

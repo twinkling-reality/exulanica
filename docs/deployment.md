@@ -86,6 +86,19 @@ and torch correctly reported CUDA unavailable on the non-GPU host. This verifies
 import closures, not model inference: no chosen production host or authorized dense capture was
 available, and the 1.3 GB checkpoint was neither fetched nor exercised in this verification.
 
+**VERIFIED 2026-09-04, actual depth forward path.** A later current `linux/amd64` depth image at
+commit `4c8a87778af24966bf896906f3ee7d5d323c86ac` is 5,483,317,747 bytes and has image ID
+`sha256:b6fe271f7ebc714268806c5513b63453979cc45d5b2445183b56b5e07f479d99`.
+The non-root image loaded `Ruicheng/moge-2-vitl` at exact revision
+`39c4d5e957afe587e04eec59dc2bcc3be5ecd968` from a read-only cache with network loading disabled,
+then executed the production `MoGeDepthModel` adapter on one exact 800 by 600 synthetic campaign
+frame. It produced 196,608 points at the production 512 by 384 model size, with 196,583 valid
+points, a metric output flag, and a 39.693069 degree vertical field of view. The run used Torch
+2.13.0+cu130 on CPU because CUDA was unavailable. Under Apple Silicon instruction emulation it
+took 200.25 seconds to load and 93.17 seconds to infer, which is compatibility evidence and not a
+production-host performance result. The digest-bound machine record is
+[`evaluation/2026-09-04-linux-amd64-depth-forward.json`](evaluation/2026-09-04-linux-amd64-depth-forward.json).
+
 ---
 
 ## 2. Topology
