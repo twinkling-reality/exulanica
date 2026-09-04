@@ -195,6 +195,7 @@ select distinct on (c.capture_id)
    and a.content_sha256 is not null
    and a.byte_size is not null
    and not tombstone_blocks_capture(a.workspace_id, c.capture_id)
+   and not person_withdrawal_blocks_artifact(a.workspace_id, a.artifact_id)
    and not exists (
      select 1 from reconstruction_scene_member m
       where m.workspace_id = a.workspace_id
@@ -342,10 +343,15 @@ def read_point_map(
         _LIVE_HOLDER, (workspace, bytes(row["source_blob_sha256"]))
     ).fetchone()
     assert holder is not None
-    if row["purged_at"] is not None or not holder["live"]:
+    withdrawn = connection.execute(
+        "select person_withdrawal_blocks_artifact(%s, %s) as blocked",
+        (workspace, artifact_id),
+    ).fetchone()
+    assert withdrawn is not None
+    if row["purged_at"] is not None or not holder["live"] or withdrawn["blocked"]:
         raise TombstonedError(
-            f"geometry {artifact_id} was deleted. It was derived from a photograph this "
-            "workspace no longer holds, or its bytes have already been destroyed."
+            f"geometry {artifact_id} was deleted. Its photograph is gone, a confirmed person "
+            "withdrew, or its bytes have already been destroyed."
         )
     # `store.get` re-hashes what it read against the key it was asked for, and that key is the
     # artifact's own recorded content hash. So the bytes leaving this function are the bytes the

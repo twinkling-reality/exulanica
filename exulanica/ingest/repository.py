@@ -394,6 +394,8 @@ class IngestRepository:
         capture_id: uuid.UUID | None = None,
         track_key: str | None = None,
         interval_ns: Sequence[tuple[int, int]] | None = None,
+        entity_id: uuid.UUID | None = None,
+        assertion_id: uuid.UUID | None = None,
         reason: str | None = None,
         blocklist_hash: bool = False,
     ) -> uuid.UUID:
@@ -405,6 +407,8 @@ class IngestRepository:
             capture_id=capture_id,
             track_key=track_key,
             interval_ns=interval_ns,
+            entity_id=entity_id,
+            assertion_id=assertion_id,
             reason=reason,
             blocklist_hash=blocklist_hash,
         )

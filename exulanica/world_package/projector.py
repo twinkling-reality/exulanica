@@ -228,7 +228,10 @@ def _project_components(
         "select o.occurrence_id,o.capture_id,o.class,o.primary_span_id,o.span_ids,o.presence,"
         "o.detector_version,o.quality,o.identity_key from occurrence o "
         "join capture c using(capture_id) "
-        "where c.deleted_at is null order by o.occurrence_id"
+        "where c.deleted_at is null and not exists ("
+        "select 1 from entity_link withdrawn join entity e using(entity_id) "
+        "where withdrawn.occurrence_id=o.occurrence_id and withdrawn.state='confirmed' "
+        "and e.deleted_at is not null) order by o.occurrence_id"
     ).fetchall()
     entities = cursor.execute(
         "select entity_id,class,display_name,merged_into,created_at from entity "
@@ -326,7 +329,8 @@ def _project_components(
         "a.content_sha256,a.byte_size,a.superseded_by,a.purged_at,a.needs_repair,a.scene_id "
         "from artifact a where a.workspace_id=%s and ("
         "(a.scene_id is null and exists (select 1 from capture c "
-        " where c.blob_sha256=a.source_blob_sha256 and c.deleted_at is null)) "
+        " where c.blob_sha256=a.source_blob_sha256 and c.deleted_at is null) "
+        " and not person_withdrawal_blocks_artifact(a.workspace_id,a.artifact_id)) "
         "or exists (select 1 from reconstruction_scene s "
         "left join reconstruction_scene_job j on j.workspace_id=s.workspace_id "
         "and j.job_id=s.current_job_id where s.workspace_id=a.workspace_id "

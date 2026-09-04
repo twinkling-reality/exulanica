@@ -31,6 +31,11 @@ def occurrence_rows(connection: psycopg.Connection, workspace: uuid.UUID) -> lis
         "left join entity_link l on l.occurrence_id = o.occurrence_id "
         "  and l.state = any(array['confirmed','auto_provisional']::link_state[]) "
         "where o.workspace_id = %s and c.deleted_at is null "
+        "and not exists (select 1 from entity_link withdrawn "
+        "  join entity e on e.entity_id = withdrawn.entity_id "
+        "  where withdrawn.workspace_id = o.workspace_id "
+        "    and withdrawn.occurrence_id = o.occurrence_id "
+        "    and withdrawn.state = 'confirmed' and e.deleted_at is not null) "
         "order by o.occurrence_id",
         (workspace,),
     ).fetchall()
@@ -82,7 +87,13 @@ def proposal_rows(connection: psycopg.Connection, workspace: uuid.UUID) -> list[
         "                   jsonb_array_elements_text(m.basis -> 'modalities')), '{}'::text[]) "
         "                  <@ r.basis_modalities)) as refused "
         "from match_proposal m join occurrence o on o.occurrence_id = m.occurrence_id "
-        "where m.workspace_id = %s "
+        "join entity proposed on proposed.entity_id = m.entity_id "
+        "where m.workspace_id = %s and proposed.deleted_at is null "
+        "and not exists (select 1 from entity_link withdrawn "
+        "  join entity e on e.entity_id = withdrawn.entity_id "
+        "  where withdrawn.workspace_id = o.workspace_id "
+        "    and withdrawn.occurrence_id = o.occurrence_id "
+        "    and withdrawn.state = 'confirmed' and e.deleted_at is not null) "
         "order by m.occurrence_id, m.rank",
         (workspace,),
     ).fetchall()

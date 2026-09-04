@@ -52,10 +52,11 @@ _SECOND = b"point map for the second photograph"
 class Delivered:
     """A workspace with two photographs, a point map for each, and an app in front of them."""
 
-    def __init__(self, client, repository, store, first, second) -> None:
+    def __init__(self, client, repository, store, database, first, second) -> None:
         self.client = client
         self.repository = repository
         self.store = store
+        self.database = database
         self.first = first
         self.second = second
 
@@ -129,7 +130,9 @@ def delivered(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
     with TestClient(app) as client:
         # `written` is in ingest order, which is second then first. The names below are the
         # photographs' own order in time, which is what the route is documented to return.
-        yield Delivered(client, repository, store, first=written[1], second=written[0])
+        yield Delivered(
+            client, repository, store, database, first=written[1], second=written[0]
+        )
 
 
 # -- what the route is for ------------------------------------------------------------------
@@ -371,53 +374,126 @@ def test_bytes_that_no_longer_hash_to_their_key_are_refused_loudly(delivered):
 # -- the gaps this work found, pinned so that closing one is visible -------------------------
 
 
-def test_a_person_scoped_withdrawal_reaches_no_derivative(delivered):
-    """PINS A GAP. ADR-0009's note, made executable, in the two places it is actually visible.
+def test_a_person_scoped_withdrawal_reaches_every_recorded_derivative(delivered):
+    """The person vanishes, their geometry and vector are purged, and the source remains."""
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.deletion.worker import PurgeWorker
+    from exulanica.epistemics.assertions import AssertionWriter
+    from exulanica.identity import IdentityRepository, name_occurrence
 
-    ``domain-and-evidence-model.md`` section 6.4 specifies an entity cascade: deleting a person
-    soft-marks "entity, links, proposals, entity-level aggregates" and physically purges
-    "entity-level embeddings and exemplars, display name". None of that happens, and this asserts
-    the two facts that make it so:
+    connection = delivered.repository.connection
+    workspace = delivered.repository.workspace_id
+    capture = delivered.sql(
+        "select capture_id from capture where workspace_id=%s and blob_sha256=%s",
+        workspace,
+        delivered.first[1].digest,
+    )[0]["capture_id"]
+    span = delivered.sql(
+        "select span_id from evidence_span where workspace_id=%s and blob_sha256=%s "
+        "order by span_id limit 1",
+        workspace,
+        delivered.first[1].digest,
+    )[0]["span_id"]
+    run_id = delivered.sql(
+        "select run_id from pipeline_run where workspace_id=%s order by started_at limit 1",
+        workspace,
+    )[0]["run_id"]
+    occurrence = connection.execute(
+        "insert into occurrence (workspace_id,capture_id,class,primary_span_id,span_ids,presence,"
+        "produced_by_run,detector_version,identity_key,emit_key) values "
+        "(%s,%s,'person',%s,array[%s]::uuid[],'{[0,1)}'::int8multirange,%s,'test',%s,%s) "
+        "returning occurrence_id",
+        (workspace, capture, span, span, run_id, bytes([71]) * 32, f"person:{uuid.uuid4()}"),
+    ).fetchone()["occurrence_id"]
+    named = name_occurrence(
+        IdentityRepository(connection, workspace),
+        AssertionWriter(connection, workspace),
+        occurrence_id=occurrence,
+        display_name="Withdrawn Person",
+        actor=uuid.uuid4(),
+    )
+    derived = uuid.uuid4()
+    connection.execute(
+        "insert into derived_artifact (derived_id,workspace_id,kind,depends_on,dep_index,payload) "
+        "values (%s,%s,'entity_exemplars','[]'::jsonb,%s::text[],'{}'::jsonb)",
+        (derived, workspace, [f"entity:{named.entity_id}"]),
+    )
+    provision_workspace(connection, workspace)
+    embedding = connection.execute(
+        "insert into embedding (workspace_id,family,ref_type,ref_id,model_ref,pipeline_version,"
+        "dims,v) values (%s,'face','occurrence',%s,'test',1,4096,%s) returning embedding_id",
+        (workspace, occurrence, "[" + ",".join(["0.5"] * 4096) + "]"),
+    ).fetchone()["embedding_id"]
 
-    *   **The product cannot express the request.** ``IngestRepository.insert_tombstone`` takes no
-        ``entity_id``, and ``tombstone`` constrains ``scope = 'entity'`` to name one, so no code
-        path in this repository can write an entity-scope tombstone at all.
-    *   **Written directly, it enqueues nothing.** Migration 0015's trigger returns early for any
-        scope but ``capture`` and ``workspace``, so no purge job exists and nothing is destroyed.
+    before = delivered.get("/graph").json()
+    assert any(row["entity_id"].endswith(str(named.entity_id)) for row in before["entities"])
+    assert delivered.get(f"/geometry/{delivered.first[0]}").status_code == 200
 
-    This is correct for the photograph and for its geometry: "Entity deletion is not media
-    deletion", which section 6.4 lists among the consequences that "must not be softened". It is
-    not correct for the entity-level derivatives that section promises to destroy. The gap is
-    recorded in that section under CORRECTED. **When it is closed, this test fails**, which is the
-    right moment for somebody to be reading it.
-    """
-    import inspect
-
-    from exulanica.ingest.repository import IngestRepository
-
-    signature = inspect.signature(IngestRepository.insert_tombstone)
-    assert "entity_id" not in signature.parameters, (
-        "insert_tombstone can now express an entity scope. Check that the purge cascade reaches "
-        "the entity-level derivatives domain-and-evidence-model.md 6.4 promises, and rewrite "
-        "this test and that section's CORRECTED note together."
+    tombstone = delivered.repository.insert_tombstone(
+        scope="entity",
+        entity_id=named.entity_id,
+        requested_by=uuid.uuid4(),
+        reason="the person withdrew",
     )
 
-    entity = delivered.sql("select entity_id from entity limit 1")
-    tombstone = delivered.repository.connection.execute(
-        "insert into tombstone (workspace_id, scope, entity_id, requested_by, reason) "
-        "values (%s, 'entity', %s, %s, 'the person withdrew') returning tombstone_id",
-        (
-            delivered.repository.workspace_id,
-            entity[0]["entity_id"] if entity else uuid.uuid4(),
-            uuid.uuid4(),
-        ),
-    ).fetchone()["tombstone_id"]
+    after = delivered.get("/graph").json()
+    assert not any(row["entity_id"].endswith(str(named.entity_id)) for row in after["entities"])
+    assert not any(
+        row["occurrence_id"].endswith(str(occurrence)) for row in after["occurrences"]
+    )
+    assert delivered.get(f"/geometry/{delivered.first[0]}").status_code == 410
+    assert delivered.get(f"/geometry/{delivered.second[0]}").status_code == 200
+    assert delivered.sql(
+        "select stale from derived_artifact where derived_id=%s", derived
+    )[0]["stale"]
+    assert delivered.sql(
+        "select status from assertion where assertion_id=%s", named.assertion_id
+    )[0]["status"] == "retracted"
 
+    jobs = delivered.sql(
+        "select target_kind,target_ref from purge_job where tombstone_id=%s order by target_kind",
+        tombstone,
+    )
+    assert {row["target_kind"] for row in jobs} == {"artifact", "embedding"}
+    assert any(row["target_ref"] == str(embedding) for row in jobs)
+    receipt = delivered.sql(
+        "select record,canonical_bytes,record_digest from person_withdrawal_receipt "
+        "where tombstone_id=%s",
+        tombstone,
+    )[0]
+    assert hashlib.sha256(bytes(receipt["canonical_bytes"])).digest() == bytes(
+        receipt["record_digest"]
+    )
+    assert receipt["record"]["source_capture_policy"] == "retained"
+
+    outcome = PurgeWorker(
+        delivered.database,
+        delivered.store,
+        frozenset({workspace}),
+        require_cross_workspace_view=False,
+    ).drain()
+    assert outcome.failed == 0
+    assert outcome.skipped == 0
+    assert not delivered.store.exists(BlobId.of_bytes(_FIRST))
+    assert delivered.sql(
+        "select purged_at from artifact where workspace_id=%s and artifact_id=%s",
+        workspace,
+        delivered.first[0],
+    )[0]["purged_at"] is not None
     assert not delivered.sql(
-        "select purge_id from purge_job where tombstone_id = %s", tombstone
-    ), "an entity tombstone now enqueues work; see this test's docstring"
-    # And the photograph, and its geometry, are still there. That part is by design.
-    assert delivered.get(f"/geometry/{delivered.first[0]}").status_code == 200
+        "select embedding_id from embedding where workspace_id=%s and embedding_id=%s",
+        workspace,
+        embedding,
+    )
+    assert delivered.sql(
+        "select deleted_at from capture where workspace_id=%s and capture_id=%s",
+        workspace,
+        capture,
+    )[0]["deleted_at"] is None
+    assert delivered.sql(
+        "select purged_at from blob where blob_sha256=%s", delivered.first[1].digest
+    )[0]["purged_at"] is None
+    assert delivered.store.exists(delivered.first[1])
 
 
 def test_a_pose_job_directory_is_not_an_artifact_and_no_tombstone_reaches_it(tmp_path):

@@ -862,6 +862,115 @@ def test_the_scene_rung_read_withdraws_the_claim_after_any_member_is_deleted(sce
     assert scene_rung_rows(scene.repository.connection, scene.workspace_id) == []
 
 
+def test_person_withdrawal_reaches_unregistered_members_and_every_scene_build(scene, tmp_path):
+    """A confirmed person in an unregistered frame withdraws every build, but not its source."""
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.epistemics.assertions import AssertionWriter
+    from exulanica.identity import IdentityRepository, name_occurrence
+
+    capture = scene.captures[1]
+    row = scene.one(
+        "select c.blob_sha256,s.span_id from capture c join evidence_span s "
+        "on s.workspace_id=c.workspace_id and s.blob_sha256=c.blob_sha256 "
+        "where c.workspace_id=%s and c.capture_id=%s order by s.span_id limit 1",
+        scene.workspace_id,
+        capture,
+    )
+    run = scene.one(
+        "select run_id from pipeline_run where workspace_id=%s order by started_at limit 1",
+        scene.workspace_id,
+    )
+    occurrence = scene.repository.connection.execute(
+        "insert into occurrence (workspace_id,capture_id,class,primary_span_id,span_ids,presence,"
+        "produced_by_run,detector_version,identity_key,emit_key) values "
+        "(%s,%s,'person',%s,array[%s]::uuid[],'{[0,1)}'::int8multirange,%s,'test',%s,%s) "
+        "returning occurrence_id",
+        (
+            scene.workspace_id,
+            capture,
+            row["span_id"],
+            row["span_id"],
+            run["run_id"],
+            bytes([73]) * 32,
+            f"person:{uuid.uuid4()}",
+        ),
+    ).fetchone()["occurrence_id"]
+    named = name_occurrence(
+        IdentityRepository(scene.repository.connection, scene.workspace_id),
+        AssertionWriter(scene.repository.connection, scene.workspace_id),
+        occurrence_id=occurrence,
+        display_name="Person In Unregistered Frame",
+        actor=uuid.uuid4(),
+    )
+    provision_workspace(scene.repository.connection, scene.workspace_id)
+    embedding = scene.repository.connection.execute(
+        "insert into embedding (workspace_id,family,ref_type,ref_id,model_ref,pipeline_version,"
+        "dims,v) values (%s,'face','occurrence',%s,'test',1,4096,%s) returning embedding_id",
+        (
+            scene.workspace_id,
+            occurrence,
+            "[" + ",".join(["0.5"] * 4096) + "]",
+        ),
+    ).fetchone()["embedding_id"]
+    rung_id, _decision = _record_gate_rung(scene, scene.scene_id, run["run_id"])
+    older_receipt = scene.receipt_digest
+    newer_payload = b"a superseding build over the same three photographs"
+    newer_artifact = _insert_scene_artifact(scene, scene.scene_id, newer_payload)
+    newer_receipt = BlobId.of_bytes(newer_payload)
+    source_blob = BlobId(bytes(row["blob_sha256"]))
+    source_point_map = scene.one(
+        "select a.artifact_id,a.content_sha256 from artifact a join capture c "
+        "on c.workspace_id=a.workspace_id and c.blob_sha256=a.source_blob_sha256 "
+        "where c.capture_id=%s and a.kind='point_map'",
+        capture,
+    )
+
+    tombstone = scene.repository.insert_tombstone(
+        scope="entity",
+        entity_id=named.entity_id,
+        requested_by=uuid.uuid4(),
+        reason="the person withdrew from reconstruction",
+    )
+
+    assert scene.blocked()
+    assert scene_rung_rows(scene.repository.connection, scene.workspace_id) == []
+    assert scene.one("select status from assertion where assertion_id=%s", rung_id)[
+        "status"
+    ] == "retracted"
+    queued = {
+        row["target_ref"]
+        for row in scene.rows(
+            "select target_ref from purge_job where tombstone_id=%s and target_kind='artifact'",
+            tombstone,
+        )
+    }
+    assert older_receipt.hex in queued
+    assert newer_receipt.hex in queued
+    assert bytes(source_point_map["content_sha256"]).hex() in queued
+
+    outcome = scene.worker().drain()
+    assert outcome.blocked is None, outcome.blocked
+    assert outcome.failed == 0, outcome.errors
+    assert not scene.store.exists(older_receipt)
+    assert not scene.store.exists(newer_receipt)
+    assert not scene.store.exists(BlobId(bytes(source_point_map["content_sha256"])))
+    assert scene.one(
+        "select count(*) as n from embedding where workspace_id=%s and embedding_id=%s",
+        scene.workspace_id,
+        embedding,
+    )["n"] == 0
+    assert scene.store.exists(source_blob)
+    assert scene.one("select deleted_at from capture where capture_id=%s", capture)[
+        "deleted_at"
+    ] is None
+    assert scene.one("select purged_at from artifact where artifact_id=%s", newer_artifact)[
+        "purged_at"
+    ] is not None
+    assert scene.reconstruction(scene.export(tmp_path / "after-person-withdrawal.wmp"))[
+        "scenes"
+    ] == []
+
+
 # -- the bytes ---------------------------------------------------------------------------------
 
 

@@ -180,6 +180,8 @@ def test_every_migration_is_a_single_transaction_with_no_down_path(migration):
         "reconstruction_privacy_admission",
         "reconstruction_privacy_admission_member",
         "reconstruction_privacy_screening",
+        "person_derivative_dependency",
+        "person_withdrawal_receipt",
     ],
 )
 def test_every_required_table_exists(table):

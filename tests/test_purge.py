@@ -519,11 +519,11 @@ def test_the_purge_role_cannot_reopen_the_leak_0011_closed(purged):
 
 
 def test_a_kind_this_worker_cannot_destroy_is_never_claimed(purged):
-    """`purge_job.target_kind` keeps four values and this worker handles two of them.
+    """An embedding job without an entity dependency is not destructive authority.
 
-    Claiming an `embedding` job means handing a uuid to `BlobId.from_hex`. Measured before the
-    filter: the job failed, and with the retry bound it would burn its attempts and leave the
-    tombstone permanently incomplete for a row nothing was ever going to destroy.
+    The worker handles embedding rows, but only when the queue row is bound through a durable
+    dependency to the entity tombstone that authorized it. A manually inserted target under a
+    capture tombstone stays unclaimed.
     """
     capture_id = purged.rows("select capture_id from capture")[0]["capture_id"]
     tombstone_id = purged.tombstone_the_capture(capture_id)
@@ -693,7 +693,7 @@ def test_the_truncate_refusal_is_policy_and_not_a_guarantee(purged):
 
 
 def test_no_runtime_role_can_delete_a_tombstone_or_its_queue(purged):
-    """The purger marks rows and destroys objects. It deletes no row, and it holds no DELETE."""
+    """Neither runtime role deletes audit rows; the purger's sole row DELETE is embedding."""
     for role, password in ((_APP_ROLE, _APP_PASSWORD), (_PURGE_ROLE, _PURGE_PASSWORD)):
         with purged.database(role=role, password=password).session(purged.workspace_id) as c:
             for table in ("tombstone", "purge_job", "capture", "artifact", "blob"):

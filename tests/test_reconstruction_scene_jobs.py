@@ -307,6 +307,78 @@ def test_deleting_any_pending_member_cancels_the_job(ingest_spine):
     )
 
 
+def test_late_confirmed_person_link_cancels_an_already_running_scene_job(repository):
+    """The dependency edge is backfilled when identity is decided after the job was queued."""
+    from exulanica.identity import IdentityRepository
+
+    captures = _captures(repository)
+    job_id, _ = _enqueue(repository, captures)
+    claimed = repository.claim_reconstruction_scene(worker="pose", lease_seconds=60)
+    assert claimed is not None
+    capture = repository.capture(captures[1])
+    assert capture is not None
+    span = repository.connection.execute(
+        "insert into evidence_span (workspace_id,blob_sha256,track_key,t_start_ns,t_end_ns,"
+        "modality,span_digest) values (%s,%s,'img',0,1,'still_image',%s) returning span_id",
+        (repository.workspace_id, capture.blob_id.digest, bytes([81]) * 32),
+    ).fetchone()["span_id"]
+    run_id = repository.connection.execute(
+        "insert into pipeline_run (workspace_id,trigger) values (%s,'manual') returning run_id",
+        (repository.workspace_id,),
+    ).fetchone()["run_id"]
+    occurrence = repository.connection.execute(
+        "insert into occurrence (workspace_id,capture_id,class,primary_span_id,span_ids,presence,"
+        "produced_by_run,detector_version,identity_key,emit_key) values "
+        "(%s,%s,'person',%s,array[%s]::uuid[],'{[0,1)}'::int8multirange,%s,'test',%s,%s) "
+        "returning occurrence_id",
+        (
+            repository.workspace_id,
+            captures[1],
+            span,
+            span,
+            run_id,
+            bytes([82]) * 32,
+            f"person:{uuid.uuid4()}",
+        ),
+    ).fetchone()["occurrence_id"]
+    identity = IdentityRepository(repository.connection, repository.workspace_id)
+    entity = identity.entities.create(entity_class="person")
+    identity.links.insert(
+        occurrence_id=occurrence,
+        entity_id=entity,
+        state="confirmed",
+        method="user_confirm",
+        basis_digest=bytes([83]) * 32,
+        decided_by=uuid.uuid4(),
+    )
+    assert repository.connection.execute(
+        "select 1 from person_derivative_dependency where workspace_id=%s and entity_id=%s "
+        "and target_kind='scene_job' and target_id=%s",
+        (repository.workspace_id, entity, job_id),
+    ).fetchone()
+
+    repository.insert_tombstone(
+        scope="entity",
+        entity_id=entity,
+        requested_by=uuid.uuid4(),
+        reason="withdraw from every reconstruction",
+    )
+
+    row = repository.connection.execute(
+        "select status,claim_token,failure_class from reconstruction_scene_job "
+        "where workspace_id=%s and job_id=%s",
+        (repository.workspace_id, job_id),
+    ).fetchone()
+    assert row == {
+        "status": "cancelled",
+        "claim_token": None,
+        "failure_class": "person_withdrawn",
+    }
+    assert repository.reconstruction_scene_cancelled_or_lost(
+        job_id=job_id, claim_token=claimed.claim_token
+    )
+
+
 def test_job_membership_cannot_be_changed_after_enqueue(repository):
     captures = _captures(repository)
     job_id, _ = _enqueue(repository, captures)

@@ -86,12 +86,9 @@ RETRY_AFTER: Final = dt.timedelta(minutes=15)
 #: silent incompletion corrections 3 and 13 were both about.
 MAX_ATTEMPTS: Final = 8
 
-#: The kinds this worker knows how to destroy. `purge_job.target_kind` also permits `embedding`
-#: and `text_chunk`, which are rows rather than stored objects and are out of scope for R18; the
-#: column keeps them so the day those are implemented it does not move. Claiming one here means
-#: handing a uuid to `BlobId.from_hex`: measured, that fails the job, and with the retry bound
-#: above it would burn its attempts and leave the tombstone permanently incomplete.
-DESTROYABLE_KINDS: Final = ("blob", "artifact")
+#: The kinds this worker knows how to destroy. Blob and artifact targets name stored object
+#: hashes. Embedding targets name a database row that only the purge role may delete.
+DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding")
 
 
 #: The policy `provision_purge_role` creates. Named here as well as there because this module is
@@ -162,12 +159,9 @@ class PurgeTarget:
     purge_id: uuid.UUID
     tombstone_id: uuid.UUID
     workspace_id: uuid.UUID
-    #: ``blob`` for an original, ``artifact`` for a derivative. The two are destroyed the same
-    #: way and are recorded on different tables, which is the only reason this is here.
+    #: ``blob`` and ``artifact`` name stored bytes. ``embedding`` names one sensitive vector row.
     target_kind: str
-    #: The content hash, hex. **Not a storage key and not a path.** The store computes the key
-    #: from the hash, so a queue row carrying a path would be a second opinion about where an
-    #: object lives, and the one that is wrong is the one that leaves bytes behind.
+    #: A lowercase content hash for stored bytes, or an embedding UUID. Never a storage path.
     target_ref: str
     attempts: int
     #: What the store was told when it was told to destroy this. Every field is mandatory on
@@ -203,6 +197,11 @@ def claim_purge(
         "  select pj.purge_id from purge_job pj "
         "   where pj.workspace_id = %s "
         "     and pj.target_kind = any(%s) "
+        "     and (pj.target_kind <> 'embedding' or exists ("
+        "       select 1 from tombstone t join person_derivative_dependency d "
+        "         on d.workspace_id=t.workspace_id and d.entity_id=t.entity_id "
+        "        and d.target_kind='embedding' and d.target_id=pj.target_ref::uuid "
+        "        where t.tombstone_id=pj.tombstone_id and t.scope='entity')) "
         "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "

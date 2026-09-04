@@ -378,7 +378,7 @@ is done, no claim is made here about range requests being on the browser path.
 | --- | --- | --- |
 | `exulanica_app` | select, insert, update. No delete anywhere. Select only on `predicate` and `schema_migrations` | Row-level security is inert for an owner, and a runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name |
 | `exulanica_ro` | select, and nothing else | The Selection executor runs a plan derived from model output. It must not be able to write whatever happened upstream of it |
-| `exulanica_purge` | A **cross-workspace read** of identifiers, content hashes and deletion markers on `capture` and `artifact`; update of `purged_at` and `storage_key` on `blob` and `artifact`; update of `state`, `attempts`, `attempted_at`, `last_error` and `completed_at` on `purge_job`; update of `purge_completed_at` on `tombstone`; **no delete on any table** | `blob` is not workspace-scoped, so two workspaces that ingest the same photograph share one object. A purger that could only see its own workspace answers "destroy these bytes" while another tenant still holds a live capture of them. Measured, and it is why this role exists |
+| `exulanica_purge` | A **cross-workspace read** of the narrow holder columns on `capture`, `artifact`, `reconstruction_scene_member`, and `person_derivative_dependency`; update of purge markers on `blob` and `artifact`; queue and completion updates; **DELETE on `embedding` only** | Stored bytes may be shared across workspaces, so the destroy decision needs every holder. A person vector has no harmless stub representation, so the dedicated purger removes that row while every other table remains outside its DELETE authority |
 
 Every UPDATE in that row is column by column, and a review measured what the full-table version
 bought: this role could push a tombstone's `effective_at` a year out, which makes it stop blocking
@@ -1014,7 +1014,7 @@ deployment setting instead.
 ### 12.3 No reference counting on `blob`
 
 `blob` is not workspace-scoped (migration 0001), and the purge path works around that with a
-cross-workspace SELECT policy on `capture` and `artifact` granted to `exulanica_purge`. Replacing
+cross-workspace SELECT policy on the exact holder relations granted to `exulanica_purge`. Replacing
 that with a maintained holder count on `blob` is **not the right change now**.
 
 **CORRECTED 2026-09-03.** The policy now covers a third relation,

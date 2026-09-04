@@ -1469,30 +1469,33 @@ the experiment plan as the test most likely to find a real bug.
 | --- | --- | --- | --- |
 | **Capture** | capture, occurrences, assertions, spans, embeddings, text chunks, derived artifacts, answer caches | original blob bytes, all derivative bytes, all embedding rows, all text-chunk bodies | `blob` stub (hash plus `purged_at`), `pipeline_event` ledger with payloads scrubbed to hashes, the tombstone |
 | **Interval** | assertions and occurrences whose `presence` intersects the interval; artifacts overlapping it marked `needs_repair` | embeddings and text chunks derived from the interval; re-encoded clips of it | the rest of the capture; spans outside the interval |
-| **Entity** | entity, links, proposals, entity-level aggregates | entity-level embeddings and exemplars, display name | occurrences (still anonymous), the underlying media, `identity_rejection` rows, so re-detection does not re-propose the deleted identity |
+| **Entity** | entity, links, proposals, assertions, entity-level aggregates | person and occurrence embeddings, person-dependent point maps, and every artifact for every reconstruction scene containing the confirmed occurrence; the display-name cache is cleared | source captures and original photograph bytes, `identity_rejection` rows, the dependency and withdrawal receipts |
 | **Workspace** | everything | everything, including blobs | an audit stub |
 
-**CORRECTED 2026-09-03. The Entity row above describes a cascade that nothing runs, and the
-Interval row describes one that runs only in part.** The table is the specification; this
-paragraph is what is built, and the two disagree.
+**CORRECTED 2026-09-04. Entity withdrawal is now a production cascade. Interval withdrawal
+remains partial.** Migration 0030 adds `person_derivative_dependency`. A confirmed identity link
+records edges to the occurrence's point-map artifact, every reconstruction scene and job that
+contains its capture whether registration succeeded or not, every retained scene artifact,
+person and occurrence embeddings, dependent aggregate rows, and entity or scene assertions.
+Triggers fill both directions: a late human confirmation backfills existing targets, and a late
+artifact, membership, job, vector, aggregate, or assertion records its edge from existing
+confirmed links. Model-only proposals create no destructive authority.
 
-*Entity scope does not reach any derivative, and it cannot be requested.* Two facts, either of
-which alone would be enough. `IngestRepository.insert_tombstone` takes no `entity_id`, and
-`tombstone` constrains `scope = 'entity'` to name one, so **no code path in this repository can
-write an entity-scope tombstone at all**. Written directly in SQL, it still enqueues nothing:
-migration 0015's `tg_tombstone_enqueues_its_purge` returns early for every scope but `capture`
-and `workspace`, so no `purge_job` row exists, nothing is soft-marked, and no entity-level
-embedding, exemplar or display name is destroyed. What an entity tombstone *does* do is refuse
-future writes, through `tombstone_blocks_entity`, which the `assertion`, `embedding` and
-`entity_link` triggers call. That is a write guard, not a cascade. Note also that
-`tombstone_purge_is_complete` returns true for a tombstone with no jobs, so an entity tombstone
-is "complete" having destroyed nothing; only the worker writes `purge_completed_at`, and with no
-job to claim it never runs, so the column stays null and nothing reports the discrepancy.
+`IngestRepository.insert_tombstone` accepts `entity_id`. The tombstone transaction clears the
+display-name cache, soft-deletes the entity, marks dependent aggregates stale, retracts entity
+and scene-rung assertions, cancels queued or running reconstruction jobs, and enqueues all
+person-dependent stored objects and vector rows. Geometry and world-package reads refuse the
+dependency immediately, before the asynchronous purge catches up. The dedicated purge role may
+DELETE from `embedding` and no other database table. Stored object bytes still use the
+content-addressed privileged purger. `person_withdrawal_releases_artifact` refuses destruction
+when any live artifact outside that exact entity dependency still holds the same bytes.
 
-*The reconstructed geometry a person appears in is correctly untouched by that*, which is the
-first consequence below working as designed rather than a second gap. `exulanica/graph/geometry.py`
-asks `tombstone_blocks_capture`, which covers workspace, capture and interval scope and
-deliberately not entity scope.
+The original photograph is deliberately retained. An entity tombstone is not a media tombstone,
+and `capture.deleted_at` remains null. This distinction is exercised in the delete-one-person
+tests: the source object stays, unrelated geometry stays, but the linked point map, registered or
+unregistered scene, every retained scene build, rung assertion, display identity, aggregate, and
+vector leave their serving surfaces. `person_withdrawal_receipt` keeps a canonical, digest-bound,
+machine-readable summary; the exact edges and purge jobs remain the detailed evidence.
 
 *Interval scope soft-marks nothing and repairs nothing.* The same early return applies, so an
 interval redaction leaves `capture.deleted_at` null and enqueues no purge job. The artifacts the

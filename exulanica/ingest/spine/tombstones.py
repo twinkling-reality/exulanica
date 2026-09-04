@@ -51,6 +51,8 @@ def insert(
     capture_id: uuid.UUID | None = None,
     track_key: str | None = None,
     interval_ns: Sequence[tuple[int, int]] | None = None,
+    entity_id: uuid.UUID | None = None,
+    assertion_id: uuid.UUID | None = None,
     reason: str | None = None,
     blocklist_hash: bool = False,
 ) -> uuid.UUID:
@@ -61,14 +63,17 @@ def insert(
     """
     row = scope.connection.execute(
         "insert into tombstone (workspace_id, scope, capture_id, track_key, interval_ns, "
-        "blocklist_hash, requested_by, reason) "
-        "values (%s, %s, %s, %s, %s::int8multirange, %s, %s, %s) returning tombstone_id",
+        "entity_id, assertion_id, blocklist_hash, requested_by, reason) "
+        "values (%s, %s, %s, %s, %s::int8multirange, %s, %s, %s, %s, %s) "
+        "returning tombstone_id",
         (
             scope.workspace_id,
             scope_name,
             capture_id,
             track_key,
             _multirange(interval_ns) if interval_ns else None,
+            entity_id,
+            assertion_id,
             blocklist_hash,
             requested_by,
             reason,

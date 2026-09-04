@@ -13,9 +13,8 @@ while RLS is what stops a READ of another workspace's rows, and nothing was test
 
 So this module creates the role and grants it exactly what it needs:
 
-*   **No DELETE anywhere.** Deletion in this system is a tombstone plus a purge job plus the
-    separately authorised purger in :mod:`exulanica.store.base`. A runtime role that can DELETE
-    can erase the record of what it erased.
+*   **No DELETE for the runtime.** Deletion is a tombstone plus a purge job. The purger alone may
+    delete embedding rows, because retaining a person vector as a stub retains the derivative.
 *   **SELECT only on ``predicate``.** This is defect R3. ``allows_kind`` is what stops a model
     filing a name, and ``writes_a_name`` is what stops a new vocabulary row escaping the rule
     by being spelled differently. A runtime role that can UPDATE that table can disarm both,
@@ -121,6 +120,12 @@ _PURGE_READS: Final = {
         "purged_at",
     ),
     "reconstruction_scene_member": ("workspace_id", "scene_id", "capture_id"),
+    "person_derivative_dependency": (
+        "workspace_id",
+        "entity_id",
+        "target_kind",
+        "target_id",
+    ),
 }
 
 #: The tables :data:`_PURGE_READS` gives the cross-workspace policy to, in a public form, because
@@ -302,9 +307,9 @@ def provision_purge_role(
     *   **Column by column.** A policy cannot restrict columns; a grant can. It is given the
         identifiers, the hashes and the deletion markers, and not ``device_id``, not
         ``started_at``, and not an artifact's ``idempotency_key``.
-    *   **No DELETE anywhere, on any table.** Erasure of bytes runs through
-        ``exulanica.store.privileged_purger``, which cannot be constructed without naming the
-        tombstone that authorises it. Erasure of rows is not something this system does.
+    *   **DELETE on ``embedding`` only.** A person vector has no harmless stub form. Stored byte
+        erasure still runs through ``exulanica.store.privileged_purger`` and every other table
+        remains outside the role's DELETE authority.
     *   **And its UPDATE on the queue and the tombstone is column by column too.** It was not,
         and a review measured what a full-table grant bought: this role could push a tombstone's
         ``effective_at`` a year out, which reopens the leak 0011 closed, and could set
@@ -346,6 +351,7 @@ def provision_purge_role(
                     role_name,
                 )
             )
+        connection.execute(sql.SQL("grant select, delete on embedding to {}").format(role_name))
         for table, columns in _PURGE_WRITES.items():
             connection.execute(
                 sql.SQL("grant update ({}) on {} to {}").format(

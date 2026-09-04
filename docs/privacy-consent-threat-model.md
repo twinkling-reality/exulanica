@@ -1115,6 +1115,22 @@ The strict policy intentionally leaves masking unimplemented. A later mask imple
 introduce a versioned mask artifact and make it the exact input to depth. Adding region metadata
 to the current receipt without changing the pixels is not sufficient.
 
+### 9.5 Person-scoped reconstruction withdrawal
+
+**BUILT 2026-09-04.** A human-confirmed identity link creates durable dependency edges to
+person-dependent geometry, all scenes and scene jobs containing that occurrence's capture, every
+retained artifact for those scenes, person or occurrence embeddings, dependent aggregates, and
+entity or scene assertions. Registration failure does not remove the dependency: an unregistered
+input was still given to the reconstruction process. Model-only identity proposals never
+authorize deletion.
+
+An entity tombstone follows those stored edges without rerunning face detection. Serving stops in
+the tombstone transaction. Pending reconstruction work is cancelled, assertions are retracted,
+and the purge queue removes stored geometry plus the vector rows themselves. The original source
+photograph remains live. A canonical digest-bound withdrawal receipt records the exact tombstone,
+entity, edge count, purge count, cancellation count, assertion count, and source-retention policy.
+The dependency rows and purge jobs retain target-level audit evidence.
+
 ---
 
 ## 10. OPEN: when may a biometric embedding exist at all

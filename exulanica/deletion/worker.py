@@ -22,10 +22,9 @@ Per job, and none of these may be reordered:
 correction 3. It is not a failure: another live capture, in this workspace or another, is using
 those exact bytes, and the right thing is to ask again later.
 
-**What this cannot do.** It holds no DELETE on any table; the purge role is granted none. It
-destroys objects and marks rows. Row deletion is not something this system does: 0001 keeps the
-``blob`` stub so a citation into deleted content resolves to "the user deleted this" rather than
-to nothing at all.
+**What this can delete from the database.** The purge role has DELETE on ``embedding`` only.
+Person withdrawal must remove the vector itself, and a soft marker would retain the sensitive
+derivative. Stored objects still use the content-addressed purge path and keep their stub rows.
 
 **The cross-workspace read is a privilege of the role, not of this code, and this asks.**
 ``provision_purge_role`` grants ``exulanica_purge`` a permissive SELECT policy on ``capture`` and
@@ -220,6 +219,20 @@ class PurgeWorker:
     def _destroy(
         self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
     ) -> None:
+        if target.target_kind == "embedding":
+            with connection.transaction():
+                deleted = connection.execute(
+                    "delete from embedding where workspace_id = %s and embedding_id = %s",
+                    (target.workspace_id, uuid.UUID(target.target_ref)),
+                )
+                if deleted.rowcount:
+                    outcome.destroyed += 1
+                else:
+                    outcome.already_absent += 1
+                queue.finish_purge(
+                    connection, target.workspace_id, purge_id=target.purge_id, state="done"
+                )
+            return
         blob_id = BlobId.from_hex(target.target_ref)
         # The lock and the question share one transaction, so nothing can start holding these
         # bytes between the answer and the destruction. The lock is released at commit, which is
@@ -227,7 +240,17 @@ class PurgeWorker:
         with connection.transaction():
             connection.execute("select purge_lock_object(%s)", (target.target_ref,))
             row = connection.execute(
-                "select purge_releases_bytes(decode(%s, 'hex')) as releases", (target.target_ref,)
+                "select case when %s = 'artifact' and exists ("
+                "  select 1 from tombstone where tombstone_id=%s and scope='entity') "
+                "then person_withdrawal_releases_artifact(%s,decode(%s,'hex')) "
+                "else purge_releases_bytes(decode(%s,'hex')) end as releases",
+                (
+                    target.target_kind,
+                    target.tombstone_id,
+                    target.tombstone_id,
+                    target.target_ref,
+                    target.target_ref,
+                ),
             ).fetchone()
             assert row is not None
             if not row["releases"]:
