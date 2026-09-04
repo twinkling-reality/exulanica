@@ -1,0 +1,477 @@
+"""Versioned privacy admission policy for reconstruction geometry.
+
+The first production policy is deliberately strict. Synthetic sources may use an exemption only
+when their durable authorization is itself synthetic. Benchmark and personal sources require a
+named human to inspect the exact bytes, and any detected or unresolved person blocks geometry.
+No mask is claimed because this policy does not implement one.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import uuid
+from typing import Any, Final
+
+from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.errors import PrivacyAdmissionError
+from exulanica.evidence.blob import BlobId
+from exulanica.evidence.scene import scene_id_for, scene_member_digest
+from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.spine.privacy import (
+    PrivacyAdmissionRow,
+    PrivacyScreeningRow,
+    ReconstructionAuthorizationRow,
+)
+
+__all__ = [
+    "PRIVACY_POLICY_PARAMS",
+    "PRIVACY_POLICY_VERSION",
+    "admit_reconstruction_scene",
+    "authorize_benchmark_capture",
+    "authorize_personal_capture",
+    "authorize_synthetic_capture",
+    "record_human_screening",
+    "record_synthetic_exemption",
+    "require_privacy_screening",
+]
+
+PRIVACY_POLICY_VERSION: Final = "exulanica.reconstruction-privacy/v1"
+PRIVACY_POLICY_PARAMS: Final[dict[str, Any]] = {
+    "person_policy": "block-any-detected-or-unresolved-person",
+    "masking": "not-implemented",
+    "synthetic_exemption": "requires-durable-synthetic-generator-manifest",
+    "real_media_review": "named-human-over-exact-source-bytes",
+}
+_POLICY_DIGEST: Final = sha256_of_canonical(PRIVACY_POLICY_PARAMS)
+_AUTHORIZATION_NAMESPACE: Final = uuid.UUID("c43ad553-9510-5de2-876c-7359e58520e1")
+_SCREENING_NAMESPACE: Final = uuid.UUID("f4f2600b-aa92-59d4-a75c-0914ad9d88c4")
+_ADMISSION_NAMESPACE: Final = uuid.UUID("345e1307-d5b9-52e2-8ca2-8f8db00a378d")
+
+
+def _utc(value: dt.datetime | None = None) -> dt.datetime:
+    instant = value or dt.datetime.now(dt.UTC)
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("privacy receipt times must include a UTC offset")
+    return instant.astimezone(dt.UTC)
+
+
+def _iso(value: dt.datetime | None) -> str | None:
+    return None if value is None else _utc(value).isoformat().replace("+00:00", "Z")
+
+
+def _capture(repository: IngestRepository, capture_id: uuid.UUID) -> BlobId:
+    capture = repository.capture(capture_id)
+    if capture is None or capture.deleted_at is not None:
+        raise PrivacyAdmissionError(f"capture {capture_id} is absent or deleted")
+    return capture.blob_id
+
+
+def _authorize(
+    repository: IngestRepository,
+    *,
+    capture_id: uuid.UUID,
+    corpus_class: str,
+    purpose: str,
+    authorization_scope: dict[str, Any],
+    evidence: dict[str, Any],
+    synthetic_manifest_digest: bytes | None,
+    authorized_by: uuid.UUID,
+    authorized_at: dt.datetime | None,
+    valid_until: dt.datetime | None,
+) -> ReconstructionAuthorizationRow:
+    source = _capture(repository, capture_id)
+    at = _utc(authorized_at)
+    until = _utc(valid_until) if valid_until else None
+    record = {
+        "profile": "exulanica.capture-reconstruction-authorization/v1",
+        "capture_id": str(capture_id),
+        "source_sha256": source.hex,
+        "corpus_class": corpus_class,
+        "purpose": purpose,
+        "authorization_scope": authorization_scope,
+        "authorization_evidence": evidence,
+        "synthetic_manifest_sha256": (
+            synthetic_manifest_digest.hex() if synthetic_manifest_digest else None
+        ),
+        "authorized_by": str(authorized_by),
+        "authorized_at": _iso(at),
+        "valid_until": _iso(until),
+    }
+    digest = sha256_of_canonical(record)
+    canonical = canonical_json(record)
+    authorization_id = uuid.uuid5(
+        _AUTHORIZATION_NAMESPACE,
+        f"{repository.workspace_id}:{capture_id}:{digest.hex()}",
+    )
+    return repository.insert_reconstruction_authorization(
+        authorization_id=authorization_id,
+        capture_id=capture_id,
+        source_sha256=source,
+        corpus_class=corpus_class,
+        purpose=purpose,
+        authorization_scope=authorization_scope,
+        authorization_evidence=evidence,
+        authorization_record=record,
+        authorization_canonical=canonical,
+        evidence_digest=digest,
+        synthetic_manifest_digest=synthetic_manifest_digest,
+        authorized_by=authorized_by,
+        authorized_at=at,
+        valid_until=until,
+    )
+
+
+def authorize_synthetic_capture(
+    repository: IngestRepository,
+    *,
+    capture_id: uuid.UUID,
+    actor: uuid.UUID,
+    generator_manifest: dict[str, Any],
+    authorization_scope: dict[str, Any],
+    purpose: str = "reconstruction evaluation",
+    authorized_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> ReconstructionAuthorizationRow:
+    """Authorize exact bytes generated by one canonical synthetic scene manifest."""
+    profile = generator_manifest.get("profile")
+    if not isinstance(profile, str) or not profile:
+        raise ValueError("a synthetic generator manifest needs a non-empty profile")
+    manifest_digest = sha256_of_canonical(generator_manifest)
+    return _authorize(
+        repository,
+        capture_id=capture_id,
+        corpus_class="synthetic",
+        purpose=purpose,
+        authorization_scope=authorization_scope,
+        evidence={
+            "generator_profile": profile,
+            "generator_manifest_sha256": manifest_digest.hex(),
+        },
+        synthetic_manifest_digest=manifest_digest,
+        authorized_by=actor,
+        authorized_at=authorized_at,
+        valid_until=valid_until,
+    )
+
+
+def authorize_benchmark_capture(
+    repository: IngestRepository,
+    *,
+    capture_id: uuid.UUID,
+    actor: uuid.UUID,
+    official_source_url: str,
+    retrieval_date: str,
+    license_document_sha256: str,
+    permitted_use: str,
+    authorization_scope: dict[str, Any],
+    purpose: str = "non-commercial reconstruction engineering evaluation",
+    authorized_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> ReconstructionAuthorizationRow:
+    """Authorize benchmark bytes using a recorded official source and license digest."""
+    if len(license_document_sha256) != 64:
+        raise ValueError("license_document_sha256 must be 64 hexadecimal characters")
+    try:
+        bytes.fromhex(license_document_sha256)
+    except ValueError as exc:
+        raise ValueError("license_document_sha256 must be hexadecimal") from exc
+    return _authorize(
+        repository,
+        capture_id=capture_id,
+        corpus_class="benchmark",
+        purpose=purpose,
+        authorization_scope=authorization_scope,
+        evidence={
+            "official_source_url": official_source_url,
+            "retrieval_date": retrieval_date,
+            "license_document_sha256": license_document_sha256,
+            "permitted_use": permitted_use,
+        },
+        synthetic_manifest_digest=None,
+        authorized_by=actor,
+        authorized_at=authorized_at,
+        valid_until=valid_until,
+    )
+
+
+def authorize_personal_capture(
+    repository: IngestRepository,
+    *,
+    capture_id: uuid.UUID,
+    actor: uuid.UUID,
+    account_authority_basis: str,
+    authorization_scope: dict[str, Any],
+    purpose: str,
+    authorized_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> ReconstructionAuthorizationRow:
+    """Record account authority without treating it as another person's consent."""
+    return _authorize(
+        repository,
+        capture_id=capture_id,
+        corpus_class="personal",
+        purpose=purpose,
+        authorization_scope=authorization_scope,
+        evidence={"account_authority_basis": account_authority_basis},
+        synthetic_manifest_digest=None,
+        authorized_by=actor,
+        authorized_at=authorized_at,
+        valid_until=valid_until,
+    )
+
+
+def _record_screening(
+    repository: IngestRepository,
+    *,
+    authorization: ReconstructionAuthorizationRow,
+    method: str,
+    reviewed_by: uuid.UUID | None,
+    sensitive_regions: list[dict[str, Any]],
+    eligibility_state: str,
+    blocking_reasons: list[str],
+    screened_at: dt.datetime | None,
+    valid_until: dt.datetime | None,
+) -> PrivacyScreeningRow:
+    at = _utc(screened_at)
+    until = _utc(valid_until) if valid_until else None
+    record = {
+        "profile": "exulanica.reconstruction-privacy-screening-receipt/v1",
+        "authorization": {
+            "authorization_id": str(authorization.authorization_id),
+            "evidence_sha256": authorization.evidence_digest.hex(),
+            "scope": authorization.authorization_scope,
+        },
+        "capture_id": str(authorization.capture_id),
+        "source_sha256": authorization.source_sha256.hex(),
+        "screening_method": method,
+        "model": None,
+        "human_review": {
+            "required": method == "human_review",
+            "reviewed_by": str(reviewed_by) if reviewed_by else None,
+        },
+        "sensitive_regions": sensitive_regions,
+        "mask_artifacts": [],
+        "eligibility_state": eligibility_state,
+        "blocking_reasons": blocking_reasons,
+        "policy": {
+            "version": PRIVACY_POLICY_VERSION,
+            "params_sha256": _POLICY_DIGEST.hex(),
+        },
+        "screened_at": _iso(at),
+        "valid_until": _iso(until),
+    }
+    digest = sha256_of_canonical(record)
+    canonical = canonical_json(record)
+    screening_id = uuid.uuid5(
+        _SCREENING_NAMESPACE,
+        f"{repository.workspace_id}:{authorization.capture_id}:{digest.hex()}",
+    )
+    return repository.insert_privacy_screening(
+        screening_id=screening_id,
+        authorization_id=authorization.authorization_id,
+        capture_id=authorization.capture_id,
+        source_sha256=BlobId(authorization.source_sha256),
+        screening_method=method,
+        human_review_required=method == "human_review",
+        reviewed_by=reviewed_by,
+        sensitive_regions=sensitive_regions,
+        eligibility_state=eligibility_state,
+        blocking_reasons=blocking_reasons,
+        policy_version=PRIVACY_POLICY_VERSION,
+        policy_params_digest=_POLICY_DIGEST,
+        authorization_scope=authorization.authorization_scope,
+        screened_at=at,
+        valid_until=until,
+        receipt_record=record,
+        receipt_canonical=canonical,
+        receipt_digest=digest,
+    )
+
+
+def record_synthetic_exemption(
+    repository: IngestRepository,
+    *,
+    authorization_id: uuid.UUID,
+    screened_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> PrivacyScreeningRow:
+    """Exempt only an explicitly synthetic authorization, backed by a database trigger too."""
+    authorization = repository.reconstruction_authorization(authorization_id)
+    if authorization is None:
+        raise PrivacyAdmissionError("the reconstruction authorization does not exist")
+    if authorization.corpus_class != "synthetic":
+        raise PrivacyAdmissionError(
+            "synthetic exemption cannot be applied to benchmark or personal media"
+        )
+    return _record_screening(
+        repository,
+        authorization=authorization,
+        method="synthetic_exemption",
+        reviewed_by=None,
+        sensitive_regions=[],
+        eligibility_state="eligible",
+        blocking_reasons=[],
+        screened_at=screened_at,
+        valid_until=valid_until,
+    )
+
+
+def record_human_screening(
+    repository: IngestRepository,
+    *,
+    authorization_id: uuid.UUID,
+    reviewed_by: uuid.UUID,
+    sensitive_regions: list[dict[str, Any]],
+    failure_reason: str | None = None,
+    screened_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> PrivacyScreeningRow:
+    """Record strict exact-byte review. Any region or review failure blocks geometry."""
+    authorization = repository.reconstruction_authorization(authorization_id)
+    if authorization is None:
+        raise PrivacyAdmissionError("the reconstruction authorization does not exist")
+    if failure_reason:
+        state = "failed"
+        reasons = [failure_reason]
+    elif sensitive_regions:
+        state = "blocked"
+        reasons = ["one or more sensitive person regions remain unmasked"]
+    else:
+        state = "eligible"
+        reasons = []
+    return _record_screening(
+        repository,
+        authorization=authorization,
+        method="human_review",
+        reviewed_by=reviewed_by,
+        sensitive_regions=sensitive_regions,
+        eligibility_state=state,
+        blocking_reasons=reasons,
+        screened_at=screened_at,
+        valid_until=valid_until,
+    )
+
+
+def require_privacy_screening(
+    repository: IngestRepository,
+    capture_id: uuid.UUID,
+    screening_id: uuid.UUID,
+) -> PrivacyScreeningRow:
+    """Resolve one exact eligible receipt or stop before geometry inference."""
+    screening = repository.privacy_screening(screening_id)
+    if screening is None or screening.capture_id != capture_id:
+        raise PrivacyAdmissionError("privacy screening is missing for the exact capture")
+    if not repository.privacy_screening_allows(capture_id, screening_id):
+        raise PrivacyAdmissionError("privacy screening is failed, blocked, stale, or withdrawn")
+    return screening
+
+
+def admit_reconstruction_scene(
+    repository: IngestRepository,
+    *,
+    capture_ids: list[uuid.UUID],
+    screening_ids: list[uuid.UUID | None],
+    admitted_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> PrivacyAdmissionRow:
+    """Persist a fail-closed decision over one exact ordered capture set."""
+    if not capture_ids or len(capture_ids) != len(screening_ids):
+        raise ValueError("privacy admission needs one screening slot per capture")
+    if len(set(capture_ids)) != len(capture_ids):
+        raise ValueError("privacy admission capture members must be unique")
+    until = _utc(valid_until) if valid_until else None
+    sources: list[BlobId] = []
+    screenings: list[PrivacyScreeningRow | None] = []
+    blockers: list[str] = []
+    pairs = zip(capture_ids, screening_ids, strict=True)
+    for ordinal, (capture_id, screening_id) in enumerate(pairs):
+        source = _capture(repository, capture_id)
+        sources.append(source)
+        receipt = repository.privacy_screening(screening_id) if screening_id else None
+        screenings.append(receipt)
+        if receipt is None or receipt.capture_id != capture_id:
+            blockers.append(f"member {ordinal} has no screening for its exact source")
+        elif not repository.privacy_screening_allows(capture_id, receipt.screening_id):
+            blockers.append(f"member {ordinal} screening is failed, blocked, stale, or withdrawn")
+    at = _utc(admitted_at) if admitted_at else max(
+        (receipt.screened_at for receipt in screenings if receipt is not None),
+        default=dt.datetime.now(dt.UTC),
+    )
+    classes = {receipt.corpus_class for receipt in screenings if receipt is not None}
+    scopes = {
+        sha256_of_canonical(receipt.authorization_scope)
+        for receipt in screenings
+        if receipt is not None
+    }
+    corpus_class = (
+        next(iter(classes)) if len(classes) == 1 else ("unknown" if not classes else "mixed")
+    )
+    if len(classes) != 1:
+        blockers.append("members do not share one explicit corpus class")
+    if len(scopes) != 1:
+        blockers.append("members do not share one authorization scope")
+    authorization_scope = (
+        next(receipt.authorization_scope for receipt in screenings if receipt is not None)
+        if len(scopes) == 1
+        else {}
+    )
+    state = "eligible" if not blockers else "blocked"
+    members = []
+    member_records = []
+    for ordinal, (capture_id, source, receipt) in enumerate(
+        zip(capture_ids, sources, screenings, strict=True)
+    ):
+        authorization_id = receipt.authorization_id if receipt else None
+        screening_id = receipt.screening_id if receipt else None
+        members.append((capture_id, source, authorization_id, screening_id))
+        member_records.append(
+            {
+                "ordinal": ordinal,
+                "capture_id": str(capture_id),
+                "source_sha256": source.hex,
+                "authorization_id": str(authorization_id) if authorization_id else None,
+                "screening_id": str(screening_id) if screening_id else None,
+                "screening_receipt_sha256": receipt.receipt_digest.hex() if receipt else None,
+            }
+        )
+    scene_id = scene_id_for(capture_ids)
+    member_digest = scene_member_digest(capture_ids)
+    record = {
+        "profile": "exulanica.reconstruction-privacy-admission/v1",
+        "scene_id": str(scene_id),
+        "member_digest": member_digest.hex(),
+        "members": member_records,
+        "corpus_class": corpus_class,
+        "eligibility_state": state,
+        "blocking_reasons": blockers,
+        "authorization_scope": authorization_scope,
+        "policy": {
+            "version": PRIVACY_POLICY_VERSION,
+            "params_sha256": _POLICY_DIGEST.hex(),
+        },
+        "admitted_at": _iso(at),
+        "valid_until": _iso(until),
+    }
+    digest = sha256_of_canonical(record)
+    canonical = canonical_json(record)
+    admission_id = uuid.uuid5(
+        _ADMISSION_NAMESPACE,
+        f"{repository.workspace_id}:{scene_id}:{digest.hex()}",
+    )
+    return repository.insert_privacy_admission(
+        admission_id=admission_id,
+        scene_id=scene_id,
+        member_digest=member_digest,
+        corpus_class=corpus_class,
+        eligibility_state=state,
+        blocking_reasons=blockers,
+        policy_version=PRIVACY_POLICY_VERSION,
+        policy_params_digest=_POLICY_DIGEST,
+        authorization_scope=authorization_scope,
+        admitted_at=at,
+        valid_until=until,
+        admission_record=record,
+        admission_canonical=canonical,
+        admission_digest=digest,
+        members=members,
+    )

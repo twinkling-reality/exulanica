@@ -19,6 +19,7 @@ ended on the first.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import multiprocessing
 import threading
@@ -35,6 +36,10 @@ from exulanica.db.session import Database
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.privacy import (
+    authorize_synthetic_capture,
+    record_synthetic_exemption,
+)
 from exulanica.ingest.worker import MINIMUM_LEASE_SECONDS, DerivativeWorker, lease_seconds_for
 from exulanica.models.errors import TransportError
 from exulanica.models.manifest import Role
@@ -213,6 +218,22 @@ def queued(tmp_path, repository, spine_schema):
         )
         assert outcome.capture_id is not None, outcome.error
         capture_ids.append(outcome.capture_id)
+        authorization = authorize_synthetic_capture(
+            repository,
+            capture_id=outcome.capture_id,
+            actor=uuid.UUID("8d2f15b7-ff76-5889-8550-faf75d8bca33"),
+            generator_manifest={
+                "profile": "exulanica.derivative-reclaim-test/v1",
+                "notice": "SYNTHETIC TEST FIXTURE",
+            },
+            authorization_scope={"purpose": "worker recovery test"},
+            authorized_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+        )
+        record_synthetic_exemption(
+            repository,
+            authorization_id=authorization.authorization_id,
+            screened_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+        )
     batch.declare_size(len(capture_ids))
     job_id = derivative_queue.enqueue(
         repository.connection,

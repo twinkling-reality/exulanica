@@ -700,14 +700,34 @@ def _reconstruct(repository, photo_dir, store, *, valid_fraction=1.0, when="2026
     idempotency key and the same artifact, which is the cost control working exactly as designed
     and not what a test of two regions wants.
     """
+    from exulanica.ingest.privacy import (
+        authorize_synthetic_capture,
+        record_synthetic_exemption,
+    )
     from exulanica.ingest.scenes import run_scene_grouping
     from exulanica.reconstruction.testing import FlatDepthModel
 
     pipeline = PhotoIngestPipeline(
         repository, store, vision=None, depth=FlatDepthModel(valid_fraction=valid_fraction)
     )
-    outcome = pipeline.ingest_file(
-        write_photo(photo_dir, f"r{when[-8:].replace(':', '')}.jpg", when=when)
+    path = write_photo(photo_dir, f"r{when[-8:].replace(':', '')}.jpg", when=when)
+    intake = pipeline.ingest_intake(path.read_bytes(), filename=path.name)
+    assert intake.capture_id is not None, intake.error
+    authorization = authorize_synthetic_capture(
+        repository,
+        capture_id=intake.capture_id,
+        actor=uuid.UUID("25f22ef6-997b-5274-ac66-b96af1420410"),
+        generator_manifest={
+            "profile": "exulanica.api-reconstruction-test/v1",
+            "notice": "SYNTHETIC TEST FIXTURE",
+        },
+        authorization_scope={"purpose": "API reconstruction test"},
+    )
+    screening = record_synthetic_exemption(
+        repository, authorization_id=authorization.authorization_id
+    )
+    outcome = pipeline.ingest_derivatives(
+        intake.capture_id, privacy_screening_id=screening.screening_id
     )
     assert outcome.error is None, outcome.error
     run_scene_grouping(repository)

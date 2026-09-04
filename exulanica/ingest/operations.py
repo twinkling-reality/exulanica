@@ -235,6 +235,7 @@ def reconstruction_scene_job(
     row = connection.execute(
         "select j.job_id,j.scene_id,j.member_digest,j.selection_policy,"
         "j.selection_policy_digest,j.build_inputs,j.build_input_digest,j.status,j.attempts,"
+        "j.privacy_admission_id,j.privacy_admission_digest,"
         "j.available_at,j.claimed_by,j.lease_expires_at,j.pose_manifest_digest,"
         "j.pose_receipt_artifact_id,j.placement_artifact_id,j.gate_artifact_id,"
         "j.rung_assertion_id,"

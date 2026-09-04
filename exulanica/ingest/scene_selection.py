@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
+from exulanica.ingest.privacy import admit_reconstruction_scene
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scenes import SceneGroup
 from exulanica.ingest.stages import stage
@@ -94,6 +95,16 @@ def enqueue_scene_reconstructions(
         )
         if len(point_maps) != len(group.capture_ids):
             continue
+        admission = admit_reconstruction_scene(
+            repository,
+            capture_ids=group.capture_ids,
+            screening_ids=[
+                point_maps[capture_id].privacy_screening_id
+                for capture_id in group.capture_ids
+            ],
+        )
+        if admission.eligibility_state != "eligible":
+            continue
         build_inputs = {
             "profile": "exulanica.reconstruction-scene-build-input/v1",
             "point_maps": [
@@ -104,6 +115,12 @@ def enqueue_scene_reconstructions(
                 }
                 for capture_id in group.capture_ids
             ],
+            "privacy_admission": {
+                "admission_ref": str(admission.admission_id),
+                "admission_sha256": admission.admission_digest.hex(),
+                "policy_version": admission.policy_version,
+                "policy_params_sha256": admission.policy_params_digest.hex(),
+            },
             "stages": [
                 {
                     "key": key,
@@ -116,6 +133,8 @@ def enqueue_scene_reconstructions(
         job_id, inserted = repository.enqueue_reconstruction_scene(
             capture_ids=group.capture_ids,
             selection_policy=record,
+            privacy_admission_id=admission.admission_id,
+            privacy_admission_digest=admission.admission_digest,
             build_inputs=build_inputs,
         )
         selections.append(

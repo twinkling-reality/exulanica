@@ -1080,6 +1080,41 @@ a CI grep for the cast's names; branch protection so a force-push cannot quietly
 view. Rejected alternative: a documented rule and reviewer diligence, rejected because the realistic
 leak arrives via an issue attachment or a CI log, not a deliberate commit.
 
+### 9.4 Reconstruction privacy admission
+
+**BUILT 2026-09-04.** Migration 0029 and `exulanica.ingest.privacy` add a fail-closed boundary
+before point-map inference and scene queueing. The boundary has three immutable records:
+
+1. A capture authorization binds the exact source digest, corpus class, purpose, actor,
+   authorization scope, and evidence. Synthetic authorization also binds a canonical generator
+   manifest. Benchmark authorization requires an official source URL, retrieval date, license
+   document digest, and permitted use. Personal authorization records account authority only. It
+   does not claim that the account holder consented for another person.
+2. A per-capture screening receipt binds the authorization, source digest, method, reviewer,
+   sensitive regions, empty mask list, policy version, policy parameter digest, validity time,
+   eligibility, and blockers. The current policy implements no detector and no mask. Benchmark
+   and personal media therefore require a named human review of the exact bytes. Any detected or
+   unresolved person blocks geometry. A failed or expired review is not equivalent to no person.
+3. A scene admission binds the exact ordered capture set, every source and screening receipt,
+   one corpus class, one authorization scope, policy version, validity time, eligibility, and
+   blockers. Every scene job stores that admission id and digest as immutable input.
+
+Each record stores canonical UTF-8 JSON beside its SHA-256 digest. PostgreSQL verifies that the
+bytes decode to the stored JSON and that their digest matches. The database also refuses a new
+point map without an eligible receipt, refuses a scene job without an eligible exact-set
+admission, checks every job member against the admission ordinal, and rechecks the admission on
+claim and publication. Missing, failed, blocked, expired, deleted, or mismatched inputs stop the
+flow.
+
+The synthetic exemption is narrow by construction. Both the application and a database trigger
+require the linked capture authorization to have corpus class `synthetic` and a generator
+manifest digest. It cannot be used for benchmark or personal media. Synthetic plumbing results
+remain evidence about runtime plumbing only, not about real-world reconstruction quality.
+
+The strict policy intentionally leaves masking unimplemented. A later mask implementation must
+introduce a versioned mask artifact and make it the exact input to depth. Adding region metadata
+to the current receipt without changing the pixels is not sufficient.
+
 ---
 
 ## 10. OPEN: when may a biometric embedding exist at all

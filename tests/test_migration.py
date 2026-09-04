@@ -41,6 +41,36 @@ SQL_0002 = MIGRATIONS["0002"]
 #: ever created the day somebody moved a `create table` into a new file.
 ALL_SQL = "\n".join(MIGRATIONS[version] for version in sorted(MIGRATIONS))
 
+HISTORICAL_MIGRATION_CHECKSUMS = {
+    "0001": "05909f3d36fba433f2adc22f57af4e0ce1cef5c8894a05d56fce8a6f53f6412e",
+    "0002": "08250a55180ba6ac1174625d0e5007688a8f693664625aa4fddfe03a3e056300",
+    "0003": "9e4304dae50f60b9e8d619e50c5200a60c9a1e20b3003b1da2e46b4dd5cd5173",
+    "0004": "61040674bb27f37d40778a554c1cdefbf477ff07016c0b055ecc9704ddfe38fd",
+    "0005": "0d005aa84a64554727105ad1f94265a7759a71cf4db0e32665718210fd603996",
+    "0006": "e4e2110efec6269136596a35f656201b35dc536e00754aaaeb32f82afc87fa33",
+    "0007": "1dde0d4134de293e3126a63650e43676188e0b378f27755618d2472301eb344a",
+    "0008": "d0cbc0f413a1dbd5cb4a891ba0257f183ecd833be2216f178104bd7d78570386",
+    "0009": "8f9bc42ce40d6a9ee6310b68d459e47643ac42c9c30f44eb8d4b4f38ef19e616",
+    "0010": "0b8faf2bd38e9670bffcffdc7c646669da95b26c2fa6b9dd81f27a2ea15821aa",
+    "0011": "e8424d8d9547f139ef9453216b46d6b17ca72012951140043eded2aac6ebad1b",
+    "0012": "b70bb1261b079f3e593ffa0305ebcd9565e6c6710a7f0b3000e607cb9125779a",
+    "0013": "98b775fac728553b08263631e2ef2f311eaba78724f13b7b8939e125edc64491",
+    "0014": "46cc44a17b3af7d077858bfe09d3d5332d2f705afdb39af0464e9712ebbaf79d",
+    "0015": "b66eed0e288a0b25994285dc44d7d7bc3843c15ac1ca500c623c5466665161a8",
+    "0016": "369fb8a502220238149cf77faac2ffa7594f6001225c247bef725f916a453037",
+    "0017": "7ebc764ba48f83f6a0cd60ca9b6c1e2a4e33434a99ca22a7f69ba490e36ded85",
+    "0018": "53d6f3ada2ea50cdd3def16388bc6e7e70649a22f259f5a8937d7cb8856b66b1",
+    "0019": "f1cb348a6cc7602a3b7192494f4fcaabf2e42a72328f1206be7b0f3c3aac0ead",
+    "0020": "36f951579afb29cb930388f353a73f4893824e3f8a703a746534e8c78a7d4262",
+    "0021": "b1579836aaae4d848db82e708a338c14f34e646d7bdf7bfec870d5ec9e9e65e4",
+    "0022": "6fbce45468e39c3f2d0957ab36d25a7e4a97558e8623575b895af9bb3a567d6d",
+    "0023": "4dcddc82fd95ccf78e4afac82f73cc487dc2d5884a02789b45fbc17bba061527",
+    "0024": "bc11ed3928ec17b2bb4a1c1cf93d5e20403109e606e634e0b55384beaec74696",
+    "0025": "2419f702b54764fc6015a2a72b64957db8ef8f9c37ac930f25a4155e04ffcd21",
+    "0026": "92d59d62447265497e1e7d99e11690216622d3a880cf24c89b7888246eed3a26",
+    "0027": "a462b000291f105ee056cbe0001aa875bdfce868dcd185eaa09db52917d10517",
+}
+
 
 def test_the_migrations_are_numbered_and_ordered():
     files = list(migrations())
@@ -48,6 +78,16 @@ def test_the_migrations_are_numbered_and_ordered():
         f"{number:04d}" for number in range(1, len(files) + 1)
     ], [m.version for m in files]
     assert len(files) >= 8, "a migration went missing from the directory"
+
+
+def test_historical_migrations_0001_through_0027_are_byte_identical():
+    """The Exulanica cutover keeps already applied pre-release SQL byte for byte."""
+    actual = {
+        migration.version: migration.checksum.hex()
+        for migration in migrations()
+        if migration.version <= "0027"
+    }
+    assert actual == HISTORICAL_MIGRATION_CHECKSUMS
 
 
 @pytest.mark.parametrize("migration", list(migrations()), ids=lambda m: m.version)
@@ -70,6 +110,7 @@ def test_every_migration_is_a_single_transaction_with_no_down_path(migration):
         "blob",
         "media_track",
         "capture",
+        "capture_reconstruction_authorization",
         "clock_anchor",
         "evidence_span",
         "stage_registry",
@@ -136,6 +177,9 @@ def test_every_migration_is_a_single_transaction_with_no_down_path(migration):
         "reconstruction_scene_job",
         "reconstruction_scene_job_member",
         "reconstruction_scene_member",
+        "reconstruction_privacy_admission",
+        "reconstruction_privacy_admission_member",
+        "reconstruction_privacy_screening",
     ],
 )
 def test_every_required_table_exists(table):

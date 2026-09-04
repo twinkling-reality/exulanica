@@ -228,6 +228,11 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
     )
     replacement_id = artifact_id_for(key)
     replacement = store.put_bytes(b"replacement point map")
+    privacy = repository.connection.execute(
+        "select privacy_screening_id from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[0]),
+    ).fetchone()
+    assert privacy is not None
     repository.insert_artifact(
         artifact_id=replacement_id,
         kind=spec.output_kind,
@@ -241,6 +246,7 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         storage_key=store.key_for(replacement.blob_id),
         byte_size=replacement.byte_size,
         produced_by_event=None,
+        privacy_screening_id=privacy["privacy_screening_id"],
     )
     repository.connection.execute(
         "update artifact set superseded_by=%s where workspace_id=%s and artifact_id=%s",

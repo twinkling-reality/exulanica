@@ -66,5 +66,5 @@ class StageWrites(Protocol):
         outcome: IngestOutcome,
         pending: list[bytes],
         produced_by_event: uuid.UUID | None = None,
+        privacy_screening_id: uuid.UUID | None = None,
     ) -> StageResult: ...
-

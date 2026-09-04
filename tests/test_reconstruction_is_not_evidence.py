@@ -25,6 +25,7 @@ Four checks, weakest first, and the ordering is deliberate.
 from __future__ import annotations
 
 import ast
+import uuid
 from pathlib import Path
 
 import pytest
@@ -108,12 +109,34 @@ def test_no_reconstruction_function_is_annotated_to_return_a_citation():
 @pytest.fixture
 def reconstructed(repository, photo_dir, tmp_path):
     """One photograph ingested with reconstruction on. Returns the artifact and its content hash."""
+    from exulanica.ingest.privacy import (
+        authorize_synthetic_capture,
+        record_synthetic_exemption,
+    )
     from exulanica.reconstruction.testing import FlatDepthModel
 
     write_photo(photo_dir, "a.jpg", when=iso(10), gps=(64.3271, -20.1199))
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(repository, store, vision=None, depth=FlatDepthModel())
-    outcome = pipeline.ingest_file(photo_dir / "a.jpg")
+    data = (photo_dir / "a.jpg").read_bytes()
+    intake = pipeline.ingest_intake(data, filename="a.jpg")
+    assert intake.capture_id is not None, intake.error
+    authorization = authorize_synthetic_capture(
+        repository,
+        capture_id=intake.capture_id,
+        actor=uuid.UUID("a244f9d0-9bd9-5f55-a133-2712cd05d720"),
+        generator_manifest={
+            "profile": "exulanica.reconstruction-boundary-test/v1",
+            "notice": "SYNTHETIC TEST FIXTURE",
+        },
+        authorization_scope={"purpose": "reconstruction boundary test"},
+    )
+    screening = record_synthetic_exemption(
+        repository, authorization_id=authorization.authorization_id
+    )
+    outcome = pipeline.ingest_derivatives(
+        intake.capture_id, privacy_screening_id=screening.screening_id
+    )
     assert outcome.error is None, outcome.error
     assert "depth" in outcome.stages_run, outcome.stages_run
 

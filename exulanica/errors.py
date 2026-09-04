@@ -63,3 +63,7 @@ class TombstonedError(ExulanicaError):
     cancels on this and retries on anything else, so a tombstone refusal that arrives as some
     other error type becomes an unbounded retry loop against content the user deleted.
     """
+
+
+class PrivacyAdmissionError(ExulanicaError):
+    """No current eligible privacy receipt permits reconstruction of these bytes."""

@@ -24,6 +24,7 @@ from PIL import Image
 
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
@@ -52,6 +53,7 @@ def run(
     intake: StageResult,
     ledger: Ledger,
     outcome: IngestOutcome,
+    privacy_screening_id: uuid.UUID | None,
 ) -> None:
     spec = stage("depth")
     if model is None:
@@ -64,7 +66,17 @@ def run(
         )
         return
 
-    input_digest = input_digest_of([intake.content_sha256])
+    if privacy_screening_id is None:
+        from exulanica.errors import PrivacyAdmissionError
+
+        raise PrivacyAdmissionError(
+            "point-map inference requires an exact eligible privacy screening receipt"
+        )
+    screening = require_privacy_screening(
+        writes.repository, capture_id, privacy_screening_id
+    )
+
+    input_digest = input_digest_of([intake.content_sha256, screening.receipt_digest])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
     if existing is not None:
@@ -137,6 +149,7 @@ def run(
                 recorder=recorder,
                 outcome=outcome,
                 pending=pending,
+                privacy_screening_id=screening.screening_id,
             )
             _record_rung(
                 writes, capture_id, image_span_id, decision, result, prediction, ledger

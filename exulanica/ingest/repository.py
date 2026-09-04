@@ -63,6 +63,7 @@ from exulanica.ingest.spine import (
     derived,
     inferences,
     occurrences,
+    privacy,
     reconstruction_jobs,
     reconstruction_scenes,
     spans,
@@ -250,6 +251,8 @@ class IngestRepository:
         *,
         capture_ids: list[uuid.UUID],
         selection_policy: dict[str, Any],
+        privacy_admission_id: uuid.UUID,
+        privacy_admission_digest: bytes,
         build_inputs: dict[str, Any] | None = None,
     ) -> tuple[uuid.UUID, bool]:
         """Queue one exact, policy-described capture set for pose recovery."""
@@ -257,6 +260,8 @@ class IngestRepository:
             self._scope,
             capture_ids=capture_ids,
             selection_policy=selection_policy,
+            privacy_admission_id=privacy_admission_id,
+            privacy_admission_digest=privacy_admission_digest,
             build_inputs=build_inputs,
         )
 
@@ -338,6 +343,46 @@ class IngestRepository:
             failure_message=failure_message,
             retry_delay_seconds=retry_delay_seconds,
         )
+
+    # -- reconstruction privacy ---------------------------------------------------------
+
+    def insert_reconstruction_authorization(
+        self, **values: Any
+    ) -> privacy.ReconstructionAuthorizationRow:
+        """Persist why exact capture bytes may be used for reconstruction."""
+        return privacy.insert_authorization(self._scope, **values)
+
+    def reconstruction_authorization(
+        self, authorization_id: uuid.UUID
+    ) -> privacy.ReconstructionAuthorizationRow | None:
+        """Read one exact-source reconstruction authorization."""
+        return privacy.authorization(self._scope, authorization_id)
+
+    def insert_privacy_screening(self, **values: Any) -> privacy.PrivacyScreeningRow:
+        """Persist one immutable fail-closed screening result."""
+        return privacy.insert_screening(self._scope, **values)
+
+    def privacy_screening(
+        self, screening_id: uuid.UUID
+    ) -> privacy.PrivacyScreeningRow | None:
+        """Read one screening and its corpus classification."""
+        return privacy.screening(self._scope, screening_id)
+
+    def privacy_screening_allows(
+        self, capture_id: uuid.UUID, screening_id: uuid.UUID
+    ) -> bool:
+        """Whether this exact current source remains eligible for geometry."""
+        return privacy.screening_allows(self._scope, capture_id, screening_id)
+
+    def latest_privacy_screening(
+        self, capture_id: uuid.UUID
+    ) -> privacy.PrivacyScreeningRow | None:
+        """Resolve the newest current eligible receipt for exact capture bytes."""
+        return privacy.latest_screening(self._scope, capture_id)
+
+    def insert_privacy_admission(self, **values: Any) -> privacy.PrivacyAdmissionRow:
+        """Persist one decision over an exact ordered capture set."""
+        return privacy.admit(self._scope, **values)
 
     # -- tombstones ---------------------------------------------------------------------
 
@@ -433,6 +478,7 @@ class IngestRepository:
         storage_key: str,
         byte_size: int,
         produced_by_event: uuid.UUID | None,
+        privacy_screening_id: uuid.UUID | None = None,
     ) -> bool:
         """Insert a derivative. Returns False when another worker already produced it."""
         return artifacts.insert(
@@ -449,6 +495,7 @@ class IngestRepository:
             storage_key=storage_key,
             byte_size=byte_size,
             produced_by_event=produced_by_event,
+            privacy_screening_id=privacy_screening_id,
         )
 
     def insert_scene_artifact(

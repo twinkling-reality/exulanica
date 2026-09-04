@@ -191,6 +191,7 @@ class PhotoIngestPipeline:
         outcome: IngestOutcome,
         pending: list[bytes],
         produced_by_event: uuid.UUID | None = None,
+        privacy_screening_id: uuid.UUID | None = None,
     ) -> StageResult:
         """Queue bytes, insert the artifact row, and report reuse honestly.
 
@@ -250,6 +251,7 @@ class PhotoIngestPipeline:
             storage_key=self._store.key_for(BlobId(content_hash)),
             byte_size=len(payload),
             produced_by_event=produced_by_event,
+            privacy_screening_id=privacy_screening_id,
         )
         recorder.record_output(artifact_id)
         outcome.stages_run.append(spec.key)
@@ -308,7 +310,7 @@ class PhotoIngestPipeline:
         outcome = IngestOutcome(path=source)
         with self._recorded_run(outcome, batch_id=batch_id) as ledger:
             prepared = self._intake(source.read_bytes(), ledger, outcome)
-            self._derivatives(prepared, ledger, outcome)
+            self._derivatives(prepared, ledger, outcome, privacy_screening_id=None)
         return outcome
 
     def ingest_intake(
@@ -350,6 +352,7 @@ class PhotoIngestPipeline:
         batch_id: uuid.UUID | None = None,
         delivery_job_id: uuid.UUID | None = None,
         delivery_claim_token: uuid.UUID | None = None,
+        privacy_screening_id: uuid.UUID | None = None,
     ) -> IngestOutcome:
         """Run rendition, vision and depth for a capture whose intake has already committed.
 
@@ -402,6 +405,9 @@ class PhotoIngestPipeline:
                     "to derive from. Ingest the photograph rather than resuming it."
                 )
             upright, facts = _decode(self._store.get(blob_id))
+            if privacy_screening_id is None and self._depth is not None:
+                screening = self._repository.latest_privacy_screening(capture_id)
+                privacy_screening_id = screening.screening_id if screening else None
             self._derivatives(
                 _Prepared(
                     blob_id=blob_id,
@@ -420,6 +426,7 @@ class PhotoIngestPipeline:
                 ),
                 ledger,
                 outcome,
+                privacy_screening_id=privacy_screening_id,
             )
         return outcome
 
@@ -492,7 +499,12 @@ class PhotoIngestPipeline:
         )
 
     def _derivatives(
-        self, prepared: _Prepared, ledger: Ledger, outcome: IngestOutcome
+        self,
+        prepared: _Prepared,
+        ledger: Ledger,
+        outcome: IngestOutcome,
+        *,
+        privacy_screening_id: uuid.UUID | None,
     ) -> None:
         rendition = rendition_stage.run(
             self, prepared.blob_id, prepared.upright, prepared.intake, ledger, outcome
@@ -523,6 +535,7 @@ class PhotoIngestPipeline:
             prepared.intake,
             ledger,
             outcome,
+            privacy_screening_id,
         )
 
 

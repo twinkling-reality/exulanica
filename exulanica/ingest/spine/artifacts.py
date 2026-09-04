@@ -45,6 +45,7 @@ class CaptureArtifactRow:
     content_sha256: bytes
     storage_key: str
     byte_size: int
+    privacy_screening_id: uuid.UUID | None
 
 
 def current_for_captures(
@@ -55,12 +56,15 @@ def current_for_captures(
         return {}
     rows = scope.connection.execute(
         "select distinct on (c.capture_id) c.capture_id,a.artifact_id,a.content_sha256,"
-        "a.storage_key,a.byte_size from capture c join artifact a "
+        "a.storage_key,a.byte_size,a.privacy_screening_id from capture c join artifact a "
         "on a.workspace_id=c.workspace_id and a.source_blob_sha256=c.blob_sha256 "
         "where c.workspace_id=%s and c.capture_id=any(%s::uuid[]) and c.deleted_at is null "
         "and a.kind=%s and a.superseded_by is null and a.purged_at is null "
         "and a.content_sha256 is not null and a.storage_key is not null "
         "and a.byte_size is not null "
+        "and (a.kind <> 'point_map' or (a.privacy_screening_id is not null and "
+        "privacy_screening_allows_capture(c.workspace_id,c.capture_id,"
+        "a.privacy_screening_id))) "
         "and not tombstone_blocks_capture(c.workspace_id,c.capture_id) "
         "order by c.capture_id,a.stage_version desc,a.created_at desc,a.artifact_id",
         (scope.workspace_id, capture_ids, kind),
@@ -72,6 +76,7 @@ def current_for_captures(
             content_sha256=bytes(row["content_sha256"]),
             storage_key=row["storage_key"],
             byte_size=int(row["byte_size"]),
+            privacy_screening_id=row["privacy_screening_id"],
         )
         for row in rows
     }
@@ -94,13 +99,17 @@ def exact_for_captures(
     capture_ids = list(artifact_ids_by_capture)
     artifact_ids = list(artifact_ids_by_capture.values())
     rows = scope.connection.execute(
-        "select c.capture_id,a.artifact_id,a.content_sha256,a.storage_key,a.byte_size "
+        "select c.capture_id,a.artifact_id,a.content_sha256,a.storage_key,a.byte_size,"
+        "a.privacy_screening_id "
         "from capture c join artifact a on a.workspace_id=c.workspace_id "
         "and a.source_blob_sha256=c.blob_sha256 where c.workspace_id=%s "
         "and c.capture_id=any(%s::uuid[]) and a.artifact_id=any(%s::uuid[]) "
         "and c.deleted_at is null and a.kind=%s and a.purged_at is null "
         "and a.content_sha256 is not null and a.storage_key is not null "
         "and a.byte_size is not null "
+        "and (a.kind <> 'point_map' or (a.privacy_screening_id is not null and "
+        "privacy_screening_allows_capture(c.workspace_id,c.capture_id,"
+        "a.privacy_screening_id))) "
         "and not tombstone_blocks_capture(c.workspace_id,c.capture_id)",
         (scope.workspace_id, capture_ids, artifact_ids, kind),
     ).fetchall()
@@ -111,6 +120,7 @@ def exact_for_captures(
             content_sha256=bytes(row["content_sha256"]),
             storage_key=row["storage_key"],
             byte_size=int(row["byte_size"]),
+            privacy_screening_id=row["privacy_screening_id"],
         )
         for row in rows
         if artifact_ids_by_capture.get(row["capture_id"]) == row["artifact_id"]
@@ -154,6 +164,7 @@ def insert(
     storage_key: str,
     byte_size: int,
     produced_by_event: uuid.UUID | None,
+    privacy_screening_id: uuid.UUID | None = None,
 ) -> bool:
     """Insert a derivative. Returns False when another worker already produced it.
 
@@ -168,8 +179,8 @@ def insert(
         cursor = scope.connection.execute(
             "insert into artifact (artifact_id, workspace_id, kind, source_blob_sha256, "
             "stage_key, stage_version, params_digest, input_digest, idempotency_key, "
-            "content_sha256, storage_key, byte_size, produced_by_event) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "content_sha256, storage_key, byte_size, produced_by_event,privacy_screening_id) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             "on conflict (workspace_id, idempotency_key) do nothing",
             (
                 artifact_id,
@@ -185,6 +196,7 @@ def insert(
                 storage_key,
                 byte_size,
                 produced_by_event,
+                privacy_screening_id,
             ),
         )
     return cursor.rowcount > 0

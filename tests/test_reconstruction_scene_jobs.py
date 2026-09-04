@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 
 import psycopg
@@ -12,6 +13,11 @@ from exulanica.ingest.operations import (
     reconstruction_scene_job,
     reconstruction_scene_metrics,
     retry_reconstruction_scene_job,
+)
+from exulanica.ingest.privacy import (
+    admit_reconstruction_scene,
+    authorize_synthetic_capture,
+    record_synthetic_exemption,
 )
 from exulanica.ingest.scene_selection import enqueue_scene_reconstructions
 from exulanica.ingest.scenes import SceneGroup
@@ -48,16 +54,47 @@ def _policy() -> dict[str, object]:
     }
 
 
+def _enqueue(repository, captures, *, build_inputs=None):
+    screening_ids = []
+    for capture_id in captures:
+        authorization = authorize_synthetic_capture(
+            repository,
+            capture_id=capture_id,
+            actor=uuid.UUID("f0a03490-8b8a-5260-89e9-77ad3cc814b2"),
+            generator_manifest={
+                "profile": "exulanica.scene-job-test/v1",
+                "notice": "SYNTHETIC TEST FIXTURE",
+            },
+            authorization_scope={"purpose": "scene job test"},
+            authorized_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+        )
+        screening_ids.append(
+            record_synthetic_exemption(
+                repository,
+                authorization_id=authorization.authorization_id,
+                screened_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+            ).screening_id
+        )
+    admission = admit_reconstruction_scene(
+        repository,
+        capture_ids=captures,
+        screening_ids=screening_ids,
+    )
+    return repository.enqueue_reconstruction_scene(
+        capture_ids=captures,
+        selection_policy=_policy(),
+        privacy_admission_id=admission.admission_id,
+        privacy_admission_digest=admission.admission_digest,
+        build_inputs=build_inputs,
+    )
+
+
 def test_enqueue_is_deterministic_and_a_restart_claims_the_exact_order(ingest_spine):
     repository, reopen = ingest_spine
     captures = _captures(repository)
 
-    job_id, inserted = repository.enqueue_reconstruction_scene(
-        capture_ids=captures, selection_policy=_policy()
-    )
-    same_id, inserted_again = repository.enqueue_reconstruction_scene(
-        capture_ids=captures, selection_policy=_policy()
-    )
+    job_id, inserted = _enqueue(repository, captures)
+    same_id, inserted_again = _enqueue(repository, captures)
 
     assert inserted is True
     assert inserted_again is False
@@ -118,9 +155,7 @@ def test_the_initial_policy_waits_for_every_point_map_and_binds_exact_inputs(rep
 
 def test_two_claimants_do_not_receive_the_same_scene(ingest_spine):
     repository, reopen = ingest_spine
-    repository.enqueue_reconstruction_scene(
-        capture_ids=_captures(repository), selection_policy=_policy()
-    )
+    _enqueue(repository, _captures(repository))
 
     first = reopen().claim_reconstruction_scene(worker="first", lease_seconds=60)
     second = reopen().claim_reconstruction_scene(worker="second", lease_seconds=60)
@@ -130,10 +165,7 @@ def test_two_claimants_do_not_receive_the_same_scene(ingest_spine):
 
 
 def test_scene_operations_report_exact_inputs_and_only_accelerate_retryable_failures(repository):
-    job_id, _inserted = repository.enqueue_reconstruction_scene(
-        capture_ids=_captures(repository),
-        selection_policy=_policy(),
-    )
+    job_id, _inserted = _enqueue(repository, _captures(repository))
     claimed = repository.claim_reconstruction_scene(worker="operator-test", lease_seconds=60)
     assert claimed is not None
     repository.fail_reconstruction_scene_job(
@@ -187,9 +219,7 @@ def test_scene_operations_report_exact_inputs_and_only_accelerate_retryable_fail
 
 def test_expired_claim_rotates_the_token_and_stale_completion_is_refused(ingest_spine):
     repository, reopen = ingest_spine
-    job_id, _ = repository.enqueue_reconstruction_scene(
-        capture_ids=_captures(repository), selection_policy=_policy()
-    )
+    job_id, _ = _enqueue(repository, _captures(repository))
     first_repository = reopen()
     first = first_repository.claim_reconstruction_scene(worker="first", lease_seconds=60)
     assert first is not None
@@ -252,9 +282,7 @@ def test_completion_records_partial_registration_once(ingest_spine):
 def test_deleting_any_pending_member_cancels_the_job(ingest_spine):
     repository, _reopen = ingest_spine
     captures = _captures(repository)
-    job_id, _ = repository.enqueue_reconstruction_scene(
-        capture_ids=captures, selection_policy=_policy()
-    )
+    job_id, _ = _enqueue(repository, captures)
     claimed = repository.claim_reconstruction_scene(worker="pose", lease_seconds=60)
     assert claimed is not None
 
@@ -281,9 +309,7 @@ def test_deleting_any_pending_member_cancels_the_job(ingest_spine):
 
 def test_job_membership_cannot_be_changed_after_enqueue(repository):
     captures = _captures(repository)
-    job_id, _ = repository.enqueue_reconstruction_scene(
-        capture_ids=captures, selection_policy=_policy()
-    )
+    job_id, _ = _enqueue(repository, captures)
 
     with (
         pytest.raises(psycopg.errors.IntegrityConstraintViolation),

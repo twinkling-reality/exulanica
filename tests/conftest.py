@@ -154,7 +154,14 @@ def write_photo(directory: Path, name: str, **kwargs: Any) -> Path:
     return path
 
 
-def write_point_map(repository, store, blob_id, payload: bytes = b"not a real .opm"):
+def write_point_map(
+    repository,
+    store,
+    blob_id,
+    payload: bytes = b"not a real .opm",
+    *,
+    privacy_screening_id=None,
+):
     """Put a point-map artifact of ``blob_id`` in the store and the spine, and return its row.
 
     The payload is deliberately NOT a valid container. The delivery route serves bytes and
@@ -167,7 +174,31 @@ def write_point_map(repository, store, blob_id, payload: bytes = b"not a real .o
     the row the depth stage would write. Writing it by hand rather than running the stage is what
     lets the API tests run with no depth model, a 1.3 GB checkpoint and torch.
     """
+    from exulanica.ingest.privacy import (
+        authorize_synthetic_capture,
+        record_synthetic_exemption,
+    )
     from exulanica.ingest.stages import artifact_id_for, idempotency_key, input_digest_of, stage
+
+    if privacy_screening_id is None:
+        capture = repository.live_capture_for_blob(blob_id)
+        assert capture is not None
+        authorization = authorize_synthetic_capture(
+            repository,
+            capture_id=capture.capture_id,
+            actor=uuid.UUID("c936c289-0209-5ea5-b06a-c95535f6677b"),
+            generator_manifest={
+                "profile": "exulanica.test-point-map-source/v1",
+                "notice": "SYNTHETIC TEST FIXTURE",
+            },
+            authorization_scope={"purpose": "automated test"},
+            authorized_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+        )
+        privacy_screening_id = record_synthetic_exemption(
+            repository,
+            authorization_id=authorization.authorization_id,
+            screened_at=dt.datetime(2026, 9, 4, tzinfo=dt.UTC),
+        ).screening_id
 
     spec = stage("depth")
     binding = {"model_id": "test/depth-model"}
@@ -187,6 +218,7 @@ def write_point_map(repository, store, blob_id, payload: bytes = b"not a real .o
         storage_key=store.key_for(stored.blob_id),
         byte_size=stored.byte_size,
         produced_by_event=None,
+        privacy_screening_id=privacy_screening_id,
     )
     return artifact_id_for(key), stored.blob_id
 

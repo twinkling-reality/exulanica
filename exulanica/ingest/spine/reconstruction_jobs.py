@@ -57,6 +57,8 @@ class ClaimedSceneJob:
     selection_policy_digest: bytes
     build_inputs: dict[str, Any]
     build_input_digest: bytes
+    privacy_admission_id: uuid.UUID
+    privacy_admission_digest: bytes
     members: tuple[SceneJobMember, ...]
     attempts: int
     claim_token: uuid.UUID
@@ -69,6 +71,8 @@ def enqueue(
     *,
     capture_ids: list[uuid.UUID],
     selection_policy: dict[str, Any],
+    privacy_admission_id: uuid.UUID,
+    privacy_admission_digest: bytes,
     build_inputs: dict[str, Any] | None = None,
 ) -> tuple[uuid.UUID, bool]:
     """Queue one exact ordered set, or verify and reuse the identical queued question."""
@@ -85,15 +89,18 @@ def enqueue(
     member_digest = scene_member_digest(capture_ids)
     job_id = uuid.uuid5(
         _JOB_NAMESPACE,
-        f"{scene_id}:{policy_digest.hex()}:{build_input_digest.hex()}",
+        f"{scene_id}:{policy_digest.hex()}:{build_input_digest.hex()}:"
+        f"{privacy_admission_digest.hex()}",
     )
     with scope.connection.transaction():
         cursor = scope.connection.execute(
             "insert into reconstruction_scene_job "
             "(job_id, workspace_id, scene_id, member_digest, selection_policy, "
-            "selection_policy_digest,build_inputs,build_input_digest,scratch_key) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "on conflict (workspace_id,scene_id,selection_policy_digest,build_input_digest) "
+            "selection_policy_digest,build_inputs,build_input_digest,scratch_key,"
+            "privacy_admission_id,privacy_admission_digest) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "on conflict (workspace_id,scene_id,selection_policy_digest,build_input_digest,"
+            "privacy_admission_digest) "
             "do nothing",
             (
                 job_id,
@@ -105,6 +112,8 @@ def enqueue(
                 Jsonb(inputs),
                 build_input_digest,
                 f"{scope.workspace_id}/{job_id}",
+                privacy_admission_id,
+                privacy_admission_digest,
             ),
         )
         inserted = cursor.rowcount > 0
@@ -120,10 +129,18 @@ def enqueue(
                 )
 
         row = scope.connection.execute(
-            "select job_id,member_digest,selection_policy,build_inputs "
+            "select job_id,member_digest,selection_policy,build_inputs,"
+            "privacy_admission_id,privacy_admission_digest "
             "from reconstruction_scene_job where workspace_id=%s and scene_id=%s "
-            "and selection_policy_digest=%s and build_input_digest=%s",
-            (scope.workspace_id, scene_id, policy_digest, build_input_digest),
+            "and selection_policy_digest=%s and build_input_digest=%s "
+            "and privacy_admission_digest=%s",
+            (
+                scope.workspace_id,
+                scene_id,
+                policy_digest,
+                build_input_digest,
+                privacy_admission_digest,
+            ),
         ).fetchone()
         members = scope.connection.execute(
             "select capture_id from reconstruction_scene_job_member "
@@ -136,6 +153,8 @@ def enqueue(
             or bytes(row["member_digest"]) != member_digest
             or dict(row["selection_policy"]) != selection_policy
             or dict(row["build_inputs"]) != inputs
+            or row["privacy_admission_id"] != privacy_admission_id
+            or bytes(row["privacy_admission_digest"]) != privacy_admission_digest
             or [member["capture_id"] for member in members] != capture_ids
         ):
             raise ValueError(
@@ -186,6 +205,8 @@ def _claimed(scope: WorkspaceScope, row: dict[str, Any], *, reclaimed: bool) -> 
         selection_policy_digest=bytes(row["selection_policy_digest"]),
         build_inputs=dict(row["build_inputs"]),
         build_input_digest=bytes(row["build_input_digest"]),
+        privacy_admission_id=row["privacy_admission_id"],
+        privacy_admission_digest=bytes(row["privacy_admission_digest"]),
         members=tuple(
             SceneJobMember(
                 capture_id=member["capture_id"],
@@ -204,6 +225,15 @@ def _claimed(scope: WorkspaceScope, row: dict[str, Any], *, reclaimed: bool) -> 
 
 def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> ClaimedSceneJob | None:
     """Claim expired work first, then queued or retryable work, with a rotated token."""
+    scope.connection.execute(
+        "update reconstruction_scene_job set status='cancelled',claim_token=null,"
+        "claimed_by=null,lease_expires_at=null,completed_at=coalesce(completed_at,now()),"
+        "updated_at=now(),failure_class='privacy_withdrawn',"
+        "failure_message='the exact privacy admission is no longer eligible' "
+        "where workspace_id=%s and status in ('queued','failed') "
+        "and not privacy_admission_allows_job(workspace_id,job_id)",
+        (scope.workspace_id,),
+    )
     reclaimed = True
     row = scope.connection.execute(
         "update reconstruction_scene_job set status='running', attempts=attempts+1, "
@@ -212,10 +242,12 @@ def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> Claime
         "failure_class=null, failure_message=null "
         "where job_id=(select job_id from reconstruction_scene_job "
         "where workspace_id=%s and status='running' and lease_expires_at < now() "
+        "and privacy_admission_allows_job(workspace_id,job_id) "
         "and attempts < %s order by available_at,created_at,job_id "
         "for update skip locked limit 1) "
         "returning job_id,scene_id,member_digest,selection_policy,selection_policy_digest,"
-        "build_inputs,build_input_digest,attempts,claim_token,scratch_key",
+        "build_inputs,build_input_digest,privacy_admission_id,privacy_admission_digest,"
+        "attempts,claim_token,scratch_key",
         (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS),
     ).fetchone()
     if row is None:
@@ -228,9 +260,11 @@ def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> Claime
             "where job_id=(select job_id from reconstruction_scene_job "
             "where workspace_id=%s and status in ('queued','failed') and available_at <= now() "
             "and attempts < %s and not tombstone_blocks_reconstruction_job(workspace_id,job_id) "
+            "and privacy_admission_allows_job(workspace_id,job_id) "
             "order by available_at,created_at,job_id for update skip locked limit 1) "
             "returning job_id,scene_id,member_digest,selection_policy,selection_policy_digest,"
-            "build_inputs,build_input_digest,attempts,claim_token,scratch_key",
+            "build_inputs,build_input_digest,privacy_admission_id,privacy_admission_digest,"
+            "attempts,claim_token,scratch_key",
             (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS),
         ).fetchone()
     return None if row is None else _claimed(scope, row, reclaimed=reclaimed)
@@ -255,7 +289,8 @@ def heartbeat(
 def cancelled_or_lost(scope: WorkspaceScope, *, job_id: uuid.UUID, claim_token: uuid.UUID) -> bool:
     row = scope.connection.execute(
         "select status,claim_token,tombstone_blocks_reconstruction_job(workspace_id,job_id) "
-        "as blocked from reconstruction_scene_job where workspace_id=%s and job_id=%s",
+        "as blocked,privacy_admission_allows_job(workspace_id,job_id) as privacy_allowed "
+        "from reconstruction_scene_job where workspace_id=%s and job_id=%s",
         (scope.workspace_id, job_id),
     ).fetchone()
     return bool(
@@ -263,6 +298,7 @@ def cancelled_or_lost(scope: WorkspaceScope, *, job_id: uuid.UUID, claim_token: 
         or row["status"] != "running"
         or row["claim_token"] != claim_token
         or row["blocked"]
+        or not row["privacy_allowed"]
     )
 
 
@@ -286,7 +322,8 @@ def complete(
         "claim_token=null,claimed_by=null,lease_expires_at=null,"
         "completed_at=now(),updated_at=now(),failure_class=null,failure_message=null "
         "where workspace_id=%s and job_id=%s and status='running' and claim_token=%s "
-        "and not tombstone_blocks_reconstruction_job(workspace_id,job_id)",
+        "and not tombstone_blocks_reconstruction_job(workspace_id,job_id) "
+        "and privacy_admission_allows_job(workspace_id,job_id)",
         (
             scratch_key,
             pose_manifest_digest,
