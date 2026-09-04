@@ -9,6 +9,28 @@ deletion, and recovery. It does not claim that the path has passed a representat
 quality gate. No consented dense capture set or digest-pinned production pose image was available
 for that measurement.
 
+## Verification baseline
+
+**VERIFIED 2026-09-04 at `ea70b80`.** The exact campaign database and required clean-bytecode
+command sequence completed with 1,349 passed tests, 2 intentional skips, and 3 warnings. Ruff
+passed, and all four import-layer contracts passed over 256 files and 1,760 dependencies.
+
+```bash
+find . -name __pycache__ -not -path './.venv/*' -exec rm -rf {} +
+EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest
+uv run ruff check .
+uv run lint-imports
+```
+
+The first full campaign run found four migration-test failures and one import-layer violation.
+The withdrawal exercise had been placed in `exulanica.evaluation` even though it composes World
+Memory Package projection and therefore belongs in the top-level orchestration layer. Commit
+`d60be1c` moved that workflow without changing its retained record. The migration failures exposed
+an unqualified ledger lookup: a fresh deployment schema could inherit a later search-path schema's
+`schema_migrations` table. Commit `ea70b80` qualified ledger reads and writes to the connection's
+current schema and added a decoy-ledger PostgreSQL regression. A deliberate reversal made that
+regression fail by reading the decoy before the correction was restored.
+
 ## 1. Production flow
 
 The normal ingest flow runs scene grouping after capture processing. `run_scene_grouping` records
