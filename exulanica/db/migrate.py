@@ -59,15 +59,32 @@ class MigrationReport:
 
 
 def applied_migrations(connection: psycopg.Connection) -> dict[str, bytes]:
-    """``{version: checksum}`` from ``schema_migrations``, or ``{}`` before it exists."""
+    """``{version: checksum}`` from this connection's schema, or ``{}`` before it exists.
+
+    The table is schema-qualified deliberately. A connection may put ``public`` after an isolated
+    deployment schema so PostgreSQL extensions remain visible. An unqualified lookup would then
+    fall through to a different deployment's ``public.schema_migrations`` when the first schema
+    is empty, making a fresh database look fully migrated or drifted.
+    """
+    schema = _current_schema(connection)
     try:
         with connection.transaction():
             rows = connection.execute(
-                "select version, checksum from schema_migrations"
+                sql.SQL("select version, checksum from {}.schema_migrations").format(
+                    sql.Identifier(schema)
+                )
             ).fetchall()
     except psycopg.errors.UndefinedTable:
         return {}
     return {row["version"]: bytes(row["checksum"]) for row in rows}
+
+
+def _current_schema(connection: psycopg.Connection) -> str:
+    row = connection.execute("select current_schema() as schema_name").fetchone()
+    schema = None if row is None else row["schema_name"]
+    if not isinstance(schema, str) or not schema:
+        raise RuntimeError("migration connection has no current schema")
+    return schema
 
 
 def verify_schema(database: Database) -> None:
@@ -107,8 +124,10 @@ def _apply_one(connection: psycopg.Connection, migration: Migration) -> None:
     connection.execute(migration.sql)
     with connection.transaction():
         connection.execute(
-            "insert into schema_migrations (version, checksum) values (%s, %s) "
-            "on conflict (version) do nothing",
+            sql.SQL(
+                "insert into {}.schema_migrations (version, checksum) values (%s, %s) "
+                "on conflict (version) do nothing"
+            ).format(sql.Identifier(_current_schema(connection))),
             (migration.version, migration.checksum),
         )
 

@@ -65,6 +65,37 @@ def test_apply_pending_applies_every_migration_and_records_what_it_applied(empty
         assert tables["n"] >= 30
 
 
+def test_an_empty_schema_does_not_inherit_a_fallback_schema_migration_ledger():
+    """Extension lookup may fall through the search path; the deployment ledger may not."""
+    url = env_get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip(f"set {env_name('TEST_DATABASE_URL')} to a scratch PostgreSQL database")
+    suffix = uuid.uuid4().hex[:12]
+    primary = f"exulanica_migrate_primary_{suffix}"
+    fallback = f"exulanica_migrate_fallback_{suffix}"
+    with psycopg.connect(url, autocommit=True) as admin:
+        admin.execute(f'create schema "{primary}"')
+        admin.execute(f'create schema "{fallback}"')
+        admin.execute(
+            f'create table "{fallback}".schema_migrations '
+            "(version text primary key, checksum bytea not null)"
+        )
+        admin.execute(
+            f'insert into "{fallback}".schema_migrations (version, checksum) '
+            "values ('decoy', decode(repeat('00', 32), 'hex'))"
+        )
+        options = urllib.parse.quote(
+            f"-csearch_path={primary},{fallback},public", safe=""
+        )
+        scoped = f"{url}{'&' if '?' in url else '?'}options={options}"
+        try:
+            with Database(url=scoped).unscoped() as connection:
+                assert applied_migrations(connection) == {}
+        finally:
+            admin.execute(f'drop schema "{primary}" cascade')
+            admin.execute(f'drop schema "{fallback}" cascade')
+
+
 def test_a_second_apply_is_a_no_op_rather_than_an_error(empty_schema):
     """Startup runs this every time. A migration that reapplies itself is a crash loop."""
     database, _name = empty_schema
