@@ -214,7 +214,31 @@ retryable failure can be made immediately eligible with
 `POST /operations/reconstruction-scenes/{job_id}/retry`; succeeded, cancelled and exhausted jobs
 are immutable and return a conflict instead of being rewritten.
 
-## 8. Known blockers
+## 8. Deterministic synthetic plumbing fixture
+
+**BUILT AND VERIFIED 2026-09-04.**
+`exulanica.evaluation.synthetic_multiview` generates eight overlapping 800 by 600 views of one
+explicit textured 3D room. The seed, room surfaces, point sampling, camera arc, intrinsics,
+extrinsics, renderer versions, and image inventory are stored in canonical digest-bound scene,
+camera, and source manifests. Every frame has a visible SYNTHETIC banner and a synthetic EXIF
+description. No generated image call or personal input participates.
+
+Generate it in ignored Exulanica storage:
+
+```bash
+uv run python scripts/generate_synthetic_multiview.py .exulanica/validation/synthetic-v1
+```
+
+On the measured Apple M3 Pro host, the exact default source manifest digest was
+`a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f`. Real pycolmap 4.2.0
+registered all eight views through `run_colmap_pose_job`. The pinned
+`Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968` checkpoint executed on MPS
+at the production 512-pixel edge, producing 196,608 points with 196,583 valid points. Model load
+took 9.466 seconds and inference took 2.384 seconds on that run. Those values prove executable
+plumbing, coordinate conversion, and manifest provenance only. A procedural room is not evidence
+of real-photograph reconstruction quality.
+
+## 9. Known blockers
 
 Rung 2 is not implemented by this path. It requires a physically validated scale receipt, measured
 coverage, a measured collision-safe corridor, required destinations, and structural-world

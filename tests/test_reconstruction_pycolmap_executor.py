@@ -6,21 +6,20 @@ half: they run the real library through the real controller and assert that a po
 receipt. They skip where the `pose` extra is absent, which is CI, so the suite that must stay
 green stays green and the claim that pose recovery runs is made only where it was executed.
 
-The photographs are renders of the committed courtyard point map, generated here rather than
-committed, because the repository has no consented multi-view capture and a fixture of eight
-1024x768 images would be 2 MB of test data for a thing that a hundred lines of numpy reproduce.
-That makes these tests a check of the wiring and of COLMAP's behaviour on easy input. They are
-NOT evidence about photographs, and `docs/reconstruction-findings.md` section 3 says so beside
-every number they produce.
+The photographs are deterministic renders of the versioned procedural room in
+``exulanica.evaluation.synthetic_multiview``. They are generated rather than committed, because
+the repository has no consented multi-view capture and the compact scene definition reproduces
+the exact source and camera manifests. These tests check wiring and COLMAP on easy input. They
+are NOT evidence about photographs.
 """
 
 from __future__ import annotations
 
 import hashlib
-import math
 from pathlib import Path
 
 import pytest
+from exulanica.evaluation.synthetic_multiview import generate_synthetic_multiview
 from exulanica.reconstruction.pose import (
     PoseBuildManifest,
     SourceFrame,
@@ -28,80 +27,22 @@ from exulanica.reconstruction.pose import (
 )
 
 pytest.importorskip("pycolmap", reason="the pose extra is not installed")
-numpy = pytest.importorskip("numpy", reason="rendering the synthetic capture needs numpy")
-PIL_Image = pytest.importorskip("PIL.Image", reason="rendering the synthetic capture needs Pillow")
+pytest.importorskip("numpy", reason="rendering the synthetic capture needs numpy")
+pytest.importorskip("PIL.Image", reason="rendering the synthetic capture needs Pillow")
 
-from exulanica.reconstruction.pycolmap_executor import (  # noqa: E402  (after the skip guards)
+from exulanica.reconstruction.pycolmap_executor import (
     PYCOLMAP_EXECUTABLE,
     PycolmapExecutor,
     pycolmap_version,
 )
 
-_FIXTURE = (
-    Path(__file__).resolve().parents[1]
-    / "web/packages/app/public/fixtures/memory/glasshouse-courtyard.opm"
-)
-_VIEWS = 6
-_WIDTH, _HEIGHT = 800, 600
-_FOV_Y_DEG = 50.0
-
-
-def _load_point_map(path: Path) -> tuple[object, object]:
-    import json
-    import struct
-
-    raw = path.read_bytes()
-    assert raw[:4] == b"OPM1"
-    header = json.loads(raw[8 : 8 + struct.unpack_from("<I", raw, 4)[0]])
-    count = header["pointCount"]
-    sections = {section["name"]: section for section in header["sections"]}
-    position = sections["position"]["byteOffset"]
-    colour = sections["color"]["byteOffset"]
-    points = numpy.frombuffer(raw, numpy.float32, count * 3, position).reshape(-1, 3)
-    colours = numpy.frombuffer(raw, numpy.uint8, count * 4, colour).reshape(-1, 4)[:, :3]
-    return points.astype(numpy.float64), colours
-
-
-def _render(points, colours, centre, target, path: Path) -> None:
-    """One view of the point map as square sprites, painted far to near."""
-    forward = target - centre
-    forward = forward / numpy.linalg.norm(forward)
-    right = numpy.cross(forward, numpy.array([0.0, 1.0, 0.0]))
-    right = right / numpy.linalg.norm(right)
-    up = numpy.cross(right, forward)
-    relative = points - centre
-    camera = numpy.stack(
-        [relative @ right, relative @ up, relative @ forward], axis=1
-    )
-    front = camera[:, 2] > 0.1
-    camera, visible = camera[front], colours[front]
-    focal = (_HEIGHT / 2) / math.tan(math.radians(_FOV_Y_DEG) / 2)
-    x = camera[:, 0] * focal / camera[:, 2] + _WIDTH / 2
-    y = -camera[:, 1] * focal / camera[:, 2] + _HEIGHT / 2
-    size = numpy.minimum(0.04 * focal / camera[:, 2], 12.0)
-    canvas = numpy.full((_HEIGHT, _WIDTH, 3), 246, numpy.uint8)
-    for index in numpy.argsort(-camera[:, 2]):
-        radius = size[index] / 2
-        x0, x1 = int(x[index] - radius), math.ceil(x[index] + radius)
-        y0, y1 = int(y[index] - radius), math.ceil(y[index] + radius)
-        if x1 <= 0 or y1 <= 0 or x0 >= _WIDTH or y0 >= _HEIGHT:
-            continue
-        canvas[max(0, y0) : min(_HEIGHT, y1), max(0, x0) : min(_WIDTH, x1)] = visible[index]
-    PIL_Image.fromarray(canvas).save(path, quality=92)
+_VIEWS = 8
 
 
 @pytest.fixture(scope="module")
 def synthetic_capture(tmp_path_factory) -> Path:
-    if not _FIXTURE.is_file():
-        pytest.skip(f"{_FIXTURE.name} is a gitignored fixture and is not present")
-    points, colours = _load_point_map(_FIXTURE)
     directory = tmp_path_factory.mktemp("capture")
-    target = numpy.array([0.0, 0.0, -6.0])
-    for index in range(_VIEWS):
-        offset = (index / (_VIEWS - 1)) * 2.0 - 1.0
-        centre = numpy.array([1.2 * offset, 0.1 * offset, -0.3 - 0.4 * (1 - offset * offset)])
-        _render(points, colours, centre, target, directory / f"view_{index:02d}.jpg")
-    return directory
+    return generate_synthetic_multiview(directory).image_directory
 
 
 def _manifest(source: Path) -> PoseBuildManifest:
