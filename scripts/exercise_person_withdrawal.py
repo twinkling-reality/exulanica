@@ -8,7 +8,7 @@ import json
 import uuid
 from pathlib import Path
 
-from exulanica.evaluation.person_withdrawal import (
+from exulanica.orchestration.person_withdrawal import (
     PersonWithdrawalExercise,
     exercise_synthetic_person_withdrawal,
 )

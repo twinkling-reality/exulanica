@@ -7,7 +7,9 @@ normal user identity and entity tombstone paths, projects World Memory Packages 
 and drains the normal separately privileged purge queue.
 
 The simulation exercises withdrawal reachability. It is not a claim that the rendered pixels
-contain a person, not a privacy screening result, and not evidence about personal media.
+contain a person, not a privacy screening result, and not evidence about personal media. It lives
+in orchestration because it composes ingest, graph, deletion, and World Memory Package boundaries;
+the evaluation package remains below the package projection layer.
 """
 
 from __future__ import annotations

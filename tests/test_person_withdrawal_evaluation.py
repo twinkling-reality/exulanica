@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from exulanica.errors import TombstonedError
-from exulanica.evaluation.person_withdrawal import (
+from exulanica.orchestration.person_withdrawal import (
     _late_publication_refusal,
     assert_exulanica_store_root,
     assert_test_database_url,
