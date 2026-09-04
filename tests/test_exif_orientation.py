@@ -12,6 +12,7 @@ ingest, record that it happened, and put every region in upright display space.
 from __future__ import annotations
 
 import io
+import random
 
 import pytest
 from exulanica.evidence.region import MIRRORED_EXIF_ORIENTATIONS, rotation_for_exif_orientation
@@ -125,6 +126,28 @@ def test_the_rendition_carries_no_exif_at_all():
     rendition = render(upright, stage("rendition"))
     with Image.open(io.BytesIO(rendition.data)) as encoded:
         assert dict(encoded.getexif()) == {}
+
+
+def test_rendition_encodes_high_entropy_pixels_without_libjpeg_buffer_failure():
+    """A valid photograph must not be refused because optional JPEG optimisation overflows.
+
+    Version 1 failed deterministically for these bytes with Pillow's ``broken data stream when
+    writing image file`` error. Keeping the generator here makes the regression independent of
+    the campaign fixture and ensures it passes through the real downscale and encoder path.
+    """
+    rng = random.Random(0xE771A)
+    image = Image.frombytes("RGB", (800, 600), rng.randbytes(800 * 600 * 3))
+
+    spec = stage("rendition")
+    assert spec.version == 2
+    assert spec.params["optimize"] is False
+
+    first = render(image, spec)
+    second = render(image, spec)
+    assert first.data == second.data
+    with Image.open(io.BytesIO(first.data)) as encoded:
+        encoded.load()
+        assert encoded.size == (768, 576)
 
 
 def test_an_image_with_no_exif_is_treated_as_upright():

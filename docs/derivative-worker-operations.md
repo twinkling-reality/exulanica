@@ -81,6 +81,12 @@ for a registered `(stage key, version, parameter digest)`. The implemented per-c
 | `vision` | Structured observation when a vision implementation is configured | Actual start/end, model identity, attempts, tokens and returned cost |
 | `depth` | Point-map production when a depth implementation is configured | Actual start/end and model identity |
 
+**CORRECTED 2026-09-04.** Rendition stage version 2 records `optimize: false` in its parameters.
+Version 1 always enabled Pillow's optional JPEG entropy-table optimization. The libjpeg encoder
+then failed on reproducible, valid high-entropy frames with `broken data stream when writing image
+file` before any model call. Version 2 makes the robust encoding choice deterministic and visible in
+the artifact identity. It does not retry the same input with a hidden alternative encoder setting.
+
 There are no indexing, publication, or reconstruction events. New stage names require a reviewed
 stage definition before the database accepts their events.
 

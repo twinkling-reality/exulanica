@@ -61,6 +61,9 @@ def render(upright: Image.Image, spec: StageSpec) -> Rendition:
     params = spec.params
     max_edge = int(params["max_edge_px"])
     resample = _RESAMPLERS[str(params["resample"])]
+    optimize = params["optimize"]
+    if type(optimize) is not bool:
+        raise ValueError("rendition optimize parameter must be a boolean")
 
     image = upright
     if image.mode in {"RGBA", "LA", "P"}:
@@ -87,7 +90,7 @@ def render(upright: Image.Image, spec: StageSpec) -> Rendition:
         format=str(params["format"]),
         quality=int(params["quality"]),
         subsampling=_SUBSAMPLING[str(params["subsampling"])],
-        optimize=True,
+        optimize=optimize,
         # exif is not passed, so none is written. See the module docstring.
     )
     return Rendition(

@@ -140,7 +140,12 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "rendition": StageSpec(
         key="rendition",
-        version=1,
+        # Version 2 disables libjpeg's optional entropy-table optimisation. Version 1 always
+        # requested it, but Pillow's encoder can fail on ordinary high-entropy images with
+        # ``broken data stream when writing image file``.
+        # This changes the encoded bytes, so it is a versioned output change rather than an
+        # unrecorded implementation fallback.
+        version=2,
         output_kind="rendition",
         deterministic=True,
         params={
@@ -148,6 +153,7 @@ STAGES: Final[dict[str, StageSpec]] = {
             "format": "JPEG",
             "quality": 90,
             "subsampling": "4:4:4",
+            "optimize": False,
             "resample": "lanczos",
             "colour_space": "sRGB",
             "orientation": "display",
