@@ -1,0 +1,306 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "before_withdrawal": {
+      "graph": {
+        "recovered_from_signed_pre_withdrawal_package": true,
+        "rung_count": 1,
+        "rung_scene_ids": [
+          "ebb62349-8429-5423-a4c8-202eb7b402c4"
+        ],
+        "scene_count": 1,
+        "scene_ids": [
+          "ebb62349-8429-5423-a4c8-202eb7b402c4"
+        ],
+        "target_rung_present": true,
+        "target_scene_present": true
+      },
+      "world_memory_package": {
+        "all_reconstruction_rung_claim_count": 9,
+        "artifact_descriptor_count": 27,
+        "local_output_name": "before-withdrawal.wmp",
+        "manifest_sha256": "05268f38250eacb3c42232e7d9e359ce6dd1e9fa341ab201de5a842fb5eda214",
+        "merkle_root_sha256": "e4ffc9d76668894fc9342d353cbc863c6388f7f9573cd212a4c1e7db0064bf3e",
+        "profile_version": "exulanica-wmp-1.0",
+        "scene_count": 1,
+        "scene_rung_claim_count": 1,
+        "signing_public_key_sha256": "1208ed99607e2edeb2b1c9c494648800cf1ef843bc1160c010287e0997067481"
+      }
+    },
+    "durable_dependencies_before_withdrawal": [
+      {
+        "artifact_kind": "scene_gate_receipt",
+        "content_sha256": "6adfd74048b9713eb12bac89e799f5bed0c3eaa79afa37641aac036ce4afa1a7",
+        "stored_bytes_present": true,
+        "target_id": "4ad96a2e-cef7-51fd-bf32-8e264b8028fe",
+        "target_kind": "artifact"
+      },
+      {
+        "artifact_kind": "point_map_placement",
+        "content_sha256": "dea6dc980fe0bb3dd2886e2e02a99b30de97b33249f34d77a1dcaaf5f8ae1bdf",
+        "stored_bytes_present": true,
+        "target_id": "9a42b9d8-2ea5-5454-9c63-d1d20611633f",
+        "target_kind": "artifact"
+      },
+      {
+        "artifact_kind": "pose_receipt",
+        "content_sha256": "804aae628d5e597fdcb9a1a920690499e0197c5a0e4edd664876d702bdc5adea",
+        "stored_bytes_present": true,
+        "target_id": "b5f60b56-ca84-581f-9a4c-53207758a92f",
+        "target_kind": "artifact"
+      },
+      {
+        "artifact_kind": "point_map",
+        "content_sha256": "678cd9a965550a0d455d54f01c4512ea4d4a18ccce012a3fb4c1b90fe1f62a15",
+        "stored_bytes_present": true,
+        "target_id": "f05532c7-5922-5206-9ad4-eada60a1f6b3",
+        "target_kind": "artifact"
+      },
+      {
+        "artifact_kind": null,
+        "content_sha256": null,
+        "stored_bytes_present": null,
+        "target_id": "01a06e5b-3b2e-7b7e-bb10-e97a6af27079",
+        "target_kind": "assertion"
+      },
+      {
+        "artifact_kind": null,
+        "content_sha256": null,
+        "stored_bytes_present": null,
+        "target_id": "01a06e8d-0b4b-7278-b527-557ad72b83ec",
+        "target_kind": "assertion"
+      },
+      {
+        "artifact_kind": null,
+        "content_sha256": null,
+        "stored_bytes_present": null,
+        "target_id": "ebb62349-8429-5423-a4c8-202eb7b402c4",
+        "target_kind": "scene"
+      },
+      {
+        "artifact_kind": null,
+        "content_sha256": null,
+        "stored_bytes_present": null,
+        "target_id": "806ee8aa-e53a-533b-bf47-3ed83a47ac55",
+        "target_kind": "scene_job"
+      },
+      {
+        "artifact_kind": null,
+        "content_sha256": null,
+        "stored_bytes_present": null,
+        "target_id": "b61f2f47-2ba5-518d-b6fd-864daecec9dc",
+        "target_kind": "scene_job"
+      }
+    ],
+    "limitations": [
+      "The occurrence and identity are explicit synthetic evaluation simulation records.",
+      "The exercise proves dependency reachability, serving withdrawal, package withdrawal, late-write refusal, and stored-byte purge on one actual synthetic production scene.",
+      "It does not test a real person's identity, request, legal basis, or personal-media consent.",
+      "Registered and unregistered members, concurrent workers, retries, shared bytes, and superseded builds remain covered by the PostgreSQL integration suite.",
+      "The browser disappearance observation is retained separately after this database and object-store exercise.",
+      "The first evaluator process stopped after the tombstone commit when its late-write probe caught the database exception below the repository's domain-error boundary. No purge job ran before the corrected evaluator resumed the durable tombstone and queue."
+    ],
+    "notice": "A simulated occurrence over an all-synthetic scene exercised production person withdrawal. It is not a claim that a person appears in the pixels, a personal-media result, or a consent event.",
+    "profile": "exulanica.person-withdrawal-evaluation/v1",
+    "purge": {
+      "already_absent": 0,
+      "blocked": null,
+      "completed_tombstone_ids": [
+        "01a06e8d-0b89-794c-8a65-83180b99bd53"
+      ],
+      "database_role": "exulanica_purge",
+      "destroyed": 4,
+      "errors": [],
+      "exhausted": 0,
+      "failed": 0,
+      "final": {
+        "dependent_artifacts": [
+          {
+            "artifact_id": "4ad96a2e-cef7-51fd-bf32-8e264b8028fe",
+            "database_purged": true,
+            "stored_bytes_present": false
+          },
+          {
+            "artifact_id": "9a42b9d8-2ea5-5454-9c63-d1d20611633f",
+            "database_purged": true,
+            "stored_bytes_present": false
+          },
+          {
+            "artifact_id": "b5f60b56-ca84-581f-9a4c-53207758a92f",
+            "database_purged": true,
+            "stored_bytes_present": false
+          },
+          {
+            "artifact_id": "f05532c7-5922-5206-9ad4-eada60a1f6b3",
+            "database_purged": true,
+            "stored_bytes_present": false
+          }
+        ],
+        "purge_jobs": [
+          {
+            "count": 4,
+            "state": "done",
+            "target_kind": "artifact"
+          }
+        ],
+        "source_capture_deleted": false,
+        "source_object_present": true,
+        "tombstone_purge_complete": true,
+        "unrelated_point_maps": [
+          {
+            "artifact_id": "70496635-25b9-5663-b802-360704c7edbd",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "86e7efcd-ed48-56c6-bf79-42cb7fd66028",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "8eea0298-5029-5cd2-84b8-07563396d221",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "9d4c7941-bf87-5ddc-8c14-271cf7fd3d9b",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "9fcb69a4-dfae-5300-8d6e-9207f29787b4",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "c9a2b735-d7c7-5566-8500-07c7f614fd2d",
+            "database_live": true,
+            "stored_bytes_present": true
+          },
+          {
+            "artifact_id": "e9bad4d4-ca46-5e64-93ab-0d48505adbd3",
+            "database_live": true,
+            "stored_bytes_present": true
+          }
+        ]
+      },
+      "skipped": 0
+    },
+    "retention_boundary": {
+      "live_capture_count": 8,
+      "source_capture_deleted": false,
+      "source_capture_policy": "retained",
+      "source_object_present": true,
+      "unrelated_point_maps": [
+        {
+          "artifact_id": "70496635-25b9-5663-b802-360704c7edbd",
+          "content_sha256": "567cb0c2fa31f3866cd5dd125f901602e67f3a852ff50e695ce8dbf2b97f9400",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "86e7efcd-ed48-56c6-bf79-42cb7fd66028",
+          "content_sha256": "3181e7280d8103933ceaf8183cafc38f938fdebd3e2305b8c84254a0bcaf1da2",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "8eea0298-5029-5cd2-84b8-07563396d221",
+          "content_sha256": "9765314c58a8fb9dd951f273cdc8b6df854fb007c9259820aa457260d6a9dcc3",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "9d4c7941-bf87-5ddc-8c14-271cf7fd3d9b",
+          "content_sha256": "929530a8440eff5618f8346fd39329d66c3c35a9d902b511b8681d5ef7e43180",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "9fcb69a4-dfae-5300-8d6e-9207f29787b4",
+          "content_sha256": "4bd73765b2924fd697d23c957854820effef03fd8af2b475434f521bb792a4df",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "c9a2b735-d7c7-5566-8500-07c7f614fd2d",
+          "content_sha256": "0890eee767e46e4f8ffda05b24cccd718004492c347aa107adc9448a58dd02b8",
+          "stored_bytes_present": true
+        },
+        {
+          "artifact_id": "e9bad4d4-ca46-5e64-93ab-0d48505adbd3",
+          "content_sha256": "194c811a72e3f0f5cacf3439a908077d1f371de5ccf94f296466001fd8982b6d",
+          "stored_bytes_present": true
+        }
+      ]
+    },
+    "source_build": {
+      "exercise_started_git_head": "af7a33c663716a10afe25d1f845984f1566c1e73",
+      "interrupted_and_resumed": true,
+      "measured_implementation_scope_dirty": false,
+      "record_completed_git_head": "69639606269f1ef61e344d12fe9c9fe2b5cfc23b",
+      "repository_dirty": true
+    },
+    "synthetic_subject": {
+      "actor_id": "753a402e-18f0-586e-866e-5cb9c21f6163",
+      "display_name": "Synthetic Withdrawal Fixture Subject",
+      "entity_id": "01a06e8d-0b47-7cf7-8a12-1a04f517aee9",
+      "link_id": "01a06e8d-0b52-7018-96ce-5ee3a8e9581b",
+      "naming_assertion_id": "01a06e8d-0b4b-7278-b527-557ad72b83ec",
+      "occurrence_id": "01a06e8d-0b3b-76b1-bbea-6b5f6ad254f8",
+      "simulation_profile": "exulanica.synthetic-person-withdrawal-fixture/v1"
+    },
+    "target": {
+      "authorization_sha256": "00448c97f39aa7d083e37cf9c862a8039e72de87694897839efdb9563b838d56",
+      "build_input_sha256": "1f3e373665b7c6de2e21b548a9f33171352338a3672d65c384dbdaefb3af991c",
+      "capture_id": "01a06e52-e45a-71ce-8f2d-8afe307c0702",
+      "capture_ordinal": 0,
+      "corpus_class": "synthetic",
+      "current_job_id": "806ee8aa-e53a-533b-bf47-3ed83a47ac55",
+      "point_map_artifact_id": "f05532c7-5922-5206-9ad4-eada60a1f6b3",
+      "point_map_content_sha256": "678cd9a965550a0d455d54f01c4512ea4d4a18ccce012a3fb4c1b90fe1f62a15",
+      "privacy_admission_id": "110ba26d-9126-5350-9576-7bb1c63f13ee",
+      "privacy_admission_sha256": "8151792548fd09b2ab236461b69f34e9ab26b24bd1f9b366e00af4d84082331d",
+      "registered": true,
+      "scene_id": "ebb62349-8429-5423-a4c8-202eb7b402c4",
+      "screening_sha256": "4399f9516b0aea36044f72581b041bd99575c5a12a2d097e7004c3b03b8d66fe",
+      "source_manifest_sha256": "a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f",
+      "source_sha256": "c080d6d58a9b0a67f9c4a7de85b0720ddb8c696ff5bab8406aa667a00e065820",
+      "workspace_id": "01fb340f-ff45-5a49-ae9e-f1a430a626f7"
+    },
+    "withdrawal": {
+      "database_receipt": {
+        "cancelled_scene_job_count": 0,
+        "created_at": "2026-09-04T22:32:12.425518Z",
+        "dependency_count": 9,
+        "profile": "exulanica.person-withdrawal-receipt/v1",
+        "purge_job_count": 4,
+        "record_sha256": "f9608e0fbd0e9b7647c049169b6cbc1ba347b63f89c946128c7017d5d60a13ba",
+        "retracted_assertion_count": 2,
+        "source_capture_policy": "retained"
+      },
+      "immediate_graph": {
+        "rung_count": 0,
+        "rung_scene_ids": [],
+        "scene_count": 0,
+        "scene_ids": [],
+        "target_rung_present": false,
+        "target_scene_present": false
+      },
+      "late_publication_refusal": {
+        "error_class": "TombstonedError",
+        "reason": "tombstoned: write refused for artifact",
+        "refused": true,
+        "sqlstate": "23000"
+      },
+      "tombstone_id": "01a06e8d-0b89-794c-8a65-83180b99bd53",
+      "world_memory_package": {
+        "all_reconstruction_rung_claim_count": 8,
+        "artifact_descriptor_count": 23,
+        "local_output_name": "after-withdrawal.wmp",
+        "manifest_sha256": "777c3aea67060d70034fe95eb1f02c43a5a9ad99a8d81142e5fb0fdf1369eb88",
+        "merkle_root_sha256": "16e7d0acb210e73a41f803f89b46ebc0489293008ccd2332c69bae3e5fc65642",
+        "profile_version": "exulanica-wmp-1.0",
+        "scene_count": 0,
+        "scene_rung_claim_count": 0,
+        "signing_public_key_sha256": "d36742aab3af26c0e076ecf1f3a582badb79ba62ace3d9a7c4e74060d89ac004"
+      }
+    }
+  },
+  "record_sha256": "fdfc2821c54136f296982e3ec2a949aa35380a984a637f1649c3bb4288a1bf69"
+}

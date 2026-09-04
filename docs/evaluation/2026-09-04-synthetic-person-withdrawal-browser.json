@@ -1,0 +1,80 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.browser-person-withdrawal-observation/v1",
+    "observed_at": "2026-09-04T22:47:27Z",
+    "corpus_class": "synthetic",
+    "notice": "A simulated person occurrence over an all-synthetic scene exercised the production withdrawal path. This is not a claim that a person appears in the pixels, a personal-media result, or a consent event.",
+    "source_build": {
+      "git_head": "be551299b97bfcd23b5a2bd393a0df4d16d5a6d7",
+      "repository_dirty": true,
+      "measured_app_scope_dirty": false
+    },
+    "target": {
+      "workspace_id": "01fb340f-ff45-5a49-ae9e-f1a430a626f7",
+      "scene_id": "ebb62349-8429-5423-a4c8-202eb7b402c4",
+      "capture_id": "01a06e52-e45a-71ce-8f2d-8afe307c0702",
+      "evidence_span_id": "01a06e52-e463-77bb-8c0f-7093ba241552",
+      "tombstone_id": "01a06e8d-0b89-794c-8a65-83180b99bd53"
+    },
+    "browser_runtime": {
+      "browser": "Google Chrome 152.0.7977.82",
+      "operating_system": "macOS 26.5.1 build 25F80",
+      "cpu": "Apple M3 Pro",
+      "viewport_css_px": [
+        1280,
+        720
+      ]
+    },
+    "browser_observation": {
+      "empty_world_element_count": 1,
+      "empty_heading": "No live memories are available",
+      "shell_world_state": "empty",
+      "canvas_hidden": true,
+      "canvas_engine": null,
+      "reconstruction_validation_record_present": false,
+      "renderer_mounted": false
+    },
+    "api_observation": {
+      "graph_http_status": 200,
+      "live_island_count": 0,
+      "live_occurrence_count": 0,
+      "live_reconstruction_scene_count": 0,
+      "source_catalog_http_status": 409,
+      "source_catalog_code": "world_not_configured",
+      "source_catalog_detail": "no protected world topology is registered"
+    },
+    "retained_original": {
+      "capture_live": true,
+      "evidence_http_status": 200,
+      "media_type": "image/jpeg",
+      "byte_size": 768370,
+      "source_sha256": "c080d6d58a9b0a67f9c4a7de85b0720ddb8c696ff5bab8406aa667a00e065820",
+      "digest_matches_admitted_source": true
+    },
+    "screenshot": {
+      "path": "2026-09-04-synthetic-person-withdrawal-browser.png",
+      "sha256": "c460de7069cc18fe5e0c34a3b5f5609d5a92ca99c20f461dbae6b3cb14bcd0af",
+      "byte_size": 44726,
+      "width_css_px": 1280,
+      "height_css_px": 720,
+      "capture_mode": "separate headless Chrome visual capture; DOM assertions came from the interactive browser"
+    },
+    "automated_recovery_evidence": {
+      "empty_world_boundary": "web/packages/app/test/empty-world.test.ts",
+      "full_web_test_files": 87,
+      "full_web_tests": 670,
+      "dependency_boundary_violations": 0,
+      "app_production_build_succeeded": true,
+      "condition_reversal_mutation_killed": true
+    },
+    "limitations": [
+      "This observation loaded the application after the withdrawal; it is not an interactive browser recording of the tombstone transaction itself.",
+      "The direct authorized evidence citation proves that retained source bytes remain retrievable, but the world source-media catalog is unavailable after protected topology disappears.",
+      "No frame timing is reported because the empty state intentionally does not mount a renderer.",
+      "The screenshot is visual evidence only and is not the source of the DOM assertions.",
+      "No personal media was admitted or evaluated."
+    ]
+  },
+  "record_sha256": "a80439e64ac0865bb57eab64a0df7bc34d532f22b5398af4c25b67c0f9f85863"
+}

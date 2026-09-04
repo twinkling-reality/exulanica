@@ -278,7 +278,38 @@ license permits qualified redistribution, the validation campaign avoids adding 
 to the Apache-2.0 source tree. Benchmark results can establish engineering and reconstruction
 measurements only. They cannot establish personal-media acceptance.
 
-## 10. Known blockers
+## 10. Synthetic person-withdrawal exercise
+
+**EXECUTED AND RETAINED 2026-09-04.** A clearly simulated person occurrence was linked through
+the normal identity path to one capture in the all-synthetic production scene. The normal entity
+tombstone immediately removed the scene and its rung claim from graph delivery and World Memory
+Package projection. The dedicated `exulanica_purge` role then destroyed the target point map, pose
+receipt, placement receipt, and scene-gate receipt. Seven unrelated point maps remained live and
+stored. A late artifact publication attempt was refused with SQLSTATE 23000.
+
+The exact database, package, purge, and retained-source observations are digest-bound in
+`docs/evaluation/2026-09-04-synthetic-person-withdrawal.json`. The first evaluator process stopped
+after committing the tombstone because its probe caught a database exception below the repository
+domain-error boundary. No purge job had run. The corrected evaluator resumed the durable tombstone
+and queue, then completed the exercise. This interruption is recorded as evidence rather than
+discarded.
+
+The follow-up production browser observation is digest-bound in
+`docs/evaluation/2026-09-04-synthetic-person-withdrawal-browser.json`. The authenticated graph had
+zero live islands, occurrences, and reconstruction scenes. Chrome rendered one semantic empty
+state, hid the canvas, and mounted no renderer. The exact original still returned HTTP 200 from its
+authorized evidence citation with the admitted 768,370 bytes and SHA-256, while the higher-level
+source catalog returned `world_not_configured` because no protected topology remained. The latter
+distinction matters: source retention and citation retrieval succeeded, but the result does not
+claim that a topology-dependent catalog still discovers the retained file.
+
+The occurrence, entity, and name in this exercise are synthetic simulation records. The evidence
+proves dependency reachability, immediate serving withdrawal, package withdrawal, late-write
+refusal, privileged stored-byte purge, browser disappearance, and source retention for this exact
+synthetic scene. It does not prove a real person's identity, request, legal basis, consent, or
+personal-media acceptance.
+
+## 11. Known blockers
 
 Rung 2 is not implemented by this path. It requires a physically validated scale receipt, measured
 coverage, a measured collision-safe corridor, required destinations, and structural-world
