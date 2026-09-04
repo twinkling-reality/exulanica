@@ -19,7 +19,10 @@ from exulanica.ingest.privacy import (
     authorize_synthetic_capture,
     record_synthetic_exemption,
 )
-from exulanica.ingest.scene_selection import enqueue_scene_reconstructions
+from exulanica.ingest.scene_selection import (
+    enqueue_exact_scene_reconstruction,
+    enqueue_scene_reconstructions,
+)
 from exulanica.ingest.scenes import SceneGroup
 from exulanica.store.local import LocalContentAddressedStore
 
@@ -151,6 +154,68 @@ def test_the_initial_policy_waits_for_every_point_map_and_binds_exact_inputs(rep
     assert [item["capture_ref"] for item in row["build_inputs"]["point_maps"]] == [
         str(capture_id) for capture_id in captures[2:]
     ]
+
+
+def test_operator_exact_set_binds_actor_purpose_order_and_source_bytes(repository, tmp_path):
+    captures = _captures(repository, 3)
+    store = LocalContentAddressedStore(tmp_path / "store")
+    for index, capture_id in enumerate(captures):
+        capture = repository.capture(capture_id)
+        assert capture is not None
+        write_point_map(
+            repository,
+            store,
+            capture.blob_id,
+            payload=f"exact point map {index}".encode(),
+        )
+    actor = uuid.UUID("cc20715e-2466-58cc-a9d7-7d519ce4f192")
+    authorized_at = dt.datetime(2026, 9, 4, 17, tzinfo=dt.UTC)
+
+    selection = enqueue_exact_scene_reconstruction(
+        repository,
+        list(reversed(captures)),
+        actor=actor,
+        purpose="licensed benchmark reconstruction validation",
+        authorized_at=authorized_at,
+    )
+
+    assert selection is not None
+    assert selection.member_count == 3
+    row = repository.connection.execute(
+        "select selection_policy,selection_policy_digest from reconstruction_scene_job "
+        "where workspace_id=%s and job_id=%s",
+        (repository.workspace_id, selection.job_id),
+    ).fetchone()
+    assert row is not None
+    policy = row["selection_policy"]
+    assert policy["profile"] == "exulanica.operator-exact-set-pose-selection/v1"
+    assert policy["authorization"] == {
+        "actor_ref": str(actor),
+        "authorized_at": "2026-09-04T17:00:00Z",
+        "profile": "exulanica.operator-exact-set-authorization/v1",
+        "purpose": "licensed benchmark reconstruction validation",
+    }
+    assert [item["capture_ref"] for item in policy["members"]] == [
+        str(capture_id) for capture_id in reversed(captures)
+    ]
+    assert [item["ordinal"] for item in policy["members"]] == [0, 1, 2]
+    assert all(len(item["source_sha256"]) == 64 for item in policy["members"])
+    assert len(bytes(row["selection_policy_digest"])) == 32
+
+
+def test_operator_exact_set_does_not_queue_incomplete_privacy_safe_inputs(repository):
+    captures = _captures(repository, 3)
+
+    assert (
+        enqueue_exact_scene_reconstruction(
+            repository,
+            captures,
+            actor=uuid.UUID("cc20715e-2466-58cc-a9d7-7d519ce4f192"),
+            purpose="licensed benchmark reconstruction validation",
+            authorized_at=dt.datetime(2026, 9, 4, 17, tzinfo=dt.UTC),
+        )
+        is None
+    )
 
 
 def test_two_claimants_do_not_receive_the_same_scene(ingest_spine):

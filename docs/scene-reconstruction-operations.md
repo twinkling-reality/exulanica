@@ -1,6 +1,7 @@
 # Production reconstruction scenes
 
-Status: **IMPLEMENTED and PostgreSQL-tested 2026-09-04; no authorized real capture run**.
+Status: **IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark acquired, production
+run pending named human privacy review**.
 
 This document is the operating contract for Exulanica's production rung-3 multi-photograph path.
 It covers scene selection, durable work, pose recovery, placement, graph delivery, rendering,
@@ -26,6 +27,12 @@ The grouping stage's current one-hour and 250-metre boundaries are unvalidated s
 They are not hidden product rules. Changing them changes the stage digest and therefore creates a
 new deterministic grouping result. A future reviewed selection policy can replace
 `SceneGroupPosePolicy` without changing scene identity, job leasing, placement, or delivery.
+
+Sources that honestly lack the automatic policy's EXIF assumptions may use
+`enqueue_exact_scene_reconstruction`. This is a narrow operator-authorized selection interface,
+not a metadata repair. Its versioned policy binds the operator, authorization time, purpose,
+ordered capture ids, and source digests. It still waits for every privacy-bound point map and uses
+the same admission, build-input, queue, worker, and publication contracts as automatic grouping.
 
 The queue row is durable before compute starts. It owns an immutable ordered membership table, the
 complete member-set digest, the selection-policy digest, an exact build-input record and digest, a
@@ -238,7 +245,40 @@ took 9.466 seconds and inference took 2.384 seconds on that run. Those values pr
 plumbing, coordinate conversion, and manifest provenance only. A procedural room is not evidence
 of real-photograph reconstruction quality.
 
-## 9. Known blockers
+## 9. Licensed real benchmark
+
+**ACQUIRED AND VERIFIED 2026-09-04; PRODUCTION ADMISSION PENDING NAMED HUMAN REVIEW.** The selected
+corpus is the 14-image `pipes` training scene from the ETH3D High-resolution Multi-view Stereo
+Benchmark. ETH3D's official site licenses its data under CC BY-NC-SA 4.0. The selected undistorted
+archive is 145,321,540 bytes and includes 14 images at 6,220 by 4,141 pixels plus COLMAP-format
+camera calibration and sparse points. Surface ground truth is available separately and is not in
+this bounded download.
+
+The committed digest-bound source manifest is
+`exulanica/evaluation/benchmarks/eth3d-pipes-v1.json`. It fixes the official source URL, retrieval
+date, archive checksum, license legal-code checksum, exact file inventory, per-image checksums and
+dimensions, ground-truth availability, and privacy-inspection state. Acquire only those declared
+bytes into ignored Exulanica storage:
+
+```bash
+uv run python scripts/acquire_benchmark_scene.py \
+  .exulanica/validation/benchmark/eth3d-pipes
+```
+
+On 2026-09-04 the downloader verified source-manifest digest
+`4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814` and archive digest
+`718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c`. A Codex visual review of
+all 14 frames found no visible people, but that review is explicitly provisional. The production
+privacy policy requires a named human to review the exact bytes, so no eligibility receipt may be
+created until that confirmation occurs. This fail-closed state is evidence that benchmark
+availability does not bypass real-media admission.
+
+The archive and source images remain ignored local inputs. They are not committed. Although the
+license permits qualified redistribution, the validation campaign avoids adding ShareAlike media
+to the Apache-2.0 source tree. Benchmark results can establish engineering and reconstruction
+measurements only. They cannot establish personal-media acceptance.
+
+## 10. Known blockers
 
 Rung 2 is not implemented by this path. It requires a physically validated scale receipt, measured
 coverage, a measured collision-safe corridor, required destinations, and structural-world

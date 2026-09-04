@@ -1,0 +1,68 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "archive": {
+      "bytes": 145321540,
+      "filename": "pipes_dslr_undistorted.7z",
+      "sha256": "718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c",
+      "url": "https://www.eth3d.net/data/pipes_dslr_undistorted.7z"
+    },
+    "calibration_directory": "pipes/dslr_calibration_undistorted",
+    "corpus_class": "benchmark",
+    "dataset": {
+      "citation": "Thomas Schops, Johannes L. Schonberger, Silvano Galliani, Torsten Sattler, Konrad Schindler, Marc Pollefeys, and Andreas Geiger. A Multi-View Stereo Benchmark with High-Resolution Images and Multi-Camera Videos. CVPR 2017.",
+      "name": "ETH3D High-resolution Multi-view Stereo Benchmark",
+      "scene": "pipes",
+      "split": "training"
+    },
+    "files": [
+      {"bytes": 168, "path": "pipes/dslr_calibration_undistorted/cameras.txt", "sha256": "c578c441c9fe0aa0624cca280eaa6881e48d7a8df1a106fe27482da80636aecc"},
+      {"bytes": 971781, "path": "pipes/dslr_calibration_undistorted/images.txt", "sha256": "52313d210be6c18191fea051655a41f6b67a365e4ef3d99b8bc8940c63eb1256"},
+      {"bytes": 176384, "path": "pipes/dslr_calibration_undistorted/points3D.txt", "sha256": "a6e8675d728a2204a78fb0c8ef73cdb20bd277f7b22001fe7e369b95e361ab92"},
+      {"bytes": 10385068, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0634.JPG", "sha256": "661b824a1db24687e7ba7aa9efefc12d3efc9d95994bd75473363de7e496dcf7", "width": 6220},
+      {"bytes": 10346406, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0635.JPG", "sha256": "d0f5a55f79373850317eab550438058e765a75ba90c2f411c9a20317a7dbb049", "width": 6220},
+      {"bytes": 10289785, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0636.JPG", "sha256": "9ee7dae20e0af9e656b8195aaa366b9d16b7651c2eaf2d99aeba0118a68ad151", "width": 6220},
+      {"bytes": 10489025, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0637.JPG", "sha256": "10fb26b562f8ea0bd79213942f4e863753a8eea1549577e6eda02da58672ea91", "width": 6220},
+      {"bytes": 10737033, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0638.JPG", "sha256": "8a5b506a2e0dd4515fb959cbeec601bb7e97efa9685414994169494f4e66dd85", "width": 6220},
+      {"bytes": 10137606, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0639.JPG", "sha256": "a333f5f5dc0a60a43c1991c707ad332640b5270e29e100c91b7ae03dc89f5110", "width": 6220},
+      {"bytes": 10372672, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0640.JPG", "sha256": "dfc8a97e47c099fa59070342b1e7ec2e0840a6c3f184440ffc29e63aeba0f542", "width": 6220},
+      {"bytes": 10363187, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0641.JPG", "sha256": "9f84ff4200c6892a6f5497bb84b6c750e363c800d91e19e887321543233f59df", "width": 6220},
+      {"bytes": 10656263, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0642.JPG", "sha256": "c093f8318c25f408d951c8ab24b5a026942661ffb48e6fa3de1fee464c59f39a", "width": 6220},
+      {"bytes": 11019673, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0643.JPG", "sha256": "09cee9360dcbdcd04729eb3041e9ddabcb3f0390efc85e121aa958634cf507cd", "width": 6220},
+      {"bytes": 10755119, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0644.JPG", "sha256": "598d5ec54a3ec21065a2d19d92ea5f20f3abc334f90dfcfac0c98cbc1d9b5f62", "width": 6220},
+      {"bytes": 11139278, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0645.JPG", "sha256": "36d186000b48caf6bef5bcc98d520ed13e44296e62e7275ae70ba2cfe1654819", "width": 6220},
+      {"bytes": 10630386, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0646.JPG", "sha256": "539b724aea4e002d88e81643cc99c09da6c21f6d936b8707af66f031b4a9e964", "width": 6220},
+      {"bytes": 10490689, "height": 4141, "path": "pipes/images/dslr_images_undistorted/DSC_0647.JPG", "sha256": "9e56a1dd663d1cec2998650a943c79073e38aee7d2878e3f65b3de175d79cdee", "width": 6220}
+    ],
+    "ground_truth": {
+      "camera_calibration": true,
+      "colmap_format": true,
+      "sparse_points": true,
+      "surface_geometry_in_selected_archive": false
+    },
+    "image_count": 14,
+    "image_directory": "pipes/images/dslr_images_undistorted",
+    "license": {
+      "bytes": 20850,
+      "dataset_license_page": "https://www.eth3d.net/",
+      "filename": "CC-BY-NC-SA-4.0.txt",
+      "identifier": "CC-BY-NC-SA-4.0",
+      "permitted_use": "Non-commercial engineering evaluation with attribution and ShareAlike obligations.",
+      "redistribution": "Permitted under CC BY-NC-SA 4.0 subject to attribution, NonCommercial, ShareAlike, and notice requirements.",
+      "sha256": "e66c269d4819aaab34b49ef5220c4ddab6756f21bb5180761a4eb8561f2b7bbd",
+      "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.txt"
+    },
+    "privacy_inspection": {
+      "production_human_review": "required-before-admission",
+      "result": "no-visible-persons-detected",
+      "reviewed_frames": 14,
+      "reviewer_kind": "codex-visual-inspection",
+      "sensitive_regions": [],
+      "status": "provisional-until-named-human-confirms"
+    },
+    "profile": "exulanica.benchmark-source-manifest/v1",
+    "retrieval_date": "2026-09-04",
+    "source_page": "https://www.eth3d.net/datasets"
+  },
+  "record_sha256": "4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814"
+}

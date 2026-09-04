@@ -312,6 +312,7 @@ corpus.
 | ffmpeg 8.1.1 | LGPL or GPL depending on build configuration | n/a | **UNVERIFIED** | n/a | **UNVERIFIED.** We invoke it as a subprocess and neither link nor redistribute it, which is the standard mitigation. **Confirm the build configuration of the binary used in the container** |
 | RO-Crate 1.2 spec | open standard | n/a | Yes for the spec | <https://www.researchobject.org/ro-crate/> | SHIP the spec. **Tooling libraries UNVERIFIED** |
 | Croissant 1.0 plus RAI spec | open standard, MLCommons | n/a | Yes for the spec | <https://docs.mlcommons.org/croissant/> | SHIP the spec. **Tooling libraries UNVERIFIED** |
+| ETH3D high-resolution multi-view benchmark, `pipes` training scene | Data: CC-BY-NC-SA-4.0 | n/a | No, separately licensed evaluation input | <https://www.eth3d.net/> | **USE-ONLY, VERIFIED 2026-09-04.** Official data page states CC BY-NC-SA 4.0. Fixed archive and license-document digests are in `exulanica/evaluation/benchmarks/eth3d-pipes-v1.json`. Never vendor the source images into the Apache-2.0 tree |
 
 ---
 

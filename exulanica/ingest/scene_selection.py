@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from dataclasses import dataclass
 from typing import Protocol
@@ -12,9 +13,11 @@ from exulanica.ingest.scenes import SceneGroup
 from exulanica.ingest.stages import stage
 
 __all__ = [
+    "ExactSetJobSelection",
     "SceneGroupPosePolicy",
     "SceneJobSelection",
     "SceneReconstructionPolicy",
+    "enqueue_exact_scene_reconstruction",
     "enqueue_scene_reconstructions",
 ]
 
@@ -23,6 +26,13 @@ __all__ = [
 class SceneJobSelection:
     job_id: uuid.UUID
     scene_group_ordinal: int
+    member_count: int
+    inserted: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ExactSetJobSelection:
+    job_id: uuid.UUID
     member_count: int
     inserted: bool
 
@@ -71,6 +81,125 @@ class SceneGroupPosePolicy:
         }
 
 
+def _utc_text(value: dt.datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("exact-set authorization time must include a UTC offset")
+    return value.astimezone(dt.UTC).isoformat().replace("+00:00", "Z")
+
+
+def _enqueue_capture_set(
+    repository: IngestRepository,
+    capture_ids: list[uuid.UUID],
+    selection_record: dict[str, object],
+) -> tuple[uuid.UUID, bool] | None:
+    point_maps = repository.current_capture_artifacts(
+        capture_ids=capture_ids,
+        kind="point_map",
+    )
+    if len(point_maps) != len(capture_ids):
+        return None
+    admission = admit_reconstruction_scene(
+        repository,
+        capture_ids=capture_ids,
+        screening_ids=[point_maps[capture_id].privacy_screening_id for capture_id in capture_ids],
+    )
+    if admission.eligibility_state != "eligible":
+        return None
+    build_inputs = {
+        "profile": "exulanica.reconstruction-scene-build-input/v1",
+        "point_maps": [
+            {
+                "capture_ref": str(capture_id),
+                "artifact_ref": str(point_maps[capture_id].artifact_id),
+                "content_sha256": point_maps[capture_id].content_sha256.hex(),
+            }
+            for capture_id in capture_ids
+        ],
+        "privacy_admission": {
+            "admission_ref": str(admission.admission_id),
+            "admission_sha256": admission.admission_digest.hex(),
+            "policy_version": admission.policy_version,
+            "policy_params_sha256": admission.policy_params_digest.hex(),
+        },
+        "stages": [
+            {
+                "key": key,
+                "version": stage(key).version,
+                "params_sha256": stage(key).params_digest.hex(),
+            }
+            for key in ("scene_pose", "scene_placement", "scene_gate")
+        ],
+    }
+    return repository.enqueue_reconstruction_scene(
+        capture_ids=capture_ids,
+        selection_policy=selection_record,
+        privacy_admission_id=admission.admission_id,
+        privacy_admission_digest=admission.admission_digest,
+        build_inputs=build_inputs,
+    )
+
+
+def enqueue_exact_scene_reconstruction(
+    repository: IngestRepository,
+    capture_ids: list[uuid.UUID],
+    *,
+    actor: uuid.UUID,
+    purpose: str,
+    authorized_at: dt.datetime,
+) -> ExactSetJobSelection | None:
+    """Queue one operator-authorized ordered set behind the normal selection boundary.
+
+    This interface exists for sources such as benchmarks whose honest metadata does not satisfy
+    the automatic grouping policy. It does not fabricate capture time or EXIF. The actor,
+    purpose, ordered capture identities, and exact source digests are part of the immutable
+    selection policy whose canonical digest is stored with the job.
+    """
+    if len(capture_ids) < 3:
+        raise ValueError("the current pose backend does not accept fewer than three members")
+    if len(set(capture_ids)) != len(capture_ids):
+        raise ValueError("exact-set capture members must be unique")
+    if not purpose.strip():
+        raise ValueError("exact-set authorization purpose must be non-empty")
+    members = []
+    for ordinal, capture_id in enumerate(capture_ids):
+        capture = repository.capture(capture_id)
+        if capture is None or capture.deleted_at is not None:
+            raise ValueError(f"exact-set capture {capture_id} is absent or deleted")
+        members.append(
+            {
+                "capture_ref": str(capture_id),
+                "ordinal": ordinal,
+                "source_sha256": capture.blob_id.hex,
+            }
+        )
+    record: dict[str, object] = {
+        "profile": "exulanica.operator-exact-set-pose-selection/v1",
+        "authorization": {
+            "actor_ref": str(actor),
+            "authorized_at": _utc_text(authorized_at),
+            "profile": "exulanica.operator-exact-set-authorization/v1",
+            "purpose": purpose,
+        },
+        "members": members,
+        "minimum_member_count": 3,
+        "ordering": "operator-declared-exact-order",
+        "source": {"kind": "operator_exact_set"},
+        "limitations": [
+            "Selection records authorization but does not predict registration or pose quality.",
+            "The interface must not be used to fabricate missing capture metadata.",
+        ],
+    }
+    result = _enqueue_capture_set(repository, capture_ids, record)
+    if result is None:
+        return None
+    job_id, inserted = result
+    return ExactSetJobSelection(
+        job_id=job_id,
+        member_count=len(capture_ids),
+        inserted=inserted,
+    )
+
+
 def enqueue_scene_reconstructions(
     repository: IngestRepository,
     groups: list[SceneGroup],
@@ -89,54 +218,10 @@ def enqueue_scene_reconstructions(
         record = selected_by.selection_record(group)
         if record is None:
             continue
-        point_maps = repository.current_capture_artifacts(
-            capture_ids=group.capture_ids,
-            kind="point_map",
-        )
-        if len(point_maps) != len(group.capture_ids):
+        result = _enqueue_capture_set(repository, group.capture_ids, record)
+        if result is None:
             continue
-        admission = admit_reconstruction_scene(
-            repository,
-            capture_ids=group.capture_ids,
-            screening_ids=[
-                point_maps[capture_id].privacy_screening_id
-                for capture_id in group.capture_ids
-            ],
-        )
-        if admission.eligibility_state != "eligible":
-            continue
-        build_inputs = {
-            "profile": "exulanica.reconstruction-scene-build-input/v1",
-            "point_maps": [
-                {
-                    "capture_ref": str(capture_id),
-                    "artifact_ref": str(point_maps[capture_id].artifact_id),
-                    "content_sha256": point_maps[capture_id].content_sha256.hex(),
-                }
-                for capture_id in group.capture_ids
-            ],
-            "privacy_admission": {
-                "admission_ref": str(admission.admission_id),
-                "admission_sha256": admission.admission_digest.hex(),
-                "policy_version": admission.policy_version,
-                "policy_params_sha256": admission.policy_params_digest.hex(),
-            },
-            "stages": [
-                {
-                    "key": key,
-                    "version": stage(key).version,
-                    "params_sha256": stage(key).params_digest.hex(),
-                }
-                for key in ("scene_pose", "scene_placement", "scene_gate")
-            ],
-        }
-        job_id, inserted = repository.enqueue_reconstruction_scene(
-            capture_ids=group.capture_ids,
-            selection_policy=record,
-            privacy_admission_id=admission.admission_id,
-            privacy_admission_digest=admission.admission_digest,
-            build_inputs=build_inputs,
-        )
+        job_id, inserted = result
         selections.append(
             SceneJobSelection(
                 job_id=job_id,
