@@ -20,7 +20,8 @@ export interface FrameSummary {
   readonly frameP50Ms: number;
   readonly frameP95Ms: number;
   readonly frameP99Ms: number;
-  readonly fpsMean: number;
+  readonly framesOver16_7Ms: number;
+  readonly frameOver16_7Fraction: number;
   readonly fpsP1Low: number;
 }
 
@@ -32,14 +33,21 @@ export function summarizeFrameTimes(samples: readonly number[]): FrameSummary {
     const index = Math.min(sorted.length - 1, Math.round((sorted.length - 1) * fraction));
     return sorted[index]!;
   };
-  const rounded = (value: number): number => Math.round(value * 100) / 100;
+  const rounded = (value: number, digits = 2): number => {
+    const scale = 10 ** digits;
+    return Math.round(value * scale) / scale;
+  };
+  const framesOver16_7Ms = sorted.filter((value) => value > 16.7).length;
   return Object.freeze({
     frames: sorted.length,
     frameMeanMs: rounded(mean),
     frameP50Ms: rounded(at(0.5)),
     frameP95Ms: rounded(at(0.95)),
     frameP99Ms: rounded(at(0.99)),
-    fpsMean: sorted.length === 0 ? 0 : rounded(1000 / Math.max(mean, 1e-6)),
+    framesOver16_7Ms,
+    frameOver16_7Fraction: sorted.length === 0
+      ? 0
+      : rounded(framesOver16_7Ms / sorted.length, 6),
     fpsP1Low: sorted.length === 0 ? 0 : rounded(1000 / Math.max(at(0.99), 1e-6)),
   });
 }
@@ -140,6 +148,7 @@ export class BrowserValidationRecorder {
           warmup_seconds: this.#warmupSeconds,
           duration_seconds: this.#measureSeconds,
           first_meaningful_render_ms: rounded(firstMeaningfulRenderMs),
+          time_to_full_detail_ms: rounded(firstMeaningfulRenderMs),
           geometry_load_ms: rounded(this.#geometryLoadMs),
           ...summarizeFrameTimes(frames),
           hidden_during_run: hiddenDuringRun,
