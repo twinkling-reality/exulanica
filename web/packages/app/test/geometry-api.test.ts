@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ReconstructionSceneRecord } from '@exulanica/graph-client';
-import { GeometryClient, regionsByCapture } from '../src/geometry-api.js';
+import {
+  GeometryClient,
+  regionsByCapture,
+  type GeometryLoadMeasurement,
+} from '../src/geometry-api.js';
 
 /**
  * The production reconstruction boundary, ADR-0009 D10 from the client's side.
@@ -187,9 +191,11 @@ describe('production reconstruction geometry', () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);
     const { fetch, requests } = serve([], bytes);
+    const measurements: GeometryLoadMeasurement[] = [];
     const session = await new GeometryClient({
       baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
-    }).loadScenes([sceneRecord(digest, bytes.byteLength)], regions);
+    }, (measurement) => measurements.push(measurement))
+      .loadScenes([sceneRecord(digest, bytes.byteLength)], regions);
 
     expect(session.issues).toEqual([]);
     expect(session.placedPointMaps).toHaveLength(2);
@@ -200,6 +206,30 @@ describe('production reconstruction geometry', () => {
       '/api/geometry/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       '/api/geometry/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     ]);
+    expect(measurements.map((measurement) => ({
+      artifactId: measurement.artifactId,
+      expectedBytes: measurement.expectedBytes,
+      receivedBytes: measurement.receivedBytes,
+      reused: measurement.reused,
+    }))).toEqual([
+      {
+        artifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        expectedBytes: bytes.byteLength,
+        receivedBytes: bytes.byteLength,
+        reused: false,
+      },
+      {
+        artifactId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        expectedBytes: bytes.byteLength,
+        receivedBytes: bytes.byteLength,
+        reused: false,
+      },
+    ]);
+    for (const measurement of measurements) {
+      expect(measurement.fetchMs).toBeGreaterThanOrEqual(0);
+      expect(measurement.verifyMs).toBeGreaterThanOrEqual(0);
+      expect(measurement.decodeMs).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('keeps valid scene members when one map is corrupt and falls back when none verify', async () => {

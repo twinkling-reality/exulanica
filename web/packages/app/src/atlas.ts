@@ -65,6 +65,7 @@ export async function mountAtlas(
     readonly pointMaps?: ReadonlyMap<IslandId, PointMap>;
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
   },
+  beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
   const binding = await AtlasBinding.create({
     canvas,
@@ -115,6 +116,7 @@ export async function mountAtlas(
     binding.app.renderNextFrame = draw;
     if (draw) binding.markRendered(nowMs);
   });
+  beforeStart?.(binding);
   binding.app.start();
 
   return {

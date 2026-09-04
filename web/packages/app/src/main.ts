@@ -107,6 +107,7 @@ import {
   type GeometryIssueState,
   type HeldPointMaps,
 } from './geometry-api.js';
+import { browserValidation } from './browser-validation.js';
 import { worldStyleProposalInbox } from './world-style-proposals.js';
 import {
   InteractionPolicyClient,
@@ -135,6 +136,7 @@ const canvas = document.getElementById('atlas');
 if (!(canvas instanceof HTMLCanvasElement) || shell === null) {
   throw new Error('app: expected #atlas and #shell in the document');
 }
+const browserMeasurement = browserValidation(window.location.search);
 
 let credentials_: { baseUrl: string; token: string } | null = null;
 let session: Session | null = null;
@@ -166,6 +168,7 @@ let worldStyleFailure: string | null = null;
 let sourceMediaSession: SourceMediaSession | null = null;
 let sourceMediaNotices: readonly string[] = Object.freeze([]);
 let geometryNotices: readonly string[] = Object.freeze([]);
+let geometryIssues_: readonly GeometryIssue[] = Object.freeze([]);
 let reconstructionRungs: readonly ReconstructionRungDisclosure[] = Object.freeze([]);
 let stopWorldStyleProposalInbox: (() => void) | null = null;
 
@@ -402,8 +405,11 @@ async function loadGeometry(
   where: { baseUrl: string; token: string },
   from: GraphSnapshot,
 ): Promise<void> {
+  browserMeasurement?.beginGeometryLoad();
   try {
-    const client = new GeometryClient(where);
+    const client = new GeometryClient(where, (measurement) => {
+      browserMeasurement?.recordGeometry(measurement);
+    });
     const regions = regionsByCapture(from.islands);
     const scenes = from.reconstructionScenes ?? [];
     const sceneGeometry = await client.loadScenes(scenes, regions, heldPointMaps_);
@@ -419,6 +425,11 @@ async function loadGeometry(
       ...sceneGeometry.issues,
       ...legacyGeometry.issues,
     ]);
+    geometryIssues_ = Object.freeze([
+      ...sceneGeometry.issues,
+      ...legacyGeometry.issues,
+    ]);
+    browserMeasurement?.endGeometryLoad(geometryIssues_);
     reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene);
   } catch (error) {
     pointMaps_ = undefined;
@@ -427,6 +438,8 @@ async function loadGeometry(
     geometryNotices = Object.freeze([
       `Reconstructions unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
     ]);
+    geometryIssues_ = Object.freeze([]);
+    browserMeasurement?.endGeometryLoad(geometryIssues_);
     reconstructionRungs = reconstructionRungsFor(
       from.reconstructionScenes ?? [],
       new Map(),
@@ -1239,6 +1252,12 @@ async function mount(): Promise<void> {
     ...(pointMaps_ === undefined ? {} : { pointMaps: pointMaps_ }),
     ...(placedPointMaps_ === undefined ? {} : { placedPointMaps: placedPointMaps_ }),
     reducedMotion: systemReducedMotion.matches,
+  }, browserMeasurement === null ? undefined : (binding) => {
+    browserMeasurement.observeBinding(binding, {
+      scenes: current.reconstructionScenes ?? [],
+      placedPointMapCount: placedPointMaps_?.length ?? 0,
+      placementMaxErrors: binding.verifyPlacements().map((check) => check.maxErrorMetres),
+    });
   });
   (canvas as HTMLCanvasElement).dataset.companionRenderer = 'svg';
   reflectShell();

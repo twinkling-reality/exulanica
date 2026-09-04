@@ -84,6 +84,21 @@ export interface GeometrySession {
   readonly renderingByScene: ReadonlyMap<string, RenderingSubstrate>;
 }
 
+/** One successfully placed geometry input, measured at the authenticated byte boundary. */
+export interface GeometryLoadMeasurement {
+  readonly sceneId: string;
+  readonly captureId: string;
+  readonly artifactId: string;
+  readonly expectedBytes: number;
+  readonly receivedBytes: number;
+  readonly fetchMs: number;
+  readonly verifyMs: number;
+  readonly decodeMs: number;
+  readonly reused: boolean;
+}
+
+export type GeometryLoadObserver = (measurement: GeometryLoadMeasurement) => void;
+
 /** What a previous session decoded, by artifact id. See `GeometryClient.load`. */
 export type HeldPointMaps = ReadonlyMap<string, PointMap>;
 
@@ -163,9 +178,11 @@ interface GeometryWire {
 
 export class GeometryClient {
   readonly #options: TransportOptions;
+  readonly #observer: GeometryLoadObserver | undefined;
 
-  constructor(options: TransportOptions) {
+  constructor(options: TransportOptions, observer?: GeometryLoadObserver) {
     this.#options = options;
+    this.#observer = observer;
   }
 
   /**
@@ -398,6 +415,7 @@ export class GeometryClient {
         }
 
         let map = held?.get(placement.artifactId);
+        let measurement: GeometryLoadMeasurement | null = null;
         if (map === undefined) {
           if (digest === undefined) {
             report(
@@ -407,19 +425,35 @@ export class GeometryClient {
             continue;
           }
           try {
+            const fetchStarted = monotonicNow();
             const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(reference.href);
             const bytes = await response.arrayBuffer();
+            const fetchMs = monotonicNow() - fetchStarted;
+            const verifyStarted = monotonicNow();
             const failure = await verify(
               digest,
               bytes,
               reference.contentSha256,
               reference.byteSize,
             );
+            const verifyMs = monotonicNow() - verifyStarted;
             if (failure !== null) {
               report('verification_failed', failure);
               continue;
             }
+            const decodeStarted = monotonicNow();
             map = decodeOpm(bytes);
+            measurement = Object.freeze({
+              sceneId: scene.sceneId,
+              captureId: member.captureId,
+              artifactId: placement.artifactId,
+              expectedBytes: reference.byteSize,
+              receivedBytes: bytes.byteLength,
+              fetchMs,
+              verifyMs,
+              decodeMs: monotonicNow() - decodeStarted,
+              reused: false,
+            });
           } catch (error) {
             if (error instanceof ApiError) {
               report(
@@ -453,6 +487,17 @@ export class GeometryClient {
           report('error', error instanceof Error ? error.message : 'The placement is invalid.');
           continue;
         }
+        this.#observer?.(measurement ?? Object.freeze({
+          sceneId: scene.sceneId,
+          captureId: member.captureId,
+          artifactId: placement.artifactId,
+          expectedBytes: reference.byteSize,
+          receivedBytes: 0,
+          fetchMs: 0,
+          verifyMs: 0,
+          decodeMs: 0,
+          reused: true,
+        }));
         placedPointMaps.push(Object.freeze(placed));
         byArtifact.set(placement.artifactId, map);
         if (!pointMaps.has(islandId)) pointMaps.set(islandId, map);
@@ -482,6 +527,10 @@ export class GeometryClient {
       signal: supplied === undefined ? deadline : AbortSignal.any([supplied, deadline]),
     });
   }
+}
+
+function monotonicNow(): number {
+  return globalThis.performance?.now() ?? Date.now();
 }
 
 /**
