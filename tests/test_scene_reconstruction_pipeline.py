@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import threading
@@ -26,7 +27,13 @@ from exulanica.ingest.reconstruction_scratch import (
 from exulanica.ingest.scene_reconstruction import SceneReconstructionProcessor
 from exulanica.ingest.scenes import run_scene_grouping
 from exulanica.ingest.spine.reconstruction_jobs import MAX_SCENE_CLAIMS
-from exulanica.ingest.stages import artifact_id_for, idempotency_key, input_digest_of, stage
+from exulanica.ingest.stages import (
+    STAGES,
+    artifact_id_for,
+    idempotency_key,
+    input_digest_of,
+    stage,
+)
 from exulanica.reconstruction.pose import CommandResult
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world_package import project_world_package
@@ -205,6 +212,44 @@ def test_scene_group_pose_placement_gate_and_assertion_commit_together(repositor
         ).fetchone()["count"]
         == 3
     )
+
+
+def test_scene_pose_manifest_uses_the_exact_quantized_stage_policy(
+    repository, tmp_path, monkeypatch
+):
+    current = STAGES["scene_pose"]
+    params = {
+        "controller": "colmap-sparse-checkpointed",
+        "receipt_profile": "exulanica.colmap-pose-receipt/v2",
+        "min_registered_fraction_millionths": 750_000,
+        "max_mean_reprojection_error_micropixels": 1_250_000,
+        "min_camera_translation_microunits": 500_000,
+    }
+    monkeypatch.setitem(
+        STAGES,
+        "scene_pose",
+        dataclasses.replace(current, version=current.version + 1, params=params),
+    )
+    store, _captures, _artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="policy-test", lease_seconds=60)
+    assert claimed is not None and claimed.job_id == job_id
+
+    outcome = _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    assert outcome.status == "succeeded"
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and scene_id=%s "
+        "and kind='pose_receipt'",
+        (repository.workspace_id, outcome.scene_id),
+    ).fetchone()
+    assert row is not None
+    receipt = json.loads(store.get(BlobId(bytes(row["content_sha256"]))))
+    assert receipt["manifest"]["quality_thresholds"] == {
+        "min_registered_fraction": 0.75,
+        "max_mean_reprojection_error_px": 1.25,
+        "min_camera_translation_units": 0.5,
+    }
+    assert receipt["quality"]["accepted"] is True
 
 
 def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_history(

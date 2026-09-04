@@ -53,3 +53,12 @@ population ADR-0010 D4's flag marks and a number that had never been measured.
 
 No consented OGC-1 corpus, signed consent record, or real quality observations were found locally on
 2026-08-31. Therefore Phase 3A has a productionized contract but has **not** passed its roadmap gate.
+
+**CORRECTED 2026-09-04:** scene pose manifests previously wrote all three quality thresholds as
+unmeasured constants even though the durable build input bound the `scene_pose` stage parameters.
+The scene worker now decodes the exact bound stage policy into each pose manifest. Non-integral
+thresholds remain integer-quantized in the canonical stage registry as millionths and are converted
+to their declared units only at the pose manifest boundary. The current version 1 policy still
+contains no measured values, so this correction changes no awarded rung. A future measured policy
+will change both its stage version and parameter digest, queue a new build, and retain the old
+unmeasured receipt rather than rewriting it.

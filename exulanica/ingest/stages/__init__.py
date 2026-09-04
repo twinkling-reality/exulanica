@@ -43,12 +43,14 @@ __all__ = [
     "ARTIFACT_NAMESPACE",
     "KEY_FORMAT_VERSION",
     "STAGES",
+    "ScenePoseQualityThresholds",
     "StageSpec",
     "artifact_id_for",
     "binding_digest_of",
     "idempotency_key",
     "input_digest_of",
     "pipeline_digest",
+    "scene_pose_quality_thresholds",
     "stage",
     "vision_stage_params",
 ]
@@ -94,6 +96,58 @@ class StageSpec:
     @property
     def params_digest(self) -> bytes:
         return sha256_of_canonical(self.params)
+
+
+@dataclass(frozen=True, slots=True)
+class ScenePoseQualityThresholds:
+    """Pose thresholds decoded from the registry's integer-only canonical parameters."""
+
+    min_registered_fraction: float | None
+    max_mean_reprojection_error_px: float | None
+    min_camera_translation_units: float | None
+
+
+def scene_pose_quality_thresholds(spec: StageSpec) -> ScenePoseQualityThresholds:
+    """Decode a scene-pose policy without allowing floats into its digest input."""
+    if spec.key != "scene_pose":
+        raise ValueError("pose quality thresholds require the scene_pose stage")
+    fields = (
+        (
+            "min_registered_fraction",
+            "min_registered_fraction_millionths",
+            1_000_000,
+            1_000_000,
+        ),
+        (
+            "max_mean_reprojection_error_px",
+            "max_mean_reprojection_error_micropixels",
+            1_000_000,
+            None,
+        ),
+        (
+            "min_camera_translation_units",
+            "min_camera_translation_microunits",
+            1_000_000,
+            None,
+        ),
+    )
+    decoded: list[float | None] = []
+    for legacy_key, quantized_key, denominator, maximum in fields:
+        legacy = spec.params.get(legacy_key)
+        if legacy is not None:
+            raise ValueError(
+                f"{legacy_key} must be replaced by the integer {quantized_key} parameter"
+            )
+        value = spec.params.get(quantized_key)
+        if value is None:
+            decoded.append(None)
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{quantized_key} must be a positive integer")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"{quantized_key} exceeds its allowed maximum")
+        decoded.append(value / denominator)
+    return ScenePoseQualityThresholds(*decoded)
 
 
 #: The measured rendition size. Image tokens are strongly sub-linear in pixel area: 277 tokens

@@ -24,7 +24,13 @@ from exulanica.ingest.reconstruction_scratch import (
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_rung import record_scene_rung
 from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
-from exulanica.ingest.stages import STAGES, artifact_id_for, input_digest_of, stage
+from exulanica.ingest.stages import (
+    STAGES,
+    artifact_id_for,
+    input_digest_of,
+    scene_pose_quality_thresholds,
+    stage,
+)
 from exulanica.reconstruction.placement import (
     PointMapInput,
     build_placement_record,
@@ -353,15 +359,16 @@ class SceneReconstructionProcessor:
                 )
             )
             sources.append(ScratchSource(filename, member.blob_id))
+        thresholds = scene_pose_quality_thresholds(stage("scene_pose"))
         manifest = PoseBuildManifest(
             scene_ref=str(claimed.scene_id),
             code_revision=self._code_revision,
             colmap_version=self._colmap_version or pycolmap_version(),
             execution_image=self._execution_image,
             frames=tuple(frames),
-            min_registered_fraction=None,
-            max_mean_reprojection_error_px=None,
-            min_camera_translation_units=None,
+            min_registered_fraction=thresholds.min_registered_fraction,
+            max_mean_reprojection_error_px=thresholds.max_mean_reprojection_error_px,
+            min_camera_translation_units=thresholds.min_camera_translation_units,
         )
         return manifest, tuple(sources)
 
