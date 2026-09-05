@@ -1207,8 +1207,9 @@ def test_the_deleted_photographs_own_point_map_leaves_the_export_too(scene, tmp_
     assert doomed <= before
 
     scene.delete(scene.captures[1])
-    after = {item["content_sha256"] for item in scene.reconstruction(
-        scene.export(tmp_path / "after.wmp"))["items"]}
+    after_package = scene.export(tmp_path / "after.wmp")
+    after_reconstruction = scene.reconstruction(after_package)
+    after = {item["content_sha256"] for item in after_reconstruction["items"]}
     # Its renditions and vision payloads are byte-identical to the survivors' and are still held
     # by them, so only the artifacts nothing else owns are expected to go.
     survivors = {
@@ -1223,6 +1224,16 @@ def test_the_deleted_photographs_own_point_map_leaves_the_export_too(scene, tmp_
     }
     assert (doomed - survivors), "the deleted photograph owned nothing of its own"
     assert not (doomed - survivors) & after, "a deleted photograph's own derivative was exported"
+    graph = json.loads((after_package.output / "memory/graph.json").read_text())
+    capture_subjects = {capture["capture_id"] for capture in graph["captures"]}
+    assert {
+        claim["subject"] for claim in after_reconstruction["rung_claims"]
+    } <= capture_subjects, "a rung claim names a capture the package did not export"
+    assert {
+        assertion["subject_ref"]["id"]
+        for assertion in graph["assertions"]
+        if assertion["subject_ref"]["type"] == "capture"
+    } <= capture_subjects, "the graph contains an assertion about a deleted capture"
 
 
 @pytest.mark.postgres
