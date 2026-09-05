@@ -13,3 +13,6 @@
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !exulanica
+# The gsplat trainer recipe under deploy/gsplat is its own build; it needs only its pinned
+# requirements from this directory.
+!deploy/gsplat/requirements.txt
