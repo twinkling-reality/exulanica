@@ -21,7 +21,11 @@ Generic sources without a prior reference manifest freeze their explicit split a
 
 The existing scene worker owns one lease and heartbeat throughout pose, placement and training.
 It passes the accepted pose receipt, exact images and complete selected sparse model to the real
-controller. Runtime identity and metric verification remain the controller's responsibility;
+controller. The staged training dataset is keyed by the pose output it was cut from: a retried job
+whose pose manifest changed re-runs COLMAP and produces different sparse bytes, and MEASURED
+2026-09-05 a shared staging directory refused that second output as a resumed dataset with changed
+input bytes. A failed trainer attempt now also retains the last 4000 bytes of its stderr and names
+the last line in the job's failure message; a digest alone left the first real failure nameless. Runtime identity and metric verification remain the controller's responsibility;
 see [the trainer contract](gsplat-scene-jobs.md). Install the locked compressor and make its
 `node_modules/.bin` directory available on the worker's PATH. The installed
 `exulanica-gsplat-scene-v1` launcher must run on the already authorized CUDA host with the pinned

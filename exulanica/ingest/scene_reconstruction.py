@@ -32,6 +32,7 @@ from exulanica.ingest.scene_splat import (
     gaussian_ply_bounds,
     receipt_bytes,
     stage_training_dataset,
+    training_dataset_directory,
 )
 from exulanica.ingest.spine.reconstruction_jobs import MAX_SCENE_CLAIMS, ClaimedSceneJob
 from exulanica.ingest.stages import (
@@ -432,7 +433,7 @@ class SceneReconstructionProcessor:
             [bytes.fromhex(manifest.digest), claimed.build_input_digest, claimed.job_id.bytes]
         )
         dataset = stage_training_dataset(
-            sources, pose_directory / "sparse", pose_directory.parent.parent / "training-dataset"
+            sources, pose_directory / "sparse", training_dataset_directory(pose_directory)
         )
         recorder = stack.enter_context(
             ledger.stage(

@@ -260,6 +260,18 @@ class SceneSplatRequest:
         )
 
 
+def training_dataset_directory(pose_directory: Path) -> Path:
+    """One staged dataset per pose output.
+
+    The pose job directory is named by its manifest digest, and a retried job whose pose manifest
+    changed (a new code revision, for one) re-runs COLMAP and produces different sparse bytes.
+    MEASURED 2026-09-05: staged under one shared directory, that second output was refused as a
+    resumed dataset with changed input bytes and the job failed. Keyed by the pose output it was
+    cut from, a resumed attempt of the same pose still verifies the same copy.
+    """
+    return pose_directory.parent.parent / "training-dataset" / pose_directory.name
+
+
 def stage_training_dataset(sources: Path, sparse: Path, destination: Path) -> Path:
     """Copy only verified private job inputs, or verify an interrupted job's same copy."""
     for source, target in ((sources, destination / "images"), (sparse, destination / "sparse")):

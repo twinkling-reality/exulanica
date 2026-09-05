@@ -26,6 +26,7 @@ from exulanica.ingest.scene_splat import (
     evaluation_bundle,
     gaussian_ply_bounds,
     stage_training_dataset,
+    training_dataset_directory,
 )
 from exulanica.reconstruction.gsplat_runner import read_manifest
 from exulanica.reconstruction.pose import CommandResult
@@ -360,6 +361,30 @@ def test_dataset_copy_resumes_missing_files_but_refuses_changed_bytes(tmp_path):
     (target / "sparse" / "cameras.txt").write_bytes(b"changed")
     with pytest.raises(ValueError, match="changed input bytes"):
         stage_training_dataset(sources, sparse, target)
+
+
+def test_each_pose_output_stages_its_own_training_dataset(tmp_path):
+    """A retried job whose pose manifest changed produces new COLMAP bytes (2026-09-05)."""
+    scratch = tmp_path / "job"
+    first_pose = scratch / "pose" / ("a" * 64)
+    second_pose = scratch / "pose" / ("b" * 64)
+    for pose, sparse_bytes in ((first_pose, b"sparse-a"), (second_pose, b"sparse-b")):
+        (pose / "sparse").mkdir(parents=True)
+        (pose / "sparse" / "points3D.txt").write_bytes(sparse_bytes)
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    (sources / "a.jpg").write_bytes(b"source-a")
+    first = training_dataset_directory(first_pose)
+    second = training_dataset_directory(second_pose)
+    assert first != second
+    assert first.parent == second.parent == scratch / "training-dataset"
+    stage_training_dataset(sources, first_pose / "sparse", first)
+    # Under one shared directory this second staging refused "changed input bytes" and the job
+    # failed; keyed by pose output it stages cleanly while the first copy stays verifiable.
+    stage_training_dataset(sources, second_pose / "sparse", second)
+    stage_training_dataset(sources, first_pose / "sparse", first)
+    assert (first / "sparse" / "points3D.txt").read_bytes() == b"sparse-a"
+    assert (second / "sparse" / "points3D.txt").read_bytes() == b"sparse-b"
 
 
 def test_trained_bounds_are_derived_from_actual_gaussian_bytes():

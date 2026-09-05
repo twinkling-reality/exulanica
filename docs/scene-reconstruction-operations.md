@@ -168,10 +168,17 @@ These are separate facts:
 - `displayed_rung` is the worst-first mode this client can honestly show now; and
 - `rendering_substrate` is either `posed_point_maps` or `source_photographs` in this client.
 
-Decoded geometry never promotes `recorded_rung`. The measured `scene_pose` version 2 policy requires
-at least 80 percent registration, no more than 1.0 pixel mean reprojection error, and at least 9.0
-COLMAP-normalized camera-translation units. The last value is a non-degeneracy check, not a metric
-distance. A passing pose and placement still record rung 3 because rung 1 has no reviewed splat
+Decoded geometry never promotes `recorded_rung`. The measured `scene_pose` policy requires at least
+80 percent registration, no more than 1.0 pixel mean reprojection error, and a COLMAP-normalized
+camera-translation extent of at least 5.0 units (version 4; versions 2 and 3 required 9.0). The last
+value is a non-degeneracy check, not a metric distance. MEASURED 2026-09-05 on the first retained real
+collection: two fully registered handheld captures circling a bowl measured 8.13 and 8.96 units and
+were refused by the 9.0 floor, while a third mapping of the same 51 photographs measured above 9 and
+passed. COLMAP normalizes the central camera centres to a 10-unit extent, so the maximum pairwise
+camera distance of any normalizable model lies near 10 and the floor can only distinguish a model
+whose centres could not be normalized; 5.0 does that without being crossed at random by a
+nondeterministic mapper. The retained sparse tracks, calibration record and receipt profile are
+unchanged from version 3, and every version 3 build keeps its own parameter digest. A passing pose and placement still record rung 3 because rung 1 has no reviewed splat
 receipt and rung 2 lacks physically validated scale, measured coverage, and a measured corridor. If
 no verified placed bytes are available, the client displays rung 4 source photographs while
 retaining the recorded rung and reasons in the disclosure. If a future assertion records rung 1 or

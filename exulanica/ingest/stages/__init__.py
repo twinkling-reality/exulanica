@@ -298,14 +298,22 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_pose": StageSpec(
         key="scene_pose",
-        # Version 3 retains sparse pixel/3D tracks for placement. It preserves the version 2
-        # pose-quality thresholds and calibration; it does not reinterpret those measurements.
+        # Version 4 corrects the camera-translation floor after the first real captures; it keeps
+        # version 3's retained sparse tracks, calibration record and receipt profile unchanged.
         # Version 2 closed the unmeasured policy after the fixed synthetic and licensed ETH3D
-        # pipes runs. The calibration record is part of the parameter digest so later corpus
-        # evidence cannot silently change what this version meant. COLMAP normalizes a sparse
-        # reconstruction to an extent of 10 units. The translation threshold is therefore a
-        # normalized non-degeneracy check, not a metric-distance claim.
-        version=3,
+        # pipes runs, and its floor of 9.0 units was the greatest whole unit below those two runs
+        # (9.76 and 10.92). COLMAP normalizes the central camera centres of a sparse model to an
+        # extent of 10 units, so the maximum pairwise camera distance of any model it could
+        # normalize lies near 10, while a model of near-coincident centres reports near zero.
+        # MEASURED 2026-09-05 on the first retained real collection: two fully registered handheld
+        # captures circling one subject, 0.85 px mean reprojection error, measured 8.13 and 8.96
+        # units and were refused, while a third run of the same 51 photographs measured above 9 and
+        # passed. A floor that a nondeterministic mapper crosses at random is not a policy. 5.0 is
+        # a normalized non-degeneracy check and nothing more: it refuses only a model whose camera
+        # centres could not be normalized, and no measured capture, real or fixed, approaches it.
+        # The calibration record is part of the parameter digest so later corpus evidence cannot
+        # silently change what this version meant.
+        version=4,
         output_kind="pose_receipt",
         deterministic=True,
         params={
@@ -316,7 +324,7 @@ STAGES: Final[dict[str, StageSpec]] = {
             "receipt_profile": "exulanica.colmap-pose-receipt/v2",
             "min_registered_fraction_millionths": 800_000,
             "max_mean_reprojection_error_micropixels": 1_000_000,
-            "min_camera_translation_microunits": 9_000_000,
+            "min_camera_translation_microunits": 5_000_000,
             "calibration": {
                 "profile": "exulanica.scene-pose-policy-calibration/v1",
                 "synthetic_pose_evaluation_sha256": (
@@ -331,6 +339,28 @@ STAGES: Final[dict[str, StageSpec]] = {
                     "mean_reprojection_error_micropixels_max": 571_911,
                     "camera_translation_extent_microunits_min": 9_757_480,
                 },
+                "real_capture_observations": [
+                    {
+                        "collection": "chili-salmon-bowl",
+                        "photographs": 40,
+                        "registered_fraction_millionths": 1_000_000,
+                        "mean_reprojection_error_micropixels": 852_567,
+                        "camera_translation_extent_microunits": 8_132_481,
+                        "pose_receipt_sha256": (
+                            "2976a64d54ecb4e8dc8d53533b84e38cb4996176efb7655f96b60ded982cb883"
+                        ),
+                    },
+                    {
+                        "collection": "chili-salmon-bowl",
+                        "photographs": 51,
+                        "registered_fraction_millionths": 1_000_000,
+                        "mean_reprojection_error_micropixels": 846_657,
+                        "camera_translation_extent_microunits": 8_961_565,
+                        "pose_receipt_sha256": (
+                            "c582bb5d4a7f239b09ce8f776a06528d5d15af4d04f244d2accef446d7cffd95"
+                        ),
+                    },
+                ],
                 "selection_rule": {
                     "registered_fraction": (
                         "product specification 80 percent floor, validated below both runs"
@@ -339,7 +369,8 @@ STAGES: Final[dict[str, StageSpec]] = {
                         "smallest whole-pixel ceiling above the maximum observed error"
                     ),
                     "camera_translation": (
-                        "greatest whole normalized unit below the minimum observed extent"
+                        "half the COLMAP normalization extent: refuses only a model whose camera "
+                        "centres could not be normalized, below every measured capture"
                     ),
                 },
             },

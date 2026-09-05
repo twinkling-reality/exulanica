@@ -12,7 +12,11 @@ an identity scale. Pose registration alone does not establish that a monocular p
 
 `scene_pose` version 3 preserves version 2's pose thresholds and calibration and additionally
 retains actual COLMAP model parameters, image dimensions and a bounded, deterministic sample of COLMAP pixel/3D tracks in each
-recovered camera. The sparse text files remain bound by the pose artifact inventory; camera and
+recovered camera. Version 4 keeps all of that and lowers only the camera-translation floor to 5.0
+normalized units after the first real captures showed the 9.0 floor refusing fully registered,
+sub-pixel reconstructions; see [scene operations](scene-reconstruction-operations.md). Real COLMAP
+output can also list one image observing the same sparse point at two keypoints; the receipt drops
+every observation of such a point from that image rather than choosing a keypoint. The sparse text files remain bound by the pose artifact inventory; camera and
 observation fields enter the quality digest. No learned feature descriptors are persisted.
 
 `scene_placement` version 2 emits `exulanica.posed-point-map-placement/v2`. It binds every supplied
