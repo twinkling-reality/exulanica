@@ -52,7 +52,11 @@ Every phase below preserves these rules.
 - Raw media, credentials, biometric templates, and embeddings are excluded from export by default.
 - A World Memory Package is a projection of the live store at a named instant. It is not the live
   store and cannot be recalled after a recipient downloads it.
-- Deletion invalidates and recomputes derived state. It is never described as model unlearning.
+- Deletion invalidates derived state, and recomputes the part of it that is a pure function of
+  the remaining data. A model-produced artifact is **removed, not regenerated**: re-running a
+  sampled generation would produce different bytes, so an exactness claim over it would be
+  false in the ordinary case. See [adr/0017-exact-recomputation.md](adr/0017-exact-recomputation.md).
+  It is never described as model unlearning.
 - The renderer consumes published assets and manifests. It does not author canonical memory or
   topology state.
 

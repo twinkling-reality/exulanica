@@ -1,0 +1,732 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.readiness-and-architecture-audit/v1",
+    "completed_at": "2026-09-05T02:40:00Z",
+    "starting_revision": "f6292db20e62db7ead75188709f5494c45ac2cb6",
+    "audited_implementation_head": "f6faf004c1ce3ececc7d37994425b1e27d503087",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-04-reconstruction-validation-campaign.json",
+      "record_sha256": "07633ab845962e9e0615e0afe909b1bd53c2c827c19fc2ba4ef90bee841c3c6d"
+    },
+    "scope": "An evidence-backed architecture audit of the state left by the reconstruction validation campaign, plus closure of the inexpensive pre-production invariants that sit inside the evidence address. No semantic world-intelligence vertical slice, no Rung 2 corridor implementation, no Rung 1 splats, and no production deployment work was started.",
+    "method": "Every claim below was checked against the live implementation, the migration files and the Git history rather than against the roadmap. Where a document and the code disagreed, the code was read as the fact and the document was corrected. Where the code disagreed with itself, the disagreement is recorded as a contradiction and one side was made enforceable.",
+    "confirmed_architecture": [
+      {
+        "area": "evidence address",
+        "confirmed": "An address is (SHA-256 of the original bytes, track key, half-open int64 nanosecond interval, modality) optionally refined by a normalised region and a text anchor. span_digest is SHA-256 over the RFC 8785 subset canonical JSON of that tuple, with span_id and hint excluded by construction. A full pipeline regeneration changes zero addresses.",
+        "evidence": [
+          "exulanica/evidence/address.py",
+          "exulanica/canonical.py",
+          "tests/test_evidence_address.py",
+          "tests/vectors/span_digest_v1.json"
+        ]
+      },
+      {
+        "area": "canonical form",
+        "confirmed": "Floats are refused outright before any hash is taken. Integer quantisation uses one rounding rule for measured values (round_half_down, ties toward zero) and one boundary rule for tick placement (ceil_div, toward positive infinity). Both are exact integer arithmetic.",
+        "evidence": [
+          "exulanica/canonical.py",
+          "tests/test_blob_and_canonical.py"
+        ]
+      },
+      {
+        "area": "photograph modelling",
+        "confirmed": "A photograph is a single-sample img track with timebase 1/1e9, start_pts 0 and interval [0, 1). The degenerate case exercises the overlap, tombstone and co-presence paths rather than leaving them untested until video arrives.",
+        "evidence": [
+          "exulanica/evidence/timebase.py",
+          "exulanica/ingest/spine/tracks.py",
+          "tests/test_timebase.py"
+        ]
+      },
+      {
+        "area": "orientation",
+        "confirmed": "Orientation is normalised once, at ingest, by PIL.ImageOps.exif_transpose. All eight EXIF values are admitted. Display space is the upright pixel space and the rendition handed to a model carries no EXIF at all.",
+        "evidence": [
+          "exulanica/ingest/exif.py",
+          "docs/adr/0004-exif-orientation-normalisation.md",
+          "tests/test_exif_orientation.py"
+        ]
+      },
+      {
+        "area": "epistemic separation",
+        "confirmed": "capture, inference, user and external are separate assertion classes, enforced by predicate.allows_kind with a database trigger rather than by application code. A model has no schema field a name could arrive in, and no embedding of any kind is derived from a person detection.",
+        "evidence": [
+          "exulanica/epistemics/vocabulary.py",
+          "exulanica/ingest/vision.py",
+          "tests/test_epistemic_guard_postgres.py",
+          "tests/test_ingest_preconditions.py"
+        ]
+      },
+      {
+        "area": "determinism",
+        "confirmed": "Eight stages. Six are declared deterministic and two, vision and depth, are not, because both call a model. The flag drives whether a content difference on one idempotency key is emitted as nondeterminism_detected.",
+        "evidence": [
+          "exulanica/ingest/stages/__init__.py",
+          "tests/test_exact_recomputation.py"
+        ]
+      },
+      {
+        "area": "privacy admission",
+        "confirmed": "Reconstruction geometry fails closed without an exact eligible screening receipt per member. Synthetic sources may use an exemption only when their authorization is itself synthetic; benchmark and personal sources require a named human over the exact source bytes. The policy is versioned and its parameter digest travels in every admission record.",
+        "evidence": [
+          "exulanica/ingest/privacy.py",
+          "exulanica/migrations/0029_reconstruction_privacy_admission.sql",
+          "docs/evaluation/2026-09-04-reconstruction-validation-campaign.json"
+        ]
+      },
+      {
+        "area": "withdrawal",
+        "confirmed": "A capture, interval or workspace tombstone retracts dependent scene rung assertions by trigger, purges scene artifacts, and removes the scene from the graph, the browser and the world package. A deliberate re-import creates a new capture identity and does not resurrect the old scene.",
+        "evidence": [
+          "exulanica/migrations/0031_scene_rung_withdrawal.sql",
+          "docs/evaluation/2026-09-04-benchmark-scene-withdrawal.json"
+        ]
+      },
+      {
+        "area": "migrations",
+        "confirmed": "Thirty-four forward-only migrations, each a single transaction with no down path, checksummed and verified at boot so an edited migration is a refusal to start rather than a silent schema fork.",
+        "evidence": [
+          "exulanica/migrations/__init__.py",
+          "tests/test_migration.py"
+        ]
+      },
+      {
+        "area": "browser",
+        "confirmed": "The renderer verifies every reconstruction artifact against its declared SHA-256 with SubtleCrypto before decoding, refuses a digest that is not 64 lowercase hex characters at the response boundary, and presents the rung from the scene assertion rather than inferring it from renderer success.",
+        "evidence": [
+          "web/packages/app/src/geometry-api.ts",
+          "docs/evaluation/2026-09-04-benchmark-browser.json"
+        ]
+      }
+    ],
+    "contradictions_found": [
+      {
+        "id": 1,
+        "severity": "blocking-a-freeze",
+        "claim": "domain-and-evidence-model.md sections 1.5, 9.1 and 9.2 recorded mirrored EXIF orientation as OPEN and stated that ingest refuses mirrored orientations, so no corpus containing one could be ingested.",
+        "actual": "ADR-0004 accepted the other branch on 2026-08-27 and it has been implemented since exulanica/ingest/exif.py was written. All eight values are admitted and normalised, and the licensed benchmark corpus was ingested through that path.",
+        "resolution": "Closed by ADR-0012; all three sections corrected."
+      },
+      {
+        "id": 2,
+        "severity": "latent-wrong-evidence",
+        "claim": "media_track.rotation was written as the rotation that WAS applied, in the same row as disp_w and disp_h which already have that rotation baked in.",
+        "actual": "The two readings are inconsistent. The ordinary reading of a (coded, disp, rotation, sar) group is 'rotation still to apply'. A consumer taking that reading and rotating the stored upright pixels again would place every region a right angle from its evidence. The column had no readers, which is why it was still free to fix.",
+        "resolution": "Migration 0032 sets it to 0 for normalised image tracks and constrains it; intake writes 0. No digest changed."
+      },
+      {
+        "id": 3,
+        "severity": "unenforced-contract",
+        "claim": "Migration 0001 described the region tuple and the text anchor tuple in comments, including prefix and suffix keys on text_anchor.",
+        "actual": "Nothing enforced either shape, and no writer has ever produced prefix or suffix. A row storing 0.312 where the writer meant 312000 would have been accepted and would hash differently in a second implementation.",
+        "resolution": "Closed by ADR-0013 and ADR-0014; migration 0033 enforces both shapes."
+      },
+      {
+        "id": 4,
+        "severity": "known-defect-inside-its-window",
+        "claim": "The tick-to-nanosecond formula was frozen and its round trip was pinned as lossy, with correction described as a span_format_version event.",
+        "actual": "Both conversions had no callers outside the package's own tests, no video or audio media_track row had ever been written, and every span in existence is a photograph on a timebase where the two roundings agree. Correcting it moved no stored digest.",
+        "resolution": "Corrected under ADR-0015 rather than carried. span_format_version stays at 1 and the argument that made it free is now spent."
+      },
+      {
+        "id": 5,
+        "severity": "overclaim",
+        "claim": "domain-and-evidence-model.md section 6, product-specification.md section 9 and evaluation-methodology.md all say deletion recomputation is 'exact by construction'.",
+        "actual": "Two of the eight stages call a model and are declared deterministic = false in the same repository, with the reason written out. A re-run of either produces different bytes. A-24 was recorded without that exclusion.",
+        "resolution": "Narrowed by ADR-0017. Exactness covers the deterministic closure only; a model-produced artifact is invalidated and removed, never regenerated identically. StageSpec now refuses to construct a deterministic model stage."
+      },
+      {
+        "id": 6,
+        "severity": "wrong-evidence-on-ingest",
+        "claim": "Whether the corpus contains motion photographs or bursts was recorded as an inspection of the corpus rather than a design question.",
+        "actual": "Nothing checked frame count anywhere. An animated GIF, a multi-frame WebP or a motion photograph would have been ingested as its first frame under a capture whose EXIF and pixel_size_is describe the whole file, with every span addressed at img on a blob whose other frames nothing can cite.",
+        "resolution": "Closed by refusing rather than by inspecting. exulanica/ingest/decode.py refuses a multi-frame container at the header probe and at the decode, with a message naming the video path."
+      },
+      {
+        "id": 7,
+        "severity": "stale-caveat",
+        "claim": "The domain model header said no PostgreSQL server had executed the migration in this environment and that every SQL claim in it was text-level, and 9.2 carried 'whether migration 0001 applies at all' as an ASSUMPTION.",
+        "actual": "All thirty-four migrations apply to PostgreSQL 18.6 with pgvector on every run with a configured server, and the campaign that preceded this audit already depended on that being true.",
+        "resolution": "Caveat withdrawn; the row is now VERIFIED with the server version."
+      },
+      {
+        "id": 8,
+        "severity": "stale-count",
+        "claim": "README.md said 1182 tests with 572 skipping; docs/README.md and docs/demo-runbook.md said 588 tests with 227 skipping.",
+        "actual": "1442 tests; 1440 pass with a server, 677 skip without one.",
+        "resolution": "All four claims corrected."
+      },
+      {
+        "id": 9,
+        "severity": "recorded-not-defect",
+        "claim": "The scene_pose stage declares deterministic = true, which reads as a claim that its output is byte reproducible.",
+        "actual": "exulanica/reconstruction/pycolmap_executor.py records that fixing COLMAP's random_seed 'is necessary for that and is not sufficient: RANSAC threading still admits variation, and how much has not been measured'.",
+        "resolution": "Not a defect. The flag declares that a content difference is a fault worth an event, which is necessary for an exactness claim and is not one. ADR-0017 states the distinction and tests/test_exact_recomputation.py pins it. The unmeasured residual is carried below as an open invariant."
+      }
+    ],
+    "stale_roadmap_statements": [
+      {
+        "where": "docs/frontier-roadmap.md section 2",
+        "was": "Deletion invalidates and recomputes derived state.",
+        "now": "Corrected to say that a model-produced artifact is removed, not regenerated, with a pointer to ADR-0017."
+      },
+      {
+        "where": "docs/domain-and-evidence-model.md section 9.1",
+        "was": "Six rows blocking a v1 freeze of the address format.",
+        "now": "All six are CLOSED, each naming an ADR, the artefact that enforces it and a test that fails when it is violated."
+      },
+      {
+        "where": "docs/domain-and-evidence-model.md section 9.2",
+        "was": "Four OPEN rows duplicating section 9.1 plus an ASSUMPTION about migration 0001.",
+        "now": "All five updated. The only OPEN item left in the document is P-1."
+      },
+      {
+        "where": "docs/adr/0004-exif-orientation-normalisation.md",
+        "was": "A 'Still open' section carrying the OCR modality question.",
+        "now": "Marked closed, pointing at ADR-0016 and ADR-0012."
+      }
+    ],
+    "decisions_closed": [
+      {
+        "number": 1,
+        "name": "Mirrored EXIF orientation semantics",
+        "adr": "docs/adr/0012-upright-display-space.md",
+        "invariant": "Every img track is stored with pixels already normalised to upright display space. media_track.rotation means clockwise degrees still to apply and is 0. probe_json.orientation.normalised_at_ingest is true. Every img region carries display.rotation = 0. All eight EXIF values, including the four mirrored ones, are admitted.",
+        "rationale": "region.display is inside span_digest, so a mirrored original placed against sensor space would bake a wrong region into a permanent citation address. Normalising the pixels moves the ambiguity to the one place it can be resolved once, and leaves no transform for any later consumer to reapply.",
+        "canonical_representation": "probe_json.orientation = {exif_orientation: 1..8, rotation_degrees_clockwise: 0|90|180|270, mirrored: bool, normalised_at_ingest: true}; region.display.rotation = 0 on img.",
+        "compatibility_impact": "None observable. probe_json and region are untouched, so no intake artifact content hash and no span digest changed. media_track.rotation had no readers.",
+        "failure_behaviour": "media_track_image_is_upright and evidence_span_image_region_is_upright refuse the write with SQLSTATE 23514; EvidenceAddress raises InvalidAddressError naming the rule. Ingest fails closed and reports the error.",
+        "affected_surfaces": {
+          "schema": [
+            "media_track",
+            "evidence_span"
+          ],
+          "migrations": [
+            "0032_upright_display_space.sql"
+          ],
+          "workers": [
+            "exulanica/ingest/stages/intake.py"
+          ],
+          "evidence": [
+            "exulanica/evidence/address.py",
+            "exulanica/evidence/region.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_upright_display_space.py",
+          "tests/test_exif_orientation.py"
+        ],
+        "negative_control": "Reverting intake.py to the previous value fails six of the eight orientation cases, at the database as well as at the assertion."
+      },
+      {
+        "number": 2,
+        "name": "Canonical region encoding",
+        "adr": "docs/adr/0013-region-encoding.md",
+        "invariant": "A region is {kind:'rect', rect:{x,y,w,h}, display:{w,h,rotation,sar_num,sar_den}}, integers throughout, rect coordinates in parts per million of the normalised unit square, non-empty, inside the square, no key missing and none outside the set.",
+        "rationale": "A float in a digest input has no canonical rendering two implementations agree on. One ppm of a 6000 px wide photograph is 0.006 px, three orders of magnitude below detector precision, and it divides evenly into the Media Fragments percentage rendering so the permalink form is lossless.",
+        "canonical_representation": "integers 0..1000000 on a ppm grid, upright display space",
+        "compatibility_impact": "None. Every constraint describes what exulanica/evidence/region.py already wrote. Changing the grid later is a span_format_version event.",
+        "failure_behaviour": "InvalidAddressError from Rect or DisplayGeometry, and SQLSTATE 23514 from evidence_span_region_shape on a route that does not go through those classes.",
+        "affected_surfaces": {
+          "schema": [
+            "evidence_span.region"
+          ],
+          "migrations": [
+            "0033_span_digest_input_shape.sql"
+          ],
+          "workers": [],
+          "evidence": [
+            "exulanica/evidence/region.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": [
+            "web/packages/graph-client/src/read-model.ts"
+          ]
+        },
+        "tests": [
+          "tests/test_span_digest_input_shape.py"
+        ],
+        "negative_control": "Nine malformed region tuples written through raw SQL are each refused, including a float coordinate, a zero-area box and a missing display space."
+      },
+      {
+        "number": 3,
+        "name": "Canonical digest encodings and algorithm identification",
+        "adr": "docs/adr/0014-digest-encodings.md",
+        "invariant": "span_format_version = 1 binds exactly one pair: SHA-256 over the RFC 8785 subset canonical JSON. Digests inside a digest input are 64 lowercase hex characters; base64url appears only in renderings. Optional members are absent rather than null, and no field may be sometimes absent and sometimes null. text_anchor is {artifact_id, char_start, char_end} plus optional exact; prefix and suffix are excluded permanently.",
+        "rationale": "The algorithm cannot be named by a new field without changing every digest already issued, so it is carried by the version integer that is already inside the tuple. Quote context inside the address would make a citation depend on text either side of the thing it cites.",
+        "canonical_representation": "sorted keys, no insignificant whitespace, UTF-8 with non-ASCII literal, no floats, no nulls in the span tuple",
+        "compatibility_impact": "None. No digest changed.",
+        "failure_behaviour": "CanonicalisationError naming the path for a float, before any hash is taken. SQLSTATE 23514 from evidence_span_text_anchor_shape. IntegrityError from address_from_span_row when a stored span does not rebuild to its digest.",
+        "affected_surfaces": {
+          "schema": [
+            "evidence_span.span_digest",
+            "evidence_span.text_anchor"
+          ],
+          "migrations": [
+            "0033_span_digest_input_shape.sql"
+          ],
+          "workers": [],
+          "evidence": [
+            "exulanica/canonical.py",
+            "exulanica/evidence/address.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": [
+            "web/packages/app/src/geometry-api.ts"
+          ]
+        },
+        "tests": [
+          "tests/test_span_digest_conformance.py",
+          "tests/test_span_digest_input_shape.py"
+        ],
+        "ratification": {
+          "criterion": "Section 9.1 required agreement with a second implementation, ideally one not written in Python.",
+          "artifact": "tests/vectors/span_digest_v1.json",
+          "independent_reader": "scripts/verify_canonical_conformance.mjs",
+          "runtime": "node v24.15.0",
+          "vectors_checked": 7,
+          "agreed_on_canonical_bytes": true,
+          "agreed_on_digest": true,
+          "negative_control": "Perturbing one ppm coordinate in the retained file by 1 makes the reader exit non-zero and print both byte strings.",
+          "what_this_does_not_establish": "Node and Python are two implementations, not two independent specifications, and both are ECMAScript-descended in string escaping. The ratification is strong for encoding and ordering and weaker for exotic escaping. A third reader in a language with a different string model would strengthen it and is not built, because no consumer needs one yet."
+        }
+      },
+      {
+        "number": 4,
+        "name": "Timebase rounding, boundary behaviour and exact round trips",
+        "adr": "docs/adr/0015-timebase-rounding.md",
+        "invariant": "round_half_down is ties toward zero and quantises measured values only. ticks_from_ns floors; ns_from_ticks rounds up, so ticks(t_ns(k)) == k on every timebase whose tick is at least one nanosecond, negative ticks included. A sub-nanosecond timebase is refused. A tick whose nanosecond value leaves int64 is refused at the conversion. Intervals are half-open, abutting intervals do not overlap, and an empty interval is refused.",
+        "rationale": "Placing a tick on the nanosecond axis is choosing a boundary, not quantising a measurement, and the requirement is invertibility. Rounding to nearest reads as more accurate and is what lost the sample: at 48 kHz tick 1 rendered as 20833 ns and floored back to tick 0.",
+        "canonical_representation": "ticks(t_ns) = floor(t_ns * den / (num * 1e9)); t_ns(ticks) = ceil(ticks * num * 1e9 / den)",
+        "compatibility_impact": "None observable, and this was verified rather than assumed: both conversions had no callers outside the package's tests, no video or audio media_track row had ever been written, and every span is a photograph on a timebase where the two roundings agree. span_format_version stays at 1.",
+        "failure_behaviour": "InvalidAddressError naming the finest representable timebase, or naming the tick and the timebase for an overflow. span_non_empty refuses an empty range.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [
+            "exulanica/canonical.py",
+            "exulanica/evidence/timebase.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_timebase.py",
+          "tests/test_blob_and_canonical.py"
+        ],
+        "negative_control": "The identity is asserted across 48 kHz, 44.1 kHz, 90 kHz, 1/15360, NTSC 1001/30000 and the canonical axis, over positive and negative ticks. The previous rule fails every one of them at tick 1."
+      },
+      {
+        "number": 5,
+        "name": "OCR span modality and source-coordinate semantics",
+        "adr": "docs/adr/0016-ocr-is-a-region.md",
+        "invariant": "Text read off a photograph is a frame_region span carrying an ocr_text_is assertion, or the whole-image still_image span when the model returns no usable box. transcript_text is reserved for time-anchored transcripts and is refused on the img track. Boxes are relative to upright display space, clamped into the unit square, refused when degenerate, and quantised to ppm.",
+        "rationale": "The address of OCR text is the pixels it was read from, which a region states exactly. A character offset into an OCR artifact would make the address depend on a derivative, which spine-1 forbids as identity. A new ocr_text value would be additive and free and would also be a second name for an address shape that already exists.",
+        "canonical_representation": "modality frame_region or still_image, predicate ocr_text_is, region in ppm",
+        "compatibility_impact": "None. No span carries transcript_text, so no digest changed.",
+        "failure_behaviour": "InvalidAddressError naming the correct shape, and SQLSTATE 23514 from transcript_is_not_an_image_track.",
+        "affected_surfaces": {
+          "schema": [
+            "evidence_span.modality"
+          ],
+          "migrations": [
+            "0034_ocr_is_a_region_not_a_transcript.sql"
+          ],
+          "workers": [
+            "exulanica/ingest/stages/vision.py"
+          ],
+          "evidence": [
+            "exulanica/evidence/address.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": [
+            "web/packages/graph-client/src/read-model.ts"
+          ]
+        },
+        "tests": [
+          "tests/test_ocr_span_modality.py"
+        ],
+        "negative_control": "A transcript_text address on img is refused in both layers, while the same address on a:0 still constructs."
+      },
+      {
+        "number": 6,
+        "name": "Exact-recomputation language for model-produced artifacts",
+        "adr": "docs/adr/0017-exact-recomputation.md",
+        "invariant": "A stage carrying a model_role may not declare itself deterministic, enforced in StageSpec.__post_init__. Exact recomputation is claimed for the deterministic closure only. A model-produced artifact is invalidated and removed on deletion, never regenerated identically.",
+        "rationale": "Sampled generation differs run to run by design and a neural forward pass differs across accelerators and library versions, so an exactness claim over vision or depth output would be false in the ordinary case. The narrower statement, that the artifact is gone rather than rewritten, is a complete answer to what a person is actually asking and is true.",
+        "canonical_representation": "stage_registry.deterministic is the single source of truth; the document is checked against it rather than trusted",
+        "compatibility_impact": "None. vision and depth were already deterministic = false; they now cannot stop being so quietly.",
+        "failure_behaviour": "ValueError at import naming the ADR when a model-backed stage declares itself deterministic, including through dataclasses.replace.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [
+            "exulanica/ingest/stages/__init__.py"
+          ],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [
+            "exulanica/identity/recomputation.py"
+          ],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_exact_recomputation.py"
+        ],
+        "negative_control": "The suite previously asserted only that a deterministic stage's difference is reported. The counterpart is now asserted too: a model stage that produces different bytes for one idempotency key emits nothing, because filing Tuesday as a fault is how a real fault gets ignored."
+      },
+      {
+        "number": 7,
+        "name": "What must close before personal-media ingest",
+        "adr": null,
+        "invariant": "Every item inside the evidence address is closed, so the address format no longer gates personal media. What remains are two items that are not about the address: A-8, written zero-data-retention confirmation for the exact model identifiers asserted at service boot, and P-1, when a biometric template may exist at all. P-1 is currently answered by absence: the embedding table has a deletion path and no writer anywhere in the package.",
+        "rationale": "The domain model named the orientation, region, digest, timebase and OCR items as blocking because the window closes at first production ingest. It named A-8 and P-1 separately, and neither is a technical question this audit could settle: one needs a document from a provider, the other is a risk-appetite decision a person has to make.",
+        "canonical_representation": null,
+        "compatibility_impact": "None; this is a gate definition.",
+        "failure_behaviour": "The absence of an embedding writer is asserted by a source scan that fails the day one appears, which is the one way P-1 must not be answered.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_ingest_preconditions.py"
+        ],
+        "must_close_first": [
+          {
+            "item": "Mirrored EXIF orientation",
+            "status": "CLOSED by this goal, ADR-0012"
+          },
+          {
+            "item": "Region encoding, digest encodings, OCR modality, timebase",
+            "status": "CLOSED by this goal, ADR-0013 through ADR-0016"
+          },
+          {
+            "item": "A-8 provider zero-data-retention for the exact model identifiers",
+            "status": "OPEN",
+            "why_it_gates_personal_media": "Personal photographs leave the machine to the vision provider. The domain model requires written confirmation committed to the repository and asserted at service boot with a refusal to start otherwise. No such assertion exists in exulanica/, and the input it would read does not exist either, so building the mechanism now would be an abstraction with no second implementation behind it.",
+            "what_closes_it": "The written confirmation, committed, followed by a boot assertion that refuses to start without it."
+          },
+          {
+            "item": "P-1 when a biometric template may exist at all",
+            "status": "OPEN, and currently answered by absence",
+            "why_it_gates_personal_media": "Personal media contains people. The line the system draws is at the template: a detected person becomes a scene-local occurrence with an evidence address and nothing else. That line holds today and is now pinned, so personal-media ingest may proceed without answering P-1 only for as long as no identity work begins.",
+            "what_closes_it": "A risk-appetite decision by a named person, recorded. Three incompatible rules were proposed and the evidence does not choose between them."
+          },
+          {
+            "item": "A named human review of the exact bytes per capture",
+            "status": "BUILT, exercised on the benchmark corpus",
+            "evidence": [
+              "exulanica/ingest/privacy.py",
+              "docs/evaluation/2026-09-04-reconstruction-validation-campaign.json"
+            ]
+          }
+        ]
+      },
+      {
+        "number": 8,
+        "name": "What must additionally close before video ingest",
+        "adr": null,
+        "invariant": "A container holding more than one frame is refused at the header probe and at the decode, with a message naming the video path rather than calling the file corrupt. Video ingest opens that gate; it does not bypass it.",
+        "rationale": "The three timebase items that would have gone live at first video ingest are closed. What remains is the video track path itself, and the cheap half of the gate is refusing to pretend a multi-frame file is a photograph.",
+        "canonical_representation": null,
+        "compatibility_impact": "A previously accepted class of input is now refused. No such file exists in any corpus this system has ingested; had one been ingested it would have produced wrong evidence rather than a refusal.",
+        "failure_behaviour": "ValueError inside the UNREADABLE family, so the pipeline records the error and writes no capture and no span.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [
+            "exulanica/ingest/decode.py"
+          ],
+          "evidence": [],
+          "apis": [
+            "exulanica/api/routes/intake.py"
+          ],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_ingest_preconditions.py"
+        ],
+        "must_close_first": [
+          {
+            "item": "Everything on the personal-media list",
+            "status": "see decision 7"
+          },
+          {
+            "item": "Tick round trip and round_half_down tie direction",
+            "status": "CLOSED by this goal, ADR-0015",
+            "note": "These were the items the domain model said would become live the day video arrived. They are closed in advance, which is what removes the time pressure from that day."
+          },
+          {
+            "item": "A real v:N media_track path: probe, start_pts, edit lists, rotation",
+            "status": "OPEN, not started",
+            "what_closes_it": "A container probe that produces media_track rows for video and audio tracks with their observed rationals, and the frame_at(t_ns) definition in spine-4 implemented against real bytes."
+          },
+          {
+            "item": "A-31 browser seek accuracy against ffmpeg PTS, experiment X-3",
+            "status": "OPEN, not applicable to photographs",
+            "what_closes_it": "Comparing ffmpeg PTS-selected frames against HTMLMediaElement currentTime seeks across CFR, VFR, rotated and edit-list video. If a systematic offset exists, citation playback becomes server-side deterministic clip extraction."
+          },
+          {
+            "item": "DisplayGeometry.rotation for video",
+            "status": "OPEN by design",
+            "note": "A video track is not normalised at ingest and its display space genuinely can be rotated, which is why ADR-0012 scopes the upright-display invariant to the img track rather than to rotation in general. The v:N branch is already exercised by the conformance vectors."
+          }
+        ]
+      }
+    ],
+    "remaining_open_invariants": [
+      {
+        "id": "P-1",
+        "statement": "When may a biometric template exist at all.",
+        "status": "OPEN",
+        "kind": "risk-appetite decision, not technical",
+        "who_decides": "a named person, not this audit",
+        "currently_held_by": "absence. No module in exulanica/ writes the embedding table, and the vision schema has no field a name or an identity could arrive in.",
+        "pinned_by": "tests/test_ingest_preconditions.py",
+        "blocks": [
+          "identity work",
+          "cross-capture person recall",
+          "A-18 and experiment X-6"
+        ]
+      },
+      {
+        "id": "A-8",
+        "statement": "Provider zero-data-retention for the exact model identifiers in use, confirmed in writing, committed, and asserted at service boot with a refusal to start.",
+        "status": "OPEN, mechanism not built because its input does not exist",
+        "blocks": [
+          "personal-media ingest",
+          "production rehearsal"
+        ]
+      },
+      {
+        "id": "scene-pose-residual",
+        "statement": "COLMAP's RANSAC threading admits variation beyond the fixed random_seed, and how much has not been measured.",
+        "status": "OPEN, recorded rather than rounded off",
+        "consequence": "scene_pose is declared deterministic and is not yet observed to reproduce, so it may not be described as exactly recomputable.",
+        "what_closes_it": "Two runs of one manifest on one machine, then on two, comparing the pose receipt digests."
+      },
+      {
+        "id": "A-24 / X-8",
+        "statement": "Deleting an exemplar and recomputing the deterministic closure yields a bit-identical state.",
+        "status": "NARROWED by ADR-0017, still unvalidated",
+        "note": "May never be claimed about vision or depth output at all."
+      },
+      {
+        "id": "X-11",
+        "statement": "A deleted embedding is physically absent from an ANN index after compaction.",
+        "status": "OPEN, and currently vacuous because no embedding is ever written"
+      },
+      {
+        "id": "X-12",
+        "statement": "Restore with tombstone replay.",
+        "status": "OPEN, not rehearsed",
+        "blocks": [
+          "production rehearsal"
+        ]
+      },
+      {
+        "id": "rung-thresholds",
+        "statement": "min_valid_fraction_milli = 150 and max_depth_step_milli = 100 remain explicitly unvalidated stage parameters, the second chosen on one photograph.",
+        "status": "OPEN, unchanged by this audit"
+      },
+      {
+        "id": "evaluation-corpus-size",
+        "statement": "The size of OGC-1/travel is not settled, so no evaluation bound is final.",
+        "status": "OPEN, unchanged by this audit"
+      }
+    ],
+    "dependency_order": [
+      {
+        "position": 1,
+        "goal": "Semantic answers and memory lifecycle",
+        "why_first": "It is the only one of the four whose entry gates are already met. Its dependency is the evidence address, which is now frozen and ratified, and it needs no GPU, no corpus acquisition, no provider document and no risk decision. Every downstream claim is expressed as a cited answer, so the shape of that answer is on the critical path for the other three.",
+        "evidence": [
+          "exulanica/selection/ exists end to end: question, plan, validation, executor, answer, packet",
+          "exulanica/graph/snapshot.py and the graph-client read model exist",
+          "roadmap section 3 lists semantic memory and selection as BUILT/PARTIAL with 'complete answer path' as the remaining boundary"
+        ],
+        "does_not_depend_on": [
+          "P-1, provided no person recall is introduced",
+          "A-8",
+          "any rung"
+        ]
+      },
+      {
+        "position": 2,
+        "goal": "Production rehearsal",
+        "why_here": "Independent of the reconstruction ladder and therefore parallelisable with position 1, but ordered after it because a rehearsal of a system whose answer path is incomplete rehearses less than half of it. Its blockers are operational decisions rather than measurements.",
+        "evidence": [
+          "docs/deployment.md marks the cloud account, the domain, the redeploy command and the weekly check owner as OPEN",
+          "campaign limitation: the browser measurement is one 60-second static view on a local Apple M3 Pro, not the eventual production host",
+          "X-12 restore with tombstone replay has never been performed"
+        ]
+      },
+      {
+        "position": 3,
+        "goal": "Rung 2 corridor",
+        "why_here": "It consumes measured metric scale, measured coverage, reachability and a validated corridor, none of which exist. All four are measurements over an authorized real corpus, so it cannot start before either personal-media ingest opens or a second licensed benchmark scene with overlapping captures is acquired.",
+        "evidence": [
+          "campaign limitation: Rung 2 remains withheld because metric scale, measured coverage, reachability, and a validated corridor are absent",
+          "roadmap Phase 3B requires joint co-registration of two captures of the same place before shared metric frames are allowed",
+          "docs/adr/0009-the-ladder-above-rung-3.md"
+        ]
+      },
+      {
+        "position": 4,
+        "goal": "A measured Rung 1 decision",
+        "why_last": "It consumes the same poses Rung 2 measures, plus GPU compute, plus a held-out view evaluation that does not exist. Starting it before position 3 would mean optimising splats against poses whose scale and coverage have not been measured, which is the failure ADR-0008 and ADR-0009 exist to prevent.",
+        "evidence": [
+          "campaign limitation: Rung 1 remains withheld because there is no reviewed splat receipt or held-out splat evaluation",
+          "roadmap Phase 3C requires a reviewed resumable gsplat job, compatible GPU execution, measured scale and coverage, compression and a nav proxy"
+        ]
+      }
+    ],
+    "subsequent_goal_gates": [
+      {
+        "goal": "Semantic answers and memory lifecycle",
+        "entry_gates": [
+          "The evidence address format is closed and ratified. MET by this goal: all six section 9.1 rows are CLOSED and the conformance vectors reproduce outside Python.",
+          "The full backend and web verification gates are green at the starting revision. MET: 1440 backend tests, 670 web tests, 4 import contracts, production build.",
+          "No person recall or template derivation is in scope, because P-1 is unanswered. The absence of an embedding writer is pinned by tests/test_ingest_preconditions.py and must stay pinned."
+        ],
+        "exit_gates": [
+          "A question reaches an answer through the real selection path, and every factual clause in that answer carries a citation token that verifies against a stored span_digest.",
+          "An answer that cannot be supported refuses rather than estimates, and the refusal is exercised by a test rather than described.",
+          "Memory lifecycle: an occurrence, an entity and a derived artifact each have a recorded path from creation through confirmation to withdrawal, and a withdrawal marks dependent artifacts stale through dep_index rather than regenerating them.",
+          "No answer path derives or persists a biometric template.",
+          "A retained record states which corpus produced the numbers and does not present synthetic plumbing as accuracy."
+        ]
+      },
+      {
+        "goal": "Production rehearsal",
+        "entry_gates": [
+          "A named person owns the weekly check through the unattended window.",
+          "A cloud account, project, region and domain are chosen and recorded.",
+          "A-8: written zero-data-retention confirmation for the exact model identifiers, committed to the repository."
+        ],
+        "exit_gates": [
+          "A clean deploy from an empty environment, performed from a clean shell, with the command recorded.",
+          "X-12: a restore from a pre-deletion backup followed by mandatory tombstone replay, with the instance refusing traffic until replay completes.",
+          "An external health check reaching a device that is not the host.",
+          "The zero-backend static build served with the API deliberately switched off, and labelled as recorded rather than live.",
+          "A browser measurement on the production host rather than on a local laptop."
+        ]
+      },
+      {
+        "goal": "Rung 2 corridor",
+        "entry_gates": [
+          "An authorized corpus with at least two captures of one place, each with a named human screening receipt over the exact bytes.",
+          "Joint co-registration of those two captures succeeds and is measured, before any shared metric frame is allowed.",
+          "A metric scale source that is not model-derived, because ADR-0009 forbids a model-derived scale from opening the query path."
+        ],
+        "exit_gates": [
+          "Every published required destination is reachable for the declared agent radius, and the renderer cannot expand the validated movement envelope.",
+          "The corridor artifact is bound to the reconstruction and topology versions it was measured against.",
+          "A scene that fails coverage or reachability publishes Rung 3 or Rung 4 with the reason, rather than being promoted."
+        ]
+      },
+      {
+        "goal": "A measured Rung 1 decision",
+        "entry_gates": [
+          "Rung 2's pose and coverage measurements exist over the same corpus.",
+          "A reviewed Apache-2.0 gsplat path with a resumable, checkpointed job and recorded GPU, revision, parameters, iterations, timing and cost.",
+          "A held-out view split defined before training rather than after."
+        ],
+        "exit_gates": [
+          "A scene earns Rung 1 only when its declared registration, view-quality, coverage and artifact-integrity checks pass, and a failure publishes a lower rung with the reason.",
+          "No factual claim depends on splat geometry or splat colour, because splat delivery is lossy by construction.",
+          "Training intermediates stay out of the runtime and the World Memory Package."
+        ]
+      }
+    ],
+    "known_limitations": [
+      "This audit closed the items that sit inside the evidence address. It did not measure reconstruction quality, retrieval accuracy or human comprehensibility, and no number in it is a product claim.",
+      "The cross-implementation ratification used Node and Python, which are two implementations and not two independent specifications. Both are ECMAScript-descended in string escaping.",
+      "No personal media was admitted or evaluated at any point.",
+      "The tick round trip is now exact and has never been exercised on a real video file, because no video path exists to exercise it.",
+      "scene_pose is declared deterministic and has not been observed to reproduce across two runs, so it may not be described as exactly recomputable.",
+      "The production app build still passes with a non-blocking warning that its main JavaScript chunk exceeds 500 kB after minification, unchanged by this goal."
+    ],
+    "intentionally_deferred": [
+      {
+        "item": "A boot-time zero-data-retention assertion",
+        "why": "The document it would read does not exist. Building the mechanism first would be an abstraction with nothing behind it, and it would read as a closed gate while asserting nothing."
+      },
+      {
+        "item": "A TypeScript canonical-JSON module in web/packages",
+        "why": "No browser consumer verifies a span_digest today; the renderer verifies content digests over raw bytes and already does that. The conformance vectors are the artifact a future implementation is ratified against, which is the part that had to exist now."
+      },
+      {
+        "item": "An ocr_text modality value",
+        "why": "Additive and free whenever it is genuinely needed. Adding it now would be a second name for an address shape that already exists, and two names mean two code paths in every consumer."
+      },
+      {
+        "item": "Widening media_track.rotation to the eight EXIF values",
+        "why": "ADR-0004 rejected that branch; ADR-0012 removed the last reason to revisit it."
+      },
+      {
+        "item": "A grep-based ban on the words unlearning and forgetting",
+        "why": "It would fail on 'forgetting to bump a version' in a code comment and push those comments into worse English. The enforceable half of the rule is that the registry decides which stages may carry an exactness claim and the document is checked against the registry."
+      },
+      {
+        "item": "Correcting the 500 kB main chunk warning in the Atlas build",
+        "why": "Out of scope for an evidence-model audit and unchanged from the campaign."
+      }
+    ],
+    "migrations": {
+      "historical_unchanged": "0001 through 0031, byte identical to the starting revision",
+      "added_forward_only": [
+        "0032_upright_display_space.sql",
+        "0033_span_digest_input_shape.sql",
+        "0034_ocr_is_a_region_not_a_transcript.sql"
+      ],
+      "rewrites": 0,
+      "digests_changed": 0
+    },
+    "verification": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "server": "PostgreSQL 18.6 with pgvector, nothing substituted",
+      "backend_collected": 1447,
+      "backend_passed": 1445,
+      "backend_skipped": 2,
+      "backend_warnings": 3,
+      "backend_passed_at_starting_revision": 1354,
+      "backend_tests_added": 91,
+      "ruff_passed": true,
+      "import_contracts_kept": 4,
+      "import_contracts_broken": 0,
+      "web_test_files_passed": 87,
+      "web_tests_passed": 670,
+      "web_typecheck_passed": true,
+      "web_boundaries_passed": true,
+      "production_app_build_passed": true,
+      "landing_build_passed": true,
+      "span_digest_conformance_vectors_agreed": 7,
+      "span_digest_conformance_runtime": "node v24.15.0"
+    }
+  },
+  "record_sha256": "4dc155bd57a91cd66e1c7c0f85ea52660e26ecc1e5239bff239b007717b20064"
+}
