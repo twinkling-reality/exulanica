@@ -244,6 +244,10 @@ either retained real collection.
 
 Pose estimation may use held-out photographs; their RGB is excluded from Gaussian optimization
 and color initialization. Report this as appearance-held-out evaluation, not unseen-pose recovery.
+After a training run, `uv run python scripts/heldout_comparisons.py --sha256 <bundle digest>
+--output <evidence directory>` produces the photograph-beside-render images and the digest-bound
+`comparisons.json` that the evaluation record cites; the bundle digest is the training receipt's
+evaluation artifact hash. Look at every held-out view, not the best one.
 
 The retained record and companion mutation records under `docs/evaluation/2026-09-05-*` distinguish
 real public-source intake/browser observations from synthetic operational tests. CPU optimizer

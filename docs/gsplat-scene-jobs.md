@@ -144,6 +144,14 @@ is not a training, image-quality, or reference-scene acceptance result. Checkpoi
 logs, and held-out renders are private operational artifacts, not default publication assets.
 `accepted.ply` is the legacy controller filename; its presence by itself is not acceptance.
 
+To look at what the scores measured, `scripts/heldout_comparisons.py` reads a retained evaluation
+bundle (by path, or by content digest inside the blob store), verifies every file it uses against
+the bundle's own inventory and the render digests in `metrics.json`, and writes one photograph
+beside render JPEG per held-out view with that view's PSNR, SSIM, LPIPS and coverage printed on it,
+plus a `comparisons.json` that binds the bundle, the render and reference digests and the output
+images. A tampered or truncated bundle is refused rather than drawn. The comparisons show
+appearance at photographed viewpoints only.
+
 ## Build and run on available CUDA compute
 
 `deploy/gsplat/Dockerfile` is the concrete build recipe. It requires a real **digest-pinned** CUDA
