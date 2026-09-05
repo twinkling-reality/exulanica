@@ -39,7 +39,7 @@ reading the code that would have to run, not by reading a plan that describes it
 | Photograph ingest | `uv run exulanica-ingest ingest <dir>` | Real vision observations over real photographs through `MiniMaxAI/MiniMax-M3`, EXIF normalisation, scene grouping, content-addressed storage, and a second run that skips everything and issues zero model calls |
 | Landing surface | `pnpm --dir web landing` | The public title and Method surfaces. Its CTA links to the real app when that destination is configured; it does not replay a mock Atlas |
 | First-person traverse of a region | `pnpm --filter @exulanica/atlas-react bakeoff:playcanvas` | Pointer-lock mouse-look, WASD, reticle targeting and the live anchor overlay over point-map islands, on **synthetic** fixtures |
-| Test suite | `uv run pytest` | 588 tests, 227 of which skip without a live PostgreSQL 18 server with pgvector |
+| Test suite | `uv run pytest` | 1447 tests, 677 of which skip without a live PostgreSQL 18 server with pgvector |
 
 ### 1.2 Does not exist yet
 

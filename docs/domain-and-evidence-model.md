@@ -25,10 +25,14 @@ Label convention is the one in [README.md](README.md):
 document, and building them found errors in it. Where this document disagreed with what runs, the
 built artefact wins and the paragraph is marked **CORRECTED**; where it disagreed with
 [runtime-verification.md](runtime-verification.md), that document wins, as its own header says. None of these
-corrections is a redesign. One caveat applies to every SQL claim below: no PostgreSQL server has
-executed this migration in this environment, so the SQL checks are text-level.
-`tests/test_migration.py::test_the_migration_actually_applies` skips unless
-`EXULANICA_TEST_DATABASE_URL` points at a PostgreSQL 18 instance.
+corrections is a redesign.
+
+**The caveat this header used to carry is withdrawn, 2026-09-04.** It said no PostgreSQL server had
+executed the migration in this environment and that every SQL claim below was therefore text-level.
+That has not been true for some time: the suite applies all thirty-four migrations to a real
+PostgreSQL 18 server with pgvector on every run that sets `EXULANICA_TEST_DATABASE_URL`, and 1445 of
+1447 tests pass that way, with nothing substituted. A claim below about a trigger, a check
+constraint or a row-level-security policy is executed unless the paragraph says otherwise.
 
 Corpus context that shapes this document, already settled in
 [product-specification.md](product-specification.md) section 2: **the capture corpus is still
@@ -1848,7 +1852,7 @@ timebase item specifically at first video ingest.
 | Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **CLOSED 2026-09-04** | Closed by refusing a multi-frame container at ingest rather than by inspecting the corpus. Section 1.5 |
 | The tie direction of `round_half_down` | **CLOSED 2026-09-04** | Ratified as ties toward zero, ADR-0015 and section 9.1 |
 | Tick to ns to tick is not the identity under the frozen formulas | **CLOSED 2026-09-04** | Corrected inside its decision window; the round trip is now exact. ADR-0015 and section 9.1 |
-| Whether migration `0001_spine.sql` applies at all | **ASSUMPTION** | `tests/test_migration.py::test_the_migration_actually_applies` against a real PostgreSQL 18 instance. It skips unless `EXULANICA_TEST_DATABASE_URL` is set, so every SQL claim here is currently a text-level claim |
+| Whether migration `0001_spine.sql` applies at all | **VERIFIED 2026-09-04** | `tests/test_migration.py::test_the_migration_actually_applies` runs against PostgreSQL 18.6 with pgvector, nothing substituted. All thirty-four migrations apply, and 1445 of 1447 tests pass with a server configured |
 | Whether exact search over `halfvec(4096)` stays fast enough as the library grows | **ASSUMPTION** | Measurement at corpus scale. The additive fallback is a truncated 1024-dimension recall column, section 4.4 |
 | Browser seek accuracy against ffmpeg PTS | ASSUMPTION A-31 | Experiment X-3. Not live for a photograph corpus; becomes live when video arrives |
 | Re-anchor rate across model versions | ASSUMPTION | Experiment X-19 |

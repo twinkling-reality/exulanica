@@ -188,7 +188,7 @@ credits: the model client is exercised through a scripted HTTP transport, and te
 generated rather than committed, so the content of every test image is known exactly.
 
 ```bash
-uv run pytest                       # 1182 tests; 572 skip without a database
+uv run pytest                       # 1447 tests; 677 skip without a database
 uv run ruff check .                 # lints backend, tests and scripts
 uv run lint-imports                 # the backend layering contract, four rules
 uv run exulanica-preflight            # checks every manifest id against the live catalog
@@ -363,7 +363,7 @@ that starts Exulanica end to end.
 | `exulanica/deletion/` | The purge queue a tombstone fills and the worker that empties it. Destroys objects, marks rows, and holds DELETE on nothing |
 | `pyproject.toml` | Also the backend layering contract, enforced by `uv run lint-imports` |
 | `exulanica/canonical.py`, `exulanica/errors.py` | Canonical JSON and the one rounding rule; the error taxonomy |
-| `tests/` | 1182 tests, 572 of which need a PostgreSQL 18 server. No network, no credentials, no committed binary fixtures |
+| `tests/` | 1447 tests, 677 of which need a PostgreSQL 18 server. No network, no credentials, no committed binary fixtures |
 | `scripts/` | The standalone runtime verification harnesses, kept byte-identical so their evidence stays reproducible |
 | `web/packages/atlas-core/` | Scene graph, island frames, focus resolution, layout solver. No React, no DOM, no renderer |
 | `web/packages/atlas-react/` | Renderer bindings, anchor overlay, HUD, comfort settings |

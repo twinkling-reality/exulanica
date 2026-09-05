@@ -56,6 +56,7 @@ questions in both.
 | [physical-streaming-runtime.md](physical-streaming-runtime.md) | Cancel-safe physical residency, authenticated fetch and Range observation, pressure downgrade, neighborhood rebasing, context recovery, disposal, and the production measurement boundary | RENDERER CONTRACT IMPLEMENTED; real asset/hardware gate blocked |
 | [derivative-worker-operations.md](derivative-worker-operations.md) | Production derivative-worker process, RLS role, leases, retries, reclaim, progress, metrics, replay, shutdown, and failure recovery | IMPLEMENTED and PostgreSQL-tested 2026-08-31 |
 | [scene-reconstruction-operations.md](scene-reconstruction-operations.md) | Production multi-photograph selection, leases, pose and placement receipts, graph delivery, multi-map rendering, rung disclosure, deletion, scratch cleanup, and recovery | IMPLEMENTED and PostgreSQL/browser-tested 2026-09-04; real-corpus quality run blocked |
+| [evaluation/2026-09-04-readiness-and-architecture-audit.json](evaluation/2026-09-04-readiness-and-architecture-audit.json) | The post-reconstruction readiness audit: confirmed architecture, the contradictions it found, the eight identity and evidence decisions it closed, what is still open, and the entry and exit gates for the four goals that follow | Retained, digest bound, checked by `tests/test_retained_evaluation_records.py` |
 | [domain-and-evidence-model.md](domain-and-evidence-model.md) | The evidence address, the epistemic model, occurrence versus entity, schemas, idempotency, deletion and tombstones, the provenance ledger, the World Memory Package | DECISION, with CORRECTED and OPEN items inline |
 | [model-and-service-selection.md](model-and-service-selection.md) | The model and service matrix with exact identifiers and declared fallbacks, the 2026-08-31 deprecation, the catalog type-field hazard, routing and cost discipline, and what may be claimed about model use | VERIFIED 2026-08-27, with OPEN items listed |
 | [runtime-verification.md](runtime-verification.md) | What the platform does when called rather than when read about: the archived NVIDIA provenance record, measured image token costs, reasoning-token behaviour, which structured-output mechanism works, embedding width, and the resolved spend exposure | VERIFIED by execution 2026-08-27 |
@@ -107,8 +108,8 @@ on conflict.
 The evidence spine is implemented rather than only specified: migration
 `exulanica/migrations/0001_spine.sql` and the `exulanica/evidence/` modules, with tests. Building it
 found errors in the committed design, and those are corrected in place and marked **CORRECTED**
-rather than left for the next reader to trip over. The suite is 588 tests, 227 of which require a
-live PostgreSQL instance and skip without one. All 588 pass against the documented target,
+rather than left for the next reader to trip over. The suite is 1447 tests, 677 of which require a
+live PostgreSQL instance and skip without one. All 1445 pass against the documented target,
 PostgreSQL 18 with pgvector, with nothing substituted for either, so the SQL-level guarantees are
 executed rather than described. The SQLite mirror the ingest path used to write is deleted:
 there is one schema.
