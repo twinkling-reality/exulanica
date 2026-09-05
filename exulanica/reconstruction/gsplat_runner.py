@@ -423,7 +423,8 @@ def load_dataset(
 ) -> tuple[list[dict[str, Any]], Any]:
     import numpy as np
     import pycolmap
-    from PIL import Image
+
+    from exulanica.corpus.decode import probe
 
     sparse = dataset / "sparse"
     model = (
@@ -442,9 +443,8 @@ def load_dataset(
         image_path = dataset / "images" / image.name
         if not image_path.resolve().is_relative_to((dataset / "images").resolve()):
             raise ValueError("COLMAP image path escapes the exact dataset")
-        with Image.open(image_path) as source:
-            if source.size != (camera.width, camera.height):
-                raise ValueError("COLMAP camera resolution differs from source image")
+        if probe(image_path.read_bytes()) != (camera.width, camera.height):
+            raise ValueError("COLMAP camera resolution differs from source image")
         transform = np.eye(4, dtype=np.float32)
         transform[:3] = image.cam_from_world().matrix()
         views.append(
@@ -474,9 +474,10 @@ def load_dataset(
 
 def _image(view: dict[str, Any], torch: Any) -> Any:
     import numpy as np
-    from PIL import Image
 
-    with Image.open(view["path"]) as source:
+    from exulanica.corpus.decode import open_sensor
+
+    with open_sensor(view["path"].read_bytes()) as source:
         pixels = np.array(source.convert("RGB"), dtype=np.float32) / 255.0
     return torch.from_numpy(pixels).to("cuda").unsqueeze(0)
 

@@ -529,8 +529,8 @@ def test_a_photograph_becomes_pixels_in_exactly_one_module():
     broke it before.
     """
     assert _image_open_call_sites() == [
-        "exulanica/ingest/decode.py:open_upright",
-        "exulanica/ingest/decode.py:probe",
+        "exulanica/corpus/decode.py:open_sensor",
+        "exulanica/corpus/decode.py:probe",
     ]
 
 

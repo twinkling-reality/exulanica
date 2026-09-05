@@ -24,13 +24,50 @@ for name in (
     "test_gsplat_dataset.py",
     "test_gsplat_container.py",
     "test_reference_inputs.py",
+    "test_corpus_decode.py",
 ):
     shutil.copy(root / "tests" / name, work / "tests" / name)
 runner = "exulanica/reconstruction/gsplat_runner.py"
 splat = "exulanica/reconstruction/splat.py"
 container = "exulanica/reconstruction/gsplat_container.py"
 reference = "exulanica/evaluation/reference_inputs.py"
+decoder = "exulanica/corpus/decode.py"
 mutants = [
+    (
+        "sensor_orientation_is_preserved",
+        decoder,
+        "    return opened",
+        "    from PIL import ImageOps\n\n    return ImageOps.exif_transpose(opened)",
+        "test_sensor_pixels_preserve_all_exif_orientations",
+    ),
+    (
+        "sensor_pixel_budget",
+        decoder,
+        "    if pixels > MAX_PIXELS:",
+        "    if False:",
+        "test_budget_refuses_header_before_loading",
+    ),
+    (
+        "sensor_single_frame_only",
+        decoder,
+        "    _single_frame(image)",
+        "    pass # mutant silently retains only frame one",
+        "test_multiple_frames_are_refused_at_probe_and_decode",
+    ),
+    (
+        "sensor_pixels_loaded_before_return",
+        decoder,
+        "        opened.load()",
+        "        pass # mutant returns without decoding payload",
+        "test_sensor_decoder_loads_pixels",
+    ),
+    (
+        "ingest_still_normalizes_orientation",
+        "exulanica/ingest/decode.py",
+        "        return extract_exif_facts(opened)",
+        "        _upright, facts = extract_exif_facts(opened)\n        return opened, facts",
+        "test_sensor_pixels_preserve_all_exif_orientations",
+    ),
     (
         "reference_normalized_paths",
         reference,

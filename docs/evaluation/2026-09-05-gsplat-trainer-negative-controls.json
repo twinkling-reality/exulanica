@@ -7,6 +7,61 @@
     "isolated_source_copy": true,
     "records": [
       {
+        "mutation": "sensor_orientation_is_preserved",
+        "production_file": "exulanica/corpus/decode.py",
+        "test": "test_sensor_pixels_preserve_all_exif_orientations",
+        "returncode": 1,
+        "killed": true,
+        "replace": "    return opened",
+        "with": "    from PIL import ImageOps\n\n    return ImageOps.exif_transpose(opened)",
+        "observed_output_sha256": "ba34307be7fa667febed7de8ec3029c1daaf0ffe0f26e757949403917442f691",
+        "observed_outcome": "targeted regression failed under production mutation"
+      },
+      {
+        "mutation": "sensor_pixel_budget",
+        "production_file": "exulanica/corpus/decode.py",
+        "test": "test_budget_refuses_header_before_loading",
+        "returncode": 1,
+        "killed": true,
+        "replace": "    if pixels > MAX_PIXELS:",
+        "with": "    if False:",
+        "observed_output_sha256": "4d41c2be78538b5c7f47a9e1210a70a3c3a564d788e8c3cfe3561627f7e09c1d",
+        "observed_outcome": "targeted regression failed under production mutation"
+      },
+      {
+        "mutation": "sensor_single_frame_only",
+        "production_file": "exulanica/corpus/decode.py",
+        "test": "test_multiple_frames_are_refused_at_probe_and_decode",
+        "returncode": 1,
+        "killed": true,
+        "replace": "    _single_frame(image)",
+        "with": "    pass # mutant silently retains only frame one",
+        "observed_output_sha256": "7de6282c088eebabda9c55a7ba252573cacbaa7bb895286dde34bf947c064cb1",
+        "observed_outcome": "targeted regression failed under production mutation"
+      },
+      {
+        "mutation": "sensor_pixels_loaded_before_return",
+        "production_file": "exulanica/corpus/decode.py",
+        "test": "test_sensor_decoder_loads_pixels",
+        "returncode": 1,
+        "killed": true,
+        "replace": "        opened.load()",
+        "with": "        pass # mutant returns without decoding payload",
+        "observed_output_sha256": "37ddc6037922fc5ec07604c62fe6508cbbf76fb456dca0add557ce203048690f",
+        "observed_outcome": "targeted regression failed under production mutation"
+      },
+      {
+        "mutation": "ingest_still_normalizes_orientation",
+        "production_file": "exulanica/ingest/decode.py",
+        "test": "test_sensor_pixels_preserve_all_exif_orientations",
+        "returncode": 1,
+        "killed": true,
+        "replace": "        return extract_exif_facts(opened)",
+        "with": "        _upright, facts = extract_exif_facts(opened)\n        return opened, facts",
+        "observed_output_sha256": "bdce89cb8c90eec589727542f2628385208eebafb0449bbd97fd6f5de84b10a2",
+        "observed_outcome": "targeted regression failed under production mutation"
+      },
+      {
         "mutation": "reference_normalized_paths",
         "production_file": "exulanica/evaluation/reference_inputs.py",
         "test": "test_rehashed_malformed_inventory",
@@ -14,7 +69,7 @@
         "killed": true,
         "replace": "or pure.as_posix() != relative",
         "with": "or False",
-        "observed_output_sha256": "2e4250981613b7b175db5268e2306ae156ab8481405b356afc92d0a5c9617945",
+        "observed_output_sha256": "abaf61147208db2770df5f28b9c7e8fe37fb59ab489947227befad63de15ebeb",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -25,7 +80,7 @@
         "killed": true,
         "replace": "not re.fullmatch(r\"[0-9a-f]{64}\", digest)",
         "with": "False",
-        "observed_output_sha256": "77de541ef3ed0b6923fc39b4a46e8f35e03f0cbbff125a6aeda9fd70d4365a65",
+        "observed_output_sha256": "9d54e5b8a396a453df8c7f2f66c0803c9c25ca1cb25558665a760ac0e774abe1",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -36,7 +91,7 @@
         "killed": true,
         "replace": "type(item.get(field)) is not int or item[field] <= 0",
         "with": "False",
-        "observed_output_sha256": "b3062222cebe05db0dd27a8cd10d25107c4ef48e9c3aec5771883555851afd39",
+        "observed_output_sha256": "1fe6801acc48291391dba8cf94b794253fef5a788fdce0ae397a0cf787cdc247",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -47,7 +102,7 @@
         "killed": true,
         "replace": "or len(set(split[field])) != len(split[field])",
         "with": "or False",
-        "observed_output_sha256": "2af0692c4df491e62f96f6ab10df4f0aa670c037695b228984b322c4aa9c50b9",
+        "observed_output_sha256": "498595e2a2503b9c59ae74e5b495b765bf28a696562ecc6a3d1d18a0773261d5",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -58,7 +113,7 @@
         "killed": true,
         "replace": "candidate.is_symlink()",
         "with": "False",
-        "observed_output_sha256": "31a56d465ce4eaadba0e104a9b57d9e8e831153ad8be78f803a9eb57fe29a279",
+        "observed_output_sha256": "7fe8067d67ed581c7cc78dadc6fe320d7d00b27aa003239f44f8a1cb7c9af011",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -69,7 +124,7 @@
         "killed": true,
         "replace": "version.returncode != 0 or not re.search(",
         "with": "False and re.search(",
-        "observed_output_sha256": "89f5e7e2dc951b42eaeab1a9b55fd1f4e7f3b8831da7ef21691a298adf9d98b9",
+        "observed_output_sha256": "f63186c702da5f51960c549f544cde5cacd1cde14620979a50f5249f91d2f112",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -80,7 +135,7 @@
         "killed": true,
         "replace": "_digest_bytes(_canonical(pose_manifest)) != manifest.pose_manifest_digest",
         "with": "False",
-        "observed_output_sha256": "983e5981d6028a810baaddde8620756d3566238efd13803dc5a31e1cca2527f7",
+        "observed_output_sha256": "c7752450b0ba2dfde7dff40e3c5537006b606229dd7c9041d628652daff1825e",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -91,7 +146,7 @@
         "killed": true,
         "replace": "observed != expected",
         "with": "False",
-        "observed_output_sha256": "7ce2ccb18e40db69019e426d80bb80c908b39f2d5c1b278f48ec4d702bf52fbc",
+        "observed_output_sha256": "8e74a7ba8ee92c7729e1fc1ab6cf49c7099da01dbe2f1071112527f6f9b6dfa7",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -102,7 +157,7 @@
         "killed": true,
         "replace": "declared != actual",
         "with": "False",
-        "observed_output_sha256": "86b45c023be2f77b2db7713c9e15f04c1216ef09ba155144b01ad7010874a84c",
+        "observed_output_sha256": "b3031574db7dc0f63e39a69acdeafce2aabe867f659786a9dd7e8f18e8794729",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -113,7 +168,7 @@
         "killed": true,
         "replace": "if scale is not None and (",
         "with": "if (",
-        "observed_output_sha256": "1bbe05913b9fde78b6bf0aab07ea5bcb6e7e74c515ea21b5bf05de34f0bcc71d",
+        "observed_output_sha256": "f60d4217507757f3646840effb2c8630d882112dba0f7aae1ab3766642334db3",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -124,7 +179,7 @@
         "killed": true,
         "replace": "not set(self.heldout_source_sha256) < set(self.source_sha256)",
         "with": "False",
-        "observed_output_sha256": "7e51af3695625f278eca90b626241a3fad4443c24efe948c371a64034d0d87c5",
+        "observed_output_sha256": "ba1d7b7f2362e2667f548bb226d3cb54b9fea6b47478af66118ebdf99d3cf9de",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -135,7 +190,7 @@
         "killed": true,
         "replace": "            shutil.rmtree(prepared)",
         "with": "            raise ValueError(\"mutant rejects interrupted preprocessing\")",
-        "observed_output_sha256": "97565a0a6ec99bb8659a9947f569ae1eaad6ebf47493ea5be8dec502006248d5",
+        "observed_output_sha256": "e3b17181dc5c8f3d1a8e627689021206fe209e1780159fc8f8cb0080c457401f",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -146,7 +201,7 @@
         "killed": true,
         "replace": "in heldout_sources",
         "with": "in ()",
-        "observed_output_sha256": "ff2ef29f00b9bf87eb0469f581353cd0298b44810f65ef6f0fcd4dfdb1d455c4",
+        "observed_output_sha256": "cc5e78aecd5629bba11d78574b252eba5863958999f2df6b0bae35ae26723714",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -157,7 +212,7 @@
         "killed": true,
         "replace": "receipt.get(\"source_dataset_digest\") != source_digest",
         "with": "False",
-        "observed_output_sha256": "5bc7b28b1f122eb2e13c7cb090126bd274e43a3ee2e92bbf83c63af028f6795f",
+        "observed_output_sha256": "6f57a2f27f543dc91d21b79cd8157fa96ff6bcb961a15a0cc8b0ac8c83c447f1",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -168,7 +223,7 @@
         "killed": true,
         "replace": "                    _stop_owned(docker, cidfile, owner, grace_seconds)",
         "with": "                    pass # mutant skips owned daemon stop",
-        "observed_output_sha256": "fdd4d9f6d2691147c4446f8c1bba3f188e7eeba2a6bee2eba92d1c05555433ea",
+        "observed_output_sha256": "6578ed0e79312c5b1aa72b142349fe87d19796e6da91188cc09d321bf2109278",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -179,7 +234,7 @@
         "killed": true,
         "replace": "            _control(docker, \"kill\", container_id)",
         "with": "            pass # mutant omits daemon kill",
-        "observed_output_sha256": "df5464c6a46fd4178dabc0025942d88ff866d97256c6ea6e49a51bca2193b115",
+        "observed_output_sha256": "e74caf6d2562753481482ee0dffa301057ff8d5e75506a6b64791312997c1a6e",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -190,7 +245,7 @@
         "killed": true,
         "replace": "or label != owner",
         "with": "or False",
-        "observed_output_sha256": "c9aeda01618295cf41039438ecda23a6a81ef53bb02dc7edee76a62305576f9c",
+        "observed_output_sha256": "b09a903d2f928e82a16aaaf2989aea0372cc2a0ca64ea6622ebf324b69b98f27",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -201,7 +256,7 @@
         "killed": true,
         "replace": "    _mark_uncertain(output, owner, \"launch active; owned daemon cleanup not yet confirmed\")",
         "with": "    pass # mutant fails to persist ownership before launch",
-        "observed_output_sha256": "4054a8c45e0a3533272560cb62ae1326457b8ce5b28adc3b20dbfcafe08f87a0",
+        "observed_output_sha256": "066c0f0fb0045febd3ce12aa950f96a4a279212a6eaefd429b11e866b7d2ef7b",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -212,7 +267,7 @@
         "killed": true,
         "replace": "        _stop_owned(docker, cidfile, owner, 10)",
         "with": "        pass # mutant clears recovery guard without daemon confirmation",
-        "observed_output_sha256": "511d6d90c4406c21d029fc995bfa5d6812cb2ea41698dab944054f351ac4c8cc",
+        "observed_output_sha256": "c90fe1bb57972c8b15563f076b1de0ac77b01dc4fb2e48c07d91f2fd55766337",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -223,7 +278,7 @@
         "killed": true,
         "replace": "\n            _stop_owned(docker, cidfile, owner, grace_seconds)",
         "with": "\n            pass # mutant trusts Docker CLI exit",
-        "observed_output_sha256": "40b2982faaf45074c19911ba8baf76d96d063cc6e8ff14d2c8511768eff9d335",
+        "observed_output_sha256": "5afd3367a3feb61977dd79df79b549717b6f72670143e3221c3d0a0395e068f6",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -234,7 +289,7 @@
         "killed": true,
         "replace": "        if not stopped:",
         "with": "        if requested_at is None:",
-        "observed_output_sha256": "df6fb9afb64f74129e2c94b6be1c01389b4488a74ae10fe3db1ea1c53e8e8b49",
+        "observed_output_sha256": "c21313341fabfd230ab98566552860fff1ca9a604807765c663456cd860fca12",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -245,7 +300,7 @@
         "killed": true,
         "replace": "    restore_rng(state[\"rng\"])",
         "with": "    pass # mutant omits RNG restoration",
-        "observed_output_sha256": "4b947497728ad34182aba04201464a16d83e319027a509cdaf215efc588e1d9b",
+        "observed_output_sha256": "05ed2426fd98487fe4d78d1103e1804eb402203524f2ebb95723e98623061768",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -256,7 +311,7 @@
         "killed": true,
         "replace": "        optimizer.load_state_dict(state[\"optimizers\"][key])",
         "with": "        pass # mutant omits Adam state",
-        "observed_output_sha256": "fc2afd15e04233a7aca0c8f0a1594a1f598cd9bda1c9a58d1da9a346f20d60d1",
+        "observed_output_sha256": "0570770bdaea2a7699e57a8313356353ecb9fa1f7a884e6216c5fc0b5d467325",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -267,7 +322,7 @@
         "killed": true,
         "replace": "    scheduler.load_state_dict(state[\"scheduler\"])",
         "with": "    pass # mutant omits schedule state",
-        "observed_output_sha256": "6f09996c264b875285245621de2cbb22241d858b9655cee40f87ca3cadc52691",
+        "observed_output_sha256": "3aee1927777264a9e9e6339d2e375896540fbd7191ffa7ebc6b56156b076cfa3",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -278,7 +333,7 @@
         "killed": true,
         "replace": "\"strategy\": strategy_state,",
         "with": "\"strategy\": {},",
-        "observed_output_sha256": "413d5439d2e59a7e49f8d04e22357db474665971d8ceb5c7d03a5c1d8f26004b",
+        "observed_output_sha256": "af8c04eea3131118c5f4c01c4f986c2090694f5c2997faa48954c3c7668f29e9",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -289,7 +344,7 @@
         "killed": true,
         "replace": "\"sampler\": sampler,",
         "with": "\"sampler\": {\"order\": [], \"cursor\": 0},",
-        "observed_output_sha256": "ed7a16e16b6ce48868ab12104517a7c1b98fd9f80c1e59f38abb46e0e5e5a5bc",
+        "observed_output_sha256": "9db5e77fee07e901b443fb06e7ba548d7845f974012560cf19e336b615a43c52",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -300,7 +355,7 @@
         "killed": true,
         "replace": "value.get(\"identity\") != identity",
         "with": "False",
-        "observed_output_sha256": "f1f03bee3d725ed0fd2106edd412b95009690d4a68dc3af742c409e4a98399d1",
+        "observed_output_sha256": "19c7f42e9a8ab58369c46697136540aa305d089384e7e14535d7fb3f30c77fa8",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -311,7 +366,7 @@
         "killed": true,
         "replace": "_digest_file(checkpoint) != value.get(\"sha256\")",
         "with": "False",
-        "observed_output_sha256": "389113bfa575c5cf3366be03f71c70c0ad795adee70c45e31a8520109fcd886c",
+        "observed_output_sha256": "cae9a3f4fa13690d416dd8bd7f9aad16a75aa80a73bc41def4a7baa4c8cb30a2",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -322,7 +377,7 @@
         "killed": true,
         "replace": "not required <= state.keys()",
         "with": "False",
-        "observed_output_sha256": "6e2d54e950289b005b8022d4e126827c632deaaa9b5fc345a2952bc85d4d781e",
+        "observed_output_sha256": "902017e9d18099748840738f6d4821be53a1a987d540f6b1c84a85004875e262",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -333,7 +388,7 @@
         "killed": true,
         "replace": "if p.is_file())",
         "with": "if p.is_file() and \"sparse\" not in p.parts)",
-        "observed_output_sha256": "c6a7a2ac7e1e0c88622a4248b8fde2c5bce3abbd552e6cf7ee5821a9ad73dccc",
+        "observed_output_sha256": "1675d8835f7b01b180ee9cf6685061c260d8048f6cec2cc768fbc97c14d9fd8c",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -344,7 +399,7 @@
         "killed": true,
         "replace": "if value != manifest.as_payload():",
         "with": "if False:",
-        "observed_output_sha256": "684144106045485ecd53975f3d3e432952845c05823430750c2b604780b86fd9",
+        "observed_output_sha256": "3d6725f422516c1876a153d250e401b95c1d54c2134d46e36b9e94d84cdac5ce",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -355,7 +410,7 @@
         "killed": true,
         "replace": "if not torch.cuda.is_available():",
         "with": "if False:",
-        "observed_output_sha256": "3812313e979e8b0d8592a7ad6e634f146ba62416a9dc3ff9ef9b6bba7c572b47",
+        "observed_output_sha256": "c550530a55888cfff4536c6cda52b1ccc808ef24d46fc7b2052661a4ee107098",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -366,7 +421,7 @@
         "killed": true,
         "replace": "        manifest.execution_image,",
         "with": "        \"gsplat:latest\",",
-        "observed_output_sha256": "46bb3fa9a0f4d01cb6cb883e496e03e09b47af95fdb62ee0b00828d27dd32245",
+        "observed_output_sha256": "e51bc7e71bd73faada8117017c9ecfefa5d4067f34d2cc0510acf3c3fdd95b3a",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -377,7 +432,7 @@
         "killed": true,
         "replace": " + (\",readonly\" if readonly else \"\")",
         "with": " + \"\"",
-        "observed_output_sha256": "cdecc096cca161e18bec11abc4bed18511c385f76d3eb3dbd9bfee78ac37901c",
+        "observed_output_sha256": "00d4471bc67f3d5dd076cf4dc5f6a4f56e6ce4a7b65aa11a787a914445cbd76b",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -388,7 +443,7 @@
         "killed": true,
         "replace": "runtime.get(\"manifest_digest\") != manifest.digest",
         "with": "False",
-        "observed_output_sha256": "a7ef812cd98ff4a1322aef3db83d03afcffbf42aad5a5c23da9632296d574d83",
+        "observed_output_sha256": "037e91794bf9ebdda6b9d23e3029aab838e20c762886ec269ceebcdf559b7608",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -399,7 +454,7 @@
         "killed": true,
         "replace": "if runtime.get(\"duration_accounting_complete\") is not True:",
         "with": "if False:",
-        "observed_output_sha256": "c855e08814ccdf50215cb3dbc5b29bf2bbc91a655d941f4063d746267806e595",
+        "observed_output_sha256": "bee448e5d20c0f4600b73f6c701af1f8c00167a678159984453d91f83c4d9606",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -410,7 +465,7 @@
         "killed": true,
         "replace": "if runtime.get(\"training_protocol\") != TRAINING_PROTOCOL:",
         "with": "if False:",
-        "observed_output_sha256": "144208bc4d716e85d0e0e016ae97fe83ada62cc96193aa901c616681ae2987f3",
+        "observed_output_sha256": "3ec4aa3ee92a5b1762e8a806578ca095dbfd15a559dc65f56e6adebd7398723a",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -421,7 +476,7 @@
         "killed": true,
         "replace": "if runtime.get(\"ply_sha256\") != _digest_file(output / \"accepted.ply\"):",
         "with": "if False:",
-        "observed_output_sha256": "b69ce54c1256ce318a0a751c6e8088fa9552d1acd1a7672cf849367b7870975a",
+        "observed_output_sha256": "7c61f42b3ad464abd5de5641422b4da37832ca5ccd0299b443df3d7b68460ab6",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -432,7 +487,7 @@
         "killed": true,
         "replace": "if \"gsplat\" not in normalized:\n        raise ValueError(\"runtime package inventory omits gsplat\")",
         "with": "if False:\n        raise ValueError(\"runtime package inventory omits gsplat\")",
-        "observed_output_sha256": "d535ccafde1bbd97f24d3787e66884a39e576ee42b9e44a9b2fad9f512a43b5d",
+        "observed_output_sha256": "c9706d86b5035615f219e5abd0c4f94f6d78eb67945ae72f96a104f30c2ee2f1",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -443,7 +498,7 @@
         "killed": true,
         "replace": "if duration <= 0:",
         "with": "if False:",
-        "observed_output_sha256": "51e6d3b020f5ef584560b1852591690a1ba36c9604f097f4367ae3f2459f98ae",
+        "observed_output_sha256": "a35803846c55d82bf0cbad6cabb9411671a05f64370cf3c974ec4aa7f8b1460d",
         "observed_outcome": "targeted regression failed under production mutation"
       },
       {
@@ -454,10 +509,10 @@
         "killed": true,
         "replace": "        or not math.isfinite(scale)\n",
         "with": "",
-        "observed_output_sha256": "5fdeeeae8474e54cc460663bf3af69cd07617d105c3accd08af79dd9f8ddae8a",
+        "observed_output_sha256": "be47070d3b7eca8efc16812b709693c3027b2230bfad5ccd4a80bb40ecb3c0dc",
         "observed_outcome": "targeted regression failed under production mutation"
       }
     ]
   },
-  "record_sha256": "5ac4e854b23cfb0640f0330445248bf35e9e35b7e0406ee6997466d4aec6804e"
+  "record_sha256": "ec7f64af14ae95c22f85ba762d24dfe93591e8844ad46fde7f052fa9c9a51e29"
 }

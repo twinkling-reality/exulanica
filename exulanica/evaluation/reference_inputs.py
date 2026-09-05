@@ -14,9 +14,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
-from PIL import Image
-
 from exulanica.canonical import canonical_json
+from exulanica.corpus.decode import open_sensor
 
 PROFILE = "exulanica.reference-inputs/v1"
 ENVELOPE = "exulanica.digest-bound-record/v1"
@@ -162,9 +161,7 @@ def prepare_inputs(
             continue
         if path.is_symlink() or not path.resolve(strict=True).is_relative_to(root):
             raise ValueError("symlinked reference inputs are refused")
-        with Image.open(path) as image:
-            image.verify()
-        with Image.open(path) as image:
+        with open_sensor(path.read_bytes()) as image:
             width, height = image.size
         files.append(
             {

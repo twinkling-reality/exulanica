@@ -28,17 +28,19 @@
         "broken": 0
       },
       "uv_lock_check": "passed",
-      "production_mutants_killed": 41,
+      "production_mutants_killed": 46,
       "combined_non_database_verification": {
-        "passed": 74,
+        "passed": 88,
         "files": [
+          "tests/test_corpus_decode.py",
           "tests/test_gsplat_runner.py",
           "tests/test_gsplat_dataset.py",
           "tests/test_gsplat_container.py",
           "tests/test_reconstruction_splat.py",
           "tests/test_reconstruction_scene_gate.py",
           "tests/test_reference_inputs.py",
-          "tests/test_retained_evaluation_records.py"
+          "tests/test_retained_evaluation_records.py",
+          "tests/test_ingest_persistence.py::test_a_photograph_becomes_pixels_in_exactly_one_module"
         ]
       },
       "mutation_reproducer": "uv run python scripts/verify_gsplat_controls.py",
@@ -46,6 +48,15 @@
         "command": "uv run pytest tests/test_reconstruction_pose.py tests/test_gsplat_runner.py tests/test_gsplat_dataset.py",
         "passed": 17,
         "duplicate_runtime_override": false
+      },
+      "shared_sensor_decoder": {
+        "test_file": "tests/test_corpus_decode.py",
+        "passed": 13,
+        "budget_pixels": 64000000,
+        "all_exif_orientations_preserved": true,
+        "multiframe_refusal_preserved": true,
+        "architecture_sweep": "tests/test_ingest_persistence.py::test_a_photograph_becomes_pixels_in_exactly_one_module",
+        "architecture_sweep_passed": true
       }
     },
     "test_evidence_scope": [
@@ -54,7 +65,8 @@
       "Actual launcher child processes exercised a declared local Docker-protocol stand-in: cooperative exit75, forced kill, disconnected CLI, concurrent stop/exit race, ownership refusal, uncertain-state protection, and reconciliation. No real Docker daemon or GPU execution was performed.",
       "No GPU convergence, image quality, GPU resource use, trained-scene runtime bill, or browser appearance was measured by this verification.",
       "Appearance acceptance is explicitly independent of recorded rung; a nonmetric pose may train but cannot earn physical scale.",
-      "All Torch-bearing checks execute in child pytest processes, preserving real CPU Adam/RNG/checkpoint assertions without loading Torch into the COLMAP test process."
+      "All Torch-bearing checks execute in child pytest processes, preserving real CPU Adam/RNG/checkpoint assertions without loading Torch into the COLMAP test process.",
+      "One shared corpus sensor decoder preserves all eight EXIF pixel orientations for calibrated training while ingest still normalizes display pixels; explicit64M pixel and multiframe refusals apply at probe and load. The unchanged architecture sweep permits Image.open only in that core module."
     ],
     "remaining": [
       "NVIDIA CUDA compute access and any required paid allocation approval",
@@ -64,7 +76,7 @@
       "Independent physical scale and coverage evidence before any recorded rung1 claim"
     ],
     "source_sha256": {
-      "exulanica/reconstruction/gsplat_runner.py": "743c30fb9d561cc0239ce224bff39563143ffadf169f8b13574eb561ca1c7c89",
+      "exulanica/reconstruction/gsplat_runner.py": "0074328c77fc79b00d2668c4e5c34e3b4ae052bee147e488fc01c2e0c3bb20b4",
       "exulanica/reconstruction/gsplat_protocol.py": "845579aeb8713718da90a1e41ff97a4e18f39572f68e26d587a4c5e69b2a28a7",
       "exulanica/reconstruction/gsplat_container.py": "d04cd04802eb6b62f29a088b5bda7205217a9a383519a29ca4bbdc50975f5c7d",
       "exulanica/reconstruction/splat.py": "033876fc970063ecb8629ee58eb7086a8ba41ecfe466b8ce4afe5fff1cfb20de",
@@ -74,15 +86,19 @@
       "deploy/gsplat/Dockerfile": "95aa58f3ee1c0a461b31b1129f2ee6122f4c7bb417ac55f71be5f3e72ef6702b",
       "deploy/gsplat/requirements.txt": "72fc29ed614300790d55c9a07cbe87702299981f5cecf700ed56afdda9dd03fd",
       "docs/gsplat-scene-jobs.md": "927c7852a3d0b73d71077f4c4169f272b4c0c4152b3bdea097b1544be91698e3",
-      "scripts/verify_gsplat_controls.py": "e205cc0e35831d8170215ba2edf4358b6e46a4fff4c73091fda867e8ffbbcaf6",
+      "scripts/verify_gsplat_controls.py": "3f83b099cb560ed58fc741c85f34afca58ce7e00e819bbb0530c61c5ab8300ea",
       "deploy/gsplat/compressor/package.json": "780922ad9608715c6e40513b3340fec8e92afb30a02f12a4e58bb0a68c939304",
       "deploy/gsplat/compressor/package-lock.json": "4e608c12bf1f1f0bc740f277a255886e52fa1c5889ace1d14924901ffcb1d04f",
       "docs/adr/gsplat-training-and-recorded-rung.md": "69785c1a7f6cb5507b120173a6c5fb15131e0e7a6bc94464b825718638c1d2b6",
-      "exulanica/evaluation/reference_inputs.py": "7100a5729489eb47925c5b437d799cb1594246fbdc26924432efb6090ad68ad9",
+      "exulanica/evaluation/reference_inputs.py": "687e9a0ee26fdf584a576455ebd6b9a5020bb7c67d058e8e60ef8bc72b556efb",
       "tests/test_reference_inputs.py": "0a0f7d5c25d64185eaf87a54ebb61f2fcdf9ce32ab3ad695e55438ed5dcd7b40",
-      "tests/test_gsplat_container.py": "e75df4864cccc61bd656cef435cdd88edf3cb833e7cc3e7cbde75d440d7c1705"
+      "tests/test_gsplat_container.py": "e75df4864cccc61bd656cef435cdd88edf3cb833e7cc3e7cbde75d440d7c1705",
+      "exulanica/corpus/decode.py": "db66bea847e025c6f2c764b4da1814eb8080af1214c2b678a9c0d70baa2897a5",
+      "exulanica/ingest/decode.py": "864ca00dc60de4cf47557fb97532517db2316950ec4135c70077f4d284cbba34",
+      "tests/test_corpus_decode.py": "79ceaf7caa48fb11eeb9f405d683fa40203a8c59271a9005ebe33c9e117e0a6d",
+      "tests/test_ingest_persistence.py": "7b42cfd61b93f877a967e63b9146afff314c25b81a8786646571231fb1481949"
     },
-    "negative_controls_sha256": "26db4ed3416bf3e0614bd85ea187886c1aa4204e5024978abf34b5c4e0d55b2b",
+    "negative_controls_sha256": "a7010e22575301eb10dd97092390ceff7048d5d720ee479eb74336d12a2385ed",
     "recorded_rung_scale_gate_preserved": true,
     "nonmetric_optimization_allowed_without_rung_promotion": true,
     "real_cpu_compressor_smoke": {
@@ -104,5 +120,5 @@
       "output_retention": "temporary-test-material-not-a-reference-scene"
     }
   },
-  "record_sha256": "34dc72046590ed87b12c1fc70e4846a2bd6d42e0f2dbda5cacf32d91fbf8c6b5"
+  "record_sha256": "3d117a586cd5d005cb4701a37b58d5835348fe7773e34ebf65b56453eca171ee"
 }
