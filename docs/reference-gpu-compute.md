@@ -89,6 +89,13 @@ are named in the commits.
   worker's first pass went to a stale job pinned to an earlier image, which consumed that job's
   final attempt before the intended job began. The worker now accepts `--job <id>` and
   `EXULANICA_SCENE_JOB_IDS`; name the job you queued when the machine is rented for it.
+- `splat-transform 3.3.3` prints its version banner on stderr. The compressor check read only
+  stdout, so the first accepted real training was refused at the compression step after two hours
+  on the card. The check now reads both streams; on the rented host, whose worker revision was
+  pinned by the request, a one-line shell shim merging the streams let the same job resume from its
+  final checkpoint instead of retraining.
+- The stage-binding currency check ran after pose recovery. A stale retryable job spent thirty
+  minutes of COLMAP on 210 photographs before being refused; the check now runs first.
 - The first trained bowl scene passed every appearance rule and was still refused by the floater
   proxy (0.472 against a predeclared 0.15). The proxy measures distance from sparse points and a
   plain table around a densely matched bowl has almost none; it is a divergence diagnostic, not a
