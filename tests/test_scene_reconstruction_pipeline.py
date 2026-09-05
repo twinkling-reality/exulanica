@@ -319,21 +319,35 @@ def test_scene_pose_manifest_uses_the_exact_quantized_stage_policy(
     assert receipt["quality"]["accepted"] is True
 
 
-def test_current_scene_pose_policy_is_bound_to_the_two_fixed_calibration_runs():
+def test_current_scene_pose_policy_is_bound_to_the_fixed_calibration_and_real_capture_runs():
+    """Version 4 keeps the two synthetic/benchmark calibrations and records the real captures
+    whose fully registered, sub-pixel models the version 3 floor of 9.0 units refused."""
     current = STAGES["scene_pose"]
     thresholds = scene_pose_quality_thresholds(current)
     calibration = current.params["calibration"]
 
-    assert current.version == 3
+    assert current.version == 4
     assert thresholds.min_registered_fraction == 0.8
     assert thresholds.max_mean_reprojection_error_px == 1.0
-    assert thresholds.min_camera_translation_units == 9.0
+    assert thresholds.min_camera_translation_units == 5.0
     assert calibration["synthetic_pose_evaluation_sha256"] == (
         "dc0680b24fc85ba3ebe2ed55d3ed92a10e9ea161ded9701b73014c336808c5d7"
     )
     assert calibration["benchmark_pose_evaluation_sha256"] == (
         "68640ca95fce5adf54d8217b53139a4706edf6c6430cd6d854b58079b59408d8"
     )
+    real = calibration["real_capture_observations"]
+    assert [(run["photographs"], run["camera_translation_extent_microunits"]) for run in real] == [
+        (40, 8_132_481),
+        (51, 8_961_565),
+    ]
+    assert all(run["registered_fraction_millionths"] == 1_000_000 for run in real)
+    assert all(run["mean_reprojection_error_micropixels"] < 1_000_000 for run in real)
+    assert all(
+        run["camera_translation_extent_microunits"] > thresholds.min_camera_translation_units * 1e6
+        for run in real
+    ), "the recorded real captures must pass the floor this version chose"
+    assert all(len(run["pose_receipt_sha256"]) == 64 for run in real)
 
 
 def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_history(
