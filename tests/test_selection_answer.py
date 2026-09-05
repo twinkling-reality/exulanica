@@ -633,3 +633,114 @@ def test_a_plan_that_fails_twice_refuses_rather_than_answering_a_different_quest
     with pytest.raises(StructuredOutputError):
         propose_plan(client, "which photographs?", ())
     assert answered.transport.call_count == 2, "it retried more than once, or not at all"
+
+
+# -- the citation binds to a stored span_digest ------------------------------------------------
+#
+# ADR-0014 makes `span_digest` the identity of an evidence address, and the readiness audit's
+# exit gate for this goal is that "every factual clause in that answer carries a citation token
+# that verifies against a stored span_digest". Three tests below, and they are three because the
+# property is a chain and each link failed differently before they existed:
+#
+#   1. The digest comparison inside `address_from_span_row` had never been observed to fire, so
+#      it was indistinguishable from `return address`.
+#   2. The clause-level property had never been asserted on an answer that `answer_question`
+#      itself produced. Every cited-clause test used a hand-built packet.
+#   3. Nothing joined a token to a database row. The permalink route is the third, independent
+#      form of the same lookup, and no test walked a produced answer's citation into it.
+
+
+def _historical_citations(outcome):
+    """Every (clause ordinal, token) pair a factual clause rests on. Empty is a test failure."""
+    return [
+        (ordinal, token)
+        for ordinal, clause in enumerate(outcome.answer.clauses)
+        if clause.type is ClauseType.HISTORICAL
+        for token in clause.citations
+    ]
+
+
+def test_a_stored_span_that_no_longer_hashes_to_its_digest_stops_the_answer(answered):
+    """The negative control for the whole chain, and the one that was missing.
+
+    `t_end_ns` is an input to the digest, so moving it leaves a row whose stored `span_digest`
+    describes evidence the row no longer denotes. `[0, 2)` rather than `[0, 1)` is still a legal
+    span under `span_non_empty`, so the database accepts the write and the only thing standing
+    between that row and a citation is the rebuild.
+
+    It must not degrade to a 404 or a shorter answer. A citation that has stopped verifying is
+    an integrity failure about every answer that ever cited it, not a missing photograph.
+    """
+    from exulanica.errors import IntegrityError
+
+    connection = answered.repository.connection
+    span = connection.execute(
+        "select span_id from evidence_span where modality = 'still_image' order by span_id limit 1"
+    ).fetchone()["span_id"]
+    connection.execute("update evidence_span set t_end_ns = 2 where span_id = %s", (span,))
+
+    with pytest.raises(IntegrityError, match="rebuilt to digest"):
+        answered.packet()
+
+
+def test_every_factual_clause_cites_a_token_that_resolves_to_a_stored_span_digest(answered):
+    """The exit-gate sentence, asserted on an answer the real path produced.
+
+    The answer here is the deterministic floor, reached by giving the composer two answers the
+    validator refuses. That is deliberate rather than convenient: the floor is the output at
+    zero model compliance, so proving the property there proves it for the worst case the
+    system can reach, and the tokens are the ones `answer_question` minted rather than ones this
+    test chose.
+
+    The last assertion is the one that makes this more than a dictionary lookup. `packet.resolve`
+    proves the token is in the packet; the `select` proves the address that token names is an
+    address the database is storing, under the digest ADR-0014 defines as its identity.
+    """
+    connection = answered.repository.connection
+    bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
+    client = answered.client([_answer_body(bad), _answer_body(bad)])
+    outcome = answer_question(
+        connection, client, "which photographs?", answered.session,
+        plan=SelectionPlan(intent=Intent.CAPTURES),
+    )
+    assert outcome.deterministic, "the floor is what this test is asserting about"
+    assert outcome.abstention is None
+
+    citations = _historical_citations(outcome)
+    assert citations, "an answer with no factual clause proves nothing about factual clauses"
+    for ordinal, token in citations:
+        item = outcome.packet.resolve(token)
+        assert item is not None, f"clause {ordinal} cites {token!r}, which is not in the packet"
+        stored = connection.execute(
+            "select span_id from evidence_span where workspace_id = %s and span_digest = %s",
+            (answered.session.workspace_id, item.address.span_digest),
+        ).fetchall()
+        assert len(stored) == 1, f"clause {ordinal} cites a digest no stored span carries"
+        assert stored[0]["span_id"] == item.span_id
+
+
+def test_a_citation_permalink_parses_back_to_the_same_digest(answered):
+    """The permalink is the durable half, because the token is not durable and must not be.
+
+    Tokens are drawn per request and are documented as valid for one response only, so the thing
+    an archived answer can keep is the URI. ADR-0014's round trip is what makes that safe:
+    `parse_uri(to_uri(a))` is an address equal to `a`, and address equality IS digest equality,
+    so the permalink carries the digest without a field for it.
+    """
+    from exulanica.evidence import parse_uri
+
+    connection = answered.repository.connection
+    bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
+    client = answered.client([_answer_body(bad), _answer_body(bad)])
+    outcome = answer_question(
+        connection, client, "which photographs?", answered.session,
+        plan=SelectionPlan(intent=Intent.CAPTURES),
+    )
+    citations = _historical_citations(outcome)
+    assert citations
+    for _, token in citations:
+        item = outcome.packet.resolve(token)
+        assert item is not None
+        reparsed = parse_uri(item.uri)
+        assert reparsed == item.address
+        assert reparsed.span_digest == item.address.span_digest

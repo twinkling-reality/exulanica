@@ -43,7 +43,6 @@ import psycopg
 from fastapi import APIRouter, Header, HTTPException, Path, Request, Response
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
-from exulanica.errors import BlobNotFoundError
 from exulanica.evidence import EvidenceAddress, parse_uri
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
@@ -154,10 +153,14 @@ def _address(
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="no such evidence")
-    try:
-        address = address_from_span_row(row)
-    except BlobNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="no such evidence") from exc
+    # No `except` here, and the absence is the point. `address_from_span_row` raises
+    # IntegrityError when the row no longer hashes to its stored digest, and InvalidAddressError
+    # when the row is not a well formed address at all. Both are integrity failures about every
+    # citation naming this span, and app.py answers IntegrityError with a loud 500 rather than a
+    # 404. This used to catch BlobNotFoundError, which that function cannot raise: the clause
+    # was inert, and had it ever fired it would have turned the mismatch this docstring says
+    # must not be hidden into "no such evidence".
+    address = address_from_span_row(row)
     return address, row["media_type"] or _MEDIA_TYPE_FALLBACK, _clock_headers(row)
 
 

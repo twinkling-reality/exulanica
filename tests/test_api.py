@@ -558,6 +558,116 @@ def test_the_endpoints_that_need_a_model_say_so_rather_than_guessing(deployment)
         assert "model credential" in response.json()["detail"]
 
 
+def _with_model(deployment, responses):
+    """Swap a scripted model into the running app, and hand back the transport that counts.
+
+    ``Services`` is frozen, so this replaces the whole object on ``app.state.services`` rather
+    than reaching into it. The rest of the deployment is untouched: the same schema, the same
+    store, the same two tokens, and the same read-only executor.
+
+    The transport is scripted rather than mocked. It is the real :class:`ModelClient` running
+    against prepared HTTP responses, so everything between the route and the wire is the code
+    that runs in production.
+    """
+    import dataclasses
+
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.client import ModelClient
+
+    from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
+    from model_fakes import FakeTransport
+
+    transport = FakeTransport(list(responses))
+    app = deployment.client.app
+    app.state.services = dataclasses.replace(
+        app.state.services,
+        model_client=ModelClient(
+            api_key="test-key-not-real",
+            transport=transport,
+            budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        ),
+    )
+    return transport
+
+
+def _refused_answer_body():
+    """A schema-valid answer the validator refuses: a historical claim with no citation."""
+    from exulanica.models.transport import HttpResponse
+
+    from model_fakes import chat_body
+
+    answer = {"clauses": [{"text": "You were there.", "type": "historical",
+                           "citations": [], "value_refs": []}]}
+    return HttpResponse(status_code=200, text=json.dumps(chat_body(json.dumps(answer))))
+
+
+def test_an_answers_citations_open_the_evidence_they_name_and_only_for_its_owner(deployment):
+    """The exit-gate chain, walked over HTTP: clause -> token -> permalink -> stored span.
+
+    The composer is given two answers the validator refuses, so the response is the
+    deterministic floor. That is the point rather than a shortcut: the floor is what the system
+    emits at zero model compliance, and its historical clauses carry the tokens the packet
+    minted for this response.
+
+    Each citation is then fed to the permalink route, which looks the address up by
+    ``span_digest`` and by workspace. A 200 for the owner is the citation verifying against a
+    stored digest; a 404 for the stranger is the same lookup failing to be an existence oracle.
+    """
+    transport = _with_model(deployment, [_refused_answer_body(), _refused_answer_body()])
+    response = deployment.as_owner(
+        "POST", "/selection/ask",
+        json={"question": "which photographs?", "plan": {"intent": "captures"}},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["deterministic"] is True
+    assert body["abstained"] is None
+    assert transport.call_count == 2, "one try and one repair, then the floor"
+
+    cited = {
+        token
+        for clause in body["answer"]["clauses"]
+        if clause["type"] == "historical"
+        for token in clause["citations"]
+    }
+    assert cited, "an answer with no factual clause proves nothing about factual clauses"
+    for token in cited:
+        uri = body["citations"][token]
+        assert deployment.as_owner("GET", "/evidence", params={"uri": uri}).status_code == 200
+        assert deployment.as_stranger("GET", "/evidence", params={"uri": uri}).status_code == 404
+
+
+def test_an_unanswerable_question_refuses_over_http_without_calling_the_model(deployment):
+    """The refusal at the surface, and the model call that never happens.
+
+    A time window in 1999 matches nothing, so the packet is empty and ``answer_question``
+    returns before ``compose_answer``. The response is a 200 carrying an abstention rather than
+    an error, because declining to answer is an answer; what makes it a refusal rather than an
+    estimate is that every clause is ``meta``, nothing is cited, and the transport was never
+    touched.
+    """
+    transport = _with_model(deployment, [_refused_answer_body()])
+    response = deployment.as_owner(
+        "POST", "/selection/ask",
+        json={
+            "question": "was I ever in Antarctica?",
+            "plan": {
+                "intent": "captures",
+                "time": [{"start": "1999-01-01T00:00:00+00:00",
+                          "end": "1999-12-31T00:00:00+00:00"}],
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["abstained"] == "UNANSWERABLE_NOT_CAPTURED"
+    assert body["citations"] == {}
+    assert body["selection"]["total_matched"] == 0
+    assert [clause["type"] for clause in body["answer"]["clauses"]] == ["meta"]
+    assert all(not clause["citations"] for clause in body["answer"]["clauses"])
+    assert transport.call_count == 0, "an empty packet reached the model"
+
+
 # -- identity -----------------------------------------------------------------------------
 
 
