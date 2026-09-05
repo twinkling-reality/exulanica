@@ -358,12 +358,14 @@ def test_stale_stage_bindings_are_refused_before_any_pose_work_runs(repository, 
 
     from exulanica.canonical import canonical_json
 
-    store, captures, point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    store, _captures, _point_artifacts, job_id = _queued_scene(repository, tmp_path)
     claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
     assert claimed is not None and claimed.job_id == job_id
     stale_inputs = dict(claimed.build_inputs)
     stale_inputs["stages"] = [
-        {**binding, "version": binding["version"] - 1} if binding["key"] == "scene_pose" else binding
+        {**binding, "version": binding["version"] - 1}
+        if binding["key"] == "scene_pose"
+        else binding
         for binding in claimed.build_inputs["stages"]
     ]
     stale = dataclasses.replace(
