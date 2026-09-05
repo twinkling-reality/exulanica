@@ -1,19 +1,21 @@
 # Production reconstruction scenes
 
-Status: **IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark acquired, production
-run pending named human privacy review**.
+Status: **IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed,
+measured in the browser, withdrawn, and purged through the production path**.
 
 This document is the operating contract for Exulanica's production rung-3 multi-photograph path.
 It covers scene selection, durable work, pose recovery, placement, graph delivery, rendering,
-deletion, and recovery. It does not claim that the path has passed a representative real-corpus
-quality gate. No consented dense capture set or digest-pinned production pose image was available
-for that measurement.
+deletion, and recovery. The completed ETH3D `pipes` run is one licensed indoor benchmark, not a
+representative real-corpus or personal-media acceptance gate. No consented personal capture set was
+admitted for this campaign.
 
 ## Verification baseline
 
-**VERIFIED 2026-09-04 at `ea70b80`.** The exact campaign database and required clean-bytecode
-command sequence completed with 1,349 passed tests, 2 intentional skips, and 3 warnings. Ruff
-passed, and all four import-layer contracts passed over 256 files and 1,760 dependencies.
+**VERIFIED 2026-09-04 through the completed withdrawal work.** The exact campaign database and
+required clean-bytecode command sequence completed with 1,354 passed tests, 2 intentional skips,
+and 3 warnings. Ruff passed, and all four import-layer contracts passed over 257 files and 1,770
+dependencies. The complete web workspace passed type checking, all dependency boundaries, and 670
+tests across 87 files. The production Atlas application build also completed.
 
 ```bash
 find . -name __pycache__ -not -path './.venv/*' -exec rm -rf {} +
@@ -162,13 +164,15 @@ These are separate facts:
 - `displayed_rung` is the worst-first mode this client can honestly show now; and
 - `rendering_substrate` is either `posed_point_maps` or `source_photographs` in this client.
 
-Decoded geometry never promotes `recorded_rung`. With the current unmeasured thresholds, a scene
-with at least one registered and placed point map records rung 3. The gate also records why rung 1
-has no reviewed splat receipt and why rung 2 lacks physically validated scale, measured coverage,
-and a measured corridor. If no verified placed bytes are available, the client displays rung 4
-source photographs while retaining the recorded rung and reasons in the disclosure. If a future
-assertion records rung 1 or 2 before this client supports that substrate, the displayed rung stays
-3 and the disclosure says why.
+Decoded geometry never promotes `recorded_rung`. The measured `scene_pose` version 2 policy requires
+at least 80 percent registration, no more than 1.0 pixel mean reprojection error, and at least 9.0
+COLMAP-normalized camera-translation units. The last value is a non-degeneracy check, not a metric
+distance. A passing pose and placement still record rung 3 because rung 1 has no reviewed splat
+receipt and rung 2 lacks physically validated scale, measured coverage, and a measured corridor. If
+no verified placed bytes are available, the client displays rung 4 source photographs while
+retaining the recorded rung and reasons in the disclosure. If a future assertion records rung 1 or
+2 before this client supports that substrate, the displayed rung stays 3 and the disclosure says
+why.
 
 The status disclosure is the authoritative render site for rung copy. Its sentence comes from the
 single `RUNG_COPY` table in `web/packages/formation/src/labels.ts`; the app carries no second table.
@@ -182,7 +186,8 @@ following:
 
 - cancels a queued, failed, or running scene job in the database;
 - makes the running worker's cancellation check stop pycolmap;
-- blocks completed scene assertions and artifacts immediately;
+- retracts the current scene-rung assertion with a durable retraction tied to the tombstone;
+- blocks completed scene artifacts immediately;
 - removes the scene from graph delivery and World Memory Package projection; and
 - makes scene artifact bytes eligible for the separately authorized purge flow.
 
@@ -200,6 +205,12 @@ verify. A startup sweep removes old unprotected scratch. If a process dies on th
 claim, startup first changes the expired job to terminal `failed` with
 `failure_class = claim_exhausted`, then makes its old scratch eligible for that sweep. A retry after
 handled cleanup safely restages the exact source set.
+
+A later deliberate re-import of the same source bytes creates or reuses a new live capture identity.
+Under the shared purge lock it also restores a globally purged blob row's storage key and clears its
+purged marker before the post-commit store publication finishes. The old capture tombstone continues
+to block the old scene identity. Without a new exact privacy screening receipt, a derivative worker
+fails closed before producing a replacement point map.
 
 ## 7. Running the worker
 
@@ -269,12 +280,11 @@ of real-photograph reconstruction quality.
 
 ## 9. Licensed real benchmark
 
-**ACQUIRED AND VERIFIED 2026-09-04; PRODUCTION ADMISSION PENDING NAMED HUMAN REVIEW.** The selected
-corpus is the 14-image `pipes` training scene from the ETH3D High-resolution Multi-view Stereo
-Benchmark. ETH3D's official site licenses its data under CC BY-NC-SA 4.0. The selected undistorted
-archive is 145,321,540 bytes and includes 14 images at 6,220 by 4,141 pixels plus COLMAP-format
-camera calibration and sparse points. Surface ground truth is available separately and is not in
-this bounded download.
+**EXECUTED, MEASURED, WITHDRAWN, AND RETAINED 2026-09-04.** The selected corpus is the 14-image
+`pipes` training scene from the ETH3D High-resolution Multi-view Stereo Benchmark. ETH3D's official
+site licenses its data under CC BY-NC-SA 4.0. The selected undistorted archive is 145,321,540 bytes
+and includes 14 images at 6,220 by 4,141 pixels plus COLMAP-format camera calibration and sparse
+points. Surface ground truth is available separately and was not downloaded.
 
 The committed digest-bound source manifest is
 `exulanica/evaluation/benchmarks/eth3d-pipes-v1.json`. It fixes the official source URL, retrieval
@@ -289,11 +299,35 @@ uv run python scripts/acquire_benchmark_scene.py \
 
 On 2026-09-04 the downloader verified source-manifest digest
 `4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814` and archive digest
-`718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c`. A Codex visual review of
-all 14 frames found no visible people, but that review is explicitly provisional. The production
-privacy policy requires a named human to review the exact bytes, so no eligibility receipt may be
-created until that confirmation occurs. This fail-closed state is evidence that benchmark
-availability does not bypass real-media admission.
+`718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c`. The benchmark operator
+reviewed all 14 exact frames and confirmed that they show the pipes mechanical room with no visible
+people. Fourteen immutable authorization and screening receipts bind that review, the source and
+license digests, the operator, and the exact capture digests. Before that review, the ordinary
+production worker refused to process the queued scene.
+
+The pinned MoGe checkpoint produced all 14 point maps through the normal derivative queue. Real
+pycolmap 4.2.0 then registered 14 of 14 photographs. The measured version 2 build passed with
+0.569790 pixel mean reprojection error and a 10.913192-unit normalized camera span. The retained
+camera-truth comparison reports 0.006594 ground-truth-unit camera-centre RMS error, 0.014844 maximum
+error over a 2.593471-unit camera extent, and 0.354748 degrees maximum relative-rotation error.
+These values are bound in `docs/evaluation/2026-09-04-benchmark-pose.json`.
+
+The actual authenticated browser application rendered all 14 placed maps as one scene: 2,371,957
+points and 47,457,908 geometry bytes. On an Apple M3 Pro with 18 GiB physical unified memory,
+Chrome 152 and PlayCanvas 2.21.4 reported a 574.8 millisecond first meaningful render, 285.9
+millisecond geometry load, 16.8 millisecond p99 frame time, 59.52 FPS one-percent low, 80.90 MiB
+peak JavaScript heap, no geometry issues, and no GPU error over a visible 60-second static view.
+The digest-bound record is `docs/evaluation/2026-09-04-benchmark-browser.json`. It names the local
+hardware and does not call it representative of the eventual production host.
+
+After publication, an authorized tombstone for `DSC_0634.JPG` immediately removed the complete
+scene from graph and browser delivery and retracted its Rung 3 assertion. Signed WMP projection
+removed the scene and scene artifacts. The purge role destroyed all six old and current scene
+receipt objects plus the deleted member's unique source and derivative objects. Thirteen unrelated
+point maps survived. One shared probe object was correctly deferred because live captures still
+held it. Re-import restored the source under a distinct capture identity, did not resurrect the old
+scene, and produced no point map without a new privacy receipt. The full audit is
+`docs/evaluation/2026-09-04-benchmark-scene-withdrawal.json`.
 
 The archive and source images remain ignored local inputs. They are not committed. Although the
 license permits qualified redistribution, the validation campaign avoids adding ShareAlike media

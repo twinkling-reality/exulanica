@@ -58,9 +58,9 @@ No consented OGC-1 corpus, signed consent record, or real quality observations w
 unmeasured constants even though the durable build input bound the `scene_pose` stage parameters.
 The scene worker now decodes the exact bound stage policy into each pose manifest. Non-integral
 thresholds remain integer-quantized in the canonical stage registry as millionths and are converted
-to their declared units only at the pose manifest boundary. The current version 1 policy still
-contains no measured values, so this correction changes no awarded rung. A future measured policy
-will change both its stage version and parameter digest, queue a new build, and retain the old
+to their declared units only at the pose manifest boundary. The version 1 policy retains no
+measured values and its original receipt remains unchanged. The later measured version 2 policy
+changed both its stage version and parameter digest, queued a new build, and retained the old
 unmeasured receipt rather than rewriting it.
 
 **VERIFIED 2026-09-04:** the fixed synthetic scene and licensed ETH3D `pipes` scene both completed
@@ -82,3 +82,9 @@ This is a strict first calibration from one synthetic and one indoor benchmark s
 representative personal-photo threshold study. New corpus evidence must create a new stage version
 and new build rather than changing version 2 in place. The retained benchmark comparison is
 `evaluation/2026-09-04-benchmark-pose.json`.
+
+The production rebuild under version 2 registered all 14 benchmark photographs, measured 0.569790
+pixel mean reprojection error and 10.913192 normalized camera-translation units, and passed the
+three bound thresholds. It remained Rung 3 because there is no metric scale, measured coverage,
+validated corridor, or reviewed splat receipt. The actual browser observation is retained in
+`evaluation/2026-09-04-benchmark-browser.json`.

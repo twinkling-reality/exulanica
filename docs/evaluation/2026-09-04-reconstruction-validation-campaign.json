@@ -1,0 +1,231 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.reconstruction-validation-campaign/v1",
+    "completed_at": "2026-09-05T00:58:36Z",
+    "evaluated_implementation_head": "00e8e5d43ad5dfe340c75f656a035c8e4432d347",
+    "starting_revision": "e8650bc81f8fa3ff05876d5bbae5b34476a72eed",
+    "status": "passed-with-declared-limitations",
+    "operator_review": {
+      "corpus": "ETH3D pipes benchmark",
+      "exact_member_count": 14,
+      "conclusion": "All supplied photographs depict the pipes mechanical room and no visible people.",
+      "authorization_and_screening_receipt_count": 14,
+      "source_manifest_sha256": "4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814"
+    },
+    "retained_records": [
+      {
+        "path": "docs/evaluation/2026-09-04-linux-amd64-depth-forward.json",
+        "record_sha256": "1c31b75940435eb19e6c39df91088403ee32a56d8afbd14a2e1537282e044143"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-synthetic-browser.json",
+        "record_sha256": "78d3d531b3cb61f6e831b79a50398d4fa557d4a59623dcfd8304c351babfd294"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-synthetic-person-withdrawal.json",
+        "record_sha256": "fdfc2821c54136f296982e3ec2a949aa35380a984a637f1649c3bb4288a1bf69"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-synthetic-person-withdrawal-browser.json",
+        "record_sha256": "a80439e64ac0865bb57eab64a0df7bc34d532f22b5398af4c25b67c0f9f85863"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-benchmark-pose.json",
+        "record_sha256": "68640ca95fce5adf54d8217b53139a4706edf6c6430cd6d854b58079b59408d8"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-benchmark-browser.json",
+        "record_sha256": "901b357df9fa13df94705642e8d8459b013f510c85020e0523140d3371ef33b4"
+      },
+      {
+        "path": "docs/evaluation/2026-09-04-benchmark-scene-withdrawal.json",
+        "record_sha256": "0f8eca4f797792bafbedd6f45c8fc7a3853acce5e1563b89d028fd7f87917c3a"
+      }
+    ],
+    "benchmark_result": {
+      "scene_id": "456369cc-86e7-5eab-8b8f-72f85de42030",
+      "measured_build_job_id": "bd1c2329-a6d9-5b00-8f47-808c0422bcb0",
+      "registered_member_count": 14,
+      "excluded_member_count": 0,
+      "mean_reprojection_error_micropixels": 569790,
+      "camera_translation_extent_microunits": 10913192,
+      "recorded_rung": 3,
+      "displayed_rung": 3,
+      "rendered_point_map_count": 14,
+      "rendered_point_count": 2371957,
+      "authenticated_geometry_bytes": 47457908,
+      "first_meaningful_render_microseconds": 574800,
+      "frame_p99_microseconds": 16800,
+      "fps_one_percent_low_milli": 59520,
+      "peak_js_heap_mib_hundredths": 8090
+    },
+    "withdrawal_result": {
+      "deleted_member": "DSC_0634.JPG",
+      "scene_removed_from_graph": true,
+      "scene_rung_retracted": true,
+      "scene_removed_from_browser": true,
+      "scene_removed_from_world_package": true,
+      "scene_artifact_object_count_purged": 6,
+      "all_scene_artifact_files_absent": true,
+      "surviving_unrelated_point_map_count": 13,
+      "shared_probe_preserved": true,
+      "reimport_created_new_capture_identity": true,
+      "reimport_resurrected_old_scene": false,
+      "reimport_without_new_privacy_receipt_produced_point_map": false
+    },
+    "completion_checks": [
+      {
+        "number": 1,
+        "status": "passed",
+        "claim": "Real-media reconstruction fails closed without an exact eligible privacy screening receipt.",
+        "evidence": [
+          "Fourteen benchmark authorization and screening receipts were required before point-map work.",
+          "The deliberate re-import failed twice with PrivacyAdmissionError before point-map generation."
+        ]
+      },
+      {
+        "number": 2,
+        "status": "passed",
+        "claim": "Person-scoped withdrawal reaches justified dependent artifacts and scenes.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-synthetic-person-withdrawal.json",
+          "docs/evaluation/2026-09-04-synthetic-person-withdrawal-browser.json"
+        ]
+      },
+      {
+        "number": 3,
+        "status": "passed",
+        "claim": "The pinned MoGe checkpoint executed through the production adapter.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-linux-amd64-depth-forward.json",
+          "The normal benchmark derivative queue produced all 14 point maps with Ruicheng/moge-2-vitl at revision 39c4d5e957afe587e04eec59dc2bcc3be5ecd968."
+        ]
+      },
+      {
+        "number": 4,
+        "status": "passed",
+        "claim": "Real pycolmap executed on deterministic synthetic overlapping views.",
+        "evidence": [
+          "The synthetic production run registered 8 of 8 deterministic views with pycolmap 4.2.0.",
+          "docs/evaluation/2026-09-04-synthetic-browser.json"
+        ]
+      },
+      {
+        "number": 5,
+        "status": "passed",
+        "claim": "One licensed real benchmark scene passed through normal production orchestration.",
+        "evidence": [
+          "exulanica/evaluation/benchmarks/eth3d-pipes-v1.json",
+          "docs/evaluation/2026-09-04-benchmark-pose.json"
+        ]
+      },
+      {
+        "number": 6,
+        "status": "passed",
+        "claim": "All registered benchmark point maps rendered together in the actual browser application.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-benchmark-browser.json"
+        ]
+      },
+      {
+        "number": 7,
+        "status": "passed",
+        "claim": "Recorded and displayed rung facts came from the assertion and retained withholding reasons.",
+        "evidence": [
+          "The browser presented Rung 3 from the scene assertion and did not infer promotion from renderer success."
+        ]
+      },
+      {
+        "number": 8,
+        "status": "passed",
+        "claim": "A reproducible browser measurement record is retained.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-benchmark-browser.json"
+        ]
+      },
+      {
+        "number": 9,
+        "status": "passed",
+        "claim": "Deleting one member withdrew the complete scene and its unique bytes without collateral deletion.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-benchmark-scene-withdrawal.json"
+        ]
+      },
+      {
+        "number": 10,
+        "status": "passed",
+        "claim": "Person-scoped withdrawal was exercised and retained.",
+        "evidence": [
+          "docs/evaluation/2026-09-04-synthetic-person-withdrawal.json",
+          "docs/evaluation/2026-09-04-synthetic-person-withdrawal-browser.json"
+        ]
+      },
+      {
+        "number": 11,
+        "status": "passed",
+        "claim": "All backend and relevant web verification gates passed from the Exulanica namespace.",
+        "evidence": [
+          "Backend: 1354 passed, 2 intentional skips, and 3 warnings.",
+          "Ruff passed.",
+          "All 4 import contracts passed over 257 files and 1770 dependencies.",
+          "Web: type checking and dependency boundaries passed, with 670 tests across 87 files.",
+          "The production Atlas Vite build passed."
+        ]
+      },
+      {
+        "number": 12,
+        "status": "passed",
+        "claim": "Historical migrations remain unchanged.",
+        "evidence": [
+          "Migrations 0001 through 0028 have no changes from starting revision e8650bc81f8fa3ff05876d5bbae5b34476a72eed.",
+          "The campaign added only forward migrations 0029, 0030, and 0031."
+        ]
+      },
+      {
+        "number": 13,
+        "status": "passed",
+        "claim": "Implementation and evidence were committed as independent green milestones.",
+        "evidence": [
+          "Privacy, withdrawal, deterministic generation, real model execution, pose calibration, browser measurement, and deletion audit each have bounded commits."
+        ]
+      },
+      {
+        "number": 14,
+        "status": "passed",
+        "claim": "Every result distinguishes synthetic plumbing, benchmark performance, and pending personal-media acceptance.",
+        "evidence": [
+          "No personal media was admitted or evaluated.",
+          "The retained records state the corpus class and limitations."
+        ]
+      }
+    ],
+    "verification": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "backend_passed": 1354,
+      "backend_skipped": 2,
+      "backend_warnings": 3,
+      "ruff_passed": true,
+      "import_contracts_kept": 4,
+      "import_contracts_broken": 0,
+      "import_files_analyzed": 257,
+      "import_dependencies_analyzed": 1770,
+      "web_test_files_passed": 87,
+      "web_tests_passed": 670,
+      "web_typecheck_passed": true,
+      "web_boundaries_passed": true,
+      "production_app_build_passed": true
+    },
+    "limitations": [
+      "This campaign used one indoor licensed benchmark and cannot establish broad photograph or personal-media acceptance.",
+      "No personal media was admitted or evaluated.",
+      "Rung 2 remains withheld because metric scale, measured coverage, reachability, and a validated corridor are absent.",
+      "Rung 1 remains withheld because there is no reviewed splat receipt or held-out splat evaluation.",
+      "The benchmark browser measurement is one 60-second static view on a local Apple M3 Pro, not the eventual production host.",
+      "The native MPS benchmark depth run has no runtime image digest; the separate locked linux/amd64 image record proves the production adapter forward path.",
+      "One shared probe purge job remained deferred because unrelated live captures still owned the same bytes.",
+      "The production app build passed with a non-blocking warning that its main JavaScript chunk exceeds 500 kB after minification."
+    ]
+  },
+  "record_sha256": "07633ab845962e9e0615e0afe909b1bd53c2c827c19fc2ba4ef90bee841c3c6d"
+}
