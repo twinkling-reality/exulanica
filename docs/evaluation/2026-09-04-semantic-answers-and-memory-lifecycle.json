@@ -1,0 +1,268 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.semantic-answers-and-memory-lifecycle/v1",
+    "completed_at": "2026-09-05T03:50:00Z",
+    "starting_revision": "1623219b7f3db7cf8087cc0244ce9af851b6dcc5",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-04-readiness-and-architecture-audit.json",
+      "record_sha256": "4dc155bd57a91cd66e1c7c0f85ea52660e26ecc1e5239bff239b007717b20064"
+    },
+    "scope": "The semantic answer path and the memory lifecycle, taken as the first goal in the readiness audit's dependency order. No Rung 2 corridor implementation, no Rung 1 splats, no personal-media ingest, no video ingest and no production deployment work was started. No identity work was begun, because P-1 is unanswered.",
+    "method": "Each exit gate was checked against the live implementation rather than against the roadmap, and the finding in every case was that the mechanism already existed and the proof did not. So the work is mostly tests, and each one was verified to fail when the invariant it names is violated: the negative control for every test added here is recorded below and was executed rather than reasoned about. Three production changes were made, each because a check found a defect rather than a missing test.",
+    "corpus_class": "synthetic",
+    "corpus": {
+      "what": "Photographs generated in process by tests/conftest.py::write_photo. The repository carries no binary fixture, so the content of every test image is known exactly.",
+      "personal_media_admitted": false,
+      "benchmark_media_admitted": false,
+      "ogc_1_present": false,
+      "why_it_matters": "docs/evaluation-corpus-contract.md records that no OGC-1 CORPUS.json, label bundle, consent evidence or blind fixture exists. No accuracy number about answers can be produced against a corpus that does not exist, and none is produced here."
+    },
+    "what_is_plumbing_and_what_is_accuracy": {
+      "rule": "A number below is either a count of test cases and code paths, or it is a measurement of how well the system answers questions. Only the first kind exists in this record. Every count is of executable checks over a synthetic corpus; not one of them says how often the system is right.",
+      "plumbing_exercised_against_a_real_server": [
+        "PostgreSQL 18.6 with pgvector at postgresql://localhost:5433/exulanica_spine_test. Nothing was substituted and no in-memory mirror exists.",
+        "Ingest through PhotoIngestPipeline, scene grouping through run_scene_grouping, naming through name_occurrence, withdrawal through an entity-scoped tombstone.",
+        "Selection parse, validate, execute, packet build, address rebuild, answer validation, abstention and the deterministic floor.",
+        "The HTTP surface for POST /selection/ask and GET /evidence, including the cross-workspace refusal on a citation permalink."
+      ],
+      "faked_and_named": {
+        "what": "The model's HTTP transport, through tests/model_fakes.py::FakeTransport.",
+        "what_is_not_faked": "The ModelClient itself, its schema handling, its repair loop and its budget guard all run. The scripted responses stand in for the endpoint and for nothing else.",
+        "consequence": "No answer in this repository was composed by a live model endpoint, so no hallucination rate, no false-answer rate, no false-abstention rate and no latency figure is measured or claimed."
+      },
+      "measured_accuracy": null
+    },
+    "decisions": [
+      {
+        "number": 1,
+        "name": "A citation token verifies against the stored span digest it names",
+        "gate": "A question reaches an answer through the real selection path, and every factual clause carries a citation token that verifies against a stored span_digest.",
+        "invariant": "Every historical clause in an answer carries at least one citation token; each token resolves to a packet item; each item's address was rebuilt from a stored evidence_span row and equals the span_digest that row stores; and each item's permalink parses back to an equal address. An address that no longer hashes to its stored digest stops the answer rather than degrading it.",
+        "rationale": "The mechanism was complete and unobserved. address_from_span_row compares the rebuilt digest to the stored one, and nothing had ever made that comparison fail, so it was indistinguishable from returning the address unchanged. The clause-level property had only ever been asserted against hand-built packets, and nothing joined a token to a database row at all.",
+        "canonical_representation": "span_digest is SHA-256 over the RFC 8785 subset canonical JSON of the address tuple, per ADR-0014, unchanged by this goal. The durable form of a citation is the exulanica:// permalink, not the token: tokens are drawn per request from secrets.choice and are valid for one response, while parse_uri(to_uri(a)) == a and address equality is digest equality, so the permalink carries the digest without a field for it.",
+        "compatibility_impact": "None. No digest changed, no schema changed and no response shape changed. The only production edit removed an except clause that caught an exception the function it wrapped cannot raise.",
+        "failure_behaviour": "IntegrityError from address_from_span_row, naming the span and both digests, which app.py answers with a 500 carrying code integrity_failure. Deliberately not a 404: a citation that has stopped verifying is a fact about every answer that ever cited it, and serving anything would hide it.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [
+            "exulanica/api/routes/evidence.py"
+          ],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_selection_answer.py::test_a_stored_span_that_no_longer_hashes_to_its_digest_stops_the_answer",
+          "tests/test_selection_answer.py::test_every_factual_clause_cites_a_token_that_resolves_to_a_stored_span_digest",
+          "tests/test_selection_answer.py::test_a_citation_permalink_parses_back_to_the_same_digest",
+          "tests/test_api.py::test_an_answers_citations_open_the_evidence_they_name_and_only_for_its_owner"
+        ],
+        "negative_control": "Replacing the digest comparison in exulanica/store/resolve.py with a branch that never fires makes the first test report DID NOT RAISE. Executed."
+      },
+      {
+        "number": 2,
+        "name": "Refuse what cannot be supported, refuse nothing else, and refuse it as a refusal",
+        "gate": "An answer that cannot be supported refuses rather than estimating, and the refusal is exercised by a test rather than described.",
+        "invariant": "An empty packet abstains without calling the model, and a packet built from a proposal-inclusive Selection carries nothing citable. A capture that matched always carries at least one support row, so an abstention means nothing matched rather than that the executor lost track of why something did. A model failure the answer path cannot absorb leaves the HTTP boundary as a stated refusal with a code, never as an unhandled exception.",
+        "rationale": "The refusal half was already structural and already tested. What was not held was its converse. is_unconstrained is false the moment any dimension is set, including capture.processing_states, which produces no support of its own; with no time window the whole-photograph branch never fired and _support_for returned nothing, so every matching capture left the executor with support=() and the answer was 'Nothing in your library matches' over four photographs the same Selection had just counted. A refusal that fires when the evidence is there is a false statement about somebody's own library, which is the failure evaluation-methodology.md scores as M3 false_abstention_rate.",
+        "canonical_representation": "Support.dimension gains a fifth value, 'capture', meaning the photograph matched on a property of itself with the whole-photograph span as the record of that property. Labelling it 'time' would have made the Selection say a time window put the photograph there when none was asked for.",
+        "compatibility_impact": "A processing-state-only plan now returns captures carrying support where it previously returned captures carrying none, so such a plan produces a citable packet instead of an abstention. No stored row changed and no digest changed. SupportView.dimension is a free-text string at the API boundary and no browser consumer parses it as a closed set.",
+        "failure_behaviour": "Abstention codes stay as they were: NOT_CAPTURED when nothing matched, AMBIGUOUS when the Selection admitted unconfirmed links. A model error is problem+json: 502 model_refused for an upstream that would not answer, 429 budget_exceeded for spend this instance declined.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [
+            "exulanica/api/app.py"
+          ],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_selection.py::test_a_capture_that_matched_always_carries_something_to_cite",
+          "tests/test_selection_answer.py::test_a_plan_that_matched_photographs_is_answered_rather_than_refused",
+          "tests/test_api.py::test_an_unanswerable_question_refuses_over_http_without_calling_the_model",
+          "tests/test_api.py::test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code"
+        ],
+        "negative_control": "Disabling the new branch in _describe_captures makes both new selection tests fail, the second reporting the abstention verbatim: 'I have no evidence for that. Nothing in your library matches.' Executed."
+      },
+      {
+        "number": 3,
+        "name": "The lifecycle is walked on the derived artifact the pipeline writes",
+        "gate": "An occurrence, an entity and a derived artifact each have a recorded path from creation through confirmation to withdrawal, and a withdrawal marks dependent artifacts stale through dep_index rather than regenerating them.",
+        "invariant": "A scene_group written by run_scene_grouping carries dep_index entries of the form capture:<uuid>. Confirming a person in one of those captures records a person_derivative_dependency row naming that artifact with basis confirmed_identity_link. An entity-scoped tombstone then sets stale on that artifact and leaves computed_at, payload and the workspace's derived_artifact row count unchanged, and a second grouping run cannot clear it. An artifact whose dep_index names nothing is untouched.",
+        "rationale": "Both existing staleness tests plant their own row with an entity: dep_index, and no shipping producer emits that shape: upsert_derived_artifact has exactly two production call sites and both write capture:. The invalidation path had therefore been demonstrated only against rows a test had inserted, which shows the predicate compiles and nothing about the system. The production ordering is the half that needed proving, because the artifact exists before the person is identified, so the dependency can only be recorded on the link side.",
+        "canonical_representation": "dep_index is a text[] of '<kind>:<uuid>' strings with a GIN index over it. Migration 0030 reads it in both directions: on derived_artifact insert, and inside record_person_dependencies_for_link when a link becomes confirmed. Only the second fires in the production ordering.",
+        "compatibility_impact": "None. No production code changed for this decision; the change is a test file over machinery that already shipped.",
+        "failure_behaviour": "Nothing anywhere sets stale back to false, and exulanica/ingest/spine/derived.py upserts with 'on conflict (derived_id) do nothing', so a re-run addresses the same row and declines to touch it. 'Invalidated, never silently regenerated' is a property of the writer rather than a convention.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_memory_lifecycle.py"
+        ],
+        "negative_control": "Emptying the dep_index the producer writes fails all six tests in the file. Turning derived.upsert into 'do update set stale = false' fails the re-run case with 'a re-run cleared an invalidation it must not be able to clear'. Both executed."
+      },
+      {
+        "number": 4,
+        "name": "The biometric boundary is pinned over SQL and over the answer path by name",
+        "gate": "No answer path derives or persists a biometric template.",
+        "invariant": "No file under exulanica/, Python or SQL, inserts or copies into the embedding table. No module the answer path is built from -- exulanica.selection, exulanica.graph, exulanica.store -- names the embedding table as a word or calls ModelClient.embed. A real question run end to end leaves the embedding table empty, and person occurrences carry only detection quality keys.",
+        "rationale": "P-1 is unanswered and is currently held by absence, so the guard on that absence has to be at least as wide as the fact. It was not: it matched one pattern in Python only, so a writer added inside a migration or a plpgsql function would not have tripped it, and migrations are where this schema's triggers live. Separately, 'semantic answers' is the name of a goal that reaches for vector retrieval, and ModelClient.embed is a live capability bound to a real manifest role, so the shortest path from this goal to a template runs through exulanica.selection.",
+        "canonical_representation": "Two source scans and one row count. The scans match '(?:insert\\\\s+into|copy)\\\\s+\"?embedding\"?\\\\b' case-insensitively over *.py and *.sql, and '\\\\bembedding\\\\b' or '\\\\.embed\\\\(' over the answer path's packages. The executor's to_tsvector is lexical search over the user's own photographs and is matched by neither.",
+        "compatibility_impact": "None. The scans describe what the package already contains: the widened pattern finds nothing today, and the fact it now covers was already true.",
+        "failure_behaviour": "The test names the file and line of every match and fails. The purge role's 'delete from embedding' in exulanica/deletion/worker.py is untouched, which is the asymmetry P-1 is currently answered by: the row can be destroyed and cannot be created.",
+        "affected_surfaces": {
+          "schema": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_ingest_preconditions.py::test_nothing_in_the_package_writes_an_embedding",
+          "tests/test_ingest_preconditions.py::test_the_answer_path_does_not_name_the_table_a_template_would_live_in",
+          "tests/test_selection_answer.py::test_answering_a_question_persists_no_biometric_template"
+        ],
+        "negative_control": "Appending 'copy embedding from stdin;' to migration 0034 fails the widened scan, which the previous Python-only pattern would not have seen. Appending a string naming the embedding table to exulanica/selection/plan.py fails the answer-path scan. Both executed and both reverted."
+      }
+    ],
+    "counts": {
+      "what_these_are": "Counts of executable checks, not measurements of answer quality. Every one is a number of test cases or of code paths; none is an accuracy.",
+      "backend_collected_at_starting_revision": 1447,
+      "backend_collected_now": 1463,
+      "backend_tests_added": 16,
+      "backend_passed": 1461,
+      "backend_skipped": 2,
+      "tests_added_per_gate": {
+        "citation_verifies_against_a_stored_span_digest": 4,
+        "refusal_rather_than_estimate": 4,
+        "memory_lifecycle": 6,
+        "no_biometric_template_on_the_answer_path": 2
+      },
+      "tests_widened_rather_than_added": 1,
+      "production_files_changed": 3,
+      "migrations_added": 0,
+      "historical_migrations_rewritten": 0,
+      "span_digests_changed": 0,
+      "negative_controls_executed": 6
+    },
+    "verification": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "server": "PostgreSQL 18.6 with pgvector, nothing substituted",
+      "backend_passed": 1461,
+      "backend_skipped": 2,
+      "backend_warnings": 3,
+      "ruff_passed": true,
+      "import_contracts_kept": 4,
+      "import_contracts_broken": 0,
+      "web_test_files_passed": 87,
+      "web_tests_passed": 670,
+      "web_typecheck_passed": true,
+      "web_boundaries_passed": true,
+      "web_unchanged_by_this_goal": true
+    },
+    "what_this_record_does_not_claim": [
+      "No accuracy of any kind was measured. exulanica/evaluation/metrics.py carries blocked_on sentences for M2 hallucination_rate, both M3 components, M8 plan validity and semantic accuracy, and M13 answer latency, every one of them beginning 'no question set exists'. Those sentences are unchanged by this goal and no number here is published against any of them.",
+      "No answer in this repository was composed by a live model endpoint. The reasoning core nvidia/Nemotron-3_5-Lightning composes answers and the extraction model Qwen/Qwen3-235B-A22B-Instruct-2507 fills in plans in production; in every test here their HTTP transport is scripted. The latency and conformance figures recorded in exulanica/selection/question.py's comments come from a manual run that was never retained, and are not reproduced or relied on here.",
+      "No retrieval quality was measured. That the executor returns the captures a plan names is asserted over a generated corpus, which is a statement about the compiler and the SQL rather than about whether a question found the right photographs.",
+      "Nothing about people was measured, because nothing about people may be. P-1 is unanswered, no identity work was begun, and no cross-capture person recall exists."
+    ],
+    "known_limitations": [
+      "Abstention.NOT_IN_MODALITY has no producer. abstain() defaults to NOT_CAPTURED and the only other value any caller passes is AMBIGUOUS, so a third of the abstention space is unreachable. exulanica/evaluation/metrics.py already records this inside M3's blocked_on. It was deliberately not given one: deciding from a question's text that the answer would need audio, speech or continuous time is a classifier with no second implementation and no corpus to measure against, and evaluation-methodology.md warns that inferring the reason code afterwards is the laundering the separate codes exist to prevent.",
+      "No answer is persisted. AnsweredQuestion is an in-memory dataclass, the executor runs in a read-only transaction, and POST /selection/ask returns a token-to-permalink map valid for that response only. There is no answer_cache row anywhere, so EntityRecord.citingAnswerCount in the browser read model is still a hard zero and the tier policy that would count answers losing their citation is unsatisfiable. Persisting answers was considered and refused for this goal: it would make a durable copy of a per-request token namespace the design deliberately discards.",
+      "Recomputation.mark_stale is vacuous over shipping producers. Its predicate is 'dep_index && %s::text[]' over strings built only as entity:<uuid> and occurrence:<uuid>, and no production writer emits either. Every one of its call sites in the identity decisions therefore reports a confident zero against a real corpus. The withdrawal cascade in migration 0030 is the live path, and it is what decision 3 exercises. No producer was made to emit entity: dep_index to fix this, because that would mean inventing a derived artifact kind with no consumer to make an invalidation path non-vacuous.",
+      "An entity's withdrawal is not recorded in the ledger its creation is in. Creation and confirmation are identity_event rows; withdrawal is a person_withdrawal_receipt row plus entity.deleted_at, and identity_event_type has no value that could hold a withdrawal. The two are joined only by entity_id. An entity_withdrawn event type was considered and refused: the withdrawal is already recorded and digest-bound, and a second home for one fact is a second implementation of nothing.",
+      "An occurrence has no withdrawal of its own. The occurrence table has no deleted_at and tombstone_scope has no occurrence member, so an occurrence is withdrawn by the withdrawal of the person it was confirmed to be. The test asserts the consequence a reader sees rather than a state the schema does not carry.",
+      "A derived artifact has no confirmation state of its own. The table carries stale and nothing else, and the closest thing to a middle stage is the person_derivative_dependency row filed when a link is confirmed, which is what this goal treats as the artifact's confirmation. place_proposal payloads carry requires_user_confirmation: true and nothing in production reads it; no confirmation workflow was built for one proposal kind with no consumer.",
+      "A capture, interval or workspace tombstone sets no derived_artifact.stale. Only the entity-scoped cascade does. Unchanged by this goal and not in its gates.",
+      "No first-party client calls the answer path. Nothing under web/ requests /selection/ask, /selection/plan or /selection/packet, and no console script asks a question. The path is reached by tests and by the HTTP surface, and architecture-overview.md 5.3's 'prose is rendered client side from the structure' has no client rendering it.",
+      "address_from_span_row does not read the text_anchor column, so the digest round trip is limited to photographs. Unreachable today because nothing writes transcript_text, which migration 0034's own comment records, and it becomes live the day a transcript does."
+    ],
+    "intentionally_deferred": [
+      {
+        "item": "A gold question set and an answer scorer",
+        "why": "metrics.py names the absence of a question set five times as the blocker. A scorer written against no corpus has one implementation and nothing to score, and building one would put a number where the methodology requires a blank."
+      },
+      {
+        "item": "Persisting answers as answer_cache derived artifacts",
+        "why": "It would give Recomputation.mark_stale a real producer and give the browser's citingAnswerCount a value, and it would also create a durable copy of a per-request token namespace the design discards on purpose. The gates ask for a citation that verifies, and the permalink already carries the digest."
+      },
+      {
+        "item": "An entity_withdrawn identity_event type",
+        "why": "The withdrawal is already recorded, digest-bound, in person_withdrawal_receipt."
+      },
+      {
+        "item": "A producer for Abstention.NOT_IN_MODALITY",
+        "why": "A modality classifier over question text, with no second implementation and no corpus. The honest move is the disclosure above, which metrics.py already carries."
+      },
+      {
+        "item": "A shared constant for the digest-bound envelope profile string",
+        "why": "Five producers spell it inline and each is a handful of lines. A sixth by the same idiom is cheaper than the abstraction, and the enforcement point that matters is already a test over the whole directory. Folding it in would enlarge this change."
+      },
+      {
+        "item": "A browser surface for asking a question",
+        "why": "Large, with no second consumer, and outside every gate. The gates ask that a question reaches an answer, not that a person types it into a page."
+      },
+      {
+        "item": "Roadmap and README status updates",
+        "why": "Uncommitted work was in flight in README.md, docs/frontier-roadmap.md, docs/demo-runbook.md and the landing package when this goal ran, and it was preserved untouched rather than merged with. The status drift the surveys found in frontier-roadmap.md section 3 is recorded here and left to whoever owns that work."
+      }
+    ],
+    "still_open_after_this_goal": [
+      {
+        "id": "P-1",
+        "statement": "When may a biometric template exist at all.",
+        "status": "OPEN, unchanged, and still answered by absence",
+        "note": "The absence of an embedding writer is now pinned over SQL as well as Python, and the answer path is pinned by name. Nothing here brings the decision any closer; it makes the current answer harder to change by accident."
+      },
+      {
+        "id": "A-8",
+        "statement": "Provider zero-data-retention for the exact model identifiers, confirmed in writing and asserted at service boot.",
+        "status": "OPEN, mechanism not built because its input does not exist"
+      },
+      {
+        "id": "M2 / M3 / M8 / M13",
+        "statement": "Every answer-path metric.",
+        "status": "OPEN, blocked on a gold question set that does not exist"
+      },
+      {
+        "id": "A-32 / X-4",
+        "statement": "Structured-answer schema conformance over a question set.",
+        "status": "OPEN, not started"
+      },
+      {
+        "id": "scene-pose-residual",
+        "statement": "COLMAP RANSAC threading variation beyond the fixed seed.",
+        "status": "OPEN, unchanged by this goal"
+      },
+      {
+        "id": "X-12",
+        "statement": "Restore with tombstone replay.",
+        "status": "OPEN, unchanged by this goal"
+      }
+    ],
+    "entry_gates_held_throughout": [
+      "The evidence address format stayed closed. No migration was added, no historical migration was touched, and no span digest changed.",
+      "No person recall and no template derivation was introduced, and tests/test_ingest_preconditions.py still pins the absence of an embedding writer, over a wider surface than before.",
+      "The full backend and web verification gates are green."
+    ]
+  },
+  "record_sha256": "051d873f01adae6f0d967c98c82f0e4dca0a39efa8eb194c07b2adeb6167abf3"
+}
