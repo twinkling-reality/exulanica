@@ -388,6 +388,7 @@ def test_source_listing_preserves_missing_evidence_instead_of_inventing_an_asset
             "captured_at": None,
             "captured_at_uncertainty_ms": None,
             "asset_reference": None,
+            "capture_ids": [],
         }
     ]
 

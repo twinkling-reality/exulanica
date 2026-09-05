@@ -103,6 +103,7 @@ export function adaptSnapshot(
   const occurrences: readonly OccurrenceRecord[] = payload.occurrences.map(
     (row): OccurrenceRecord => ({
       occurrenceId: row.occurrence_id as OccurrenceRecord['occurrenceId'],
+      captureId: row.capture_id,
       anchorId: row.occurrence_id as AnchorIdRef,
       islandId: toIsland(row.capture_id),
       kind: row.occurrence_class as OccurrenceRecord['kind'],
@@ -160,7 +161,21 @@ export function adaptSnapshot(
     payload.reconstruction_scenes.map((row) => {
       const islandIds = new Set(row.members.map((member) => toIsland(member.capture_id)));
       return {
-        sceneId: row.scene_id,
+      sceneId: row.scene_id,
+      trainedGeometry: row.trained_geometry == null ? null : {
+        artifactId: row.trained_geometry.artifact_id,
+        contentSha256: row.trained_geometry.content_sha256,
+        container: row.trained_geometry.container,
+        sceneFromAssetRowMajor: row.trained_geometry.scene_from_asset_row_major,
+        bounds: row.trained_geometry.bounds,
+        state: row.trained_geometry.state,
+        reference: row.trained_geometry.reference === null ? null : {
+          href: row.trained_geometry.reference.href,
+          authorization: row.trained_geometry.reference.authorization,
+          contentSha256: row.trained_geometry.reference.content_sha256,
+          byteSize: row.trained_geometry.reference.byte_size,
+        },
+      },
         islandId: islandIds.size === 1 ? [...islandIds][0]! : null,
         memberDigest: row.member_digest,
         poseReceiptSha256: row.pose_receipt_sha256,

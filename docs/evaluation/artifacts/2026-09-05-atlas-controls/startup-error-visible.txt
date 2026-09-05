@@ -1,0 +1,35 @@
+Retained test-output excerpt (not the complete execution log).
+Case: startup-error-visible
+Observed complete output SHA-256: c52736afb1507e93f788081340f1710e1f7e4f7fc2a4e2f7fe5036434f1076d8
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/startup-state.test.ts (2 tests | 1 failed | 1 skipped) 6ms
+   × visible Atlas startup states > shows loading before requests finish and an actionable failure if startup rejects 5ms
+     → expected 'status' to be 'alert' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 skipped (2)
+   Start at  11:42:47
+   Duration  603ms (transform 62ms, setup 0ms, collect 69ms, tests 6ms, environment 137ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/startup-state.test.ts > visible Atlas startup states > shows loading before requests finish and an actionable failure if startup rejects
+AssertionError: expected 'status' to be 'alert' // Object.is equality
+
+Expected: "alert"
+Received: "status"
+
+ ❯ packages/app/test/startup-state.test.ts:12:42
+     10|     expect(loading.textContent).toContain('Loading the library');
+     11|     const failure = buildStartupState(new Error('The world topology is…
+     12|     expect(failure.getAttribute('role')).toBe('alert');
+       |                                          ^
+     13|     expect(failure.textContent).toContain('The world topology is not c…
+     14|     expect(failure.querySelector('button')!.textContent).toBe('Retry o…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

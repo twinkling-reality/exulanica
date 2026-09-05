@@ -1,0 +1,60 @@
+from pathlib import Path
+import shutil, subprocess, tempfile, json, hashlib, re
+# Run from the repository root with its frontend dependencies already installed.
+repo = Path.cwd() / 'web'
+if not (repo / 'package.json').is_file():
+ raise SystemExit('Run this harness from the repository root.')
+scratch = Path(tempfile.mkdtemp(prefix='orimera-atlas-controls-'))
+shutil.copytree(repo/'test-data',scratch/'test-data')
+for name in ['package.json','vitest.config.ts','tsconfig.base.json','tsconfig.json']:
+ shutil.copy2(repo/name,scratch/name)
+(scratch/'node_modules').symlink_to(repo/'node_modules',target_is_directory=True)
+for name in [path.name for path in (repo/'packages').iterdir() if path.is_dir()]:
+ target=scratch/'packages'/name
+ shutil.copytree(repo/'packages'/name,target,ignore=shutil.ignore_patterns('node_modules','dist','*.tsbuildinfo'))
+ modules=repo/'packages'/name/'node_modules'
+ if modules.exists(): (target/'node_modules').symlink_to(modules,target_is_directory=True)
+cases=[
+ ('cpu-single-scale','packages/atlas-react/src/playcanvas/scene-point-maps.ts','const [x, y, z] = point;','const [x, y, z] = point.map(v => v * value.localUnitsToSceneUnits);','packages/atlas-react/test/scene-point-maps.test.ts','applies local scale'),
+ ('uniform-scale-validation','packages/atlas-react/src/playcanvas/scene-point-maps.ts','const r = [0, 1, 2].map((row) =>','return; const r = [0, 1, 2].map((row) =>','packages/atlas-react/test/scene-point-maps.test.ts','refuses undeclared'),
+ ('legacy-placement-refusal','packages/app/src/geometry-api.ts',"if (placement.scaleStatus !== 'colmap-correspondence-fit')",'if (false)','packages/app/test/geometry-api.test.ts','refuses legacy'),
+ ('consecutive-midpoints','packages/atlas-react/src/playcanvas/scene-inspection.ts','const next = sources[index + 1];','const next = undefined;','packages/atlas-react/test/scene-inspection.test.ts','preserves the source'),
+ ('inspection-return-pose','packages/atlas-react/src/playcanvas/atlas-binding.ts','this.applyNavigationPose(held.returnPose);','/* mutation: omit pose restoration */','packages/atlas-react/test/scene-inspection.test.ts','keeps inspection out'),
+ ('source-without-occurrences','packages/atlas-react/src/playcanvas/source-media.ts','for (const descriptor of catalog.values())','for (const descriptor of [])','packages/atlas-react/test/source-media.test.ts','uses explicit'),
+ ('capture-evidence-membership','packages/graph-client/src/snapshot.ts','captureId: row.capture_id,','captureId: undefined,','packages/graph-client/test/snapshot.test.ts','caller'),
+ ('source-only-no-camera','packages/app/src/ui/reconstruction-inspector.ts',"if (view.kind !== 'source-only' && !options.onView(sceneId, view.id))",'if (!options.onView(sceneId, view.id))','packages/app/test/reconstruction-inspector.test.ts','opens original'),
+ ('inspection-availability','packages/app/src/ui/status.ts',"scene.renderingSubstrate !== 'source_photographs' && input.onInspectScene !== undefined",'input.onInspectScene !== undefined','packages/app/test/reconstruction-inspector.test.ts','offers inspection'),
+ ('pre-reconstruction-source-access','packages/app/src/ui/status.ts','for (const region of input.sourceRegions ?? [])','for (const region of [])','packages/app/test/reconstruction-inspector.test.ts','keeps a live source'),
+ ('honest-full-detail-metric','packages/app/src/browser-validation.ts','time_to_full_detail_ms: null,','time_to_full_detail_ms: rounded(firstMeaningfulRenderMs),','packages/app/test/browser-validation-record.test.ts','records exact'),
+ ('startup-error-visible','packages/app/src/ui/startup-state.ts','const failed = error !== undefined;','const failed = false;','packages/app/test/startup-state.test.ts','shows loading'),
+ ('source-capture-projection','packages/app/src/source-media-api.ts','captureIds: source.captureIds,','captureIds: [],','packages/app/test/source-media-api.test.ts','fetches available'),
+]
+cases += [
+ ('sog-self-contained','packages/atlas-react/src/playcanvas/scene-splats.ts'," || !files.has(name)","",'packages/atlas-react/test/scene-splats.test.ts','rejects missing textures'),
+ ('sog-streamed-descriptor','packages/atlas-react/src/playcanvas/scene-splats.ts','if ((flags & 8) !== 0) {','if (false) {','packages/atlas-react/test/scene-splats.test.ts','refuses truncated'),
+ ('sog-native-in-memory','packages/atlas-react/src/playcanvas/scene-splats.ts','filename, contents: value.bytes','filename, contents: new ArrayBuffer(0)','packages/atlas-react/test/scene-splats.test.ts','supplies verified'),
+ ('sog-failed-resource-removal','packages/atlas-react/src/playcanvas/scene-splats.ts','app.assets.remove(asset);','/* mutation: leaked failed resource */','packages/atlas-react/test/scene-splats.test.ts','removes failed'),
+ ('trained-digest-refusal','packages/app/src/geometry-api.ts','const failure = await verify(digest, bytes, reference.contentSha256, reference.byteSize);','const failure = null;','packages/app/test/geometry-api.test.ts','refuses wrong digests'),
+ ('trained-graph-projection','packages/graph-client/src/snapshot.ts','trainedGeometry: row.trained_geometry == null ? null :','trainedGeometry: true ? null :','packages/graph-client/test/snapshot.test.ts','carries the trained artifact'),
+ ('narrow-viewport-startup','packages/app/src/style.css',':not(.gate)', '', 'packages/app/test/startup-state.test.ts','does not hide loading'),
+ ('readable-source-caption','packages/app/src/ui/reconstruction-inspector.ts','? fallback : title;', '? title : title;', 'packages/app/test/reconstruction-inspector.test.ts','keeps generated identifiers'),
+]
+baseline=subprocess.run(['pnpm','exec','vitest','run','packages/app','packages/atlas-react','packages/graph-client'],cwd=scratch,text=True,capture_output=True)
+(scratch/'baseline.log').write_text(baseline.stdout+baseline.stderr)
+print('BASELINE',baseline.returncode,scratch,flush=True)
+if baseline.returncode != 0: raise RuntimeError('isolated baseline failed')
+results=[]
+for name,file,before,after,test,pattern in cases:
+ p=scratch/file; source=p.read_text()
+ if before not in source: raise RuntimeError(f'missing mutation {name}')
+ p.write_text(source.replace(before,after))
+ run=subprocess.run(['pnpm','exec','vitest','run',test,'-t',pattern],cwd=scratch,text=True,capture_output=True)
+ p.write_text(source)
+ log=run.stdout+run.stderr
+ (scratch/(name+'.log')).write_text(log)
+ observed=run.returncode != 0 and bool(re.search(r'Tests\s+[1-9][0-9]* failed',log))
+ results.append(dict(name=name,production_file=file,source_sha256=hashlib.sha256(source.encode()).hexdigest(),test=test,test_filter=pattern,exit_code=run.returncode,observed_failure=observed,log_file=str(scratch/(name+'.log'))))
+ print(name,run.returncode,observed,flush=True)
+(scratch/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+print('RESULTS',scratch/'results.json',flush=True)
+if not all(r['observed_failure'] for r in results): raise SystemExit(1)

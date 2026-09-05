@@ -380,6 +380,7 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
         "select capture_id from capture where workspace_id=%s and deleted_at is null limit 1",
         (repository.workspace_id,),
     ).fetchone()["capture_id"]
+    assert metadata.capture_ids == (capture_id,)
     repository.insert_tombstone(
         scope="capture",
         capture_id=capture_id,
@@ -390,3 +391,4 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
     assert deleted.state is SourceMediaState.UNAVAILABLE_ASSET
     assert deleted.reason == "source evidence was deleted"
     assert deleted.evidence_path is None
+    assert deleted.capture_ids == ()

@@ -287,6 +287,7 @@ class SourceMediaView(BaseModel):
     captured_at: dt.datetime | None
     captured_at_uncertainty_ms: int | None
     asset_reference: SourceAssetReferenceView | None
+    capture_ids: tuple[uuid.UUID, ...]
 
 
 def read_repository(
@@ -547,4 +548,5 @@ def _source_view(source: WorldSourceMedia) -> SourceMediaView:
         captured_at=source.captured_at,
         captured_at_uncertainty_ms=source.captured_at_uncertainty_ms,
         asset_reference=asset_reference,
+        capture_ids=source.capture_ids,
     )

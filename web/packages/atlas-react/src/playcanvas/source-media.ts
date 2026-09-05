@@ -14,6 +14,10 @@ export interface SourceMediaDescriptor {
   readonly available: boolean;
   readonly accent: string;
   readonly alt: string;
+  /** Explicit topology ownership, usable before any model has produced occurrence anchors. */
+  readonly regionId?: string | null;
+  /** Live source captures returned by the authenticated evidence projection. */
+  readonly captureIds?: readonly string[];
 }
 
 export type SourceMediaCatalog = ReadonlyMap<string, SourceMediaDescriptor>;
@@ -34,6 +38,13 @@ export function sourceMediaForIsland(
       seen.add(identity);
       found.push(descriptor);
     }
+  }
+  for (const descriptor of catalog.values()) {
+    if (descriptor.regionId !== island.islandId) continue;
+    const identity = descriptor.url ?? descriptor.evidenceRef;
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    found.push(descriptor);
   }
   return Object.freeze(found);
 }

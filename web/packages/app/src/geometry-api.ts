@@ -35,8 +35,8 @@
  */
 
 import type { IslandId } from '@exulanica/atlas-core';
-import type { PlacedScenePointMap, PointMap } from '@exulanica/atlas-react/playcanvas';
-import { decodeOpm, validateScenePointMapPlacement } from '@exulanica/atlas-react/playcanvas';
+import type { PlacedScenePointMap, PointMap, TrainedSceneGeometry } from '@exulanica/atlas-react/playcanvas';
+import { decodeOpm, validateScenePointMapPlacement, validateSogBundle, validateTrainedSceneGeometry } from '@exulanica/atlas-react/playcanvas';
 import {
   ApiError,
   Transport,
@@ -82,6 +82,8 @@ export interface GeometrySession {
   readonly issues: readonly GeometryIssue[];
   /** What this browser can draw now, after transport, digest and decode checks. */
   readonly renderingByScene: ReadonlyMap<string, RenderingSubstrate>;
+  /** Verified SOG bytes; GPU decode availability is settled separately by the renderer. */
+  readonly trainedGeometry: readonly TrainedSceneGeometry[];
 }
 
 /** One successfully placed geometry input, measured at the authenticated byte boundary. */
@@ -346,6 +348,7 @@ export class GeometryClient {
       byArtifact,
       issues: Object.freeze(issues),
       renderingByScene: new Map(),
+      trainedGeometry: Object.freeze([]),
     });
   }
 
@@ -361,6 +364,7 @@ export class GeometryClient {
     const renderingByScene = new Map<string, RenderingSubstrate>();
     const issues: GeometryIssue[] = [];
     const digest = globalThis.crypto?.subtle;
+    const trainedGeometry: TrainedSceneGeometry[] = [];
 
     for (const scene of scenes) {
       let loadedForScene = 0;
@@ -390,6 +394,10 @@ export class GeometryClient {
             'no_region',
             'The reconstruction scene no longer resolves to one complete region in this graph.',
           );
+          continue;
+        }
+        if (placement.scaleStatus !== 'colmap-correspondence-fit') {
+          report('unplaced', 'This reconstruction has no validated alignment to the recovered cameras.');
           continue;
         }
         if (placement.state !== 'available' || placement.reference === null) {
@@ -507,6 +515,55 @@ export class GeometryClient {
         scene.sceneId,
         loadedForScene > 0 ? 'posed_point_maps' : 'source_photographs',
       );
+      const trained = scene.trainedGeometry;
+      if (trained != null) {
+        const report = (state: GeometryIssueState, reason: string): void => {
+          issues.push({ sceneId: scene.sceneId, captureId: scene.members[0]?.captureId ?? '', islandId, state, reason });
+        };
+        const reference = trained.reference;
+        if (islandId === null || scene.islandId !== islandId) {
+          report('no_region', 'The trained scene does not resolve to one complete region.');
+        } else if (trained.state !== 'available' || reference === null) {
+          report('bytes_missing', 'The trained scene is recorded but its verified bytes are unavailable.');
+        } else if (trained.container !== 'sog/1') {
+          report('unsupported_container', 'This build reads trained scene bundles in sog/1.');
+        } else if (reference.authorization !== 'workspace-bearer'
+          || reference.href !== `/scene-geometry/${trained.artifactId}`
+          || !/^\/scene-geometry\/[0-9a-f-]{36}$/u.test(reference.href)
+          || reference.contentSha256 !== trained.contentSha256) {
+          report('error', 'The trained scene reference failed its provenance check.');
+        } else if (digest === undefined) {
+          report('unverifiable', 'This page cannot verify trained scene bytes; source evidence remains available.');
+        } else {
+          try {
+            const started = monotonicNow();
+            const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(reference.href);
+            const bytes = await response.arrayBuffer();
+            const fetched = monotonicNow();
+            const failure = await verify(digest, bytes, reference.contentSha256, reference.byteSize);
+            const verified = monotonicNow();
+            if (failure !== null) report('verification_failed', failure);
+            else {
+              const { pointCount } = validateSogBundle(bytes);
+              const value: TrainedSceneGeometry = {
+                sceneId: scene.sceneId, islandId, artifactId: trained.artifactId,
+                bytes, pointCount, bounds: trained.bounds,
+                sceneFromAssetRowMajor: trained.sceneFromAssetRowMajor,
+              };
+              validateTrainedSceneGeometry(value);
+              trainedGeometry.push(Object.freeze(value));
+              this.#observer?.(Object.freeze({
+                sceneId: scene.sceneId, captureId: scene.members[0]?.captureId ?? '',
+                artifactId: trained.artifactId, expectedBytes: reference.byteSize, receivedBytes: bytes.byteLength,
+                fetchMs: fetched - started, verifyMs: verified - fetched, decodeMs: monotonicNow() - verified, reused: false,
+              }));
+            }
+          } catch (error) {
+            report(error instanceof ApiError && error.isUnauthenticated ? 'unauthorized' : 'undecodable',
+              error instanceof Error ? error.message : 'The trained scene could not load.');
+          }
+        }
+      }
     }
 
     return Object.freeze({
@@ -515,6 +572,7 @@ export class GeometryClient {
       byArtifact,
       issues: Object.freeze(issues),
       renderingByScene,
+      trainedGeometry: Object.freeze(trainedGeometry),
     });
   }
 

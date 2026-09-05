@@ -64,6 +64,8 @@ export interface PointCloud {
   readonly defaultSizeGain: number;
   readonly defaultMaxSizePx: number;
   setTheme(theme: PresentationTheme): void;
+  /** Compare evidence without the authored fog or display gain masking reconstruction defects. */
+  setInspection(active: boolean): void;
   destroy(): void;
 }
 
@@ -250,6 +252,10 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     defaultSizeGain: options.sizeGain ?? DEFAULT_SIZE_GAIN,
     defaultMaxSizePx: options.maxSizePx ?? DEFAULT_MAX_SIZE_PX,
     setTheme,
+    setInspection(active) {
+      material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
+      material.setParameter('uExposure', active ? 1 : 1.25);
+    },
     destroy(): void {
       mesh.destroy();
       material.destroy();

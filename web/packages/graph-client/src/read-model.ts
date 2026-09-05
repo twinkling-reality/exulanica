@@ -274,6 +274,8 @@ export type OccurrenceKind =
 /** A detection made addressable. Anonymous by construction: no name field exists here. */
 export interface OccurrenceRecord {
   readonly occurrenceId: OccurrenceIdRef;
+  /** Original capture membership, retained so a recovered camera can resolve existing evidence. */
+  readonly captureId?: string;
   readonly anchorId: AnchorIdRef;
   readonly islandId: IslandIdRef;
   readonly kind: OccurrenceKind;
@@ -307,7 +309,22 @@ export interface OccurrenceRecord {
  */
 export type ReconstructionRungRef = 1 | 2 | 3 | 4;
 
-export type RenderingSubstrate = 'posed_point_maps' | 'source_photographs';
+export type RenderingSubstrate = 'posed_point_maps' | 'gaussian_splats' | 'source_photographs';
+
+export interface TrainedGeometryRecord {
+  readonly artifactId: string;
+  readonly contentSha256: string;
+  readonly container: 'sog/1';
+  readonly sceneFromAssetRowMajor: readonly number[];
+  readonly bounds: { readonly min: readonly number[]; readonly max: readonly number[] };
+  readonly state: 'available' | 'bytes_missing' | 'invalid';
+  readonly reference: {
+    readonly href: string;
+    readonly authorization: 'workspace-bearer';
+    readonly contentSha256: string;
+    readonly byteSize: number;
+  } | null;
+}
 
 export interface ReconstructionPointMapRecord {
   readonly artifactId: string;
@@ -315,7 +332,7 @@ export interface ReconstructionPointMapRecord {
   readonly container: string | null;
   readonly sceneFromOpmRowMajor: readonly number[];
   readonly localUnitsToSceneUnits: number;
-  readonly scaleStatus: 'unvalidated-identity';
+  readonly scaleStatus: 'colmap-correspondence-fit';
   readonly state: 'available' | 'bytes_missing';
   readonly reference: {
     readonly href: string;
@@ -352,6 +369,7 @@ export interface ReconstructionSceneRecord {
   readonly placementState: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
   readonly renderingSubstrate: RenderingSubstrate;
   readonly members: readonly ReconstructionSceneMemberRecord[];
+  readonly trainedGeometry?: TrainedGeometryRecord | null;
 }
 
 export interface IslandRecord {

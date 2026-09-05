@@ -68,6 +68,7 @@ export type {
   IndexStatus,
   IslandIdRef,
   IslandRecord,
+  TrainedGeometryRecord,
   LinkState,
   MatchProposalView,
   OccurrenceIdRef,

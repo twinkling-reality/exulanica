@@ -1,0 +1,77 @@
+Retained test-output excerpt (not the complete execution log).
+Case: legacy-placement-refusal
+Observed complete output SHA-256: 7ba3cd1fee25b17e6720368e04f2f2a14ba01a0d76947748f42872dc166d3c03
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/geometry-api.test.ts (22 tests | 1 failed | 21 skipped) 13ms
+   × production reconstruction geometry > refuses legacy identity placement before fetching any bytes 13ms
+     → expected [ { …(2) }, { …(2) } ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  11:42:33
+   Duration  1.27s (transform 377ms, setup 0ms, collect 846ms, tests 13ms, environment 0ms, prepare 83ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/geometry-api.test.ts > production reconstruction geometry > refuses legacy identity placement before fetching any bytes
+AssertionError: expected [ { …(2) }, { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "init": Object {
++       "headers": Object {
++         "authorization": "Bearer private-token",
++       },
++       "method": "GET",
++       "signal": AbortSignal {
++         Symbol(kEvents): Map {},
++         Symbol(events.maxEventTargetListeners): 0,
++         Symbol(events.maxEventTargetListenersWarned): false,
++         Symbol(kHandlers): Map {},
++         Symbol(kAborted): false,
++         Symbol(kReason): undefined,
++         Symbol(kComposite): false,
++         Symbol(kTimeout): true,
++       },
++     },
++     "path": "/api/geometry/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++   },
++   Object {
++     "init": Object {
++       "headers": Object {
++         "authorization": "Bearer private-token",
++       },
++       "method": "GET",
++       "signal": AbortSignal {
++         Symbol(kEvents): Map {},
++         Symbol(events.maxEventTargetListeners): 0,
++         Symbol(events.maxEventTargetListenersWarned): false,
++         Symbol(kHandlers): Map {},
++         Symbol(kAborted): false,
++         Symbol(kReason): undefined,
++         Symbol(kComposite): false,
++         Symbol(kTimeout): true,
++       },
++     },
++     "path": "/api/geometry/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++   },
++ ]
+
+ ❯ packages/app/test/geometry-api.test.ts:274:22
+    272|       baseUrl: 'https://exulanica.test/api', token: 'private-token', f…
+    273|     }).loadScenes([legacy], regions);
+    274|     expect(requests).toEqual([]);
+       |                      ^
+    275|     expect(session.placedPointMaps).toEqual([]);
+    276|     expect(session.renderingByScene.get('scene-1')).toBe('source_photo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

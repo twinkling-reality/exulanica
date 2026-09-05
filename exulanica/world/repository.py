@@ -1097,6 +1097,9 @@ class WorldStyleRepository:
             "tombstone_blocks_any_span(ws.workspace_id,array[s.span_id]) end as tombstoned,"
             "exists(select 1 from capture c where c.workspace_id=ws.workspace_id "
             "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null) as live_capture "
+            ",array(select c.capture_id from capture c where c.workspace_id=ws.workspace_id "
+            "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null "
+            "order by c.capture_id) as capture_ids "
             "from world_topology_source ws "
             "left join evidence_span s on s.workspace_id=ws.workspace_id "
             "and s.span_id=ws.evidence_span_id "
@@ -1145,6 +1148,7 @@ class WorldStyleRepository:
             height=row["disp_h"] or row["coded_h"],
             captured_at=row["utc_instant"],
             captured_at_uncertainty_ms=row["uncertainty_ms"],
+            capture_ids=tuple(row["capture_ids"]) if available else (),
         )
 
 

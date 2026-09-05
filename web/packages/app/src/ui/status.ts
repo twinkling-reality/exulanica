@@ -25,6 +25,10 @@ export interface StatusInput {
    */
   readonly notices?: readonly string[];
   readonly reconstructionScenes?: readonly ReconstructionRungDisclosure[];
+  readonly onInspectScene?: (sceneId: string) => void;
+  readonly onInspectSources?: (sceneId: string) => void;
+  /** Live photograph groups before a reconstruction job has created a scene receipt. */
+  readonly sourceRegions?: readonly { readonly regionId: string; readonly captureCount: number }[];
 }
 
 export interface ReconstructionRungDisclosure {
@@ -76,7 +80,7 @@ export function buildStatus(input: StatusInput): HTMLElement {
     const recorded = scene.recordedRung === null ? 'unreadable' : String(scene.recordedRung);
     const substrate = scene.renderingSubstrate === 'posed_point_maps'
       ? 'posed point maps'
-      : 'source photographs';
+      : scene.renderingSubstrate === 'gaussian_splats' ? 'trained Gaussian reconstruction' : 'source photographs';
     details.append(
       el('summary', {
         text: `Recorded rung ${recorded}; showing rung ${scene.displayedRung} from ${substrate}.`,
@@ -94,6 +98,30 @@ export function buildStatus(input: StatusInput): HTMLElement {
       const reasons = el('ul', { class: 'reconstruction-rung-reasons' });
       for (const reason of scene.reasons) reasons.append(el('li', { text: reason }));
       details.append(reasons);
+    }
+    if (scene.renderingSubstrate !== 'source_photographs' && input.onInspectScene !== undefined) {
+      const inspect = el('button', { type: 'button', text: 'Inspect reconstruction' });
+      inspect.addEventListener('click', () => input.onInspectScene?.(scene.sceneId));
+      details.append(inspect);
+    }
+    if (input.onInspectSources !== undefined) {
+      const sources = el('button', { type: 'button', text: 'Inspect source photographs' });
+      sources.addEventListener('click', () => input.onInspectSources?.(scene.sceneId));
+      details.append(sources);
+    }
+    bar.append(details);
+  }
+
+  for (const region of input.sourceRegions ?? []) {
+    const details = el('details', { class: 'reconstruction-rung' });
+    details.dataset.regionId = region.regionId;
+    details.append(el('summary', {
+      text: `${counted(region.captureCount, 'grouped photograph', 'grouped photographs')} · reconstruction unavailable`,
+    }));
+    if (input.onInspectSources !== undefined) {
+      const sources = el('button', { type: 'button', text: 'Inspect source photographs' });
+      sources.addEventListener('click', () => input.onInspectSources?.(region.regionId));
+      details.append(sources);
     }
     bar.append(details);
   }

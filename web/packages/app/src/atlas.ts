@@ -37,6 +37,7 @@ import type {
   PointMap,
   PlacedScenePointMap,
   SourceMediaCatalog,
+  TrainedSceneGeometry,
 } from '@exulanica/atlas-react/playcanvas';
 import { AtlasBinding } from '@exulanica/atlas-react/playcanvas';
 
@@ -64,6 +65,7 @@ export async function mountAtlas(
     readonly reducedMotion?: boolean;
     readonly pointMaps?: ReadonlyMap<IslandId, PointMap>;
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
+    readonly trainedGeometry?: readonly TrainedSceneGeometry[];
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -72,6 +74,7 @@ export async function mountAtlas(
     overlayParent,
     scene,
     pointMaps: presentation?.pointMaps ?? NO_POINT_MAPS,
+    ...(presentation?.trainedGeometry === undefined ? {} : { trainedGeometry: presentation.trainedGeometry }),
     ...(presentation?.placedPointMaps === undefined
       ? {}
       : { placedPointMaps: presentation.placedPointMaps }),

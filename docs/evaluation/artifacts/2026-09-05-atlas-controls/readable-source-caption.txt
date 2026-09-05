@@ -1,0 +1,35 @@
+Retained test-output excerpt (not the complete execution log).
+Case: readable-source-caption
+Observed complete output SHA-256: 0a607fa78f053a8e39f5cf1b0615bb3a49e00a597e7b3b79b4ef16f430543059
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts (6 tests | 1 failed | 5 skipped) 5ms
+   × reconstruction camera register > keeps generated identifiers out of photo captions and return above media 4ms
+     → expected 'Source 01a07221-f387-7611-8425-41acf0…' to be 'Photograph 1' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  11:43:00
+   Duration  860ms (transform 61ms, setup 0ms, collect 72ms, tests 5ms, environment 139ms, prepare 47ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/reconstruction-inspector.test.ts > reconstruction camera register > keeps generated identifiers out of photo captions and return above media
+AssertionError: expected 'Source 01a07221-f387-7611-8425-41acf0…' to be 'Photograph 1' // Object.is equality
+
+Expected: "Photograph 1"
+Received: "Source 01a07221-f387-7611-8425-41acf0ed73e5"
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts:8:90
+      6| describe('reconstruction camera register', () => {
+      7|   it('keeps generated identifiers out of photo captions and return abo…
+      8|     expect(sourceCaption('Source 01a07221-f387-7611-8425-41acf0ed73e5'…
+       |                                                                                          ^
+      9|     expect(sourceCaption('Source 01a0722d 8c7b 791e b304 ee9c31019f1c'…
+     10|     expect(sourceCaption('Volcanic rock', 'Photograph 1')).toBe('Volca…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

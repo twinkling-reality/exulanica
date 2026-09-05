@@ -13,15 +13,35 @@ export interface PlacedScenePointMap {
 
 /** Refuse matrices whose producer-side affine and finite guarantees were lost on the wire. */
 export function validateScenePointMapPlacement(value: PlacedScenePointMap): void {
-  const matrix = value.sceneFromOpmRowMajor;
+  validateSceneTransform(value.sceneFromOpmRowMajor, value.localUnitsToSceneUnits);
+}
+
+export function validateSceneTransform(matrix: readonly number[], scale: number): void {
   if (matrix.length !== 16 || matrix.some((component) => !Number.isFinite(component))) {
     throw new TypeError('scene point-map placement must be a finite 4x4 matrix');
   }
   if (matrix[12] !== 0 || matrix[13] !== 0 || matrix[14] !== 0 || matrix[15] !== 1) {
     throw new TypeError('scene point-map placement must be an affine row-major matrix');
   }
-  if (!Number.isFinite(value.localUnitsToSceneUnits) || value.localUnitsToSceneUnits <= 0) {
+  if (!Number.isFinite(scale) || scale <= 0) {
     throw new TypeError('scene point-map scale must be finite and positive');
+  }
+  const r = [0, 1, 2].map((row) =>
+    [0, 1, 2].map((column) => matrix[row * 4 + column]! / scale));
+  for (let left = 0; left < 3; left += 1) {
+    for (let right = 0; right < 3; right += 1) {
+      const dot = r.reduce((sum, row) => sum + row[left]! * row[right]!, 0);
+      if (Math.abs(dot - (left === right ? 1 : 0)) > 1e-5) {
+        throw new TypeError('scene point-map transform must contain its declared uniform scale');
+      }
+    }
+  }
+  const determinant =
+    r[0]![0]! * (r[1]![1]! * r[2]![2]! - r[1]![2]! * r[2]![1]!)
+    - r[0]![1]! * (r[1]![0]! * r[2]![2]! - r[1]![2]! * r[2]![0]!)
+    + r[0]![2]! * (r[1]![0]! * r[2]![1]! - r[1]![1]! * r[2]![0]!);
+  if (Math.abs(determinant - 1) > 1e-5) {
+    throw new TypeError('scene point-map transform must be a proper rotation without reflection');
   }
 }
 
@@ -32,10 +52,9 @@ export function opmPointInScene(
 ): readonly [number, number, number] {
   validateScenePointMapPlacement(value);
   const matrix = value.sceneFromOpmRowMajor;
-  const scale = value.localUnitsToSceneUnits;
-  const x = point[0] * scale;
-  const y = point[1] * scale;
-  const z = point[2] * scale;
+  // The affine matrix already contains sR. The scalar is its declared scale, not a second
+  // transform. Applying it again made fitted, non-identity alignments disagree with the GPU.
+  const [x, y, z] = point;
   return [
     matrix[0]! * x + matrix[1]! * y + matrix[2]! * z + matrix[3]!,
     matrix[4]! * x + matrix[5]! * y + matrix[6]! * z + matrix[7]!,

@@ -10,6 +10,7 @@ const source = (overrides: Record<string, unknown> = {}) => ({
   source_id: 'source-1',
   slot_key: 'hero-memory',
   region_id: 'region-a',
+  capture_ids: ['capture-1'],
   state: 'available',
   reason: null,
   evidence_span_id: 'span-1',
@@ -48,6 +49,7 @@ describe('production source media boundary', () => {
     const session = await client.load('#7c71b5');
     expect(session.catalog.get('span-1')).toMatchObject({
       available: true, url: 'blob:source-1', evidenceRef: 'span-1',
+      regionId: 'region-a', captureIds: ['capture-1'],
     });
     expect(requests.map((request) => request.path)).toEqual([
       '/api/world/source-media', '/api/evidence/span-1',

@@ -1,0 +1,38 @@
+Retained test-output excerpt (not the complete execution log).
+Case: sog-self-contained
+Observed complete output SHA-256: 5e03228ff22bbebe05ffce1d8ad46acce58b9e8f36ddabc5df17e64f38c9d33f
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts (5 tests | 1 failed | 4 skipped) 5ms
+   × native authenticated trained scene boundary > rejects missing textures before native parsing can make unauthenticated subrequests 5ms
+     → expected [Function] to throw an error
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  11:42:49
+   Duration  2.02s (transform 42ms, setup 0ms, collect 1.63s, tests 5ms, environment 0ms, prepare 76ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-splats.test.ts > native authenticated trained scene boundary > rejects missing textures before native parsing can make unauthenticated subrequests
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts:35:44
+     33|     expect(metadataOffset).toBeGreaterThan(-1);
+     34|     data[metadataOffset + 1] = 'x'.charCodeAt(0);
+     35|     expect(() => validateSogBundle(bytes)).toThrow(/missing or externa…
+       |                                            ^
+     36|   });
+     37| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

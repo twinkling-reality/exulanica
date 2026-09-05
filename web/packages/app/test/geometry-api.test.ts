@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { ReconstructionSceneRecord } from '@exulanica/graph-client';
 import {
   GeometryClient,
@@ -132,6 +133,75 @@ function serve(rows: unknown[], bytes: ArrayBuffer, etag?: string) {
 
 const regions = new Map([[CAPTURE_A, REGION as never], [CAPTURE_B, REGION as never]]);
 
+function trainedFixture(): ArrayBuffer {
+  return Uint8Array.from(readFileSync(`${process.cwd()}/test-data/compressor-3.3.3-format-only.sog`)).buffer;
+}
+
+function trainedScene(digest: string, size: number): ReconstructionSceneRecord {
+  const scene = sceneRecord(digest, size);
+  return { ...scene, members: scene.members.map((member) => ({ ...member, placement: null })),
+    renderingSubstrate: 'gaussian_splats', trainedGeometry: {
+      artifactId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', contentSha256: digest,
+      container: 'sog/1', state: 'available',
+      sceneFromAssetRowMajor: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
+      reference: { href: '/scene-geometry/cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        authorization: 'workspace-bearer', contentSha256: digest, byteSize: size },
+    } };
+}
+
+describe('trained scene authenticated delivery', () => {
+  it('passes exact verified SOG bytes to the renderer boundary without claiming a successful GPU load', async () => {
+    const bytes = trainedFixture();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const measurements: GeometryLoadMeasurement[] = [];
+    const loaded = await new GeometryClient({ baseUrl: 'https://exulanica.test', token: 'workspace-token', fetch },
+      (measurement) => measurements.push(measurement)).loadScenes([trainedScene(digest, bytes.byteLength)], regions);
+    expect(requests).toHaveLength(1);
+    expect(new Headers(requests[0]!.init.headers).get('Authorization')).toBe('Bearer workspace-token');
+    expect(requests[0]!.path).toBe('/scene-geometry/cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+    expect(loaded.trainedGeometry).toHaveLength(1);
+    expect(loaded.trainedGeometry[0]!.bytes).toEqual(bytes);
+    expect(loaded.trainedGeometry[0]!.pointCount).toBe(512);
+    expect(loaded.renderingByScene.get('scene-1')).toBe('source_photographs');
+    expect(loaded.issues).toEqual([]);
+    expect(measurements[0]!.receivedBytes).toBe(bytes.byteLength);
+  });
+
+  it('refuses wrong digests, external paths, missing bytes, and unavailable verification', async () => {
+    const bytes = trainedFixture();
+    const digest = await sha256(bytes);
+    const original = trainedScene(digest, bytes.byteLength);
+    const source = original.trainedGeometry!;
+    const wrongDigest = 'f'.repeat(64);
+    const cases: readonly [ReconstructionSceneRecord, string, number][] = [
+      [{ ...original, trainedGeometry: { ...source, contentSha256: wrongDigest,
+        reference: { ...source.reference!, contentSha256: wrongDigest } } }, 'verification_failed', 1],
+      [{ ...original, trainedGeometry: { ...source,
+        reference: { ...source.reference!, href: 'https://elsewhere.test/scene.sog' } } }, 'error', 0],
+      [{ ...original, trainedGeometry: { ...source, state: 'bytes_missing', reference: null } }, 'bytes_missing', 0],
+    ];
+    for (const [scene, state, expectedRequests] of cases) {
+      const { fetch, requests } = serve([], bytes);
+      const loaded = await new GeometryClient({ baseUrl: 'https://exulanica.test', token: 'private', fetch })
+        .loadScenes([scene], regions);
+      expect(loaded.trainedGeometry).toEqual([]);
+      expect(loaded.issues.map((issue) => issue.state)).toEqual([state]);
+      expect(requests).toHaveLength(expectedRequests);
+    }
+    vi.stubGlobal('crypto', {});
+    try {
+      const { fetch, requests } = serve([], bytes);
+      const loaded = await new GeometryClient({ baseUrl: 'https://exulanica.test', token: 'private', fetch })
+        .loadScenes([original], regions);
+      expect(loaded.issues[0]!.state).toBe('unverifiable');
+      expect(loaded.trainedGeometry).toEqual([]);
+      expect(requests).toHaveLength(0);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
 function sceneRecord(
   contentSha256: string,
   byteSize: number,
@@ -153,7 +223,7 @@ function sceneRecord(
         0, 0, 0, 1,
       ],
       localUnitsToSceneUnits: 1,
-      scaleStatus: 'unvalidated-identity' as const,
+      scaleStatus: 'colmap-correspondence-fit' as const,
       state: 'available' as const,
       reference: {
         href: `/geometry/${artifactId}`,
@@ -187,6 +257,25 @@ function sceneRecord(
 }
 
 describe('production reconstruction geometry', () => {
+  it('refuses legacy identity placement before fetching any bytes', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const old = sceneRecord(digest, bytes.byteLength);
+    const legacy = {
+      ...old,
+      members: old.members.map((member) => ({
+        ...member, placement: { ...member.placement, scaleStatus: 'unvalidated-identity' },
+      })),
+    } as unknown as ReconstructionSceneRecord;
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([legacy], regions);
+    expect(requests).toEqual([]);
+    expect(session.placedPointMaps).toEqual([]);
+    expect(session.renderingByScene.get('scene-1')).toBe('source_photographs');
+    expect(session.issues.map((issue) => issue.state)).toEqual(['unplaced', 'unplaced']);
+  });
   it('loads every digest-verified point map in a posed scene with its distinct transform', async () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);

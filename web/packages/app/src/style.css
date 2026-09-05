@@ -754,6 +754,40 @@ button.ghost {
   opacity: 0.82;
 }
 
+.reconstruction-loading {
+  position: fixed;
+  bottom: 1rem;
+  left: var(--gap);
+  right: var(--gap);
+  padding: 0.7rem 1rem;
+  background: var(--raised);
+  color: var(--ink);
+  z-index: 80;
+}
+
+.reconstruction-inspector {
+  position: fixed;
+  right: var(--gap);
+  top: 5rem;
+  width: min(22rem, calc(100vw - 2 * var(--gap)));
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+  padding: 1rem 1.2rem;
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--ink-faint);
+  z-index: 70;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+.reconstruction-inspector[hidden], .reconstruction-inspector [hidden] { display: none; }
+.reconstruction-inspector h2 { margin-top: 0; font-size: 1.1rem; }
+.reconstruction-inspector select { width: 100%; }
+.reconstruction-inspector nav { display: flex; justify-content: space-between; margin: 0.6rem 0; }
+.reconstruction-inspector img { display: block; width: 100%; height: auto; margin-top: 0.6rem; }
+.reconstruction-inspector > button { margin-top: 0.8rem; }
+
 /* ------------------------------------------------------------------ Atlas system surfaces */
 
 .atlas-commands {
@@ -1099,7 +1133,7 @@ kbd {
     visibility: hidden;
   }
 
-  #shell > :not(.viewport-boundary) {
+  #shell > :not(.viewport-boundary):not(.gate):not(.reconstruction-loading):not(.atlas-empty) {
     display: none !important;
   }
 
@@ -2706,3 +2740,6 @@ button.command-action:focus-visible {
 .companion-rail-foot .command-action-label {
   color: inherit;
 }
+
+.reconstruction-inspector-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
+.reconstruction-inspector-header h2 { margin: 0; }

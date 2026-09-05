@@ -1,0 +1,87 @@
+Retained test-output excerpt (not the complete execution log).
+Case: trained-graph-projection
+Observed complete output SHA-256: 7ea5e43d9ae509730973de3a656f5895b268bf350e0eab83db86db080837c6a4
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/graph-client/test/snapshot.test.ts (18 tests | 1 failed | 17 skipped) 6ms
+   × a receipt-backed reconstruction scene remains distinct from its island > carries the trained artifact identity and authenticated reference without changing the quality gate 6ms
+     → expected { sceneId: 'scene-1', …(16) } to match object { sceneId: 'scene-1', …(4) }
+(12 matching properties omitted from actual)
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  11:42:57
+   Duration  609ms (transform 52ms, setup 0ms, collect 72ms, tests 6ms, environment 0ms, prepare 39ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/graph-client/test/snapshot.test.ts > a receipt-backed reconstruction scene remains distinct from its island > carries the trained artifact identity and authenticated reference without changing the quality gate
+AssertionError: expected { sceneId: 'scene-1', …(16) } to match object { sceneId: 'scene-1', …(4) }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  Object {
+    "displayedRung": 3,
+    "recordedRung": 3,
+    "renderingSubstrate": "gaussian_splats",
+    "sceneId": "scene-1",
+-   "trainedGeometry": Object {
+-     "artifactId": "trained-artifact",
+-     "bounds": Object {
+-       "max": Array [
+-         2,
+-         3,
+-         4,
+-       ],
+-       "min": Array [
+-         -2,
+-         -3,
+-         -4,
+-       ],
+-     },
+-     "container": "sog/1",
+-     "contentSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+-     "reference": Object {
+-       "authorization": "workspace-bearer",
+-       "byteSize": 1234,
+-       "contentSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+-       "href": "/scene-geometry/trained-artifact",
+-     },
+-     "sceneFromAssetRowMajor": Array [
+-       1,
+-       0,
+-       0,
+-       2,
+-       0,
+-       1,
+-       0,
+-       0,
+-       0,
+-       0,
+-       1,
+-       -3,
+-       0,
+-       0,
+-       0,
+-       1,
+-     ],
+-     "state": "available",
+-   },
++   "trainedGeometry": null,
+  }
+
+ ❯ packages/graph-client/test/snapshot.test.ts:212:47
+    210|       },
+    211|     }] });
+    212|     expect(snapshot.reconstructionScenes![0]).toMatchObject({
+       |                                               ^
+    213|       sceneId: scene.scene_id, recordedRung: 3, displayedRung: 3,
+    214|       renderingSubstrate: 'gaussian_splats', trainedGeometry: {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

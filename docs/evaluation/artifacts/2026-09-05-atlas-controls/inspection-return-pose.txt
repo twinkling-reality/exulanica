@@ -1,0 +1,48 @@
+Retained test-output excerpt (not the complete execution log).
+Case: inspection-return-pose
+Observed complete output SHA-256: f4d5530e1c9460af55f8f3dee880bed9f5fa2aa0801c86aa86f949ca02b4bb96
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (3 tests | 1 failed | 2 skipped) 22ms
+   × bounded reconstruction inspection > keeps inspection out of walking and restores the exact original pose and field of view 21ms
+     → expected { x: 10.000000000000002, y: 2, …(3) } to deeply equal { x: 1.2345, y: 2.3456, …(3) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 skipped (3)
+   Start at  11:44:12
+   Duration  3.09s (transform 493ms, setup 0ms, collect 1.90s, tests 22ms, environment 530ms, prepare 104ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > keeps inspection out of walking and restores the exact original pose and field of view
+AssertionError: expected { x: 10.000000000000002, y: 2, …(3) } to deeply equal { x: 1.2345, y: 2.3456, …(3) }
+
+- Expected
++ Received
+
+  Object {
+-   "pitch": -0.21,
+-   "x": 1.2345,
+-   "y": 2.3456,
+-   "yaw": 0.63,
+-   "z": -9.123,
++   "pitch": 0,
++   "x": 10.000000000000002,
++   "y": 2,
++   "yaw": 1.5707963267948966,
++   "z": 15,
+  }
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:66:36
+     64|     expect(binding.inspectionView?.id).toBe(views[2]!.id);
+     65|     binding.endSceneInspection();
+     66|     expect(binding.controls.state).toEqual(start);
+       |                                    ^
+     67|     expect(binding.camera.camera!.fov).toBe(73);
+     68|     expect(enabled).toHaveBeenLastCalledWith(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

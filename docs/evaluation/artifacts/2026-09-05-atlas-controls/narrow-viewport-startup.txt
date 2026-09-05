@@ -1,0 +1,38 @@
+Retained test-output excerpt (not the complete execution log).
+Case: narrow-viewport-startup
+Observed complete output SHA-256: f4bd77e63ae3b6322e9d72f8917eed048f7fc783e18317e5f35190fd23b3f0b0
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/startup-state.test.ts (2 tests | 1 failed | 1 skipped) 7ms
+   × visible Atlas startup states > does not hide loading or errors behind the narrow-viewport world restriction 7ms
+     → expected true to be false // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 skipped (2)
+   Start at  11:42:58
+   Duration  804ms (transform 64ms, setup 0ms, collect 70ms, tests 7ms, environment 201ms, prepare 65ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/startup-state.test.ts > visible Atlas startup states > does not hide loading or errors behind the narrow-viewport world restriction
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ packages/app/test/startup-state.test.ts:24:39
+     22|     const failure = buildStartupState(new Error('API unavailable'));
+     23|     shell.append(loading, failure);
+     24|     expect(loading.matches(selector)).toBe(false);
+       |                                       ^
+     25|     expect(failure.matches(selector)).toBe(false);
+     26|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

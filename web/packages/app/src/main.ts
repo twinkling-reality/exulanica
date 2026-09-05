@@ -51,11 +51,13 @@ import type {
   PlacedScenePointMap,
   PointMap,
   SourceMediaCatalog,
+  TrainedSceneGeometry,
 } from '@exulanica/atlas-react/playcanvas';
 import {
   footprintRadiusOf,
   scenePointMapFootprint,
   scenePointMapViewpoint,
+  trainedSceneFootprint,
 } from '@exulanica/atlas-react/playcanvas';
 import {
   applicationTitle,
@@ -82,6 +84,8 @@ import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
+import { buildReconstructionInspector } from './ui/reconstruction-inspector.js';
+import { buildStartupState } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
@@ -160,6 +164,7 @@ let previewSourceMedia: SourceMediaCatalog | undefined;
 let pointMaps_: ReadonlyMap<IslandId, PointMap> | undefined;
 /** All maps with their shared-scene transforms. Undefined for the legacy preview path. */
 let placedPointMaps_: readonly PlacedScenePointMap[] | undefined;
+let trainedGeometry_: readonly TrainedSceneGeometry[] = Object.freeze([]);
 /** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
 let heldPointMaps_: HeldPointMaps | undefined;
 
@@ -197,7 +202,8 @@ function reconstructionsOf(
     out.set(islandId, {
       rung: 3,
       viewpointLocal: localVec3(viewpoint[0], viewpoint[1], viewpoint[2]),
-      footprintRadiusLocal: scenePointMapFootprint(values),
+      footprintRadiusLocal: Math.max(scenePointMapFootprint(values), ...trainedGeometry_
+        .filter((geometry) => geometry.islandId === islandId).map(trainedSceneFootprint)),
     });
   }
   for (const [islandId, map] of maps ?? []) {
@@ -248,9 +254,14 @@ applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
   preferences.worldStyleParameters,
 ));
 
-void boot();
+void boot().catch((error: unknown) => {
+  canvas!.hidden = true;
+  shell!.setAttribute('data-world-state', 'error');
+  replace(shell!, [buildStartupState(error)]);
+});
 
 async function boot(): Promise<void> {
+  replace(shell!, [buildStartupState()]);
   if (preview) {
     await start('');
     return;
@@ -338,14 +349,22 @@ async function start(token: string): Promise<void> {
       worldStyles = null;
     }
     interactionPolicies = new InteractionPolicyClient(credentials_);
-    const interactionState = await interactionPolicies.current();
-    if (interactionState.current !== null) {
-      preferences = preferencesFromInteractionPolicy(preferences, interactionState.parameters);
-      try {
-        writePreferences(window.localStorage, preferences);
-      } catch {
-        // The durable server copy is authoritative; private browsing may reject its local cache.
+    const startupNotices: string[] = [];
+    try {
+      const interactionState = await new InteractionPolicyClient({
+        ...credentials_, signal: AbortSignal.timeout(15_000),
+      }).current();
+      if (interactionState.current !== null) {
+        preferences = preferencesFromInteractionPolicy(preferences, interactionState.parameters);
+        try {
+          writePreferences(window.localStorage, preferences);
+        } catch {
+          // The durable server copy is authoritative; private browsing may reject its local cache.
+        }
       }
+    } catch (error) {
+      interactionPolicies = null;
+      startupNotices.push(`Saved interaction settings unavailable: ${error instanceof Error ? error.message : 'the request failed'}`);
     }
     sourceMediaSession?.dispose();
     sourceMediaSession = null;
@@ -359,7 +378,7 @@ async function start(token: string): Promise<void> {
         profile.palette.stoneShadow,
       );
       previewSourceMedia = sourceMediaSession.catalog;
-      sourceMediaNotices = Object.freeze(sourceMediaSession.issues.map((issue) => {
+      sourceMediaNotices = Object.freeze([...startupNotices, ...sourceMediaSession.issues.map((issue) => {
         const state = issue.state === 'missing_evidence'
           ? 'Missing source evidence'
           : issue.state === 'unavailable_asset'
@@ -368,10 +387,11 @@ async function start(token: string): Promise<void> {
               ? 'Source not authorized'
               : 'Source loading error';
         return `${state}: ${issue.reason}`;
-      }));
+      })]);
     } catch (error) {
       previewSourceMedia = new Map();
       sourceMediaNotices = Object.freeze([
+        ...startupNotices,
         `Source media unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
       ]);
     }
@@ -421,6 +441,7 @@ async function loadGeometry(
     const legacyGeometry = await client.load(regions, held, sceneCaptures);
     pointMaps_ = new Map([...legacyGeometry.pointMaps, ...sceneGeometry.pointMaps]);
     placedPointMaps_ = sceneGeometry.placedPointMaps;
+    trainedGeometry_ = sceneGeometry.trainedGeometry;
     heldPointMaps_ = new Map([...legacyGeometry.byArtifact, ...sceneGeometry.byArtifact]);
     geometryNotices = geometryNoticesFor([
       ...sceneGeometry.issues,
@@ -435,6 +456,7 @@ async function loadGeometry(
   } catch (error) {
     pointMaps_ = undefined;
     placedPointMaps_ = undefined;
+    trainedGeometry_ = Object.freeze([]);
     heldPointMaps_ = undefined;
     geometryNotices = Object.freeze([
       `Reconstructions unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
@@ -454,11 +476,13 @@ function reconstructionRungsFor(
 ): readonly ReconstructionRungDisclosure[] {
   return Object.freeze(scenes.map((scene) => {
     const substrate = actual.get(scene.sceneId) ?? 'source_photographs';
-    const displayedRung = substrate === 'posed_point_maps' ? Math.max(scene.displayedRung, 3) : 4;
+    const displayedRung = substrate === 'source_photographs' ? 4 : Math.max(scene.recordedRung ?? 3, 3);
     const reasons = [...scene.displayReasons];
     if (substrate !== scene.renderingSubstrate) {
       reasons.push(
-        'This browser could not load a verified posed map, so it is displaying source photographs.',
+        substrate === 'source_photographs'
+          ? 'This browser has no loaded reconstruction; the original source photographs remain available.'
+          : 'This browser is showing verified reconstruction geometry; its recorded quality gate is unchanged.',
       );
     }
     return Object.freeze({
@@ -532,7 +556,16 @@ async function mount(): Promise<void> {
   // Geometry, re-read here rather than once at start-up. See `loadGeometry`: the list is what
   // carries a deletion to the renderer, and the bytes are not re-fetched. The preview fills the
   // same slot from disk and must not be overwritten by a route it does not serve.
-  if (!preview) await loadGeometry(currentCredentials, current);
+  if (!preview) {
+    const loading = el('p', {
+      class: 'reconstruction-loading', role: 'status',
+      text: 'Loading and verifying reconstruction… Source photographs remain available if geometry cannot load.',
+    });
+    shell!.setAttribute('aria-busy', 'true');
+    shell!.append(loading);
+    try { await loadGeometry(currentCredentials, current); }
+    finally { loading.remove(); shell!.removeAttribute('aria-busy'); }
+  }
 
   // The turn engine outlives a re-mount, so it is told about the new graph rather than rebuilt.
   // Rebuilding it would discard the memory of what has already been asked, and the Companion
@@ -1126,6 +1159,73 @@ async function mount(): Promise<void> {
     }
   }
 
+  const reconstructionInspector = buildReconstructionInspector({
+    onView: (sceneId, viewId) => atlas?.binding.inspectSceneView(sceneId, viewId) ?? false,
+    onReturn: () => atlas?.binding.endSceneInspection(),
+  });
+  const inspectReconstruction = (sceneId: string): void => {
+    dispatchShell({ type: 'show-world' });
+    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
+    const views = atlas?.binding.inspectionViews(sceneId) ?? [];
+    let cameraNumber = 0;
+    const choices = views.map((view) => {
+      const member = view.kind === 'source-camera'
+        ? record?.members.find((candidate) => candidate.placement?.artifactId === view.artifactIds[0])
+        : undefined;
+      if (view.kind === 'source-camera') cameraNumber += 1;
+      // World source IDs name topology slots, not captures. Join through the actual evidence
+      // handles of this capture; matching a generated source ID to a capture ID loses every source.
+      const source = member === undefined ? null :
+        [...(previewSourceMedia?.values() ?? [])].find((descriptor) =>
+          descriptor.captureIds?.includes(member.captureId))
+        ?? current.occurrences
+          .filter((occurrence) => occurrence.captureId === member.captureId)
+          .flatMap((occurrence) => occurrence.evidence)
+          .map((handle) => previewSourceMedia?.get(handle))
+          .find((descriptor) => descriptor !== undefined) ?? null;
+      return {
+        id: view.id, kind: view.kind,
+        label: view.kind === 'source-camera'
+          ? `Source camera ${cameraNumber}` : `Between cameras ${cameraNumber} and ${cameraNumber + 1}`,
+        source,
+      };
+    });
+    if (!reconstructionInspector.open(sceneId, choices)) {
+      showTravelStatus('No verified reconstruction cameras are available. The original sources remain in Index.', 'failure');
+    }
+  };
+  const inspectSceneSources = (sceneId: string): void => {
+    atlas?.binding.endSceneInspection();
+    dispatchShell({ type: 'show-world' });
+    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
+    const region = current.islands.find((island) => island.islandId === (record?.islandId ?? sceneId));
+    const captures = new Set(record?.members.map((member) => member.captureId) ?? region?.captureIds ?? []);
+    const regionId = record?.islandId ?? region?.islandId;
+    const seen = new Set<string>();
+    const sources = [...(previewSourceMedia?.values() ?? [])].filter((source) => {
+      if (seen.has(source.evidenceRef)) return false;
+      if ((regionId === undefined || source.regionId !== regionId)
+        && !source.captureIds?.some((id) => captures.has(id))) return false;
+      seen.add(source.evidenceRef);
+      return true;
+    });
+    const choices = sources.map((source, index) => ({
+      id: `source:${source.evidenceRef}`, kind: 'source-only' as const,
+      label: `Photograph ${index + 1}`, source,
+    }));
+    if (!reconstructionInspector.open(sceneId, choices)) {
+      showTravelStatus('No authorized source photographs are available in this session.', 'failure');
+    }
+  };
+  const renderReconstructionStatus = (): HTMLElement => buildStatus({
+    omittedRegionCount: built.omitted.length, undrawable: built.undrawable,
+    notices: [...sourceMediaNotices, ...geometryNotices], reconstructionScenes: reconstructionRungs,
+    sourceRegions: current.islands
+      .filter((island) => !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
+      .map((island) => ({ regionId: island.islandId, captureCount: island.captureIds.length })),
+    onInspectScene: inspectReconstruction, onInspectSources: inspectSceneSources,
+  });
+  let reconstructionStatus = renderReconstructionStatus();
   replace(shell!, [
     stage,
     chrome.reticle,
@@ -1141,15 +1241,15 @@ async function mount(): Promise<void> {
     optionsView.root,
     settingsView.root,
     viewportBoundary,
-      buildStatus({
-        omittedRegionCount: built.omitted.length,
-        undrawable: built.undrawable,
-        notices: [...sourceMediaNotices, ...geometryNotices],
-        reconstructionScenes: reconstructionRungs,
-      }),
+    reconstructionInspector.root,
+    reconstructionStatus,
   ]);
 
   reflectShell = (): void => {
+    if (shellState.primary !== 'world') {
+      atlas?.binding.endSceneInspection();
+      reconstructionInspector.hide();
+    }
     shell!.setAttribute('data-primary', shellState.primary);
     shell!.setAttribute('data-camera', shellState.camera);
     chrome.setIndexOpen(shellState.primary === 'index');
@@ -1230,7 +1330,12 @@ async function mount(): Promise<void> {
   const activeTheme = themeForPreferences(preferences, systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
-  atlas = await mountAtlas(canvas as HTMLCanvasElement, stage, built.scene, (report) => {
+  const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
+    text: 'Opening the Atlas and decoding its available reconstruction…' });
+  shell!.append(rendererLoading);
+  shell!.setAttribute('aria-busy', 'true');
+  try {
+    atlas = await mountAtlas(canvas as HTMLCanvasElement, stage, built.scene, (report) => {
     if (lastMoving !== report.moving) {
       lastMoving = report.moving;
       shell!.setAttribute('data-moving', report.moving ? 'true' : 'false');
@@ -1273,6 +1378,7 @@ async function mount(): Promise<void> {
     ...(previewSourceMedia === undefined ? {} : { sourceMedia: previewSourceMedia }),
     ...(pointMaps_ === undefined ? {} : { pointMaps: pointMaps_ }),
     ...(placedPointMaps_ === undefined ? {} : { placedPointMaps: placedPointMaps_ }),
+    trainedGeometry: trainedGeometry_,
     reducedMotion: systemReducedMotion.matches,
   }, browserMeasurement === null ? undefined : (binding) => {
     browserMeasurement.observeBinding(binding, {
@@ -1280,7 +1386,17 @@ async function mount(): Promise<void> {
       placedPointMapCount: placedPointMaps_?.length ?? 0,
       placementMaxErrors: binding.verifyPlacements().map((check) => check.maxErrorMetres),
     });
-  });
+    });
+  } finally { rendererLoading.remove(); shell!.removeAttribute('aria-busy'); }
+  const actualRendering = new Map<string, RenderingSubstrate>();
+  for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
+  for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
+  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering);
+  geometryNotices = Object.freeze([...geometryNotices, ...atlas.binding.trainedSceneFailures
+    .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
+  const refreshedStatus = renderReconstructionStatus();
+  reconstructionStatus.replaceWith(refreshedStatus);
+  reconstructionStatus = refreshedStatus;
   (canvas as HTMLCanvasElement).dataset.companionRenderer = 'svg';
   reflectShell();
 
@@ -1290,6 +1406,9 @@ async function mount(): Promise<void> {
   // the lock on Escape and on focus loss without telling the application first, so a mode the
   // application tracked itself would be wrong within seconds of the user tabbing away.
   const mounted = atlas;
+  mounted.binding.onInspectionChange = (view) => {
+    if (view === null) reconstructionInspector.hide();
+  };
   mounted.binding.mapOverlay?.setActive(shellState.camera === 'map');
   mounted.binding.onMapTarget = (islandId) => {
     const resolution = mounted.binding.navigateToIsland(islandId, travelUsesReducedMotion());

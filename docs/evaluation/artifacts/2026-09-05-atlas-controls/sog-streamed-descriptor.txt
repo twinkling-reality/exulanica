@@ -1,0 +1,38 @@
+Retained test-output excerpt (not the complete execution log).
+Case: sog-streamed-descriptor
+Observed complete output SHA-256: e9cfa3d9536b1a5192a1b8e20fd0be1a12ded161044b10f8c4436129f2b3cf16
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts (5 tests | 1 failed | 4 skipped) 6ms
+   × native authenticated trained scene boundary > refuses truncated archives, bad descriptors, and non-affine transforms 5ms
+     → expected [Function] to throw an error
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  11:42:51
+   Duration  640ms (transform 41ms, setup 0ms, collect 315ms, tests 6ms, environment 0ms, prepare 61ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-splats.test.ts > native authenticated trained scene boundary > refuses truncated archives, bad descriptors, and non-affine transforms
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts:45:44
+     43|     const at = array.findIndex((_, i) => i + 4 <= array.length && data…
+     44|     data.setUint32(at + 8, 1, true);
+     45|     expect(() => validateSogBundle(bytes)).toThrow(/descriptor/);
+       |                                            ^
+     46|     expect(() => validateTrainedSceneGeometry({ ...geometry(),
+     47|       sceneFromAssetRowMajor: new Array(16).fill(0) })).toThrow(/affin…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

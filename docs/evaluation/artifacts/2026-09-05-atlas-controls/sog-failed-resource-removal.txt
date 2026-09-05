@@ -1,0 +1,31 @@
+Retained test-output excerpt (not the complete execution log).
+Case: sog-failed-resource-removal
+Observed complete output SHA-256: 2e848585dc4042ce5e536b7adaa945f3438db03f1763a6906554519d151c07a2
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts (5 tests | 1 failed | 4 skipped) 5ms
+   × native authenticated trained scene boundary > removes failed native resources and never invokes the loader for an invalid bundle 5ms
+     → expected "spy" to be called once, but got 0 times
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  11:42:54
+   Duration  623ms (transform 31ms, setup 0ms, collect 315ms, tests 5ms, environment 0ms, prepare 37ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-splats.test.ts > native authenticated trained scene boundary > removes failed native resources and never invokes the loader for an invalid bundle
+AssertionError: expected "spy" to be called once, but got 0 times
+ ❯ packages/atlas-react/test/scene-splats.test.ts:71:27
+     69|     const app = { assets } as unknown as pc.AppBase;
+     70|     await expect(createSceneSplatAsset(app, geometry())).rejects.toThr…
+     71|     expect(assets.remove).toHaveBeenCalledOnce();
+       |                           ^
+     72|     assets.load.mockClear();
+     73|     await expect(createSceneSplatAsset(app, geometry(new ArrayBuffer(0…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

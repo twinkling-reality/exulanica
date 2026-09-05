@@ -99,6 +99,17 @@ export class BrowserValidationRecorder {
     let hiddenDuringRun = document.hidden;
     let peakHeapBytes: number | null = heapBytes();
     let maxDrawCalls = 0;
+    const cameraSegments: {
+      id: string;
+      kind: string;
+      position: readonly number[];
+      forward: readonly number[];
+      up: readonly number[] | null;
+      fovYDeg: number;
+      sourceAspect: number | null;
+      artifactIds: readonly string[];
+      samples: number[];
+    }[] = [];
 
     const onVisibility = (): void => {
       if (document.hidden) hiddenDuringRun = true;
@@ -120,6 +131,23 @@ export class BrowserValidationRecorder {
       if (measuredMs >= this.#measureSeconds * 1000) return;
       measuredMs += frameMs;
       frames.push(frameMs);
+      const inspection = binding.inspectionView;
+      const id = inspection?.id ?? 'atlas-navigation';
+      let segment = cameraSegments.at(-1);
+      if (segment?.id !== id) {
+        const pose = binding.cameraPose();
+        segment = {
+          id, kind: inspection?.kind ?? 'atlas-navigation',
+          position: inspection?.position ?? [pose.position.x, pose.position.y, pose.position.z],
+          forward: inspection?.forward ?? [pose.forward.x, pose.forward.y, pose.forward.z],
+          up: inspection?.up ?? null,
+          fovYDeg: binding.camera.camera?.fov ?? 70,
+          sourceAspect: inspection?.sourceAspect ?? null,
+          artifactIds: inspection?.artifactIds ?? [], samples: [],
+        };
+        cameraSegments.push(segment);
+      }
+      segment.samples.push(frameMs);
       if (measuredMs >= this.#measureSeconds * 1000) finish();
     };
 
@@ -148,10 +176,14 @@ export class BrowserValidationRecorder {
           warmup_seconds: this.#warmupSeconds,
           duration_seconds: this.#measureSeconds,
           first_meaningful_render_ms: rounded(firstMeaningfulRenderMs),
-          time_to_full_detail_ms: rounded(firstMeaningfulRenderMs),
+          // A frame and a draw call do not prove every point survived the shaders or appeared.
+          time_to_full_detail_ms: null,
           geometry_load_ms: rounded(this.#geometryLoadMs),
           ...summarizeFrameTimes(frames),
           hidden_during_run: hiddenDuringRun,
+          camera_segments: cameraSegments.map(({ samples, ...camera }) => ({
+            ...camera, ...summarizeFrameTimes(samples),
+          })),
         },
         runtime: {
           browser_user_agent: navigator.userAgent,
@@ -181,11 +213,14 @@ export class BrowserValidationRecorder {
         },
         geometry: {
           placed_point_map_count: context.placedPointMapCount,
-          rendered_point_map_count: binding.islands.length,
-          rendered_point_count: binding.islands.reduce(
+          uploaded_point_map_count: binding.islands.length,
+          uploaded_point_count: binding.islands.reduce(
             (total, visual) => total + visual.pointMap.map.header.pointCount,
             0,
           ),
+          loaded_trained_scene_count: binding.trainedScenes.length,
+          loaded_gaussian_count: binding.trainedScenes.reduce((total, scene) => total + scene.geometry.pointCount, 0),
+          trained_scene_failures: binding.trainedSceneFailures,
           authenticated_network_bytes: geometryBytes,
           artifact_sizes: this.#geometry.map((item) => item.expectedBytes),
           loads: this.#geometry,
@@ -200,8 +235,8 @@ export class BrowserValidationRecorder {
         renderer: {
           max_draw_calls: maxDrawCalls,
           gpu_error: gpuError,
-          render_valid: binding.islands.length === context.placedPointMapCount
-            && binding.islands.length > 0
+          draw_submission_valid: binding.islands.length === context.placedPointMapCount
+            && (binding.islands.length > 0 || binding.trainedScenes.length > 0)
             && maxDrawCalls > 0
             && (gpuError === null || gpuError === gl?.NO_ERROR),
         },
@@ -209,6 +244,9 @@ export class BrowserValidationRecorder {
           'This local browser measurement is not representative of the eventual production host.',
           'Peak JavaScript heap is null when the browser does not expose performance.memory.',
           'Resource transfer bytes follow the browser Resource Timing accounting convention.',
+          'Uploaded point counts and draw submissions are not evidence of visible pixels or reconstruction quality.',
+          'Time to full detail is unmeasured; the first presented frame may contain authored world geometry only.',
+          'Inspection preserves source vertical field of view; horizontal coverage follows the recorded canvas aspect ratio.',
         ],
       });
       const output = document.createElement('script');

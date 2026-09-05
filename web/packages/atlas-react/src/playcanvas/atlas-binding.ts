@@ -106,6 +106,8 @@ import type { PointMap } from './opm.js';
 import type { PointCloud } from './point-cloud.js';
 import { createPointCloud } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
+import { sceneInspectionViews, type SceneInspectionView } from './scene-inspection.js';
+import { createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
 import {
   opmPointInScene,
   type PlacedScenePointMap,
@@ -145,6 +147,7 @@ export interface AtlasBindingOptions {
   readonly pointMaps: ReadonlyMap<IslandId, PointMap>;
   /** Every map in a posed reconstruction scene. Supersedes pointMaps when supplied. */
   readonly placedPointMaps?: readonly PlacedScenePointMap[];
+  readonly trainedGeometry?: readonly TrainedSceneGeometry[];
   /** Caller-authorized media presentation keyed by the scene's evidence handles. */
   readonly sourceMedia?: SourceMediaCatalog;
   readonly deviceTypes?: readonly string[];
@@ -205,6 +208,13 @@ export class AtlasBinding {
   readonly table: AnchorTable;
   readonly emphasis: EmphasisBuffers;
   readonly islands: readonly IslandVisual[];
+  readonly trainedScenes: readonly {
+    readonly island: Island;
+    readonly entity: pc.Entity;
+    readonly asset: pc.Asset;
+    readonly geometry: TrainedSceneGeometry;
+  }[];
+  readonly trainedSceneFailures: readonly { readonly sceneId: string; readonly reason: string }[];
   readonly scene: AtlasScene;
   readonly navigationWorld: NavigationWorld;
   readonly field: WorldField;
@@ -245,6 +255,14 @@ export class AtlasBinding {
   private navigationTransition: DirectNavigationTransition | null = null;
   private navigationElapsedMs = 0;
   private navigationTargetIsland: IslandId | null = null;
+  private inspection: {
+    readonly returnPose: NavigationPose;
+    readonly returnFov: number;
+    view: SceneInspectionView;
+  } | null = null;
+  private readonly inspectionMatrix = new pc.Mat4();
+  private readonly inspectionTarget = new pc.Vec3();
+  private readonly inspectionUp = new pc.Vec3();
   private applicationControlsEnabled = true;
   private styleProposalSequence = 0;
   private readonly skyClearColor = new pc.Color();
@@ -254,6 +272,7 @@ export class AtlasBinding {
   onResidencyActions: ((actions: readonly ResidencyAction[]) => void) | null = null;
   onNavigationArrive: ((target: DirectNavigationTarget) => void) | null = null;
   onMapTarget: ((islandId: IslandId) => void) | null = null;
+  onInspectionChange: ((view: SceneInspectionView | null) => void) | null = null;
 
   /** Called by the physical residency executor after its checked publish or terminal fallback. */
   settleResidencyRequest(requestId: string, ok: boolean): void {
@@ -267,7 +286,16 @@ export class AtlasBinding {
   private applyResidencyPresentation(): void {
     this.sourceFirst.setResidency(this.residencyAllocated, this.mapState !== null);
     for (const visual of this.islands) {
-      visual.entity.enabled = this.residencyAllocated.get(visual.island.islandId) !== 'stub';
+      const inspecting = visual.island.islandId === this.inspection?.view.islandId;
+      visual.entity.enabled = !this.trainedScenes.some((splat) => splat.geometry.sceneId === visual.pointMap.sceneId)
+        && (inspecting || this.residencyAllocated.get(visual.island.islandId) !== 'stub');
+      visual.cloud.setInspection(inspecting);
+      visual.uIsland[2] = inspecting ? visual.uIsland[1]!
+        : visual.uIsland[1]! * (1 - DISSOLVE_BAND_FRACTION);
+    }
+    for (const visual of this.trainedScenes) {
+      visual.entity.enabled = visual.island.islandId === this.inspection?.view.islandId
+        || this.residencyAllocated.get(visual.island.islandId) !== 'stub';
     }
   }
 
@@ -281,6 +309,8 @@ export class AtlasBinding {
     scene: AtlasScene,
     table: AnchorTable,
     islands: readonly IslandVisual[],
+    trainedScenes: AtlasBinding['trainedScenes'],
+    trainedSceneFailures: AtlasBinding['trainedSceneFailures'],
     navigationWorld: NavigationWorld,
     field: WorldField,
     sourceFirst: SourceFirstGrove,
@@ -308,6 +338,8 @@ export class AtlasBinding {
     this.scene = scene;
     this.table = table;
     this.islands = islands;
+    this.trainedScenes = trainedScenes;
+    this.trainedSceneFailures = trainedSceneFailures;
     this.navigationWorld = navigationWorld;
     this.field = field;
     this.sourceFirst = sourceFirst;
@@ -348,8 +380,9 @@ export class AtlasBinding {
       pc.RenderComponentSystem,
       pc.CameraComponentSystem,
       pc.LightComponentSystem,
+      pc.GSplatComponentSystem,
     ];
-    appOptions.resourceHandlers = [pc.TextureHandler];
+    appOptions.resourceHandlers = [pc.TextureHandler, pc.GSplatHandler];
     app.init(appOptions);
     app.setCanvasFillMode(pc.FILLMODE_NONE);
     app.setCanvasResolution(pc.RESOLUTION_AUTO);
@@ -432,9 +465,34 @@ export class AtlasBinding {
       if (held === undefined) pointMapsByIsland.set(value.islandId, [value]);
       else held.push(value);
     }
+    const trainedAssets = new Map<TrainedSceneGeometry, { asset: pc.Asset; entity: pc.Entity }>();
+    const trainedSceneFailures: Array<AtlasBinding['trainedSceneFailures'][number]> = [];
+    for (const geometry of options.trainedGeometry ?? []) {
+      if (!options.scene.islands.some((island) => island.islandId === geometry.islandId)) continue;
+      let asset: pc.Asset | undefined;
+      let entity: pc.Entity | undefined;
+      try {
+        asset = await createSceneSplatAsset(app, geometry);
+        entity = new pc.Entity(`trained-scene:${geometry.artifactId}`);
+        const m = geometry.sceneFromAssetRowMajor;
+        applySceneTransform(entity, m, Math.hypot(m[0]!, m[4]!, m[8]!));
+        entity.addComponent('gsplat', { asset });
+        trainedAssets.set(geometry, { asset, entity });
+      }
+      catch (error) {
+        entity?.destroy();
+        if (asset !== undefined) { asset.unload(); app.assets.remove(asset); }
+        trainedSceneFailures.push({ sceneId: geometry.sceneId,
+          reason: error instanceof Error ? error.message : 'The trained scene decoder failed.' });
+      }
+    }
+    const trainedIslandIds = new Set([...trainedAssets.keys()].map((geometry) => geometry.islandId));
+    const availableReconstruction = new Set([...pointMapsByIsland.keys(), ...trainedIslandIds]);
     const residencyCatalog: ResidencyAsset[] = options.scene.islands.map((island) => ({
       islandId: island.islandId,
-      cost: pointMapsByIsland.has(island.islandId)
+      cost: trainedIslandIds.has(island.islandId)
+        ? Object.freeze({ stub: 0, proxy: 24, coarse: 24, full: 24 })
+        : pointMapsByIsland.has(island.islandId)
         ? Object.freeze({
             stub: 0,
             proxy: 4 * pointMapsByIsland.get(island.islandId)!.length,
@@ -453,7 +511,8 @@ export class AtlasBinding {
     renderRoot.addChild(field.entity);
     const sourceFirst = createSourceFirstGrove(
       app,
-      options.scene,
+      { ...options.scene, islands: options.scene.islands.map((island) =>
+        availableReconstruction.has(island.islandId) ? island : { ...island, rung: 4 as const }) },
       options.sourceMedia ?? new Map(),
       initialArtProfile,
       theme,
@@ -461,7 +520,7 @@ export class AtlasBinding {
     );
     renderRoot.addChild(sourceFirst.entity);
     const topology = composeAtlasWorld(options.scene, {
-      availableReconstruction: new Set(pointMapsByIsland.keys()),
+      availableReconstruction,
     });
     const composedWorld = createComposedWorld(
       device,
@@ -510,11 +569,17 @@ export class AtlasBinding {
     });
     renderRoot.addChild(composedWorld.entity);
     const visuals: IslandVisual[] = [];
+    const trainedScenes: Array<AtlasBinding['trainedScenes'][number]> = [];
 
     for (const island of options.scene.islands) {
       const islandEntity = new pc.Entity(`island:${island.islandId}`);
       applyPlacement(islandEntity, island);
       renderRoot.addChild(islandEntity);
+      for (const [geometry, { asset, entity }] of trainedAssets) {
+        if (geometry.islandId !== island.islandId) continue;
+        islandEntity.addChild(entity);
+        trainedScenes.push({ island, entity, asset, geometry });
+      }
 
       for (const pointMap of pointMapsByIsland.get(island.islandId) ?? []) {
         const entity = new pc.Entity(`point-map:${pointMap.artifactId}`);
@@ -626,6 +691,8 @@ export class AtlasBinding {
       options.scene,
       table,
       visuals,
+      Object.freeze(trainedScenes),
+      Object.freeze(trainedSceneFailures),
       navigationWorld,
       field,
       sourceFirst,
@@ -839,12 +906,66 @@ export class AtlasBinding {
     this.controls.setEnabled(
       this.applicationControlsEnabled &&
       this.mapState === null &&
-      this.navigationTransition === null,
+      this.navigationTransition === null &&
+      this.inspection === null,
     );
+  }
+
+  /** Repeatable photographed and interpolated cameras over verified, currently resident inputs. */
+  inspectionViews(sceneId: string): readonly SceneInspectionView[] {
+    const maps = this.islands.filter((visual) => visual.pointMap.sceneId === sceneId);
+    const island = maps[0]?.island;
+    return island === undefined ? [] : sceneInspectionViews(island, maps.map((visual) => visual.pointMap));
+  }
+
+  get inspectionView(): SceneInspectionView | null { return this.inspection?.view ?? null; }
+
+  inspectSceneView(sceneId: string, viewId: string): boolean {
+    const view = this.inspectionViews(sceneId).find((candidate) => candidate.id === viewId);
+    if (view === undefined) return false;
+    this.cancelDirectNavigation();
+    if (this.mapState !== null) this.setMapMode(false);
+    if (this.inspection === null) {
+      this.inspection = { returnPose: this.navigationPose(), returnFov: this.camera.camera?.fov ?? 70, view };
+    } else this.inspection.view = view;
+    if (document.pointerLockElement === this.device.canvas) document.exitPointerLock();
+    const [x, y, z] = view.position;
+    const [fx, fy, fz] = view.forward;
+    Object.assign(this.controls.state, {
+      x, y, z,
+      yaw: Math.atan2(-fx, -fz),
+      pitch: Math.atan2(fy, Math.hypot(fx, fz)),
+    });
+    if (this.camera.camera !== undefined && this.camera.camera !== null) {
+      this.camera.camera.fov = view.fovYDeg;
+    }
+    this.navigationTargetIsland = view.islandId;
+    this.refreshControlsEnabled();
+    this.applyResidencyPresentation();
+    this.invalidate();
+    this.onInspectionChange?.(view);
+    return true;
+  }
+
+  /** Restore the complete ground pose; inspection never validates or changes walking geometry. */
+  endSceneInspection(): void {
+    const held = this.inspection;
+    if (held === null) return;
+    this.inspection = null;
+    this.applyNavigationPose(held.returnPose);
+    if (this.camera.camera !== undefined && this.camera.camera !== null) {
+      this.camera.camera.fov = held.returnFov;
+    }
+    this.navigationTargetIsland = null;
+    this.refreshControlsEnabled();
+    this.applyResidencyPresentation();
+    this.invalidate();
+    this.onInspectionChange?.(null);
   }
 
   /** The map is the same live scene from a high camera pose; no scene is loaded or replaced. */
   setMapMode(active: boolean): void {
+    if (active) this.endSceneInspection();
     this.invalidate();
     if (active === (this.mapState !== null)) return;
     this.composedWorld.setMapActive(active);
@@ -901,7 +1022,7 @@ export class AtlasBinding {
     target: DirectNavigationTarget,
     reducedMotion = false,
   ): DirectNavigationResolution {
-    const state = this.mapState?.ground ?? this.navigationPose();
+    const state = this.inspection?.returnPose ?? this.mapState?.ground ?? this.navigationPose();
     const resolution = resolveDirectNavigation(
       this.scene,
       this.navigationWorld,
@@ -909,6 +1030,7 @@ export class AtlasBinding {
       state.position,
     );
     if (!resolution.ok) return resolution;
+    this.endSceneInspection();
     if (this.mapState !== null) this.setMapMode(false);
     const planned = planDirectNavigationTransition(resolution, state, reducedMotion);
     if (target.kind === 'island') {
@@ -1099,7 +1221,7 @@ export class AtlasBinding {
     }
     const navigating = this.navigationTransition !== null;
     if (navigating) this.advanceDirectNavigation(dt * 1000);
-    else this.controls.update(dt);
+    else if (this.inspection === null) this.controls.update(dt);
 
     const s = this.controls.state;
     this.pose.position.set(
@@ -1111,7 +1233,19 @@ export class AtlasBinding {
     this.qYaw.setFromAxisAngle(pc.Vec3.UP, (s.yaw * 180) / Math.PI);
     this.qPitch.setFromAxisAngle(pc.Vec3.RIGHT, (s.pitch * 180) / Math.PI);
     this.pose.rotation.mul2(this.qYaw, this.qPitch);
-    this.camera.setRotation(this.pose.rotation);
+    if (this.inspection === null) this.camera.setRotation(this.pose.rotation);
+    else {
+      const view = this.inspection.view;
+      this.inspectionTarget.set(
+        this.pose.position.x + view.forward[0],
+        this.pose.position.y + view.forward[1],
+        this.pose.position.z + view.forward[2],
+      );
+      this.inspectionUp.set(...view.up);
+      this.inspectionMatrix.setLookAt(this.pose.position, this.inspectionTarget, this.inspectionUp);
+      this.pose.rotation.setFromMat4(this.inspectionMatrix);
+      this.camera.setRotation(this.pose.rotation);
+    }
 
     const cameraAtlas = atlasVec3(s.x, s.y, s.z);
     this.tierState =
@@ -1204,9 +1338,13 @@ export class AtlasBinding {
       const residency = this.residencyAllocated.get(visual.island.islandId) ?? 'stub';
       const residencyDensity =
         residency === 'full' ? 1 : residency === 'coarse' ? 0.7 : residency === 'proxy' ? 0.35 : 0;
-      const density = Math.min(tierDensity, residencyDensity);
+      // Inspection compares the complete loaded reconstruction at identical cameras. It must
+      // not silently thin samples because a previous view lowered the residency budget.
+      const density = visual.island.islandId === this.inspection?.view.islandId
+        ? 1 : Math.min(tierDensity, residencyDensity);
 
-      visual.uIsland[0] = Math.max(0.001, emphasis / 0.45) * density;
+      visual.uIsland[0] = visual.island.islandId === this.inspection?.view.islandId
+        ? 1 : Math.max(0.001, emphasis / 0.45) * density;
       visual.uPoint[2] = projScale;
       visual.uPoint[3] = this.elapsed;
       visual.cloud.material.setParameter('uIsland', visual.uIsland);
@@ -1306,6 +1444,11 @@ export class AtlasBinding {
     this.regionMass.destroy();
     this.regionRelief.destroy();
     for (const visual of this.islands) visual.cloud.destroy();
+    for (const visual of this.trainedScenes) {
+      visual.entity.destroy();
+      visual.asset.unload();
+      this.app.assets.remove(visual.asset);
+    }
     this.app.destroy();
   }
 }
@@ -1358,15 +1501,17 @@ function applyPlacement(entity: pc.Entity, island: Island): void {
 
 /** Convert the receipt's row-major affine transform into PlayCanvas local TRS. */
 function applyScenePointMapPlacement(entity: pc.Entity, value: PlacedScenePointMap): void {
-  const m = value.sceneFromOpmRowMajor;
+  applySceneTransform(entity, value.sceneFromOpmRowMajor, value.localUnitsToSceneUnits);
+}
+
+function applySceneTransform(entity: pc.Entity, m: readonly number[], scale: number): void {
   const rotation = new pc.Mat4().set([
-    m[0]!, m[4]!, m[8]!, 0,
-    m[1]!, m[5]!, m[9]!, 0,
-    m[2]!, m[6]!, m[10]!, 0,
+    m[0]! / scale, m[4]! / scale, m[8]! / scale, 0,
+    m[1]! / scale, m[5]! / scale, m[9]! / scale, 0,
+    m[2]! / scale, m[6]! / scale, m[10]! / scale, 0,
     0, 0, 0, 1,
   ]);
   entity.setLocalPosition(m[3]!, m[7]!, m[11]!);
   entity.setLocalRotation(new pc.Quat().setFromMat4(rotation));
-  const scale = value.localUnitsToSceneUnits;
   entity.setLocalScale(scale, scale, scale);
 }

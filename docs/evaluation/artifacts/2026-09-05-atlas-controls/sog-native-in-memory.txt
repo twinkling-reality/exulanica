@@ -1,0 +1,88 @@
+Retained test-output excerpt (not the complete execution log).
+Case: sog-native-in-memory
+Observed complete output SHA-256: d0b12d91c3f2c556d261ff212489b2ca8521252ebac8f69e2cb6598e2cdd0caf
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-splats.test.ts (5 tests | 1 failed | 4 skipped) 25ms
+   × native authenticated trained scene boundary > supplies verified bytes in memory to the native gsplat loader and keeps them owned until disposal 25ms
+     → expected  to be  // Object.is equality
+
+If it should pass with deep equality, replace "toBe" with "toEqual"
+
+Expected: 
+Received: serializes to the same string
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  11:42:53
+   Duration  744ms (transform 35ms, setup 0ms, collect 283ms, tests 25ms, environment 0ms, prepare 38ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-splats.test.ts > native authenticated trained scene boundary > supplies verified bytes in memory to the native gsplat loader and keeps them owned until disposal
+AssertionError: expected  to be  // Object.is equality
+
+If it should pass with deep equality, replace "toBe" with "toEqual"
+
+Expected: 
+Received: serializes to the same string
+
+
+- Expected
++ Received
+
+- ArrayBuffer [
+-   80,
+-   75,
+-   3,
+-   4,
+-   20,
+-   0,
+-   8,
+-   8,
+-   0,
+-   0,
+-   -30,
+-   91,
+-   37,
+-   93,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+-   0,
+... [excerpt: 16135 full-output lines omitted, including large array diff] ...
+-   0,
+-   0,
+-   -64,
+-   61,
+-   0,
+-   0,
+-   0,
+-   0,
+- ]
++ ArrayBuffer []
+
+ ❯ Object.<anonymous> packages/atlas-react/test/scene-splats.test.ts:55:29
+     53|       expect(asset.type).toBe('gsplat');
+     54|       const file = asset.file as { contents: ArrayBuffer; url: string …
+     55|       expect(file.contents).toBe(value.bytes);
+       |                             ^
+     56|       expect(file.url).toBe('verified-scene/artifact.sog');
+     57|       asset.resource = { destroy: vi.fn() };
+ ❯ packages/atlas-react/src/playcanvas/scene-splats.ts:146:18
+ ❯ Module.createSceneSplatAsset packages/atlas-react/src/playcanvas/scene-splats.ts:142:11
+ ❯ packages/atlas-react/test/scene-splats.test.ts:60:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

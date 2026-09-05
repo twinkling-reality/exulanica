@@ -1,0 +1,88 @@
+Retained test-output excerpt (not the complete execution log).
+Case: trained-digest-refusal
+Observed complete output SHA-256: b5e4f7c9f3fec4be9ec203ac324d39a029fff0ad0c1057101ab9952104ea3704
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/geometry-api.test.ts (22 tests | 1 failed | 21 skipped) 31ms
+   × trained scene authenticated delivery > refuses wrong digests, external paths, missing bytes, and unavailable verification 31ms
+     → expected [ { sceneId: 'scene-1', …(6) } ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 skipped (22)
+   Start at  11:42:55
+   Duration  1.24s (transform 343ms, setup 0ms, collect 771ms, tests 31ms, environment 0ms, prepare 134ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/geometry-api.test.ts > trained scene authenticated delivery > refuses wrong digests, external paths, missing bytes, and unavailable verification
+AssertionError: expected [ { sceneId: 'scene-1', …(6) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "artifactId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
++     "bounds": Object {
++       "max": Array [
++         1,
++         1,
++         1,
++       ],
++       "min": Array [
++         -1,
++         -1,
++         -1,
++       ],
++     },
++     "bytes": ArrayBuffer [
++       80,
++       75,
++       3,
++       4,
++       20,
++       0,
++       8,
++       8,
++       0,
++       0,
++       -30,
++       91,
++       37,
++       93,
++       0,
++       0,
++       0,
++       0,
++       0,
++       0,
++       0,
+... [excerpt: 16158 full-output lines omitted, including large array diff] ...
++       0,
++       0,
++       0,
++       1,
++       0,
++       0,
++       0,
++       0,
++       1,
++     ],
++     "sceneId": "scene-1",
++   },
++ ]
+
+ ❯ packages/app/test/geometry-api.test.ts:189:38
+    187|       const loaded = await new GeometryClient({ baseUrl: 'https://exul…
+    188|         .loadScenes([scene], regions);
+    189|       expect(loaded.trainedGeometry).toEqual([]);
+       |                                      ^
+    190|       expect(loaded.issues.map((issue) => issue.state)).toEqual([state…
+    191|       expect(requests).toHaveLength(expectedRequests);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

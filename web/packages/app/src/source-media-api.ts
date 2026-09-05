@@ -26,6 +26,7 @@ interface SourceMediaWire {
   readonly sourceId: string;
   readonly slotKey: string;
   readonly regionId: string | null;
+  readonly captureIds: readonly string[];
   readonly state: 'available' | 'unavailable_asset' | 'missing_evidence';
   readonly reason: string | null;
   readonly evidenceSpanId: string | null;
@@ -69,6 +70,8 @@ export class SourceMediaClient {
       const unavailable = (state: SourceMediaIssueState, reason: string): void => {
         const descriptor = Object.freeze({
           evidenceRef: key,
+          regionId: source.regionId,
+          captureIds: source.captureIds,
           title,
           capturedLabel: source.capturedAt?.slice(0, 10) ?? 'Capture date unavailable',
           url: null,
@@ -120,6 +123,8 @@ export class SourceMediaClient {
         held.push(url);
         installDescriptor(catalog, source, Object.freeze({
           evidenceRef: source.evidenceSpanId,
+          regionId: source.regionId,
+          captureIds: source.captureIds,
           title,
           capturedLabel: source.capturedAt?.slice(0, 10) ?? 'Capture date unavailable',
           url,
@@ -186,6 +191,7 @@ function parseSourceList(value: unknown): readonly SourceMediaWire[] {
       sourceId: requiredText(source['source_id'], 'source ID'),
       slotKey: requiredText(source['slot_key'], 'source slot'),
       regionId: optionalText(source['region_id'], 'source region ID'),
+      captureIds: source['capture_ids'] === undefined ? [] : parseCaptureIds(source['capture_ids']),
       state,
       reason: optionalText(source['reason'], 'source reason'),
       evidenceSpanId: optionalText(source['evidence_span_id'], 'evidence span ID'),
@@ -195,6 +201,13 @@ function parseSourceList(value: unknown): readonly SourceMediaWire[] {
       assetReference,
     });
   }));
+}
+
+function parseCaptureIds(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || item.length === 0)) {
+    throw new TypeError('The server returned invalid source capture IDs.');
+  }
+  return Object.freeze([...new Set(value as string[])]);
 }
 
 function safeEvidencePath(value: string): boolean {

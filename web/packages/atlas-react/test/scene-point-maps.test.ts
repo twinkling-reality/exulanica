@@ -30,9 +30,9 @@ const placed = (
 describe('posed scene point maps', () => {
   it('applies local scale, proper rotation and translation in the recorded order', () => {
     const value = placed([
-      0, 0, 1, 3,
-      0, 1, 0, 0,
-      -1, 0, 0, 5,
+      0, 0, 2, 3,
+      0, 2, 0, 0,
+      -2, 0, 0, 5,
       0, 0, 0, 1,
     ], 2);
     expect(opmPointInScene(value, [1, 2, 3])).toEqual([9, 4, 3]);
@@ -66,5 +66,14 @@ describe('posed scene point maps', () => {
     expect(() => validateScenePointMapPlacement(broken)).toThrow(/affine/);
     expect(() => validateScenePointMapPlacement(placed(new Array(16).fill(Number.NaN))))
       .toThrow(/finite/);
+  });
+
+  it('refuses undeclared scale, shear, and reflection instead of drawing a different GPU transform', () => {
+    const matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    expect(() => validateScenePointMapPlacement(placed(matrix, 2))).toThrow(/declared uniform scale/);
+    expect(() => validateScenePointMapPlacement(placed(matrix.map((v, i) => i === 1 ? 0.2 : v))))
+      .toThrow(/declared uniform scale/);
+    expect(() => validateScenePointMapPlacement(placed(matrix.map((v, i) => i === 0 ? -1 : v))))
+      .toThrow(/without reflection/);
   });
 });

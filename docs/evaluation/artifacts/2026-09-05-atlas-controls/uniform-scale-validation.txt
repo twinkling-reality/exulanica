@@ -1,0 +1,38 @@
+Retained test-output excerpt (not the complete execution log).
+Case: uniform-scale-validation
+Observed complete output SHA-256: 96af7d83a8ac19a346809e7887d573bca5358413a1ae3e78f0bf0a81e5e454ad
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-point-maps.test.ts (4 tests | 1 failed | 3 skipped) 5ms
+   × posed scene point maps > refuses undeclared scale, shear, and reflection instead of drawing a different GPU transform 4ms
+     → expected [Function] to throw an error
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  11:42:32
+   Duration  1.25s (transform 362ms, setup 0ms, collect 837ms, tests 5ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-point-maps.test.ts > posed scene point maps > refuses undeclared scale, shear, and reflection instead of drawing a different GPU transform
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ packages/atlas-react/test/scene-point-maps.test.ts:73:69
+     71|   it('refuses undeclared scale, shear, and reflection instead of drawi…
+     72|     const matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+     73|     expect(() => validateScenePointMapPlacement(placed(matrix, 2))).to…
+       |                                                                     ^
+     74|     expect(() => validateScenePointMapPlacement(placed(matrix.map((v, …
+     75|       .toThrow(/declared uniform scale/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

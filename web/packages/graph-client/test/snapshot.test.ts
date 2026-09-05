@@ -115,6 +115,7 @@ describe('the snapshot adapter states what the server cannot answer', () => {
   it('asks the caller what an island is rather than deciding', () => {
     expect(snapshot.entities[0]!.islandIds).toEqual(['island:c1', 'island:c2']);
     expect(snapshot.occurrences[0]!.islandId).toBe('island:c1');
+    expect(snapshot.occurrences[0]!.captureId).toBe('c1');
   });
 
   it('reports citingAnswerCount as zero because no answer is stored anywhere', () => {
@@ -157,7 +158,7 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
             0, 0, 0, 1,
           ],
           local_units_to_scene_units: 1,
-          scale_status: 'unvalidated-identity' as const,
+          scale_status: 'colmap-correspondence-fit' as const,
           state: 'available' as const,
           reference: {
             href: '/geometry/artifact-1',
@@ -194,6 +195,29 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
       displayedRung: 3,
       renderingSubstrate: 'posed_point_maps',
       reconstructionSceneId: 'scene-1',
+    });
+  });
+
+  it('carries the trained artifact identity and authenticated reference without changing the quality gate', () => {
+    const matrix = [1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 1, -3, 0, 0, 0, 1];
+    const snapshot = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes: [{ ...scene,
+      rendering_substrate: 'gaussian_splats', trained_geometry: {
+        artifact_id: 'trained-artifact', content_sha256: '6'.repeat(64), container: 'sog/1',
+        state: 'available', scene_from_asset_row_major: matrix,
+        bounds: { min: [-2, -3, -4], max: [2, 3, 4] },
+        reference: { href: '/scene-geometry/trained-artifact', authorization: 'workspace-bearer',
+          content_sha256: '6'.repeat(64), byte_size: 1234 },
+      },
+    }] });
+    expect(snapshot.reconstructionScenes![0]).toMatchObject({
+      sceneId: scene.scene_id, recordedRung: 3, displayedRung: 3,
+      renderingSubstrate: 'gaussian_splats', trainedGeometry: {
+        artifactId: 'trained-artifact', contentSha256: '6'.repeat(64), container: 'sog/1',
+        state: 'available', sceneFromAssetRowMajor: matrix,
+        bounds: { min: [-2, -3, -4], max: [2, 3, 4] },
+        reference: { href: '/scene-geometry/trained-artifact', authorization: 'workspace-bearer',
+          contentSha256: '6'.repeat(64), byteSize: 1234 },
+      },
     });
   });
 

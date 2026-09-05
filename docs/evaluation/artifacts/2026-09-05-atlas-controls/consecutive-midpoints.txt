@@ -1,0 +1,41 @@
+Retained test-output excerpt (not the complete execution log).
+Case: consecutive-midpoints
+Observed complete output SHA-256: 302086ecb720ffcb65851c8c0c875c8da2c9c916f3c9ced76925b9e3968bf202
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (3 tests | 1 failed | 2 skipped) 6ms
+   × bounded reconstruction inspection > preserves the source projection and transforms fitted camera axes exactly once 5ms
+     → expected [ 'source-camera', 'source-camera' ] to deeply equal [ 'source-camera', …(2) ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 skipped (3)
+   Start at  11:42:36
+   Duration  1.61s (transform 303ms, setup 0ms, collect 756ms, tests 6ms, environment 176ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > preserves the source projection and transforms fitted camera axes exactly once
+AssertionError: expected [ 'source-camera', 'source-camera' ] to deeply equal [ 'source-camera', …(2) ]
+
+- Expected
++ Received
+
+  Array [
+    "source-camera",
+-   "between-cameras",
+    "source-camera",
+  ]
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:22:44
+     20|   it('preserves the source projection and transforms fitted camera axe…
+     21|     const views = sceneInspectionViews(island, [map(1), map(5)]);
+     22|     expect(views.map((view) => view.kind)).toEqual(['source-camera', '…
+       |                                            ^
+     23|     expect(views[0]!.position[0]).toBeCloseTo(10);
+     24|     expect(views[0]!.position[1]).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

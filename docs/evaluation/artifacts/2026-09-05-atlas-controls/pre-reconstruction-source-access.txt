@@ -1,0 +1,37 @@
+Retained test-output excerpt (not the complete execution log).
+Case: pre-reconstruction-source-access
+Observed complete output SHA-256: a9e12468cac18e276f1c3fcfb5d533bd3c2bc741b17a2408a36969ea13a537e5
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts (6 tests | 1 failed | 5 skipped) 4ms
+   × reconstruction camera register > keeps a live source group inspectable before any reconstruction scene exists 4ms
+     → expected '' to contain '7 grouped photographs'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  11:42:44
+   Duration  579ms (transform 48ms, setup 0ms, collect 81ms, tests 4ms, environment 114ms, prepare 80ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/reconstruction-inspector.test.ts > reconstruction camera register > keeps a live source group inspectable before any reconstruction scene exists
+AssertionError: expected '' to contain '7 grouped photographs'
+
+- Expected
++ Received
+
+- 7 grouped photographs
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts:80:32
+     78|     const status = buildStatus({ omittedRegionCount: 0, undrawable: ne…
+     79|       sourceRegions: [{ regionId: 'photo-group', captureCount: 7 }], o…
+     80|     expect(status.textContent).toContain('7 grouped photographs');
+       |                                ^
+     81|     expect(status.textContent).not.toContain('Recorded rung');
+     82|     status.querySelector('button')!.click();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

@@ -1,0 +1,44 @@
+Retained test-output excerpt (not the complete execution log).
+Case: cpu-single-scale
+Observed complete output SHA-256: 6bc8fea7301c00f209358f39b8e020f4249a6fc6052cf9e224139f3884021450
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-point-maps.test.ts (4 tests | 1 failed | 3 skipped) 13ms
+   × posed scene point maps > applies local scale, proper rotation and translation in the recorded order 12ms
+     → expected [ 15, 8, 1 ] to deeply equal [ 9, 4, 3 ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  11:42:30
+   Duration  1.27s (transform 439ms, setup 0ms, collect 957ms, tests 13ms, environment 0ms, prepare 45ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-point-maps.test.ts > posed scene point maps > applies local scale, proper rotation and translation in the recorded order
+AssertionError: expected [ 15, 8, 1 ] to deeply equal [ 9, 4, 3 ]
+
+- Expected
++ Received
+
+  Array [
+-   9,
+-   4,
+-   3,
++   15,
++   8,
++   1,
+  ]
+
+ ❯ packages/atlas-react/test/scene-point-maps.test.ts:38:47
+     36|       0, 0, 0, 1,
+     37|     ], 2);
+     38|     expect(opmPointInScene(value, [1, 2, 3])).toEqual([9, 4, 3]);
+       |                                               ^
+     39|     expect(scenePointMapViewpoint(value)).toEqual([3, 3, 5]);
+     40|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

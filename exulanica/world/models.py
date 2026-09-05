@@ -151,3 +151,4 @@ class WorldSourceMedia:
     height: int | None
     captured_at: dt.datetime | None
     captured_at_uncertainty_ms: int | None
+    capture_ids: tuple[uuid.UUID, ...] = ()

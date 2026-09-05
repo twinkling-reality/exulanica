@@ -1,0 +1,57 @@
+Retained test-output excerpt (not the complete execution log).
+Case: source-only-no-camera
+Observed complete output SHA-256: 0d26bf7c5ace855e0d64fcb366f543ebef1fcdeabe320973ad35f02d24b46c35
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts (6 tests | 1 failed | 5 skipped) 7ms
+   × reconstruction camera register > opens original evidence in source-only fallback without pretending to move a recovered camera 7ms
+     → expected "spy" to not be called at all, but actually been called 1 times
+
+Received: 
+
+  1st spy call:
+
+    Array [
+      "scene",
+      "source:span",
+    ]
+
+
+Number of calls: 1
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  11:42:41
+   Duration  763ms (transform 75ms, setup 0ms, collect 96ms, tests 7ms, environment 119ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/reconstruction-inspector.test.ts > reconstruction camera register > opens original evidence in source-only fallback without pretending to move a recovered camera
+AssertionError: expected "spy" to not be called at all, but actually been called 1 times
+
+Received: 
+
+  1st spy call:
+
+    Array [
+      "scene",
+      "source:span",
+    ]
+
+
+Number of calls: 1
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts:20:24
+     18|       url: 'blob:authorized', available: true, accent: '', alt: 'Origi…
+     19|     panel.open('scene', [{ id: 'source:span', kind: 'source-only', lab…
+     20|     expect(onView).not.toHaveBeenCalled();
+       |                        ^
+     21|     expect(panel.root.querySelector('h2')!.textContent).toBe('Source p…
+     22|     expect(panel.root.querySelector('img')!.src).toBe('blob:authorized…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

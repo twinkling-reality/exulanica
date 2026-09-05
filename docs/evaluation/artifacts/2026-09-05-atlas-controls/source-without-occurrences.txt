@@ -1,0 +1,52 @@
+Retained test-output excerpt (not the complete execution log).
+Case: source-without-occurrences
+Observed complete output SHA-256: 9deddc4e47618621f71b0d6582d8520b8ba8d5290cc3b0d37b4e5f19c3f12201
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/atlas-react/test/source-media.test.ts (1 test | 1 failed) 5ms
+   × source-only Atlas regions > uses explicit authorized topology sources without inventing occurrence anchors 5ms
+     → expected [] to deeply equal [ { evidenceRef: 'evidence-a', …(8) } ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  11:42:39
+   Duration  426ms (transform 114ms, setup 0ms, collect 146ms, tests 5ms, environment 0ms, prepare 37ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-media.test.ts > source-only Atlas regions > uses explicit authorized topology sources without inventing occurrence anchors
+AssertionError: expected [] to deeply equal [ { evidenceRef: 'evidence-a', …(8) } ]
+
+- Expected
++ Received
+
+- Array [
+-   Object {
+-     "accent": "",
+-     "alt": "Source",
+-     "available": true,
+-     "captureIds": Array [
+-       "capture-a",
+-     ],
+-     "capturedLabel": "",
+-     "evidenceRef": "evidence-a",
+-     "regionId": "region-a",
+-     "title": "Source",
+-     "url": "blob:authorized-a",
+-   },
+- ]
++ Array []
+
+ ❯ packages/atlas-react/test/source-media.test.ts:15:51
+     13|     const outside = { ...source, regionId: 'region-b', evidenceRef: 'o…
+     14|     const catalog = new Map([['slot-a', source], ['evidence-a', source…
+     15|     expect(sourceMediaForIsland(island, catalog)).toEqual([source]);
+       |                                                   ^
+     16|     expect(island.anchors).toEqual([]);
+     17|     expect(island.rung).toBe(4);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

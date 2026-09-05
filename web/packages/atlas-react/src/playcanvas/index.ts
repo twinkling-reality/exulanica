@@ -14,6 +14,10 @@ export type { OpmHeader, OpmSection, OpmSegment, PointMap } from './opm.js';
 export { decodeOpm, footprintRadiusOf, packedVertexBytes, sourcePanelEnvelopeOf } from './opm.js';
 
 export type { PlacedScenePointMap } from './scene-point-maps.js';
+export type { SceneInspectionView } from './scene-inspection.js';
+export { sceneInspectionViews } from './scene-inspection.js';
+export type { TrainedSceneGeometry } from './scene-splats.js';
+export { validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint } from './scene-splats.js';
 export {
   opmPointInScene,
   scenePointMapFootprint,

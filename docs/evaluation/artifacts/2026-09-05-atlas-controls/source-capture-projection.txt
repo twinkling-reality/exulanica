@@ -1,0 +1,48 @@
+Retained test-output excerpt (not the complete execution log).
+Case: source-capture-projection
+Observed complete output SHA-256: b6d9d24032a7c2af934c9eb537ab5e7054c14b15cb1452478af65df5b6ae8032
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/source-media-api.test.ts (4 tests | 1 failed | 3 skipped) 9ms
+   × production source media boundary > fetches available bytes with bearer authorization and revokes its blob URL 9ms
+     → expected { evidenceRef: 'span-1', …(8) } to match object { available: true, …(4) }
+(4 matching properties omitted from actual)
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  11:42:48
+   Duration  377ms (transform 60ms, setup 0ms, collect 66ms, tests 9ms, environment 0ms, prepare 60ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/source-media-api.test.ts > production source media boundary > fetches available bytes with bearer authorization and revokes its blob URL
+AssertionError: expected { evidenceRef: 'span-1', …(8) } to match object { available: true, …(4) }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  Object {
+    "available": true,
+-   "captureIds": Array [
+-     "capture-1",
+-   ],
++   "captureIds": Array [],
+    "evidenceRef": "span-1",
+    "regionId": "region-a",
+    "url": "blob:source-1",
+  }
+
+ ❯ packages/app/test/source-media-api.test.ts:50:43
+     48|     });
+     49|     const session = await client.load('#7c71b5');
+     50|     expect(session.catalog.get('span-1')).toMatchObject({
+       |                                           ^
+     51|       available: true, url: 'blob:source-1', evidenceRef: 'span-1',
+     52|       regionId: 'region-a', captureIds: ['capture-1'],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

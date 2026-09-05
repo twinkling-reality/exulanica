@@ -1,0 +1,38 @@
+Retained test-output excerpt (not the complete execution log).
+Case: capture-evidence-membership
+Observed complete output SHA-256: 650bd7ced643b41f899f6133fbf98fde1b78d27d3a4bd93c1f0e01050859b7ef
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/graph-client/test/snapshot.test.ts (18 tests | 1 failed | 17 skipped) 4ms
+   × the snapshot adapter states what the server cannot answer > asks the caller what an island is rather than deciding 4ms
+     → expected undefined to be 'c1' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 skipped (18)
+   Start at  11:42:40
+   Duration  447ms (transform 62ms, setup 0ms, collect 107ms, tests 4ms, environment 0ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/graph-client/test/snapshot.test.ts > the snapshot adapter states what the server cannot answer > asks the caller what an island is rather than deciding
+AssertionError: expected undefined to be 'c1' // Object.is equality
+
+- Expected: 
+"c1"
+
++ Received: 
+undefined
+
+ ❯ packages/graph-client/test/snapshot.test.ts:118:48
+    116|     expect(snapshot.entities[0]!.islandIds).toEqual(['island:c1', 'isl…
+    117|     expect(snapshot.occurrences[0]!.islandId).toBe('island:c1');
+    118|     expect(snapshot.occurrences[0]!.captureId).toBe('c1');
+       |                                                ^
+    119|   });
+    120| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

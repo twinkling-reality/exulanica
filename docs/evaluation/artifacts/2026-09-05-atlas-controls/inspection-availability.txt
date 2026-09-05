@@ -1,0 +1,42 @@
+Retained test-output excerpt (not the complete execution log).
+Case: inspection-availability
+Observed complete output SHA-256: 0891d548354643acb27627d54bd349465900dedb4e60e45fefafb61b9e007b71
+Test identity, assertion failure, and assertion location are retained; large data diffs may be omitted.
+Local checkout/scratch paths are replaced by placeholders. Any token/source literals are synthetic test fixtures.
+
+
+ RUN  v2.1.9 <isolated-source-copy>
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts (6 tests | 1 failed | 5 skipped) 12ms
+   × reconstruction camera register > offers inspection only when this session loaded reconstruction 11ms
+     → expected <button type="button"></button> to be null
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  11:42:43
+   Duration  876ms (transform 55ms, setup 0ms, collect 296ms, tests 12ms, environment 142ms, prepare 51ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/reconstruction-inspector.test.ts > reconstruction camera register > offers inspection only when this session loaded reconstruction
+AssertionError: expected <button type="button"></button> to be null
+
+- Expected: 
+null
+
++ Received: 
+<button
+  type="button"
+>
+  Inspect reconstruction
+</button>
+
+ ❯ packages/app/test/reconstruction-inspector.test.ts:69:45
+     67|     const missing = buildStatus({ omittedRegionCount: 0, undrawable: n…
+     68|       reconstructionScenes: [{ ...common, renderingSubstrate: 'source_…
+     69|     expect(missing.querySelector('button')).toBeNull();
+       |                                             ^
+     70|     const available = buildStatus({ omittedRegionCount: 0, undrawable:…
+     71|       reconstructionScenes: [{ ...common, displayedRung: 3, renderingS…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

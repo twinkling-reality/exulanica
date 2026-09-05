@@ -47,7 +47,21 @@ export interface ReconstructionScenePayload {
   readonly registered_member_count: number;
   readonly receipt_state: 'available' | 'missing' | 'invalid';
   readonly placement_state: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
-  readonly rendering_substrate: 'posed_point_maps' | 'source_photographs';
+  readonly rendering_substrate: 'posed_point_maps' | 'gaussian_splats' | 'source_photographs';
+  readonly trained_geometry?: {
+    readonly artifact_id: string;
+    readonly content_sha256: string;
+    readonly container: 'sog/1';
+    readonly scene_from_asset_row_major: readonly number[];
+    readonly bounds: { readonly min: readonly number[]; readonly max: readonly number[] };
+    readonly state: 'available' | 'bytes_missing' | 'invalid';
+    readonly reference: {
+      readonly href: string;
+      readonly authorization: 'workspace-bearer';
+      readonly content_sha256: string;
+      readonly byte_size: number;
+    } | null;
+  } | null;
   readonly members: readonly {
     readonly capture_id: string;
     readonly ordinal: number;
@@ -59,7 +73,7 @@ export interface ReconstructionScenePayload {
       readonly container: string | null;
       readonly scene_from_opm_row_major: readonly number[];
       readonly local_units_to_scene_units: number;
-      readonly scale_status: 'unvalidated-identity';
+      readonly scale_status: 'colmap-correspondence-fit';
       readonly state: 'available' | 'bytes_missing';
       readonly reference: {
         readonly href: string;
