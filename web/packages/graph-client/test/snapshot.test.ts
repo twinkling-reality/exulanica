@@ -221,6 +221,20 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
     });
   });
 
+  it('carries accepted cameras independently of point maps with exact calibration and capture identity', () => {
+    const camera = { scene_from_camera_row_major: [1, 0, 0, 2, 0, 1, 0, 3, 0, 0, 1, 4, 0, 0, 0, 1],
+      projection: 'pinhole-approximation' as const,
+      calibration: { model: 'SIMPLE_RADIAL', width: 800, height: 600, fx: 620, fy: 620,
+        cx: 390, cy: 280, parameters: [620, 390, 280, 0.03] } };
+    const snapshot = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes: [{ ...scene,
+      members: scene.members.map((member) => ({ ...member, placement: null, recovered_camera: camera })),
+    }] });
+    expect(snapshot.reconstructionScenes![0]!.members[0]).toMatchObject({ captureId: 'c1', placement: null,
+      recoveredCamera: { sceneFromCameraRowMajor: camera.scene_from_camera_row_major,
+        projection: camera.projection, calibration: camera.calibration } });
+    expect(snapshot.reconstructionScenes![0]!.recordedRung).toBe(scene.recorded_rung);
+  });
+
   it('does not place one scene into either region when a custom island policy splits its members', () => {
     const snapshot = adaptSnapshot(
       { ...PAYLOAD, reconstruction_scenes: [scene] },

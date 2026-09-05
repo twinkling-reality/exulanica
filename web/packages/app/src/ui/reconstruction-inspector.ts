@@ -5,6 +5,7 @@ export interface ReconstructionInspectionOption {
   readonly id: string;
   readonly kind: 'source-camera' | 'between-cameras' | 'source-only';
   readonly label: string;
+  readonly projection?: 'pinhole' | 'pinhole-approximation' | 'opm-estimate' | 'interpolated';
   readonly source: SourceMediaDescriptor | null;
 }
 
@@ -50,7 +51,10 @@ export function buildReconstructionInspector(options: {
     state.textContent = view.kind === 'source-only'
       ? 'Original photograph. Reconstructed camera inspection is unavailable for this scene.'
       : view.kind === 'source-camera'
-      ? 'Recovered source camera. Loaded maps use full display density without point-map fog or boundary thinning; missing members remain disclosed.'
+      ? (view.projection === 'pinhole-approximation'
+        ? 'Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.'
+        : view.projection === 'pinhole' ? 'Recovered camera with its calibrated pinhole projection.'
+          : 'Recovered source camera using the point-map field-of-view estimate.')
       : 'Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.';
     source.hidden = false;
     source.open = view.kind === 'source-only';

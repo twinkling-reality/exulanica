@@ -1,0 +1,33 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: plain-service-error
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/app/test/startup-state.test.ts (3 tests | 1 failed | 2 skipped) 6ms
+   × visible Atlas startup states > explains service failures plainly while preserving authorization and useful contract details 5ms
+     → expected 'Atlas could not openhttp_500: Interna…' to contain 'The Atlas service is unavailable. Ple…'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 skipped (3)
+   Start at  12:02:48
+   Duration  513ms (transform 49ms, setup 0ms, collect 67ms, tests 6ms, environment 117ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/startup-state.test.ts > visible Atlas startup states > explains service failures plainly while preserving authorization and useful contract details
+AssertionError: expected 'Atlas could not openhttp_500: Interna…' to contain 'The Atlas service is unavailable. Ple…'
+
+Expected: "The Atlas service is unavailable. Please retry in a moment."
+Received: "Atlas could not openhttp_500: Internal Server ErrorRetry opening Atlas"
+
+ ❯ packages/app/test/startup-state.test.ts:11:52
+      9|     for (const error of [new ApiError(500, 'http_500', 'Internal Serve…
+     10|       new TypeError('Failed to fetch'), new DOMException('Timed out', …
+     11|       expect(buildStartupState(error).textContent).toContain('The Atla…
+       |                                                    ^
+     12|       expect(buildStartupState(error).textContent).not.toContain('http…
+     13|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

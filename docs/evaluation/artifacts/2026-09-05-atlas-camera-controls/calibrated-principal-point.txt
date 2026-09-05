@@ -1,0 +1,29 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: calibrated-principal-point
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (5 tests | 1 failed | 4 skipped) 5ms
+   × bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection 5ms
+     → expected 0.2 to be close to -0.050000000000000044, received difference is 0.25000000000000006, but expected 0.005
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  12:02:45
+   Duration  1.06s (transform 215ms, setup 0ms, collect 579ms, tests 5ms, environment 112ms, prepare 41ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection
+AssertionError: expected 0.2 to be close to -0.050000000000000044, received difference is 0.25000000000000006, but expected 0.005
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:71:18
+     69|     const ndcX = (d[0]! * 0.2 + d[8]! * -2) / 2;
+     70|     const ndcY = (d[5]! * 0.1 + d[9]! * -2) / 2;
+     71|     expect(ndcX).toBeCloseTo(2 * (800 * 0.2 / 2 + 300) / 800 - 1);
+       |                  ^
+     72|     expect(ndcY).toBeCloseTo(1 - 2 * (280 - 600 * 0.1 / 2) / 600);
+     73|     binding.endSceneInspection();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

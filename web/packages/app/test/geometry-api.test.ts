@@ -151,6 +151,49 @@ function trainedScene(digest: string, size: number): ReconstructionSceneRecord {
 }
 
 describe('trained scene authenticated delivery', () => {
+  const camera = {
+    sceneFromCameraRowMajor: [1, 0, 0, 2, 0, 1, 0, 3, 0, 0, 1, 4, 0, 0, 0, 1],
+    projection: 'pinhole' as const,
+    calibration: { model: 'PINHOLE', width: 800, height: 600, fx: 810, fy: 620, cx: 390, cy: 280,
+      parameters: [810, 620, 390, 280] },
+  };
+  it('delivers accepted calibrated cameras with a trained scene when every OPM is absent', async () => {
+    const bytes = trainedFixture();
+    const digest = await sha256(bytes);
+    const original = trainedScene(digest, bytes.byteLength);
+    const scene = { ...original, members: original.members.map((member) => ({ ...member, recoveredCamera: camera })) };
+    const { fetch, requests } = serve([], bytes);
+    const loaded = await new GeometryClient({ baseUrl: 'https://exulanica.test', token: 'synthetic-token', fetch })
+      .loadScenes([scene], regions);
+    expect(loaded.placedPointMaps).toEqual([]);
+    expect(loaded.trainedGeometry).toHaveLength(1);
+    expect(loaded.recoveredCameras.map((camera) => camera.captureId)).toEqual([CAPTURE_A, CAPTURE_B]);
+    expect(loaded.recoveredCameras[0]).toMatchObject({ ...camera, captureId: CAPTURE_A,
+      poseReceiptSha256: original.poseReceiptSha256, sceneId: original.sceneId, islandId: REGION });
+    expect(requests.map((request) => request.path)).toEqual(['/scene-geometry/cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
+    expect(loaded.issues).toEqual([]);
+  });
+
+  it('rejects unaccepted, unregistered, or scaled camera descriptors without blocking source fallback', async () => {
+    const original = sceneRecord('a'.repeat(64), 0);
+    const member = { ...original.members[0]!, placement: null, recoveredCamera: camera };
+    const scenes: ReconstructionSceneRecord[] = [
+      { ...original, receiptState: 'invalid', members: [member] },
+      { ...original, members: [{ ...member, registered: false }] },
+      { ...original, members: [{ ...member, recoveredCamera: { ...camera,
+        sceneFromCameraRowMajor: camera.sceneFromCameraRowMajor.map((v, i) => i === 0 ? 2 : v) } }] },
+      { ...original, poseReceiptSha256: null, members: [member] },
+    ];
+    for (const scene of scenes) {
+      const { fetch, requests } = serve([], new ArrayBuffer(0));
+      const loaded = await new GeometryClient({ baseUrl: 'https://exulanica.test', token: 'synthetic-token', fetch })
+        .loadScenes([scene], regions);
+      expect(loaded.recoveredCameras).toEqual([]);
+      expect(loaded.renderingByScene.get(scene.sceneId)).toBe('source_photographs');
+      expect(requests).toEqual([]);
+    }
+  });
+
   it('passes exact verified SOG bytes to the renderer boundary without claiming a successful GPU load', async () => {
     const bytes = trainedFixture();
     const digest = await sha256(bytes);

@@ -1,0 +1,29 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: calibrated-fov
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (5 tests | 1 failed | 4 skipped) 5ms
+   × bounded reconstruction inspection > uses accepted cameras without any OPM and preserves exact capture, receipt, calibration, and order 4ms
+     → expected 55 to be close to 53.13010235415598, received difference is 1.86989764584402, but expected 0.005
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  12:02:41
+   Duration  1.25s (transform 262ms, setup 0ms, collect 640ms, tests 5ms, environment 142ms, prepare 53ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > uses accepted cameras without any OPM and preserves exact capture, receipt, calibration, and order
+AssertionError: expected 55 to be close to 53.13010235415598, received difference is 1.86989764584402, but expected 0.005
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:37:31
+     35|     expect(views[0]!.poseReceiptSha256).toBe('a'.repeat(64));
+     36|     expect(views[0]!.artifactIds).toEqual([]);
+     37|     expect(views[0]!.fovYDeg).toBeCloseTo(2 * Math.atan(0.5) * 180 / M…
+       |                               ^
+     38|     expect(views[0]!.calibration).toEqual(recovered(2).calibration);
+     39|     expect(views[1]!.projection).toBe('interpolated');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

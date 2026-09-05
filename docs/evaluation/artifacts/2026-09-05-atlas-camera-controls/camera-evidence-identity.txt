@@ -1,0 +1,77 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: camera-evidence-identity
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/graph-client/test/snapshot.test.ts (19 tests | 1 failed | 18 skipped) 7ms
+   × a receipt-backed reconstruction scene remains distinct from its island > carries accepted cameras independently of point maps with exact calibration and capture identity 6ms
+     → expected { …(6) } to match object { captureId: 'c1', …(2) }
+(3 matching properties omitted from actual)
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  12:02:49
+   Duration  459ms (transform 49ms, setup 0ms, collect 60ms, tests 7ms, environment 0ms, prepare 54ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/graph-client/test/snapshot.test.ts > a receipt-backed reconstruction scene remains distinct from its island > carries accepted cameras independently of point maps with exact calibration and capture identity
+AssertionError: expected { …(6) } to match object { captureId: 'c1', …(2) }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  Object {
+-   "captureId": "c1",
++   "captureId": "wrong-synthetic-capture",
+    "placement": null,
+    "recoveredCamera": Object {
+      "calibration": Object {
+        "cx": 390,
+        "cy": 280,
+        "fx": 620,
+        "fy": 620,
+        "height": 600,
+        "model": "SIMPLE_RADIAL",
+        "parameters": Array [
+          620,
+          390,
+          280,
+          0.03,
+        ],
+        "width": 800,
+      },
+      "projection": "pinhole-approximation",
+      "sceneFromCameraRowMajor": Array [
+        1,
+        0,
+        0,
+        2,
+        0,
+        1,
+        0,
+        3,
+        0,
+        0,
+        1,
+        4,
+        0,
+        0,
+        0,
+        1,
+      ],
+    },
+  }
+
+ ❯ packages/graph-client/test/snapshot.test.ts:232:59
+    230|       members: scene.members.map((member) => ({ ...member, placement: …
+    231|     }] });
+    232|     expect(snapshot.reconstructionScenes![0]!.members[0]).toMatchObjec…
+       |                                                           ^
+    233|       recoveredCamera: { sceneFromCameraRowMajor: camera.scene_from_ca…
+    234|         projection: camera.projection, calibration: camera.calibration…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

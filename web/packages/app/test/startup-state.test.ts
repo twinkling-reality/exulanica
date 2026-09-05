@@ -2,8 +2,19 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildStartupState } from '../src/ui/startup-state.js';
+import { ApiError } from '@exulanica/graph-client';
 
 describe('visible Atlas startup states', () => {
+  it('explains service failures plainly while preserving authorization and useful contract details', () => {
+    for (const error of [new ApiError(500, 'http_500', 'Internal Server Error'),
+      new TypeError('Failed to fetch'), new DOMException('Timed out', 'TimeoutError')]) {
+      expect(buildStartupState(error).textContent).toContain('The Atlas service is unavailable. Please retry in a moment.');
+      expect(buildStartupState(error).textContent).not.toContain('http_500');
+    }
+    expect(buildStartupState(new ApiError(401, 'unauthorized', 'missing token')).textContent)
+      .toContain('This session is not authorized');
+    expect(buildStartupState(new Error('Invalid world topology')).textContent).toContain('Invalid world topology');
+  });
   it('shows loading before requests finish and an actionable failure if startup rejects', () => {
     const loading = buildStartupState();
     expect(loading.getAttribute('role')).toBe('status');

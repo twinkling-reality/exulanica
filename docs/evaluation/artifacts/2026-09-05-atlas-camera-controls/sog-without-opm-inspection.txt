@@ -1,0 +1,36 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: sog-without-opm-inspection
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (5 tests | 1 failed | 4 skipped) 6ms
+   × bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection 5ms
+     → expected [] to have a length of 1 but got +0
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  12:02:43
+   Duration  1.29s (transform 234ms, setup 0ms, collect 559ms, tests 6ms, environment 123ms, prepare 63ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:63:19
+     61|     expect(binding.inspectionViews('unloaded')).toEqual([]);
+     62|     const views = binding.inspectionViews('scene');
+     63|     expect(views).toHaveLength(1);
+       |                   ^
+     64|     expect(binding.inspectSceneView('scene', views[0]!.id)).toBe(true);
+     65|     const matrix = new Mat4();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

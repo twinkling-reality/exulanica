@@ -1,0 +1,78 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: accepted-pose-only
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/app/test/geometry-api.test.ts (24 tests | 1 failed | 23 skipped) 8ms
+   × trained scene authenticated delivery > rejects unaccepted, unregistered, or scaled camera descriptors without blocking source fallback 7ms
+     → expected [ { …(8) } ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 23 skipped (24)
+   Start at  12:02:38
+   Duration  1.37s (transform 380ms, setup 0ms, collect 977ms, tests 8ms, environment 0ms, prepare 57ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/geometry-api.test.ts > trained scene authenticated delivery > rejects unaccepted, unregistered, or scaled camera descriptors without blocking source fallback
+AssertionError: expected [ { …(8) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "calibration": Object {
++       "cx": 390,
++       "cy": 280,
++       "fx": 810,
++       "fy": 620,
++       "height": 600,
++       "model": "PINHOLE",
++       "parameters": Array [
++         810,
++         620,
++         390,
++         280,
++       ],
++       "width": 800,
++     },
++     "captureId": "11111111-1111-4111-8111-111111111111",
++     "islandId": "99999999-9999-4999-8999-999999999999",
++     "ordinal": 0,
++     "poseReceiptSha256": "2222222222222222222222222222222222222222222222222222222222222222",
++     "projection": "pinhole",
++     "sceneFromCameraRowMajor": Array [
++       1,
++       0,
++       0,
++       2,
++       0,
++       1,
++       0,
++       3,
++       0,
++       0,
++       1,
++       4,
++       0,
++       0,
++       0,
++       1,
++     ],
++     "sceneId": "scene-1",
++   },
++ ]
+
+ ❯ packages/app/test/geometry-api.test.ts:191:39
+    189|       const loaded = await new GeometryClient({ baseUrl: 'https://exul…
+    190|         .loadScenes([scene], regions);
+    191|       expect(loaded.recoveredCameras).toEqual([]);
+       |                                       ^
+    192|       expect(loaded.renderingByScene.get(scene.sceneId)).toBe('source_…
+    193|       expect(requests).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

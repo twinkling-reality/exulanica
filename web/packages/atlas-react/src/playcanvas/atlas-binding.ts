@@ -106,7 +106,7 @@ import type { PointMap } from './opm.js';
 import type { PointCloud } from './point-cloud.js';
 import { createPointCloud } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
-import { sceneInspectionViews, type SceneInspectionView } from './scene-inspection.js';
+import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
 import {
   opmPointInScene,
@@ -148,6 +148,7 @@ export interface AtlasBindingOptions {
   /** Every map in a posed reconstruction scene. Supersedes pointMaps when supplied. */
   readonly placedPointMaps?: readonly PlacedScenePointMap[];
   readonly trainedGeometry?: readonly TrainedSceneGeometry[];
+  readonly recoveredCameras?: readonly RecoveredSceneCamera[];
   /** Caller-authorized media presentation keyed by the scene's evidence handles. */
   readonly sourceMedia?: SourceMediaCatalog;
   readonly deviceTypes?: readonly string[];
@@ -255,9 +256,11 @@ export class AtlasBinding {
   private navigationTransition: DirectNavigationTransition | null = null;
   private navigationElapsedMs = 0;
   private navigationTargetIsland: IslandId | null = null;
+  private readonly recoveredCameras: readonly RecoveredSceneCamera[];
   private inspection: {
     readonly returnPose: NavigationPose;
     readonly returnFov: number;
+    readonly returnProjection: pc.CameraComponent['calculateProjection'];
     view: SceneInspectionView;
   } | null = null;
   private readonly inspectionMatrix = new pc.Mat4();
@@ -311,6 +314,7 @@ export class AtlasBinding {
     islands: readonly IslandVisual[],
     trainedScenes: AtlasBinding['trainedScenes'],
     trainedSceneFailures: AtlasBinding['trainedSceneFailures'],
+    recoveredCameras: readonly RecoveredSceneCamera[],
     navigationWorld: NavigationWorld,
     field: WorldField,
     sourceFirst: SourceFirstGrove,
@@ -340,6 +344,7 @@ export class AtlasBinding {
     this.islands = islands;
     this.trainedScenes = trainedScenes;
     this.trainedSceneFailures = trainedSceneFailures;
+    this.recoveredCameras = recoveredCameras;
     this.navigationWorld = navigationWorld;
     this.field = field;
     this.sourceFirst = sourceFirst;
@@ -693,6 +698,7 @@ export class AtlasBinding {
       visuals,
       Object.freeze(trainedScenes),
       Object.freeze(trainedSceneFailures),
+      options.recoveredCameras ?? [],
       navigationWorld,
       field,
       sourceFirst,
@@ -914,8 +920,9 @@ export class AtlasBinding {
   /** Repeatable photographed and interpolated cameras over verified, currently resident inputs. */
   inspectionViews(sceneId: string): readonly SceneInspectionView[] {
     const maps = this.islands.filter((visual) => visual.pointMap.sceneId === sceneId);
-    const island = maps[0]?.island;
-    return island === undefined ? [] : sceneInspectionViews(island, maps.map((visual) => visual.pointMap));
+    const island = maps[0]?.island ?? this.trainedScenes.find((visual) => visual.geometry.sceneId === sceneId)?.island;
+    return island === undefined ? [] : sceneInspectionViews(island, maps.map((visual) => visual.pointMap),
+      this.recoveredCameras.filter((camera) => camera.sceneId === sceneId));
   }
 
   get inspectionView(): SceneInspectionView | null { return this.inspection?.view ?? null; }
@@ -926,7 +933,8 @@ export class AtlasBinding {
     this.cancelDirectNavigation();
     if (this.mapState !== null) this.setMapMode(false);
     if (this.inspection === null) {
-      this.inspection = { returnPose: this.navigationPose(), returnFov: this.camera.camera?.fov ?? 70, view };
+      this.inspection = { returnPose: this.navigationPose(), returnFov: this.camera.camera?.fov ?? 70,
+        returnProjection: this.camera.camera!.calculateProjection, view };
     } else this.inspection.view = view;
     if (document.pointerLockElement === this.device.canvas) document.exitPointerLock();
     const [x, y, z] = view.position;
@@ -937,7 +945,17 @@ export class AtlasBinding {
       pitch: Math.atan2(fy, Math.hypot(fx, fz)),
     });
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
-      this.camera.camera.fov = view.fovYDeg;
+      const camera = this.camera.camera;
+      camera.fov = view.fovYDeg;
+      const calibration = view.calibration;
+      camera.calculateProjection = (matrix: pc.Mat4) => {
+        if (calibration === null) {
+          matrix.setPerspective(camera.fov, camera.aspectRatio, camera.nearClip, camera.farClip, camera.horizontalFov);
+          return;
+        }
+        const frustum = calibratedCameraFrustum(calibration, camera.aspectRatio, camera.nearClip);
+        matrix.setFrustum(frustum.left, frustum.right, frustum.bottom, frustum.top, camera.nearClip, camera.farClip);
+      };
     }
     this.navigationTargetIsland = view.islandId;
     this.refreshControlsEnabled();
@@ -955,6 +973,7 @@ export class AtlasBinding {
     this.applyNavigationPose(held.returnPose);
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
       this.camera.camera.fov = held.returnFov;
+      this.camera.camera.calculateProjection = held.returnProjection;
     }
     this.navigationTargetIsland = null;
     this.refreshControlsEnabled();

@@ -342,10 +342,28 @@ export interface ReconstructionPointMapRecord {
   } | null;
 }
 
+export interface RecoveredCameraCalibration {
+  readonly model: string;
+  readonly width: number;
+  readonly height: number;
+  readonly fx: number;
+  readonly fy: number;
+  readonly cx: number;
+  readonly cy: number;
+  readonly parameters: readonly number[];
+}
+
+export interface RecoveredCameraRecord {
+  readonly sceneFromCameraRowMajor: readonly number[];
+  readonly calibration: RecoveredCameraCalibration;
+  readonly projection: 'pinhole' | 'pinhole-approximation';
+}
+
 export interface ReconstructionSceneMemberRecord {
   readonly captureId: string;
   readonly ordinal: number;
   readonly registered: boolean;
+  readonly recoveredCamera?: RecoveredCameraRecord | null;
   readonly placement: ReconstructionPointMapRecord | null;
   readonly exclusionReason: string | null;
 }

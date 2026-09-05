@@ -16,21 +16,30 @@ requires `colmap-correspondence-fit`; old identity receipts fall back to sources
 These relative scene units are not independently validated physical metres.
 
 In a scene's status panel, **Inspect reconstruction** opens a repeatable camera
-register. Each recovered source camera retains its position, forward vector, roll,
-and vertical field of view. Consecutive valid cameras also provide a bounded
+register. Each recovered source camera retains its accepted pose/capture identity, position,
+forward vector, roll, and actual COLMAP calibration. Cameras are delivered independently
+of OPM availability, so a successfully loaded trained scene remains inspectable when
+every point map is absent. Intrinsics set both focal scales and the principal point;
+vertical coverage fits the canvas and additional horizontal coverage follows its aspect
+ratio. Lens distortion models are explicitly labelled pinhole approximations.
+Consecutive valid cameras also provide a bounded
 midpoint; this is explicitly an unobserved view, without a photograph or a validated
 route. Opposing cameras and different scenes are not interpolated. IDs derive from
-the scene and artifact identities, so comparisons can return to the same views.
-The canvas aspect ratio is recorded; horizontal image coverage may differ from the
-original photograph. Walking input is suspended during inspection, and **Return to
-Atlas** restores the previous position, orientation, and field of view.
+the scene and capture identities (or legacy artifact identities), so comparisons can
+return to the same views.
+The canvas aspect ratio and exact calibration are recorded; horizontal image coverage
+may differ from the original photograph. Walking input is suspended during inspection,
+and **Return to Atlas** restores the previous position, orientation, field of view,
+and projection.
 
 Point-map inspection disables point-map atmospheric fog and boundary thinning and
 uses full display density. Semantic visibility and source confidence remain part of
 the OPM renderer; this is not a promise that every uploaded sample becomes a pixel.
-The authored world keeps its established appearance. A splat artifact without any
-available fitted OPM camera can still load, but the application does not invent a
-recovered viewpoint; its source gallery remains accessible.
+The authored world keeps its established appearance. A splat artifact uses accepted
+pose cameras even without
+OPM assets. Older records without accepted calibration keep the OPM field-of-view
+estimate fallback, and source galleries remain accessible. Camera metadata alone
+does not enable reconstruction inspection when no geometry actually loaded.
 
 ## Trained artifact delivery
 
@@ -67,7 +76,9 @@ navigation above the image in a sticky header. “Grouped photographs” counts 
 membership; additional authorized topology slots may appear in the gallery.
 
 Loading, terminal startup errors, and retry controls remain visible below the
-desktop viewport threshold. An optional saved interaction policy failing to load
+desktop viewport threshold. Service outages and network failures have a plain-language
+retry message; authorization and useful contract errors retain their own explanations.
+An optional saved interaction policy failing to load
 does not leave the document blank. Native reconstruction decoding has its own
 visible loading state.
 

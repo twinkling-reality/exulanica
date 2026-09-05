@@ -66,6 +66,15 @@ export interface ReconstructionScenePayload {
     readonly capture_id: string;
     readonly ordinal: number;
     readonly registered: boolean;
+    readonly recovered_camera?: {
+      readonly scene_from_camera_row_major: readonly number[];
+      readonly calibration: {
+        readonly model: string; readonly width: number; readonly height: number;
+        readonly fx: number; readonly fy: number; readonly cx: number; readonly cy: number;
+        readonly parameters: readonly number[];
+      };
+      readonly projection: 'pinhole' | 'pinhole-approximation';
+    } | null;
     readonly exclusion_reason: string | null;
     readonly placement: {
       readonly artifact_id: string;

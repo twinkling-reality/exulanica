@@ -35,8 +35,8 @@
  */
 
 import type { IslandId } from '@exulanica/atlas-core';
-import type { PlacedScenePointMap, PointMap, TrainedSceneGeometry } from '@exulanica/atlas-react/playcanvas';
-import { decodeOpm, validateScenePointMapPlacement, validateSogBundle, validateTrainedSceneGeometry } from '@exulanica/atlas-react/playcanvas';
+import type { PlacedScenePointMap, PointMap, TrainedSceneGeometry, RecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
+import { decodeOpm, validateScenePointMapPlacement, validateSogBundle, validateTrainedSceneGeometry, validateRecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
 import {
   ApiError,
   Transport,
@@ -84,6 +84,7 @@ export interface GeometrySession {
   readonly renderingByScene: ReadonlyMap<string, RenderingSubstrate>;
   /** Verified SOG bytes; GPU decode availability is settled separately by the renderer. */
   readonly trainedGeometry: readonly TrainedSceneGeometry[];
+  readonly recoveredCameras: readonly RecoveredSceneCamera[];
 }
 
 /** One successfully placed geometry input, measured at the authenticated byte boundary. */
@@ -349,6 +350,7 @@ export class GeometryClient {
       issues: Object.freeze(issues),
       renderingByScene: new Map(),
       trainedGeometry: Object.freeze([]),
+      recoveredCameras: Object.freeze([]),
     });
   }
 
@@ -365,6 +367,7 @@ export class GeometryClient {
     const issues: GeometryIssue[] = [];
     const digest = globalThis.crypto?.subtle;
     const trainedGeometry: TrainedSceneGeometry[] = [];
+    const recoveredCameras: RecoveredSceneCamera[] = [];
 
     for (const scene of scenes) {
       let loadedForScene = 0;
@@ -378,6 +381,19 @@ export class GeometryClient {
       ) ? [...resolvedIslands][0]! : null;
 
       for (const member of scene.members) {
+        if (member.recoveredCamera != null && member.registered && scene.receiptState === 'available'
+          && scene.poseReceiptSha256 !== null && islandId !== null && scene.islandId === islandId) {
+          try {
+            const camera: RecoveredSceneCamera = { ...member.recoveredCamera, sceneId: scene.sceneId,
+              captureId: member.captureId, ordinal: member.ordinal, islandId,
+              poseReceiptSha256: scene.poseReceiptSha256 };
+            validateRecoveredSceneCamera(camera);
+            recoveredCameras.push(Object.freeze(camera));
+          } catch (error) {
+            issues.push({ sceneId: scene.sceneId, captureId: member.captureId, islandId, state: 'undecodable',
+              reason: error instanceof Error ? error.message : 'The recovered camera is invalid.' });
+          }
+        }
         const placement = member.placement;
         if (placement === null) continue;
         const report = (state: GeometryIssueState, reason: string): void => {
@@ -484,6 +500,7 @@ export class GeometryClient {
         const placed: PlacedScenePointMap = {
           sceneId: scene.sceneId,
           artifactId: placement.artifactId,
+          captureId: member.captureId,
           islandId,
           map,
           sceneFromOpmRowMajor: placement.sceneFromOpmRowMajor,
@@ -573,6 +590,7 @@ export class GeometryClient {
       issues: Object.freeze(issues),
       renderingByScene,
       trainedGeometry: Object.freeze(trainedGeometry),
+      recoveredCameras: Object.freeze(recoveredCameras),
     });
   }
 

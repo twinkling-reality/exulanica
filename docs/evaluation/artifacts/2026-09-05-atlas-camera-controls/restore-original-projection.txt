@@ -1,0 +1,36 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: restore-original-projection
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts (5 tests | 1 failed | 4 skipped) 6ms
+   × bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection 5ms
+     → expected [Function] to be [Function spy] // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  12:02:46
+   Duration  1.01s (transform 223ms, setup 0ms, collect 545ms, tests 6ms, environment 117ms, prepare 40ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/scene-inspection.test.ts > bounded reconstruction inspection > opens a loaded trained scene without maps and restores the prior projection after calibrated inspection
+AssertionError: expected [Function] to be [Function spy] // Object.is equality
+
+- Expected
++ Received
+
+- [Function spy]
++ [Function anonymous]
+
+ ❯ packages/atlas-react/test/scene-inspection.test.ts:74:40
+     72|     expect(ndcY).toBeCloseTo(1 - 2 * (280 - 600 * 0.1 / 2) / 600);
+     73|     binding.endSceneInspection();
+     74|     expect(camera.calculateProjection).toBe(originalProjection);
+       |                                        ^
+     75|     expect(camera.fov).toBe(73);
+     76|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

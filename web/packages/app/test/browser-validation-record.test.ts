@@ -8,7 +8,9 @@ describe('browser validation evidence', () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const events = new Map<string, (value: number) => void>();
     const view = { id: 'scene:camera:a', kind: 'source-camera', position: [1, 2, 3],
-      forward: [0, 0, -1], up: [0, 1, 0], fovYDeg: 55, sourceAspect: 1.5, artifactIds: ['a'] };
+      forward: [0, 0, -1], up: [0, 1, 0], fovYDeg: 55, sourceAspect: 1.5, artifactIds: ['a'],
+      captureIds: ['capture-a'], poseReceiptSha256: 'a'.repeat(64), projection: 'pinhole',
+      calibration: { model: 'PINHOLE', fx: 600, fy: 600, cx: 300, cy: 200, width: 600, height: 400 } };
     const fake = {
       app: { on: (name: string, callback: (value: number) => void) => events.set(name, callback),
         off: (name: string) => events.delete(name), stats: { drawCalls: { total: 3 } } },
@@ -33,6 +35,9 @@ describe('browser validation evidence', () => {
     expect(record.measurement.camera_segments.map((segment: { id: string }) => segment.id))
       .toEqual(['scene:camera:a', 'scene:midpoint:a:b']);
     expect(record.measurement.camera_segments[0].position).toEqual([1, 2, 3]);
+    expect(record.measurement.camera_segments[0].captureIds).toEqual(['capture-a']);
+    expect(record.measurement.camera_segments[0].poseReceiptSha256).toBe('a'.repeat(64));
+    expect(record.measurement.camera_segments[0].calibration.fx).toBe(600);
     expect(record.measurement.camera_segments[0].frames).toBe(1);
     expect(record.geometry.uploaded_point_count).toBe(123);
     expect(record.geometry.rendered_point_count).toBeUndefined();

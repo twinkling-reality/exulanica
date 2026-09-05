@@ -108,6 +108,10 @@ export class BrowserValidationRecorder {
       fovYDeg: number;
       sourceAspect: number | null;
       artifactIds: readonly string[];
+      captureIds: readonly string[];
+      poseReceiptSha256: string | null;
+      projection: string | null;
+      calibration: unknown;
       samples: number[];
     }[] = [];
 
@@ -143,7 +147,9 @@ export class BrowserValidationRecorder {
           up: inspection?.up ?? null,
           fovYDeg: binding.camera.camera?.fov ?? 70,
           sourceAspect: inspection?.sourceAspect ?? null,
-          artifactIds: inspection?.artifactIds ?? [], samples: [],
+          artifactIds: inspection?.artifactIds ?? [],
+          captureIds: inspection?.captureIds ?? [], poseReceiptSha256: inspection?.poseReceiptSha256 ?? null,
+          projection: inspection?.projection ?? null, calibration: inspection?.calibration ?? null, samples: [],
         };
         cameraSegments.push(segment);
       }

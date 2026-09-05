@@ -1,0 +1,16 @@
+Retained assertion/test-summary excerpt; complete observed output is separately digest-bound.
+Synthetic camera, source, and token literals are test fixtures.
+Case: passing isolated baseline
+
+
+ RUN  v2.1.9 /private<isolated-source-copy>
+
+ ✓ packages/graph-client/test/snapshot.test.ts (19 tests) 13ms
+ ✓ packages/app/test/startup-state.test.ts (3 tests) 7ms
+ ✓ packages/app/test/geometry-api.test.ts (24 tests) 48ms
+ ✓ packages/atlas-react/test/scene-inspection.test.ts (5 tests) 5ms
+
+ Test Files  4 passed (4)
+      Tests  51 passed (51)
+   Start at  12:02:33
+   Duration  2.48s (transform 986ms, setup 0ms, collect 3.27s, tests 73ms, environment 747ms, prepare 247ms)

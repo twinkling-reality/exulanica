@@ -194,6 +194,11 @@ export function adaptSnapshot(
           captureId: member.capture_id,
           ordinal: member.ordinal,
           registered: member.registered,
+          recoveredCamera: member.recovered_camera == null ? null : {
+            sceneFromCameraRowMajor: member.recovered_camera.scene_from_camera_row_major,
+            calibration: member.recovered_camera.calibration,
+            projection: member.recovered_camera.projection,
+          },
           exclusionReason: member.exclusion_reason,
           placement: member.placement === null
             ? null

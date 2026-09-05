@@ -5,6 +5,7 @@ import type { PointMap } from './opm.js';
 export interface PlacedScenePointMap {
   readonly sceneId: string;
   readonly artifactId: string;
+  readonly captureId?: string;
   readonly islandId: IslandId;
   readonly map: PointMap;
   readonly sceneFromOpmRowMajor: readonly number[];

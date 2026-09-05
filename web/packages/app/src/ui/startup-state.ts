@@ -7,7 +7,11 @@ export function buildStartupState(error?: unknown): HTMLElement {
   panel.append(el('h1', { text: failed ? 'Atlas could not open' : 'Opening Atlas' }));
   const reason = error instanceof ApiError && error.isUnauthenticated
     ? 'This session is not authorized. Use an access token configured for this instance.'
-    : error instanceof Error ? error.message
+    : (error instanceof ApiError && error.status >= 500)
+      || (error instanceof TypeError && /fetch|network|load failed/i.test(error.message))
+      || (error instanceof DOMException && ['NetworkError', 'TimeoutError'].includes(error.name))
+      ? 'The Atlas service is unavailable. Please retry in a moment.'
+      : error instanceof Error ? error.message
       : failed ? 'The library could not load. Please retry.'
         : 'Loading the library, its source photographs, and verified reconstructions…';
   panel.append(el('p', { class: failed ? 'gate-failure' : 'gate-note', text: reason }));

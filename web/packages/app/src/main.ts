@@ -52,6 +52,7 @@ import type {
   PointMap,
   SourceMediaCatalog,
   TrainedSceneGeometry,
+  RecoveredSceneCamera,
 } from '@exulanica/atlas-react/playcanvas';
 import {
   footprintRadiusOf,
@@ -165,6 +166,7 @@ let pointMaps_: ReadonlyMap<IslandId, PointMap> | undefined;
 /** All maps with their shared-scene transforms. Undefined for the legacy preview path. */
 let placedPointMaps_: readonly PlacedScenePointMap[] | undefined;
 let trainedGeometry_: readonly TrainedSceneGeometry[] = Object.freeze([]);
+let recoveredCameras_: readonly RecoveredSceneCamera[] = Object.freeze([]);
 /** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
 let heldPointMaps_: HeldPointMaps | undefined;
 
@@ -205,6 +207,14 @@ function reconstructionsOf(
       footprintRadiusLocal: Math.max(scenePointMapFootprint(values), ...trainedGeometry_
         .filter((geometry) => geometry.islandId === islandId).map(trainedSceneFootprint)),
     });
+  }
+  for (const trained of trainedGeometry_) {
+    if (out.has(trained.islandId)) continue;
+    const camera = recoveredCameras_.find((camera) => camera.sceneId === trained.sceneId && camera.islandId === trained.islandId);
+    if (camera === undefined) continue;
+    const m = camera.sceneFromCameraRowMajor;
+    out.set(trained.islandId, { rung: 3, viewpointLocal: localVec3(m[3]!, m[7]!, m[11]!),
+      footprintRadiusLocal: trainedSceneFootprint(trained) });
   }
   for (const [islandId, map] of maps ?? []) {
     if (out.has(islandId)) continue;
@@ -442,6 +452,7 @@ async function loadGeometry(
     pointMaps_ = new Map([...legacyGeometry.pointMaps, ...sceneGeometry.pointMaps]);
     placedPointMaps_ = sceneGeometry.placedPointMaps;
     trainedGeometry_ = sceneGeometry.trainedGeometry;
+    recoveredCameras_ = sceneGeometry.recoveredCameras;
     heldPointMaps_ = new Map([...legacyGeometry.byArtifact, ...sceneGeometry.byArtifact]);
     geometryNotices = geometryNoticesFor([
       ...sceneGeometry.issues,
@@ -457,6 +468,7 @@ async function loadGeometry(
     pointMaps_ = undefined;
     placedPointMaps_ = undefined;
     trainedGeometry_ = Object.freeze([]);
+    recoveredCameras_ = Object.freeze([]);
     heldPointMaps_ = undefined;
     geometryNotices = Object.freeze([
       `Reconstructions unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
@@ -1170,7 +1182,8 @@ async function mount(): Promise<void> {
     let cameraNumber = 0;
     const choices = views.map((view) => {
       const member = view.kind === 'source-camera'
-        ? record?.members.find((candidate) => candidate.placement?.artifactId === view.artifactIds[0])
+        ? record?.members.find((candidate) => candidate.captureId === view.captureIds[0]
+          || (view.captureIds.length === 0 && candidate.placement?.artifactId === view.artifactIds[0]))
         : undefined;
       if (view.kind === 'source-camera') cameraNumber += 1;
       // World source IDs name topology slots, not captures. Join through the actual evidence
@@ -1184,7 +1197,7 @@ async function mount(): Promise<void> {
           .map((handle) => previewSourceMedia?.get(handle))
           .find((descriptor) => descriptor !== undefined) ?? null;
       return {
-        id: view.id, kind: view.kind,
+        id: view.id, kind: view.kind, projection: view.projection,
         label: view.kind === 'source-camera'
           ? `Source camera ${cameraNumber}` : `Between cameras ${cameraNumber} and ${cameraNumber + 1}`,
         source,
@@ -1379,6 +1392,7 @@ async function mount(): Promise<void> {
     ...(pointMaps_ === undefined ? {} : { pointMaps: pointMaps_ }),
     ...(placedPointMaps_ === undefined ? {} : { placedPointMaps: placedPointMaps_ }),
     trainedGeometry: trainedGeometry_,
+    recoveredCameras: recoveredCameras_,
     reducedMotion: systemReducedMotion.matches,
   }, browserMeasurement === null ? undefined : (binding) => {
     browserMeasurement.observeBinding(binding, {

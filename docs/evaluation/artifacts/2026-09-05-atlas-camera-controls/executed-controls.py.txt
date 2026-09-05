@@ -1,0 +1,45 @@
+from pathlib import Path
+import shutil, subprocess, tempfile, json, hashlib, re
+repo = Path.cwd() / 'web'
+if not (repo / 'package.json').is_file():
+ raise SystemExit('Run from the repository root.')
+scratch = Path(tempfile.mkdtemp(prefix='atlas-camera-controls-'))
+shutil.copytree(repo/'test-data', scratch/'test-data')
+for name in ['package.json','vitest.config.ts','tsconfig.base.json','tsconfig.json']:
+ shutil.copy2(repo/name,scratch/name)
+(scratch/'node_modules').symlink_to(repo/'node_modules',target_is_directory=True)
+for source in (repo/'packages').iterdir():
+ if not source.is_dir(): continue
+ target=scratch/'packages'/source.name
+ shutil.copytree(source,target,ignore=shutil.ignore_patterns('node_modules','dist','*.tsbuildinfo'))
+ if (source/'node_modules').exists(): (target/'node_modules').symlink_to(source/'node_modules',target_is_directory=True)
+cases=[
+ ('camera-independent-of-opm','packages/app/src/geometry-api.ts','member.recoveredCamera != null && member.registered','member.recoveredCamera != null && member.placement !== null && member.registered','packages/app/test/geometry-api.test.ts','delivers accepted calibrated'),
+ ('accepted-pose-only','packages/app/src/geometry-api.ts',"&& scene.receiptState === 'available'",'','packages/app/test/geometry-api.test.ts','rejects unaccepted'),
+ ('camera-wire-projection','packages/graph-client/src/snapshot.ts','recoveredCamera: member.recovered_camera == null ? null :','recoveredCamera: true ? null :','packages/graph-client/test/snapshot.test.ts','carries accepted cameras'),
+ ('calibrated-fov','packages/atlas-react/src/playcanvas/scene-inspection.ts','2 * Math.atan(camera.calibration.height / (2 * camera.calibration.fy)) * 180 / Math.PI','55','packages/atlas-react/test/scene-inspection.test.ts','uses accepted cameras'),
+ ('sog-without-opm-inspection','packages/atlas-react/src/playcanvas/atlas-binding.ts',' ?? this.trainedScenes.find((visual) => visual.geometry.sceneId === sceneId)?.island','','packages/atlas-react/test/scene-inspection.test.ts','opens a loaded trained'),
+ ('calibrated-principal-point','packages/atlas-react/src/playcanvas/scene-inspection.ts','c.width / 2 - c.cx','c.width / 2 - c.width / 2','packages/atlas-react/test/scene-inspection.test.ts','opens a loaded trained'),
+ ('restore-original-projection','packages/atlas-react/src/playcanvas/atlas-binding.ts','this.camera.camera.calculateProjection = held.returnProjection;','/* omit restoration */','packages/atlas-react/test/scene-inspection.test.ts','opens a loaded trained'),
+ ('plain-service-error','packages/app/src/ui/startup-state.ts','error instanceof ApiError && error.status >= 500','false','packages/app/test/startup-state.test.ts','explains service failures'),
+ ('camera-evidence-identity','packages/graph-client/src/snapshot.ts','captureId: member.capture_id,',"captureId: 'wrong-synthetic-capture',",'packages/graph-client/test/snapshot.test.ts','carries accepted cameras'),
+]
+baseline=subprocess.run(['pnpm','exec','vitest','run',*sorted({row[4] for row in cases})],cwd=scratch,text=True,capture_output=True)
+(scratch/'baseline.log').write_text(baseline.stdout+baseline.stderr)
+if baseline.returncode: raise RuntimeError('isolated baseline failed: '+str(scratch))
+print('BASELINE PASSED',scratch,flush=True)
+results=[]
+for name,file,before,after,test,pattern in cases:
+ path=scratch/file; original=path.read_text()
+ if before not in original: raise RuntimeError('missing mutation: '+name)
+ try:
+  path.write_text(original.replace(before,after))
+  run=subprocess.run(['pnpm','exec','vitest','run',test,'-t',pattern],cwd=scratch,text=True,capture_output=True)
+ finally: path.write_text(original)
+ output=run.stdout+run.stderr;(scratch/(name+'.log')).write_text(output)
+ observed=run.returncode != 0 and bool(re.search(r'Tests\s+[1-9][0-9]* failed',output))
+ results.append(dict(name=name,production_file='web/'+file,source_sha256=hashlib.sha256(original.encode()).hexdigest(),before=before,after=after,test='web/'+test,test_filter=pattern,exit_code=run.returncode,observed_failure=observed,log_file=str(scratch/(name+'.log'))))
+ print(name,run.returncode,observed,flush=True)
+(scratch/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+if not all(row['observed_failure'] for row in results): raise RuntimeError('not every mutation caused a test assertion failure')
+print('RESULTS',scratch/'results.json',flush=True)
