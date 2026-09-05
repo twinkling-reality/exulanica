@@ -393,19 +393,32 @@ def _describe_captures(
         elif not reasons:
             # **A capture that matched must never leave here with nothing to cite.**
             #
-            # `is_unconstrained` is false as soon as any dimension is set, including one that
-            # produces no support of its own. A plan whose only dimension is
-            # `capture.processing_states` is legal, is one the planner is free to emit, and used
-            # to reach this line with `reasons` empty: `_support_for` returns nothing without
-            # entity ids, place ids or a semantic query, and the branch above does not fire
-            # without a time window. Every capture then carried `support=()`, the packet
-            # collected no spans, and the question was answered "Nothing in your library
-            # matches, so there is nothing I could cite" while `total_matched` was four.
+            # The claim this support makes is narrow and exactly true: this photograph is in
+            # this Selection, and the whole-photograph span is the record that it exists. It is
+            # the same claim the branch above makes for a time match, under its own dimension
+            # rather than mislabelled as one.
             #
-            # That is a false abstention (M3), and it is worse than a wrong answer because it is
-            # stated as a fact about the library. The photograph matched on a property of the
-            # capture itself, and the whole-photograph span is the record of that property, so
-            # it is cited under its own dimension rather than mislabelled as a time match.
+            # Two routes reach it, and the second is why the condition is `not reasons` rather
+            # than a test on one dimension.
+            #
+            # *   A plan whose only dimension is `capture.processing_states`. `is_unconstrained`
+            #     is false as soon as any dimension is set, `_support_for` returns nothing
+            #     without entity ids, place ids or a semantic query, and the branch above needs
+            #     a time window. Every capture carried `support=()`, so the packet was empty and
+            #     the question came back "Nothing in your library matches, so there is nothing I
+            #     could cite" while `total_matched` was four. That is a false abstention (M3),
+            #     and it is worse than a wrong answer because it is stated as a fact about
+            #     somebody's own library.
+            #
+            # *   `EntityMode.ALL`, which is a question about the SCOPE and returns the scope
+            #     entire, including captures holding none of the named entities. Those have no
+            #     entity support and never will; M6 specifies that reading. They did not cause
+            #     an abstention, because the captures that do hold an entity fill the packet.
+            #     What they caused was worse to read: `EvidencePacket.truncated` compares
+            #     `total_matched` against the captures in the packet, so the composer was told
+            #     "more captures matched than are shown here" when nothing had been truncated
+            #     and one capture simply had nothing citable. A scope member that cannot be
+            #     cited is a scope member the answer cannot mention.
             reasons.append(
                 Support(span_id=row["span_id"], assertion_id=None, dimension="capture")
             )

@@ -374,6 +374,33 @@ def test_a_capture_that_matched_always_carries_something_to_cite(library):
         assert {support.dimension for support in capture.support} == {"capture"}
 
 
+def test_a_scope_member_holding_neither_entity_is_still_citable(library):
+    """The second route into the same branch, pinned so it is deliberate rather than incidental.
+
+    M6 makes ALL a question about the scope, and the scope is returned entire: the photograph
+    with nobody in it is part of the correct answer to "photographs with both A and B" under
+    that reading. It has no entity support and never will.
+
+    Before it carried the whole-photograph span it was counted in `total_matched` and absent
+    from the packet, which made `EvidencePacket.truncated` true and told the composer that more
+    captures matched than were shown. Nothing had been truncated. A scope member that cannot be
+    cited is a scope member the answer cannot mention, while still being counted in the total.
+    """
+    plan = _plan(
+        entities=EntitySelector(
+            ids=[library.entities["A"], library.entities["B"]], mode=EntityMode.ALL
+        )
+    )
+    result = library.run(plan)
+    assert library.matched(plan) == {"together", "alone_a", "alone_b", "empty"}
+    empty = [c for c in result.captures if c.capture_id == library.captures["empty"]]
+    assert len(empty) == 1
+    assert {s.dimension for s in empty[0].support} == {"capture"}, (
+        "the photograph with nobody in it is in the scope and has no entity support"
+    )
+    assert all(capture.support for capture in result.captures)
+
+
 # -- the entities intent -----------------------------------------------------------------
 
 

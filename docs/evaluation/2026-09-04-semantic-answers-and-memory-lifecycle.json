@@ -70,7 +70,7 @@
         "invariant": "An empty packet abstains without calling the model, and a packet built from a proposal-inclusive Selection carries nothing citable. A capture that matched always carries at least one support row, so an abstention means nothing matched rather than that the executor lost track of why something did. A model failure the answer path cannot absorb leaves the HTTP boundary as a stated refusal with a code, never as an unhandled exception.",
         "rationale": "The refusal half was already structural and already tested. What was not held was its converse. is_unconstrained is false the moment any dimension is set, including capture.processing_states, which produces no support of its own; with no time window the whole-photograph branch never fired and _support_for returned nothing, so every matching capture left the executor with support=() and the answer was 'Nothing in your library matches' over four photographs the same Selection had just counted. A refusal that fires when the evidence is there is a false statement about somebody's own library, which is the failure evaluation-methodology.md scores as M3 false_abstention_rate.",
         "canonical_representation": "Support.dimension gains a fifth value, 'capture', meaning the photograph matched on a property of itself with the whole-photograph span as the record of that property. Labelling it 'time' would have made the Selection say a time window put the photograph there when none was asked for.",
-        "compatibility_impact": "A processing-state-only plan now returns captures carrying support where it previously returned captures carrying none, so such a plan produces a citable packet instead of an abstention. No stored row changed and no digest changed. SupportView.dimension is a free-text string at the API boundary and no browser consumer parses it as a closed set.",
+        "compatibility_impact": "Two observable changes, both widenings. A processing-state-only plan now returns captures carrying support where it previously returned captures carrying none, so such a plan produces a citable packet instead of an abstention. And an ALL-mode scope member holding no named entity is now citable, so a packet built from an ALL plan stops reporting itself as truncated when it is not. No stored row changed and no digest changed. SupportView.dimension is a free-text string at the API boundary and no browser consumer parses it as a closed set.",
         "failure_behaviour": "Abstention codes stay as they were: NOT_CAPTURED when nothing matched, AMBIGUOUS when the Selection admitted unconfirmed links. A model error is problem+json: 502 model_refused for an upstream that would not answer, 429 budget_exceeded for spend this instance declined.",
         "affected_surfaces": {
           "schema": [],
@@ -86,11 +86,13 @@
         },
         "tests": [
           "tests/test_selection.py::test_a_capture_that_matched_always_carries_something_to_cite",
+          "tests/test_selection.py::test_a_scope_member_holding_neither_entity_is_still_citable",
           "tests/test_selection_answer.py::test_a_plan_that_matched_photographs_is_answered_rather_than_refused",
           "tests/test_api.py::test_an_unanswerable_question_refuses_over_http_without_calling_the_model",
           "tests/test_api.py::test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code"
         ],
-        "negative_control": "Disabling the new branch in _describe_captures makes both new selection tests fail, the second reporting the abstention verbatim: 'I have no evidence for that. Nothing in your library matches.' Executed."
+        "negative_control": "Disabling the new branch in _describe_captures fails all three new selection tests, one of them reporting the abstention verbatim: 'I have no evidence for that. Nothing in your library matches.' Executed.",
+        "second_route_into_the_same_branch": "EntityMode.ALL is a question about the scope and returns the scope entire, so a capture holding none of the named entities is part of the correct answer under M6 and has no entity support. Those captures did not cause an abstention, because the ones that do hold an entity fill the packet. What they caused was a false truncation signal: EvidencePacket.truncated compares total_matched against the captures in the packet, so the composer was told more captures matched than were shown when nothing had been truncated. This is now pinned by test_a_scope_member_holding_neither_entity_is_still_citable rather than left as a side effect."
       },
       {
         "number": 3,
@@ -146,27 +148,28 @@
     "counts": {
       "what_these_are": "Counts of executable checks, not measurements of answer quality. Every one is a number of test cases or of code paths; none is an accuracy.",
       "backend_collected_at_starting_revision": 1447,
-      "backend_collected_now": 1463,
-      "backend_tests_added": 16,
-      "backend_passed": 1461,
+      "backend_collected_now": 1469,
+      "backend_tests_added": 22,
+      "backend_passed": 1467,
       "backend_skipped": 2,
       "tests_added_per_gate": {
         "citation_verifies_against_a_stored_span_digest": 4,
-        "refusal_rather_than_estimate": 4,
+        "refusal_rather_than_estimate": 5,
         "memory_lifecycle": 6,
-        "no_biometric_template_on_the_answer_path": 2
+        "no_biometric_template_on_the_answer_path": 2,
+        "the_retained_record_itself": 5
       },
       "tests_widened_rather_than_added": 1,
       "production_files_changed": 3,
       "migrations_added": 0,
       "historical_migrations_rewritten": 0,
       "span_digests_changed": 0,
-      "negative_controls_executed": 6
+      "negative_controls_executed": 8
     },
     "verification": {
       "database": "postgresql://localhost:5433/exulanica_spine_test",
       "server": "PostgreSQL 18.6 with pgvector, nothing substituted",
-      "backend_passed": 1461,
+      "backend_passed": 1467,
       "backend_skipped": 2,
       "backend_warnings": 3,
       "ruff_passed": true,
@@ -264,5 +267,5 @@
       "The full backend and web verification gates are green."
     ]
   },
-  "record_sha256": "051d873f01adae6f0d967c98c82f0e4dca0a39efa8eb194c07b2adeb6167abf3"
+  "record_sha256": "0375067da79ea5830a99da990cc292a8d279ddc879fddc6f4c335b1c2de398c9"
 }
