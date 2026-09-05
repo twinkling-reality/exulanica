@@ -26,6 +26,11 @@ from test_evaluation_bundle import _bundle
 
 @pytest.fixture
 def empty_replay_database() -> Iterator[Database]:
+    if env_get("TEST_ALLOW_DATABASE_CREATION") != "1":
+        pytest.skip(
+            "set EXULANICA_TEST_ALLOW_DATABASE_CREATION=1 to permit creating a disposable "
+            "database; EXULANICA_TEST_DATABASE_URL alone does not authorize it"
+        )
     base = env_get("TEST_DATABASE_URL")
     if not base:
         pytest.skip("set EXULANICA_TEST_DATABASE_URL to run the clean replay")
@@ -48,6 +53,20 @@ def empty_replay_database() -> Iterator[Database]:
             if not name.startswith("exulanica_replay_test_"):
                 raise AssertionError("refusing to drop an unexpected database")
             admin.execute(sql.SQL("drop database {}").format(sql.Identifier(name)))
+
+
+def test_clean_replay_database_creation_requires_explicit_opt_in(monkeypatch):
+    monkeypatch.delenv("EXULANICA_TEST_ALLOW_DATABASE_CREATION", raising=False)
+    monkeypatch.setenv(
+        "EXULANICA_TEST_DATABASE_URL", "postgresql://localhost:5433/exulanica_spine_test"
+    )
+
+    def forbidden_connect(*_args, **_kwargs):
+        raise AssertionError("database connection attempted without database-creation opt-in")
+
+    monkeypatch.setattr(psycopg, "connect", forbidden_connect)
+    with pytest.raises(pytest.skip.Exception, match="TEST_ALLOW_DATABASE_CREATION"):
+        next(empty_replay_database.__wrapped__())
 
 
 def test_clean_replay_uses_a_new_database_and_keeps_the_gate_blocked(
