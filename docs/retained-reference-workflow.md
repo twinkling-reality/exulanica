@@ -164,10 +164,52 @@ acceptance rule until the actual held-out measurement and visual inspection have
 
 The scene worker requires `EXULANICA_DATABASE_URL`, `EXULANICA_DATA_DIR`,
 `EXULANICA_WORKSPACE_IDS`, `EXULANICA_CODE_REVISION` and `EXULANICA_POSE_RUNTIME_IMAGE`.
-Configure its database role according to [scene operations](scene-reconstruction-operations.md),
-then run `uv run --extra pose exulanica-scene-worker`. Depth and pycolmap run in separate processes
-because their native OpenMP runtimes conflict on this Mac. GPU training additionally needs the
-reviewed Docker runtime and pinned compressor executable on the worker's PATH.
+Configure its database role according to [scene operations](scene-reconstruction-operations.md).
+Depth and pycolmap run in separate processes because their native OpenMP runtimes conflict on this
+Mac. GPU training additionally needs the reviewed Docker runtime and pinned compressor executable
+on the worker's PATH, which in practice means the worker runs on the CUDA host.
+
+### Run the scene worker on an authorized CUDA host
+
+EXECUTED 2026-09-05 on a rented NVIDIA L40S virtual machine (Ubuntu 22.04, Docker 29, driver
+580.126.09, 12 CPUs, 70 GiB) at a declared $1.06 per GPU-hour. The pattern keeps the single
+permitted database and the retained store as the authority while pose, placement and training run
+where the GPU is. The trainer launcher bind-mounts local paths and talks to the local Docker
+daemon, so the worker itself must run on that host, not through a remote Docker context.
+
+1. Bootstrap the host once: `deploy/gsplat/host-bootstrap.sh` verifies the GPU inside Docker,
+   installs the NVIDIA container toolkit if the runtime is missing, unpacks the official Node
+   tarball for the locked compressor, and starts a local registry on `127.0.0.1:5000` so every
+   image receives a real immutable manifest digest without an external account.
+2. Ship the committed tree: `git archive HEAD | ssh <host> 'mkdir -p ~/orimera && tar -x -C ~/orimera'`,
+   then on the host `npm ci --prefix deploy/gsplat/compressor` with `~/node/bin` on the PATH.
+3. Build and push both images at that revision. The worker image is the root `Dockerfile`; the
+   trainer image is `deploy/gsplat/Dockerfile` with `CUDA_BASE` set to the digest-pinned reference
+   `docker inspect --format '{{index .RepoDigests 0}}'` reports for the pulled PyTorch base. Push
+   each to `localhost:5000/...:<short revision>` and read its `RepoDigests` entry back. The
+   trainer's build revision must equal the worker's `EXULANICA_CODE_REVISION`; the runner refuses
+   any other pairing, so a code change means rebuilding both and queueing a new request with the
+   new trainer digest.
+4. Sync the store: `rsync -a .exulanica/reference-baseline/runtime/blobs/ <host>:~/exulanica-data/blobs/`.
+5. Open the database tunnel from the Mac and keep it open while the worker runs:
+   `ssh -N -R 127.0.0.1:5433:127.0.0.1:5433 <host>`. The Mac's PostgreSQL trusts loopback
+   connections, so the worker's URL names the Mac's operating-system user and the permitted
+   database, and `PGOPTIONS=-c role=exulanica_app` selects the ordinary application role.
+6. Queue the exact scene with a training request whose `execution_image` is the trainer digest
+   and whose `requested_gpu` is exactly what `torch.cuda.get_device_name(0)` reports inside that
+   image, then run `deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <name>`
+   on the host with `CODE_REVISION`, `EXULANICA_WORKSPACE_IDS` and `EXULANICA_DATABASE_URL` set.
+   It runs the worker inside the worker image with host networking, the host Docker socket, and
+   the store mounted at its host path, so pose receipts record the runtime they ran in.
+7. Pull results back with `rsync -a --ignore-existing <host>:~/exulanica-data/blobs/
+   .exulanica/reference-baseline/runtime/blobs/`; the store is content-addressed, so the merge is
+   safe. The database rows already point at those objects. Reload ordinary Atlas.
+
+Two automatic side effects deserve care. Admission queues the ordinary metadata-group scene job as
+well, so a workspace can end up with a group scene and an exact-set scene over overlapping
+photographs; Atlas displays the more complete one per region and lists the other as not drawn. A
+job whose stage bindings are no longer current is refused rather than run under new rules; queue a
+new exact request instead of retrying it.
 
 ## Alignment, quality and operational evidence
 
