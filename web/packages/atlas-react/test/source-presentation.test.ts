@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   atlasLandscapeSurface, atlasVec3, buildNavigationWorld, composeAtlasWorld,
-  islandId, localVec3, makeIsland, makeScene, placement,
+  islandId, localVec3, makeIsland, makeScene, placement, planResidency,
 } from '@exulanica/atlas-core';
 import {
-  initialAtlasCameraState, recoveredCameraState, sourceFirstArrivalPose, sourceGroveScene,
+  initialAtlasCameraState, pointMapResidencyCost, recoveredCameraState, sourceFirstArrivalPose, sourceGroveScene,
 } from '../src/playcanvas/atlas-binding.js';
 
 const island = makeIsland({
@@ -89,5 +89,26 @@ describe('arrival at a reconstructed region', () => {
     const start = initialAtlasCameraState(scene, world, 'inspection');
     expect(start.pitch).toBe(-0.085);
     expect(Math.hypot(start.x - reconstructed.placement.position.x, start.z - reconstructed.placement.position.z)).toBeGreaterThan(3);
+  });
+});
+
+describe('residency of a region with many placed point maps', () => {
+  it('lets one region always afford its full stage while several still compete', () => {
+    expect(pointMapResidencyCost(1, 96)).toEqual({ stub: 0, proxy: 4, coarse: 10, full: 24 });
+    expect(pointMapResidencyCost(38, 96)).toEqual({ stub: 0, proxy: 24, coarse: 48, full: 96 });
+    const id = islandId('bowl');
+    const plan = planResidency(
+      [{ islandId: id, cost: pointMapResidencyCost(38, 96) }],
+      [{ islandId: id, desired: 'full', priority: 203 }],
+      { maxCost: 96 },
+    );
+    expect(plan.allocated.get(id)).toBe('full');
+    // Under frame pressure the budget shrinks and the stage steps down without vanishing.
+    const squeezed = planResidency(
+      [{ islandId: id, cost: pointMapResidencyCost(38, 96) }],
+      [{ islandId: id, desired: 'full', priority: 203 }],
+      { maxCost: 30 },
+    );
+    expect(squeezed.allocated.get(id)).toBe('proxy');
   });
 });

@@ -500,17 +500,13 @@ export class AtlasBinding {
     }
     const trainedIslandIds = new Set([...trainedAssets.keys()].map((geometry) => geometry.islandId));
     const availableReconstruction = new Set([...pointMapsByIsland.keys(), ...trainedIslandIds]);
+    const residencyBudget = options.residencyBudget ?? 96;
     const residencyCatalog: ResidencyAsset[] = options.scene.islands.map((island) => ({
       islandId: island.islandId,
       cost: trainedIslandIds.has(island.islandId)
         ? Object.freeze({ stub: 0, proxy: 24, coarse: 24, full: 24 })
         : pointMapsByIsland.has(island.islandId)
-        ? Object.freeze({
-            stub: 0,
-            proxy: 4 * pointMapsByIsland.get(island.islandId)!.length,
-            coarse: 10 * pointMapsByIsland.get(island.islandId)!.length,
-            full: 24 * pointMapsByIsland.get(island.islandId)!.length,
-          })
+        ? pointMapResidencyCost(pointMapsByIsland.get(island.islandId)!.length, residencyBudget)
         : Object.freeze({ stub: 0, proxy: 2, coarse: 2, full: 2 }),
     }));
     const field = createWorldField(
@@ -685,7 +681,7 @@ export class AtlasBinding {
       renderRoot,
       initialArtProfile,
       Object.freeze(residencyCatalog),
-      options.residencyBudget ?? 96,
+      residencyBudget,
       options.sourcePresentation ?? 'world',
     );
   }
@@ -1502,6 +1498,26 @@ export function initialAtlasCameraState(
           pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
         };
       })();
+}
+
+/**
+ * Residency cost of a region's placed point maps, in budget units, capped so one region always fits.
+ *
+ * The cost grows with the map count so that many regions compete for the budget, and it is capped
+ * at the budget itself so that a single region can never price itself out of view. MEASURED
+ * 2026-09-05 on the first real scene: 38 placed maps cost 912 against a budget of 96, even their
+ * proxy stage exceeded it, the planner left the region at stub, and the walking view showed the
+ * landscape alone while inspection, which bypasses residency, showed the geometry. The decoded
+ * maps are uploaded either way; residency only decides what is drawn, and the representation
+ * pressure controller still scales the budget down when frames run long.
+ */
+export function pointMapResidencyCost(mapCount: number, budget: number): ResidencyAsset['cost'] {
+  return Object.freeze({
+    stub: 0,
+    proxy: Math.min(4 * mapCount, budget / 4),
+    coarse: Math.min(10 * mapCount, budget / 2),
+    full: Math.min(24 * mapCount, budget),
+  });
 }
 
 /** The controls' pose at a recovered camera: forward is (-sin yaw, 0, -cos yaw), pitch positive up. */
