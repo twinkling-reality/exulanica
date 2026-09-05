@@ -81,6 +81,18 @@ class StageSpec:
     different content hashes, a deterministic stage emits ``nondeterminism_detected`` and a
     non-deterministic one does not, so a sampled generation is not reported as a fault while a
     changed resampling filter is.
+
+    **What the flag does and does not claim (ADR-0017).** ``deterministic = True`` declares that a
+    content difference on this stage is a **fault worth an event**. That is necessary for an
+    exact-recomputation claim and is not the same as one: ``scene_pose`` sets it because a fixed
+    ``random_seed`` makes a differing pose worth investigating, while
+    ``exulanica/reconstruction/pycolmap_executor.py`` records that RANSAC threading still admits
+    variation and that nobody has measured how much. Only a stage that is both declared
+    deterministic and observed to reproduce may be described as exactly recomputable.
+
+    ``deterministic = False`` is required of every stage carrying a ``model_role``, enforced
+    below. A model-produced artifact is not bit-reproducible, and no wording anywhere in this
+    product may imply that it is.
     """
 
     key: str
@@ -92,6 +104,17 @@ class StageSpec:
 
     def __post_init__(self) -> None:
         canonical_json(self.params)  # refuse a float parameter at import, not at hash time
+        if self.model_role is not None and self.deterministic:
+            # ADR-0017. A stage that calls a model may not claim byte reproducibility. Sampled
+            # generation differs run to run by design, and a neural forward pass differs across
+            # accelerators and library versions even at temperature zero. Declaring one
+            # deterministic would file every legitimate difference as a fault and, worse, would
+            # put a stage behind the exact-recomputation claim that cannot support it.
+            raise ValueError(
+                f"stage {self.key!r} names model role {self.model_role!r} and declares itself "
+                "deterministic. A model-produced artifact is not bit-reproducible; see "
+                "docs/adr/0017-exact-recomputation.md."
+            )
 
     @property
     def params_digest(self) -> bytes:

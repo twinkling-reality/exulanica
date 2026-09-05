@@ -1607,12 +1607,38 @@ literature can support: an audit of ten unlearning methods found that Fisher For
 Forgetting and Certified Hessian Forgetting all fail to achieve the true objective despite formal
 certifications (<https://arxiv.org/html/2606.16110v1>, VERIFIED 2026-08-27).
 
-**ASSUMPTION (A-24).** Deleting an exemplar and recomputing yields a **bit-identical** state. Settled by
-experiment **X-8**, the deletion closure test: delete one exemplar, run the recompute path, build a fresh
-state from the remaining rows, and assert byte equality of exemplars, negatives, cohort membership and
-index (about 1 day). Any nondeterminism (ordering, float reduction order, coreset tie-breaking) must be
-eliminated, or the exact-recomputation claim must be weakened. **This claim may not be made publicly
-until X-8 passes.**
+**CORRECTED 2026-09-04, [adr/0017-exact-recomputation.md](adr/0017-exact-recomputation.md): "exact by
+construction" was scoped too widely.** It is true of the stages that are pure functions of their
+inputs. It is not true of a stage that calls a model. Sampled generation differs run to run by
+design, and a neural forward pass differs across accelerators and library versions even at
+temperature zero, so a re-run of a model stage produces a *different artifact*, not the same bytes.
+
+Stages that are not exactly recomputable, and therefore excluded from that claim: `vision` and
+`depth`. Both carry a `model_role`, and `stage_registry.deterministic` is `false` for both.
+`StageSpec` now refuses to construct a stage that names a model role and declares itself
+deterministic, so the exclusion cannot be lost by editing a flag.
+
+What is true of a model-produced artifact under deletion is narrower and is what the product says
+instead: **it is invalidated and removed, not regenerated.** `derived_artifact.stale` is set through
+`dep_index`, and no deletion path re-runs a model. Nothing about the account holder survives inside
+a caption, because the caption is gone rather than rewritten.
+
+A third case is neither: `scene_pose` is declared deterministic because it fixes COLMAP's
+`random_seed`, which makes a differing pose worth an event. `exulanica/reconstruction/pycolmap_executor.py`
+records that RANSAC threading still admits variation and that the residual has not been measured, so
+the stage is **declared deterministic and not yet observed to reproduce**, and only the second of
+those licenses an exact-recomputation claim.
+
+**ASSUMPTION (A-24), NARROWED.** Deleting an exemplar and recomputing the **deterministic** closure
+yields a bit-identical state. Settled by experiment **X-8**, the deletion closure test: delete one
+exemplar, run the recompute path, build a fresh state from the remaining rows, and assert byte
+equality of exemplars, negatives, cohort membership and index (about 1 day). Any nondeterminism
+(ordering, float reduction order, coreset tie-breaking) must be eliminated, or the claim must be
+weakened further. **This claim may not be made publicly until X-8 passes**, and it may never be made
+about `vision` or `depth` output at all.
+
+Pinned by `tests/test_exact_recomputation.py`, which derives the excluded list from the registry
+rather than trusting the sentence above.
 
 ---
 
