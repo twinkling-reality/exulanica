@@ -1,4 +1,4 @@
-"""The four components that can be scored today, and nothing that cannot.
+"""The corpus and authorization scorers; declared-plan answers use question_scorers.py.
 
 Each one returns a ``Count`` with every case named, because section 3.1 rule 4 asks for failures
 by name with their evidence rather than for an aggregate. A component that cannot run is not

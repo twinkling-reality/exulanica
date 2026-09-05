@@ -50,6 +50,14 @@ METRICS: Final[tuple[Component, ...]] = (
         blocked_on=None,
     ),
     Component(
+        "M1", "answer_citation_grounding", "declared-plan deterministic answer grounding",
+        "enforced", "1.00",
+        "Every scored deterministic answer had the manifest count and cited only gold photos, "
+        "or abstained when the gold set was empty",
+        "Live-model factual support, human semantic judgement, or completeness of cited photos",
+        blocked_on=None,
+    ),
+    Component(
         "M1", "cit_region", "region-level citation precision", "unclassified", None, None, None,
         blocked_on="section 6 places this in neither acceptance table, and no browser harness "
         "exists to measure a rendered region: the web workspace has no Playwright",
@@ -60,23 +68,23 @@ METRICS: Final[tuple[Component, ...]] = (
         "Zero unsupported claims across the N answerable questions in OGC-1, bounding the true "
         "rate at <= X% (95% Wilson upper)",
         '"Exulanica does not hallucinate." The bound is the claim',
-        blocked_on="no question set exists. The gold question fixture is unwritten, so there is "
-        "no answerable set to score against",
+        blocked_on="synthetic gold questions now exist, but live-model runs need NEBIUS_API_KEY "
+        "and frozen atomic-claim support labels; deterministic grounding is not M2",
     ),
     Component(
         "M3", "false_answer_rate", "answered an unanswerable question", "learned", "0",
         "The system abstained on every unanswerable question in OGC-1",
         "Abstention behaviour on question types not represented",
-        blocked_on="no question set exists, and one of the three abstention reason codes has no "
-        "producer, so a third of the space cannot be reached even with one",
+        blocked_on="live-model runs need NEBIUS_API_KEY; NOT_IN_MODALITY still has no producer, "
+        "so the gold modality-gap questions cannot be scored as a supported abstention path",
     ),
     Component(
         "M3", "false_abstention_rate", "abstained on an answerable question", "learned",
         "<= 2 in 35 (rescaled to final n)",
         "The system answered all but K answerable questions",
         "A general willingness-to-answer rate",
-        blocked_on="no gold question set exists, so there is no answerable question that the "
-        "system could have abstained on",
+        blocked_on="synthetic gold questions exist; live-model answers and NEBIUS_API_KEY are "
+        "still required, and a deterministic fallback run does not measure this rate",
     ),
     Component(
         "M4", "person_recall_at_5", "gold-same person pair within the top 5", "learned", "1.00",
@@ -127,12 +135,28 @@ METRICS: Final[tuple[Component, ...]] = (
         "people at all",
     ),
     Component(
-        "M8", "plan_validity", "parse, execution and schema validity", "enforced", "1.00 each",
-        "Every query compiled to a schema-valid, executable plan",
+        "M8", "plan_validity", "three stage checks per declared gold plan (parse/schema/execute)",
+        "enforced", "1.00 each",
+        "Every declared gold plan parsed, passed schema validation and executed",
         "That the plan expressed the question. That is M8 semantic accuracy, a human-labelled "
         "number with a 0.90 bar",
-        blocked_on="no question set exists, and planning calls a model, so it needs a credential "
-        "and three runs per rule 2",
+        blocked_on=None,
+    ),
+    Component(
+        "M8", "gold_result_exact_match", "declared gold-plan photo set diagnostic",
+        "enforced", "100%",
+        "Every scored declared gold plan returned exactly the manifest-derived photo set",
+        "Model plan semantics, person recall, or isolated SQL correctness: object appearance "
+        "queries also depend on captions and the manifest appearance vocabulary",
+        blocked_on=None,
+    ),
+    Component(
+        "M8", "model_plan_validity", "live-model plan parse, execution and schema validity",
+        "enforced", "1.00 each",
+        "Every live-model query compiled to a schema-valid, executable plan",
+        "Whether the model expressed the question correctly",
+        blocked_on="live-model planning needs NEBIUS_API_KEY and at least three uncached runs; "
+        "declared gold plans do not measure a model planner",
     ),
     Component(
         "M8", "plan_semantic_accuracy", "the plan expressed the question", "learned", ">= 0.90",
@@ -206,7 +230,8 @@ METRICS: Final[tuple[Component, ...]] = (
         "first token p50 <= 1.5 s; answer with resolvable citations p95 <= 8 s",
         "Measured from [region] against [model IDs] on OGC-1",
         "Latency under load. The suite is sequential and single-user",
-        blocked_on="no question set exists and answering calls a model",
+        blocked_on="synthetic gold questions exist; live-model latency needs NEBIUS_API_KEY, "
+        "five repetitions and first-token/citation-ready timing, which this offline run lacks",
     ),
     Component(
         "M14", "frame_time", "browser frame time and memory", "learned",

@@ -149,6 +149,11 @@ def render_report(
     """
     blocked = blocked or {}
     by_key = {f"{c.metric}.{c.key}": c for c in METRICS}
+    for key, result in results.items():
+        if key not in by_key:
+            raise ValueError(f"unknown evaluation component: {key}")
+        if result is not None and (by_key[key].blocked_on or blocked.get(key)):
+            raise ValueError(f"blocked component cannot publish a number: {key}")
     paired = [(by_key[key], results.get(key)) for key in by_key]
     enforced = [(c, r) for c, r in paired if c.kind == "enforced"]
     learned = [(c, r) for c, r in paired if c.kind == "learned"]
@@ -179,9 +184,12 @@ WHAT THIS CORPUS IS, and read it before any number below.
   MODALITY. The corpus is still images with no audio and no video, so nothing here tests any
   speech-dependent or motion-dependent behaviour, and no result may be read as though it did.
 
-  WHAT IS NOT COVERED. There are no people in this corpus. There is no question set, so nothing
-  that answers a question is measured. There is no browser harness and no hardware target, so no
-  rendering number exists.
+  WHAT IS NOT COVERED. There are no people in this corpus. Synthetic manifest-derived gold
+  questions exercise declared plans and the deterministic answer renderer. They do not measure
+  live-model planning, factual support, abstention rates or latency. Object appearance queries
+  depend on detector captions and an explicit manifest vocabulary; a miss is a pipeline result,
+  not an isolated SQL defect. Place questions need human-confirmed entity IDs. No rendering
+  number is measured by this harness.
 """
     if coverage:
         head += "\n  MEASURED AGAINST THIS WORKSPACE, rather than stated in general:\n\n"

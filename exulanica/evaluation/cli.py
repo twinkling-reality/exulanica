@@ -46,6 +46,8 @@ from exulanica.evaluation.provenance import (
     repository_snapshot,
     verify_archive,
 )
+from exulanica.evaluation.question_scorers import QUESTION_COMPONENTS, score_gold_questions
+from exulanica.evaluation.questions import GoldQuestions, derive_questions
 from exulanica.evaluation.replay import ReplayError, run_clean_replay
 from exulanica.evaluation.report import render_report
 from exulanica.evaluation.scorers import (
@@ -69,10 +71,24 @@ SCORED: Final[tuple[str, ...]] = (
     "M5.provenance_completeness",
     "M10.authorisation",
     "M15.capture_time_window_exact_match",
+    *QUESTION_COMPONENTS,
 )
 
 _PUBLIC = {"/healthz", "/readyz", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
 _EVALUATION_OWNER_DATABASE_URL_ENV = env_name("EVALUATION_OWNER_DATABASE_URL")
+
+
+def _cmd_questions(args: argparse.Namespace, stream: Any) -> int:
+    """Freeze synthetic gold independently of any database or model output."""
+    try:
+        questions = derive_questions(GroundTruth.read(args.corpus))
+        questions.write(args.out)
+    except (OSError, ValueError) as exc:
+        print(f"gold question generation: FAILED: {exc}", file=stream)
+        return 2
+    print(f"SYNTH-1 gold questions written to {args.out}", file=stream)
+    print(f"questions sha256 {questions.sha256}", file=stream)
+    return 0
 
 
 def _cmd_inspect_corpus(args: argparse.Namespace, stream: Any) -> int:
@@ -227,6 +243,17 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
             print(f"evaluation archive: FAILED: {exc}", file=stream)
             return 2
     truth = GroundTruth.read(args.corpus)
+    questions = None
+    question_blocker = "Generated gold plans require an explicitly synthetic manifest."
+    if truth.synthetic:
+        try:
+            questions = (
+                GoldQuestions.read(args.questions, truth) if getattr(args, "questions", None)
+                else derive_questions(truth)
+            )
+        except (OSError, ValueError) as exc:
+            print(f"gold questions: FAILED: {exc}", file=stream)
+            return 2
     workspace = uuid.UUID(args.workspace)
     database = Database.from_env()
 
@@ -250,6 +277,15 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
         results["M15.capture_time_window_exact_match"] = windows
         if windows is None:
             blocked["M15.capture_time_window_exact_match"] = why
+        observations: tuple[dict[str, Any], ...] = ()
+        if questions is not None:
+            scored_questions = score_gold_questions(connection, workspace, truth, questions)
+            results.update(scored_questions.results)
+            blocked.update(scored_questions.blocked)
+            observations = scored_questions.observations
+        else:
+            results.update(dict.fromkeys(QUESTION_COMPONENTS))
+            blocked.update(dict.fromkeys(QUESTION_COMPONENTS, question_blocker))
         coverage = what_the_corpus_cannot_support(connection, workspace, truth)
         execution = execution_snapshot(
             connection,
@@ -300,8 +336,9 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
         },
         # Null with a reason rather than absent. Section 2.0 rule 1 names it as a required
         # key, and a missing key and a blocked one read the same in a JSON file.
-        "fixture_version": None,
-        "fixture_blocked_on": "no gold question set exists",
+        "fixture_version": questions.sha256 if questions else None,
+        "fixture_blocked_on": None if questions else question_blocker,
+        "question_observations": observations,
         "blind_access_proof": None,
         "blind_access_blocked_on": "legacy corpus has no frozen split or access receipt",
         "workspace_id": str(workspace),
@@ -336,6 +373,10 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
             "snapshots/package-migrations.json": _pretty_json(package_migrations),
             "snapshots/database-execution.json": _pretty_json(execution),
         }
+        if questions is not None:
+            snapshots["inputs/gold-questions.json"] = _pretty_json(
+                questions.model_dump(mode="json")
+            )
         try:
             receipt = create_archive(
                 args.archive_parent,
@@ -396,6 +437,10 @@ def main(argv: list[str] | None = None, stream: Any = None) -> int:
     stream = stream or sys.stdout
     parser = argparse.ArgumentParser(prog="exulanica-eval", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    questions = sub.add_parser("questions", help="freeze synthetic gold from MANIFEST.json")
+    questions.add_argument("--corpus", required=True)
+    questions.add_argument("--out", required=True)
+    questions.set_defaults(handler=_cmd_questions)
     inspect = sub.add_parser(
         "inspect-corpus",
         help="validate a Phase 2 CORPUS.json bundle without opening private media",
@@ -441,6 +486,7 @@ def main(argv: list[str] | None = None, stream: Any = None) -> int:
     replay_bundle.set_defaults(handler=_cmd_replay_bundle)
     run = sub.add_parser("run", help="measure what can be measured against a corpus")
     run.add_argument("--corpus", required=True, help="the directory holding MANIFEST.json")
+    run.add_argument("--questions", default=None, help="frozen synthetic gold question file")
     run.add_argument("--workspace", required=True, help="the workspace uuid the corpus is in")
     run.add_argument(
         "--data-dir",

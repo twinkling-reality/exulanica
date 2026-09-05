@@ -1,0 +1,301 @@
+{
+  "profile": "exulanica.synthetic-gold-questions/v1",
+  "corpus_id": "SYNTH-1",
+  "synthetic": true,
+  "manifest_sha256": "7b7833c902637acbc59dd992b4a3d8671d9d644a18d6c0c5b1ca6fd5f008b57c",
+  "questions": [
+    {
+      "question_id": "time:courtyard-spring:whole",
+      "question": "Which photographs were captured from 2026-04-18T09:14:29+00:00 inclusive to 2026-04-18T09:17:15+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "courtyard-spring"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "377e47169957d5ea2135c3bb3e5f237cead1f0a9fe0d85ba6d41c85314358fb3",
+        "bdf427135082df5a459759eef5f8e659a7b18171141032bc994573b2052e2bf4",
+        "cd816136674829b47ad11266a9414eef856fae3f9b7bf502a5829fb8b487906c"
+      ],
+      "expected_capture_count": 3,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T09:14:29+00:00",
+            "end": "2026-04-18T09:17:15+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "time:courtyard-spring:before",
+      "question": "Which photographs were captured from 2026-04-18T09:14:28+00:00 inclusive to 2026-04-18T09:14:29+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "courtyard-spring"
+      },
+      "answerability": "not_captured",
+      "expected_photo_sha256": [],
+      "expected_capture_count": 0,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T09:14:28+00:00",
+            "end": "2026-04-18T09:14:29+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "time:harbour-spring:whole",
+      "question": "Which photographs were captured from 2026-04-18T14:43:38+00:00 inclusive to 2026-04-18T14:45:17+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "harbour-spring"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "74f2cb95758777385b6242d53ba2a88bca7fbdea697c973cb361a59036d91f48",
+        "85ca31b2ec7170e0c1444561f90fa88c38f4246faab1ec9b41badf48cb2d8606",
+        "da938996d536c32a5b21394b50d2079566c0bfced7b4f2ba51f04d09c7829f11"
+      ],
+      "expected_capture_count": 3,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T14:43:38+00:00",
+            "end": "2026-04-18T14:45:17+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "time:harbour-spring:before",
+      "question": "Which photographs were captured from 2026-04-18T14:43:37+00:00 inclusive to 2026-04-18T14:43:38+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "harbour-spring"
+      },
+      "answerability": "not_captured",
+      "expected_photo_sha256": [],
+      "expected_capture_count": 0,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T14:43:37+00:00",
+            "end": "2026-04-18T14:43:38+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "time:kitchen-spring:whole",
+      "question": "Which photographs were captured from 2026-04-18T18:21:09+00:00 inclusive to 2026-04-18T18:23:13+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "kitchen-spring"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "85bac0abb9a787f4022ddb6fa0554e11095929449c1596904a99e3cfee4684d3",
+        "909428b7fff376dbabc96ab8fbb93f21cae8caf9880f709408e78b5543479e70",
+        "ab95f2616cfff1b5ee131ade4a1f4e27449200648fd341e7dde52c67e95620e4"
+      ],
+      "expected_capture_count": 3,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T18:21:09+00:00",
+            "end": "2026-04-18T18:23:13+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "time:kitchen-spring:before",
+      "question": "Which photographs were captured from 2026-04-18T18:21:08+00:00 inclusive to 2026-04-18T18:21:09+00:00 exclusive?",
+      "dimension": "time",
+      "context": {
+        "trip": "kitchen-spring"
+      },
+      "answerability": "not_captured",
+      "expected_photo_sha256": [],
+      "expected_capture_count": 0,
+      "plan": {
+        "intent": "captures",
+        "time": [
+          {
+            "start": "2026-04-18T18:21:08+00:00",
+            "end": "2026-04-18T18:21:09+00:00"
+          }
+        ],
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "object:satchel",
+      "question": "Which photographs show satchel?",
+      "dimension": "object",
+      "context": {
+        "subject": "satchel"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "20872dd3d645cfe85e444bbe960518d95dbdd8d526e4727e2a2a69c087cb91da",
+        "377e47169957d5ea2135c3bb3e5f237cead1f0a9fe0d85ba6d41c85314358fb3",
+        "85bac0abb9a787f4022ddb6fa0554e11095929449c1596904a99e3cfee4684d3",
+        "909428b7fff376dbabc96ab8fbb93f21cae8caf9880f709408e78b5543479e70",
+        "ab95f2616cfff1b5ee131ade4a1f4e27449200648fd341e7dde52c67e95620e4",
+        "ac35a880654b9dea86e5fc030d213848fcba59de7bd4679e4233dbbbb1586a2f",
+        "bdf427135082df5a459759eef5f8e659a7b18171141032bc994573b2052e2bf4",
+        "cd816136674829b47ad11266a9414eef856fae3f9b7bf502a5829fb8b487906c",
+        "e7f65e241d4ea4964c17c3c7766ae1c44a88aa23187ee7cf42df787d75794b0c"
+      ],
+      "expected_capture_count": 9,
+      "plan": {
+        "intent": "captures",
+        "semantic_query": "satchel",
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "object:thermos",
+      "question": "Which photographs show thermos?",
+      "dimension": "object",
+      "context": {
+        "subject": "thermos"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "377e47169957d5ea2135c3bb3e5f237cead1f0a9fe0d85ba6d41c85314358fb3",
+        "541b0f75a950eebbdb42b04c43762c7c298cf7628c0740e3456ba0c4ed03bb79",
+        "74f2cb95758777385b6242d53ba2a88bca7fbdea697c973cb361a59036d91f48",
+        "85ca31b2ec7170e0c1444561f90fa88c38f4246faab1ec9b41badf48cb2d8606",
+        "bdf427135082df5a459759eef5f8e659a7b18171141032bc994573b2052e2bf4",
+        "cafdae23eb13b8b96b90d37798fd61fe7c8749ca5c9a3ac748ab3e8d5147078e",
+        "cd816136674829b47ad11266a9414eef856fae3f9b7bf502a5829fb8b487906c",
+        "d521787dcd8274759d135d77dc74b08ff07f7b507d3b123b2d7ce519b1c860ce",
+        "da938996d536c32a5b21394b50d2079566c0bfced7b4f2ba51f04d09c7829f11"
+      ],
+      "expected_capture_count": 9,
+      "plan": {
+        "intent": "captures",
+        "semantic_query": "thermos",
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "object:lantern",
+      "question": "Which photographs show lantern?",
+      "dimension": "object",
+      "context": {
+        "subject": "lantern"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "20872dd3d645cfe85e444bbe960518d95dbdd8d526e4727e2a2a69c087cb91da",
+        "541b0f75a950eebbdb42b04c43762c7c298cf7628c0740e3456ba0c4ed03bb79",
+        "85bac0abb9a787f4022ddb6fa0554e11095929449c1596904a99e3cfee4684d3",
+        "909428b7fff376dbabc96ab8fbb93f21cae8caf9880f709408e78b5543479e70",
+        "ab95f2616cfff1b5ee131ade4a1f4e27449200648fd341e7dde52c67e95620e4",
+        "ac35a880654b9dea86e5fc030d213848fcba59de7bd4679e4233dbbbb1586a2f",
+        "cafdae23eb13b8b96b90d37798fd61fe7c8749ca5c9a3ac748ab3e8d5147078e",
+        "d521787dcd8274759d135d77dc74b08ff07f7b507d3b123b2d7ce519b1c860ce",
+        "e7f65e241d4ea4964c17c3c7766ae1c44a88aa23187ee7cf42df787d75794b0c"
+      ],
+      "expected_capture_count": 9,
+      "plan": {
+        "intent": "captures",
+        "semantic_query": "lantern",
+        "limit": 24
+      },
+      "blocked_on": null
+    },
+    {
+      "question_id": "place:courtyard",
+      "question": "Which photographs were made at the synthetic place courtyard?",
+      "dimension": "place",
+      "context": {
+        "place": "courtyard"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "20872dd3d645cfe85e444bbe960518d95dbdd8d526e4727e2a2a69c087cb91da",
+        "377e47169957d5ea2135c3bb3e5f237cead1f0a9fe0d85ba6d41c85314358fb3",
+        "ac35a880654b9dea86e5fc030d213848fcba59de7bd4679e4233dbbbb1586a2f",
+        "bdf427135082df5a459759eef5f8e659a7b18171141032bc994573b2052e2bf4",
+        "cd816136674829b47ad11266a9414eef856fae3f9b7bf502a5829fb8b487906c",
+        "e7f65e241d4ea4964c17c3c7766ae1c44a88aa23187ee7cf42df787d75794b0c"
+      ],
+      "expected_capture_count": 6,
+      "plan": null,
+      "blocked_on": "A place filter requires a human-confirmed place entity; the harness does not manufacture that decision from the manifest."
+    },
+    {
+      "question_id": "place:harbour",
+      "question": "Which photographs were made at the synthetic place harbour?",
+      "dimension": "place",
+      "context": {
+        "place": "harbour"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "541b0f75a950eebbdb42b04c43762c7c298cf7628c0740e3456ba0c4ed03bb79",
+        "74f2cb95758777385b6242d53ba2a88bca7fbdea697c973cb361a59036d91f48",
+        "85ca31b2ec7170e0c1444561f90fa88c38f4246faab1ec9b41badf48cb2d8606",
+        "cafdae23eb13b8b96b90d37798fd61fe7c8749ca5c9a3ac748ab3e8d5147078e",
+        "d521787dcd8274759d135d77dc74b08ff07f7b507d3b123b2d7ce519b1c860ce",
+        "da938996d536c32a5b21394b50d2079566c0bfced7b4f2ba51f04d09c7829f11"
+      ],
+      "expected_capture_count": 6,
+      "plan": null,
+      "blocked_on": "A place filter requires a human-confirmed place entity; the harness does not manufacture that decision from the manifest."
+    },
+    {
+      "question_id": "place:kitchen",
+      "question": "Which photographs were made at the synthetic place kitchen?",
+      "dimension": "place",
+      "context": {
+        "place": "kitchen"
+      },
+      "answerability": "answerable",
+      "expected_photo_sha256": [
+        "85bac0abb9a787f4022ddb6fa0554e11095929449c1596904a99e3cfee4684d3",
+        "909428b7fff376dbabc96ab8fbb93f21cae8caf9880f709408e78b5543479e70",
+        "ab95f2616cfff1b5ee131ade4a1f4e27449200648fd341e7dde52c67e95620e4"
+      ],
+      "expected_capture_count": 3,
+      "plan": null,
+      "blocked_on": "A place filter requires a human-confirmed place entity; the harness does not manufacture that decision from the manifest."
+    },
+    {
+      "question_id": "modality:speech",
+      "question": "What was said while these photographs were taken?",
+      "dimension": "modality",
+      "context": {},
+      "answerability": "not_in_modality",
+      "expected_photo_sha256": [],
+      "expected_capture_count": 0,
+      "plan": null,
+      "blocked_on": "Still images carry no speech evidence, and NOT_IN_MODALITY has no production question-path producer. M3 remains blocked."
+    }
+  ]
+}

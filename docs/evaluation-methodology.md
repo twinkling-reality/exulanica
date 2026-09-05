@@ -467,6 +467,23 @@ named case studies with the actual intervals printed. Never as an F1.
 Natural-language queries compile to a closed-vocabulary structured plan which a fixed compiler turns
 into parameterized SQL with zero string interpolation of model output.
 
+**Declared gold plans and live-model plans are different measurements (ADR-0020).** The synthetic
+question set derives photo answers from the drawing manifest before any database query. Its
+declared plans exercise parse, reference/schema validation and SQL execution; `M8.plan_validity`
+reports those three stages as named cases. `M8.model_plan_validity` remains blocked until live-model
+planning is measured. `M8.gold_result_exact_match` compares returned photo hashes to the frozen
+gold, including object appearance queries. Missing captions and appearance-vocabulary mismatch
+therefore fail that diagnostic; it does not isolate the compiler from the detector. No identity
+decisions are generated to make an entity filter scoreable. Place questions are frozen with their
+gold photo sets but remain unexecuted until a human confirms the place entities.
+
+`M1.answer_citation_grounding` follows those declared plans through the real evidence packet,
+deterministic answer renderer and validator. It checks clause citation tokens against manifest
+photo hashes and checks the answer count or empty-set abstention. It measures no model claim
+support, semantic judgement or general abstention quality. M2, M3 and M13 stay blocked without
+live-model evidence and the inputs their own definitions require. The gold modality-gap question
+is retained as unexecutable because `NOT_IN_MODALITY` still has no producer.
+
 - **Parse rate** (syntactically valid plan). **Pass: 1.00.**
 - **Execution rate** (runs without runtime error). **Pass: 1.00.**
 - **Schema validity**: the plan references only entity types, edge types and fields that exist.
@@ -1016,7 +1033,10 @@ rather than omitted. A suite that reports only the probes it passes is not an ad
 | M1 CIT-ID | 1.00 | "Every citation in OGC-1 opened the exact original photograph that supports the claim" | Any statement about photographs outside OGC-1, or about region-level precision within a photograph |
 | M5 provenance completeness | 1.00 | "Every edge in the confirmed graph carries at least one evidence pointer" | That the edges are correct. Correctness is M5 precision and recall, a separate, learned number |
 | M6 filter set exact-match | 100% | "ANY, ALL and TOGETHER filters return the exact gold set on every expression tested" | Correct behaviour on filter expressions not in the suite |
-| M8 parse, execution, schema validity | 1.00 each | "Every query compiled to a schema-valid, executable plan" | That the plan expressed the question. That is M8 semantic accuracy, a human-labelled number with a 0.90 bar |
+| M8 declared gold-plan parse, execution, schema validity | 1.00 each | "Every declared gold plan parsed, passed schema validation and executed" | That the plan expressed the question. That is M8 semantic accuracy, a human-labelled number with a 0.90 bar |
+| M8 live-model plan validity | 1.00 each | "Every live-model query compiled to a schema-valid, executable plan" | Whether the model expressed the question correctly |
+| M8 declared gold-plan photo set diagnostic | 100% | "Every scored declared gold plan returned exactly the manifest-derived photo set" | Model plan semantics, person recall, or isolated SQL correctness: object appearance queries also depend on captions and the manifest appearance vocabulary |
+| M1 declared-plan deterministic answer grounding | 1.00 | "Every scored deterministic answer had the manifest count and cited only gold photos, or abstained when the gold set was empty" | Live-model factual support, human semantic judgement, or completeness of cited photos |
 | M9 gate precision | 0 false invocations | "No external lookup occurred for any private entity, any historical question, or with opt-in off, across the tested negatives" | That the gate is unbreakable. It licenses only that these negatives did not break it |
 | M9 payload minimality | pass | "The only content that left the system for external lookup was a public entity name" | Anything about what the external provider does with it |
 | M10 deletion | 100% of logged artifacts absent | "Every artifact logged at ingestion was verifiably absent after deletion" | "Your data is gone." Backups, exported packages, and anything already published are outside this test and are disclosed separately |

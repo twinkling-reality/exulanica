@@ -13,7 +13,7 @@ one-level walk quietly stopped seeing the entire authenticated surface. So the l
 one sentence: nothing the product runs depends on the API, and the only thing that does is the
 thing that measures it.
 
-**The corpus problem, first and loudest.** The only corpus that exists is synthetic: eighty
+**The corpus problem, first and loudest.** The question corpus is synthetic:
 renders of three geometric arrangements. Nothing about identity, clustering or reconstruction is
 real on it. No number computed against it is evidence about photographs, no interval is printed
 against it, and the report says all of that above the results rather than in a footnote.
