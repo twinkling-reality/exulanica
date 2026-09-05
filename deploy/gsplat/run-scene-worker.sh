@@ -10,8 +10,10 @@
 # Required environment: CODE_REVISION (40 hex), EXULANICA_WORKSPACE_IDS (comma separated),
 # EXULANICA_DATABASE_URL (for example postgresql://<os-user>@127.0.0.1:5433/exulanica_spine_test).
 # Optional: EXULANICA_DATA_DIR (default ~/exulanica-data), PGOPTIONS (default -c role=exulanica_app),
-# REPO_DIR (default ~/orimera, must hold deploy/gsplat/compressor/node_modules), NODE_DIR (~/node).
-# Usage: deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <worker-name>
+# REPO_DIR (default ~/orimera, must hold deploy/gsplat/compressor/node_modules), NODE_DIR (~/node),
+# EXULANICA_SCENE_JOB_IDS (comma separated; the worker then claims only those jobs instead of
+# draining the workspaces oldest first, which on a rented GPU can spend the pass on a stale job).
+# Usage: deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <worker-name> [--job <id>]
 set -euo pipefail
 : "${CODE_REVISION:?set CODE_REVISION to the exact 40-character Git revision the images were built at}"
 : "${EXULANICA_WORKSPACE_IDS:?set EXULANICA_WORKSPACE_IDS}"
@@ -37,6 +39,7 @@ exec docker run --rm --network host --no-healthcheck \
   -e PGOPTIONS="${PGOPTIONS:--c role=exulanica_app}" \
   -e EXULANICA_DATA_DIR="$DATA_DIR" \
   -e EXULANICA_WORKSPACE_IDS="$EXULANICA_WORKSPACE_IDS" \
+  -e EXULANICA_SCENE_JOB_IDS="${EXULANICA_SCENE_JOB_IDS:-}" \
   -e EXULANICA_CODE_REVISION="$CODE_REVISION" \
   -e EXULANICA_POSE_RUNTIME_IMAGE="$WORKER_IMAGE" \
   -w "$DATA_DIR" \

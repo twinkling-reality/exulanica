@@ -254,8 +254,12 @@ uv run --extra pose exulanica-scene-worker
 
 Both provenance variables are required. A mutable image tag or guessed checkout is not accepted.
 The worker also refuses an owner, superuser, or BYPASSRLS database role and an empty workspace set.
-Use `--once` to drain the work currently eligible and exit. Defaults are a 900-second lease,
-30-second heartbeat, 2-second polling interval, and 3600-second abandoned-scratch age.
+Use `--once` to drain the work currently eligible and exit. Repeat `--job <job-uuid>` (or set
+`EXULANICA_SCENE_JOB_IDS`) to claim only the named jobs; without it the worker takes every eligible
+job in its workspaces oldest first, including a stale retryable job another operator forgot. A
+job-scoped worker that finds nothing in its scope claims nothing and exits cleanly under `--once`.
+Defaults are a 900-second lease, 30-second heartbeat, 2-second polling interval, and 3600-second
+abandoned-scratch age.
 
 Authenticated operators can read top-level state from `GET /operations/reconstruction-scenes`.
 It distinguishes derivative work, ready or running scene work, groups blocked on missing point

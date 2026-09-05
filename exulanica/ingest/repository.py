@@ -266,11 +266,15 @@ class IngestRepository:
         )
 
     def claim_reconstruction_scene(
-        self, *, worker: str, lease_seconds: float
+        self,
+        *,
+        worker: str,
+        lease_seconds: float,
+        job_ids: frozenset[uuid.UUID] | None = None,
     ) -> reconstruction_jobs.ClaimedSceneJob | None:
-        """Claim the next pending scene build for this workspace."""
+        """Claim the next pending scene build for this workspace, or one of the named jobs."""
         return reconstruction_jobs.claim(
-            self._scope, worker=worker, lease_seconds=lease_seconds
+            self._scope, worker=worker, lease_seconds=lease_seconds, job_ids=job_ids
         )
 
     def active_reconstruction_scratch_keys(self) -> frozenset[str]:

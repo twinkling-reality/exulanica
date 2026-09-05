@@ -81,9 +81,12 @@ class SceneReconstructionWorker:
         lease_seconds: float = 900.0,
         heartbeat_seconds: float = 30.0,
         abandoned_after_seconds: float = 3600.0,
+        job_ids: frozenset[uuid.UUID] | None = None,
     ) -> None:
         if not workspaces:
             raise ValueError("a scene worker needs at least one configured workspace")
+        if job_ids is not None and not job_ids:
+            raise ValueError("a job-scoped scene worker needs at least one job id")
         if heartbeat_seconds <= 0 or heartbeat_seconds >= lease_seconds:
             raise ValueError("scene heartbeat must be positive and shorter than its lease")
         self._database = database
@@ -96,6 +99,7 @@ class SceneReconstructionWorker:
         self._lease_seconds = lease_seconds
         self._heartbeat_seconds = heartbeat_seconds
         self._abandoned_after_seconds = abandoned_after_seconds
+        self._job_ids = job_ids
         self._stop = threading.Event()
 
     def request_stop(self) -> None:
@@ -108,6 +112,11 @@ class SceneReconstructionWorker:
     @property
     def workspace_count(self) -> int:
         return len(self._workspaces)
+
+    @property
+    def job_ids(self) -> frozenset[uuid.UUID] | None:
+        """The explicit jobs this worker may claim; ``None`` drains its workspaces."""
+        return self._job_ids
 
     def cleanup_abandoned(self) -> tuple[str, ...]:
         active: set[str] = set()
@@ -142,6 +151,7 @@ class SceneReconstructionWorker:
             claimed = repository.claim_reconstruction_scene(
                 worker=self._name,
                 lease_seconds=self._lease_seconds,
+                job_ids=self._job_ids,
             )
             if claimed is None:
                 return None

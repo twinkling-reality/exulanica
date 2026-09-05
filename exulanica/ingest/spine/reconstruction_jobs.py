@@ -224,8 +224,22 @@ def _claimed(scope: WorkspaceScope, row: dict[str, Any], *, reclaimed: bool) -> 
     )
 
 
-def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> ClaimedSceneJob | None:
-    """Claim expired work first, then queued or retryable work, with a rotated token."""
+def claim(
+    scope: WorkspaceScope,
+    *,
+    worker: str,
+    lease_seconds: float,
+    job_ids: frozenset[uuid.UUID] | None = None,
+) -> ClaimedSceneJob | None:
+    """Claim expired work first, then queued or retryable work, with a rotated token.
+
+    ``job_ids`` narrows the claim to explicitly named jobs. A worker rented for one
+    scene otherwise drains every eligible job in the workspace, oldest first; MEASURED
+    2026-09-05 a fresh GPU worker spent its first pass and a stale job's final attempt
+    that way. ``None`` keeps the ordinary drain-everything behaviour.
+    """
+    scoped = "" if job_ids is None else " and job_id = any(%s)"
+    scoped_parameters: tuple[object, ...] = () if job_ids is None else (list(job_ids),)
     scope.connection.execute(
         "update reconstruction_scene_job set status='cancelled',claim_token=null,"
         "claimed_by=null,lease_expires_at=null,completed_at=coalesce(completed_at,now()),"
@@ -244,12 +258,12 @@ def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> Claime
         "where job_id=(select job_id from reconstruction_scene_job "
         "where workspace_id=%s and status='running' and lease_expires_at < now() "
         "and privacy_admission_allows_job(workspace_id,job_id) "
-        "and attempts < %s order by available_at,created_at,job_id "
+        "and attempts < %s" + scoped + " order by available_at,created_at,job_id "
         "for update skip locked limit 1) "
         "returning job_id,scene_id,member_digest,selection_policy,selection_policy_digest,"
         "build_inputs,build_input_digest,privacy_admission_id,privacy_admission_digest,"
         "attempts,claim_token,scratch_key",
-        (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS),
+        (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS, *scoped_parameters),
     ).fetchone()
     if row is None:
         reclaimed = False
@@ -261,12 +275,12 @@ def claim(scope: WorkspaceScope, *, worker: str, lease_seconds: float) -> Claime
             "where job_id=(select job_id from reconstruction_scene_job "
             "where workspace_id=%s and status in ('queued','failed') and available_at <= now() "
             "and attempts < %s and not tombstone_blocks_reconstruction_job(workspace_id,job_id) "
-            "and privacy_admission_allows_job(workspace_id,job_id) "
+            "and privacy_admission_allows_job(workspace_id,job_id)" + scoped + " "
             "order by available_at,created_at,job_id for update skip locked limit 1) "
             "returning job_id,scene_id,member_digest,selection_policy,selection_policy_digest,"
             "build_inputs,build_input_digest,privacy_admission_id,privacy_admission_digest,"
             "attempts,claim_token,scratch_key",
-            (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS),
+            (worker, lease_seconds, scope.workspace_id, MAX_SCENE_CLAIMS, *scoped_parameters),
         ).fetchone()
     return None if row is None else _claimed(scope, row, reclaimed=reclaimed)
 

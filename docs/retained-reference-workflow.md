@@ -200,7 +200,11 @@ daemon, so the worker itself must run on that host, not through a remote Docker 
    image, then run `deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <name>`
    on the host with `CODE_REVISION`, `EXULANICA_WORKSPACE_IDS` and `EXULANICA_DATABASE_URL` set.
    It runs the worker inside the worker image with host networking, the host Docker socket, and
-   the store mounted at its host path, so pose receipts record the runtime they ran in.
+   the store mounted at its host path, so pose receipts record the runtime they ran in. Add
+   `--job <job id>` (or `EXULANICA_SCENE_JOB_IDS`) so the rented worker claims exactly the job you
+   queued: `--once` otherwise drains every eligible job in the workspace oldest first, and
+   MEASURED 2026-09-05 a fresh worker's first pass went to a stale job pinned to an older image,
+   which failed on its final attempt before the intended job started.
 7. Pull results back with `rsync -a --ignore-existing <host>:~/exulanica-data/blobs/
    .exulanica/reference-baseline/runtime/blobs/`; the store is content-addressed, so the merge is
    safe. The database rows already point at those objects. Reload ordinary Atlas.

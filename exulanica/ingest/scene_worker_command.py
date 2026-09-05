@@ -22,10 +22,32 @@ from exulanica.ingest.scene_worker import SceneReconstructionWorker
 from exulanica.ingest.worker_command import parse_workspaces
 from exulanica.store.local import LocalContentAddressedStore
 
-__all__ = ["main"]
+__all__ = ["JOB_IDS_ENV", "main", "parse_job_ids"]
 
 CODE_REVISION_ENV: Final = env_name("CODE_REVISION")
 POSE_IMAGE_ENV: Final = env_name("POSE_RUNTIME_IMAGE")
+JOB_IDS_ENV: Final = env_name("SCENE_JOB_IDS")
+
+
+def parse_job_ids(values: list[str], environment: Mapping[str, str]) -> frozenset[uuid.UUID] | None:
+    """Resolve explicit ``--job`` flags plus a comma-separated deployment value.
+
+    Nothing configured means the worker drains its workspaces as before. Anything
+    configured must parse as UUIDs; a typo that silently widened the scope back to
+    every job would defeat the reason an operator named jobs at all.
+    """
+    raw = list(values)
+    raw.extend(
+        part.strip()
+        for part in (env_get("SCENE_JOB_IDS", environment) or "").split(",")
+        if part.strip()
+    )
+    if not raw:
+        return None
+    try:
+        return frozenset(uuid.UUID(value) for value in raw)
+    except ValueError as exc:
+        raise ValueError(f"{JOB_IDS_ENV} and --job accept UUIDs only: {exc}") from exc
 
 
 def _required(environment: Mapping[str, str], name: str) -> str:
@@ -72,6 +94,7 @@ def _build(
         lease_seconds=args.lease_seconds,
         heartbeat_seconds=args.heartbeat_seconds,
         abandoned_after_seconds=args.abandoned_after_seconds,
+        job_ids=parse_job_ids(args.job, environment),
     )
 
 
@@ -86,6 +109,12 @@ def main(
         description="Drain exact scene sets through checkpointed camera-pose recovery.",
     )
     parser.add_argument("--workspace", action="append", default=[])
+    parser.add_argument(
+        "--job",
+        action="append",
+        default=[],
+        help="claim only this scene job (repeatable); default drains the workspaces",
+    )
     parser.add_argument("--name")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=2.0)
@@ -101,7 +130,13 @@ def main(
     except Exception as error:
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))
         return 1
-    _emit(output, "startup", worker=worker.name, removed_scratch=len(removed))
+    _emit(
+        output,
+        "startup",
+        worker=worker.name,
+        removed_scratch=len(removed),
+        **({} if worker.job_ids is None else {"job_ids": sorted(map(str, worker.job_ids))}),
+    )
     requested = threading.Event()
 
     def stop(signum: int, _frame: Any) -> None:

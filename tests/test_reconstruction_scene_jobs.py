@@ -218,6 +218,32 @@ def test_operator_exact_set_does_not_queue_incomplete_privacy_safe_inputs(reposi
     )
 
 
+def test_a_job_scoped_claim_takes_only_the_named_job_and_leaves_the_rest_queued(ingest_spine):
+    repository, reopen = ingest_spine
+    older_job, _ = _enqueue(repository, _captures(repository, 3))
+    newer_captures = [
+        capture for capture in _captures(repository, 6) if capture not in {older_job}
+    ][3:]
+    newer_job, inserted = _enqueue(repository, newer_captures)
+    assert inserted is True and newer_job != older_job
+
+    scoped = reopen().claim_reconstruction_scene(
+        worker="rented-gpu", lease_seconds=60, job_ids=frozenset({newer_job})
+    )
+    assert scoped is not None
+    assert scoped.job_id == newer_job, "the oldest job must not win when the worker named another"
+    assert (
+        reopen().claim_reconstruction_scene(
+            worker="rented-gpu", lease_seconds=60, job_ids=frozenset({newer_job})
+        )
+        is None
+    ), "a scoped worker with nothing left in its scope claims nothing, even with other work queued"
+
+    unscoped = reopen().claim_reconstruction_scene(worker="pool", lease_seconds=60)
+    assert unscoped is not None
+    assert unscoped.job_id == older_job
+
+
 def test_two_claimants_do_not_receive_the_same_scene(ingest_spine):
     repository, reopen = ingest_spine
     _enqueue(repository, _captures(repository))
