@@ -41,6 +41,39 @@ OPM assets. Older records without accepted calibration keep the OPM field-of-vie
 estimate fallback, and source galleries remain accessible. Camera metadata alone
 does not enable reconstruction inspection when no geometry actually loaded.
 
+## Display frame, arrival and residency
+
+MEASURED 2026-09-05 on the first retained real scene (40 bowl photographs, 38 placed maps):
+drawn as delivered, the scene stood tilted on its COLMAP axes, off the region centre, about six
+times larger than the walking world, 1.2 units under the authored landscape, and its region was
+left at the residency stub stage, so the arrival frame showed landscape alone while the
+inspector, which bypasses residency, showed the geometry. Four presentation rules now apply to
+every drawn scene. None changes a receipt, a rung, or a physical claim, and the status line says
+so beside the rung.
+
+- **Display frame.** `sceneDisplayFrame` in atlas-core derives one similarity per scene from
+  its recovered cameras: up is the mean camera up (or the negated mean forward for a top-down
+  survey, or the scene axes when neither agrees), the point the camera rays converge on sits on
+  the region's vertical axis, and the median camera stands at eye height above the low quantile of
+  the displayed bounds. The loader composes it into every placed map, the trained asset and every
+  recovered camera of that scene, so all three stay consistent, and records it as
+  `displayFrames`. The status reads, for example, "Displayed upright at 0.159× nonmetric exhibit
+  scale, with the recovered cameras at eye height."
+- **Grounding.** A reconstructed region's placement height is the authored landscape height at
+  its centre, so local y = 0 is the ground the visitor stands on. Source-first regions keep the
+  solver plane and compensate per veil, as before.
+- **Arrival.** A region with recovered cameras arrives where the first photograph was taken,
+  looking where that camera looked (`viewpointForwardLocal`). The first frame is the first
+  photograph's view of the geometry. Regions without a recovered direction keep the offset framing.
+- **Residency.** A region's point-map cost is capped at the residency budget, so one region can
+  always afford its full stage while several still compete; the representation pressure controller
+  still steps the stage down under frame pressure without dropping the region to stub.
+
+One region displays one scene. When several current scenes overlap the same photographs, the
+region shows the one covering the most of them, then trained geometry over point maps; the others
+stay in the graph and the status list marked "Not drawn". An exact set whose members exceed the
+metadata group joins that group's island rather than splitting into standalone islands.
+
 ## Trained artifact delivery
 
 `trained_geometry` describes the exact current published artifact: SOG container,
