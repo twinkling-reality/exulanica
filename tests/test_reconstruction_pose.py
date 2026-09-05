@@ -240,3 +240,19 @@ def test_pose_quality_retains_real_sparse_correspondences_and_camera_dimensions(
     }
     assert camera.sparse_observations == ((7, 160, 120, 2, 0, 8, 0.25, 2),)
     assert camera.as_payload()["sparse_observations"] == [[7, 160, 120, 2, 0, 8, 0.25, 2]]
+
+
+def test_pose_receipt_drops_points_one_image_observes_twice(tmp_path):
+    """Real COLMAP models can merge tracks so one image sees a point at two keypoints."""
+    from exulanica.reconstruction.pose import _alignment_observations, _images
+
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "cameras.txt").write_text("1 PINHOLE 320 240 200 200 160 120\n")
+    (model / "images.txt").write_text("1 1 0 0 0 -2 0 0 1 a.jpg\n160 120 7 161 121 7 40 50 8\n")
+    (model / "points3D.txt").write_text(
+        "7 2 0 8 120 130 140 0.25 1 0 1 1 2 3\n8 1 0 8 120 130 140 0.5 1 2 2 3\n"
+    )
+    camera = _alignment_observations(model, _images(model / "images.txt"))["a.jpg"]
+    assert camera.sparse_observations == ((8, 40, 50, 1, 0, 8, 0.5, 2),)
+    assert len({item[0] for item in camera.sparse_observations}) == len(camera.sparse_observations)

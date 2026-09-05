@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import time
+from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -470,6 +471,16 @@ def _alignment_observations(
             if not math.isfinite(x) or not math.isfinite(y):
                 raise ValueError("non-finite COLMAP pixel observation")
             selected.append((point_id, x, y, *points[point_id]))
+        # MEASURED 2026-09-05 on the first real photograph set: COLMAP track merging can leave one
+        # image observing a point at two keypoints. Such a correspondence is ambiguous for scale
+        # fitting, and the placement reader refuses duplicate point IDs, so every observation of
+        # that point is dropped from this image rather than choosing one keypoint arbitrarily.
+        repeated = {
+            point_id
+            for point_id, count in Counter(item[0] for item in selected).items()
+            if count > 1
+        }
+        selected = [item for item in selected if item[0] not in repeated]
         selected.sort(key=lambda item: hashlib.sha256(str(item[0]).encode()).digest())
         size = sizes.get(int(fields[8]))
         if size is None or min(size) <= 0:
