@@ -716,6 +716,34 @@ def test_a_deliberate_re_import_after_deletion_proceeds_with_a_new_capture(inges
     assert live == 1
 
 
+def test_a_deliberate_re_import_restores_purged_blob_metadata_and_bytes(ingested):
+    """A new live capture must not point at a global blob row that still says purged."""
+    repository, store, pipeline, path, first = ingested
+    deleted_capture, tombstone_id = _delete_capture(repository, reason="user deleted it")
+    _purge_every_blob(store, tombstone_id)
+    repository.connection.execute(
+        "update blob set purged_at=now(),storage_key=null where blob_sha256=%s",
+        (first.blob_id.digest,),
+    )
+    assert not store.exists(first.blob_id)
+
+    outcome = pipeline.ingest_file(path)
+
+    assert outcome.error is None
+    assert outcome.capture_id != deleted_capture
+    assert store.exists(first.blob_id)
+    row = repository.connection.execute(
+        "select byte_size,media_type,storage_key,purged_at from blob where blob_sha256=%s",
+        (first.blob_id.digest,),
+    ).fetchone()
+    assert row == {
+        "byte_size": path.stat().st_size,
+        "media_type": "image/jpeg",
+        "storage_key": store.key_for(first.blob_id),
+        "purged_at": None,
+    }
+
+
 def test_an_explicit_hash_blocklist_refuses_the_write_and_cancels_the_run(ingested):
     """The other intent, and it needs its own explicit opt-in: never let this content back in.
 

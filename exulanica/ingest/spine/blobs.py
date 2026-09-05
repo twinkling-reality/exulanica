@@ -65,10 +65,13 @@ def locked_stored_objects(
 def upsert(
     scope: WorkspaceScope, blob_id: BlobId, *, byte_size: int, media_type: str, storage_key: str
 ) -> bool:
-    """Register bytes. Returns True when the database had not seen them before."""
+    """Register or restore bytes. Returns True for a new row or a purged row made live."""
     cursor = scope.connection.execute(
         "insert into blob (blob_sha256, byte_size, media_type, storage_key) "
-        "values (%s, %s, %s, %s) on conflict (blob_sha256) do nothing",
+        "values (%s, %s, %s, %s) on conflict (blob_sha256) do update set "
+        "byte_size=excluded.byte_size,media_type=excluded.media_type,"
+        "storage_key=excluded.storage_key,purged_at=null "
+        "where blob.purged_at is not null",
         (blob_id.digest, byte_size, media_type, storage_key),
     )
     return cursor.rowcount > 0
