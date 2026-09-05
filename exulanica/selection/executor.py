@@ -384,9 +384,16 @@ def _describe_captures(
     captures: list[SelectedCapture] = []
     for row in rows:
         reasons = list(support.get(row["capture_id"], ()))
-        if plan.time or plan.is_unconstrained:
+        if plan.time:
             # The whole-photograph span is what a time match rests on: EXIF said so, and the
             # photograph is the record of that.
+            #
+            # `plan.is_unconstrained` used to be in this condition, which meant the Atlas's
+            # opening view -- an empty plan, the most common Selection in the product -- told
+            # every client through SupportView that a time window had put each photograph there
+            # when no window was asked for. That is the same mislabel the branch below exists to
+            # avoid, and an unconstrained plan falls into it now: it sets no dimension, so it
+            # produces no support of its own, so `reasons` is empty.
             reasons.append(
                 Support(span_id=row["span_id"], assertion_id=None, dimension="time")
             )
@@ -398,8 +405,11 @@ def _describe_captures(
             # the same claim the branch above makes for a time match, under its own dimension
             # rather than mislabelled as one.
             #
-            # Two routes reach it, and the second is why the condition is `not reasons` rather
-            # than a test on one dimension.
+            # Three routes reach it, and the second and third are why the condition is
+            # `not reasons` rather than a test on one dimension.
+            #
+            # *   An unconstrained plan, which sets no dimension at all. The photograph is in
+            #     the Selection because everything is.
             #
             # *   A plan whose only dimension is `capture.processing_states`. `is_unconstrained`
             #     is false as soon as any dimension is set, `_support_for` returns nothing

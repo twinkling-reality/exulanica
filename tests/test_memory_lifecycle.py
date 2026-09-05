@@ -67,9 +67,10 @@ def _payload_with_a_person():
 class Lifecycle:
     """The corpus, the ids it produced, and the small queries this file asks repeatedly."""
 
-    def __init__(self, repository, store) -> None:
+    def __init__(self, repository, store, photo_dir) -> None:
         self.repository = repository
         self.store = store
+        self.photo_dir = photo_dir
         self.connection = repository.connection
         self.workspace = repository.workspace_id
 
@@ -109,7 +110,7 @@ def lifecycle(tmp_path, photo_dir, repository):
             write_photo(photo_dir, name, when=when, gps=GULLFOSS)
         )
         assert outcome.error is None, outcome.error
-    return Lifecycle(repository, store)
+    return Lifecycle(repository, store, photo_dir)
 
 
 def _scene_group(lifecycle: Lifecycle) -> uuid.UUID:
@@ -385,3 +386,93 @@ def test_an_artifact_that_names_no_dependency_is_left_alone_by_the_withdrawal(li
         )[0]["n"]
         == 0
     )
+
+
+def test_the_next_ingest_after_a_withdrawal_writes_nothing_live_about_that_person(lifecycle):
+    """A withdrawal that only reaches backwards is defeated by the next photograph.
+
+    Everything above is about derivatives that existed when the tombstone landed. This is the
+    one that did not, and it is the case the production path actually reaches: one more
+    photograph of the same scene changes the group key, so ``run_scene_grouping`` computes a new
+    uuid5, the row is an INSERT rather than a conflict, and none of the machinery above applies
+    to it.
+
+    Measured before migration 0035 existed: the new scene_group came out with ``stale = false``
+    and a ``person_derivative_dependency`` row naming the withdrawn entity with basis
+    ``confirmed_identity_link``, because ``entity_link.state`` is still ``confirmed`` after a
+    withdrawal and the recorder does not look at ``entity.deleted_at``. A live, unmarked
+    derivative naming a withdrawn person's capture, written after they withdrew.
+
+    That is docs/domain-and-evidence-model.md 6.4's failure with the recorded set present and
+    correct: the name survives its own deletion because invalidation only ever looked backwards.
+    """
+    first = _scene_group(lifecycle)
+    actor = uuid.uuid4()
+    _occurrence, named = _name_the_person(lifecycle, actor)
+    lifecycle.repository.insert_tombstone(
+        scope="entity", entity_id=named.entity_id, requested_by=actor, reason="withdrew"
+    )
+    assert lifecycle.artifact(first)["stale"] is True
+
+    store = LocalContentAddressedStore(lifecycle.store.root.parent / "after")
+    PhotoIngestPipeline(
+        lifecycle.repository, store, vision=CountingVisionModel(payload=_payload_with_a_person())
+    ).ingest_file(
+        write_photo(
+            lifecycle.photo_dir, "c.jpg", when="2026:08:27 10:07:00", gps=GULLFOSS
+        )
+    )
+    run_scene_grouping(lifecycle.repository)
+
+    groups = lifecycle.sql(
+        "select derived_id, stale, dep_index from derived_artifact where workspace_id = %s "
+        "and kind = %s order by derived_id",
+        lifecycle.workspace,
+        SCENE_GROUP_KIND,
+    )
+    assert len(groups) == 2, "the third photograph should have produced a second group"
+    live = [row for row in groups if not row["stale"]]
+    assert live == [], (
+        "a derivative written after the withdrawal names the withdrawn person's capture and is "
+        f"live: {[row['derived_id'] for row in live]}"
+    )
+
+
+def test_an_ingest_that_touches_nobody_withdrawn_still_produces_live_artifacts(lifecycle):
+    """The control on the one above, and it is the assertion that keeps it from being a hammer.
+
+    Staling every artifact a workspace writes after any withdrawal would pass the previous test
+    and would make one person's withdrawal invalidate the whole library. So: a second scene,
+    holding a capture the withdrawn person was never confirmed in, comes out live.
+    """
+    _first = _scene_group(lifecycle)
+    actor = uuid.uuid4()
+    _occurrence, named = _name_the_person(lifecycle, actor)
+    lifecycle.repository.insert_tombstone(
+        scope="entity", entity_id=named.entity_id, requested_by=actor, reason="withdrew"
+    )
+
+    # Six hours later and somewhere else, with nobody in it, so no occurrence links it to
+    # anyone: a different scene by both the time and the distance rule.
+    payload = copy.deepcopy(DEFAULT_PAYLOAD)
+    payload["objects"] = []
+    store = LocalContentAddressedStore(lifecycle.store.root.parent / "elsewhere")
+    PhotoIngestPipeline(
+        lifecycle.repository, store, vision=CountingVisionModel(payload=payload)
+    ).ingest_file(
+        write_photo(
+            lifecycle.photo_dir, "d.jpg", when="2026:08:27 16:00:00", gps=(38.7223, -9.1393)
+        )
+    )
+    run_scene_grouping(lifecycle.repository)
+
+    groups = lifecycle.sql(
+        "select derived_id, stale, dep_index from derived_artifact where workspace_id = %s "
+        "and kind = %s",
+        lifecycle.workspace,
+        SCENE_GROUP_KIND,
+    )
+    assert len(groups) == 2
+    live = [row for row in groups if not row["stale"]]
+    assert len(live) == 1, "the scene the withdrawn person was never in must survive"
+    assert len(live[0]["dep_index"]) == 1, "the new scene holds the one new photograph"

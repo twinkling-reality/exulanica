@@ -703,6 +703,56 @@ def test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code(deployment
     assert transport.call_count == 2, "one try and one repair, then the refusal"
 
 
+@pytest.mark.parametrize(
+    ("failure", "status", "code"),
+    [
+        ("budget", 429, "budget_exceeded"),
+        ("truncated", 500, "model_output_truncated"),
+    ],
+)
+def test_the_other_two_model_failures_get_their_own_codes(deployment, failure, status, code):
+    """Three outcomes in one handler, so all three are exercised.
+
+    The 502 above is an upstream that would not answer. Neither of these is that, and reporting
+    them as one would lose the distinction the error module exists to keep. A budget refusal is
+    this instance declining to spend, and nothing upstream was even asked. A truncation is a
+    `max_tokens` on this side that does not clear the model's reasoning overhead, which
+    exulanica/models/errors.py records as "a configuration mistake, not a model failure ...
+    because the opposite reading has already cost this project one wrong conclusion".
+    """
+    import dataclasses
+    from decimal import Decimal
+
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.client import ModelClient
+    from exulanica.models.errors import TruncatedResponseError
+
+    from model_fakes import FakeTransport
+
+    if failure == "budget":
+        # A ceiling of zero, so the guard refuses before the transport is reached at all.
+        budget = BudgetGuard(ceiling_usd=Decimal("0.00"), max_calls=0)
+    else:
+        budget = BudgetGuard(ceiling_usd=Decimal("5.00"), max_calls=10)
+
+    transport = FakeTransport(
+        [] if failure == "budget" else [TruncatedResponseError("max_tokens landed mid-answer")]
+    )
+    app = deployment.client.app
+    app.state.services = dataclasses.replace(
+        app.state.services,
+        model_client=ModelClient(
+            api_key="test-key-not-real", transport=transport, budget=budget
+        ),
+    )
+
+    response = deployment.as_owner(
+        "POST", "/selection/plan", json={"question": "where was I?"}
+    )
+    assert response.status_code == status, response.text
+    assert response.json()["code"] == code
+
+
 # -- identity -----------------------------------------------------------------------------
 
 

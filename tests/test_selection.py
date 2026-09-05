@@ -374,6 +374,36 @@ def test_a_capture_that_matched_always_carries_something_to_cite(library):
         assert {support.dimension for support in capture.support} == {"capture"}
 
 
+def test_an_unconstrained_plan_does_not_claim_a_time_window_put_the_photograph_there(library):
+    """The Atlas's opening view, and the third route into the capture dimension.
+
+    An empty plan is legal, means "everything", and is what the interface shows before anybody
+    has asked a question, so it is the most common Selection in the product. It carries no time
+    window. Labelling its support a time match told every client, through SupportView, that a
+    window it never sent had selected each photograph.
+    """
+    result = library.run(_plan())
+    assert result.total_matched == 4
+    for capture in result.captures:
+        assert {support.dimension for support in capture.support} == {"capture"}
+
+    # And a plan that DID ask about time still says so, or the fix would have cost the
+    # distinction it exists to keep.
+    windowed = library.run(
+        _plan(
+            time=[
+                CaptureWindow(
+                    start=dt.datetime(2026, 3, 4, tzinfo=dt.UTC),
+                    end=dt.datetime(2026, 3, 5, tzinfo=dt.UTC),
+                )
+            ]
+        )
+    )
+    assert windowed.captures
+    for capture in windowed.captures:
+        assert "time" in {support.dimension for support in capture.support}
+
+
 def test_a_scope_member_holding_neither_entity_is_still_citable(library):
     """The second route into the same branch, pinned so it is deliberate rather than incidental.
 

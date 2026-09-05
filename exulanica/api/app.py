@@ -72,7 +72,7 @@ from exulanica.identity.subjects import (
     NotUndoable,
     UnknownSubject,
 )
-from exulanica.models.errors import BudgetExceededError, ModelError
+from exulanica.models.errors import BudgetExceededError, ModelError, TruncatedResponseError
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
     InvalidInteractionData,
@@ -230,10 +230,18 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # 502 rather than 500, and it is not decoration. The models are an upstream this
         # instance depends on and does not control, so the failure is about that dependency
         # rather than about stored state, and the one 500 this API issues stays reserved for
-        # `integrity_failure`, where it means a citation has stopped verifying. A budget ceiling
-        # is the exception: nothing upstream failed, this instance declined to spend.
+        # `integrity_failure`, where it means a citation has stopped verifying.
+        #
+        # Two exceptions, and both are cases where nothing upstream failed. A budget ceiling is
+        # this instance declining to spend. And a truncated response is a `max_tokens` on this
+        # side that does not clear the model's reasoning overhead: `exulanica.models.errors` says
+        # so in its own module docstring, that it "names a configuration mistake, not a model
+        # failure, and says so, because the opposite reading has already cost this project one
+        # wrong conclusion". Filing it as `model_refused` would be that reading.
         if isinstance(exc, BudgetExceededError):
             return _problem(429, "budget_exceeded", str(exc))
+        if isinstance(exc, TruncatedResponseError):
+            return _problem(500, "model_output_truncated", str(exc))
         return _problem(502, "model_refused", str(exc))
 
     @app.exception_handler(InvalidStyleData)

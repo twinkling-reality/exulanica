@@ -95,19 +95,34 @@ def test_the_capture_pipeline_reaches_the_refusal_rather_than_ingesting_frame_on
 # -- the personal-media gate ------------------------------------------------------------------
 
 
-#: Every way this package could put a row into `embedding`. Three shapes rather than one:
-#: `insert into embedding`, the same with a quoted identifier, and `copy embedding`, which is
-#: how a bulk load would arrive and which the previous single pattern would not have seen.
-#: Matched case-insensitively, over SQL as well as Python, because a writer added inside a
-#: migration or a plpgsql function is a writer.
+#: Every spelling of "put a row into the embedding table" this scan can see.
+#:
+#: `insert into` and `copy`, quoted or bare, over SQL as well as Python, because a writer added
+#: inside a migration or a plpgsql function is a writer.
+#:
+#: **The trailing `[a-z0-9_]*` is the partition, and leaving it off was a real hole.** `embedding`
+#: is `partition by list (workspace_id)` and `provision_workspace` creates one child table per
+#: workspace as `embedding_ws_<hex>`. A writer naming the child directly stores exactly the same
+#: vector, and `\b` does not fire after `embedding` when the next character is an underscore, so
+#: `insert into embedding_ws_9f2c...` matched nothing at all.
+#:
+#: **What it still cannot see, stated rather than implied.** This is a text scan. SQL composed
+#: through `psycopg.sql` -- `sql.SQL("insert into {}").format(sql.Identifier("embedding"))` --
+#: is the idiom `exulanica/db/roles.py` is written in, and no regex over source can follow it.
+#: The scan is a tripwire on the ordinary spelling, not a proof. The proof that no template
+#: exists is the pair of runtime assertions below it, which count rows after a real ingest and
+#: after a real answer.
 _EMBEDDING_WRITER = re.compile(
-    r"""(?:insert\s+into|copy)\s+"?embedding"?\b""", re.IGNORECASE
+    r"""(?:insert\s+into|copy)\s+"?embedding[a-z0-9_]*"?""", re.IGNORECASE
 )
 
 #: The modules the answer path is built from. `exulanica.graph` is here because the read model
-#: the answer's Selection resolves against is assembled there, and `exulanica.store.resolve` is
-#: what turns a citation back into original bytes.
-_ANSWER_PATH = ("selection", "graph", "store")
+#: the answer's Selection resolves against is assembled there, `exulanica.store` is what turns a
+#: citation back into original bytes, and `exulanica.api/routes` is where the handler for
+#: POST /selection/ask lives. That last one was missing at first, which left the HTTP entry
+#: point of the answer path outside the scan that exists to guard it: `client.embed(...)` added
+#: to the route would have tripped nothing.
+_ANSWER_PATH = ("selection", "graph", "store", "api")
 
 
 def test_nothing_in_the_package_writes_an_embedding():
@@ -147,13 +162,20 @@ def test_the_answer_path_does_not_name_the_table_a_template_would_live_in():
     the conversation about P-1 that has to happen first.
     """
     named = []
+    scanned = 0
     for package in _ANSWER_PATH:
-        for path in sorted((_PACKAGE / package).rglob("*.py")):
+        directory = _PACKAGE / package
+        assert directory.is_dir(), f"{package} is not a package; this scan would pass over nothing"
+        for path in sorted(directory.rglob("*.py")):
+            scanned += 1
             text = path.read_text(encoding="utf-8")
             for pattern in (r"\bembedding\b", r"\.embed\("):
                 for match in re.finditer(pattern, text):
                     line = text[: match.start()].count("\n") + 1
                     named.append(f"{path.relative_to(_PACKAGE.parent)}:{line}")
+    # A scan over zero files passes. The directories are named as bare strings, so a rename or a
+    # move would silently empty this assertion rather than break it.
+    assert scanned >= 20, f"the answer-path scan opened only {scanned} files"
     assert not named, f"the answer path reached for a vector: {named}"
 
 

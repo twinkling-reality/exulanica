@@ -169,25 +169,90 @@ def test_the_answer_record_names_its_corpus_and_publishes_no_accuracy():
     assert "composed by a live model endpoint" in disclaimers
 
 
+def _numeric_fields(node, path=""):
+    """Every (path, key, value) whose value is a number. Depth first; list members kept."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            here = f"{path}.{key}" if path else key
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                yield here, key, value
+            else:
+                yield from _numeric_fields(value, here)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _numeric_fields(value, f"{path}[{index}]")
+
+
 def test_the_answer_record_publishes_no_number_against_a_blocked_metric():
     """"No retrieval or accuracy number may be published against an OPEN evaluation item."
 
     Enforced against ``metrics.py`` rather than against a copied list, so a component that
-    becomes runnable later does not leave this test asserting a stale set. Every metric whose
-    ``blocked_on`` is set is one no number may be attached to, and the record's counts are
-    keyed by gate rather than by metric precisely so none of them can be read as one.
+    becomes runnable later does not leave this test asserting a stale set.
+
+    Over the WHOLE record rather than over its counts block, and that is not fussiness: the
+    first version of this test read ``record["counts"]`` alone, which would have let a measured
+    hallucination rate or a p50 latency published anywhere else in the same digest-bound
+    document pass green.
+
+    It walks numeric values rather than searching text, because the record's own disclosures
+    name these metrics on purpose. "M2 hallucination_rate ... blocked_on 'no question set
+    exists'" is the sentence the gate asks for; a substring scan would refuse the disclosure and
+    permit the number, which is exactly backwards.
     """
     from exulanica.evaluation.metrics import METRICS
 
     record = _answers()
-    blocked = {f"{c.metric}.{c.key}" for c in METRICS if c.blocked_on is not None}
-    assert {"M2.hallucination_rate", "M3.false_answer_rate", "M13.answer_latency"} <= blocked
+    blocked = {c.key for c in METRICS if c.blocked_on is not None}
+    assert {"hallucination_rate", "false_answer_rate", "answer_latency"} <= blocked
 
-    counts = json.dumps(record["counts"])
-    for name in blocked:
-        _metric, key = name.split(".", 1)
-        assert key not in counts, f"the counts block names {name}, which is blocked"
+    numbers = list(_numeric_fields(record))
+    assert numbers, "a record with no numeric field would pass this vacuously"
+    for path, key, value in numbers:
+        assert key not in blocked, f"{path} = {value} is a number against a blocked metric"
     assert "not measurements of answer quality" in record["counts"]["what_these_are"]
+
+
+def test_the_answer_records_counts_agree_with_each_other():
+    """The record's own arithmetic, which is the error that actually happened.
+
+    Its first two revisions each stated a tests_added figure that was five short, because the
+    numbers were taken before the commit that retained them added its own tests. Nothing caught
+    it: the per-gate breakdown summed to the wrong total and agreed with it.
+
+    This does not re-run the suite, so it cannot tell whether 1480 is the true collection. It
+    tells whether the three numbers the record derives from each other are consistent, which is
+    what silently drifted.
+    """
+    counts = _answers()["counts"]
+    added = counts["backend_collected_now"] - counts["backend_collected_at_starting_revision"]
+    assert added == counts["backend_tests_added"], (
+        f"{counts['backend_collected_now']} - "
+        f"{counts['backend_collected_at_starting_revision']} is {added}, not "
+        f"{counts['backend_tests_added']}"
+    )
+    assert sum(counts["tests_added_per_gate"].values()) == counts["backend_tests_added"]
+    assert counts["backend_passed"] + counts["backend_skipped"] == counts["backend_collected_now"]
+
+
+def test_the_answer_records_migration_counts_describe_the_repository():
+    """The counts a reader would check first, checked against the tree rather than themselves.
+
+    These three fields are the record saying it stayed inside the goal's constraints, and the
+    first version of this test asserted them against the document's own literals, which a
+    thirty-fifth migration would not have disturbed. The forward-only count is checked against
+    the files; "not rewritten" is checked as "all thirty-four are still there", because the
+    migration runner's checksums and Git are what hold the rest of that claim.
+    """
+    from exulanica.migrations import migrations
+
+    record = _answers()
+    versions = sorted(migration.version for migration in migrations())
+    historical = [f"{n:04d}" for n in range(1, 35)]
+    assert versions[: len(historical)] == historical, "a migration 0001-0034 is missing"
+    assert len(versions) - len(historical) == record["counts"]["migrations_added"]
+    assert record["counts"]["historical_migrations_rewritten"] == 0
 
 
 def test_the_answer_record_discloses_what_it_left_vacuous_or_unreachable():
@@ -215,6 +280,61 @@ def test_the_answer_record_says_the_biometric_pin_still_holds():
     record = _answers()
     held = " ".join(record["entry_gates_held_throughout"])
     assert "absence of an embedding writer" in held
-    assert record["counts"]["migrations_added"] == 0
-    assert record["counts"]["historical_migrations_rewritten"] == 0
     assert record["counts"]["span_digests_changed"] == 0
+
+
+def test_the_answer_record_numbers_its_decisions_contiguously_and_states_all_five_fields():
+    """Every decision carries the five things this project asks a decision to state.
+
+    The contiguity check is the cheap half and it earns its place: this record was renumbered
+    once while a decision was inserted mid-series, and a gap would read as a decision that was
+    dropped rather than as a numbering slip.
+    """
+    record = _answers()
+    numbers = [decision["number"] for decision in record["decisions"]]
+    assert numbers == list(range(1, len(numbers) + 1)), numbers
+    for decision in record["decisions"]:
+        for field in (
+            "name", "invariant", "rationale", "canonical_representation",
+            "compatibility_impact", "failure_behaviour", "negative_control",
+        ):
+            assert decision.get(field), f"decision {decision['number']} has no {field}"
+        assert decision["tests"], decision["number"]
+        assert set(decision["affected_surfaces"]) == {
+            "schema", "migrations", "workers", "evidence", "apis", "exports",
+            "deletion_paths", "browser_consumers",
+        }, decision["number"]
+
+
+def test_every_artefact_the_answer_record_names_exists():
+    """A record naming a test that does not exist is a record nobody can check."""
+    record = _answers()
+    for decision in record["decisions"]:
+        for target in decision["tests"]:
+            path, _, node = target.partition("::")
+            assert (_ROOT / path).is_file(), target
+            if node:
+                assert node in (_ROOT / path).read_text(encoding="utf-8"), target
+        for name in decision["affected_surfaces"]["migrations"]:
+            assert (_ROOT / "exulanica" / "migrations" / name).is_file(), name
+        for name in decision["affected_surfaces"]["apis"]:
+            assert (_ROOT / name).is_file(), name
+
+
+def test_the_answer_record_says_what_reviewing_it_found_and_what_it_did_not_fix():
+    """A review that only records what it fixed is a review that hid what it did not.
+
+    Two findings were deliberately left open, and both are pre-existing weaknesses this goal did
+    not introduce. Recording them with their reasons is the difference between a decision and an
+    omission.
+    """
+    record = _answers()
+    findings = record["found_by_reviewing_this_goal"]
+    assert len(findings) >= 5
+    dispositions = [item["disposition"] for item in findings]
+    assert any(d.startswith("FIXED") for d in dispositions)
+    unfixed = [item for item in findings if item["disposition"].startswith("NOT FIXED")]
+    assert unfixed, "a review of this size that found nothing it declined to fix is not a review"
+    for item in unfixed:
+        assert "disclosed" in item["disposition"]
+        assert len(item["finding"]) > 60, "an undisclosed reason is not a disclosure"

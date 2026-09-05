@@ -261,6 +261,45 @@ def test_a_number_the_query_did_produce_is_accepted(answered):
     assert validate_answer(answer, packet) is answer
 
 
+def test_a_number_that_is_only_a_substring_of_a_value_is_refused(answered):
+    """Mechanism 2 covers whole numbers, not any digits that happen to occur inside one.
+
+    Measured on the previous rule: `_values` emits a `date_N` reference for every distinct
+    capture date, so a packet over any dated library carries a string like "2026-03-04", and
+    substring containment made "20", "02", "26", "6-0" and every single digit inside it free.
+    A model could write "20 photographs" over a library of two, cite the date, and pass, which
+    is exactly the confidently invented count this rule exists to stop. The digit runs the date
+    is actually made of are "2026", "03" and "04"; "20" is not one of them.
+
+    The legitimate case is asserted beside it, because a rule that refused every number would
+    pass this test and be useless: the year is one of the date's own digit runs and stays sayable.
+    """
+    packet = answered.packet()
+    date = packet.value("date_0")
+    assert date is not None and date.text.startswith("2026-03-04")
+
+    invented = Answer(
+        clauses=[
+            AnswerClause(
+                text="I have 20 photographs from that day.",
+                type=ClauseType.META,
+                value_refs=[date.key],
+            )
+        ]
+    )
+    with pytest.raises(AnswerRejected, match="'20' with no value reference"):
+        validate_answer(invented, packet)
+
+    legitimate = Answer(
+        clauses=[
+            AnswerClause(
+                text="That was in 2026.", type=ClauseType.META, value_refs=[date.key]
+            )
+        ]
+    )
+    assert validate_answer(legitimate, packet) is legitimate
+
+
 def test_a_value_reference_the_packet_does_not_have_is_refused(answered):
     packet = answered.packet()
     answer = Answer(
@@ -791,7 +830,16 @@ def test_answering_a_question_persists_no_biometric_template(answered):
     ``frame_region`` span and quality keys that describe the detection, and there is no column
     on it a template or a name could arrive in.
     """
+    from exulanica.db.migrate import provision_workspace
+
     connection = answered.repository.connection
+    # **Without this the row count could not fail.** `embedding` is partitioned by list on
+    # workspace_id, so with no partition for this workspace any insert aborts before a row
+    # exists and `count(*)` is zero whatever the answer path does. Provisioning opens the write
+    # path, which is what makes the assertion below a check rather than a restatement of the
+    # schema.
+    provision_workspace(connection, answered.session.workspace_id)
+
     bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     client = answered.client([_answer_body(bad), _answer_body(bad)])
     outcome = answer_question(

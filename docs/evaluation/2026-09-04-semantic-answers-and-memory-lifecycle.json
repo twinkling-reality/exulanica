@@ -9,7 +9,7 @@
       "record_sha256": "4dc155bd57a91cd66e1c7c0f85ea52660e26ecc1e5239bff239b007717b20064"
     },
     "scope": "The semantic answer path and the memory lifecycle, taken as the first goal in the readiness audit's dependency order. No Rung 2 corridor implementation, no Rung 1 splats, no personal-media ingest, no video ingest and no production deployment work was started. No identity work was begun, because P-1 is unanswered.",
-    "method": "Each exit gate was checked against the live implementation rather than against the roadmap, and the finding in every case was that the mechanism already existed and the proof did not. So the work is mostly tests, and each one was verified to fail when the invariant it names is violated: the negative control for every test added here is recorded below and was executed rather than reasoned about. Three production changes were made, each because a check found a defect rather than a missing test.",
+    "method": "Each exit gate was checked against the live implementation rather than against the roadmap, and the finding in every case was that the mechanism already existed and the proof did not. So the work is mostly tests, and each one was verified to fail when the invariant it names is violated: the negative control for every test added here is recorded below and was executed rather than reasoned about. Three production changes were made, each because a check found a defect rather than a missing test, and one forward migration, because an adversarial review of this goal's own work found that withdrawal was defeated by the next ingest.",
     "corpus_class": "synthetic",
     "corpus": {
       "what": "Photographs generated in process by tests/conftest.py::write_photo. The repository carries no binary fixture, so the content of every test image is known exactly.",
@@ -102,7 +102,7 @@
         "rationale": "Both existing staleness tests plant their own row with an entity: dep_index, and no shipping producer emits that shape: upsert_derived_artifact has exactly two production call sites and both write capture:. The invalidation path had therefore been demonstrated only against rows a test had inserted, which shows the predicate compiles and nothing about the system. The production ordering is the half that needed proving, because the artifact exists before the person is identified, so the dependency can only be recorded on the link side.",
         "canonical_representation": "dep_index is a text[] of '<kind>:<uuid>' strings with a GIN index over it. Migration 0030 reads it in both directions: on derived_artifact insert, and inside record_person_dependencies_for_link when a link becomes confirmed. Only the second fires in the production ordering.",
         "compatibility_impact": "None. No production code changed for this decision; the change is a test file over machinery that already shipped.",
-        "failure_behaviour": "Nothing anywhere sets stale back to false, and exulanica/ingest/spine/derived.py upserts with 'on conflict (derived_id) do nothing', so a re-run addresses the same row and declines to touch it. 'Invalidated, never silently regenerated' is a property of the writer rather than a convention.",
+        "failure_behaviour": "Nothing anywhere sets stale back to false, and exulanica/ingest/spine/derived.py upserts with 'on conflict (derived_id) do nothing', so a re-run over an unchanged member set addresses the same row and declines to touch it. That is half the claim and it was stated as the whole of it for two revisions: SceneGroup.key is a digest over the sorted member captures, so one more photograph of the same scene yields a different uuid5 and a plain INSERT. The other half is decision 4.",
         "affected_surfaces": {
           "schema": [],
           "migrations": [],
@@ -120,6 +120,35 @@
       },
       {
         "number": 4,
+        "name": "A withdrawal reaches forward, not only backwards",
+        "gate": "The withdrawal half of the memory lifecycle gate, and the constraint to preserve withdrawal.",
+        "invariant": "A derived_artifact inserted after an entity withdrawal, whose dep_index names a capture, occurrence or entity that a withdrawn person was confirmed in, is stale on arrival. An artifact naming nobody withdrawn is written live.",
+        "rationale": "Found by review of this goal's own work, then measured on the live schema. Migration 0030 records the derivatives that already depend on a person when their link is confirmed, and the entity tombstone marks each of those stale. Both halves work. Neither covers the derivative that does not exist yet. Withdraw a person and ingest one more photograph of the same scene: run_scene_grouping computes a new group key, so the uuid5 artifact id is new and the row is an INSERT rather than a conflict; tg_record_person_dependencies_from_derived then files a dependency row for the withdrawn entity with basis confirmed_identity_link, because entity_link.state is still confirmed after a withdrawal and that recorder does not read entity.deleted_at. The cascade that would have staled it ran at the tombstone and does not run again. The result is a live, unmarked derivative naming a withdrawn person's capture, written after they withdrew. That is domain-and-evidence-model.md 6.4's failure with the recorded set present and correct: the name survives its own deletion because invalidation only ever looked backwards.",
+        "canonical_representation": "stale = true, the word this schema already has for 'computed from something that is no longer true' and the one the entity cascade sets. The new trigger reads dep_index directly, with 0030's three prefixes, so it does not depend on which AFTER INSERT trigger fires first.",
+        "compatibility_impact": "One forward migration, 0035. Migrations 0001 through 0034 are byte identical to the starting revision. No existing row changed: the trigger fires on insert only, and it is a no-op in a workspace where nobody has withdrawn.",
+        "failure_behaviour": "Stale, not refused. Refusing the insert would fail the whole ingest for a workspace where somebody has withdrawn, which turns exercising a right into an outage, and a derivative may legitimately serve captures the withdrawn person is not in. Nothing anywhere sets stale back to false, so a stale-on-arrival artifact is invalidated on exactly the same terms as one the tombstone reached.",
+        "affected_surfaces": {
+          "schema": [
+            "derived_artifact.stale"
+          ],
+          "migrations": [
+            "0035_a_withdrawal_reaches_forward.sql"
+          ],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_memory_lifecycle.py::test_the_next_ingest_after_a_withdrawal_writes_nothing_live_about_that_person",
+          "tests/test_memory_lifecycle.py::test_an_ingest_that_touches_nobody_withdrawn_still_produces_live_artifacts"
+        ],
+        "negative_control": "Both directions were executed. Removing migration 0035 fails the first test, naming the live artifact and its three capture: dep_index entries. Widening the trigger's predicate to `true` fails the second, because one person's withdrawal then invalidates a scene they were never in."
+      },
+      {
+        "number": 5,
         "name": "The biometric boundary is pinned over SQL and over the answer path by name",
         "gate": "No answer path derives or persists a biometric template.",
         "invariant": "No file under exulanica/, Python or SQL, inserts or copies into the embedding table. No module the answer path is built from -- exulanica.selection, exulanica.graph, exulanica.store -- names the embedding table as a word or calls ModelClient.embed. A real question run end to end leaves the embedding table empty, and person occurrences carry only detection quality keys.",
@@ -146,30 +175,31 @@
       }
     ],
     "counts": {
-      "what_these_are": "Counts of executable checks, not measurements of answer quality. Every one is a number of test cases or of code paths; none is an accuracy.",
-      "backend_collected_at_starting_revision": 1447,
-      "backend_collected_now": 1469,
-      "backend_tests_added": 22,
-      "backend_passed": 1467,
+      "what_these_are": "Counts of executable checks, not measurements of answer quality. Every one is a number of test cases or of files; none is an accuracy. Collection counts were measured in this environment, the starting revision in a clean worktree at 1623219 with the same interpreter.",
+      "backend_collected_at_starting_revision": 1448,
+      "backend_collected_now": 1481,
+      "backend_tests_added": 33,
+      "backend_passed": 1479,
       "backend_skipped": 2,
       "tests_added_per_gate": {
         "citation_verifies_against_a_stored_span_digest": 4,
-        "refusal_rather_than_estimate": 5,
-        "memory_lifecycle": 6,
+        "refusal_rather_than_estimate": 9,
+        "memory_lifecycle": 8,
         "no_biometric_template_on_the_answer_path": 2,
-        "the_retained_record_itself": 5
+        "the_retained_record_itself": 10
       },
       "tests_widened_rather_than_added": 1,
-      "production_files_changed": 3,
-      "migrations_added": 0,
+      "production_files_changed": 4,
+      "migrations_added": 1,
       "historical_migrations_rewritten": 0,
       "span_digests_changed": 0,
-      "negative_controls_executed": 8
+      "starting_revision_count_differs_from_the_predecessor_record": "The readiness audit records 1447 collected at this same revision and this environment collects 1448. The difference is one test and is a property of which optional extras are installed, not of the tree. It is recorded rather than reconciled, because quietly adopting the predecessor's number would make the tests_added figure below wrong by one.",
+      "negative_controls": "Every decision below carries a negative_control field naming what was mutated and which tests failed, and every one of them was executed rather than reasoned about. An aggregate count is deliberately absent: it was carried for two revisions and was wrong in both, because one control that fails one more test is not one more control, and no reader could check the total against anything."
     },
     "verification": {
       "database": "postgresql://localhost:5433/exulanica_spine_test",
       "server": "PostgreSQL 18.6 with pgvector, nothing substituted",
-      "backend_passed": 1467,
+      "backend_passed": 1479,
       "backend_skipped": 2,
       "backend_warnings": 3,
       "ruff_passed": true,
@@ -182,10 +212,60 @@
       "web_unchanged_by_this_goal": true
     },
     "what_this_record_does_not_claim": [
-      "No accuracy of any kind was measured. exulanica/evaluation/metrics.py carries blocked_on sentences for M2 hallucination_rate, both M3 components, M8 plan validity and semantic accuracy, and M13 answer latency, every one of them beginning 'no question set exists'. Those sentences are unchanged by this goal and no number here is published against any of them.",
+      "No accuracy of any kind was measured. exulanica/evaluation/metrics.py carries blocked_on sentences for M2 hallucination_rate, both M3 components, M8 plan validity and semantic accuracy, and M13 answer latency. Four of the six begin 'no question set exists'; M3 false_abstention_rate begins 'no gold question set exists' and M8 plan semantic accuracy is blocked on 'human labelling, which no harness can supply'. An earlier revision of this record said all six shared one opening and that was simply false. Those sentences are unchanged by this goal and no number here is published against any of them.",
       "No answer in this repository was composed by a live model endpoint. The reasoning core nvidia/Nemotron-3_5-Lightning composes answers and the extraction model Qwen/Qwen3-235B-A22B-Instruct-2507 fills in plans in production; in every test here their HTTP transport is scripted. The latency and conformance figures recorded in exulanica/selection/question.py's comments come from a manual run that was never retained, and are not reproduced or relied on here.",
       "No retrieval quality was measured. That the executor returns the captures a plan names is asserted over a generated corpus, which is a statement about the compiler and the SQL rather than about whether a question found the right photographs.",
       "Nothing about people was measured, because nothing about people may be. P-1 is unanswered, no identity work was begun, and no cross-capture person recall exists."
+    ],
+    "found_by_reviewing_this_goal": [
+      {
+        "finding": "Withdrawal only reached backwards.",
+        "disposition": "FIXED by decision 4, migration 0035."
+      },
+      {
+        "finding": "The answer-path biometric scan omitted exulanica/api/routes, where the handler for POST /selection/ask lives, so a vector call at the HTTP entry point of the answer path would have tripped nothing.",
+        "disposition": "FIXED. The scan covers api as well, and refuses to pass over fewer than twenty files, because a scan naming directories as bare strings passes vacuously the day one is renamed."
+      },
+      {
+        "finding": "The embedding row count after an answer could not fail: embedding is partitioned by list on workspace_id, and with no partition for the test workspace any insert aborts before a row exists.",
+        "disposition": "FIXED. The test provisions the workspace first, which opens the write path, and a deliberate template write from inside build_packet now fails it 1 == 0."
+      },
+      {
+        "finding": "The blocked-metric rule read only the record's counts block, so an accuracy or latency number published elsewhere in the same document passed.",
+        "disposition": "FIXED. It walks every numeric value in the record at any depth. It matches keys rather than text on purpose: the record's own disclosures name these metrics, and a substring scan would refuse the disclosure and permit the number."
+      },
+      {
+        "finding": "The migration counts were asserted against the record's own literals, so a thirty-fifth migration would not have disturbed them. It did not disturb them: the new test caught the stale record on its first run.",
+        "disposition": "FIXED. They are checked against the migration files."
+      },
+      {
+        "finding": "TruncatedResponseError reached the boundary as 502 model_refused, which is the reading exulanica/models/errors.py says has already cost this project one wrong conclusion: it names a configuration mistake on this side, not a model failure.",
+        "disposition": "FIXED. 500 model_output_truncated, with a test."
+      },
+      {
+        "finding": "The 429 budget_exceeded branch had no test.",
+        "disposition": "FIXED. Both remaining branches of the handler are exercised. Adding an unexercised branch in the same series that deleted a clause for being inert was the inconsistency worth removing."
+      },
+      {
+        "finding": "validate_answer's digit rule was a substring test, so a clause could contain a number the query never produced whenever its digits occurred anywhere inside a value reference the clause named. _values emits a date_N reference for every distinct capture date, so any packet over a dated library carried a string like 2026-03-04 and made '20', '02', '26' and every single digit inside it free. Measured on a realistic packet, six of eight clauses stating invented numbers passed validation.",
+        "disposition": "FIXED, and this was the most serious thing the review found. The rule now compares whole digit runs: the runs of 2026-03-04 are 2026, 03 and 04, so writing the year is still a legitimate rendering of a value the query produced and writing '20 photographs' is not. This is the mechanism architecture-overview.md 5.3 calls the one that kills the highest-damage hallucination class in a memory product, so leaving it disclosed rather than closed was the wrong call and it was reversed."
+      },
+      {
+        "finding": "The embedding writer scan could not see a writer naming a partition. embedding is partition by list (workspace_id) and provision_workspace creates one child table per workspace as embedding_ws_<hex>; the pattern ended in \\b, which does not fire when the next character is an underscore, so 'insert into embedding_ws_9f2c...' matched nothing at all while storing the identical vector.",
+        "disposition": "FIXED. The pattern admits the partition suffix, with a control that adds a partition writer to a migration and watches the scan name its line."
+      },
+      {
+        "finding": "An unconstrained plan labelled every support dimension 'time' although it carries no time window, and that reaches clients: an empty plan is the Atlas's opening view and SupportView serves the dimension verbatim.",
+        "disposition": "FIXED. It falls into the capture dimension with the other two routes, which is what it always meant. A plan that did ask about time is asserted to still say so, or the fix would have cost the distinction it exists to keep."
+      },
+      {
+        "finding": "A text scan over source cannot follow SQL composed through psycopg.sql, which is the idiom exulanica/db/roles.py is written in, so the writer scan is a tripwire on the ordinary spelling rather than a proof.",
+        "disposition": "NOT FIXED, disclosed, in the test's own comment as well as here. A trigger refusing every insert would be spelling-independent and would also break the purge path's only test, which has to create a row in order to delete one. The proof that no template exists is the pair of runtime row counts, after a real ingest and after a real answer; the scan is what makes an ordinary writer loud on the day somebody adds one."
+      },
+      {
+        "finding": "The 429 and 502 responses put the raw exception string in a client-visible detail, so a budget refusal states this instance's spend, its ceiling and the environment variable that sets them.",
+        "disposition": "NOT FIXED, disclosed. It is the convention every other handler in app.py already follows, including the integrity failure that echoes span ids and digests, and the caller is an authenticated owner of the workspace. Changing it is a decision about the whole error surface rather than about this handler."
+      }
     ],
     "known_limitations": [
       "Abstention.NOT_IN_MODALITY has no producer. abstain() defaults to NOT_CAPTURED and the only other value any caller passes is AMBIGUOUS, so a third of the abstention space is unreachable. exulanica/evaluation/metrics.py already records this inside M3's blocked_on. It was deliberately not given one: deciding from a question's text that the answer would need audio, speech or continuous time is a classifier with no second implementation and no corpus to measure against, and evaluation-methodology.md warns that inferring the reason code afterwards is the laundering the separate codes exist to prevent.",
@@ -262,10 +342,10 @@
       }
     ],
     "entry_gates_held_throughout": [
-      "The evidence address format stayed closed. No migration was added, no historical migration was touched, and no span digest changed.",
+      "The evidence address format stayed closed. Migrations 0001 through 0034 are byte identical to the starting revision, no span digest changed, and the one migration added, 0035, touches derived_artifact.stale and nothing inside an address.",
       "No person recall and no template derivation was introduced, and tests/test_ingest_preconditions.py still pins the absence of an embedding writer, over a wider surface than before.",
       "The full backend and web verification gates are green."
     ]
   },
-  "record_sha256": "0375067da79ea5830a99da990cc292a8d279ddc879fddc6f4c335b1c2de398c9"
+  "record_sha256": "a072965782bb4cb45293d82a21a14500f1fa1d1d0331c57c8230ee0158bd989b"
 }

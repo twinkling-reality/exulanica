@@ -148,16 +148,29 @@ def validate_answer(answer: Answer, packet: EvidencePacket) -> Answer:
                 "user's past resolves to the original source or it is not made."
             )
 
-        covered = []
+        covered: set[str] = set()
         for key in clause.value_refs:
             value = packet.value(key)
             if value is None:
                 reasons.append(f"{where} references value {key!r}, which the packet does not have")
             else:
-                covered.append(value.text)
+                # **Whole digit runs, not substrings, and the difference was measured.**
+                #
+                # This used to ask whether the clause's digits appeared anywhere inside the
+                # referenced text. A packet over any dated library carries a `date_N` reference
+                # like "2026-05-20", and substring containment made every single digit 0 to 9
+                # free, along with "20", "26", "05", "202" and "0-0". A model could state an
+                # invented count, ordinal or year and pass, which is the "confidently invented
+                # date, count or duration" this rule exists to stop.
+                #
+                # Splitting the reference into its own digit runs keeps what the rule is for and
+                # drops what it never meant. Writing "2026" from the date "2026-05-20" is a
+                # legitimate rendering of a value the query produced; writing "20 photographs"
+                # from it is not, and no longer passes.
+                covered.update(_DIGITS.findall(value.text))
 
         for digits in _DIGITS.findall(clause.text):
-            if not any(digits in text for text in covered):
+            if digits not in covered:
                 reasons.append(
                     f"{where} contains the number {digits!r} with no value reference covering "
                     "it. A number the query did not produce is a number the model invented."
