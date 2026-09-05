@@ -1,0 +1,167 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "corpus_class": "synthetic-numeric-geometry",
+    "database_access_by_this_verification": false,
+    "date": "2026-09-05",
+    "files": {
+      "exulanica/reconstruction/alignment.py": "ca636c297a3a3c492d39ea885a25fa1bae625228ed9c681f2fa36e2077bee699",
+      "exulanica/reconstruction/placement.py": "abf2e920c47d269386189a3f48b188b07ca43c1e0ee594abab0d39794778f51a",
+      "exulanica/reconstruction/pose.py": "6b572f48eab06daa79c66cf04c06af67ee7be5ccda61eec937f878d40639e7a7",
+      "tests/test_reconstruction_placement.py": "921ff5a8ec758bbf68846bd63262b7379ed910501e1ea8d88400d42fcfad99d8",
+      "tests/test_reconstruction_pose.py": "27b154bed2c43f7de4f1056252125cd017a043197df947524b3a5bfcf1af31a4"
+    },
+    "independent_camera_contract": "Accepted COLMAP camera pose and calibration are exposed independently of OPM bytes, with unit renderer-camera transform and explicit projection approximation for distortion models.",
+    "isolated_source_copy": true,
+    "limitations": [
+      "Real photograph visual quality was not evaluated by this record.",
+      "Model agreement does not establish physical scale.",
+      "Engineering rejection thresholds are not calibrated to a representative photographic corpus.",
+      "Database lifecycle verification belongs to the separately serialized campaign record."
+    ],
+    "negative_controls": [
+      {
+        "exit_code": 1,
+        "name": "identity_on_insufficient_evidence",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "c7b7f123bb5a918f5a2a3f818fe9b8bb61ffb47ba6048d7ba96a97b962ab98bd",
+        "production_file": "exulanica/reconstruction/alignment.py",
+        "replace": "return AlignmentResult(None, reason, diagnostics)",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_no_correspondences_excludes_geometry_instead_of_assuming_identity",
+          "tests/test_reconstruction_placement.py::test_sparse_or_inconsistent_alignment_never_places_identity_geometry"
+        ],
+        "with": "return AlignmentResult(1.0, None, diagnostics)"
+      },
+      {
+        "exit_code": 1,
+        "name": "skip_point_map_digest",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "5016548fd0cc7a75e2fb6d498b76fb5561036a27afb60dc05ed85efa77c2189e",
+        "production_file": "exulanica/reconstruction/placement.py",
+        "replace": "if self.content is not None and _digest(self.content) != self.content_sha256:",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_point_map_digest_verifies_actual_fitting_bytes"
+        ],
+        "with": "if False and self.content is not None and _digest(self.content) != self.content_sha256:"
+      },
+      {
+        "exit_code": 1,
+        "name": "ignore_scale_policy_tampering",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "a9c2b64c31f70e702ca65d98b42730198a7972d3740cad20c6e11309e89198bb",
+        "production_file": "exulanica/reconstruction/placement.py",
+        "replace": "if comparison != expected.payload():",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_rehashed_physical_scale_claim_is_refused"
+        ],
+        "with": "if {k: v for k, v in comparison.items() if k != \"scale_policy\"} != {k: v for k, v in expected.payload().items() if k != \"scale_policy\"}:"
+      },
+      {
+        "exit_code": 1,
+        "name": "replace_robust_median_with_mean",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "e62f0875247ba402904c89ca50cab9529c508613aef6003d3314c64fdee6c35e",
+        "production_file": "exulanica/reconstruction/alignment.py",
+        "replace": "statistics.median(sample_scale(pair) for pair in train)",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_robust_scale_tolerates_minority_outliers_without_a_metric_claim"
+        ],
+        "with": "statistics.mean(sample_scale(pair) for pair in train)"
+      },
+      {
+        "exit_code": 1,
+        "name": "discard_recovered_rotation",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "52f1df4ef2e873e930def807303bff950c62ef2e4be32c4952fad805ac48653b",
+        "production_file": "exulanica/reconstruction/alignment.py",
+        "replace": "rotation = _rotation(quaternion_wxyz)",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_scale_fit_uses_recovered_rotation_and_translation"
+        ],
+        "with": "rotation = _rotation((1, 0, 0, 0))"
+      },
+      {
+        "exit_code": 1,
+        "name": "apply_identity_matrix_scale",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "0d1c2e18df533ad0717794e42241d6b860bc83f096a485b2e20b8bc51fcb2100",
+        "production_file": "exulanica/reconstruction/placement.py",
+        "replace": "scene_from_opm=_scene_from_opm(camera, alignment.scale)",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_transform_converts_opm_axes_and_places_the_recovered_camera",
+          "tests/test_reconstruction_placement.py::test_nonphysical_scalar_is_applied_once_and_leaves_the_camera_centre_fixed"
+        ],
+        "with": "scene_from_opm=_scene_from_opm(camera, 1.0)"
+      },
+      {
+        "exit_code": 1,
+        "name": "disable_partial_byte_fallback",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "64cb4a94e68e21a05fc2149f1f36d827c6f189db3a9154bb14af308936411e27",
+        "production_file": "exulanica/reconstruction/placement.py",
+        "replace": "if allow_unavailable_bytes:",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_missing_map_removes_only_that_members_geometry_during_delivery"
+        ],
+        "with": "if False and allow_unavailable_bytes:"
+      },
+      {
+        "exit_code": 1,
+        "name": "ignore_validation_fold",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "6e34765a2cdc75c2856a3541d79d8a0413274f0f363bdc007e313c34b1d0df61",
+        "production_file": "exulanica/reconstruction/alignment.py",
+        "replace": "        or validation_fraction < minimum_fraction\n",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_alignment_holdout_is_not_used_to_fit_and_can_reject_a_perfect_training_fit"
+        ],
+        "with": ""
+      },
+      {
+        "exit_code": 1,
+        "name": "discard_real_colmap_tracks",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "d25c274d365a78a418d3e753fdf8005ab6955b74a9ccc3e3d148dc0db7ff5461",
+        "production_file": "exulanica/reconstruction/pose.py",
+        "replace": "sparse_observations=tuple(selected[:4096])",
+        "tests": [
+          "tests/test_reconstruction_pose.py::test_pose_quality_retains_real_sparse_correspondences_and_camera_dimensions"
+        ],
+        "with": "sparse_observations=()"
+      },
+      {
+        "exit_code": 1,
+        "name": "claim_physical_scale_from_agreement",
+        "observed_outcome": "targeted pytest case rejected mutant",
+        "observed_output_sha256": "3c23b1f9b4002d40a55549a1be765a2af68545c5150604bd1d95d50ce7e7da72",
+        "production_file": "exulanica/reconstruction/alignment.py",
+        "replace": "\"physically_validated\": False",
+        "tests": [
+          "tests/test_reconstruction_placement.py::test_robust_scale_tolerates_minority_outliers_without_a_metric_claim"
+        ],
+        "with": "\"physically_validated\": True"
+      }
+    ],
+    "personal_media_admitted": false,
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+      "record_sha256": "f397997b6cd4e12730805d4661d34a660623da1530bf52f4c96a812105e3a6e2"
+    },
+    "production_stage_versions": {
+      "scene_placement": 2,
+      "scene_pose": 3
+    },
+    "profile": "exulanica.scene-placement-alignment-evaluation/v1",
+    "restored_suite_passed": 29,
+    "tests": {
+      "failed": 0,
+      "files": [
+        "tests/test_reconstruction_placement.py",
+        "tests/test_reconstruction_pose.py"
+      ],
+      "passed": 29
+    }
+  },
+  "record_sha256": "d3c75866d96ec532dcae7feaf68b6bd9c062f64d34dd9ac79489137f0a41e4ee"
+}

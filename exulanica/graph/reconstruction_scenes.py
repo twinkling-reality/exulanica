@@ -24,8 +24,14 @@ from exulanica.graph.payload import (
     ReconstructionSceneRow,
     SceneGeometryReferenceRow,
     ScenePointMapPlacementRow,
+    SceneRecoveredCameraRow,
 )
-from exulanica.reconstruction.placement import PointMapInput, validate_placement_record
+from exulanica.graph.scene_geometry import trained_geometry_row
+from exulanica.reconstruction.placement import (
+    PointMapInput,
+    recovered_camera_records,
+    validate_placement_record,
+)
 from exulanica.reconstruction.scene_gate import validate_scene_gate_decision
 from exulanica.store.base import ContentAddressedStore
 
@@ -170,7 +176,7 @@ def _scene_row(
         if not _gate_agrees(decision, claim, pose_digest, placement_digest, members):
             raise ValueError("the scene gate disagrees with the durable scene claim")
         point_maps, artifacts = _point_maps_from_placement(
-            connection, workspace, scene_id, placement_bytes
+            connection, workspace, scene_id, placement_bytes, store
         )
         placement = validate_placement_record(
             placement_bytes,
@@ -178,7 +184,9 @@ def _scene_row(
             pose_receipt=pose_bytes,
             member_capture_refs=[str(member.capture_id) for member in members],
             point_maps=point_maps,
+            allow_unavailable_bytes=True,
         )
+        cameras = recovered_camera_records(pose_bytes)
     except (KeyError, TypeError, ValueError):
         return _fallback(
             scene_id,
@@ -198,6 +206,9 @@ def _scene_row(
     available_count = 0
     for member in members:
         capture_ref = str(member.capture_id)
+        recovered_camera = (
+            SceneRecoveredCameraRow(**cameras[capture_ref]) if capture_ref in cameras else None
+        )
         placed_member = placed.get(capture_ref)
         if placed_member is None:
             output_members.append(
@@ -207,6 +218,7 @@ def _scene_row(
                     registered=member.registered,
                     placement=None,
                     exclusion_reason=excluded[capture_ref],
+                    recovered_camera=recovered_camera,
                 )
             )
             continue
@@ -240,17 +252,18 @@ def _scene_row(
                     ),
                 ),
                 exclusion_reason=None,
+                recovered_camera=recovered_camera,
             )
         )
 
-    placed_count = len(placement.placed)
+    placed_count = sum(member.registered for member in members)
     if available_count == placed_count and available_count > 0:
         placement_state: Literal["available", "partial", "bytes_missing"] = "available"
     elif available_count > 0:
         placement_state = "partial"
     else:
         placement_state = "bytes_missing"
-    substrate: Literal["posed_point_maps", "source_photographs"] = (
+    substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"] = (
         "posed_point_maps" if available_count else "source_photographs"
     )
     displayed_rung = max(claim.rung or 4, 3) if available_count else 4
@@ -267,6 +280,15 @@ def _scene_row(
         display_reasons.append(
             "No verified posed point map bytes are available, so source photographs are displayed."
         )
+    trained = trained_geometry_row(connection, workspace, scene_id, pose_digest, decision, store)
+    if trained is not None and trained.state == "available":
+        substrate = "gaussian_splats"
+        displayed_rung = max(claim.rung or 4, 3)
+        display_reasons = list(claim.reasons)
+    elif any(receipt.kind == "splat" and receipt.accepted for receipt in decision.receipts):
+        display_reasons.append(
+            "Trained scene geometry is unavailable; verified fallback content is shown."
+        )
     return ReconstructionSceneRow(
         scene_id=scene_id,
         member_digest=bytes(row["member_digest"]).hex(),
@@ -282,6 +304,7 @@ def _scene_row(
         receipt_state="available",
         placement_state=placement_state,
         rendering_substrate=substrate,
+        trained_geometry=trained,
         members=output_members,
     )
 
@@ -359,11 +382,12 @@ def _point_maps_from_placement(
     workspace: uuid.UUID,
     scene_id: uuid.UUID,
     placement_bytes: bytes,
+    store: ContentAddressedStore,
 ) -> tuple[dict[str, PointMapInput], dict[str, dict[str, Any]]]:
     import json
 
     raw = json.loads(placement_bytes)
-    placed = raw["placement"]["placed"]
+    placed = raw["placement"]["point_map_inputs"]
     if not isinstance(placed, list):
         raise ValueError("the placement member list is malformed")
     inputs: dict[str, PointMapInput] = {}
@@ -372,8 +396,8 @@ def _point_maps_from_placement(
         if not isinstance(item, dict):
             raise ValueError("a placement member is malformed")
         capture_ref = str(item.get("capture_ref", ""))
-        artifact_ref = str(item.get("point_map_artifact_ref", ""))
-        content_sha256 = str(item.get("point_map_content_sha256", ""))
+        artifact_ref = str(item.get("artifact_ref", ""))
+        content_sha256 = str(item.get("content_sha256", ""))
         capture_id = uuid.UUID(capture_ref)
         artifact_id = uuid.UUID(artifact_ref)
         content_digest = bytes.fromhex(content_sha256)
@@ -390,7 +414,11 @@ def _point_maps_from_placement(
         ).fetchone()
         if row is None:
             raise ValueError(f"scene {scene_id} references an unavailable point-map artifact")
-        inputs[capture_ref] = PointMapInput(capture_ref, artifact_ref, content_sha256)
+        try:
+            content = store.get(BlobId(content_digest))
+        except (BlobNotFoundError, IntegrityError):
+            content = None
+        inputs[capture_ref] = PointMapInput(capture_ref, artifact_ref, content_sha256, content)
         artifacts[capture_ref] = row
     return inputs, artifacts
 

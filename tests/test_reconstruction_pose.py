@@ -75,8 +75,7 @@ class FakeColmap:
                 )
             (model / "images.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
             (model / "points3D.txt").write_text(
-                "1 0 0 0 255 255 255 0.4 1 0 2 0\n"
-                "2 1 0 0 255 255 255 0.6 2 0 3 0\n",
+                "1 0 0 0 255 255 255 0.4 1 0 2 0\n2 1 0 0 255 255 255 0.6 2 0 3 0\n",
                 encoding="utf-8",
             )
         return CommandResult(0, "ok", "", 4.0)
@@ -221,3 +220,23 @@ def test_a_deletion_during_an_executor_call_cancels_before_the_next_stage(tmp_pa
     assert result.failed_stage == "feature_extractor"
     assert fake.calls == ["feature_extractor"]
     assert not (result.job_directory / "receipt.json").exists()
+
+
+def test_pose_quality_retains_real_sparse_correspondences_and_camera_dimensions(tmp_path):
+    from exulanica.reconstruction.pose import _alignment_observations, _images
+
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "cameras.txt").write_text("1 PINHOLE 320 240 200 200 160 120\n")
+    (model / "images.txt").write_text("1 1 0 0 0 -2 0 0 1 a.jpg\n160 120 7\n")
+    (model / "points3D.txt").write_text("7 2 0 8 120 130 140 0.25 1 0 2 3\n")
+    camera = _alignment_observations(model, _images(model / "images.txt"))["a.jpg"]
+    assert camera.image_size == (320, 240)
+    assert camera.camera_model == "PINHOLE"
+    assert camera.camera_parameters == (200, 200, 160, 120)
+    assert camera.as_payload()["calibration"] == {
+        "model": "PINHOLE",
+        "parameters": [200, 200, 160, 120],
+    }
+    assert camera.sparse_observations == ((7, 160, 120, 2, 0, 8, 0.25, 2),)
+    assert camera.as_payload()["sparse_observations"] == [[7, 160, 120, 2, 0, 8, 0.25, 2]]

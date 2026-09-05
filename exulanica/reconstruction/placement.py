@@ -7,9 +7,9 @@ the separate scene-level fact that places those unchanged bytes. It consumes the
 Coordinate conversion is explicit. COLMAP camera coordinates are +X right, +Y down and +Z
 forward. OPM is +X right, +Y up and -Z forward. ``diag(1, -1, -1)`` maps OPM into COLMAP camera
 coordinates, then the inverse recovered camera pose maps into the scale-ambiguous COLMAP world.
-The scene therefore remains non-metric. The current producer applies an identity numeric scale
-between OPM metres and COLMAP reconstruction units for display only and records that choice as
-unvalidated; it never calls the result metres.
+The scene therefore remains non-metric. The current producer fits numeric scale
+from actual COLMAP tracks to OPM samples, withholding members without a consistent fit.
+Agreement between reconstructions never establishes physical scale.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from exulanica.reconstruction.alignment import ALIGNMENT_POLICY, fit_point_map_scale
+
 __all__ = [
     "PLACEMENT_PROFILE",
     "ExcludedPlacementMember",
@@ -28,10 +30,11 @@ __all__ = [
     "PlacementRecord",
     "PointMapInput",
     "build_placement_record",
+    "recovered_camera_records",
     "validate_placement_record",
 ]
 
-PLACEMENT_PROFILE: Final = "exulanica.posed-point-map-placement/v1"
+PLACEMENT_PROFILE: Final = "exulanica.posed-point-map-placement/v2"
 _POSE_PROFILE: Final = "exulanica.colmap-pose-receipt/v2"
 
 
@@ -53,11 +56,14 @@ class PointMapInput:
     capture_ref: str
     artifact_ref: str
     content_sha256: str
+    content: bytes | None = None
 
     def __post_init__(self) -> None:
         if not self.capture_ref or not self.artifact_ref:
             raise ValueError("point-map capture and artifact references are required")
         _require_digest(self.content_sha256, "point-map content digest")
+        if self.content is not None and _digest(self.content) != self.content_sha256:
+            raise ValueError("point-map bytes disagree with their content digest")
 
     def as_payload(self) -> dict[str, str]:
         return {
@@ -74,7 +80,8 @@ class PlacedPointMap:
     point_map_content_sha256: str
     scene_from_opm: tuple[float, ...]
     local_units_to_scene_units: float
-    scale_status: Literal["unvalidated-identity"] = "unvalidated-identity"
+    alignment: dict[str, object]
+    scale_status: Literal["colmap-correspondence-fit"] = "colmap-correspondence-fit"
 
     def as_payload(self) -> dict[str, object]:
         return {
@@ -84,6 +91,7 @@ class PlacedPointMap:
             "scene_from_opm_row_major": list(self.scene_from_opm),
             "local_units_to_scene_units": self.local_units_to_scene_units,
             "scale_status": self.scale_status,
+            "alignment": self.alignment,
         }
 
 
@@ -91,13 +99,21 @@ class PlacedPointMap:
 class ExcludedPlacementMember:
     capture_ref: str
     registered: bool
-    reason: Literal["pose-not-registered", "point-map-unavailable"]
+    reason: Literal[
+        "pose-not-registered",
+        "point-map-unavailable",
+        "alignment-unavailable",
+        "alignment-insufficient-correspondences",
+        "alignment-inconsistent",
+    ]
+    alignment: dict[str, object] | None = None
 
     def as_payload(self) -> dict[str, object]:
         return {
             "capture_ref": self.capture_ref,
             "registered": self.registered,
             "reason": self.reason,
+            "alignment": self.alignment,
         }
 
 
@@ -110,6 +126,7 @@ class PlacementRecord:
     placed: tuple[PlacedPointMap, ...]
     excluded: tuple[ExcludedPlacementMember, ...]
     input_sha256: str
+    point_map_inputs: tuple[PointMapInput, ...]
 
     def payload(self) -> dict[str, object]:
         return {
@@ -126,12 +143,11 @@ class PlacementRecord:
                 "metric": False,
             },
             "scale_policy": {
-                "method": "identity-display-scale",
+                **ALIGNMENT_POLICY,
                 "physically_validated": False,
-                "reason": (
-                    "No physical reference relates OPM metres to COLMAP reconstruction units."
-                ),
+                "reason": "COLMAP/monocular agreement does not establish physical scale.",
             },
+            "point_map_inputs": [item.as_payload() for item in self.point_map_inputs],
             "member_capture_refs": list(self.member_capture_refs),
             "placed": [member.as_payload() for member in self.placed],
             "excluded": [member.as_payload() for member in self.excluded],
@@ -158,6 +174,9 @@ class _PoseCamera:
     image_name: str
     quaternion_wxyz: tuple[float, float, float, float]
     translation_xyz: tuple[float, float, float]
+    image_size: tuple[int, int] | None
+    sparse_observations: tuple[tuple[float, ...], ...]
+    calibration: dict[str, object] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +196,46 @@ def _numbers(value: object, length: int, field: str) -> tuple[float, ...]:
             raise ValueError(f"{field} must contain {length} finite numbers")
         result.append(float(item))
     return tuple(result)
+
+
+def _calibration(raw: object, size: tuple[int, int] | None) -> dict[str, object] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or not isinstance(raw.get("model"), str) or size is None:
+        raise ValueError("camera calibration is malformed")
+    model = raw["model"]
+    shared = {
+        "SIMPLE_PINHOLE": 3,
+        "SIMPLE_RADIAL": 4,
+        "RADIAL": 5,
+        "SIMPLE_RADIAL_FISHEYE": 4,
+        "RADIAL_FISHEYE": 5,
+    }
+    separate = {
+        "PINHOLE": 4,
+        "OPENCV": 8,
+        "FULL_OPENCV": 12,
+        "OPENCV_FISHEYE": 8,
+        "FOV": 5,
+        "THIN_PRISM_FISHEYE": 12,
+    }
+    count = (shared | separate).get(model)
+    if count is None:
+        return None  # Unknown models cannot silently acquire a guessed projection.
+    values = _numbers(raw.get("parameters"), count, "camera calibration parameters")
+    fx, fy, cx, cy = (values[0], values[0], values[1], values[2]) if model in shared else values[:4]
+    if fx <= 0 or fy <= 0:
+        raise ValueError("camera calibration focal lengths must be positive")
+    return {
+        "model": model,
+        "width": size[0],
+        "height": size[1],
+        "fx": fx,
+        "fy": fy,
+        "cx": cx,
+        "cy": cy,
+        "parameters": list(values),
+    }
 
 
 def _read_pose_receipt(data: bytes) -> _PoseReceipt:
@@ -232,13 +291,33 @@ def _read_pose_receipt(data: bytes) -> _PoseReceipt:
         norm = math.sqrt(sum(component * component for component in quaternion))
         if not math.isclose(norm, 1.0, rel_tol=1e-5, abs_tol=1e-7):
             raise ValueError("a recovered camera quaternion is not unit length")
+        raw_size = raw.get("image_size")
+        size = None
+        if raw_size is not None:
+            if (
+                not isinstance(raw_size, list)
+                or len(raw_size) != 2
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value <= 0
+                    for value in raw_size
+                )
+            ):
+                raise ValueError("camera image dimensions are malformed")
+            size = (raw_size[0], raw_size[1])
+        raw_observations = raw.get("sparse_observations", [])
+        if not isinstance(raw_observations, list) or len(raw_observations) > 4096:
+            raise ValueError("camera sparse observations are malformed")
+        observations = tuple(_numbers(item, 8, "sparse observation") for item in raw_observations)
+        if len({item[0] for item in observations}) != len(observations):
+            raise ValueError("camera sparse observations contain duplicate points")
         cameras.append(
             _PoseCamera(
                 image_name=raw["image_name"],
+                image_size=size,
+                sparse_observations=observations,
+                calibration=_calibration(raw.get("calibration"), size),
                 quaternion_wxyz=quaternion,  # type: ignore[arg-type]
-                translation_xyz=_numbers(
-                    raw.get("translation_xyz"), 3, "camera translation"
-                ),  # type: ignore[arg-type]
+                translation_xyz=_numbers(raw.get("translation_xyz"), 3, "camera translation"),  # type: ignore[arg-type]
             )
         )
     registered_names = tuple(registered)
@@ -257,7 +336,7 @@ def _read_pose_receipt(data: bytes) -> _PoseReceipt:
     )
 
 
-def _scene_from_opm(camera: _PoseCamera) -> tuple[float, ...]:
+def _scene_from_opm(camera: _PoseCamera, scale: float) -> tuple[float, ...]:
     qw, qx, qy, qz = camera.quaternion_wxyz
     rotation = (
         (1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)),
@@ -266,28 +345,65 @@ def _scene_from_opm(camera: _PoseCamera) -> tuple[float, ...]:
     )
     axis = (1.0, -1.0, -1.0)
     linear = tuple(
-        tuple(rotation[camera_axis][world_axis] * axis[local_axis]
-              for local_axis, camera_axis in enumerate(range(3)))
+        tuple(
+            scale * rotation[camera_axis][world_axis] * axis[local_axis]
+            for local_axis, camera_axis in enumerate(range(3))
+        )
         for world_axis in range(3)
     )
     centre = tuple(
-        -sum(rotation[camera_axis][world_axis] * camera.translation_xyz[camera_axis]
-             for camera_axis in range(3))
+        -sum(
+            rotation[camera_axis][world_axis] * camera.translation_xyz[camera_axis]
+            for camera_axis in range(3)
+        )
         for world_axis in range(3)
     )
     return (
-        linear[0][0], linear[0][1], linear[0][2], centre[0],
-        linear[1][0], linear[1][1], linear[1][2], centre[1],
-        linear[2][0], linear[2][1], linear[2][2], centre[2],
-        0.0, 0.0, 0.0, 1.0,
+        linear[0][0],
+        linear[0][1],
+        linear[0][2],
+        centre[0],
+        linear[1][0],
+        linear[1][1],
+        linear[1][2],
+        centre[1],
+        linear[2][0],
+        linear[2][1],
+        linear[2][2],
+        centre[2],
+        0.0,
+        0.0,
+        0.0,
+        1.0,
     )
+
+
+def recovered_camera_records(pose_receipt: bytes) -> dict[str, dict[str, object]]:
+    """Expose calibrated accepted poses independently of point-map delivery or fitted scale."""
+    receipt = _read_pose_receipt(pose_receipt)
+    if json.loads(pose_receipt)["quality"].get("accepted") is not True:
+        return {}
+    captures = {filename: capture for capture, filename in receipt.frames}
+    return {
+        captures[camera.image_name]: {
+            "scene_from_camera_row_major": list(_scene_from_opm(camera, 1.0)),
+            "calibration": camera.calibration,
+            "projection": (
+                "pinhole"
+                if camera.calibration["model"] in {"PINHOLE", "SIMPLE_PINHOLE"}
+                else "pinhole-approximation"
+            ),
+        }
+        for camera in receipt.cameras
+        if camera.calibration is not None
+    }
 
 
 def _input_digest(
     scene_ref: str,
     pose_receipt_sha256: str,
     member_capture_refs: Sequence[str],
-    placed: Sequence[PlacedPointMap],
+    point_maps: Sequence[PointMapInput],
 ) -> str:
     return _digest(
         _canonical(
@@ -295,14 +411,7 @@ def _input_digest(
                 "scene_ref": scene_ref,
                 "pose_receipt_sha256": pose_receipt_sha256,
                 "member_capture_refs": list(member_capture_refs),
-                "point_maps": [
-                    {
-                        "capture_ref": member.capture_ref,
-                        "artifact_ref": member.point_map_artifact_ref,
-                        "content_sha256": member.point_map_content_sha256,
-                    }
-                    for member in placed
-                ],
+                "point_maps": [member.as_payload() for member in point_maps],
             }
         )
     )
@@ -338,29 +447,44 @@ def build_placement_record(
     for capture_ref in members:
         filename = filename_by_capture[capture_ref]
         if filename not in registered:
-            excluded.append(
-                ExcludedPlacementMember(capture_ref, False, "pose-not-registered")
-            )
+            excluded.append(ExcludedPlacementMember(capture_ref, False, "pose-not-registered"))
             continue
         point_map = point_maps.get(capture_ref)
         if point_map is None:
-            excluded.append(
-                ExcludedPlacementMember(capture_ref, True, "point-map-unavailable")
-            )
+            excluded.append(ExcludedPlacementMember(capture_ref, True, "point-map-unavailable"))
             continue
         camera = camera_by_name.get(filename)
         if camera is None:
             raise ValueError("a registered pose has no recovered camera")
+        alignment = fit_point_map_scale(
+            point_map.content,
+            image_size=camera.image_size,
+            observations=camera.sparse_observations,
+            quaternion_wxyz=camera.quaternion_wxyz,
+            translation_xyz=camera.translation_xyz,
+        )
+        if alignment.scale is None:
+            assert alignment.reason is not None
+            excluded.append(
+                ExcludedPlacementMember(capture_ref, True, alignment.reason, alignment.diagnostics)
+            )
+            continue
         placed.append(
             PlacedPointMap(
                 capture_ref=capture_ref,
                 point_map_artifact_ref=point_map.artifact_ref,
                 point_map_content_sha256=point_map.content_sha256,
-                scene_from_opm=_scene_from_opm(camera),
-                local_units_to_scene_units=1.0,
+                scene_from_opm=_scene_from_opm(camera, alignment.scale),
+                local_units_to_scene_units=alignment.scale,
+                alignment=alignment.diagnostics,
             )
         )
     pose_digest = _digest(pose_receipt)
+    inputs = tuple(
+        PointMapInput(item.capture_ref, item.artifact_ref, item.content_sha256)
+        for capture in members
+        if (item := point_maps.get(capture)) is not None
+    )
     return PlacementRecord(
         scene_ref=scene_ref,
         pose_receipt_sha256=pose_digest,
@@ -368,7 +492,8 @@ def build_placement_record(
         member_capture_refs=members,
         placed=tuple(placed),
         excluded=tuple(excluded),
-        input_sha256=_input_digest(scene_ref, pose_digest, members, placed),
+        input_sha256=_input_digest(scene_ref, pose_digest, members, inputs),
+        point_map_inputs=inputs,
     )
 
 
@@ -382,8 +507,7 @@ def _validate_matrix(member: PlacedPointMap) -> None:
     if not math.isfinite(scale) or scale <= 0:
         raise ValueError("placement scale must be finite and positive")
     rotation = tuple(
-        tuple(matrix[row * 4 + column] / scale for column in range(3))
-        for row in range(3)
+        tuple(matrix[row * 4 + column] / scale for column in range(3)) for row in range(3)
     )
     for left in range(3):
         for right in range(3):
@@ -393,10 +517,8 @@ def _validate_matrix(member: PlacedPointMap) -> None:
                 raise ValueError("placement rotation is not orthonormal")
     determinant = (
         rotation[0][0] * (rotation[1][1] * rotation[2][2] - rotation[1][2] * rotation[2][1])
-        - rotation[0][1]
-        * (rotation[1][0] * rotation[2][2] - rotation[1][2] * rotation[2][0])
-        + rotation[0][2]
-        * (rotation[1][0] * rotation[2][1] - rotation[1][1] * rotation[2][0])
+        - rotation[0][1] * (rotation[1][0] * rotation[2][2] - rotation[1][2] * rotation[2][0])
+        + rotation[0][2] * (rotation[1][0] * rotation[2][1] - rotation[1][1] * rotation[2][0])
     )
     if not math.isclose(determinant, 1.0, rel_tol=1e-6, abs_tol=1e-6):
         raise ValueError("placement rotation must be proper, without reflection")
@@ -420,8 +542,10 @@ def _record_from_payload(value: object) -> PlacementRecord:
         scale = raw.get("local_units_to_scene_units")
         if isinstance(scale, bool) or not isinstance(scale, int | float):
             raise ValueError("placement scale must be numeric")
-        if raw.get("scale_status") != "unvalidated-identity":
+        if raw.get("scale_status") != "colmap-correspondence-fit":
             raise ValueError("the placement scale status is unsupported")
+        if not isinstance(raw.get("alignment"), dict):
+            raise ValueError("the placement alignment diagnostics are malformed")
         placed.append(
             PlacedPointMap(
                 capture_ref=str(raw.get("capture_ref", "")),
@@ -429,6 +553,7 @@ def _record_from_payload(value: object) -> PlacementRecord:
                 point_map_content_sha256=str(raw.get("point_map_content_sha256", "")),
                 scene_from_opm=matrix,
                 local_units_to_scene_units=float(scale),
+                alignment=raw["alignment"],
             )
         )
     excluded: list[ExcludedPlacementMember] = []
@@ -436,13 +561,34 @@ def _record_from_payload(value: object) -> PlacementRecord:
         if not isinstance(raw, dict) or raw.get("registered") not in (True, False):
             raise ValueError("an excluded member is malformed")
         reason = raw.get("reason")
-        if reason not in ("pose-not-registered", "point-map-unavailable"):
+        if reason not in (
+            "pose-not-registered",
+            "point-map-unavailable",
+            "alignment-unavailable",
+            "alignment-insufficient-correspondences",
+            "alignment-inconsistent",
+        ):
             raise ValueError("an excluded member has an unsupported reason")
         excluded.append(
             ExcludedPlacementMember(
                 capture_ref=str(raw.get("capture_ref", "")),
                 registered=raw["registered"],
                 reason=reason,
+                alignment=raw.get("alignment"),
+            )
+        )
+    raw_inputs = value.get("point_map_inputs")
+    if not isinstance(raw_inputs, list):
+        raise ValueError("the placement point-map input bindings are malformed")
+    inputs = []
+    for item in raw_inputs:
+        if not isinstance(item, dict):
+            raise ValueError("the placement point-map input binding is malformed")
+        inputs.append(
+            PointMapInput(
+                str(item.get("capture_ref", "")),
+                str(item.get("artifact_ref", "")),
+                str(item.get("content_sha256", "")),
             )
         )
     record = PlacementRecord(
@@ -453,6 +599,7 @@ def _record_from_payload(value: object) -> PlacementRecord:
         placed=tuple(placed),
         excluded=tuple(excluded),
         input_sha256=str(value.get("input_sha256", "")),
+        point_map_inputs=tuple(inputs),
     )
     _require_digest(record.pose_receipt_sha256, "pose receipt digest")
     _require_digest(record.pose_manifest_sha256, "pose manifest digest")
@@ -467,6 +614,7 @@ def validate_placement_record(
     pose_receipt: bytes,
     member_capture_refs: Sequence[str],
     point_maps: Mapping[str, PointMapInput],
+    allow_unavailable_bytes: bool = False,
 ) -> PlacementRecord:
     """Refuse malformed, pose-inconsistent, digest-disagreeing or stale placement bytes."""
     try:
@@ -503,6 +651,32 @@ def validate_placement_record(
         member_capture_refs=member_capture_refs,
         point_maps=point_maps,
     )
-    if record != expected:
+    comparison = payload
+    if allow_unavailable_bytes:
+        # Graph delivery may lose an object after publication. Revalidate every available
+        # member and erase unavailable members' geometry before returning anything renderable.
+        # Their exact artifact row/digest bindings and the complete outcome set still verify.
+        unavailable = {key for key, item in point_maps.items() if item.content is None}
+        if unavailable:
+            comparison = dict(payload)
+            comparison["placed"] = [
+                item for item in payload["placed"] if item["capture_ref"] not in unavailable
+            ]
+            exclusions = {
+                item["capture_ref"]: item
+                for item in payload["excluded"]
+                if item["capture_ref"] not in unavailable
+            }
+            exclusions.update(
+                {
+                    item.capture_ref: item.as_payload()
+                    for item in expected.excluded
+                    if item.capture_ref in unavailable
+                }
+            )
+            comparison["excluded"] = [
+                exclusions[key] for key in expected.member_capture_refs if key in exclusions
+            ]
+    if comparison != expected.payload():
         raise ValueError("the placement is inconsistent with its pose receipt or current inputs")
-    return record
+    return expected

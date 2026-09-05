@@ -1,0 +1,292 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "corpus_class": "synthetic-numeric-geometry-and-scripted-trainer",
+    "corrections_verified": [
+      "Unvalidated identity placement is replaced with per-member scale fitted and validated against real COLMAP tracks; absent or inconsistent correspondence withholds that member geometry.",
+      "An ordinary durable scene claim now drives the actual trainer controller, writes typed scene artifacts and publishes only through its current succeeded job and active rung assertion.",
+      "Gate identity includes training, delivery and retained evaluation outputs; prepared replacement bytes cannot be served through an older successful scene.",
+      "Pose, SOG and training receipt identities distinguish immutable exact builds and separately authorized jobs while same-job retries retain stable identities.",
+      "Graceful checkpoint release refunds the failure claim; repeated preemptions remain resumable. Completed training survives retryable object-store publication failures.",
+      "Exact source presence and authorization are checked during processing; callback failures stop the owned external process before propagating. Unconfirmed container cleanup preserves and reports private scratch protection.",
+      "Every reference member must preserve the same admitted source manifest and complete frozen training/held-out split.",
+      "Recovered camera transforms and original COLMAP calibration are delivered independently of point-map bytes, preserving inspection of a trained scene when all point maps are unavailable.",
+      "A private deterministic evaluation bundle retains full runtime and metric data, required digest-bound split/preparation companions, and verified held-out pixels before scratch cleanup.",
+      "Training acceptance and successful rendering do not establish physical scale, collision, navigability or rung 1; the independent recorded-rung gate remains in force."
+    ],
+    "cuda_training_executed": false,
+    "database": {
+      "execution": "Serialized root verification with the API stopped; the implementation subagent ran only pure checks.",
+      "frozen_migrations_changed": false,
+      "url": "postgresql://localhost:5433/exulanica_spine_test"
+    },
+    "date": "2026-09-05",
+    "files": {
+      "docs/scene-placement-alignment.md": "d2629398d054f4fb397ac7e57a13c91bd209c51835d30c98fe9953a5899db265",
+      "docs/scene-splat-publication.md": "e8468b54ef2b7ab2b2530dadfeff4545f850154551bcf199bea046f6d69a52bf",
+      "exulanica/api/app.py": "950396cec3fbada5dd7e8812f78668643ad2b2f3aecf10d43f1d1575223f3fd1",
+      "exulanica/api/routes/geometry.py": "7938545e3a7e0636b46c88e2a5577250e0da8d50e51914ed88fd4a34f2cc3dee",
+      "exulanica/graph/payload.py": "d21cdf606c360dc02df68a1eae4e11a8998022cd6e472f2d9f96477be5d88c35",
+      "exulanica/graph/reconstruction_scenes.py": "517f7516b996411dba09262476a382354b968e9a0551c94eb8632a66623d2464",
+      "exulanica/graph/scene_geometry.py": "7624623c26501b9f2d941812d7a80f0f0583ef8c74f752a3cd60ef6f1d33db92",
+      "exulanica/ingest/reconstruction_scratch.py": "8b3496b1537ec3bab62ecb09e522c65a4314994a3b8643c0b3dc4c33c85b2bd2",
+      "exulanica/ingest/repository.py": "0aead5e574713836952f81d901d12a2ed5afcac9c061a1d2da0dc598a0a55744",
+      "exulanica/ingest/scene_reconstruction.py": "247a741efc4064298cd7f0a41bbd6e9100b6fdd7e6be52eca363db66e94547ea",
+      "exulanica/ingest/scene_selection.py": "965b549d34459dee88d1143266fb37d25ae7af7ef013ac4625ba0577f97227f1",
+      "exulanica/ingest/scene_splat.py": "bcb7003d8dca3ac62ed0d0a178661e7b119062cf5cec3e2a8d21574a0dec361d",
+      "exulanica/ingest/scene_worker.py": "b98a5ff9ea12009fcd2e717ca11001aae101e0cc74e9646b50f59eefd540e964",
+      "exulanica/ingest/scene_worker_command.py": "d6d854bb6af658d9497dc91d6e2152f4be270678b2d7a2b018580dbb58dbc3b5",
+      "exulanica/ingest/spine/reconstruction_jobs.py": "da67368c6bca7c408a26589cdf424a471dd4e0795ac86d5ce51a28581d7e897d",
+      "exulanica/ingest/stages/__init__.py": "1d57b782edb7c2e99ab95c350d9ee46701893160a435e10d5833205e4fc588ad",
+      "exulanica/reconstruction/alignment.py": "ca636c297a3a3c492d39ea885a25fa1bae625228ed9c681f2fa36e2077bee699",
+      "exulanica/reconstruction/placement.py": "abf2e920c47d269386189a3f48b188b07ca43c1e0ee594abab0d39794778f51a",
+      "exulanica/reconstruction/pose.py": "6b572f48eab06daa79c66cf04c06af67ee7be5ccda61eec937f878d40639e7a7",
+      "scripts/verify_scene_publication_controls.py": "6bcfeeafbe58b9a9d94603c286a8ace80d87696173cdb8bf9b2071f0e2096b19",
+      "tests/test_reconstruction_placement.py": "921ff5a8ec758bbf68846bd63262b7379ed910501e1ea8d88400d42fcfad99d8",
+      "tests/test_reconstruction_pose.py": "27b154bed2c43f7de4f1056252125cd017a043197df947524b3a5bfcf1af31a4",
+      "tests/test_scene_reconstruction_pipeline.py": "7cc6419a7dea84e967ced57737180eaf49fa7d184e0941cdffd005ba3c10e0c0",
+      "tests/test_scene_splat_pipeline.py": "a8b9715a78755fcd5a8f7dbd564b0dd09dd33d4c2e95a1760192d82074077e62"
+    },
+    "fixture_notice": "Numeric COLMAP/OPM geometry and generated test photographs exercise real production orchestration. Scripted trainer metrics and delivery bytes are explicitly synthetic; delivery bytes in these lifecycle tests are not a native SOG-format acceptance result.",
+    "limitations": [
+      "No CUDA image build, real GPU training, trained real-scene appearance acceptance or measured real GPU bill is claimed.",
+      "Lifecycle fixtures deliberately use scripted trainer metrics and test delivery bytes; native SOG compatibility is separately verified by the compressor and frontend work.",
+      "Distorted COLMAP camera models retain their full parameters but renderer projection is explicitly a pinhole approximation.",
+      "Camera placement, fitted monocular agreement and Gaussian support bounds do not establish physical units or a safe navigation envelope."
+    ],
+    "native_browser_draw_claimed_by_this_record": false,
+    "personal_media_admitted": false,
+    "physical_scale_inferred_from_model_agreement": false,
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-05-placement-alignment.json",
+        "record_sha256": "d3c75866d96ec532dcae7feaf68b6bd9c062f64d34dd9ac79489137f0a41e4ee"
+      },
+      {
+        "path": "docs/evaluation/2026-09-05-gsplat-trainer-verification.json",
+        "record_sha256": "3d117a586cd5d005cb4701a37b58d5835348fe7773e34ebf65b56453eca171ee"
+      }
+    ],
+    "profile": "exulanica.scene-publication-verification/v1",
+    "raw_output_retention": "Full logs remain in ignored local verification storage. This retained record includes hashes and observed outcomes only, without machine-local paths or credentials.",
+    "real_reference_scene_accepted": false,
+    "scope": "Production queue, placement, training controller, retained evaluation, current publication, authenticated read and recovery boundaries.",
+    "verification": {
+      "broad_backend": {
+        "duration_milliseconds": 248590,
+        "failed": 0,
+        "observed_output_sha256": "bb1fe8dee7d55486213a2e6e9bb7c72a35039b2273ac60f82df25d854ae4b0c5",
+        "passed": 1604,
+        "scope_note": "Observed before the final job-identity and evaluation-companion refinements; those refinements were validated by the final focused run and isolated controls below.",
+        "skipped": 3
+      },
+      "final_focused": {
+        "duration_milliseconds": 37610,
+        "failed": 0,
+        "observed_output_sha256": "ca45e14e66a5af2686a4377d71d116d92a75b742f0617faa3596825685d93495",
+        "passed": 66,
+        "test_files": [
+          "tests/test_scene_splat_pipeline.py",
+          "tests/test_reconstruction_placement.py",
+          "tests/test_scene_reconstruction_pipeline.py"
+        ]
+      },
+      "import_contracts_kept": 4,
+      "isolated_negative_controls": {
+        "baseline_output_sha256": "c3f10a075adace0c7a32194c3773838ef13ba5e6a0b346089fcca6d53d5fb848",
+        "control_count": 18,
+        "control_record_sha256": "51983da20a53eb160995d7fb5846469bdb0188cacadc6042141ce0426585596c",
+        "controls": [
+          {
+            "killed": true,
+            "mutation": "retained_evaluation_companions_bind_runtime",
+            "observed_output_sha256": "b3352b847e1a87ded5de31068a749b0ddbbde646a7bb898ba6c71e617be28619",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "if runtime.get(\"profile\") == \"exulanica.gsplat-scene-runner/v1\" or digest is not None:",
+            "returncode": 1,
+            "test_selector": "test_evaluation_bundle_refuses_missing_or_changed_runtime_bound_companions",
+            "with": "if False:"
+          },
+          {
+            "killed": true,
+            "mutation": "training_outputs_bind_exact_point_map_build",
+            "observed_output_sha256": "85396c4734000e7e5f3b0bc81f34c206b4ee579131f36d690599ab6aa4aaf091",
+            "production_file": "exulanica/ingest/scene_reconstruction.py",
+            "replace": "training_input = input_digest_of(\n            [bytes.fromhex(manifest.digest), claimed.build_input_digest, claimed.job_id.bytes]\n        )",
+            "returncode": 1,
+            "test_selector": "test_changed_point_map_build_gets_new_training_artifacts_with_the_same_training_config",
+            "with": "training_input = bytes.fromhex(manifest.digest)"
+          },
+          {
+            "killed": true,
+            "mutation": "independent_recovered_camera_is_unscaled",
+            "observed_output_sha256": "1083feeafb9904ffabad97d7944bce0412edf7ba2cf89af293b4d6b715e8b90c",
+            "production_file": "exulanica/reconstruction/placement.py",
+            "replace": "\"scene_from_camera_row_major\": list(_scene_from_opm(camera, 1.0)),",
+            "returncode": 1,
+            "test_selector": "tests/test_reconstruction_placement.py::test_recovered_camera_keeps_calibrated_projection_and_unscaled_renderer_pose",
+            "with": "\"scene_from_camera_row_major\": list(_scene_from_opm(camera, 2.0)),"
+          },
+          {
+            "killed": true,
+            "mutation": "independent_camera_survives_missing_point_maps",
+            "observed_output_sha256": "654a979f3515739ad58f5c5ffc115cc2e6e5e6954d46a3642a35cbc4869c2805",
+            "production_file": "exulanica/graph/reconstruction_scenes.py",
+            "replace": "exclusion_reason=excluded[capture_ref],\n                    recovered_camera=recovered_camera,",
+            "returncode": 1,
+            "test_selector": "test_trained_scene_keeps_recovered_camera_when_all_point_map_bytes_are_missing",
+            "with": "exclusion_reason=excluded[capture_ref],\n                    recovered_camera=None,"
+          },
+          {
+            "killed": true,
+            "mutation": "authorization_check_error_still_stops_the_worker",
+            "observed_output_sha256": "4988ea942faf27fdb3949ef143a295b2ba21405b5e60121d2aca95907d651586",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "except Exception as error:\n                        check_error = error",
+            "returncode": 1,
+            "test_selector": "test_cancellation_check_failure_stops_the_live_subprocess_before_propagating",
+            "with": "except Exception:\n                        raise"
+          },
+          {
+            "killed": true,
+            "mutation": "exact_dataset_bytes",
+            "observed_output_sha256": "59a493a2278177cf30e4f0a44157378f292fba0d16232a14a96044e92dddbbc2",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "(source / relative).read_bytes() != destination_file.read_bytes()",
+            "returncode": 1,
+            "test_selector": "test_dataset_copy_resumes_missing_files_but_refuses_changed_bytes",
+            "with": "False"
+          },
+          {
+            "killed": true,
+            "mutation": "explicit_integer_compute_rate",
+            "observed_output_sha256": "e8ec18316c69419463fac233df905de89a142316192655617ec676d77ccd8625",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "isinstance(value, bool) or not isinstance(value, int) or value < 0",
+            "returncode": 1,
+            "test_selector": "test_training_request_roundtrips_without_implicit_spending_or_split_changes",
+            "with": "value < 0"
+          },
+          {
+            "killed": true,
+            "mutation": "complete_prior_training_split",
+            "observed_output_sha256": "b18963cf5d8c3359c029e113bca7d9e5f9adb784c2cfbb136d8e75a6b0e3adf5",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "or set(training) != set(sources) - set(heldout)",
+            "returncode": 1,
+            "test_selector": "test_admitted_split_requires_the_complete_identical_manifest",
+            "with": "or False"
+          },
+          {
+            "killed": true,
+            "mutation": "cleanup_marker_blocks_sweeping",
+            "observed_output_sha256": "807a08e5a6f19aa7cd6deeef5e5b27104c0e495cf1a2d7fb3e737b270acfcf87",
+            "production_file": "exulanica/ingest/reconstruction_scratch.py",
+            "replace": "if any(target.rglob(\"container-cleanup-required.json\")):",
+            "returncode": 1,
+            "test_selector": "test_unconfirmed_container_cleanup_marker_protects_even_abandoned_scratch",
+            "with": "if False:"
+          },
+          {
+            "killed": true,
+            "mutation": "unconfirmed_container_exit_is_not_success",
+            "observed_output_sha256": "54d3c948d6341daec9e1fa62b1f25460aedde2c9424d2204fe6d2b67b94293ec",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "if forced or result.returncode == 76:",
+            "returncode": 1,
+            "test_selector": "test_unconfirmed_exit_retains_a_cleanup_guard_even_if_launcher_did_not_write_it",
+            "with": "if forced:"
+          },
+          {
+            "killed": true,
+            "mutation": "gaussian_bounds_verify_actual_bytes",
+            "observed_output_sha256": "2eda2344effc3ddb2677eb9c34085ffb8ec06de3388fd00a075bfd2cab00ed95",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "if len(payload) != count * stride:",
+            "returncode": 1,
+            "test_selector": "test_trained_bounds_are_derived_from_actual_gaussian_bytes",
+            "with": "if False:"
+          },
+          {
+            "killed": true,
+            "mutation": "retained_evaluation_pixel_digest",
+            "observed_output_sha256": "437ec48e4fede47fbcaa685a5c5daa2ad373d0aab1d1b996dde968e3f25afacb",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "relative in expected and hashlib.sha256(data).hexdigest() != expected[relative]",
+            "returncode": 1,
+            "test_selector": "test_private_evaluation_bundle_retains_verified_pixels_and_excludes_scratch",
+            "with": "False"
+          },
+          {
+            "killed": true,
+            "mutation": "damaged_point_map_preserves_healthy_scene_members",
+            "observed_output_sha256": "dae85ca63e96c06a407439e9e8073e47a0d61c814ea33fb171734bf2ff549ead",
+            "production_file": "exulanica/graph/reconstruction_scenes.py",
+            "replace": "allow_unavailable_bytes=True,",
+            "returncode": 1,
+            "test_selector": "tests/test_scene_reconstruction_pipeline.py::test_graph_withholds_a_missing_alignment_input_but_preserves_healthy_members",
+            "with": "allow_unavailable_bytes=False,"
+          },
+          {
+            "killed": true,
+            "mutation": "training_is_a_causal_gate_input",
+            "observed_output_sha256": "99b9d98f09c661e79d8f8b377d7839324c8f541e4b9b2dba9d61cdd60891adfa",
+            "production_file": "exulanica/ingest/scene_reconstruction.py",
+            "replace": "*(artifact.content_id.digest for artifact, _ in extras),",
+            "returncode": 1,
+            "test_selector": "test_changed_training_config_has_a_new_gate_and_unpublished_bytes_stay_hidden",
+            "with": ""
+          },
+          {
+            "killed": true,
+            "mutation": "only_current_published_geometry_is_served",
+            "observed_output_sha256": "26b225958e7704973eca3fb6c9ede6aed35303b6a27306fb9aa5c738b92d9d23",
+            "production_file": "exulanica/graph/scene_geometry.py",
+            "replace": "current is None or current.artifact_id != artifact_id",
+            "returncode": 1,
+            "test_selector": "test_changed_training_config_has_a_new_gate_and_unpublished_bytes_stay_hidden",
+            "with": "current is None"
+          },
+          {
+            "killed": true,
+            "mutation": "preemption_does_not_consume_failure_budget",
+            "observed_output_sha256": "8735c0ea16cb5e8f16ec25cbce238295cbcd4d4a9d5d62a0ab662b82ff5ac82c",
+            "production_file": "exulanica/ingest/spine/reconstruction_jobs.py",
+            "replace": "attempts=greatest(0,attempts-1)",
+            "returncode": 1,
+            "test_selector": "test_four_graceful_preemptions_keep_the_same_job_and_checkpoint_eligible",
+            "with": "attempts=attempts"
+          },
+          {
+            "killed": true,
+            "mutation": "completed_training_survives_store_retry",
+            "observed_output_sha256": "3ee939a67bf1c619c9da7ef79e2c54fbc4dc40c8203332ac7662b84e332ca5f5",
+            "production_file": "exulanica/ingest/scene_reconstruction.py",
+            "replace": "claimed.build_inputs.get(\"splat_training\") is None\n                or claimed.attempts >= MAX_SCENE_CLAIMS",
+            "returncode": 1,
+            "test_selector": "test_storage_retry_reuses_completed_training_instead_of_retraining",
+            "with": "True"
+          },
+          {
+            "killed": true,
+            "mutation": "admitted_heldout_split_cannot_drift",
+            "observed_output_sha256": "9c912e23de3ef360c819231fdaba9ec35c639db00e3f791ac6393d63fbb1752b",
+            "production_file": "exulanica/ingest/scene_splat.py",
+            "replace": "or set(heldout) != set(self.heldout_source_sha256)",
+            "returncode": 1,
+            "test_selector": "test_training_request_cannot_replace_the_previously_admitted_evaluation_split",
+            "with": "or False"
+          }
+        ],
+        "killed": 18,
+        "passing_baseline_returncode": 0,
+        "passing_restored_returncode": 0,
+        "program": "scripts/verify_scene_publication_controls.py --database-controls",
+        "restored_output_sha256": "c3f10a075adace0c7a32194c3773838ef13ba5e6a0b346089fcca6d53d5fb848",
+        "source_checkout_mutated": false
+      },
+      "targeted_ruff": "passed"
+    }
+  },
+  "record_sha256": "a9fcf904cd4bdb3a6ea2a424cfa9b115f37b13fbd0537c01c16f1438602864e2"
+}

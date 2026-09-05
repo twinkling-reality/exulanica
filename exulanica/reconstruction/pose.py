@@ -24,7 +24,7 @@ import subprocess
 import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -110,8 +110,7 @@ class PoseBuildManifest:
         if len({item.capture_ref for item in self.frames}) != len(self.frames):
             raise ValueError("capture references must be unique")
         if self.min_registered_fraction is not None and not (
-            0 < self.min_registered_fraction <= 1
-            and math.isfinite(self.min_registered_fraction)
+            0 < self.min_registered_fraction <= 1 and math.isfinite(self.min_registered_fraction)
         ):
             raise ValueError("min_registered_fraction must be in (0, 1] or unmeasured")
         if self.max_mean_reprojection_error_px is not None and (
@@ -194,6 +193,11 @@ class RecoveredCamera:
     quaternion_wxyz: tuple[float, float, float, float]
     translation_xyz: tuple[float, float, float]
     camera_centre_xyz: tuple[float, float, float]
+    image_size: tuple[int, int] | None = None
+    camera_model: str | None = None
+    camera_parameters: tuple[float, ...] = ()
+    # Pixel coordinates and triangulated positions, never inferred monocular scale.
+    sparse_observations: tuple[tuple[int, float, float, float, float, float, float, int], ...] = ()
 
     def as_payload(self) -> dict[str, object]:
         return {
@@ -206,6 +210,13 @@ class RecoveredCamera:
             "quaternion_wxyz": list(self.quaternion_wxyz),
             "translation_xyz": list(self.translation_xyz),
             "camera_centre_xyz": list(self.camera_centre_xyz),
+            "image_size": list(self.image_size) if self.image_size is not None else None,
+            "calibration": (
+                {"model": self.camera_model, "parameters": list(self.camera_parameters)}
+                if self.camera_model is not None
+                else None
+            ),
+            "sparse_observations": [list(item) for item in self.sparse_observations],
         }
 
 
@@ -366,8 +377,7 @@ def _quaternion_camera_centre(
         (2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)),
     )
     return tuple(
-        -sum(rotation[row][column] * translation[row] for row in range(3))
-        for column in range(3)
+        -sum(rotation[row][column] * translation[row] for row in range(3)) for column in range(3)
     )  # type: ignore[return-value]
 
 
@@ -402,6 +412,77 @@ def _images(path: Path) -> dict[str, RecoveredCamera]:
         # image record and never a second image.
         index += 2
     return registered
+
+
+def _alignment_observations(
+    model: Path, cameras: dict[str, RecoveredCamera]
+) -> dict[str, RecoveredCamera]:
+    """Retain actual COLMAP tracks for digest-bound point-map alignment.
+
+    The bounded deterministic sample limits receipt size. Point IDs are hash-ordered to avoid
+    favouring a contiguous image patch or the mapper's first reconstructed surface. Older
+    sparse fixtures without camera calibration remain readable but cannot support placement.
+    """
+    calibration = model / "cameras.txt"
+    if not calibration.is_file():
+        return cameras
+    sizes: dict[int, tuple[int, int]] = {}
+    intrinsics: dict[int, tuple[str, tuple[float, ...]]] = {}
+    for line in calibration.read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split()
+        sizes[int(fields[0])] = (int(fields[2]), int(fields[3]))
+        parameters = tuple(float(value) for value in fields[4:])
+        if not parameters or not all(math.isfinite(value) for value in parameters):
+            raise ValueError("COLMAP camera has invalid calibration parameters")
+        intrinsics[int(fields[0])] = (fields[1], parameters)
+    points: dict[int, tuple[float, float, float, float, int]] = {}
+    for line in (model / "points3D.txt").read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split()
+        if len(fields) < 8 or (len(fields) - 8) % 2:
+            raise ValueError("malformed COLMAP sparse point track")
+        values = tuple(float(fields[index]) for index in (1, 2, 3, 7))
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("non-finite COLMAP sparse point")
+        points[int(fields[0])] = (*values, (len(fields) - 8) // 2)
+    lines = (model / "images.txt").read_text().splitlines()
+    index = 0
+    while index < len(lines):
+        if not lines[index].strip() or lines[index].startswith("#"):
+            index += 1
+            continue
+        fields = lines[index].split()
+        name = " ".join(fields[9:])
+        observations = lines[index + 1].split() if index + 1 < len(lines) else []
+        if len(observations) % 3:
+            raise ValueError("malformed COLMAP pixel observation list")
+        selected = []
+        for start in range(0, len(observations), 3):
+            point_id = int(observations[start + 2])
+            if point_id < 0:
+                continue
+            if point_id not in points:
+                raise ValueError("COLMAP observation references a missing sparse point")
+            x, y = float(observations[start]), float(observations[start + 1])
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise ValueError("non-finite COLMAP pixel observation")
+            selected.append((point_id, x, y, *points[point_id]))
+        selected.sort(key=lambda item: hashlib.sha256(str(item[0]).encode()).digest())
+        size = sizes.get(int(fields[8]))
+        if size is None or min(size) <= 0:
+            raise ValueError("COLMAP image references missing camera dimensions")
+        cameras[name] = replace(
+            cameras[name],
+            image_size=size,
+            sparse_observations=tuple(selected[:4096]),
+            camera_model=intrinsics[int(fields[8])][0],
+            camera_parameters=intrinsics[int(fields[8])][1],
+        )
+        index += 2
+    return cameras
 
 
 def _mean_error(path: Path) -> float | None:
@@ -463,6 +544,7 @@ def _quality(manifest: PoseBuildManifest, sparse: Path) -> PoseQuality:
     model, registered, mean_error = sorted(
         candidates, key=lambda item: (-len(item[1]), str(item[0]))
     )[0]
+    registered = _alignment_observations(model, registered)
     frames_by_name = {item.filename: item for item in manifest.frames}
     known = tuple(sorted(name for name in registered if name in frames_by_name))
     cameras = tuple(registered[name] for name in known)
@@ -576,8 +658,10 @@ def run_colmap_pose_job(
         (job_dir / "sparse").mkdir(exist_ok=True)
         for stage, command, required in _commands(job_dir, source_dir, executable):
             prior = stages.get(stage)
-            if isinstance(prior, dict) and prior.get("status") == "completed" and all(
-                path.exists() for path in required
+            if (
+                isinstance(prior, dict)
+                and prior.get("status") == "completed"
+                and all(path.exists() for path in required)
             ):
                 continue
             if cancellation_check is not None and cancellation_check():
@@ -641,8 +725,10 @@ def run_colmap_pose_job(
                 continue
             stage = f"model_converter:{model.name}"
             prior = stages.get(stage)
-            if isinstance(prior, dict) and prior.get("status") == "completed" and all(
-                path.is_file() for path in required
+            if (
+                isinstance(prior, dict)
+                and prior.get("status") == "completed"
+                and all(path.is_file() for path in required)
             ):
                 continue
             command = (

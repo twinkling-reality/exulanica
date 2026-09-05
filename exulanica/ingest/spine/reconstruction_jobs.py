@@ -26,6 +26,7 @@ __all__ = [
     "expire_exhausted",
     "fail",
     "heartbeat",
+    "release_checkpointed",
 ]
 
 MAX_SCENE_CLAIMS: Final = 3
@@ -371,5 +372,26 @@ def fail(
             job_id,
             claim_token,
         ),
+    )
+    return cursor.rowcount > 0
+
+
+def release_checkpointed(
+    scope: WorkspaceScope,
+    *,
+    job_id: uuid.UUID,
+    claim_token: uuid.UUID,
+    retry_delay_seconds: float,
+) -> bool:
+    """Release verified durable progress without consuming the failure/reclaim budget."""
+    cursor = scope.connection.execute(
+        "update reconstruction_scene_job set status='queued',attempts=greatest(0,attempts-1),"
+        "available_at=now()+make_interval(secs => %s),claim_token=null,claimed_by=null,"
+        "lease_expires_at=null,completed_at=null,updated_at=now(),"
+        "failure_class='training_checkpointed',failure_message='training checkpoint is resumable' "
+        "where workspace_id=%s and job_id=%s and status='running' and claim_token=%s "
+        "and not tombstone_blocks_reconstruction_job(workspace_id,job_id) "
+        "and privacy_admission_allows_job(workspace_id,job_id)",
+        (retry_delay_seconds, scope.workspace_id, job_id, claim_token),
     )
     return cursor.rowcount > 0

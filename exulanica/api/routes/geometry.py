@@ -50,15 +50,17 @@ from pydantic import BaseModel, ConfigDict
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
-from exulanica.errors import BlobNotFoundError
+from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.graph.geometry import (
     GeometryDescriptor,
     GeometryState,
     point_map_descriptors,
     read_point_map,
 )
+from exulanica.graph.scene_geometry import read_scene_geometry
 
 router = APIRouter(prefix="/geometry", tags=["geometry"])
+scene_router = APIRouter(prefix="/scene-geometry", tags=["geometry"])
 
 #: The container's own media type, in the vendor tree, unregistered with IANA and used here for
 #: what RFC 6838 calls private use. It is named rather than left as ``application/octet-stream``
@@ -217,4 +219,29 @@ def _view(descriptor: GeometryDescriptor) -> GeometryView:
         reason=descriptor.reason,
         needs_repair=descriptor.needs_repair,
         reference=reference,
+    )
+
+
+@scene_router.get("/{artifact_id}", summary="Exact trained scene bytes, never a citation target.")
+def trained_scene(
+    artifact_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> Response:
+    try:
+        found = read_scene_geometry(connection, session.workspace_id, artifact_id, services.store)
+    except (BlobNotFoundError, IntegrityError, ValueError):
+        return _problem(424, "unavailable_asset", "trained scene bytes are unavailable or corrupt")
+    if found is None:
+        return _problem(404, "unknown_reference", "no such scene geometry")
+    return Response(
+        content=found.payload,
+        media_type="application/octet-stream",
+        headers={
+            "ETag": f'"{found.content_sha256}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Accept-Ranges": "none",
+        },
     )

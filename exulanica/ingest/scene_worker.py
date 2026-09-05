@@ -96,6 +96,10 @@ class SceneReconstructionWorker:
         self._lease_seconds = lease_seconds
         self._heartbeat_seconds = heartbeat_seconds
         self._abandoned_after_seconds = abandoned_after_seconds
+        self._stop = threading.Event()
+
+    def request_stop(self) -> None:
+        self._stop.set()
 
     @property
     def name(self) -> str:
@@ -121,7 +125,7 @@ class SceneReconstructionWorker:
     def drain_observed(self) -> list[SceneBuildOutcome]:
         """Drain all work currently eligible in the configured workspaces."""
         outcomes: list[SceneBuildOutcome] = []
-        while True:
+        while not self._stop.is_set():
             claimed_any = False
             for workspace_id in sorted(self._workspaces, key=str):
                 outcome = self._claim_one(workspace_id)
@@ -130,6 +134,7 @@ class SceneReconstructionWorker:
                     outcomes.append(outcome)
             if not claimed_any:
                 return outcomes
+        return outcomes
 
     def _claim_one(self, workspace_id: uuid.UUID) -> SceneBuildOutcome | None:
         with self._database.session(workspace_id) as connection:
@@ -148,6 +153,7 @@ class SceneReconstructionWorker:
                     code_revision=self._code_revision,
                     execution_image=self._execution_image,
                     external_cancellation=keeper.lost.is_set,
+                    stop_requested=self._stop.is_set,
                 ).process(claimed)
 
     @contextmanager

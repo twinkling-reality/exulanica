@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import hashlib
+import logging
 import os
 import shutil
 import time
@@ -144,6 +145,12 @@ def cleanup_scene_scratch(root: Path, key: str) -> bool:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            return False
+        if any(target.rglob("container-cleanup-required.json")):
+            logging.getLogger(__name__).warning(
+                "scene scratch retained: external container termination is unconfirmed",
+                extra={"scratch_key": key},
+            )
             return False
         shutil.rmtree(target)
         with contextlib.suppress(OSError):

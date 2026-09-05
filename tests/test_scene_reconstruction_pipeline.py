@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import os
 import threading
 import time
 import uuid
+from array import array
 from pathlib import Path
 
 import psycopg
@@ -35,14 +37,45 @@ from exulanica.ingest.stages import (
     scene_pose_quality_thresholds,
     stage,
 )
+from exulanica.reconstruction.opm import Viewpoint, encode_opm
+from exulanica.reconstruction.pointmap import PointMap, Segment
 from exulanica.reconstruction.pose import CommandResult
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world_package import project_world_package
+from PIL import Image
 
 from conftest import CountingVisionModel, write_photo, write_point_map
 
 _CODE_REVISION = "a" * 40
 _EXECUTION_IMAGE = "registry.example/exulanica-pose@sha256:" + "b" * 64
+
+
+def _numeric_point_map(index: int, *, color: int = 128) -> bytes:
+    """A known plane in a camera frame, used only to exercise production byte alignment."""
+    width, height = 160 + index, 100
+    focal = height / (2 * math.tan(math.radians(60) / 2))
+    positions = array("f")
+    for y in range(height):
+        for x in range(width):
+            positions.extend(
+                ((x + 0.5 - width / 2) / focal * 3, -(y + 0.5 - height / 2) / focal * 3, -3)
+            )
+    count = width * height
+    points = PointMap(
+        positions,
+        bytearray([color, color, color, 255] * count),
+        array("H", [0, 0] * count),
+        [Segment(0, "unsegmented", "unknown")],
+    )
+    return encode_opm(
+        points,
+        generator="numeric-pipeline-test",
+        viewpoint=Viewpoint(60, width / height),
+        source_size=(width, height),
+        model_size=(width, height),
+        color_alpha="support",
+        metric=False,
+    )
 
 
 class FakeColmap:
@@ -53,12 +86,14 @@ class FakeColmap:
         crash_stage: str | None = None,
         fail_stage: str | None = None,
         delete_during=None,
+        camera_spacing: float = 1,
     ) -> None:
         self.calls: list[str] = []
         self.registered = registered
         self.crash_stage = crash_stage
         self.fail_stage = fail_stage
         self.delete_during = delete_during
+        self.camera_spacing = camera_spacing
 
     def __call__(self, command: tuple[str, ...], cwd: Path) -> CommandResult:
         stage = command[1]
@@ -76,17 +111,47 @@ class FakeColmap:
             names = sorted(path.name for path in source_directory.iterdir())[: self.registered]
             model = cwd / "sparse" / "0"
             model.mkdir(parents=True)
-            lines: list[str] = []
+            # One shared world plane, projected from each recovered camera. Every track
+            # points at real corresponding 2D observations; no fake third-camera support.
+            sizes = [Image.open(source_directory / name).size for name in names]
+            pixels = [[] for _ in names]
+            sparse = []
+            for iy in range(11):
+                for ix in range(17):
+                    point_id = iy * 17 + ix + 1
+                    wx, wy, wz = (
+                        value * self.camera_spacing
+                        for value in (-2 + ix * 0.35, -2 + iy * 0.4, 6.0)
+                    )
+                    track = []
+                    for index, (width, height) in enumerate(sizes):
+                        focal = height / (2 * math.tan(math.radians(60) / 2))
+                        u = (wx - (index + 1) * self.camera_spacing) / wz * focal + width / 2
+                        v = wy / wz * focal + height / 2
+                        if 0 <= u < width and 0 <= v < height:
+                            track.extend((index + 1, len(pixels[index])))
+                            pixels[index].append((u, v, point_id))
+                    sparse.append(
+                        f"{point_id} {wx} {wy} {wz} 128 128 128 0.4 " + " ".join(map(str, track))
+                    )
+            lines = []
             for index, name in enumerate(names, 1):
                 lines.extend(
                     [
-                        f"{index} 1 0 0 0 {-index} 0 0 1 {name}",
-                        "0 0 -1",
+                        f"{index} 1 0 0 0 {-index * self.camera_spacing} 0 0 {index} {name}",
+                        " ".join(" ".join(map(str, pixel)) for pixel in pixels[index - 1]),
                     ]
                 )
             (model / "images.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-            (model / "points3D.txt").write_text(
-                "1 0 0 0 255 255 255 0.4 1 0 2 0\n",
+            (model / "points3D.txt").write_text("\n".join(sparse) + "\n", encoding="utf-8")
+            (model / "cameras.txt").write_text(
+                "\n".join(
+                    f"{index} PINHOLE {width} {height} "
+                    f"{height / (2 * math.tan(math.radians(60) / 2))} "
+                    f"{height / (2 * math.tan(math.radians(60) / 2))} {width / 2} {height / 2}"
+                    for index, (width, height) in enumerate(sizes, 1)
+                )
+                + "\n",
                 encoding="utf-8",
             )
         return CommandResult(0, "ok", "", 1.0)
@@ -115,7 +180,7 @@ def _queued_scene(repository, tmp_path: Path, *, point_maps: int = 3):
                 repository,
                 store,
                 BlobId.of_bytes(path.read_bytes()),
-                payload=f"point map {index}".encode(),
+                payload=_numeric_point_map(index),
             )
             point_artifacts.append(point_artifact)
     report = run_scene_grouping(repository)
@@ -190,6 +255,7 @@ def test_scene_group_pose_placement_gate_and_assertion_commit_together(repositor
             "capture_ref": str(captures[2]),
             "reason": "pose-not-registered",
             "registered": False,
+            "alignment": None,
         }
     ]
     assertion = repository.connection.execute(
@@ -258,7 +324,7 @@ def test_current_scene_pose_policy_is_bound_to_the_two_fixed_calibration_runs():
     thresholds = scene_pose_quality_thresholds(current)
     calibration = current.params["calibration"]
 
-    assert current.version == 2
+    assert current.version == 3
     assert thresholds.min_registered_fraction == 0.8
     assert thresholds.max_mean_reprojection_error_px == 1.0
     assert thresholds.min_camera_translation_units == 9.0
@@ -290,7 +356,7 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         binding={"model_id": "test/depth-model-v2"},
     )
     replacement_id = artifact_id_for(key)
-    replacement = store.put_bytes(b"replacement point map")
+    replacement = store.put_bytes(_numeric_point_map(0, color=129))
     privacy = repository.connection.execute(
         "select privacy_screening_id from artifact where workspace_id=%s and artifact_id=%s",
         (repository.workspace_id, point_artifacts[0]),
@@ -514,6 +580,37 @@ def test_graph_falls_back_to_photographs_when_a_scene_receipt_is_unusable(
     assert all(member.placement is None for member in scene.members)
 
 
+@pytest.mark.parametrize("damage", ["missing", "corrupt"])
+def test_graph_withholds_a_missing_alignment_input_but_preserves_healthy_members(
+    repository, tmp_path, damage
+):
+    store, captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="alignment-test", lease_seconds=60)
+    assert claimed is not None
+    outcome = _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+    assert outcome.status == "succeeded"
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[1]),
+    ).fetchone()
+    path = store.root / store.key_for(BlobId(bytes(row["content_sha256"])))
+    path.chmod(0o644)
+    if damage == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"corrupt OPM input")
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.recorded_rung == 3 and scene.displayed_rung == 3
+    assert scene.placement_state == "partial"
+    assert scene.members[0].placement is not None
+    assert scene.members[1].capture_id == captures[1]
+    assert scene.members[1].placement is None
+    assert scene.members[1].exclusion_reason == "alignment-unavailable"
+    assert scene.members[2].placement is not None
+
+
 def test_deleting_one_scene_member_withdraws_it_from_the_graph(repository, tmp_path):
     store, captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
     claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
@@ -716,7 +813,7 @@ def test_incomplete_point_maps_defer_pose_until_the_last_exact_input_arrives(rep
         repository,
         store,
         capture.blob_id,
-        payload=b"point map 2",
+        payload=_numeric_point_map(2),
     )
     point_artifacts.append(final_artifact)
     report = run_scene_grouping(repository)

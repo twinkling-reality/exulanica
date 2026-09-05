@@ -102,28 +102,28 @@ def main(
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))
         return 1
     _emit(output, "startup", worker=worker.name, removed_scratch=len(removed))
-    if args.once:
-        outcomes = worker.drain_observed()
-        _emit(
-            output,
-            "stopped",
-            jobs=len(outcomes),
-            succeeded=sum(outcome.status == "succeeded" for outcome in outcomes),
-            failed=sum(outcome.status == "failed" for outcome in outcomes),
-            cancelled=sum(outcome.status == "cancelled" for outcome in outcomes),
-        )
-        return 1 if any(outcome.status == "failed" for outcome in outcomes) else 0
-
     requested = threading.Event()
 
     def stop(signum: int, _frame: Any) -> None:
         _emit(output, "shutdown_requested", signal=signal.Signals(signum).name)
         requested.set()
+        worker.request_stop()
 
     previous = {
         signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)
     }
     try:
+        if args.once:
+            outcomes = worker.drain_observed()
+            _emit(
+                output,
+                "stopped",
+                jobs=len(outcomes),
+                succeeded=sum(outcome.status == "succeeded" for outcome in outcomes),
+                failed=sum(outcome.status == "failed" for outcome in outcomes),
+                cancelled=sum(outcome.status == "cancelled" for outcome in outcomes),
+            )
+            return 1 if any(outcome.status == "failed" for outcome in outcomes) else 0
         while not requested.is_set():
             outcomes = worker.drain_observed()
             if any(outcome.status == "failed" for outcome in outcomes):

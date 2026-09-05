@@ -52,6 +52,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/graph"): {},
     ("GET", "/geometry"): {},
     ("GET", "/geometry/{artifact_id}"): {},
+    ("GET", "/scene-geometry/{artifact_id}"): {},
     ("GET", "/selection/catalogue"): {},
     ("POST", "/selection"): {"json": {"intent": "captures"}},
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},

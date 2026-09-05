@@ -9,6 +9,7 @@ from typing import Protocol
 
 from exulanica.ingest.privacy import admit_reconstruction_scene
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.scene_splat import SceneSplatRequest
 from exulanica.ingest.scenes import SceneGroup
 from exulanica.ingest.stages import stage
 
@@ -91,6 +92,7 @@ def _enqueue_capture_set(
     repository: IngestRepository,
     capture_ids: list[uuid.UUID],
     selection_record: dict[str, object],
+    splat_training: SceneSplatRequest | None = None,
 ) -> tuple[uuid.UUID, bool] | None:
     point_maps = repository.current_capture_artifacts(
         capture_ids=capture_ids,
@@ -127,9 +129,26 @@ def _enqueue_capture_set(
                 "version": stage(key).version,
                 "params_sha256": stage(key).params_digest.hex(),
             }
-            for key in ("scene_pose", "scene_placement", "scene_gate")
+            for key in (
+                ("scene_pose", "scene_placement", "scene_gate")
+                + (
+                    ("scene_splat_training", "scene_splat_delivery", "scene_splat_evaluation")
+                    if splat_training
+                    else ()
+                )
+            )
         ],
     }
+    if splat_training is not None:
+        admitted_manifests = []
+        source_hashes = []
+        for capture_id in capture_ids:
+            screening = repository.privacy_screening(point_maps[capture_id].privacy_screening_id)
+            assert screening is not None  # The exact admission above requires every screening.
+            admitted_manifests.append(screening.authorization_scope.get("source_manifest"))
+            source_hashes.append(screening.source_sha256.hex())
+        splat_training.validate_admitted_sources(tuple(source_hashes), admitted_manifests)
+        build_inputs["splat_training"] = splat_training.as_payload()
     return repository.enqueue_reconstruction_scene(
         capture_ids=capture_ids,
         selection_policy=selection_record,
@@ -146,6 +165,7 @@ def enqueue_exact_scene_reconstruction(
     actor: uuid.UUID,
     purpose: str,
     authorized_at: dt.datetime,
+    splat_training: SceneSplatRequest | None = None,
 ) -> ExactSetJobSelection | None:
     """Queue one operator-authorized ordered set behind the normal selection boundary.
 
@@ -189,7 +209,9 @@ def enqueue_exact_scene_reconstruction(
             "The interface must not be used to fabricate missing capture metadata.",
         ],
     }
-    result = _enqueue_capture_set(repository, capture_ids, record)
+    if splat_training is not None:
+        splat_training.validate_sources(tuple(str(item["source_sha256"]) for item in members))
+    result = _enqueue_capture_set(repository, capture_ids, record, splat_training)
     if result is None:
         return None
     job_id, inserted = result

@@ -1631,10 +1631,18 @@ inputs. It is not true of a stage that calls a model. Sampled generation differs
 design, and a neural forward pass differs across accelerators and library versions even at
 temperature zero, so a re-run of a model stage produces a *different artifact*, not the same bytes.
 
-Stages that are not exactly recomputable, and therefore excluded from that claim: `vision` and
-`depth`. Both carry a `model_role`, and `stage_registry.deterministic` is `false` for both.
+Stages that are not exactly recomputable, and therefore excluded from that claim: `vision`,
+`depth`, `scene_splat_training`, and `scene_splat_delivery`. The first two carry a `model_role`;
+all four have `stage_registry.deterministic=false`. The Gaussian stages optimize scene-specific
+parameters and compress their result; their presence does not establish reproducible GPU output.
 `StageSpec` now refuses to construct a stage that names a model role and declares itself
 deterministic, so the exclusion cannot be lost by editing a flag.
+
+**UPDATED 2026-09-05.** The historical statement that there are no trained weights does not cover
+the added Gaussian scene parameters. They are scene reconstruction artifacts, not biometric
+templates. Withdrawal invalidates their scene and removes their published bytes and private
+operational artifacts through the existing scene deletion machinery; no model-unlearning claim
+is made. See [the training/rung decision](adr/gsplat-training-and-recorded-rung.md).
 
 What is true of a model-produced artifact under deletion is narrower and is what the product says
 instead: **it is invalidated and removed, not regenerated.** `derived_artifact.stale` is set through
@@ -1653,7 +1661,7 @@ exemplar, run the recompute path, build a fresh state from the remaining rows, a
 equality of exemplars, negatives, cohort membership and index (about 1 day). Any nondeterminism
 (ordering, float reduction order, coreset tie-breaking) must be eliminated, or the claim must be
 weakened further. **This claim may not be made publicly until X-8 passes**, and it may never be made
-about `vision` or `depth` output at all.
+about any of the excluded model/scene-training stages above.
 
 Pinned by `tests/test_exact_recomputation.py`, which derives the excluded list from the registry
 rather than trusting the sentence above.

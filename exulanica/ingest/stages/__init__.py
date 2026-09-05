@@ -38,6 +38,7 @@ from typing import Any, Final
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.vision import prompt_digest
+from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
 
 __all__ = [
     "ARTIFACT_NAMESPACE",
@@ -297,16 +298,21 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_pose": StageSpec(
         key="scene_pose",
-        # Version 2 closes the unmeasured policy after the fixed synthetic and licensed ETH3D
+        # Version 3 retains sparse pixel/3D tracks for placement. It preserves the version 2
+        # pose-quality thresholds and calibration; it does not reinterpret those measurements.
+        # Version 2 closed the unmeasured policy after the fixed synthetic and licensed ETH3D
         # pipes runs. The calibration record is part of the parameter digest so later corpus
         # evidence cannot silently change what this version meant. COLMAP normalizes a sparse
         # reconstruction to an extent of 10 units. The translation threshold is therefore a
         # normalized non-degeneracy check, not a metric-distance claim.
-        version=2,
+        version=3,
         output_kind="pose_receipt",
         deterministic=True,
         params={
             "controller": "colmap-sparse-checkpointed",
+            "alignment_observations": "colmap-point-tracks/v1",
+            "recovered_camera_calibration": "colmap-model-parameters/v1",
+            "max_sparse_observations_per_image": 4096,
             "receipt_profile": "exulanica.colmap-pose-receipt/v2",
             "min_registered_fraction_millionths": 800_000,
             "max_mean_reprojection_error_micropixels": 1_000_000,
@@ -341,13 +347,48 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_placement": StageSpec(
         key="scene_placement",
-        version=1,
+        version=2,
         output_kind="point_map_placement",
         deterministic=True,
         params={
-            "profile": "exulanica.posed-point-map-placement/v1",
+            "profile": "exulanica.posed-point-map-placement/v2",
+            "alignment": ALIGNMENT_POLICY,
             "opm_container": "opm/2",
-            "scale_status": "unvalidated-identity",
+            "scale_status": "colmap-correspondence-fit",
+        },
+    ),
+    "scene_splat_training": StageSpec(
+        key="scene_splat_training",
+        version=1,
+        output_kind="scene_splat_receipt",
+        deterministic=False,
+        params={
+            "profile": "exulanica.scene-splat-publication/v1",
+            "runner": "exulanica.gsplat-scene-runner/v1",
+        },
+    ),
+    "scene_splat_delivery": StageSpec(
+        key="scene_splat_delivery",
+        version=1,
+        output_kind="gaussian_splat_scene",
+        deterministic=False,
+        params={
+            "container": "sog/1",
+            "coordinate_frame": "unchanged-COLMAP-world",
+            "profile": "exulanica.scene-splat-publication/v1",
+        },
+    ),
+    "scene_splat_evaluation": StageSpec(
+        key="scene_splat_evaluation",
+        version=1,
+        output_kind="scene_splat_evaluation_bundle",
+        deterministic=True,
+        params={
+            "profile": "exulanica.scene-splat-evaluation/v1",
+            "container": "zip-stored/1",
+            "max_bytes": 268_435_456,
+            "files": ["metrics", "runtime", "split", "preparation", "attempts", "heldout-pixels"],
+            "delivery": "private-operational-artifact-no-browser-route",
         },
     ),
     "scene_gate": StageSpec(

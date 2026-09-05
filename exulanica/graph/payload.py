@@ -170,9 +170,28 @@ class ScenePointMapPlacementRow(BaseModel):
     container: str | None
     scene_from_opm_row_major: list[float]
     local_units_to_scene_units: float
-    scale_status: Literal["unvalidated-identity"]
+    scale_status: Literal["colmap-correspondence-fit"]
     state: Literal["available", "bytes_missing"]
     reference: SceneGeometryReferenceRow | None
+
+
+class SceneRecoveredCalibrationRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    width: int
+    height: int
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    parameters: list[float]
+
+
+class SceneRecoveredCameraRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scene_from_camera_row_major: list[float]
+    calibration: SceneRecoveredCalibrationRow
+    projection: Literal["pinhole", "pinhole-approximation"]
 
 
 class ReconstructionSceneMemberRow(BaseModel):
@@ -185,6 +204,21 @@ class ReconstructionSceneMemberRow(BaseModel):
     registered: bool
     placement: ScenePointMapPlacementRow | None
     exclusion_reason: str | None
+    recovered_camera: SceneRecoveredCameraRow | None = None
+
+
+class SceneTrainedGeometryRow(BaseModel):
+    """A trained representation with its own bytes; it never carries a rung assertion."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: uuid.UUID
+    content_sha256: str
+    container: Literal["sog/1"]
+    scene_from_asset_row_major: list[float]
+    bounds: dict[str, list[float]]
+    state: Literal["available", "bytes_missing", "invalid"]
+    reference: SceneGeometryReferenceRow | None
 
 
 class ReconstructionSceneRow(BaseModel):
@@ -205,7 +239,8 @@ class ReconstructionSceneRow(BaseModel):
     registered_member_count: int
     receipt_state: Literal["available", "missing", "invalid"]
     placement_state: Literal["available", "partial", "bytes_missing", "unavailable", "invalid"]
-    rendering_substrate: Literal["posed_point_maps", "source_photographs"]
+    rendering_substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"]
+    trained_geometry: SceneTrainedGeometryRow | None = None
     members: list[ReconstructionSceneMemberRow]
 
 

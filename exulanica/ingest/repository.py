@@ -325,6 +325,21 @@ class IngestRepository:
             rung_assertion_id=rung_assertion_id,
         )
 
+    def release_checkpointed_reconstruction_scene(
+        self,
+        *,
+        job_id: uuid.UUID,
+        claim_token: uuid.UUID,
+        retry_delay_seconds: float,
+    ) -> bool:
+        """Release durable training progress without counting a graceful stop as failure."""
+        return reconstruction_jobs.release_checkpointed(
+            self._scope,
+            job_id=job_id,
+            claim_token=claim_token,
+            retry_delay_seconds=retry_delay_seconds,
+        )
+
     def fail_reconstruction_scene_job(
         self,
         *,

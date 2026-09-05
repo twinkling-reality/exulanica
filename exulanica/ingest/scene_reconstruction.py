@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from exulanica.canonical import canonical_json
-from exulanica.errors import TombstonedError
+from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.committed_store import committed_writes
 from exulanica.ingest.ledger import Ledger, StageRecorder
@@ -23,7 +24,16 @@ from exulanica.ingest.reconstruction_scratch import (
 )
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_rung import record_scene_rung
-from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
+from exulanica.ingest.scene_splat import (
+    ContainerCleanupUnconfirmed,
+    SceneSplatRequest,
+    cancellable_executor,
+    evaluation_bundle,
+    gaussian_ply_bounds,
+    receipt_bytes,
+    stage_training_dataset,
+)
+from exulanica.ingest.spine.reconstruction_jobs import MAX_SCENE_CLAIMS, ClaimedSceneJob
 from exulanica.ingest.stages import (
     STAGES,
     artifact_id_for,
@@ -53,6 +63,7 @@ from exulanica.reconstruction.scene_gate import (
     SceneReceipt,
     decide_scene_rung,
 )
+from exulanica.reconstruction.splat import run_gsplat_job
 from exulanica.store import ContentAddressedStore
 
 __all__ = [
@@ -68,6 +79,10 @@ _EXTENSIONS = {
 }
 
 
+class _SplatCheckpointed(RuntimeError):
+    pass
+
+
 class _ClaimLost(RuntimeError):
     pass
 
@@ -76,7 +91,7 @@ class _ClaimLost(RuntimeError):
 class SceneBuildOutcome:
     job_id: uuid.UUID
     scene_id: uuid.UUID
-    status: Literal["succeeded", "failed", "cancelled", "busy"]
+    status: Literal["succeeded", "failed", "cancelled", "busy", "checkpointed"]
     rung: int | None = None
     registered_member_count: int = 0
     message: str | None = None
@@ -133,6 +148,8 @@ class SceneReconstructionProcessor:
         executor: CommandExecutor | None = None,
         retry_delay_seconds: float = 30.0,
         external_cancellation: Callable[[], bool] | None = None,
+        stop_requested: Callable[[], bool] | None = None,
+        splat_executor: CommandExecutor | None = None,
     ) -> None:
         self._repository = repository
         self._store = store
@@ -143,6 +160,8 @@ class SceneReconstructionProcessor:
         self._executor = executor
         self._retry_delay_seconds = retry_delay_seconds
         self._external_cancellation = external_cancellation
+        self._stop_requested = stop_requested or (lambda: False)
+        self._splat_executor = splat_executor
 
     def process(self, claimed: ClaimedSceneJob) -> SceneBuildOutcome:
         """Run or resume one claim, flush guarded bytes, then publish the scene."""
@@ -170,6 +189,30 @@ class SceneReconstructionProcessor:
                 "busy",
                 message=str(error),
             )
+        except ContainerCleanupUnconfirmed as error:
+            self._repository.fail_reconstruction_scene_job(
+                job_id=claimed.job_id,
+                claim_token=claimed.claim_token,
+                failure_class="container_cleanup_unconfirmed",
+                failure_message=str(error),
+                retry_delay_seconds=self._retry_delay_seconds,
+            )
+            ledger.finish("failed")
+            return SceneBuildOutcome(claimed.job_id, claimed.scene_id, "failed", message=str(error))
+        except _SplatCheckpointed as error:
+            released = self._repository.release_checkpointed_reconstruction_scene(
+                job_id=claimed.job_id,
+                claim_token=claimed.claim_token,
+                retry_delay_seconds=self._retry_delay_seconds,
+            )
+            should_cleanup = not released
+            ledger.finish("failed" if released else "cancelled")
+            return SceneBuildOutcome(
+                claimed.job_id,
+                claimed.scene_id,
+                "checkpointed" if released else "cancelled",
+                message=str(error),
+            )
         except TombstonedError as error:
             ledger.finish("cancelled")
             should_cleanup = True
@@ -188,7 +231,10 @@ class SceneReconstructionProcessor:
                 retry_delay_seconds=self._retry_delay_seconds,
             )
             ledger.finish("failed")
-            should_cleanup = True
+            should_cleanup = (
+                claimed.build_inputs.get("splat_training") is None
+                or claimed.attempts >= MAX_SCENE_CLAIMS
+            )
             return SceneBuildOutcome(
                 claimed.job_id,
                 claimed.scene_id,
@@ -206,6 +252,16 @@ class SceneReconstructionProcessor:
         claimed: ClaimedSceneJob,
         job_directory: Path,
         ledger: Ledger,
+    ) -> SceneBuildOutcome:
+        with ExitStack() as stack:
+            return self._process_stages(claimed, job_directory, ledger, stack)
+
+    def _process_stages(
+        self,
+        claimed: ClaimedSceneJob,
+        job_directory: Path,
+        ledger: Ledger,
+        stack: ExitStack,
     ) -> SceneBuildOutcome:
         manifest, sources = self._manifest(claimed)
         source_directory = stage_scene_sources(self._store, job_directory, sources)
@@ -231,7 +287,13 @@ class SceneReconstructionProcessor:
                 claimed.scene_id,
                 pose_spec.key,
                 pose_bytes,
-                bytes.fromhex(manifest.digest),
+                input_digest_of(
+                    [
+                        bytes.fromhex(manifest.digest),
+                        claimed.build_input_digest,
+                        claimed.job_id.bytes,
+                    ]
+                ),
             )
 
             point_maps = self._point_maps(claimed)
@@ -283,12 +345,25 @@ class SceneReconstructionProcessor:
                         else ("no registered member has a verified point-map artifact",)
                     ),
                 )
+                extras: tuple[tuple[_PendingArtifact, StageRecorder], ...] = ()
+                splat_receipt = None
+                if claimed.build_inputs.get("splat_training") is not None:
+                    extras, splat_receipt = self._train_splat(
+                        claimed,
+                        manifest,
+                        source_directory,
+                        result.job_directory,
+                        ledger,
+                        stack,
+                        pose_artifact,
+                    )
                 decision = decide_scene_rung(
                     SceneGateInputs(
                         pose=pose_receipt,
                         placement=placement_receipt,
                         registered_member_count=registered_count,
                         member_count=len(claimed.members),
+                        splat=splat_receipt,
                     )
                 )
                 gate_spec = stage("scene_gate")
@@ -297,6 +372,7 @@ class SceneReconstructionProcessor:
                     input_artifact_ids=[
                         pose_artifact.artifact_id,
                         placement_artifact.artifact_id,
+                        *(artifact.artifact_id for artifact, _ in extras),
                     ],
                 ) as gate_recorder:
                     gate_bytes = decision.to_bytes()
@@ -308,6 +384,7 @@ class SceneReconstructionProcessor:
                             [
                                 pose_artifact.content_id.digest,
                                 placement_artifact.content_id.digest,
+                                *(artifact.content_id.digest for artifact, _ in extras),
                             ]
                         ),
                     )
@@ -327,6 +404,7 @@ class SceneReconstructionProcessor:
                             (pose_artifact, pose_recorder),
                             (placement_artifact, placement_recorder),
                             (gate_artifact, gate_recorder),
+                            *extras,
                         ),
                         ledger,
                     )
@@ -336,6 +414,114 @@ class SceneReconstructionProcessor:
             "succeeded",
             rung=decision.rung,
             registered_member_count=registered_count,
+        )
+
+    def _train_splat(
+        self,
+        claimed: ClaimedSceneJob,
+        pose: PoseBuildManifest,
+        sources: Path,
+        pose_directory: Path,
+        ledger: Ledger,
+        stack: ExitStack,
+        pose_artifact: _PendingArtifact,
+    ) -> tuple[tuple[tuple[_PendingArtifact, StageRecorder], ...], SceneReceipt]:
+        request = SceneSplatRequest.from_payload(claimed.build_inputs["splat_training"])
+        manifest = request.manifest(pose)
+        training_input = input_digest_of(
+            [bytes.fromhex(manifest.digest), claimed.build_input_digest, claimed.job_id.bytes]
+        )
+        dataset = stage_training_dataset(
+            sources, pose_directory / "sparse", pose_directory.parent.parent / "training-dataset"
+        )
+        recorder = stack.enter_context(
+            ledger.stage(
+                stage("scene_splat_training"), input_artifact_ids=[pose_artifact.artifact_id]
+            )
+        )
+        result = run_gsplat_job(
+            manifest,
+            dataset_dir=dataset,
+            pose_receipt=pose_directory / "receipt.json",
+            jobs_root=pose_directory.parent.parent / "splat",
+            executor=self._splat_executor
+            or cancellable_executor(lambda: self._cancelled(claimed), self._stop_requested),
+        )
+        if self._cancelled(claimed):
+            raise TombstonedError("scene was withdrawn before training publication")
+        for member in claimed.members:
+            self._store.get(member.blob_id)  # Reverify original bytes after an expensive run.
+        if result.status == "checkpointed":
+            raise _SplatCheckpointed("Gaussian training saved a checkpoint; retry this exact job")
+        if result.status != "completed" or result.quality is None:
+            raise RuntimeError(result.reason or "Gaussian training failed")
+        quality = result.quality
+        # Quality acceptance is appearance consistency, not a physical-scale/rung claim.
+        publication: dict[str, object] = {
+            "profile": "exulanica.scene-splat-publication/v1",
+            "scene_ref": str(claimed.scene_id),
+            "pose_receipt_sha256": pose_artifact.content_id.hex,
+            "manifest": manifest.as_payload(),
+            "manifest_digest": manifest.digest,
+            "quality": quality.as_payload(),
+            "delivery": None,
+        }
+        outputs: list[tuple[_PendingArtifact, StageRecorder]] = []
+        evaluation_bytes = evaluation_bundle(result.job_directory / "output")
+        evaluation_recorder = stack.enter_context(
+            ledger.stage(
+                stage("scene_splat_evaluation"), input_artifact_ids=[pose_artifact.artifact_id]
+            )
+        )
+        evaluation = self._pending(
+            claimed.scene_id,
+            "scene_splat_evaluation",
+            evaluation_bytes,
+            hashlib.sha256(evaluation_bytes).digest(),
+        )
+        outputs.append((evaluation, evaluation_recorder))
+        publication["evaluation"] = {
+            "artifact_id": str(evaluation.artifact_id),
+            "content_sha256": evaluation.content_id.hex,
+            "byte_size": evaluation.byte_size,
+            "container": "zip-stored/1",
+        }
+        if quality.accepted:
+            content = (result.job_directory / "output" / "scene.sog").read_bytes()
+            if hashlib.sha256(content).hexdigest() != quality.delivery_sha256:
+                raise ValueError("trained delivery bytes changed before publication")
+            delivery_recorder = stack.enter_context(
+                ledger.stage(
+                    stage("scene_splat_delivery"), input_artifact_ids=[pose_artifact.artifact_id]
+                )
+            )
+            delivery = self._pending(
+                claimed.scene_id, "scene_splat_delivery", content, training_input
+            )
+            outputs.append((delivery, delivery_recorder))
+            publication["delivery"] = {
+                "artifact_id": str(delivery.artifact_id),
+                "content_sha256": delivery.content_id.hex,
+                "byte_size": delivery.byte_size,
+                "container": "sog/1",
+                "scene_from_asset_row_major": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                "bounds": gaussian_ply_bounds(
+                    (result.job_directory / "output" / "accepted.ply").read_bytes()
+                ),
+                "bounds_convention": "axis-aligned-three-sigma-Gaussian-support",
+            }
+        training_receipt = self._pending(
+            claimed.scene_id,
+            "scene_splat_training",
+            receipt_bytes(publication),
+            training_input,
+        )
+        outputs.append((training_receipt, recorder))
+        return tuple(outputs), SceneReceipt(
+            kind="splat",
+            sha256=training_receipt.content_id.hex,
+            accepted=quality.accepted,
+            reasons=quality.reasons,
         )
 
     def _manifest(
@@ -389,7 +575,14 @@ class SceneReconstructionProcessor:
                 "version": stage(key).version,
                 "params_sha256": stage(key).params_digest.hex(),
             }
-            for key in ("scene_pose", "scene_placement", "scene_gate")
+            for key in (
+                ("scene_pose", "scene_placement", "scene_gate")
+                + (
+                    ("scene_splat_training", "scene_splat_delivery", "scene_splat_evaluation")
+                    if claimed.build_inputs.get("splat_training") is not None
+                    else ()
+                )
+            )
         ]
         if raw_stages != expected_stages:
             raise ValueError("the scene job stage bindings are no longer current")
@@ -428,11 +621,12 @@ class SceneReconstructionProcessor:
                 raise ValueError("an exact point-map build input disagrees with its artifact row")
             if row.storage_key != self._store.key_for(BlobId(row.content_sha256)):
                 raise ValueError("an exact point-map build input has a non-canonical storage key")
-            self._store.get(BlobId(row.content_sha256))
+            content = self._store.get(BlobId(row.content_sha256))
             usable[str(capture_id)] = PointMapInput(
                 capture_ref=str(capture_id),
                 artifact_ref=str(row.artifact_id),
                 content_sha256=row.content_sha256.hex(),
+                content=content,
             )
         return usable
 
@@ -543,10 +737,15 @@ class SceneReconstructionProcessor:
                     raise _ClaimLost("the scene claim was cancelled or reclaimed before commit")
 
     def _cancelled(self, claimed: ClaimedSceneJob) -> bool:
-        return bool(
+        cancelled = bool(
             (self._external_cancellation is not None and self._external_cancellation())
             or self._repository.reconstruction_scene_cancelled_or_lost(
                 job_id=claimed.job_id,
                 claim_token=claimed.claim_token,
             )
         )
+        if not cancelled and any(
+            not self._store.exists(member.blob_id) for member in claimed.members
+        ):
+            raise BlobNotFoundError("an exact scene source is absent from the authoritative store")
+        return cancelled
