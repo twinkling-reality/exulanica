@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { displayCameraTransform } from '@exulanica/atlas-core';
 import { readFileSync } from 'node:fs';
 import type { ReconstructionSceneRecord } from '@exulanica/graph-client';
 import {
@@ -168,8 +169,14 @@ describe('trained scene authenticated delivery', () => {
     expect(loaded.placedPointMaps).toEqual([]);
     expect(loaded.trainedGeometry).toHaveLength(1);
     expect(loaded.recoveredCameras.map((camera) => camera.captureId)).toEqual([CAPTURE_A, CAPTURE_B]);
-    expect(loaded.recoveredCameras[0]).toMatchObject({ ...camera, captureId: CAPTURE_A,
-      poseReceiptSha256: original.poseReceiptSha256, sceneId: original.sceneId, islandId: REGION });
+    // The display frame moves the camera into the region's upright walking frame; calibration,
+    // projection and identity are untouched and the camera axes stay unit length.
+    const frame = loaded.displayFrames.get(original.sceneId)!;
+    expect(frame.metric).toBe(false);
+    expect(loaded.recoveredCameras[0]).toMatchObject({ calibration: camera.calibration, projection: camera.projection,
+      captureId: CAPTURE_A, poseReceiptSha256: original.poseReceiptSha256, sceneId: original.sceneId, islandId: REGION,
+      sceneFromCameraRowMajor: displayCameraTransform(frame, camera.sceneFromCameraRowMajor) });
+    expect(Math.hypot(...[0, 4, 8].map((i) => loaded.recoveredCameras[0]!.sceneFromCameraRowMajor[i]!))).toBeCloseTo(1, 9);
     expect(requests.map((request) => request.path)).toEqual(['/scene-geometry/cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
     expect(loaded.issues).toEqual([]);
   });
@@ -331,8 +338,12 @@ describe('production reconstruction geometry', () => {
 
     expect(session.issues).toEqual([]);
     expect(session.placedPointMaps).toHaveLength(2);
-    expect(session.placedPointMaps.map((value) => value.sceneFromOpmRowMajor[3]))
-      .toEqual([0, 3]);
+    // Receipt transforms put the maps at scene x = 0 and 3; the display frame keeps that distinct
+    // 3-unit separation, scaled, and centres the scene on the region's vertical axis.
+    const frame = session.displayFrames.get('scene-1')!;
+    const xs = session.placedPointMaps.map((value) => value.sceneFromOpmRowMajor[3]!);
+    expect(xs[1]! - xs[0]!).toBeCloseTo(3 * frame.scale, 9);
+    expect(session.placedPointMaps.map((value) => value.localUnitsToSceneUnits)).toEqual([frame.scale, frame.scale]);
     expect(session.renderingByScene.get('scene-1')).toBe('posed_point_maps');
     expect(requests.map((request) => request.path)).toEqual([
       '/api/geometry/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

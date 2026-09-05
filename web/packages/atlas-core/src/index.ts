@@ -415,3 +415,17 @@ export {
   WorldCustomizationController,
   resolveWorldStyleVersion,
 } from './world/customization.js';
+
+export type { CameraPoseSample, SceneDisplayFrame, UpMethod } from './display-frame.js';
+export {
+  DISPLAY_EYE_HEIGHT,
+  colmapCameraSample,
+  composeDisplayFrame,
+  displayCameraTransform,
+  identityDisplayFrame,
+  opmCameraSample,
+  sceneDisplayFrame,
+  transformDirection,
+  transformPoint,
+  transformedBoxCorners,
+} from './display-frame.js';

@@ -60,6 +60,13 @@ export interface Island {
    */
   readonly viewpointLocal: LocalVec3;
 
+  /**
+   * Where that camera looked, as a unit direction in the local frame, when a reconstruction
+   * recovered it. Arrival then reproduces the first photograph's view instead of framing the
+   * region from a fixed offset. Absent for regions without recovered cameras.
+   */
+  readonly viewpointForwardLocal?: LocalVec3;
+
   readonly anchors: readonly Anchor[];
 
   /**

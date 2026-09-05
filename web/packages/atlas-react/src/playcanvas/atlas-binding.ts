@@ -10,6 +10,7 @@ import type {
   EmphasisBuffers,
   FocusState,
   Island,
+  LocalVec3,
   IslandId,
   MapPresentationState,
   NavigationWorld,
@@ -50,6 +51,7 @@ import {
   focusDirectly,
   isNavigationLineVisible,
   latchFocus,
+  localDirectionToAtlas,
   localToAtlas,
   localVec3,
   mapTierState,
@@ -1462,6 +1464,12 @@ export function initialAtlasCameraState(
   sourcePresentation: 'world' | 'inspection' = 'world',
 ): CameraState {
   const first = scene.islands[0];
+  if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {
+    // A reconstructed region arrives where its first photograph was taken, looking where that
+    // camera looked. The display frame put the recovered cameras at eye height, so this is a
+    // standing viewpoint, and the first frame is the first photograph's view of the geometry.
+    return recoveredCameraState(first, first.viewpointLocal, first.viewpointForwardLocal);
+  }
   return first === undefined
     ? {
         x: navigationWorld.centre.x,
@@ -1494,6 +1502,20 @@ export function initialAtlasCameraState(
           pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
         };
       })();
+}
+
+/** The controls' pose at a recovered camera: forward is (-sin yaw, 0, -cos yaw), pitch positive up. */
+export function recoveredCameraState(island: Island, viewpointLocal: LocalVec3, forwardLocal: LocalVec3): CameraState {
+  const position = localToAtlas(island.placement, viewpointLocal);
+  const forward = localDirectionToAtlas(island.placement, forwardLocal);
+  const horizontal = Math.hypot(forward.x, forward.z);
+  return {
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    yaw: horizontal < 1e-9 ? island.placement.yaw : Math.atan2(-forward.x, -forward.z),
+    pitch: Math.max(-1.3, Math.min(1.3, Math.atan2(forward.y, horizontal))),
+  };
 }
 
 /** Preserve the validated destination position while facing a rung-4 arrival toward its source. */

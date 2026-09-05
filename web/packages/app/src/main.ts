@@ -37,6 +37,7 @@ import {
   islandId as toIslandId,
   localVec3,
   type IslandId,
+  type SceneDisplayFrame,
 } from '@exulanica/atlas-core';
 import {
   FACET_KEYS,
@@ -57,6 +58,7 @@ import type {
 import {
   footprintRadiusOf,
   scenePointMapFootprint,
+  scenePointMapForward,
   scenePointMapViewpoint,
   trainedSceneFootprint,
 } from '@exulanica/atlas-react/playcanvas';
@@ -169,6 +171,7 @@ let placedPointMaps_: readonly PlacedScenePointMap[] | undefined;
 let trainedGeometry_: readonly TrainedSceneGeometry[] = Object.freeze([]);
 let recoveredCameras_: readonly RecoveredSceneCamera[] = Object.freeze([]);
 let notDrawnScenes_: ReadonlySet<string> = new Set();
+let displayFrames_: ReadonlyMap<string, SceneDisplayFrame> = new Map();
 /** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
 let heldPointMaps_: HeldPointMaps | undefined;
 
@@ -203,9 +206,11 @@ function reconstructionsOf(
   }
   for (const [islandId, values] of placedByIsland) {
     const viewpoint = scenePointMapViewpoint(values[0]!);
+    const forward = scenePointMapForward(values[0]!);
     out.set(islandId, {
       rung: 3,
       viewpointLocal: localVec3(viewpoint[0], viewpoint[1], viewpoint[2]),
+      viewpointForwardLocal: localVec3(forward[0], forward[1], forward[2]),
       footprintRadiusLocal: Math.max(scenePointMapFootprint(values), ...trainedGeometry_
         .filter((geometry) => geometry.islandId === islandId).map(trainedSceneFootprint)),
     });
@@ -215,7 +220,9 @@ function reconstructionsOf(
     const camera = recoveredCameras_.find((camera) => camera.sceneId === trained.sceneId && camera.islandId === trained.islandId);
     if (camera === undefined) continue;
     const m = camera.sceneFromCameraRowMajor;
+    // COLMAP cameras look along their local +Z axis, the third column of the rotation.
     out.set(trained.islandId, { rung: 3, viewpointLocal: localVec3(m[3]!, m[7]!, m[11]!),
+      viewpointForwardLocal: localVec3(m[2]!, m[6]!, m[10]!),
       footprintRadiusLocal: trainedSceneFootprint(trained) });
   }
   for (const [islandId, map] of maps ?? []) {
@@ -471,7 +478,8 @@ async function loadGeometry(
       ...legacyGeometry.issues,
     ]);
     browserMeasurement?.endGeometryLoad(geometryIssues_);
-    reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene, notDrawnScenes_);
+    displayFrames_ = sceneGeometry.displayFrames;
+    reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene, notDrawnScenes_, displayFrames_);
   } catch (error) {
     pointMaps_ = undefined;
     placedPointMaps_ = undefined;
@@ -494,11 +502,20 @@ function reconstructionRungsFor(
   scenes: readonly ReconstructionSceneRecord[],
   actual: ReadonlyMap<string, RenderingSubstrate>,
   notDrawn: ReadonlySet<string> = new Set(),
+  displayFrames: ReadonlyMap<string, SceneDisplayFrame> = new Map(),
 ): readonly ReconstructionRungDisclosure[] {
   return Object.freeze(scenes.map((scene) => {
     const substrate = actual.get(scene.sceneId) ?? 'source_photographs';
     const displayedRung = substrate === 'source_photographs' ? 4 : Math.max(scene.recordedRung ?? 3, 3);
     const reasons = [...scene.displayReasons];
+    const frame = displayFrames.get(scene.sceneId);
+    if (frame !== undefined && substrate !== 'source_photographs') {
+      // The presentation frame is a layout decision and is said out loud beside the rung.
+      reasons.push(frame.upMethod === 'scene-axes'
+        ? `Displayed on its recovered axes at ${frame.scale.toPrecision(3)}× nonmetric exhibit scale.`
+        : `Displayed upright at ${frame.scale.toPrecision(3)}× nonmetric exhibit scale, `
+          + 'with the recovered cameras at eye height.');
+    }
     if (notDrawn.has(scene.sceneId)) {
       reasons.push('Not drawn: its region displays a more complete reconstruction of the same photographs.');
     } else if (substrate !== scene.renderingSubstrate) {
@@ -1431,7 +1448,7 @@ async function mount(): Promise<void> {
   const actualRendering = new Map<string, RenderingSubstrate>();
   for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
-  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, notDrawnScenes_);
+  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, notDrawnScenes_, displayFrames_);
   geometryNotices = Object.freeze([...geometryNotices, ...atlas.binding.trainedSceneFailures
     .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
   const refreshedStatus = renderReconstructionStatus();

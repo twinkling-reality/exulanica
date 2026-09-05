@@ -21,6 +21,7 @@ export { validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint 
 export {
   opmPointInScene,
   scenePointMapFootprint,
+  scenePointMapForward,
   scenePointMapViewpoint,
   validateScenePointMapPlacement,
 } from './scene-point-maps.js';

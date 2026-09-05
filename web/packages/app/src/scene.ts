@@ -94,6 +94,8 @@ export interface ReconstructedGeometry {
   readonly rung: ReconstructionRung;
   /** Where the camera stood, in the island's local frame. The point map's own origin. */
   readonly viewpointLocal: LocalVec3;
+  /** Where that camera looked, as a unit local direction, when the reconstruction recovered it. */
+  readonly viewpointForwardLocal?: LocalVec3;
   /**
    * How far the geometry actually reaches, in local units.
    *
@@ -294,6 +296,9 @@ export function buildScene(
       // was standing but simply where the first run arrives.
       viewpointLocal: reconstructions.get(toIslandId(record.islandId))?.viewpointLocal
         ?? localVec3(0, 1.6, 0),
+      ...(reconstructions.get(toIslandId(record.islandId))?.viewpointForwardLocal === undefined
+        ? {}
+        : { viewpointForwardLocal: reconstructions.get(toIslandId(record.islandId))!.viewpointForwardLocal! }),
       anchors,
       layoutEntities: layoutEntitiesOf(anchors),
     }),

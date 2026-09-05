@@ -86,3 +86,11 @@ export function scenePointMapViewpoint(
 ): readonly [number, number, number] {
   return opmPointInScene(value, value.map.header.viewpoint.position);
 }
+
+/** The direction that camera looked, in the scene frame; OPM cameras look along local -Z. */
+export function scenePointMapForward(value: PlacedScenePointMap): readonly [number, number, number] {
+  validateScenePointMapPlacement(value);
+  const m = value.sceneFromOpmRowMajor;
+  const s = value.localUnitsToSceneUnits;
+  return [-m[2]! / s, -m[6]! / s, -m[10]! / s];
+}

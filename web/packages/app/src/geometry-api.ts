@@ -34,7 +34,11 @@
  * still attempts one unposed map per region.
  */
 
-import type { IslandId } from '@exulanica/atlas-core';
+import type { IslandId, SceneDisplayFrame } from '@exulanica/atlas-core';
+import {
+  colmapCameraSample, composeDisplayFrame, displayCameraTransform, opmCameraSample, sceneDisplayFrame,
+  transformedBoxCorners,
+} from '@exulanica/atlas-core';
 import type { PlacedScenePointMap, PointMap, TrainedSceneGeometry, RecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
 import { decodeOpm, validateScenePointMapPlacement, validateSogBundle, validateTrainedSceneGeometry, validateRecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
 import {
@@ -86,6 +90,14 @@ export interface GeometrySession {
   /** Verified SOG bytes; GPU decode availability is settled separately by the renderer. */
   readonly trainedGeometry: readonly TrainedSceneGeometry[];
   readonly recoveredCameras: readonly RecoveredSceneCamera[];
+  /**
+   * The presentation similarity applied to each drawn scene's maps, trained asset and cameras.
+   *
+   * Derived from the recovered cameras alone so the scene stands upright, centred and at walking
+   * scale in its region. It is a layout decision like the region's placement: no receipt changes,
+   * no physical claim follows, and the status line discloses it.
+   */
+  readonly displayFrames: ReadonlyMap<string, SceneDisplayFrame>;
 }
 
 /** One successfully placed geometry input, measured at the authenticated byte boundary. */
@@ -347,6 +359,7 @@ export class GeometryClient {
     return Object.freeze({
       pointMaps,
       placedPointMaps: Object.freeze([]),
+      displayFrames: new Map<string, SceneDisplayFrame>(),
       byArtifact,
       issues: Object.freeze(issues),
       renderingByScene: new Map(),
@@ -377,9 +390,13 @@ export class GeometryClient {
     const digest = globalThis.crypto?.subtle;
     const trainedGeometry: TrainedSceneGeometry[] = [];
     const recoveredCameras: RecoveredSceneCamera[] = [];
+    const displayFrames = new Map<string, SceneDisplayFrame>();
 
     for (const scene of scenes) {
       let loadedForScene = 0;
+      const sceneCameras: RecoveredSceneCamera[] = [];
+      const scenePlaced: PlacedScenePointMap[] = [];
+      const sceneTrained: TrainedSceneGeometry[] = [];
       const resolvedIslands = new Set(
         scene.members.map((member) => regionOf.get(member.captureId)).filter(
           (value): value is IslandId => value !== undefined,
@@ -407,7 +424,7 @@ export class GeometryClient {
               captureId: member.captureId, ordinal: member.ordinal, islandId,
               poseReceiptSha256: scene.poseReceiptSha256 };
             validateRecoveredSceneCamera(camera);
-            recoveredCameras.push(Object.freeze(camera));
+            sceneCameras.push(camera);
           } catch (error) {
             issues.push({ sceneId: scene.sceneId, captureId: member.captureId, islandId, state: 'undecodable',
               reason: error instanceof Error ? error.message : 'The recovered camera is invalid.' });
@@ -542,7 +559,7 @@ export class GeometryClient {
           decodeMs: 0,
           reused: true,
         }));
-        placedPointMaps.push(Object.freeze(placed));
+        scenePlaced.push(placed);
         byArtifact.set(placement.artifactId, map);
         if (!pointMaps.has(islandId)) pointMaps.set(islandId, map);
         loadedForScene += 1;
@@ -587,7 +604,7 @@ export class GeometryClient {
                 sceneFromAssetRowMajor: trained.sceneFromAssetRowMajor,
               };
               validateTrainedSceneGeometry(value);
-              trainedGeometry.push(Object.freeze(value));
+              sceneTrained.push(value);
               this.#observer?.(Object.freeze({
                 sceneId: scene.sceneId, captureId: scene.members[0]?.captureId ?? '',
                 artifactId: trained.artifactId, expectedBytes: reference.byteSize, receivedBytes: bytes.byteLength,
@@ -600,6 +617,38 @@ export class GeometryClient {
           }
         }
       }
+
+      // Presentation: one similarity per scene, from its recovered cameras, so the scene stands
+      // upright, centred and at walking scale in its region. Receipts and identities are untouched.
+      const samples = sceneCameras.length > 0
+        ? sceneCameras.map((camera) => colmapCameraSample(camera.sceneFromCameraRowMajor))
+        : scenePlaced.map((placed) => opmCameraSample(placed.sceneFromOpmRowMajor));
+      const corners = [
+        ...scenePlaced.flatMap((placed) => transformedBoxCorners(placed.map.header.bounds, placed.sceneFromOpmRowMajor)),
+        ...sceneTrained.flatMap((trained) => transformedBoxCorners(trained.bounds, trained.sceneFromAssetRowMajor)),
+      ];
+      const frame = sceneDisplayFrame(samples, corners);
+      if (sceneCameras.length + scenePlaced.length + sceneTrained.length > 0) displayFrames.set(scene.sceneId, frame);
+      const reportDisplayed = (captureId: string, error: unknown): void => {
+        issues.push({ sceneId: scene.sceneId, captureId, islandId, state: 'undecodable',
+          reason: error instanceof Error ? error.message : 'The displayed transform is invalid.' });
+      };
+      for (const camera of sceneCameras) {
+        const value = { ...camera, sceneFromCameraRowMajor: displayCameraTransform(frame, camera.sceneFromCameraRowMajor) };
+        try { validateRecoveredSceneCamera(value); recoveredCameras.push(Object.freeze(value)); }
+        catch (error) { reportDisplayed(camera.captureId, error); }
+      }
+      for (const placed of scenePlaced) {
+        const value = { ...placed, sceneFromOpmRowMajor: composeDisplayFrame(frame, placed.sceneFromOpmRowMajor),
+          localUnitsToSceneUnits: frame.scale * placed.localUnitsToSceneUnits };
+        try { validateScenePointMapPlacement(value); placedPointMaps.push(Object.freeze(value)); }
+        catch (error) { reportDisplayed(placed.captureId ?? '', error); }
+      }
+      for (const trained of sceneTrained) {
+        const value = { ...trained, sceneFromAssetRowMajor: composeDisplayFrame(frame, trained.sceneFromAssetRowMajor) };
+        try { validateTrainedSceneGeometry(value); trainedGeometry.push(Object.freeze(value)); }
+        catch (error) { reportDisplayed(scene.members[0]?.captureId ?? '', error); }
+      }
     }
 
     return Object.freeze({
@@ -610,6 +659,7 @@ export class GeometryClient {
       renderingByScene,
       trainedGeometry: Object.freeze(trainedGeometry),
       recoveredCameras: Object.freeze(recoveredCameras),
+      displayFrames,
     });
   }
 
