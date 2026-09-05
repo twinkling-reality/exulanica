@@ -209,6 +209,38 @@ def test_quality_failure_keeps_rung_three_and_never_builds_a_delivery_asset(tmp_
     assert not (result.job_directory / "output" / "scene.sog").exists()
 
 
+def test_a_failed_runner_names_its_last_stderr_line_and_retains_the_tail(tmp_path):
+    """A digest of stderr left the first real failure nameless; the operator needs the words."""
+    manifest = _manifest()
+    stderr = (
+        "Traceback (most recent call last):\n  ...\n"
+        "gsplat runner refused: expected scalar type Float but found Double\n"
+    )
+    calls: list[tuple[str, ...]] = []
+
+    def failing(command: tuple[str, ...], cwd: Path) -> CommandResult:
+        calls.append(command)
+        return CommandResult(1, "", stderr, 5.0)
+
+    result = run_gsplat_job(
+        manifest,
+        dataset_dir=_dataset(tmp_path / "dataset"),
+        pose_receipt=_pose_receipt(tmp_path / "pose.json", manifest),
+        jobs_root=tmp_path / "jobs",
+        executor=failing,
+    )
+    assert result.status == "failed"
+    assert result.reason == (
+        "gsplat runner exited 1: gsplat runner refused: expected scalar type Float but found "
+        "Double; rung 3 fallback"
+    )
+    attempt = json.loads((result.job_directory / "train-attempt.json").read_text())
+    assert attempt["returncode"] == 1
+    assert attempt["stderr_tail"].endswith("found Double\n")
+    assert attempt["stderr_sha256"] == hashlib.sha256(stderr.encode()).hexdigest()
+    assert len(calls) == 1 and calls[0][0] == "exulanica-gsplat-scene-v1"
+
+
 def test_preemption_is_distinct_from_failure_and_the_next_call_resumes(tmp_path):
     manifest = _manifest()
     fake = FakeRunner(manifest, preempt_once=True)

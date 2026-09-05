@@ -482,28 +482,41 @@ def _image(view: dict[str, Any], torch: Any) -> Any:
     return torch.from_numpy(pixels).to("cuda").unsqueeze(0)
 
 
-def _parameters(points: Any, manifest: SplatBuildManifest, restored: Any, torch: Any) -> Any:
+def seed_values(points: Any, manifest: SplatBuildManifest, torch: Any) -> dict[str, Any]:
+    """Initial single-precision Gaussians from the sparse points, before any device transfer.
+
+    Every tensor is float32 explicitly. MEASURED 2026-09-05 on the first real CUDA run: the
+    nearest-neighbour distances SciPy returns are float64, so the seed scales reached the
+    rasterizer as Double beside Float means and the first iteration refused with
+    ``expected scalar type Float but found Double``.
+    """
     import numpy as np
     from scipy.spatial import cKDTree
 
-    if restored is not None:
-        values = restored["splats"]
-    else:
-        if len(points) > manifest.gaussian_cap:
-            points = points[np.random.choice(len(points), manifest.gaussian_cap, replace=False)]
-        if len(points) < 4:
-            raise ValueError("gaussian_cap must allow at least four seed Gaussians")
-        distances = cKDTree(points).query(points, k=4)[0][:, 1:]
-        scale = np.sqrt(np.mean(distances**2, axis=-1)).clip(min=1e-7)
-        n = len(points)
-        values = {
-            "means": torch.from_numpy(points),
-            "scales": torch.from_numpy(np.log(scale)).unsqueeze(1).repeat(1, 3),
-            "quats": torch.randn(n, 4),
-            "opacities": torch.logit(torch.full((n,), 0.1)),
-            "sh0": torch.zeros(n, 1, 3),
-            "shN": torch.zeros(n, 15, 3),
-        }
+    points = np.asarray(points, dtype=np.float32)
+    if len(points) > manifest.gaussian_cap:
+        points = points[np.random.choice(len(points), manifest.gaussian_cap, replace=False)]
+    if len(points) < 4:
+        raise ValueError("gaussian_cap must allow at least four seed Gaussians")
+    distances = cKDTree(points).query(points, k=4)[0][:, 1:]
+    scale = np.sqrt(np.mean(distances**2, axis=-1)).clip(min=1e-7).astype(np.float32)
+    n = len(points)
+    values = {
+        "means": torch.from_numpy(points),
+        "scales": torch.from_numpy(np.log(scale)).unsqueeze(1).repeat(1, 3),
+        "quats": torch.randn(n, 4),
+        "opacities": torch.logit(torch.full((n,), 0.1)),
+        "sh0": torch.zeros(n, 1, 3),
+        "shN": torch.zeros(n, 15, 3),
+    }
+    for key, value in values.items():
+        if value.dtype != torch.float32:
+            raise ValueError(f"seed Gaussian {key} is {value.dtype}, not float32")
+    return values
+
+
+def _parameters(points: Any, manifest: SplatBuildManifest, restored: Any, torch: Any) -> Any:
+    values = restored["splats"] if restored is not None else seed_values(points, manifest, torch)
     return torch.nn.ParameterDict(
         {key: torch.nn.Parameter(v.to("cuda")) for key, v in values.items()}
     )

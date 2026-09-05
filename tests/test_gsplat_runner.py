@@ -19,6 +19,7 @@ from exulanica.reconstruction.gsplat_runner import (
     read_manifest,
     restore_optimizers,
     save_checkpoint,
+    seed_values,
     verify_runtime,
 )
 
@@ -196,6 +197,21 @@ def test_manifest_refuses_changed_metric_definition_before_training(tmp_path):
 
 
 @_isolated_torch
+@_isolated_torch
+def test_seed_gaussians_are_single_precision_before_any_device_transfer():
+    """The first real CUDA iteration refused Double scales beside Float means (2026-09-05)."""
+    import numpy as np
+    import torch
+
+    rng = np.random.default_rng(7)
+    points = rng.normal(size=(64, 3)).astype(np.float64)  # what a caller may still hand over
+    values = seed_values(points, _manifest(), torch)
+    assert set(values) == {"means", "scales", "quats", "opacities", "sh0", "shN"}
+    assert {value.dtype for value in values.values()} == {torch.float32}
+    assert values["means"].shape == (64, 3) and values["scales"].shape == (64, 3)
+    assert torch.isfinite(values["scales"]).all()
+
+
 def test_cpu_host_cannot_claim_cuda_runtime(monkeypatch):
     import torch
 

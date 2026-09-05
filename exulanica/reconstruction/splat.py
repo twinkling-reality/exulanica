@@ -553,6 +553,9 @@ def run_gsplat_job(
                 "duration_ms": trained.duration_ms,
                 "stdout_sha256": _digest_bytes(trained.stdout.encode()),
                 "stderr_sha256": _digest_bytes(trained.stderr.encode()),
+                # A digest alone left the first real failure nameless; the tail is what an operator
+                # needs, bounded so a runaway log cannot bloat the private attempt record.
+                "stderr_tail": trained.stderr[-4000:],
             },
         )
         if trained.returncode == 75:
@@ -565,13 +568,18 @@ def run_gsplat_job(
                 "checkpointed", manifest.digest, job, None, False, "preempted; resume is durable"
             )
         if trained.returncode != 0:
+            last_line = next(
+                (line.strip() for line in reversed(trained.stderr.splitlines()) if line.strip()),
+                "",
+            )[:300]
+            detail = f": {last_line}" if last_line else ""
             return SplatJobResult(
                 "failed",
                 manifest.digest,
                 job,
                 None,
                 False,
-                f"gsplat runner exited {trained.returncode}; rung 3 fallback",
+                f"gsplat runner exited {trained.returncode}{detail}; rung 3 fallback",
             )
         ply = output / "accepted.ply"
         if not ply.is_file():
