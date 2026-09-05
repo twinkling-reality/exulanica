@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 
 import pytest
-from exulanica.canonical import canonical_json, round_half_down, sha256_of_canonical
+from exulanica.canonical import canonical_json, ceil_div, round_half_down, sha256_of_canonical
 from exulanica.errors import CanonicalisationError, InvalidAddressError
 from exulanica.evidence import BlobId
 
@@ -80,3 +80,33 @@ def test_round_half_down_is_exact_at_int64_magnitudes():
     """Float arithmetic loses this; the rounding rule must not."""
     huge = 9_223_372_036_854_775_807
     assert round_half_down(huge * 2 + 1, 2) == huge
+
+
+@pytest.mark.parametrize(
+    ("numerator", "denominator", "expected"),
+    [
+        (1, 2, 1),  # up, not to nearest
+        (-1, 2, 0),  # toward positive infinity, not away from zero
+        (3, 2, 2),
+        (-3, 2, -1),
+        (4, 2, 2),  # exact values are untouched
+        (-4, 2, -2),
+        (0, 5, 0),
+        (1, -2, 0),  # a negative denominator is normalised, not a second behaviour
+    ],
+)
+def test_ceil_div_rounds_toward_positive_infinity(numerator, denominator, expected):
+    """Toward positive infinity, not away from zero.
+
+    ``ticks_from_ns`` floors toward negative infinity, so its inverse has to round the same
+    direction to compose. Rounding away from zero would make the tick round trip exact for
+    positive times and lose a sample for negative ones, which is the harder bug to notice
+    because negative t_ns only appears when a container carries an edit list.
+    """
+    assert ceil_div(numerator, denominator) == expected
+
+
+def test_ceil_div_is_exact_at_int64_magnitudes():
+    huge = 9_223_372_036_854_775_807
+    assert ceil_div(huge * 2 - 1, 2) == huge
+    assert ceil_div(huge * 2 + 1, 2) == huge + 1

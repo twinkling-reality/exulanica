@@ -8,9 +8,16 @@ work:
     rendering that every JSON writer agrees on, so a float in a digest input is a latent
     cross-language mismatch. Callers quantise to integers first (see
     ``exulanica.evidence.region`` for how normalised coordinates become integers).
-2.  **One rounding rule**, ``round_half_down``, used by both the nanosecond/tick conversion in
-    ``exulanica.evidence.timebase`` and the coordinate quantisation in
-    ``exulanica.evidence.region``, implemented in exact integer arithmetic.
+2.  **One rounding rule for quantising a measured value**, ``round_half_down``, used by the
+    coordinate quantisation in ``exulanica.evidence.region`` and by the EXIF GPS and altitude
+    conversions, implemented in exact integer arithmetic.
+
+    ``ceil_div`` is the second and last rule, and it exists for a different job. Placing a tick
+    on the nanosecond axis is not quantising a measurement, it is choosing a boundary, and the
+    requirement there is that the choice is **invertible**: ``ticks_from_ns`` floors, so only a
+    boundary at or after the true instant lands back on the tick it came from. Rounding to
+    nearest looks more accurate and loses the sample. See ADR-0015 and the module docstring of
+    ``exulanica.evidence.timebase``.
 
 The canonical form is a strict subset of RFC 8785 (JCS): sorted keys, no insignificant
 whitespace, UTF-8. Because floats are rejected outright, the only place this could diverge
@@ -27,7 +34,13 @@ from typing import Any
 
 from exulanica.errors import CanonicalisationError
 
-__all__ = ["canonical_json", "round_half_down", "sha256_digest", "sha256_of_canonical"]
+__all__ = [
+    "canonical_json",
+    "ceil_div",
+    "round_half_down",
+    "sha256_digest",
+    "sha256_of_canonical",
+]
 
 
 def _check(value: Any, path: str) -> None:
@@ -104,3 +117,19 @@ def round_half_down(numerator: int, denominator: int) -> int:
         # Exactly .5 below zero: floor already went away from zero, so step back toward it.
         quotient += 1
     return quotient
+
+
+def ceil_div(numerator: int, denominator: int) -> int:
+    """Round ``numerator / denominator`` up, toward positive infinity. Exact integer arithmetic.
+
+    This is the boundary rule, not a rounding rule for measurements: see the module docstring.
+    Ceiling rather than nearest is what makes ``ns_from_ticks`` invertible under the flooring
+    ``ticks_from_ns``, and toward positive infinity rather than away from zero is what makes it
+    invertible for negative times too, which occur whenever a container's ``start_pts`` is later
+    than track zero.
+    """
+    if denominator == 0:
+        raise ZeroDivisionError("ceil_div: denominator is zero")
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    return -((-numerator) // denominator)

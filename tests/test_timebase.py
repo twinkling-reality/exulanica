@@ -49,16 +49,16 @@ def test_image_timebase_is_the_canonical_axis():
     assert IMAGE_TIME_BASE.ns_from_ticks(1) == 1
 
 
-def test_the_frozen_conversion_formulas_produce_exactly_the_documented_values():
-    """Pins both directions of the frozen contract at 48 kHz and at 1/15360 video ticks.
+def test_the_conversion_formulas_produce_exactly_the_documented_values():
+    """Pins both directions at 48 kHz and at 1/15360 video ticks.
 
     A 1/48000 s tick is 20833.333... ns, which nanoseconds cannot hold exactly. That is the
     whole reason the rational anchor is stored rather than discarded once t_ns is computed.
     """
     audio = TimeBase(1, 48_000)
     assert audio.ns_from_ticks(0) == 0
-    assert audio.ns_from_ticks(1) == 20_833  # round_half_down of 20833.333...
-    assert audio.ns_from_ticks(3) == 62_500  # exact
+    assert audio.ns_from_ticks(1) == 20_834  # ceil of 20833.333..., so tick 1 survives the trip
+    assert audio.ns_from_ticks(3) == 62_500  # exact, so ceiling changes nothing
     assert audio.ns_from_ticks(48_000) == NS_PER_SECOND
     assert audio.ticks_from_ns(NS_PER_SECOND) == 48_000
     assert audio.ticks_from_ns(20_832) == 0  # floor: still inside tick 0
@@ -69,35 +69,70 @@ def test_the_frozen_conversion_formulas_produce_exactly_the_documented_values():
     assert video.ticks_from_ns(NS_PER_SECOND) == 15_360
 
 
-def test_tick_round_trip_is_lossy_under_the_frozen_rounding_rule():
-    """DEFECT IN THE COMMITTED CONTRACT, pinned here so it cannot be changed quietly.
+@pytest.mark.parametrize(
+    ("num", "den", "what"),
+    [
+        (1, 48_000, "48 kHz audio"),
+        (1, 44_100, "44.1 kHz audio"),
+        (1, 90_000, "MPEG transport"),
+        (1, 15_360, "a common video timebase"),
+        (1001, 30_000, "NTSC 29.97, where num is not 1"),
+        (1, NS_PER_SECOND, "the canonical axis itself"),
+    ],
+)
+def test_tick_to_ns_to_tick_is_the_identity(num, den, what):
+    """The defect this used to pin is fixed, and this is what replaced the pin.
 
-    tick -> ns -> tick is not the identity. ns_from_ticks rounds to nearest while ticks_from_ns
-    floors, so any tick whose nanosecond value rounds *down* lands back on the previous tick:
+    ``ns_from_ticks`` rounded to nearest while ``ticks_from_ns`` floors, so any tick whose
+    nanosecond value rounded *down* landed back on the previous tick: audio tick 1 rendered as
+    20833 ns and floored straight back to tick 0. A citation stored in nanoseconds and converted
+    back to a tick for a seek opened one sample early.
 
-        audio tick 1 -> 20833 ns -> tick 0
+    Ceiling composes with floor exactly. ADR-0015 records why the correction cost nothing when it
+    was taken and why it would not have been free later. This test is the guard on the other
+    direction now: a change back to nearest, or to any rule that is not an inverse of the floor,
+    fails here rather than one sample early inside somebody's playback.
 
-    The nanosecond axis is far finer than a 48 kHz tick (20833 nanoseconds per tick), so this
-    is purely a mismatch of rounding directions, not a precision limit. A citation stored in
-    nanoseconds and converted back to a tick for a seek would open one sample early.
-
-    Correcting it means either rounding ns_from_ticks up, or rounding ticks_from_ns to nearest.
-    Either is a change to a frozen formula and therefore a span_format_version event, which is
-    why this test asserts the broken behaviour rather than the desired one: a silent fix would
-    change every span digest already issued, and this test is what stops that happening by
-    accident.
-
-    Dormant for the photograph corpus, where the timebase is the canonical axis itself and the
-    round trip is exact. It becomes live the day video arrives.
+    Negative ticks are included because they are real: ``start_pts`` later than track zero puts a
+    span before it, and edit lists produce that routinely.
     """
-    audio = TimeBase(1, 48_000)
-    lost = [t for t in range(1, 200) if audio.ticks_from_ns(audio.ns_from_ticks(t)) != t]
-    assert lost, "the frozen rule still loses ticks; if this passes empty, the rule changed"
-    assert lost[0] == 1
+    base = TimeBase(num, den)
+    for ticks in (*range(-1_000, 1_000), 2**31, -(2**31), 10**9, -(10**9)):
+        assert base.ticks_from_ns(base.ns_from_ticks(ticks)) == ticks, (ticks, what)
 
-    # The photograph case is exact, which is why the defect is not blocking at MVP.
-    for ticks in (0, 1, 2, 1_000_000):
-        assert IMAGE_TIME_BASE.ticks_from_ns(IMAGE_TIME_BASE.ns_from_ticks(ticks)) == ticks
+
+def test_a_tick_that_would_overflow_the_axis_is_refused_at_the_conversion():
+    """int64 nanoseconds is 292 years. A PTS past that is corrupt, and says so here.
+
+    Leaving it to the ``bigint`` column would report the failure three layers away from the
+    timebase that explains it.
+    """
+    ntsc = TimeBase(1001, 30_000)
+    with pytest.raises(InvalidAddressError, match="does not fit in int64"):
+        ntsc.ns_from_ticks(10**12)
+    assert ntsc.ticks_from_ns(ntsc.ns_from_ticks(10**11)) == 10**11
+
+
+def test_a_timebase_finer_than_a_nanosecond_is_refused():
+    """Two ticks sharing one t_ns cannot both round trip, so the axis refuses to hold them.
+
+    No container declares such a timebase. Refusing costs nothing and removes the one family of
+    inputs for which the identity above cannot hold.
+    """
+    with pytest.raises(InvalidAddressError, match="finer than one nanosecond"):
+        TimeBase(1, NS_PER_SECOND + 1)
+    # Exactly one nanosecond per tick is the finest representable, and it is the image timebase.
+    assert TimeBase(1, NS_PER_SECOND) == IMAGE_TIME_BASE
+
+
+def test_the_correction_moved_no_photograph_boundary():
+    """The photograph corpus is why the correction was free: its timebase converts exactly.
+
+    Every span that exists is a photograph carrying [0, 1) directly. On the canonical axis
+    ceiling and nearest agree on every value, so no stored digest could have moved.
+    """
+    for ticks in (0, 1, 2, 1_000_000, -1, -1_000_000):
+        assert IMAGE_TIME_BASE.ns_from_ticks(ticks) == ticks
 
 
 def test_tick_conversion_floors_toward_negative_infinity_for_negative_times():

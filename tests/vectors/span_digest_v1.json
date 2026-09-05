@@ -98,18 +98,18 @@
     },
     {
       "name": "audio interval on a 48 kHz tick boundary",
-      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/a:0#v=1&m=audio_time&t=0.000020833,0.0000625",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/a:0#v=1&m=audio_time&t=0.000020834,0.0000625",
       "digest_input": {
         "span_format_version": 1,
         "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
         "track_key": "a:0",
-        "t_start_ns": 20833,
+        "t_start_ns": 20834,
         "t_end_ns": 62500,
         "modality": "audio_time"
       },
-      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"audio_time\",\"span_format_version\":1,\"t_end_ns\":62500,\"t_start_ns\":20833,\"track_key\":\"a:0\"}",
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"audio_time\",\"span_format_version\":1,\"t_end_ns\":62500,\"t_start_ns\":20834,\"track_key\":\"a:0\"}",
       "canonical_json_byte_length": 184,
-      "span_digest_sha256": "1d6884645ee54de63282b9dd4ca48d7550de4dbaabdc2cba4ed3eeb0ee7f670d"
+      "span_digest_sha256": "f616fd75e1cd4b93504b393e2c45780c70c12da08d6c83c78164da996e45d23d"
     },
     {
       "name": "transcript span with no exact quote",

@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from exulanica.canonical import canonical_json
-from exulanica.evidence import BlobId, EvidenceAddress, Modality, TimeInterval
+from exulanica.evidence import BlobId, EvidenceAddress, Modality, TimeBase, TimeInterval
 from exulanica.evidence.address import SPAN_FORMAT_VERSION, TextAnchor
 from exulanica.evidence.blob import HASH_ALGORITHM
 from exulanica.evidence.region import DisplayGeometry, Rect, Region
@@ -39,6 +39,7 @@ PROFILE = "exulanica.span-digest-conformance/v1"
 
 _BLOB = BlobId.of_bytes(b"exulanica conformance vector")
 _ARTIFACT = uuid.UUID("8f14e45f-ceea-567d-861d-4f5b1b2a3c4d")
+_AUDIO = TimeBase(1, 48_000)
 
 
 def _addresses() -> list[tuple[str, EvidenceAddress]]:
@@ -82,7 +83,10 @@ def _addresses() -> list[tuple[str, EvidenceAddress]]:
             EvidenceAddress(
                 blob_id=_BLOB,
                 track_key="a:0",
-                interval=TimeInterval(20_833, 62_500),
+                # Derived through the conversion rather than written as a literal, so a change
+                # to the tick-to-nanosecond rule moves this vector and fails the pin, instead of
+                # moving real citation boundaries quietly (ADR-0015). Ticks 1 and 3.
+                interval=TimeInterval(_AUDIO.ns_from_ticks(1), _AUDIO.ns_from_ticks(3)),
                 modality=Modality.AUDIO_TIME,
             ),
         ),

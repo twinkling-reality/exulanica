@@ -134,52 +134,53 @@ from the preceding keyframe. This is a pure function of the bytes and needs no s
 
 #### What `round_half_down` means
 
-**DECISION (spine-3a), CORRECTED.** Earlier versions of this document named `round_half_down` in the
-frozen formula and never defined it anywhere. The implemented meaning, in `exulanica/canonical.py`:
-round the exact rational `numerator / denominator` to the nearest integer, and resolve an exact tie
-**toward zero**. That is the standard reading of the name, the one `decimal.ROUND_HALF_DOWN` and
-Java's `RoundingMode.HALF_DOWN` take. It is computed in exact integer arithmetic, and
-`exulanica.canonical` refuses a float outright, so no float can reach a digest input by accident. The
-same rule is used for the region quantisation in section 1.5, so the project has exactly one
-rounding rule rather than one per call site.
+**DECISION (spine-3a), CORRECTED, CLOSED 2026-09-04.** Earlier versions of this document named
+`round_half_down` in the frozen formula and never defined it anywhere. The implemented meaning, in
+`exulanica/canonical.py`: round the exact rational `numerator / denominator` to the nearest integer,
+and resolve an exact tie **toward zero**. That is the standard reading of the name, the one
+`decimal.ROUND_HALF_DOWN` and Java's `RoundingMode.HALF_DOWN` take. It is computed in exact integer
+arithmetic, and `exulanica.canonical` refuses a float outright, so no float can reach a digest input
+by accident.
 
-**OPEN, and it blocks the v1 freeze.** The other plausible reading, ties toward negative infinity,
-differs from the implemented one only on exact negative halves. Negative `t_ns` is not hypothetical:
-it occurs whenever a container's `start_pts` is later than track zero, which edit lists produce
-routinely. What is implemented is therefore an interpretation of an under-specified contract rather
-than a decision anyone recorded, and it needs explicit confirmation before v1 is frozen, because the
-rule is inside the address and a later change is a `span_format_version` event rather than a patch.
-Settling it is a decision, not an experiment.
+**Ratified by [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md)**, with the negative
+exact halves that are the only place the two readings differ pinned by
+`tests/test_blob_and_canonical.py::test_round_half_down_is_ties_toward_zero`.
 
-#### The two formulas do not compose
+The same ADR removed this rule from the timebase. `round_half_down` is now the rule for **quantising
+a measured value**: the region ppm grid in section 1.5 and the EXIF GPS and altitude conversions.
+Placing a tick on the nanosecond axis is a different job, described immediately below, and it has its
+own rule, `ceil_div`. Two rules with stated and disjoint purposes, not one per call site.
 
-**KNOWN DEFECT, PINNED (spine-3b), CORRECTED.** `ns_from_ticks` rounds to nearest while
-`ticks_from_ns` floors, so tick to ns to tick is **not** the identity. At 48 kHz one tick is
-20833.333... ns: tick 1 renders as 20833 ns, and 20833 ns floors back to tick 0. A citation stored in
-nanoseconds and converted back to a tick for a seek would open one sample early. This is a mismatch
-of rounding directions, not a precision limit: the nanosecond axis is roughly 20833 times finer than
-a 48 kHz tick.
+#### The two formulas now compose
 
-Four things about its status, each stated so it is not rediscovered:
+**DEFECT CORRECTED 2026-09-04 (spine-3b), inside its decision window.
+See [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md).**
 
-- **Pinned, not fixed.**
-  `tests/test_timebase.py::test_tick_round_trip_is_lossy_under_the_frozen_rounding_rule` asserts the
-  lossy behaviour, including that tick 1 is the first tick lost. The test fails if the loss
-  disappears, which is the point: a frozen formula may not change by accident, and a silent fix would
-  change span digests already issued.
-- **Dormant for the corpus that exists.** A photograph track's timebase is the canonical axis itself,
-  `1/1_000_000_000`, where the round trip is exact. The same test asserts the exact case, so the
-  difference between the two is recorded rather than assumed.
-- **Live the day video arrives.** Every real video or audio timebase (`1/15360`, `1/48000`,
-  `1/90000`) is coarser than a nanosecond, and the mismatch bites on any tick whose nanosecond value
-  rounds down.
-- **Correcting it is a `span_format_version` event, not a patch.** Either fix, rounding
-  `ns_from_ticks` up or rounding `ticks_from_ns` to nearest, changes a formula frozen by mig-4 in
-  section 5.4. It moves `t_start_ns` and `t_end_ns` for spans derived through it, and therefore
-  changes every `span_digest` computed from them, invalidating the citation tokens and permalinks
-  issued against those spans. No video span exists yet, so correcting it today costs nothing and
-  correcting it after the first video ingest costs a v2 span format with a migration. That is the
-  decision window, and it closes at first video ingest.
+`ns_from_ticks` used to round to nearest while `ticks_from_ns` floors, so tick to ns to tick was
+**not** the identity. At 48 kHz one tick is 20833.333... ns: tick 1 rendered as 20833 ns, and 20833
+ns floored back to tick 0. A citation stored in nanoseconds and converted back to a tick for a seek
+opened one sample early. That was a mismatch of rounding directions, not a precision limit: the
+nanosecond axis is roughly 20833 times finer than a 48 kHz tick.
+
+`ns_from_ticks` now rounds **up**, and `ticks(t_ns(k)) == k` for every `k` on every timebase whose
+tick is at least one nanosecond, negative ticks included. Ceiling toward positive infinity, not away
+from zero, because `ticks_from_ns` floors toward negative infinity and the inverse must round the
+same direction to compose. `tests/test_timebase.py::test_tick_to_ns_to_tick_is_the_identity` pins it
+across 48 kHz, 44.1 kHz, 90 kHz, 1/15360, NTSC 1001/30000 and the canonical axis.
+
+**Why this was a patch and not a `span_format_version` event.** Earlier versions of this section said
+correcting it would move `t_start_ns` and `t_end_ns` for spans derived through the conversion. The
+2026-09-04 audit established that there were none: both conversions had no callers outside the
+package's own tests, no `video` or `audio` `media_track` row had ever been written, and every span in
+existence is a photograph carrying `[0, 1)` directly, on a timebase where ceiling and nearest agree
+on every value. Not one stored digest moved. A v2 written alongside v1 would have produced two
+formats agreeing on every span that exists, so `span_format_version` stays at 1. This argument was
+available exactly once and has now been used.
+
+Two further refusals close the same family of failures: a timebase with a tick finer than one
+nanosecond is refused, because two ticks would share a `t_ns` and could not both round trip; and a
+tick whose nanosecond value leaves int64 is refused at the conversion rather than at the `bigint`
+column.
 
 **VERIFIED.** Intervals are **half-open**, matching Media Fragments URI 1.0 (W3C Recommendation,
 2012-09-25): "the begin time is considered part of the interval whereas the end time is considered to
@@ -1305,7 +1306,9 @@ built on day one rather than added when it hurts.
 
 **DECISION (mig-4): the spine is frozen at v1 and extended additively only.** `blob_sha256`,
 `track_key`, `t_start_ns`, `t_end_ns`, the half-open semantics and the nanosecond-to-tick rounding rule
-may not change. If they ever must, it is a v2 span format written **alongside** v1, with v1 spans
+may not change. (The tick-to-nanosecond rule was corrected once, on 2026-09-04, under the narrow
+argument set out in section 1.4 and [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md):
+it had no callers, no non-image track existed, and no stored digest moved. That argument is spent.) If they ever must, it is a v2 span format written **alongside** v1, with v1 spans
 migrated by a documented, reversible, verified transform, never dropped.
 
 Five independent version fields, each stored on the row that uses it:
@@ -1781,8 +1784,8 @@ timebase item specifically at first video ingest.
 | --- | --- | --- | --- |
 | EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | **CLOSED 2026-09-04** | `region.display` carries `rotation`, and the region is normalised against display space. A mirrored original puts every region on the wrong side of the image, permanently | Settled by ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md): pixels are normalised at ingest, all eight values are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" and is 0. Enforced by two check constraints in `0032_upright_display_space.sql`. No digest changed |
 | Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | **OPEN** | `modality` is a digest input. Adding a new value (`ocr_text`, say) is additive and costs nothing. **Re-labelling spans already written under `transcript_text` is not additive**: it changes their digests, so it is a v2 span format, not a rename | A naming decision, and it must be made before OCR spans are written rather than before they are read. The research named the field `transcript_artifact_id` in an audio-first context, which is where the ambiguity came from |
-| The tie direction of `round_half_down` | **OPEN** | It is the rounding rule of the frozen tick-to-nanosecond formula, so it determines `t_start_ns` and `t_end_ns` for any span derived from ticks | Confirm or reject the implemented reading, ties toward zero, matching `decimal.ROUND_HALF_DOWN`. It differs from the alternative only on exact negative halves, and negative `t_ns` is real whenever `start_pts` is later than track zero. A decision, not an experiment (section 1.4) |
-| Tick to ns to tick is not the identity | **KNOWN DEFECT, PINNED** | Both formulas are frozen by mig-4, and both produce values that go into the digest | Decide before the first video ingest whether to correct it, at which point it is free, or to carry it, at which point correcting it later is a `span_format_version` event. Pinned meanwhile by `tests/test_timebase.py::test_tick_round_trip_is_lossy_under_the_frozen_rounding_rule` (section 1.4) |
+| The tie direction of `round_half_down` | **CLOSED 2026-09-04** | It determines the quantisation of every region coordinate and every EXIF position | Ratified as ties toward zero by [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md). It no longer takes part in the timebase at all |
+| Tick to ns to tick is not the identity | **CLOSED 2026-09-04** | Both formulas produce values that go into the digest | Corrected, not carried: `ns_from_ticks` rounds up, the round trip is exact on every representable timebase, and it cost nothing because the conversion had no callers and no video or audio track had ever been written. ADR-0015, section 1.4 |
 | The region encoding: parts per million on a `[0, 1_000_000]` integer grid | **CLOSED 2026-09-04** | `region` is a digest input, and a float has no canonical rendering that two implementations agree on. Changing the grid changes every region digest | Ratified as it stands by [adr/0013-region-encoding.md](adr/0013-region-encoding.md), and now enforced by `evidence_span_region_shape` in `0033_span_digest_input_shape.sql` rather than described in a comment. Nine malformed tuples are refused by `tests/test_span_digest_input_shape.py` |
 | The digest encodings: lowercase hex for `blob_sha256`, absent keys rather than nulls, `prefix` and `suffix` excluded from `text_anchor` | **CLOSED 2026-09-04** | They are the difference between a digest that reproduces and one that does not | Ratified by [adr/0014-digest-encodings.md](adr/0014-digest-encodings.md) against a second implementation: `scripts/verify_canonical_conformance.mjs` reproduces the exact canonical bytes and digest of all seven vectors in `tests/vectors/span_digest_v1.json` outside Python. The algorithm is identified by `span_format_version`, which is itself inside the digest input |
 | Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | If it does, those files carry a genuine `v:0` track with genuine PTS, which makes the timebase items above live immediately rather than dormant | Inspection of the corpus, not a design question. The general video path applies to them unchanged |
@@ -1794,8 +1797,8 @@ timebase item specifically at first video ingest.
 | EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **CLOSED 2026-09-04** | Pixels are normalised at ingest and the normalisation is recorded. ADR-0004, ADR-0012, section 9.1 |
 | Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **OPEN** | A naming decision, but it must be made before v1 is frozen for the same reason: `modality` is inside `span_digest` and a rename is not additive |
 | Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | Inspection of the corpus. If it does, those files carry a genuine `v:0` track and the general video path applies unchanged |
-| The tie direction of `round_half_down` | **OPEN** | A decision, recorded in 9.1. Ties toward zero is implemented and unratified |
-| Tick to ns to tick is not the identity under the frozen formulas | **KNOWN DEFECT, PINNED** | A decision before first video ingest, recorded in 9.1. The behaviour is pinned by a test that fails if it changes |
+| The tie direction of `round_half_down` | **CLOSED 2026-09-04** | Ratified as ties toward zero, ADR-0015 and section 9.1 |
+| Tick to ns to tick is not the identity under the frozen formulas | **CLOSED 2026-09-04** | Corrected inside its decision window; the round trip is now exact. ADR-0015 and section 9.1 |
 | Whether migration `0001_spine.sql` applies at all | **ASSUMPTION** | `tests/test_migration.py::test_the_migration_actually_applies` against a real PostgreSQL 18 instance. It skips unless `EXULANICA_TEST_DATABASE_URL` is set, so every SQL claim here is currently a text-level claim |
 | Whether exact search over `halfvec(4096)` stays fast enough as the library grows | **ASSUMPTION** | Measurement at corpus scale. The additive fallback is a truncated 1024-dimension recall column, section 4.4 |
 | Browser seek accuracy against ffmpeg PTS | ASSUMPTION A-31 | Experiment X-3. Not live for a photograph corpus; becomes live when video arrives |

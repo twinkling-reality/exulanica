@@ -10,21 +10,36 @@ Two axes, deliberately kept apart:
     a 1/48000 s audio tick (20833.333... ns), which is why the rational is kept rather than
     discarded once ``t_ns`` is computed.
 
-The two conversion formulas are frozen contract. They may not change without a
-``span_format_version`` bump, because ``t_start_ns`` and ``t_end_ns`` are inputs to the span
-digest and therefore to every citation token and permalink already issued.
+The two conversion formulas are contract, and changing either moves ``t_start_ns`` and
+``t_end_ns`` for any span derived through them, which changes the span digest and therefore every
+citation token and permalink issued against it.
 
     ticks(t_ns) = floor( (t_ns * den) / (num * 1_000_000_000) )
-    t_ns(ticks) = round_half_down( ticks * num * 1_000_000_000 / den )
+    t_ns(ticks) = ceil( ticks * num * 1_000_000_000 / den )
 
-**Under-specified in the committed contract, and settled here:** the contract names
-``round_half_down`` but never defines it, and the two plausible readings (ties toward zero
-versus ties toward negative infinity) differ for negative exact halves. Negative ``t_ns``
-occurs whenever a container's ``start_pts`` is later than track zero, which edit lists produce
-routinely, so the case is real rather than theoretical. This implementation takes the standard
-meaning of the name, the one used by ``decimal.ROUND_HALF_DOWN`` and Java's
-``RoundingMode.HALF_DOWN``: ties resolve toward zero. This is flagged for confirmation before
-v1 is frozen.
+**The second formula was corrected on 2026-09-04, inside its decision window (ADR-0015).** It
+used to round to nearest, under a rule the committed contract named and never defined. Rounding
+to nearest reads as the more accurate choice and is the wrong one, because it does not compose
+with the flooring in the other direction: at 48 kHz one tick is 20833.333... ns, tick 1 rendered
+as 20833 ns, and 20833 ns floored straight back to tick 0. A citation stored in nanoseconds and
+converted back to a tick for a seek opened one sample early.
+
+Ceiling fixes it exactly, not approximately. ``ticks_from_ns`` answers "which tick contains this
+nanosecond", so only a boundary at or after the true instant lands back on the tick it came from,
+and ``ticks(t_ns(k)) == k`` for every ``k`` on every timebase whose tick is at least one
+nanosecond. It holds for negative ticks too, which is why the rule is toward positive infinity
+rather than away from zero.
+
+The correction was free and provably so: at the time it was taken, ``ns_from_ticks`` and
+``ticks_from_ns`` had **no callers outside this package's tests**, no ``video`` or ``audio``
+``media_track`` row had ever been written, and every existing span was a photograph carrying
+``[0, 1)`` directly rather than through a conversion. Not one stored digest moved, so
+``span_format_version`` stays at 1: writing a v2 alongside v1 would have created two formats
+agreeing on every span that exists.
+
+``round_half_down`` remains the rule for quantising a measured value, and its tie direction is
+**ratified as ties toward zero**, the standard reading of the name that ``decimal.ROUND_HALF_DOWN``
+and Java's ``RoundingMode.HALF_DOWN`` take. It no longer takes part in the timebase.
 
 A photograph is the degenerate case and is not special-cased anywhere: it is a single-sample
 track whose timebase is the canonical axis itself (1/1_000_000_000), whose ``start_pts`` is 0,
@@ -39,7 +54,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from exulanica.canonical import round_half_down
+from exulanica.canonical import ceil_div
 from exulanica.errors import InvalidAddressError
 
 __all__ = [
@@ -83,17 +98,40 @@ class TimeBase:
             raise InvalidAddressError("time base components must be ints")
         if self.num <= 0 or self.den <= 0:
             raise InvalidAddressError(f"time base must be positive, got {self.num}/{self.den}")
+        if self.den > self.num * NS_PER_SECOND:
+            # A tick finer than one nanosecond cannot be placed on the canonical axis at all:
+            # two ticks would share a t_ns and the round trip could not be exact for both. No
+            # container declares one. Refusing beats storing boundaries that cannot round trip.
+            raise InvalidAddressError(
+                f"time base {self.num}/{self.den} has a tick finer than one nanosecond, which "
+                "the canonical axis cannot represent. The finest representable timebase is "
+                f"1/{NS_PER_SECOND}."
+            )
 
     def ticks_from_ns(self, t_ns: int) -> int:
-        """Frozen contract: floor((t_ns * den) / (num * 1e9))."""
+        """Contract: floor((t_ns * den) / (num * 1e9)).
+
+        Floor, because the question is "which tick contains this nanosecond". Rounding to
+        nearest here would answer a different question and would break ``frame_at``.
+        """
         _check_int64(t_ns, "t_ns")
         return (t_ns * self.den) // (self.num * NS_PER_SECOND)
 
     def ns_from_ticks(self, ticks: int) -> int:
-        """Frozen contract: round_half_down(ticks * num * 1e9 / den)."""
+        """Contract: ceil(ticks * num * 1e9 / den).
+
+        Ceiling is what makes this the exact inverse of ``ticks_from_ns``. See the module
+        docstring and ADR-0015 for why nearest was wrong and why correcting it cost nothing.
+        """
         if not isinstance(ticks, int) or isinstance(ticks, bool):
             raise InvalidAddressError("ticks must be an int")
-        return round_half_down(ticks * self.num * NS_PER_SECOND, self.den)
+        # Checked here rather than left to the bigint column. A tick far enough out to overflow
+        # the axis is a corrupt or misread PTS, and the useful place to say so is at the
+        # conversion, where the timebase is still in hand to put in the message.
+        return _check_int64(
+            ceil_div(ticks * self.num * NS_PER_SECOND, self.den),
+            f"tick {ticks} on timebase {self}",
+        )
 
     def __str__(self) -> str:
         return f"{self.num}/{self.den}"
