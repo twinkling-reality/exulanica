@@ -264,6 +264,7 @@ class SceneReconstructionProcessor:
         ledger: Ledger,
         stack: ExitStack,
     ) -> SceneBuildOutcome:
+        self._verify_build_inputs(claimed)
         manifest, sources = self._manifest(claimed)
         source_directory = stage_scene_sources(self._store, job_directory, sources)
         pose_spec = stage("scene_pose")
@@ -559,7 +560,14 @@ class SceneReconstructionProcessor:
         )
         return manifest, tuple(sources)
 
-    def _point_maps(self, claimed: ClaimedSceneJob) -> dict[str, PointMapInput]:
+    def _verify_build_inputs(self, claimed: ClaimedSceneJob) -> list[object]:
+        """Refuse a job whose exact build inputs cannot run under the current stage rules.
+
+        Called before any stage executes. MEASURED 2026-09-05: this check used to live after
+        pose recovery, and a retryable job queued under an earlier stage version spent thirty
+        minutes of COLMAP matching on 210 photographs before being refused as stale. The refusal
+        is the same; it now costs nothing.
+        """
         if hashlib.sha256(canonical_json(claimed.build_inputs)).digest() != (
             claimed.build_input_digest
         ):
@@ -587,6 +595,10 @@ class SceneReconstructionProcessor:
         ]
         if raw_stages != expected_stages:
             raise ValueError("the scene job stage bindings are no longer current")
+        return raw_point_maps
+
+    def _point_maps(self, claimed: ClaimedSceneJob) -> dict[str, PointMapInput]:
+        raw_point_maps = self._verify_build_inputs(claimed)
         expected_capture_refs = [str(member.capture_id) for member in claimed.members]
         if [item.get("capture_ref") for item in raw_point_maps if isinstance(item, dict)] != (
             expected_capture_refs

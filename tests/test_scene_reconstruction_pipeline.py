@@ -350,6 +350,38 @@ def test_current_scene_pose_policy_is_bound_to_the_fixed_calibration_and_real_ca
     assert all(len(run["pose_receipt_sha256"]) == 64 for run in real)
 
 
+def test_stale_stage_bindings_are_refused_before_any_pose_work_runs(repository, tmp_path):
+    """MEASURED 2026-09-05: a job queued under an earlier stage version ran thirty minutes of
+    COLMAP before the binding check refused it. The refusal must come first."""
+    import dataclasses
+    import hashlib
+
+    from exulanica.canonical import canonical_json
+
+    store, captures, point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
+    assert claimed is not None and claimed.job_id == job_id
+    stale_inputs = dict(claimed.build_inputs)
+    stale_inputs["stages"] = [
+        {**binding, "version": binding["version"] - 1} if binding["key"] == "scene_pose" else binding
+        for binding in claimed.build_inputs["stages"]
+    ]
+    stale = dataclasses.replace(
+        claimed,
+        build_inputs=stale_inputs,
+        build_input_digest=hashlib.sha256(canonical_json(stale_inputs)).digest(),
+    )
+    executor = FakeColmap(registered=2)
+
+    outcome = _processor(repository, store, tmp_path, executor).process(stale)
+
+    assert outcome.status == "failed"
+    assert "stage bindings are no longer current" in (outcome.message or "")
+    assert executor.calls == [], "no COLMAP stage may run for a job the current rules refuse"
+    job = repository.reconstruction_scene_job(job_id)
+    assert job is not None and job.status == "failed"
+
+
 def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_history(
     repository, tmp_path
 ):
