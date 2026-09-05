@@ -1,0 +1,263 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.browser-reconstruction-evaluation/v1",
+    "measured_at": "2026-09-05T00:37:57.851Z",
+    "corpus_class": "benchmark",
+    "notice": "Licensed ETH3D benchmark engineering evidence only. This is not personal-media acceptance.",
+    "source": {
+      "benchmark": "ETH3D pipes",
+      "source_manifest_sha256": "4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814",
+      "archive_sha256": "718981351c14e84759fcc73215e7251fce93d6e9ea1fe24f9e15f1028232c12c",
+      "license_sha256": "e66c269d4819aaab34b49ef5220c4ddab6756f21bb5180761a4eb8561f2b7bbd",
+      "benchmark_pose_evaluation_sha256": "68640ca95fce5adf54d8217b53139a4706edf6c6430cd6d854b58079b59408d8",
+      "human_review": {
+        "screened_at": "2026-09-05T00:10:16.494120Z",
+        "reviewed_member_count": 14,
+        "sensitive_member_count": 0,
+        "sensitive_region_count": 0,
+        "review_conclusion": "All supplied photographs depict the pipes mechanical room and no visible people."
+      }
+    },
+    "source_build": {
+      "git_head": "993b66320f114102ddf3ccce27e4b09152c4c2f9",
+      "repository_dirty": true,
+      "measured_app_scope_dirty": false,
+      "browser_measurement_implementation_commit": "bb43b0e51b2c45067f3ec1ad372d4dd4441676f6"
+    },
+    "reconstruction": {
+      "scene_id": "456369cc-86e7-5eab-8b8f-72f85de42030",
+      "build_job_id": "bd1c2329-a6d9-5b00-8f47-808c0422bcb0",
+      "build_input_sha256": "cfcc0479bebdf9f9a1d6211475e96d1230d83fe275a687427c2b5fbddbcea6cb",
+      "privacy_admission_sha256": "66d3c9c33fb2cd41dda00532459acca07ca041ad51cfbd9555d4c55b30c89218",
+      "depth_model": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+      "depth_execution": "native host MPS production worker; no runtime image digest",
+      "pose_model": "pycolmap 4.2.0",
+      "pose_code_revision": "993b663a7669d8b04897b05b9f8ebdf0e2552700",
+      "pose_execution_image": "exulanica-validation-pose@sha256:99bb3b8a8cf38ffd0890ba25c944af57cebf7d20075d7a9f5c3c8f7f349b4a7f",
+      "registered_member_count": 14,
+      "excluded_member_count": 0,
+      "registration_fraction_millionths": 1000000,
+      "mean_reprojection_error_micropixels": 569790,
+      "camera_translation_extent_microunits": 10913192,
+      "pose_accepted": true,
+      "pose_receipt_sha256": "21d50e971b29d8663d1a6fedb3b97589f31bfd91a6e9014a3f02bf3a9f097104",
+      "placement_receipt_sha256": "1745a27d819c5291512fc2956cb0e75ed15a6ba7728b9f254647b672bb60305d",
+      "scene_gate_sha256": "c2df7ae1cb770038e41af32cec4754ce5dabb43d5e33c80dcaf71082e8f95de3"
+    },
+    "assertion_presentation": {
+      "recorded_rung": 3,
+      "displayed_rung": 3,
+      "rendering_substrate": "posed_point_maps",
+      "withholding_reasons": [
+        "Rung 1 withheld: no reviewed splat receipt is available.",
+        "Rung 2 withheld: no physically validated scale receipt is available.",
+        "Rung 2 withheld: no measured coverage receipt is available.",
+        "Rung 2 withheld: no measured corridor receipt is available."
+      ]
+    },
+    "browser_runtime": {
+      "browser": "Google Chrome 152.0.0.0",
+      "operating_system": "macOS 26.5.1 build 25F80",
+      "cpu": "Apple M3 Pro",
+      "logical_cpu_count": 12,
+      "physical_unified_memory_bytes": 19327352832,
+      "browser_reported_device_memory_gb": 16,
+      "gpu": "ANGLE Metal Renderer: Apple M3 Pro",
+      "engine": "PlayCanvas 2.21.4",
+      "viewport_css_px": [
+        1280,
+        720
+      ],
+      "canvas_px": [
+        1280,
+        720
+      ],
+      "device_pixel_ratio_millionths": 1000000
+    },
+    "measurement": {
+      "driver": "requestAnimationFrame",
+      "warmup_milliseconds": 2000,
+      "duration_milliseconds": 60000,
+      "frame_count": 6678,
+      "first_meaningful_render_microseconds": 574800,
+      "time_to_full_detail_microseconds": 574800,
+      "geometry_load_microseconds": 285900,
+      "frame_mean_microseconds": 8990,
+      "frame_p50_microseconds": 8300,
+      "frame_p95_microseconds": 16600,
+      "frame_p99_microseconds": 16800,
+      "fps_one_percent_low_milli": 59520,
+      "frames_over_16_7_milliseconds": 159,
+      "frame_over_16_7_milliseconds_fraction_millionths": 23810,
+      "hidden_during_run": false,
+      "peak_js_heap_mib_hundredths": 8090
+    },
+    "geometry": {
+      "placed_point_map_count": 14,
+      "rendered_point_map_count": 14,
+      "rendered_point_count": 2371957,
+      "authenticated_network_bytes": 47457908,
+      "loads": [
+        {
+          "artifact_id": "4952cd73-ae16-5d6f-971f-89ddab5f8584",
+          "capture_id": "01a06e51-8d4a-77d0-b1bb-dae7e70e238c",
+          "byte_size": 3415864,
+          "fetch_microseconds": 18300,
+          "verify_microseconds": 3100,
+          "decode_microseconds": 300
+        },
+        {
+          "artifact_id": "afa5e097-f0d3-572e-aaea-d0d9af9ebe91",
+          "capture_id": "01a06e51-8de6-7898-a93f-54a62bcc8a97",
+          "byte_size": 3433564,
+          "fetch_microseconds": 17500,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 100
+        },
+        {
+          "artifact_id": "0f7a3448-8935-5338-8e66-b4b501e2c93c",
+          "capture_id": "01a06e51-8e6c-7ee4-b30d-01b9e0ad4d0c",
+          "byte_size": 3436124,
+          "fetch_microseconds": 17400,
+          "verify_microseconds": 1400,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "c149c1bb-8f5d-52cb-adf9-68198eda45de",
+          "capture_id": "01a06e51-8ef9-72ae-85ab-ebe55dffbb0c",
+          "byte_size": 3417404,
+          "fetch_microseconds": 17400,
+          "verify_microseconds": 1500,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "8424c6d5-56cb-51a5-8765-f0ff08bb7dc6",
+          "capture_id": "01a06e51-8fb1-7209-ba43-32c0e2ad47b9",
+          "byte_size": 3437568,
+          "fetch_microseconds": 16800,
+          "verify_microseconds": 1500,
+          "decode_microseconds": 100
+        },
+        {
+          "artifact_id": "1eeb71aa-92b8-5174-bfa6-55128197a6f4",
+          "capture_id": "01a06e51-90c6-722f-9c60-a301556605f4",
+          "byte_size": 3370944,
+          "fetch_microseconds": 17500,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "0af9e45f-5d10-5d15-9290-fe29e179ace9",
+          "capture_id": "01a06e51-91e8-7150-bd96-28138a5ae949",
+          "byte_size": 3377164,
+          "fetch_microseconds": 19600,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "a1aaf66e-0253-5234-99ee-361e926aabfb",
+          "capture_id": "01a06e51-929b-7db7-8965-b3de5f373067",
+          "byte_size": 3373404,
+          "fetch_microseconds": 18100,
+          "verify_microseconds": 1400,
+          "decode_microseconds": 100
+        },
+        {
+          "artifact_id": "cb6e0357-6ffc-528f-a95c-9f22e12283e4",
+          "capture_id": "01a06e51-9339-762c-a981-eb33f698c2d9",
+          "byte_size": 3325248,
+          "fetch_microseconds": 17300,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "c3c2c7c9-14ef-5557-a2e5-d67e696eca19",
+          "capture_id": "01a06e51-93c3-761a-b4c9-ae2e3678d92c",
+          "byte_size": 3349344,
+          "fetch_microseconds": 18100,
+          "verify_microseconds": 1500,
+          "decode_microseconds": 100
+        },
+        {
+          "artifact_id": "9581716f-e6e6-50ff-8a6f-fda240021a6f",
+          "capture_id": "01a06e51-9448-72ef-a0a7-dd208954d48b",
+          "byte_size": 3352964,
+          "fetch_microseconds": 16100,
+          "verify_microseconds": 1500,
+          "decode_microseconds": 100
+        },
+        {
+          "artifact_id": "1cf78f10-29a4-52ca-810b-9390307a8ded",
+          "capture_id": "01a06e51-94e4-7e98-9280-5a2f7a0f951c",
+          "byte_size": 3370108,
+          "fetch_microseconds": 15900,
+          "verify_microseconds": 1400,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "ad6ce49a-c5ba-598d-a60b-8ceda6f4a9f1",
+          "capture_id": "01a06e51-9571-7ace-922c-4ea073266b88",
+          "byte_size": 3401184,
+          "fetch_microseconds": 20300,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 0
+        },
+        {
+          "artifact_id": "a49a0664-2258-5fdc-a65a-8de2672be464",
+          "capture_id": "01a06e51-9606-75de-9524-393c2f7bf9c3",
+          "byte_size": 3397024,
+          "fetch_microseconds": 16600,
+          "verify_microseconds": 1600,
+          "decode_microseconds": 0
+        }
+      ],
+      "placement_max_error_nanounits": [
+        7261,
+        7090,
+        5096,
+        2143,
+        1277,
+        1708,
+        4609,
+        2312,
+        2349,
+        5856,
+        3454,
+        5881,
+        854,
+        281
+      ],
+      "issues": []
+    },
+    "network": {
+      "transfer_bytes": 47539426,
+      "decoded_body_bytes": 56848715,
+      "resource_count": 184
+    },
+    "renderer": {
+      "maximum_draw_calls": 36,
+      "gpu_error": 0,
+      "render_valid": true,
+      "renderer_success_promoted_rung": false
+    },
+    "screenshot": null,
+    "automated_recovery_evidence": {
+      "digest_refusal": "web/packages/app/test/geometry-api.test.ts",
+      "per_member_missing_fallback": "web/packages/app/test/geometry-api.test.ts",
+      "per_member_corrupt_fallback": "web/packages/app/test/geometry-api.test.ts",
+      "assertion_derived_rung": "web/packages/app/test/status-rungs.test.ts"
+    },
+    "limitations": [
+      "This is one 60-second static-view observation, not a camera-path traversal or a ten-minute leak session.",
+      "No deliberately weak machine or user-agent-specific memory measurement was included.",
+      "The hardware is a personal local workstation, not the eventual production host.",
+      "One indoor benchmark scene cannot establish broad photograph acceptance.",
+      "The native MPS depth run has no runtime image digest; the separate amd64 image record proves the locked image forward path.",
+      "A screenshot was inspected during the run but is not retained because the benchmark imagery has redistribution and share-alike conditions.",
+      "The world media route was intentionally unconfigured; the reconstructed point maps remained available through their authenticated artifact routes.",
+      "No personal media was admitted or evaluated."
+    ]
+  },
+  "record_sha256": "901b357df9fa13df94705642e8d8459b013f510c85020e0523140d3371ef33b4"
+}
