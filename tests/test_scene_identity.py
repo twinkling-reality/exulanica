@@ -845,7 +845,7 @@ def test_the_scene_rung_read_withdraws_the_claim_after_any_member_is_deleted(sce
         scene.workspace_id,
     )
     assert run is not None
-    _record_gate_rung(scene, scene.scene_id, run["run_id"])
+    rung_id, _decision = _record_gate_rung(scene, scene.scene_id, run["run_id"])
 
     assert scene_rung_rows(scene.repository.connection, scene.workspace_id) == [
         SceneRungRow(
@@ -858,8 +858,23 @@ def test_the_scene_rung_read_withdraws_the_claim_after_any_member_is_deleted(sce
         )
     ]
 
-    scene.delete(scene.captures[1])
+    tombstone_id = scene.delete(scene.captures[1])
     assert scene_rung_rows(scene.repository.connection, scene.workspace_id) == []
+    assertion = scene.one(
+        "select status from assertion where assertion_id=%s", rung_id
+    )
+    retraction = scene.one(
+        "select r.retracted_by,r.reason,t.requested_by,t.effective_at,r.retracted_at "
+        "from retraction r join tombstone t on t.tombstone_id=%s "
+        "where r.assertion_id=%s",
+        tombstone_id,
+        rung_id,
+    )
+    assert assertion == {"status": "retracted"}
+    assert retraction is not None
+    assert retraction["retracted_by"] == retraction["requested_by"]
+    assert retraction["retracted_at"] == retraction["effective_at"]
+    assert str(tombstone_id) in retraction["reason"]
 
 
 def test_person_withdrawal_reaches_unregistered_members_and_every_scene_build(scene, tmp_path):
