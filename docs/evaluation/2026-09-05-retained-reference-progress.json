@@ -1,0 +1,819 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.retained-real-reference-progress/v1",
+    "date": "2026-09-05",
+    "requested_objective_complete": false,
+    "strong_reconstructed_baseline_established": false,
+    "outcome": "Independent implementation and verification finished; two real CC0 source collections retained in ordinary Atlas. Exact human review and CUDA access remain external dependencies. No real reconstruction was run for these collections.",
+    "scenes": [
+      {
+        "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+        "source_manifest_sha256": "2cdc34bd0387e957d2e1d65fd8fae100b617be0e5d6cc577f4cfd3845f28e989",
+        "verified_original_count": 51,
+        "verified_original_bytes": 126046395,
+        "database_counts": {
+          "capture": 51,
+          "capture_reconstruction_authorization": 0,
+          "reconstruction_privacy_screening": 0,
+          "reconstruction_scene": 0,
+          "reconstruction_scene_job": 0
+        },
+        "label": "bowl",
+        "title": "Chili salmon bowl",
+        "training_originals": 44,
+        "heldout_originals": 7,
+        "metadata_group_count": 40,
+        "authored_source_slot_count": 51,
+        "source_region_id": "d3e3db87-1fa6-5591-9981-d4247a5d6f59",
+        "topology_digest": "8eb4141414fac143f9ab9966b79a2242323d309ee3b88cc8f76a71984b3ce91e",
+        "source_url": "https://huggingface.co/datasets/promc/reconstruction-scenes/tree/bb2ec30fd17ffb65e24ab40e713517d0c65de41b/chili-salmon-bowl",
+        "frozen_manifest": {
+          "path": "docs/evaluation/2026-09-05-reference-bowl-inputs.json",
+          "sha256": "d904d491af37149e88f25cb9a065e82a82975166aa62d23fd06f51ff7063fb7e",
+          "byte_size": 13386,
+          "record_sha256": "2cdc34bd0387e957d2e1d65fd8fae100b617be0e5d6cc577f4cfd3845f28e989"
+        },
+        "launch_url": "http://127.0.0.1:5180/",
+        "source_directory": ".exulanica/reference-baseline/inputs/chili-salmon-bowl/images",
+        "artifact_store": ".exulanica/reference-baseline/runtime/blobs",
+        "source_asset_key_template": "sha-256/<first2>/<next2>/<fullSHA256>",
+        "reconstruction_scene_id": null,
+        "trained_artifact_id": null,
+        "visual_quality_scores": null
+      },
+      {
+        "workspace_id": "79004d44-ca24-4d17-9eef-56786415e233",
+        "source_manifest_sha256": "02a38f2ebab1815abbb5ecb86c6292969c4720f6c1c5680f5522e681819349ed",
+        "verified_original_count": 210,
+        "verified_original_bytes": 614030051,
+        "database_counts": {
+          "capture": 210,
+          "capture_reconstruction_authorization": 0,
+          "reconstruction_privacy_screening": 0,
+          "reconstruction_scene": 0,
+          "reconstruction_scene_job": 0
+        },
+        "label": "volcanic",
+        "title": "Montserrat volcanic sample",
+        "training_originals": 183,
+        "heldout_originals": 27,
+        "metadata_group_count": 210,
+        "authored_source_slot_count": 210,
+        "source_region_id": "92ee2c49-be60-5de4-9d6e-8b710ed7f0a7",
+        "topology_digest": "8f8e0ae58c6cf1e599b036dfd91d7cddc09e6fc71db2b0648d6555f3e8571b03",
+        "source_url": "https://doi.org/10.6084/m9.figshare.9120020",
+        "frozen_manifest": {
+          "path": "docs/evaluation/2026-09-05-reference-volcanic-inputs.json",
+          "sha256": "fd8cc46edb896dd4b6aa609c92947e5160722be44ecd314dc9dbc4085a81a0ce",
+          "byte_size": 46164,
+          "record_sha256": "02a38f2ebab1815abbb5ecb86c6292969c4720f6c1c5680f5522e681819349ed"
+        },
+        "launch_url": "http://127.0.0.1:5181/",
+        "source_directory": ".exulanica/reference-baseline/inputs/volcanic-sample/photographs",
+        "artifact_store": ".exulanica/reference-baseline/runtime/blobs",
+        "source_asset_key_template": "sha-256/<first2>/<next2>/<fullSHA256>",
+        "reconstruction_scene_id": null,
+        "trained_artifact_id": null,
+        "visual_quality_scores": null
+      }
+    ],
+    "execution_scope": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "database_creation_allowed": false,
+      "database_verification_serialized": true,
+      "api_and_workers_stopped_during_database_tests": true,
+      "retained_workspaces": "public schema; tests use isolated disposable schemas in the same permitted database",
+      "migrations": "Existing 0032 through 0036 applied through official migration runner; no migration edited or added.",
+      "biometric_templates_derived": false,
+      "real_human_screening_receipts_written": 0,
+      "real_depth_pose_training_jobs_executed": 0,
+      "unrelated_work": "Landing and existing documentation changes were preserved. A separate landing commit arrived during this task and is excluded from this task attribution."
+    },
+    "hardware": {
+      "processor": "Apple M3 Pro",
+      "memory_bytes": 19327352832,
+      "architecture": "arm64",
+      "macos": "26.5.1",
+      "darwin": "25.5.0",
+      "python": "3.11.6",
+      "torch": "2.14.0",
+      "cuda_available": false,
+      "mps_available": true
+    },
+    "implemented": [
+      "Real pinned gsplat CUDA trainer, held-out appearance metrics, CPU-verified full optimizer continuation, bounded execution, confirmed container cleanup and immutable execution inputs.",
+      "Normal durable scene job connects pose, correspondence-scale placement, optional training, quality acceptance, private evaluation provenance and guarded publication. Exact job/build identities prevent changed observations colliding across runs.",
+      "Authenticated digest-checked SOG delivery, native browser loading, explicit failures, accepted calibrated cameras independent of point maps, exact source inspection and return navigation.",
+      "Reusable frozen-source preparation, chunked normal intake, authenticated exact-byte human review, normal depth/scene queue and authored source composition using existing evidence."
+    ],
+    "visual_evaluation": {
+      "rubric_and_split_frozen_before_tuning": true,
+      "declared_resolution_css_pixels": [
+        1280,
+        720
+      ],
+      "declared_traversal_seconds": 60,
+      "declared_views": "First, central and last registered camera plus consecutive-camera midpoints; identical camera/settings across iterations.",
+      "passing_rubric": "Every dimension >=3 of4: surfaces; color/detail; arrival/motion; world boundary; source/loading/failure/return.",
+      "real_reconstructed_traversal_performed": false,
+      "walkthrough_artifact": null,
+      "appearance_heldout_scores": null,
+      "physical_scale_measurement": null,
+      "training_resource_use": null,
+      "training_cost": null,
+      "browser_reconstruction_performance": null,
+      "quality_judgments": null,
+      "observed_source_fallback": "Both ordinary Atlas views show the existing Aeroheart world and original-photo planes. Galleries expose all51 and210 originals, switch photos and return to Atlas. Service-offline state displays a retry action; reopening after API restart restores the source world. These observations do not establish surface quality or reconstructed navigation.",
+      "screenshots": [
+        {
+          "path": "docs/evaluation/artifacts/2026-09-05-reference/atlas-unavailable.png",
+          "sha256": "1e4cbc105ae9c4be16ac2ed5087f0e1c632906c7fe7b835ed5b74127ec8ec32c",
+          "byte_size": 14124
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-05-reference/bowl-source-inspection.png",
+          "sha256": "7025f89b38ae3308d22a44a27cb0038c1278d0273d4800e3377ae867631b70a9",
+          "byte_size": 71255
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-05-reference/bowl-source-world.png",
+          "sha256": "d50fd57b62c9a0d7ed5015cb91fbd476fc59f8819d91f574a0f52859fb202e56",
+          "byte_size": 39505
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-05-reference/volcanic-source-inspection.png",
+          "sha256": "e89dc36ea77e26aefee4559d1d277f2f15a29fefc79891061477530c34c685c2",
+          "byte_size": 65449
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-05-reference/volcanic-source-world.png",
+          "sha256": "c70563d7b0f74be4eb15f20bb6a40173f5365d9e2286583d00f103b5b1c69dbb",
+          "byte_size": 38461
+        }
+      ],
+      "screenshot_scope": "Actual browser source-only fallback and service-unavailable views, not reconstruction outputs."
+    },
+    "second_scene_demonstrated": "The same generic manifest, ordinary chunked intake, source derivative, stable composition and authenticated Atlas gallery workflow handled210 volcanic originals after51 bowl originals. Neither example establishes real training success or applicability to arbitrary scenes.",
+    "scale_and_rungs": {
+      "placement": "Positive robust correspondence scale with held-out correspondence validation, still nonmetric. Legacy identity placement withheld.",
+      "physical_reference": "Volcanic publisher scale_data.zip includes target distances; no recovered-point association or independent scale validation executed.",
+      "recorded_rung_promoted": false,
+      "nonmetric_training_permitted": true,
+      "rung1_physical_gate_preserved": true,
+      "appearance_heldout_scope": "Held-out original RGB excluded from Gaussian optimization and color initialization; pose recovery may use all images."
+    },
+    "verification": {
+      "full_backend": {
+        "command": "env -u EXULANICA_TEST_ALLOW_DATABASE_CREATION EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest --override-ini addopts= --capture=sys -q -ra",
+        "passed": 1604,
+        "skipped": 3,
+        "warnings": 3,
+        "duration_centiseconds": 24859,
+        "scope": "Before final run-identity and evaluation-companion fixes; subsequent focused checks and mutation records bind those changes."
+      },
+      "latest_publication_suite": {
+        "passed": 66,
+        "duration_centiseconds": 3761,
+        "scope": "Final exact job/build identities, required runtime-bound evaluation companions, pose/placement and publication."
+      },
+      "frontend": {
+        "command": "pnpm --dir web check",
+        "test_files": 95,
+        "passed": 717,
+        "typecheck": "passed",
+        "package_boundaries": "passed"
+      },
+      "app_build": "passed; existing bundle exceeds500kB warning remains",
+      "python_lint": "53 changed Python files passed",
+      "import_contracts": "4 kept",
+      "dependency_lock": "85 packages resolved; lock check passed",
+      "skips": [
+        "Two synthetic-corpus tests: corpus was not generated.",
+        "Separate-database replay test: required creation opt-in intentionally unset."
+      ],
+      "corrected_failed_attempts": [
+        "Initial full suite exposed missing auth route probes and stale deterministic-recompute documentation; fixed. macOS native OpenMP conflict aborted that attempt. Torch-bearing tests now run in real isolated subprocesses, without an unsafe duplicate-runtime override.",
+        "Second full suite:1586 passed,3 skipped,1 failure in single-image-decoder architecture guard. Shared bounded decoder extraction fixed the real violation; final full suite passed."
+      ],
+      "records": [
+        {
+          "path": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+          "sha256": "afad49f40e5e05ee192a89ea2d93ef33e96568ff44a763cb05d80c5c1f7f28c5",
+          "byte_size": 25108,
+          "record_sha256": "f397997b6cd4e12730805d4661d34a660623da1530bf52f4c96a812105e3a6e2"
+        },
+        {
+          "path": "docs/evaluation/2026-09-04-reconstruction-validation-campaign.json",
+          "sha256": "81b3589f3a0055aae0bdcf6c83d7d865f462151ddc47f796ec4e44a95ff3b5cc",
+          "byte_size": 9907,
+          "record_sha256": "07633ab845962e9e0615e0afe909b1bd53c2c827c19fc2ba4ef90bee841c3c6d"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-gsplat-trainer-verification.json",
+          "sha256": "32193425ba23f47bba4a85e03c8b4bc7d78fa294aff147dbfead6b7289f3034a",
+          "byte_size": 7526,
+          "record_sha256": "3d117a586cd5d005cb4701a37b58d5835348fe7773e34ebf65b56453eca171ee"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-gsplat-trainer-negative-controls.json",
+          "sha256": "a7010e22575301eb10dd97092390ceff7048d5d720ee479eb74336d12a2385ed",
+          "byte_size": 25089,
+          "record_sha256": "ec7f64af14ae95c22f85ba762d24dfe93591e8844ad46fde7f052fa9c9a51e29"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-placement-alignment.json",
+          "sha256": "ffc4c3441b2b4f4956ff157ae446a6aadb89dcf42c91b9b91e9d059d47b775a3",
+          "byte_size": 8479,
+          "record_sha256": "d3c75866d96ec532dcae7feaf68b6bd9c062f64d34dd9ac79489137f0a41e4ee"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-scene-publication.json",
+          "sha256": "b749591bc9f6c088d81fb80845e15952c64c10536c6a667416fced851cfa3f6d",
+          "byte_size": 18900,
+          "record_sha256": "a9fcf904cd4bdb3a6ea2a424cfa9b115f37b13fbd0537c01c16f1438602864e2"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-reference-workflow-negative-controls.json",
+          "sha256": "39341629f492a11cf93978f61cf4e520faa5e3bb1e9c091188d1c6a7bf57ac95",
+          "byte_size": 6898,
+          "record_sha256": "4d6756f6d93676324af59c20b2d1c6443e755ef4e3a2104aaf8dffa8e6608c83"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-atlas-reconstruction-negative-controls.json",
+          "sha256": "09f447ad35ed0aa750aea41f0508ec0bc7b67aed69e78bcbe0451166cd328c90",
+          "byte_size": 21537,
+          "record_sha256": "072a5ba7392b1c4cce567705a7ddbc8938f26718994e4795af42b8ec13c6cd1b"
+        },
+        {
+          "path": "docs/evaluation/2026-09-05-atlas-camera-delivery-negative-controls.json",
+          "sha256": "41c683702f69b30bea2a66cbffd86b4cb052c338e00364b35037d9b179a43d26",
+          "byte_size": 11750,
+          "record_sha256": "c312c3e3fd5bb726097d3fc9615ebbde2e422f5645c90ac08bbd07470d11bc46"
+        }
+      ],
+      "local_execution_logs": [
+        {
+          "path": ".exulanica/reference-baseline/backend-verified.log",
+          "sha256": "bb1fe8dee7d55486213a2e6e9bb7c72a35039b2273ac60f82df25d854ae4b0c5",
+          "byte_size": 26250
+        },
+        {
+          "path": ".exulanica/reference-baseline/publication-verified.log",
+          "sha256": "2c5d462e55fa1da96fb84771f8bceab8a6671e881fda3a6f3619244d5d935370",
+          "byte_size": 100
+        },
+        {
+          "path": ".exulanica/reference-baseline/publication-final-verified.log",
+          "sha256": "ca45e14e66a5af2686a4377d71d116d92a75b742f0617faa3596825685d93495",
+          "byte_size": 100
+        },
+        {
+          "path": ".exulanica/reference-baseline/frontend-verified.log",
+          "sha256": "5c6c14a6b8d7bf7fc3b00912cc53c13413ea99f7747b1064e066b7764d70381f",
+          "byte_size": 7416
+        },
+        {
+          "path": ".exulanica/reference-baseline/frontend-build-verified.log",
+          "sha256": "73c5f2532ddb45e0c5c5948ebca0bee00aa885514e18b6f1db53546528406db5",
+          "byte_size": 937
+        },
+        {
+          "path": ".exulanica/reference-baseline/import-contracts-verified.log",
+          "sha256": "f7238fc7c087b3f44f28eb2feec6b742d3fa1c805807078be025a44055190bc0",
+          "byte_size": 1074
+        },
+        {
+          "path": ".exulanica/reference-baseline/lint-verified.log",
+          "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+          "byte_size": 19
+        },
+        {
+          "path": ".exulanica/reference-baseline/scene-controls-verified.log",
+          "sha256": "4b4e2b18f921c5f073b6aa1f5849ba2a97b39b62837daa2a277bf6797c12b526",
+          "byte_size": 920
+        },
+        {
+          "path": ".exulanica/reference-baseline/reference-controls-final-run.log",
+          "sha256": "1d520f3e9bba7fe7e1aeb55a848be1a45e7479eedb96a84a4321c4d4d69666ce",
+          "byte_size": 275
+        },
+        {
+          "path": ".exulanica/reference-baseline/retained-state-verified.log",
+          "sha256": "c5f1bf783a957403e91396c9a78778c92d47d2781b5bba2779e8f45a0afefb1c",
+          "byte_size": 1151
+        },
+        {
+          "path": ".exulanica/reference-baseline/bowl/unanswered-review-refusal.log",
+          "sha256": "2ce19a9a4780fbbdb27f7886e0710e6c34e997ff94c7b633b2341bfc831b033f",
+          "byte_size": 404
+        },
+        {
+          "path": ".exulanica/reference-baseline/volcanic/unanswered-review-refusal.log",
+          "sha256": "2ce19a9a4780fbbdb27f7886e0710e6c34e997ff94c7b633b2341bfc831b033f",
+          "byte_size": 404
+        },
+        {
+          "path": ".exulanica/reference-baseline/bowl/unadmitted-queue-refusal.log",
+          "sha256": "72f0b81461b3119bf920c6cb8951523565b5ec95b7ace019656951757d98a919",
+          "byte_size": 430
+        }
+      ],
+      "retained_state": {
+        "profile": "exulanica.digest-bound-record/v1",
+        "record": {
+          "profile": "exulanica.retained-source-state/v1",
+          "database": "postgresql://localhost:5433/exulanica_spine_test",
+          "read_only": true,
+          "scenes": {
+            "bowl": {
+              "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+              "source_manifest_sha256": "2cdc34bd0387e957d2e1d65fd8fae100b617be0e5d6cc577f4cfd3845f28e989",
+              "verified_original_count": 51,
+              "verified_original_bytes": 126046395,
+              "database_counts": {
+                "capture": 51,
+                "capture_reconstruction_authorization": 0,
+                "reconstruction_privacy_screening": 0,
+                "reconstruction_scene": 0,
+                "reconstruction_scene_job": 0
+              }
+            },
+            "volcanic": {
+              "workspace_id": "79004d44-ca24-4d17-9eef-56786415e233",
+              "source_manifest_sha256": "02a38f2ebab1815abbb5ecb86c6292969c4720f6c1c5680f5522e681819349ed",
+              "verified_original_count": 210,
+              "verified_original_bytes": 614030051,
+              "database_counts": {
+                "capture": 210,
+                "capture_reconstruction_authorization": 0,
+                "reconstruction_privacy_screening": 0,
+                "reconstruction_scene": 0,
+                "reconstruction_scene_job": 0
+              }
+            }
+          }
+        },
+        "record_sha256": "2088a85140eed175212d1f70e783a6f7a375dc5a7ba10c19f818ff52a84f9311"
+      }
+    },
+    "operational_limits": [
+      "Interrupted training, corrupt/missing artifacts, publication, lease/cancellation, withdrawal and repeated preemption were checked with labelled synthetic/disposable fixtures. No live CUDA interruption or real-scene purge was performed.",
+      "CPU optimizer continuation and actual CPU SOG compression do not establish CUDA convergence or real native-GPU scene quality.",
+      "No trained delivery pixels, meaningful off-camera traversal, real held-out score, real GPU peak memory/cost or reconstructed browser performance has been measured.",
+      "The local source-only Atlas remains a development server, not a deployed service."
+    ],
+    "external_dependencies": [
+      {
+        "needed": "Named human exact-byte review of all51 bowl and210 volcanic photographs, review time and actual person/sensitive-region findings.",
+        "why": "Existing screening/admission requirements prohibit inventing a human receipt. Blank prepared reviews were executed and refused.",
+        "review_urls": [
+          "http://127.0.0.1:8765/review-bowl.html",
+          "http://127.0.0.1:8765/review-volcanic.html"
+        ]
+      },
+      {
+        "needed": "Authorized CUDA host/account/access, or permission to provision GPU compute with a spending cap.",
+        "why": "Local Apple host cannot execute the reviewed CUDA trainer. Actual image digest, hardware and price must be recorded after authorization."
+      }
+    ],
+    "reproducible_workflow": "docs/retained-reference-workflow.md",
+    "source_code_bindings": [
+      {
+        "path": "exulanica/api/app.py",
+        "sha256": "950396cec3fbada5dd7e8812f78668643ad2b2f3aecf10d43f1d1575223f3fd1",
+        "byte_size": 13876
+      },
+      {
+        "path": "exulanica/api/routes/geometry.py",
+        "sha256": "7938545e3a7e0636b46c88e2a5577250e0da8d50e51914ed88fd4a34f2cc3dee",
+        "byte_size": 11992
+      },
+      {
+        "path": "exulanica/api/routes/reconstruction_admission.py",
+        "sha256": "24537b25834850baacef581fc09eaf6083e14dc7d73bb12d1673fb8b2e71cfc6",
+        "byte_size": 2491
+      },
+      {
+        "path": "exulanica/api/routes/world.py",
+        "sha256": "be71f7586f2e47b5a2a3adf4a7d38036371019ebfdde7c805f23ff7a692654af",
+        "byte_size": 17354
+      },
+      {
+        "path": "exulanica/corpus/decode.py",
+        "sha256": "db66bea847e025c6f2c764b4da1814eb8080af1214c2b678a9c0d70baa2897a5",
+        "byte_size": 11989
+      },
+      {
+        "path": "exulanica/evaluation/reference_inputs.py",
+        "sha256": "687e9a0ee26fdf584a576455ebd6b9a5020bb7c67d058e8e60ef8bc72b556efb",
+        "byte_size": 11487
+      },
+      {
+        "path": "exulanica/graph/payload.py",
+        "sha256": "d21cdf606c360dc02df68a1eae4e11a8998022cd6e472f2d9f96477be5d88c35",
+        "byte_size": 8705
+      },
+      {
+        "path": "exulanica/graph/reconstruction_scenes.py",
+        "sha256": "517f7516b996411dba09262476a382354b968e9a0551c94eb8632a66623d2464",
+        "byte_size": 18019
+      },
+      {
+        "path": "exulanica/graph/scene_geometry.py",
+        "sha256": "7624623c26501b9f2d941812d7a80f0f0583ef8c74f752a3cd60ef6f1d33db92",
+        "byte_size": 7498
+      },
+      {
+        "path": "exulanica/ingest/decode.py",
+        "sha256": "864ca00dc60de4cf47557fb97532517db2316950ec4135c70077f4d284cbba34",
+        "byte_size": 1062
+      },
+      {
+        "path": "exulanica/ingest/reconstruction_scratch.py",
+        "sha256": "8b3496b1537ec3bab62ecb09e522c65a4314994a3b8643c0b3dc4c33c85b2bd2",
+        "byte_size": 7160
+      },
+      {
+        "path": "exulanica/ingest/reference_admission.py",
+        "sha256": "8fe2e2748c0f5b7ae0f0a240ad323eaceaa8f8b69ca377a0fbfe44d9556eb695",
+        "byte_size": 5715
+      },
+      {
+        "path": "exulanica/ingest/repository.py",
+        "sha256": "0aead5e574713836952f81d901d12a2ed5afcac9c061a1d2da0dc598a0a55744",
+        "byte_size": 27234
+      },
+      {
+        "path": "exulanica/ingest/scene_reconstruction.py",
+        "sha256": "247a741efc4064298cd7f0a41bbd6e9100b6fdd7e6be52eca363db66e94547ea",
+        "byte_size": 31409
+      },
+      {
+        "path": "exulanica/ingest/scene_selection.py",
+        "sha256": "965b549d34459dee88d1143266fb37d25ae7af7ef013ac4625ba0577f97227f1",
+        "byte_size": 9770
+      },
+      {
+        "path": "exulanica/ingest/scene_splat.py",
+        "sha256": "bcb7003d8dca3ac62ed0d0a178661e7b119062cf5cec3e2a8d21574a0dec361d",
+        "byte_size": 20081
+      },
+      {
+        "path": "exulanica/ingest/scene_worker.py",
+        "sha256": "b98a5ff9ea12009fcd2e717ca11001aae101e0cc74e9646b50f59eefd540e964",
+        "byte_size": 6264
+      },
+      {
+        "path": "exulanica/ingest/scene_worker_command.py",
+        "sha256": "d6d854bb6af658d9497dc91d6e2152f4be270678b2d7a2b018580dbb58dbc3b5",
+        "byte_size": 5100
+      },
+      {
+        "path": "exulanica/ingest/spine/reconstruction_jobs.py",
+        "sha256": "da67368c6bca7c408a26589cdf424a471dd4e0795ac86d5ce51a28581d7e897d",
+        "byte_size": 16240
+      },
+      {
+        "path": "exulanica/ingest/stages/__init__.py",
+        "sha256": "1d57b782edb7c2e99ab95c350d9ee46701893160a435e10d5833205e4fc588ad",
+        "byte_size": 23683
+      },
+      {
+        "path": "exulanica/orchestration/reference_world.py",
+        "sha256": "cdeabec61483b98bce34bc5938c425060681f2b25bc6e0beba1e04ebef664bff",
+        "byte_size": 3189
+      },
+      {
+        "path": "exulanica/reconstruction/alignment.py",
+        "sha256": "ca636c297a3a3c492d39ea885a25fa1bae625228ed9c681f2fa36e2077bee699",
+        "byte_size": 8869
+      },
+      {
+        "path": "exulanica/reconstruction/gsplat_container.py",
+        "sha256": "d04cd04802eb6b62f29a088b5bda7205217a9a383519a29ca4bbdc50975f5c7d",
+        "byte_size": 12072
+      },
+      {
+        "path": "exulanica/reconstruction/gsplat_protocol.py",
+        "sha256": "845579aeb8713718da90a1e41ff97a4e18f39572f68e26d587a4c5e69b2a28a7",
+        "byte_size": 2044
+      },
+      {
+        "path": "exulanica/reconstruction/gsplat_runner.py",
+        "sha256": "0074328c77fc79b00d2668c4e5c34e3b4ae052bee147e488fc01c2e0c3bb20b4",
+        "byte_size": 32809
+      },
+      {
+        "path": "exulanica/reconstruction/placement.py",
+        "sha256": "abf2e920c47d269386189a3f48b188b07ca43c1e0ee594abab0d39794778f51a",
+        "byte_size": 28359
+      },
+      {
+        "path": "exulanica/reconstruction/pose.py",
+        "sha256": "6b572f48eab06daa79c66cf04c06af67ee7be5ccda61eec937f878d40639e7a7",
+        "byte_size": 33823
+      },
+      {
+        "path": "exulanica/reconstruction/splat.py",
+        "sha256": "033876fc970063ecb8629ee58eb7086a8ba41ecfe466b8ce4afe5fff1cfb20de",
+        "byte_size": 27286
+      },
+      {
+        "path": "exulanica/world/models.py",
+        "sha256": "654470b83728d3528c105cef6adb10e507ccbd556e693ef03357995824dd49e9",
+        "byte_size": 3931
+      },
+      {
+        "path": "exulanica/world/repository.py",
+        "sha256": "a087ac2ec5627b2c6f18a5eb190d074faeef7193d50c801dfcb527fa27f9d9bc",
+        "byte_size": 55567
+      },
+      {
+        "path": "scripts/compose_reference_sources.py",
+        "sha256": "792297bc7e13c079c5280516230ada065e5bbc347db950520f31ec84d1dbd324",
+        "byte_size": 2482
+      },
+      {
+        "path": "scripts/queue_reference_reconstruction.py",
+        "sha256": "bd7b8966f23db6462a16290a555a0ae78b96bdfa5571399c4d2b9c3d6af2f9a6",
+        "byte_size": 2936
+      },
+      {
+        "path": "scripts/reference_instance.py",
+        "sha256": "774f91fd1e8dbdc3241bf7c9a4276a47acdd026d781e357ddfdb7aaa1ed43690",
+        "byte_size": 5233
+      },
+      {
+        "path": "scripts/reference_scene.py",
+        "sha256": "8ef5264766abe08d64faedc37fd1b6096067b5e359c1649e96372203a0d55f8e",
+        "byte_size": 7968
+      },
+      {
+        "path": "scripts/verify_gsplat_controls.py",
+        "sha256": "3f83b099cb560ed58fc741c85f34afca58ce7e00e819bbb0530c61c5ab8300ea",
+        "byte_size": 12827
+      },
+      {
+        "path": "scripts/verify_reference_controls.py",
+        "sha256": "99c9150157c63c079c30113ee639daff6e9140acaccf8bc03b923fefa49ec657",
+        "byte_size": 6315
+      },
+      {
+        "path": "scripts/verify_scene_publication_controls.py",
+        "sha256": "6bcfeeafbe58b9a9d94603c286a8ace80d87696173cdb8bf9b2071f0e2096b19",
+        "byte_size": 10896
+      },
+      {
+        "path": "tests/test_api.py",
+        "sha256": "05d208d5d649fac57438fbf23fee8fb325660623f10799c4673fededd9f40f4e",
+        "byte_size": 46870
+      },
+      {
+        "path": "tests/test_corpus_decode.py",
+        "sha256": "79ceaf7caa48fb11eeb9f405d683fa40203a8c59271a9005ebe33c9e117e0a6d",
+        "byte_size": 2831
+      },
+      {
+        "path": "tests/test_gsplat_container.py",
+        "sha256": "e75df4864cccc61bd656cef435cdd88edf3cb833e7cc3e7cbde75d440d7c1705",
+        "byte_size": 7456
+      },
+      {
+        "path": "tests/test_gsplat_dataset.py",
+        "sha256": "57a4369d4bc0302cf1f0e65c09434eca6e8a6416fa9da5e250e0ce6fc59003e7",
+        "byte_size": 2701
+      },
+      {
+        "path": "tests/test_gsplat_runner.py",
+        "sha256": "db8afb0ed246e4d7c5c6c9102f1820cdc95d073b2fd22e7e86dd493e2187b0aa",
+        "byte_size": 7809
+      },
+      {
+        "path": "tests/test_ingest_persistence.py",
+        "sha256": "7b42cfd61b93f877a967e63b9146afff314c25b81a8786646571231fb1481949",
+        "byte_size": 72611
+      },
+      {
+        "path": "tests/test_reconstruction_placement.py",
+        "sha256": "921ff5a8ec758bbf68846bd63262b7379ed910501e1ea8d88400d42fcfad99d8",
+        "byte_size": 16375
+      },
+      {
+        "path": "tests/test_reconstruction_pose.py",
+        "sha256": "27b154bed2c43f7de4f1056252125cd017a043197df947524b3a5bfcf1af31a4",
+        "byte_size": 9141
+      },
+      {
+        "path": "tests/test_reconstruction_splat.py",
+        "sha256": "ed409db532f55b737932fa06e89f63ce20fdbd9829f36872bfe04bffc422d229",
+        "byte_size": 16117
+      },
+      {
+        "path": "tests/test_reference_admission.py",
+        "sha256": "9e76c4de46aef7ab703c8bb5b7e9caddfe27c1518b823be66a7debe63ab85f1c",
+        "byte_size": 7692
+      },
+      {
+        "path": "tests/test_reference_inputs.py",
+        "sha256": "0a0f7d5c25d64185eaf87a54ebb61f2fcdf9ce32ab3ad695e55438ed5dcd7b40",
+        "byte_size": 5003
+      },
+      {
+        "path": "tests/test_reference_world.py",
+        "sha256": "ac9ec92e004e7c13d65303bc9d9362e40c400c3c82ebd4403fcf9beca4fa6701",
+        "byte_size": 2422
+      },
+      {
+        "path": "tests/test_scene_reconstruction_pipeline.py",
+        "sha256": "7cc6419a7dea84e967ced57737180eaf49fa7d184e0941cdffd005ba3c10e0c0",
+        "byte_size": 34961
+      },
+      {
+        "path": "tests/test_scene_splat_pipeline.py",
+        "sha256": "a8b9715a78755fcd5a8f7dbd564b0dd09dd33d4c2e95a1760192d82074077e62",
+        "byte_size": 37308
+      },
+      {
+        "path": "tests/test_world_api.py",
+        "sha256": "6ce361b4566a7132ef871cf1246bb57003b24048dc8d62759c34c125d2f0bb9a",
+        "byte_size": 16014
+      },
+      {
+        "path": "tests/test_world_style_postgres.py",
+        "sha256": "b2344b708b511c24d9b6082bd63af00b642fbdf5d68526c79c4beedca71b3255",
+        "byte_size": 14778
+      },
+      {
+        "path": "web/packages/app/index.html",
+        "sha256": "a0fcd897ddf1e2728a8f8ca2ee0f65e58032fc9a9f97e3bc33c73efaf40c1e99",
+        "byte_size": 1941
+      },
+      {
+        "path": "web/packages/app/src/atlas.ts",
+        "sha256": "40f356335cdc256e453ba2dd0f93b516f848a732399e2cc002dd33155b0a1869",
+        "byte_size": 6045
+      },
+      {
+        "path": "web/packages/app/src/bootstrap.ts",
+        "sha256": "3d35b3ea261f14b62b74a3379630ca9f11d12e93bc8d678658136e12478eae2d",
+        "byte_size": 1230
+      },
+      {
+        "path": "web/packages/app/src/browser-validation.ts",
+        "sha256": "04e730873743fe89eef8032e8b2ce636b3afb2fc9dfe51da06440a14f017d737",
+        "byte_size": 12649
+      },
+      {
+        "path": "web/packages/app/src/geometry-api.ts",
+        "sha256": "81c2b7e688553d1b04ed13e5944b25629f6e9dddb7715b169b745f1144be35fe",
+        "byte_size": 32170
+      },
+      {
+        "path": "web/packages/app/src/main.ts",
+        "sha256": "be61cb0880f2f2c14d38b52a4e7bb36c98c603a86e351e47b2659e6019b7626f",
+        "byte_size": 78715
+      },
+      {
+        "path": "web/packages/app/src/source-media-api.ts",
+        "sha256": "dbb952b90f082eb9bcfeb2e5a33ccd9084ac9fc17ba98cf89a5acf5f83891c7b",
+        "byte_size": 9383
+      },
+      {
+        "path": "web/packages/app/src/style.css",
+        "sha256": "4cee5a76c3e77e77669ec05484cc1f898c692cd1f5f79ac7207f0e7e6f3faa05",
+        "byte_size": 72231
+      },
+      {
+        "path": "web/packages/app/src/ui/reconstruction-inspector.ts",
+        "sha256": "b36ebcbec956f8eff0824cb514ac90ee2e0adf67839636452bc2e8382ef92a07",
+        "byte_size": 5814
+      },
+      {
+        "path": "web/packages/app/src/ui/startup-state.ts",
+        "sha256": "d0bef0713075ebe692ab7425712dde5174b1e85adb470f5976ebc9ffc09c9656",
+        "byte_size": 1335
+      },
+      {
+        "path": "web/packages/app/src/ui/status.ts",
+        "sha256": "41237a898cf2436abe1564a62e2f0d108f389a0f168716bcf0812c3fbb8c129d",
+        "byte_size": 5123
+      },
+      {
+        "path": "web/packages/app/test/browser-validation-record.test.ts",
+        "sha256": "c22048af5d83990a3cde8d786dc0d54a70b782e7f0378cd8623255998fa1f939",
+        "byte_size": 2958
+      },
+      {
+        "path": "web/packages/app/test/geometry-api.test.ts",
+        "sha256": "b6101069ec290d5005e85a92ff62f854b2f79790fcd5ad69b26a53d4bb8c458c",
+        "byte_size": 31207
+      },
+      {
+        "path": "web/packages/app/test/reconstruction-inspector.test.ts",
+        "sha256": "3c77bbdbd14464eba6882390610cc202a251d320f33a5835e763ca7feebb6e76",
+        "byte_size": 5106
+      },
+      {
+        "path": "web/packages/app/test/source-media-api.test.ts",
+        "sha256": "da6c2cc1c2294e6a1793c2686f3b24da1b7e8ae4f5ef1e70d9a39381f750fc7a",
+        "byte_size": 5141
+      },
+      {
+        "path": "web/packages/app/test/startup-state.test.ts",
+        "sha256": "55e3bc4ef3b25a1fd6527e38ce226d3ff7794816fb43706e66c9bc5a90114570",
+        "byte_size": 2231
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+        "sha256": "2ff91e61c3f8bf82f87549c992df0b9aaa417eb828d64a7d890c20deffa60249",
+        "byte_size": 61370
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/index.ts",
+        "sha256": "f37154b249f751bdaacf8301b9710b09499c75769596b7ee06dca6b22e3ba510",
+        "byte_size": 3703
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/point-cloud.ts",
+        "sha256": "65a3c2af88a5d9a5c9bef5038e44cc36e57e89794550adb33107d551196cd626",
+        "byte_size": 12195
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/scene-inspection.ts",
+        "sha256": "a6df81665f1192463f8f1f53b10aa7f5796ca4e8888732b883f558a12d95d843",
+        "byte_size": 7322
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/scene-point-maps.ts",
+        "sha256": "278e5f0e931e941155cf0696ac8481cd37fe89b6afa4fdd270be08db1b137d99",
+        "byte_size": 3706
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/scene-splats.ts",
+        "sha256": "dff96486102c7a8da49a9da1548fd23461a37bb47fa69817a5ba03ef9915ff16",
+        "byte_size": 7796
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/source-media.ts",
+        "sha256": "bb4779a0e345047a0ca9cf701b2faf1aa8af9c0aaa5ca89599e7c6b2a66f6404",
+        "byte_size": 1905
+      },
+      {
+        "path": "web/packages/atlas-react/test/scene-inspection.test.ts",
+        "sha256": "fb145ec1e068116659cd139c3d380c7b89123c59d6927cdc904adb6abb48e3c2",
+        "byte_size": 7250
+      },
+      {
+        "path": "web/packages/atlas-react/test/scene-point-maps.test.ts",
+        "sha256": "6f6f5932dbfe77eac15efd12085b59543569d3a8de77dc6c8e6bb7a02c373861",
+        "byte_size": 2501
+      },
+      {
+        "path": "web/packages/atlas-react/test/scene-splats.test.ts",
+        "sha256": "c41f783f2b96faad086d85672c529c287e65022e18ffd5431a8236a7c1211ea9",
+        "byte_size": 3932
+      },
+      {
+        "path": "web/packages/atlas-react/test/source-media.test.ts",
+        "sha256": "8b19335bda1e97d29fc5cbb0c687ed46db2fac0de3bbb0c118fca8ebbccb4553",
+        "byte_size": 1262
+      },
+      {
+        "path": "web/packages/graph-client/src/index.ts",
+        "sha256": "86ae6442909f8cb7cfdd82a513b662c2dff22c46e298c83ee48390e7df9ce2e6",
+        "byte_size": 3216
+      },
+      {
+        "path": "web/packages/graph-client/src/read-model.ts",
+        "sha256": "3048b042bb7868491b786ea613a2c9d1fdf9caaffe2564310d8802a310653a2b",
+        "byte_size": 22092
+      },
+      {
+        "path": "web/packages/graph-client/src/snapshot.ts",
+        "sha256": "20e9ad0f3955414fb15aefee3bf717e35beaa4738b2231e77414efb888d65869",
+        "byte_size": 17202
+      },
+      {
+        "path": "web/packages/graph-client/src/wire.ts",
+        "sha256": "cc980c0255238dd8128833f2184be209b361d6ad189af620e8e087bbcdcc692b",
+        "byte_size": 6414
+      },
+      {
+        "path": "web/packages/graph-client/test/snapshot.test.ts",
+        "sha256": "61ae32b80572ec8fce1b751598923d0e014b346a43ef163b9af908482a574f14",
+        "byte_size": 14018
+      }
+    ],
+    "implementation_commits": [
+      "1500c92 Integrate validated placement and durable trained-scene publication",
+      "400891d Add exact-photo admission and reusable retained-source workflow",
+      "b5a61e1 Use accepted camera calibration for Atlas inspection without point maps",
+      "094a8f9 Share bounded image decoding across ingestion and reconstruction",
+      "bea9290 Add Atlas reconstruction inspection and authenticated native splat delivery",
+      "fa54764 Implement resumable Gaussian training with verified container cleanup",
+      "8bd4da2 Freeze reference photograph inventories and held-out evaluation splits"
+    ]
+  },
+  "record_sha256": "5a2d08ec810f5a980720e915f5c082bc213219c9c0843dc8293ef38126ca6b98"
+}

@@ -205,6 +205,24 @@ database; `scripts/verify_gsplat_controls.py` never uses a database. Run the web
 with the existing package commands. The final evaluation record records actual results and
 limitations, including any unrelated in-flight failures.
 
+## Retained verification outcome
+
+The [digest-bound progress record](evaluation/2026-09-05-retained-reference-progress.json)
+binds the frozen inputs, exact code, companion control records, source-state audit and screenshots.
+The final full backend run passed **1604 tests**, with three disclosed skips. The subsequent final
+publication suite passed **66 tests** after the last identity/provenance fixes. The web checks passed
+**717 tests**, type checking and package boundaries; the app build passed with the existing large-bundle
+warning. All 18 final publication mutations failed at their intended regression assertions, and the
+restored suite passed. The companion records retain the other executed negative controls.
+
+The final read-only audit checked every retained original's database identity and content hash:
+51 bowl originals (126046395 bytes) and 210 volcanic originals (614030051 bytes), with zero
+reconstruction jobs, scenes or human screening receipts in either retained workspace.
+Representative actual browser captures are retained under
+`docs/evaluation/artifacts/2026-09-05-reference/`: source-world and source-inspection views for each
+collection, plus `atlas-unavailable.png`. They establish source fallback and service-retry behavior.
+A reconstructed walkthrough, held-out scores and traversal performance remain unavailable.
+
 ## Exact dependencies to resume real reconstruction
 
 - Named human confirmation for both complete exact-byte galleries, with review time and the
