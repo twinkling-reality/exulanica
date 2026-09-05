@@ -606,8 +606,10 @@ def run_gsplat_job(
         version_command = (compressor_executable, "--version")
         version = executor(version_command, job)
         expected_version = TRAINING_PROTOCOL["compressor"]["version"]
+        # MEASURED 2026-09-05: splat-transform 3.3.3 prints its banner on stderr. Reading stdout
+        # alone refused the first accepted real training after two hours on the card.
         if version.returncode != 0 or not re.search(
-            rf"\bv{re.escape(expected_version)}\b", version.stdout
+            rf"\bv{re.escape(expected_version)}\b", f"{version.stdout}\n{version.stderr}"
         ):
             return SplatJobResult(
                 "failed",

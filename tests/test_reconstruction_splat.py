@@ -120,7 +120,8 @@ class FakeRunner:
             )
             return CommandResult(0, "trained", "", 12.0)
         if command[-1] == "--version":
-            return CommandResult(0, "splat-transform v3.3.3 (test fixture)", "", 1.0)
+            # The real 3.3.3 CLI writes its banner to stderr; the fixture does the same.
+            return CommandResult(0, "", "splat-transform v3.3.3 (test fixture)", 1.0)
         Path(command[-1]).write_bytes(b"SOG-delivery")
         return CommandResult(0, "compressed", "", 2.0)
 
