@@ -47,6 +47,7 @@ import {
   DEFAULT_LAYOUT_CONFIG,
   MAX_ISLANDS,
   anchorId,
+  atlasLandscapeHeight,
   atlasVec3,
   entityId as toEntityId,
   inspectLayoutCoverage,
@@ -203,6 +204,13 @@ const ANCHOR_KINDS: Readonly<Partial<Record<OccurrenceKind, AnchorKind>>> = Obje
   event: 'event',
 });
 
+/** Reconstructed regions stand on the landscape height at their centre; others keep the solver's plane. */
+export function groundedOnLandscape(placement: IslandPlacement, reconstructed: boolean): IslandPlacement {
+  if (!reconstructed) return placement;
+  const { x, z } = placement.position;
+  return { ...placement, position: atlasVec3(x, atlasLandscapeHeight(x, z), z) };
+}
+
 export function buildScene(
   snapshot: GraphSnapshot,
   layoutVersion = 1,
@@ -272,7 +280,16 @@ export function buildScene(
       islandId: toIslandId(record.islandId),
       creationOrdinal: resolvedOrdinals.get(toIslandId(record.islandId))!,
       createdAt: orderingKey(record),
-      placement: layout.placements.get(toIslandId(record.islandId)) ?? originPlacement(),
+      // A reconstruction's display ground is its local y = 0. The layout solver places every
+      // region on the y = 0 plane while the authored landscape undulates around it; a source-first
+      // region compensates per veil, and a reconstructed region compensates once here, so its
+      // geometry, recovered cameras and arrival all stand on the landscape instead of inside it.
+      // MEASURED 2026-09-05: without this the first real scene sat 1.2 units under the terrain and
+      // the arrival frame showed only landscape.
+      placement: groundedOnLandscape(
+        layout.placements.get(toIslandId(record.islandId)) ?? originPlacement(),
+        reconstructions.has(toIslandId(record.islandId)),
+      ),
       // What is actually loaded decides this renderer rung. The record remains available on the
       // graph snapshot as a separate historical fact. A failed fetch therefore presents rung 4
       // source photographs without rewriting the rung 3 that the durable gate recorded.
