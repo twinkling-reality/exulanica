@@ -1,0 +1,33 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts (4 tests | 1 failed | 3 skipped) 4ms
+   × source presentation boundary > keeps the same grounded startup position but stops aiming upward at an absent source 4ms
+     → expected 0.22665697451815742 to be -0.085 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:01
+   Duration  718ms (transform 182ms, setup 0ms, collect 484ms, tests 4ms, environment 0ms, prepare 39ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-presentation.test.ts > source presentation boundary > keeps the same grounded startup position but stops aiming upward at an absent source
+AssertionError: expected 0.22665697451815742 to be -0.085 // Object.is equality
+
+- Expected
++ Received
+
+- -0.085
++ 0.22665697451815742
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts:48:30
+     46|       .toEqual([ordinary.x, ordinary.y, ordinary.z, ordinary.yaw]);
+     47|     expect(ordinary.pitch).toBeGreaterThan(0);
+     48|     expect(inspection.pitch).toBe(-0.085);
+       |                              ^
+     49|   });
+     50| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

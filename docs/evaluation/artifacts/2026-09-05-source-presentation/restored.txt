@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ✓ packages/app/test/status-rungs.test.ts (4 tests) 6ms
+ ✓ packages/atlas-react/test/source-presentation.test.ts (4 tests) 10ms
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  12:34:06
+   Duration  688ms (transform 202ms, setup 0ms, collect 494ms, tests 16ms, environment 105ms, prepare 73ms)
+

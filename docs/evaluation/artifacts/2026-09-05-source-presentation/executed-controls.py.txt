@@ -1,0 +1,58 @@
+"""Isolated production mutations for the source-presentation boundary; never edits the working tree."""
+from pathlib import Path
+import shutil, subprocess, tempfile, json, hashlib, re, sys
+repo = Path('/Users/glendonchin/dev/Technology/orimera/web')
+scratch = Path(tempfile.mkdtemp(prefix='orimera-source-presentation-controls-'))
+shutil.copytree(repo/'test-data', scratch/'test-data')
+for name in ['package.json', 'vitest.config.ts', 'tsconfig.base.json', 'tsconfig.json']:
+    shutil.copy2(repo/name, scratch/name)
+(scratch/'node_modules').symlink_to(repo/'node_modules', target_is_directory=True)
+for name in [p.name for p in (repo/'packages').iterdir() if p.is_dir()]:
+    target = scratch/'packages'/name
+    shutil.copytree(repo/'packages'/name, target, ignore=shutil.ignore_patterns('node_modules', 'dist', '*.tsbuildinfo'))
+    modules = repo/'packages'/name/'node_modules'
+    if modules.exists():
+        (target/'node_modules').symlink_to(modules, target_is_directory=True)
+B = 'packages/atlas-react/src/playcanvas/atlas-binding.ts'
+S = 'packages/app/src/ui/status.ts'
+BT = 'packages/atlas-react/test/source-presentation.test.ts'
+ST = 'packages/app/test/status-rungs.test.ts'
+cases = [
+    ('inspection-omits-veils', B, "islands: sourcePresentation === 'inspection' ? [] : scene.islands.map", "islands: scene.islands.map", BT, 'omits every source grove island'),
+    ('world-default-preserved', B, "sourcePresentation: 'world' | 'inspection' = 'world',\n): AtlasScene {", "sourcePresentation: 'world' | 'inspection' = 'inspection',\n): AtlasScene {", BT, 'keeps ordinary world presentation'),
+    ('inspection-no-upward-pitch', B, "if (sourcePresentation === 'inspection') {\n          return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };\n        }", "", BT, 'stops aiming upward'),
+    ('inspection-arrival-pose-preserved', B, "if (sourcePresentation === 'inspection' || island.rung !== 4) return pose;", "if (island.rung !== 4) return pose;", BT, 'preserves the entire validated arrival pose'),
+    ('panel-only-in-inspection', S, "const sourceOnly = input.reconstructionFocus !== undefined\n    && !", "const sourceOnly = true\n    && !", ST, 'leaves ordinary world presentation unchanged'),
+    ('panel-hidden-when-geometry-loads', S, "&& !(input.reconstructionScenes ?? []).some((scene) => scene.renderingSubstrate !== 'source_photographs');", ";", ST, 'uses the displayed substrate after load failure'),
+    ('panel-counts-exact-inventory', S, "text: counted(collection.sourceCount, 'original photograph', 'original photographs')", "text: counted(0, 'original photograph', 'original photographs')", ST, 'makes a source-only review obvious'),
+    ('panel-opens-exact-collection', S, "inspect.addEventListener('click', () => input.onInspectSources?.(collection.sceneId));\n        row.append(inspect);", "row.append(inspect);", ST, 'makes a source-only review obvious'),
+]
+baseline = subprocess.run(['pnpm', 'exec', 'vitest', 'run', 'packages/app', 'packages/atlas-react'], cwd=scratch, text=True, capture_output=True)
+(scratch/'baseline.log').write_text(baseline.stdout + baseline.stderr)
+print('BASELINE', baseline.returncode, scratch, flush=True)
+if baseline.returncode != 0:
+    raise SystemExit('isolated baseline failed')
+results = []
+for name, file, before, after, test, pattern in cases:
+    p = scratch/file
+    source = p.read_text()
+    if source.count(before) != 1:
+        raise RuntimeError(f'mutation {name} anchor count {source.count(before)}')
+    p.write_text(source.replace(before, after))
+    run = subprocess.run(['pnpm', 'exec', 'vitest', 'run', test, '-t', pattern], cwd=scratch, text=True, capture_output=True)
+    p.write_text(source)
+    log = run.stdout + run.stderr
+    (scratch/(name + '.log')).write_text(log)
+    observed = run.returncode != 0 and bool(re.search(r'Tests\s+[1-9][0-9]* failed', log))
+    assertion = next((line.strip() for line in log.splitlines() if 'AssertionError' in line or 'Error:' in line), None)
+    results.append(dict(name=name, production_file='web/' + file, source_sha256=hashlib.sha256(source.encode()).hexdigest(),
+                        test='web/' + test, test_filter=pattern, exit_code=run.returncode, observed_failure=observed,
+                        observed_assertion=assertion, log_file=str(scratch/(name + '.log'))))
+    print(name, run.returncode, observed, assertion, flush=True)
+restored = subprocess.run(['pnpm', 'exec', 'vitest', 'run', BT, ST], cwd=scratch, text=True, capture_output=True)
+(scratch/'restored.log').write_text(restored.stdout + restored.stderr)
+print('RESTORED', restored.returncode, flush=True)
+(scratch/'results.json').write_text(json.dumps(dict(scratch=str(scratch), baseline_exit=baseline.returncode, restored_exit=restored.returncode, controls=results), indent=2) + '\n')
+print('RESULTS', scratch/'results.json', flush=True)
+if not all(r['observed_failure'] for r in results) or restored.returncode != 0:
+    raise SystemExit(1)

@@ -1,0 +1,119 @@
+{
+  "label": "volcanic",
+  "url": "http://127.0.0.1:5181/",
+  "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+  "atlas_mount_ms": 5996,
+  "total_ms": 14399,
+  "captures": [
+    {
+      "name": "world-arrival",
+      "file": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-world-arrival.jpg",
+      "viewport": [
+        1280,
+        720
+      ],
+      "devicePixelRatio": 1,
+      "shellPrimary": "world",
+      "panelVisible": true,
+      "panelText": "Source collectionNo 3D reconstruction is loadedThe landscape is authored. Use the source inspector to view the original photographs.210 original photographsInspect source photographs",
+      "inspectorHidden": true,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorDisclosure": "Camera inspection · fitted relative scale · physical scale unverified. These views do not establish a walkable surface.",
+      "inspectorViewCount": 0,
+      "inspectorState": "",
+      "inspectorImageLoaded": null,
+      "inspectorImageSize": null,
+      "statusSummaries": [
+        "210 grouped photographs · reconstruction unavailable"
+      ],
+      "statusWarnings": []
+    },
+    {
+      "name": "source-inspector",
+      "file": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-source-inspector.jpg",
+      "viewport": [
+        1280,
+        720
+      ],
+      "devicePixelRatio": 1,
+      "shellPrimary": "world",
+      "panelVisible": false,
+      "panelText": "Source collectionNo 3D reconstruction is loadedThe landscape is authored. Use the source inspector to view the original photographs.210 original photographsInspect source photographs",
+      "inspectorHidden": false,
+      "inspectorTitle": "Source photographs",
+      "inspectorDisclosure": "Authorized original evidence. No reconstructed surface or measured route is implied.",
+      "inspectorViewCount": 210,
+      "inspectorState": "Original photograph. Reconstructed camera inspection is unavailable for this scene.",
+      "inspectorImageLoaded": true,
+      "inspectorImageSize": [
+        4272,
+        2848
+      ],
+      "statusSummaries": [
+        "210 grouped photographs · reconstruction unavailable"
+      ],
+      "statusWarnings": []
+    },
+    {
+      "name": "source-inspector-second",
+      "file": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-source-inspector-second.jpg",
+      "viewport": [
+        1280,
+        720
+      ],
+      "devicePixelRatio": 1,
+      "shellPrimary": "world",
+      "panelVisible": false,
+      "panelText": "Source collectionNo 3D reconstruction is loadedThe landscape is authored. Use the source inspector to view the original photographs.210 original photographsInspect source photographs",
+      "inspectorHidden": false,
+      "inspectorTitle": "Source photographs",
+      "inspectorDisclosure": "Authorized original evidence. No reconstructed surface or measured route is implied.",
+      "inspectorViewCount": 210,
+      "inspectorState": "Original photograph. Reconstructed camera inspection is unavailable for this scene.",
+      "inspectorImageLoaded": true,
+      "inspectorImageSize": [
+        4272,
+        2848
+      ],
+      "statusSummaries": [
+        "210 grouped photographs · reconstruction unavailable"
+      ],
+      "statusWarnings": []
+    },
+    {
+      "name": "world-after-return",
+      "file": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-world-after-return.jpg",
+      "viewport": [
+        1280,
+        720
+      ],
+      "devicePixelRatio": 1,
+      "shellPrimary": "world",
+      "panelVisible": true,
+      "panelText": "Source collectionNo 3D reconstruction is loadedThe landscape is authored. Use the source inspector to view the original photographs.210 original photographsInspect source photographs",
+      "inspectorHidden": true,
+      "inspectorTitle": "Source photographs",
+      "inspectorDisclosure": "Authorized original evidence. No reconstructed surface or measured route is implied.",
+      "inspectorViewCount": 210,
+      "inspectorState": "Original photograph. Reconstructed camera inspection is unavailable for this scene.",
+      "inspectorImageLoaded": null,
+      "inspectorImageSize": null,
+      "statusSummaries": [
+        "210 grouped photographs · reconstruction unavailable"
+      ],
+      "statusWarnings": []
+    }
+  ],
+  "console_errors": [],
+  "console_warnings": [],
+  "checks": {
+    "arrival_panel_visible": true,
+    "arrival_inspector_hidden": true,
+    "inspector_opened_with_photograph": true,
+    "inspector_titled_source_photographs": true,
+    "inspector_view_count": 210,
+    "second_photograph_loaded": true,
+    "return_hides_inspector": true,
+    "return_restores_panel": true
+  }
+}

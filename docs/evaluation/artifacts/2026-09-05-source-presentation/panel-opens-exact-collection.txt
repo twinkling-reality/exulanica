@@ -1,0 +1,40 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/app/test/status-rungs.test.ts (4 tests | 1 failed | 3 skipped) 6ms
+   × reconstruction rung disclosure > makes a source-only review obvious and opens the exact inspector collection 6ms
+     → expected "spy" to be called with arguments: [ 'region-1' ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:06
+   Duration  384ms (transform 40ms, setup 0ms, collect 44ms, tests 6ms, environment 97ms, prepare 34ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/status-rungs.test.ts > reconstruction rung disclosure > makes a source-only review obvious and opens the exact inspector collection
+AssertionError: expected "spy" to be called with arguments: [ 'region-1' ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ packages/app/test/status-rungs.test.ts:18:21
+     16|     expect(notice.textContent).toContain('landscape is authored');
+     17|     notice.querySelector('button')!.click();
+     18|     expect(inspect).toHaveBeenCalledWith('region-1');
+       |                     ^
+     19|   });
+     20| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

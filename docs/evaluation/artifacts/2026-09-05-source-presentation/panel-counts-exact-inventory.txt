@@ -1,0 +1,30 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/app/test/status-rungs.test.ts (4 tests | 1 failed | 3 skipped) 6ms
+   × reconstruction rung disclosure > makes a source-only review obvious and opens the exact inspector collection 6ms
+     → expected 'Source collectionNo 3D reconstruction…' to contain '51 original photographs'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:05
+   Duration  404ms (transform 40ms, setup 0ms, collect 46ms, tests 6ms, environment 97ms, prepare 34ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/status-rungs.test.ts > reconstruction rung disclosure > makes a source-only review obvious and opens the exact inspector collection
+AssertionError: expected 'Source collectionNo 3D reconstruction…' to contain '51 original photographs'
+
+Expected: "51 original photographs"
+Received: "Source collectionNo 3D reconstruction is loadedThe landscape is authored. Use the source inspector to view the original photographs.0 original photographsInspect source photographs"
+
+ ❯ packages/app/test/status-rungs.test.ts:15:32
+     13|     const notice = status.querySelector('.reconstruction-availability'…
+     14|     expect(notice.textContent).toContain('No 3D reconstruction is load…
+     15|     expect(notice.textContent).toContain('51 original photographs');
+       |                                ^
+     16|     expect(notice.textContent).toContain('landscape is authored');
+     17|     notice.querySelector('button')!.click();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

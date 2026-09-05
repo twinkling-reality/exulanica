@@ -1,0 +1,58 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts (4 tests | 1 failed | 3 skipped) 12ms
+   × source presentation boundary > omits every source grove island in inspection while preserving authoritative scene and topology 12ms
+     → expected [ { …(10) } ] to deeply equal []
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:33:59
+   Duration  684ms (transform 172ms, setup 0ms, collect 440ms, tests 12ms, environment 0ms, prepare 42ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-presentation.test.ts > source presentation boundary > omits every source grove island in inspection while preserving authoritative scene and topology
+AssertionError: expected [ { …(10) } ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   Object {
++     "anchors": Array [],
++     "createdAt": 0,
++     "creationOrdinal": 0,
++     "footprintRadiusLocal": 7,
++     "islandId": "reference-source",
++     "layoutEntities": Set {},
++     "placement": Object {
++       "position": Object {
++         "x": 12,
++         "y": 0,
++         "z": -4,
++       },
++       "scale": 1.2,
++       "yaw": 0.35,
++     },
++     "rung": 4,
++     "scaleIsMetric": false,
++     "viewpointLocal": Object {
++       "x": 0,
++       "y": 1.6,
++       "z": 0,
++     },
++   },
++ ]
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts:23:32
+     21|     const topologyBefore = composeAtlasWorld(scene, { availableReconst…
+     22|     const groveInput = sourceGroveScene(scene, available, 'inspection'…
+     23|     expect(groveInput.islands).toEqual([]);
+       |                                ^
+     24|     expect(groveInput).not.toBe(scene);
+     25|     expect(scene.islands).toEqual([island]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

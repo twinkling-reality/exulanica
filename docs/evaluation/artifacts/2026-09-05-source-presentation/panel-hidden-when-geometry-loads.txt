@@ -1,0 +1,55 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/app/test/status-rungs.test.ts (4 tests | 1 failed | 3 skipped) 7ms
+   × reconstruction rung disclosure > uses the displayed substrate after load failure, preserving the recorded rung 6ms
+     → expected <section …(2)>…(4)</section> to be null
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:04
+   Duration  381ms (transform 38ms, setup 0ms, collect 43ms, tests 7ms, environment 97ms, prepare 40ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/status-rungs.test.ts > reconstruction rung disclosure > uses the displayed substrate after load failure, preserving the recorded rung
+AssertionError: expected <section …(2)>…(4)</section> to be null
+
+- Expected: 
+null
+
++ Received: 
+<section
+  aria-label="Reconstruction availability"
+  class="reconstruction-availability"
+>
+  <p
+    class="reconstruction-availability-kicker"
+  >
+    Source collection
+  </p>
+  <h2>
+    No 3D reconstruction is loaded
+  </h2>
+  <p>
+    The landscape is authored. Use the source inspector to view the original photographs.
+  </p>
+  <div
+    class="reconstruction-availability-collection"
+  >
+    <p>
+      3 original photographs
+    </p>
+  </div>
+</section>
+
+ ❯ packages/app/test/status-rungs.test.ts:29:98
+     27|     expect(buildStatus(input).querySelector('.reconstruction-availabil…
+     28|     expect(buildStatus({ ...input, reconstructionScenes: [{ ...scene,
+     29|       renderingSubstrate: 'gaussian_splats' }] }).querySelector('.reco…
+       |                                                                                                  ^
+     30|     expect(scene.recordedRung).toBe(3);
+     31|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

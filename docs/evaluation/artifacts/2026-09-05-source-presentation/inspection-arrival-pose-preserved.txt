@@ -1,0 +1,42 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts (4 tests | 1 failed | 3 skipped) 5ms
+   × source presentation boundary > preserves the entire validated arrival pose when the source is inspector-only 4ms
+     → expected { …(3) } to be { …(3) } // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:02
+   Duration  682ms (transform 182ms, setup 0ms, collect 453ms, tests 5ms, environment 0ms, prepare 38ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-presentation.test.ts > source presentation boundary > preserves the entire validated arrival pose when the source is inspector-only
+AssertionError: expected { …(3) } to be { …(3) } // Object.is equality
+
+- Expected
++ Received
+
+  Object {
+-   "pitch": -0.12,
++   "pitch": 0.33482895727523015,
+    "position": Object {
+      "x": 10,
+      "y": 1.62,
+      "z": 1,
+    },
+-   "yaw": 0.4,
++   "yaw": -0.0023925743504120247,
+  }
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts:53:67
+     51|   it('preserves the entire validated arrival pose when the source is i…
+     52|     const arrival = { position: atlasVec3(10, 1.62, 1), yaw: 0.4, pitc…
+     53|     expect(sourceFirstArrivalPose(island, arrival, 'inspection')).toBe…
+       |                                                                   ^
+     54|     expect(sourceFirstArrivalPose(island, arrival).position).toBe(arri…
+     55|     expect(sourceFirstArrivalPose(island, arrival).pitch).not.toBe(arr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

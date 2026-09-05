@@ -1,0 +1,476 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.atlas-source-presentation-correction/v1",
+    "date": "2026-09-05",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-retained-reference-progress.json",
+      "record_sha256": "5a2d08ec810f5a980720e915f5c082bc213219c9c0843dc8293ef38126ca6b98"
+    },
+    "requested_objective_complete": false,
+    "strong_reconstructed_baseline_established": false,
+    "user_observation": "A bowl photograph appeared to float in the review instance. It was the existing world-presentation source veil (a flat photograph with softened, animated edges), not reconstructed geometry; misleading for reconstruction review.",
+    "correction": {
+      "boundary": "sourcePresentation: 'world' | 'inspection' is one renderer input on AtlasBinding and mountAtlas. Ordinary Atlas defaults to world and is unchanged.",
+      "inspection_behavior": "Omits every source veil and its startup/arrival camera targeting; authoritative scene, topology, source authorization and the original-photo inspector are unchanged. The app shows a prominent \"No 3D reconstruction is loaded\" panel counting the exact inspector inventory, hidden while the inspector is open, in Index or Map, and as soon as any scene renders point maps or Gaussians.",
+      "selection": "scripts/reference_instance.py web sets VITE_EXULANICA_SOURCE_PRESENTATION=inspection; the launcher strips inherited VITE_EXULANICA_* variables so the setting cannot leak in from the environment.",
+      "panel_meaning": "An honest unavailable state. It is not reconstruction progress, a receipt, or a rung change."
+    },
+    "implementation_commit": "3fe0a15014501c3557aa5342300777382562e5c9",
+    "implementation_commit_subject": "Keep review-instance photographs in the inspector instead of world-space veils",
+    "unrelated_work_excluded": "README, demo runbook, frontier roadmap, web README, app/bakeoff/landing index.html, favicon and brand-icon files, assets/, scripts/generate_brand_icons.py and public/ icon files were left unstaged.",
+    "verification": {
+      "web_check": {
+        "command": "pnpm run typecheck && pnpm run boundaries && pnpm run test (in web/)",
+        "test_files": 96,
+        "passed": 724,
+        "typecheck": "passed",
+        "package_boundaries": "passed",
+        "log": {
+          "path": ".exulanica/reference-baseline/source-presentation-check-final.log",
+          "sha256": "0322b15a498e91098f3d0e4ecc03b7ca29eb0ef80b1850f7d5e5cc09816799f7",
+          "byte_size": 7229
+        },
+        "new_tests": "status-rungs: 3 added (panel content and exact collection, substrate-driven hiding, world default and no invented originals); source-presentation: 4 added (veil omission with intact topology, world default, startup pitch, arrival pose)."
+      },
+      "app_build": {
+        "command": "pnpm --filter @exulanica/app build",
+        "result": "passed; existing bundle exceeds 500 kB warning remains",
+        "log": {
+          "path": ".exulanica/reference-baseline/source-presentation-app-build.log",
+          "sha256": "1ca482a7c22fc9434706e4afa07745282fb49a3b24967550526db4a3d44778ac",
+          "byte_size": 944
+        }
+      },
+      "python_lint": "ruff check scripts/reference_instance.py passed",
+      "mutation_controls": {
+        "execution": "Isolated copy of every frontend package with symlinked dependencies; passing baseline of app and atlas-react suites, each production mutation reverted before the next, restored focused suites passed; working tree untouched; no database.",
+        "harness": {
+          "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/executed-controls.py.txt",
+          "sha256": "e1fef3c5afeeb8be323083054d844bf8a9bc3d2033d513bc5dd7ba5754703080",
+          "byte_size": 4987
+        },
+        "baseline": {
+          "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/baseline.txt",
+          "sha256": "bb134f2151f6f9e395653823ea6ab17974a473d4021a433eb7e56b5c75e85ce1",
+          "byte_size": 3558,
+          "exit_code": 0
+        },
+        "restored": {
+          "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/restored.txt",
+          "sha256": "8f2697948a1032e110cb1dfaf8cd7b83c7f81200a38a8eae54a4f6ee731c18c6",
+          "byte_size": 434,
+          "exit_code": 0
+        },
+        "controls": [
+          {
+            "name": "inspection-omits-veils",
+            "production_file": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+            "source_sha256_in_isolated_copy": "1d5c2f8f1255c427ad46065b3c2033791b20368959aa228e56886b5b82271ecb",
+            "test": "web/packages/atlas-react/test/source-presentation.test.ts",
+            "test_filter": "omits every source grove island",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected [ { \u2026(10) } ] to deeply equal []",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/inspection-omits-veils.txt",
+              "sha256": "5e360a3a34f69df916a47ad748592e9cc3fc7d174e1316703a6c4db9de9c702a",
+              "byte_size": 1987
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "world-default-preserved",
+            "production_file": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+            "source_sha256_in_isolated_copy": "1d5c2f8f1255c427ad46065b3c2033791b20368959aa228e56886b5b82271ecb",
+            "test": "web/packages/atlas-react/test/source-presentation.test.ts",
+            "test_filter": "keeps ordinary world presentation",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected [] to deeply equal [ { \u2026(10) } ]",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/world-default-preserved.txt",
+              "sha256": "b0e7b0f69cc445692543703f504b0011e755586124d1dde6661490e039ff559d",
+              "byte_size": 2013
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "inspection-no-upward-pitch",
+            "production_file": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+            "source_sha256_in_isolated_copy": "1d5c2f8f1255c427ad46065b3c2033791b20368959aa228e56886b5b82271ecb",
+            "test": "web/packages/atlas-react/test/source-presentation.test.ts",
+            "test_filter": "stops aiming upward",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected 0.22665697451815742 to be -0.085 // Object.is equality",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/inspection-no-upward-pitch.txt",
+              "sha256": "f223995d6af0f2fb26d31cffa9e32bbef964120c8103a6d6023939f3bcbb7271",
+              "byte_size": 1379
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "inspection-arrival-pose-preserved",
+            "production_file": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+            "source_sha256_in_isolated_copy": "1d5c2f8f1255c427ad46065b3c2033791b20368959aa228e56886b5b82271ecb",
+            "test": "web/packages/atlas-react/test/source-presentation.test.ts",
+            "test_filter": "preserves the entire validated arrival pose",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected { \u2026(3) } to be { \u2026(3) } // Object.is equality",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/inspection-arrival-pose-preserved.txt",
+              "sha256": "c2b75425223e8959327948e41e487d144fee1076d2302b6aefae13e6cd65bac7",
+              "byte_size": 1764
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "panel-only-in-inspection",
+            "production_file": "web/packages/app/src/ui/status.ts",
+            "source_sha256_in_isolated_copy": "30cf7ed5a896c324e8ab0f1143f7c950a1bb52f8ef05589048d754609c7916fb",
+            "test": "web/packages/app/test/status-rungs.test.ts",
+            "test_filter": "leaves ordinary world presentation unchanged",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "TypeError: Cannot read properties of undefined (reading 'collections')",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/panel-only-in-inspection.txt",
+              "sha256": "f12505c26db5dcca6f5059a7442d62dffdff9e16e6ddc61de18f9b5235c69280",
+              "byte_size": 1438
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "panel-hidden-when-geometry-loads",
+            "production_file": "web/packages/app/src/ui/status.ts",
+            "source_sha256_in_isolated_copy": "30cf7ed5a896c324e8ab0f1143f7c950a1bb52f8ef05589048d754609c7916fb",
+            "test": "web/packages/app/test/status-rungs.test.ts",
+            "test_filter": "uses the displayed substrate after load failure",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected <section \u2026(2)>\u2026(4)</section> to be null",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/panel-hidden-when-geometry-loads.txt",
+              "sha256": "1c6e7a444dfa255815a3eeaa6eb0d45c0dd78af863668e222dafcc30161fbef5",
+              "byte_size": 1904
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "panel-counts-exact-inventory",
+            "production_file": "web/packages/app/src/ui/status.ts",
+            "source_sha256_in_isolated_copy": "30cf7ed5a896c324e8ab0f1143f7c950a1bb52f8ef05589048d754609c7916fb",
+            "test": "web/packages/app/test/status-rungs.test.ts",
+            "test_filter": "makes a source-only review obvious",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected 'Source collectionNo 3D reconstruction\u2026' to contain '51 original photographs'",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/panel-counts-exact-inventory.txt",
+              "sha256": "b7933e08459c63a32bbe36dc6992a096db8ec5f7083231d7782c51fcf16819bf",
+              "byte_size": 1710
+            },
+            "log_representation": "complete captured output"
+          },
+          {
+            "name": "panel-opens-exact-collection",
+            "production_file": "web/packages/app/src/ui/status.ts",
+            "source_sha256_in_isolated_copy": "30cf7ed5a896c324e8ab0f1143f7c950a1bb52f8ef05589048d754609c7916fb",
+            "test": "web/packages/app/test/status-rungs.test.ts",
+            "test_filter": "makes a source-only review obvious",
+            "exit_code": 1,
+            "observed_failure": true,
+            "observed_assertion": "AssertionError: expected \"spy\" to be called with arguments: [ 'region-1' ]",
+            "log": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/panel-opens-exact-collection.txt",
+              "sha256": "2838956dec96a56c3f0258ef5c9533918b59e1ec54944ca5a4608e24b8384c38",
+              "byte_size": 1322
+            },
+            "log_representation": "complete captured output"
+          }
+        ]
+      },
+      "browser_captures": {
+        "method": "Fresh headless Chrome 152 over the DevTools protocol, 1280 x 720 CSS pixels, deviceScaleFactor 1, SwiftShader WebGL; waits for the Atlas mount, clicks the panel button, advances one photograph, returns; records console errors.",
+        "script": {
+          "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/capture-evidence.mjs.txt",
+          "sha256": "645467931bda1e499b503b0fbd2876bf9feaac436963a479dd83fdf063684f4f",
+          "byte_size": 8393
+        },
+        "scope": "Source-only fallback UX in the inspection presentation. No reconstructed surface, trained scene, held-out score or GPU rendering is shown or claimed.",
+        "instances": [
+          {
+            "label": "bowl",
+            "url": "http://127.0.0.1:5180/",
+            "renderer": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+            "atlas_mount_ms": 4642,
+            "total_ms": 13188,
+            "console_errors": 0,
+            "console_warnings": 0,
+            "checks": {
+              "arrival_panel_visible": true,
+              "arrival_inspector_hidden": true,
+              "inspector_opened_with_photograph": true,
+              "inspector_titled_source_photographs": true,
+              "inspector_view_count": 51,
+              "second_photograph_loaded": true,
+              "return_hides_inspector": true,
+              "return_restores_panel": true
+            },
+            "summary_file": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/bowl-capture.json",
+              "sha256": "705e45610159521b12aef1b2962dac3fd624f2bd23fcd85f34faea659aa03264",
+              "byte_size": 4723
+            },
+            "images": [
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/bowl-world-arrival.jpg",
+                "sha256": "db0d9a4df19e9303ea21e43bf61c0dc11bdec473e4d6f64576c3a3cd97ad9fe7",
+                "byte_size": 63239,
+                "state": "world-arrival",
+                "panel_visible": true,
+                "inspector_hidden": true,
+                "inspector_view_count": 0,
+                "status_summaries": [
+                  "40 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/bowl-source-inspector.jpg",
+                "sha256": "b4e07f6c64c743e099aff49b81280554422d8e9f315b9dcd76d6be47849b9eec",
+                "byte_size": 89449,
+                "state": "source-inspector",
+                "panel_visible": false,
+                "inspector_hidden": false,
+                "inspector_view_count": 51,
+                "status_summaries": [
+                  "40 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/bowl-source-inspector-second.jpg",
+                "sha256": "d0f4e15543927c5f45dc84ec869ba665ec561e54e1117afd52af5d453693d17c",
+                "byte_size": 89776,
+                "state": "source-inspector-second",
+                "panel_visible": false,
+                "inspector_hidden": false,
+                "inspector_view_count": 51,
+                "status_summaries": [
+                  "40 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/bowl-world-after-return.jpg",
+                "sha256": "3ffd13cc3697dc7e970c712da2cbee44a34a6dfe9397b4a9eb12ff49a2991cdd",
+                "byte_size": 63398,
+                "state": "world-after-return",
+                "panel_visible": true,
+                "inspector_hidden": true,
+                "inspector_view_count": 51,
+                "status_summaries": [
+                  "40 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              }
+            ]
+          },
+          {
+            "label": "volcanic",
+            "url": "http://127.0.0.1:5181/",
+            "renderer": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+            "atlas_mount_ms": 5996,
+            "total_ms": 14399,
+            "console_errors": 0,
+            "console_warnings": 0,
+            "checks": {
+              "arrival_panel_visible": true,
+              "arrival_inspector_hidden": true,
+              "inspector_opened_with_photograph": true,
+              "inspector_titled_source_photographs": true,
+              "inspector_view_count": 210,
+              "second_photograph_loaded": true,
+              "return_hides_inspector": true,
+              "return_restores_panel": true
+            },
+            "summary_file": {
+              "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-capture.json",
+              "sha256": "5624e530981e5b7e4c0c584bf36f7c6a460a59b37fa4f3db0e43f73b74fa70b9",
+              "byte_size": 4755
+            },
+            "images": [
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-world-arrival.jpg",
+                "sha256": "a3822e7cd9428d016a829308a19048063540a3eb8c4940f968048a926d408bc4",
+                "byte_size": 63274,
+                "state": "world-arrival",
+                "panel_visible": true,
+                "inspector_hidden": true,
+                "inspector_view_count": 0,
+                "status_summaries": [
+                  "210 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-source-inspector.jpg",
+                "sha256": "ab6ebd7fc7b76e2faecf64eca0eceac8d0f5d16f15ea709a5cf7ca3900f1ec93",
+                "byte_size": 80589,
+                "state": "source-inspector",
+                "panel_visible": false,
+                "inspector_hidden": false,
+                "inspector_view_count": 210,
+                "status_summaries": [
+                  "210 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-source-inspector-second.jpg",
+                "sha256": "59f74ac9b019cebfbc9f9cd16124fcd74030546099bd26b14e7b410783c142cc",
+                "byte_size": 81024,
+                "state": "source-inspector-second",
+                "panel_visible": false,
+                "inspector_hidden": false,
+                "inspector_view_count": 210,
+                "status_summaries": [
+                  "210 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              },
+              {
+                "path": "docs/evaluation/artifacts/2026-09-05-source-presentation/volcanic-world-after-return.jpg",
+                "sha256": "5229e4c861064a7c535613572a69159709cabc47913b926b312882babbb6c490",
+                "byte_size": 63528,
+                "state": "world-after-return",
+                "panel_visible": true,
+                "inspector_hidden": true,
+                "inspector_view_count": 210,
+                "status_summaries": [
+                  "210 grouped photographs \u00b7 reconstruction unavailable"
+                ],
+                "status_warnings": []
+              }
+            ]
+          }
+        ]
+      },
+      "live_browser_observation": {
+        "browser": "Interactive Google Chrome 152 on the same host, viewport 3822 x 1502 CSS pixels at devicePixelRatio 0.9 (window resize to 1280 x 720 was not honoured), not retained as a file.",
+        "bowl": "Arrival shows the authored landscape, the panel with 51 original photographs, footer \"40 grouped photographs \u00b7 reconstruction unavailable\", no photo veil. The panel button opened the inspector titled Source photographs with 51 options and a loaded 3060 x 4080 original; Return to Atlas hid the inspector and kept world/ground state. Zero console errors or exceptions after reload.",
+        "volcanic": "Arrival shows the panel with 210 original photographs and footer \"210 grouped photographs \u00b7 reconstruction unavailable\". The inspector opened with 210 options and a loaded 4272 x 2848 original while the panel computed display none; Return to Atlas hid the inspector and restored the panel."
+      },
+      "retained_state_audit": {
+        "profile": "exulanica.digest-bound-record/v1",
+        "record": {
+          "profile": "exulanica.retained-source-state/v1",
+          "database": "postgresql://localhost:5433/exulanica_spine_test",
+          "read_only": true,
+          "scenes": {
+            "bowl": {
+              "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+              "source_manifest_sha256": "2cdc34bd0387e957d2e1d65fd8fae100b617be0e5d6cc577f4cfd3845f28e989",
+              "verified_original_count": 51,
+              "verified_original_bytes": 126046395,
+              "database_counts": {
+                "capture": 51,
+                "capture_reconstruction_authorization": 0,
+                "reconstruction_privacy_screening": 0,
+                "reconstruction_scene": 0,
+                "reconstruction_scene_job": 0
+              }
+            },
+            "volcanic": {
+              "workspace_id": "79004d44-ca24-4d17-9eef-56786415e233",
+              "source_manifest_sha256": "02a38f2ebab1815abbb5ecb86c6292969c4720f6c1c5680f5522e681819349ed",
+              "verified_original_count": 210,
+              "verified_original_bytes": 614030051,
+              "database_counts": {
+                "capture": 210,
+                "capture_reconstruction_authorization": 0,
+                "reconstruction_privacy_screening": 0,
+                "reconstruction_scene": 0,
+                "reconstruction_scene_job": 0
+              }
+            }
+          }
+        },
+        "record_sha256": "2088a85140eed175212d1f70e783a6f7a375dc5a7ba10c19f818ff52a84f9311",
+        "note": "Read-only role; written to a new file so the earlier audit file stays historical."
+      }
+    },
+    "observations": [
+      "The two counts differ by design: the footer counts metadata group membership (bowl 40) while the panel and inspector count the authorized exact inventory (bowl 51); both are disclosed in the workflow document.",
+      "At the 1280 x 720 start pose the fixed panel overlaps the authored Companion pillar behind it; the pillar is authored world geometry, not reconstruction, and the overlap is cosmetic.",
+      "Headless captures use SwiftShader, so their pixels are not GPU-rendered evidence; the interactive Chrome session confirmed the same DOM states on the GPU-rendered page."
+    ],
+    "unchanged_limitations": [
+      "No reconstruction job, scene, trained asset or human screening receipt exists in either retained workspace.",
+      "No CUDA host or spending cap has been supplied; GPU balance and limit remain unknown, not zero.",
+      "No held-out score, walkthrough, traversal performance or physical-scale validation exists; the recorded rung is unchanged."
+    ],
+    "source_code_bindings": [
+      {
+        "path": "scripts/reference_instance.py",
+        "sha256": "a064f7fd6925b6cab402a22d733505c6b2493ceb8004b83eba10aa3640a3dc8b",
+        "byte_size": 5298
+      },
+      {
+        "path": "web/packages/app/src/atlas.ts",
+        "sha256": "2fb69faa973fa249fd941a1722c4bf84315dda12c720da089eb814ae18ed8818",
+        "byte_size": 6172
+      },
+      {
+        "path": "web/packages/app/src/config.ts",
+        "sha256": "c459484859a170b300d54619d022ac47f5f3ec7c95e4b79407f0bf92f6f3ce20",
+        "byte_size": 3663
+      },
+      {
+        "path": "web/packages/app/src/main.ts",
+        "sha256": "b864a6b9e40b9e76bf0cfd6c916dbeb72619f61aad5e4377d7d48a8d7b5531cb",
+        "byte_size": 79359
+      },
+      {
+        "path": "web/packages/app/src/style.css",
+        "sha256": "630d1147045fac5caaeaea717d76b090630dee3a0e57e9948f2f223439d6855f",
+        "byte_size": 73393
+      },
+      {
+        "path": "web/packages/app/src/ui/status.ts",
+        "sha256": "30cf7ed5a896c324e8ab0f1143f7c950a1bb52f8ef05589048d754609c7916fb",
+        "byte_size": 6873
+      },
+      {
+        "path": "web/packages/app/test/status-rungs.test.ts",
+        "sha256": "d3465adfa6037d1aadd922b825a16529dc24139c4b53b1bb200051ee44ff51ce",
+        "byte_size": 3604
+      },
+      {
+        "path": "web/packages/atlas-react/src/playcanvas/atlas-binding.ts",
+        "sha256": "1d5c2f8f1255c427ad46065b3c2033791b20368959aa228e56886b5b82271ecb",
+        "byte_size": 62494
+      },
+      {
+        "path": "web/packages/atlas-react/test/source-presentation.test.ts",
+        "sha256": "8874b2629f33eca94332364c86c0f0eed35873a819460bd25f59fb3f4bbe30e2",
+        "byte_size": 3009
+      },
+      {
+        "path": "docs/retained-reference-workflow.md",
+        "sha256": "c7e5898486074d201cb62a5aaf282d9a6178c23af37055c6dd6cd43d4702f8ca",
+        "byte_size": 17898
+      },
+      {
+        "path": "docs/atlas-reconstruction-inspection.md",
+        "sha256": "7994388af6932be3b488bb0182fdee18bfd9a476d9185461f1fc6f1293c5cef1",
+        "byte_size": 6863
+      }
+    ]
+  },
+  "record_sha256": "e65d1b51c3dace4246288ceff4b379f62d2abb58c69b255578d819fd8b63053f"
+}

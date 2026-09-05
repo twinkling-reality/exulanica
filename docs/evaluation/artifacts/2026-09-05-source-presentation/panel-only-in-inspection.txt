@@ -1,0 +1,27 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-source-presentation-controls-qwhrcjgo
+
+ ❯ packages/app/test/status-rungs.test.ts (4 tests | 1 failed | 3 skipped) 3ms
+   × reconstruction rung disclosure > leaves ordinary world presentation unchanged and never invents missing originals 3ms
+     → Cannot read properties of undefined (reading 'collections')
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 skipped (4)
+   Start at  12:34:03
+   Duration  383ms (transform 38ms, setup 0ms, collect 43ms, tests 3ms, environment 96ms, prepare 32ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/status-rungs.test.ts > reconstruction rung disclosure > leaves ordinary world presentation unchanged and never invents missing originals
+TypeError: Cannot read properties of undefined (reading 'collections')
+ ❯ Module.buildStatus packages/app/src/ui/status.ts:57:52
+     55|     && !(input.reconstructionScenes ?? []).some((scene) => scene.rende…
+     56|   if (sourceOnly) {
+     57|     const collections = input.reconstructionFocus!.collections.filter(…
+       |                                                    ^
+     58|     const notice = el('section', { class: 'reconstruction-availability…
+     59|     notice.append(
+ ❯ packages/app/test/status-rungs.test.ts:35:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
