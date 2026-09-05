@@ -17,6 +17,10 @@ return the identical code." That is not achieved by a check in this module; it i
 query being scoped to the caller's workspace under row-level security, so a foreign span is
 simply not there. The two cases share a code because they share a code path.
 
+**Withdrawal is checked before bytes are read.** A committed capture, interval or workspace
+withdrawal returns 410 even while purge is pending. The canonical address predicate preserves
+ordinary deliberate reimport and workspace isolation; shared stored bytes do not override it.
+
 **Range requests are supported**, because the original of a photograph is a few megabytes and a
 citation deep link should not have to transfer all of it to show the top of it. The
 implementation is deliberately the boring one: a single byte range, a 206 with ``Content-Range``,
@@ -90,7 +94,7 @@ def region(
     return Response(
         content=buffer.getvalue(),
         media_type="image/png",
-        headers={"Cache-Control": "private, max-age=3600", **clock},
+        headers={"Cache-Control": "private, no-store", **clock},
     )
 
 
@@ -118,7 +122,10 @@ def by_uri(
         ) from exc
 
     row = connection.execute(
-        "select b.media_type from evidence_span s join blob b on b.blob_sha256 = s.blob_sha256 "
+        "select b.media_type, "
+        "tombstone_blocks_span(s.workspace_id, s.blob_sha256, s.track_key, "
+        "s.t_start_ns, s.t_end_ns) as withdrawn "
+        "from evidence_span s join blob b on b.blob_sha256 = s.blob_sha256 "
         "where s.workspace_id = %s and s.span_digest = %s",
         (session.workspace_id, address.span_digest),
     ).fetchone()
@@ -126,6 +133,11 @@ def by_uri(
         # The same 404 a nonexistent span gets. A permalink for a span in another workspace and
         # a permalink for a span that never existed are indistinguishable from out here.
         raise HTTPException(status_code=404, detail="no such evidence")
+    if row["withdrawn"]:
+        raise HTTPException(
+            status_code=410, detail="evidence was withdrawn",
+            headers={"Cache-Control": "private, no-store"},
+        )
     data = resolve_original_bytes(address, get_services(request).store)
     return _ranged(
         data, row["media_type"], range_header, _evidence_headers(str(address.modality))
@@ -143,7 +155,9 @@ def _address(
     and serving the bytes anyway would hide it.
     """
     row = connection.execute(
-        "select s.*, b.media_type, a.utc_instant, a.uncertainty_ms, a.source "
+        "select s.*, b.media_type, a.utc_instant, a.uncertainty_ms, a.source, "
+        "tombstone_blocks_span(s.workspace_id, s.blob_sha256, s.track_key, "
+        "s.t_start_ns, s.t_end_ns) as withdrawn "
         "from evidence_span s "
         "join blob b on b.blob_sha256 = s.blob_sha256 "
         "left join media_track t on t.blob_sha256 = s.blob_sha256 and t.track_key = s.track_key "
@@ -153,6 +167,11 @@ def _address(
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="no such evidence")
+    if row["withdrawn"]:
+        raise HTTPException(
+            status_code=410, detail="evidence was withdrawn",
+            headers={"Cache-Control": "private, no-store"},
+        )
     # No `except` here, and the absence is the point. `address_from_span_row` raises
     # IntegrityError when the row no longer hashes to its stored digest, and InvalidAddressError
     # when the row is not a well formed address at all. Both are integrity failures about every
@@ -191,9 +210,9 @@ def _ranged(
     total = len(data)
     common = {
         "Accept-Ranges": "bytes",
-        # Private: this is somebody's photograph. A shared cache holding it would be a copy of
-        # the corpus in a place the deletion path cannot reach.
-        "Cache-Control": "private, max-age=3600",
+        # Every new request must observe current withdrawal state; neither shared caches nor
+        # a one-hour private freshness window may bypass the evidence boundary.
+        "Cache-Control": "private, no-store",
         **(extra or {}),
     }
     if not range_header:

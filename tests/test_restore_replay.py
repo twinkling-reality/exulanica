@@ -174,7 +174,7 @@ def test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates(pur
     with TestClient(app) as client:
         assert client.get("/graph", headers=headers).json()["occurrences"] == []
         for span in spans:
-            assert client.get(f"/evidence/{span['span_id']}", headers=headers).status_code == 404
+            assert client.get(f"/evidence/{span['span_id']}", headers=headers).status_code == 410
     receipt = purged.rows("select * from restore_replay_receipt")[0]
     assert receipt["restore_id"] == attempt and receipt["checkpoint_sha256"] == digest
     assert receipt["tombstone_count"] == 1
