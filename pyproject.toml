@@ -167,6 +167,11 @@ allow-direct-references = true
 # The ML stack lags Python 3.14 (the system interpreter here), so the interpreter is pinned
 # rather than merely lower-bounded. .python-version holds the concrete pin for `uv run`.
 package = true
+# uv rebuilds this project's own wheel only when a cache key changes, and its default watches
+# pyproject.toml alone. MEASURED 2026-09-05 building the scene worker image: the uv cache mount
+# survived from an earlier build, COPY had updated the package, and the image still installed the
+# older wheel, so a committed fix was absent from the running worker. The sources are the key.
+cache-keys = [{ file = "pyproject.toml" }, { file = "exulanica/**/*.py" }]
 # Every package in the lock must have a wheel for both platforms the depth stage runs on, or
 # `uv lock` fails here rather than `uv sync` failing on the other machine. Without this uv is
 # satisfied by any one wheel per package, which is how a lock carrying a Linux-only torch passed

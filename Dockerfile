@@ -39,8 +39,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ModuleNotFoundError at start. `tests/test_deployment.py` asserts this COPY exists.
 COPY pyproject.toml uv.lock LICENSE THIRD_PARTY_NOTICES.md ./
 COPY exulanica ./exulanica
+# The project wheel is rebuilt unconditionally: a cache mount that outlives the previous build must
+# never let an older wheel of this package shadow the sources COPYed just above.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable ${EXULANICA_SYNC_EXTRAS}
+    uv sync --locked --no-dev --no-editable --reinstall-package exulanica ${EXULANICA_SYNC_EXTRAS}
 
 FROM python:3.11-slim-trixie AS runtime
 LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exulanica"

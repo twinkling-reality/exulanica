@@ -67,6 +67,24 @@ def test_the_image_installs_the_package_it_claims_to_run():
     )
 
 
+def test_the_image_never_installs_a_stale_wheel_of_its_own_package():
+    """A surviving uv cache mount reused an older project wheel after COPY changed the sources.
+
+    Observed 2026-09-05 on the reference scene worker image: the container ran code from the
+    previous commit. Two guards, either sufficient alone: the sources are part of uv's cache key
+    for this project, and the installing sync reinstalls the package regardless.
+    """
+    keys = re.search(r"^cache-keys\s*=\s*\[(.*)\]", PYPROJECT, re.MULTILINE)
+    assert keys is not None, "pyproject declares no uv cache-keys, so source edits do not rebuild"
+    assert 'file = "exulanica/**/*.py"' in keys.group(1)
+    installing = [
+        line
+        for line in DOCKERFILE.splitlines()
+        if "uv sync" in line and "--no-install-project" not in line
+    ]
+    assert installing and all("--reinstall-package exulanica" in line for line in installing)
+
+
 def test_the_command_the_image_runs_can_actually_be_imported():
     """The CMD names a factory by string, so a rename anywhere else leaves it pointing at air."""
     import importlib
