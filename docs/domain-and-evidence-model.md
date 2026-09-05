@@ -14,6 +14,9 @@ Label convention is the one in [README.md](README.md):
 - **DECISION** records a choice and the strongest alternative rejected.
 - **ASSUMPTION** is unvalidated and names the experiment that settles it.
 - **OPEN** is unresolved. Nothing marked OPEN may be relied on.
+- **CLOSED** marks an item that was OPEN and no longer is. Each one names the ADR that settled it,
+  the artefact that enforces it, and the test that fails when it is violated. A decision recorded
+  only in prose is not CLOSED.
 - **CORRECTED** marks a claim that was wrong in an earlier version of this document and has been
   rewritten against what was actually built. Each one names the artefact and the test.
 
@@ -339,10 +342,21 @@ constraint in `0034_ocr_is_a_region_not_a_transcript.sql`. No span carries it, s
 A text-anchored OCR artifact, if one is ever genuinely needed, takes its own additive modality value
 rather than reusing this one.
 
-**OPEN.** Whether the corpus contains motion photographs or bursts (image containers holding a real
-video track) is not established. If it does, those files carry a genuine `v:0` track with genuine PTS
-alongside the `img` track, and the general video path applies to them unchanged. This is an inspection
-of the corpus, not a design question.
+**CLOSED 2026-09-04 by refusing, not by inspecting.** Whether the corpus contains motion photographs
+or bursts is still unestablished, and it no longer has to be established before ingest, because a
+container holding more than one frame is now **refused** by `exulanica/ingest/decode.py`, at the
+header probe and again at the decode.
+
+The alternative was worse than it looked. Nothing checked frame count, so an animated GIF, a
+multi-frame WebP or a motion photograph would have been ingested as its **first frame**, under a
+`capture` whose EXIF and `pixel_size_is` describe the whole file, with every span addressed at `img`
+on a blob whose other frames nothing can cite. That is wrong evidence rather than missing evidence.
+
+The refusal names the video path rather than calling the file corrupt, because an operator told
+"unreadable" will re-export and try again. Those files carry a genuine `v:0` track with genuine PTS
+alongside the `img` track and the general video path applies to them unchanged, which is what the
+video-ingest gate in the readiness report exists to open. Pinned by
+`tests/test_ingest_preconditions.py`.
 
 ### 1.6 The five citation kinds
 
@@ -1823,7 +1837,7 @@ timebase item specifically at first video ingest.
 | Tick to ns to tick is not the identity | **CLOSED 2026-09-04** | Both formulas produce values that go into the digest | Corrected, not carried: `ns_from_ticks` rounds up, the round trip is exact on every representable timebase, and it cost nothing because the conversion had no callers and no video or audio track had ever been written. ADR-0015, section 1.4 |
 | The region encoding: parts per million on a `[0, 1_000_000]` integer grid | **CLOSED 2026-09-04** | `region` is a digest input, and a float has no canonical rendering that two implementations agree on. Changing the grid changes every region digest | Ratified as it stands by [adr/0013-region-encoding.md](adr/0013-region-encoding.md), and now enforced by `evidence_span_region_shape` in `0033_span_digest_input_shape.sql` rather than described in a comment. Nine malformed tuples are refused by `tests/test_span_digest_input_shape.py` |
 | The digest encodings: lowercase hex for `blob_sha256`, absent keys rather than nulls, `prefix` and `suffix` excluded from `text_anchor` | **CLOSED 2026-09-04** | They are the difference between a digest that reproduces and one that does not | Ratified by [adr/0014-digest-encodings.md](adr/0014-digest-encodings.md) against a second implementation: `scripts/verify_canonical_conformance.mjs` reproduces the exact canonical bytes and digest of all seven vectors in `tests/vectors/span_digest_v1.json` outside Python. The algorithm is identified by `span_format_version`, which is itself inside the digest input |
-| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | If it does, those files carry a genuine `v:0` track with genuine PTS, which makes the timebase items above live immediately rather than dormant | Inspection of the corpus, not a design question. The general video path applies to them unchanged |
+| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **CLOSED 2026-09-04** | If one were ingested it would be stored as its first frame under a capture describing the whole file, and every span would address `img` on a blob whose other frames nothing can cite | Closed by refusing rather than by inspecting: `exulanica/ingest/decode.py` refuses any container holding more than one frame, at the header probe and at the decode, with a message naming the video path |
 
 ### 9.2 Everything else
 
@@ -1831,7 +1845,7 @@ timebase item specifically at first video ingest.
 | --- | --- | --- |
 | EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **CLOSED 2026-09-04** | Pixels are normalised at ingest and the normalisation is recorded. ADR-0004, ADR-0012, section 9.1 |
 | Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **CLOSED 2026-09-04** | Neither: OCR text is a `frame_region` span with an `ocr_text_is` assertion. ADR-0016, section 9.1 |
-| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | Inspection of the corpus. If it does, those files carry a genuine `v:0` track and the general video path applies unchanged |
+| Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **CLOSED 2026-09-04** | Closed by refusing a multi-frame container at ingest rather than by inspecting the corpus. Section 1.5 |
 | The tie direction of `round_half_down` | **CLOSED 2026-09-04** | Ratified as ties toward zero, ADR-0015 and section 9.1 |
 | Tick to ns to tick is not the identity under the frozen formulas | **CLOSED 2026-09-04** | Corrected inside its decision window; the round trip is now exact. ADR-0015 and section 9.1 |
 | Whether migration `0001_spine.sql` applies at all | **ASSUMPTION** | `tests/test_migration.py::test_the_migration_actually_applies` against a real PostgreSQL 18 instance. It skips unless `EXULANICA_TEST_DATABASE_URL` is set, so every SQL claim here is currently a text-level claim |

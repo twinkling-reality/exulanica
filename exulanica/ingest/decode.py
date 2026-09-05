@@ -155,8 +155,36 @@ def open_upright(data: bytes) -> tuple[Image.Image, ExifFacts]:
         return extract_exif_facts(opened)
 
 
+def _single_frame(image: Image.Image) -> None:
+    """Refuse a container holding more than one frame, rather than addressing only the first.
+
+    This is the "motion photographs and bursts" item that ``docs/domain-and-evidence-model.md``
+    section 1.5 records as an inspection rather than a design question, closed by refusing.
+
+    A photograph is modelled as a single-sample ``img`` track whose interval is ``[0, 1)``. An
+    animated GIF, a multi-frame WebP or a motion photograph is not that: it carries a real
+    sequence with real presentation times, and the general video path applies to it unchanged.
+    Ingesting one today would silently keep the first frame, store a ``capture`` whose
+    ``pixel_size_is`` and EXIF describe the whole file, and address every span at ``img`` on a
+    blob whose other frames nothing can cite. The evidence would be wrong rather than missing.
+
+    So it fails closed until the video preconditions in
+    ``docs/evaluation/2026-09-04-readiness-and-architecture-audit.json`` are met. The refusal is
+    the cheap half of that gate: the expensive half is the video track path itself.
+    """
+    frames = getattr(image, "n_frames", 1)
+    if isinstance(frames, int) and frames > 1:
+        raise ValueError(
+            f"this container holds {frames} frames and a photograph is modelled as a single "
+            "sample. A motion photograph, burst or animation carries a real v:0 track with real "
+            "presentation times, and the general video path applies to it unchanged. Refusing "
+            "rather than keeping frame one and addressing it as the whole file."
+        )
+
+
 def _within_budget(image: Image.Image) -> tuple[int, int]:
     """The one comparison that enforces :data:`MAX_PIXELS`. Returns the size when it passes."""
+    _single_frame(image)
     width, height = image.size
     pixels = width * height
     if pixels > MAX_PIXELS:
