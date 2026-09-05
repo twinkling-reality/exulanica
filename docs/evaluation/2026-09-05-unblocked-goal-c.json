@@ -1,0 +1,712 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.restore-tombstone-replay-goal/v1",
+    "goal": "C",
+    "implementation_revision": "0a5cf6772e8af464d48c5d0efc680c7a37a0ef61",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-unblocked-goal-a.json",
+      "record_sha256": "2e57f73dc9d685d966abba28d6b96b2d053994fe1da25eba0e878137d7b4db98"
+    },
+    "scope": "Build and locally exercise an explicit offline restore mechanism for X-12. The result covers a complete sealed deletion checkpoint retained independently of both backups, a pending restore marker, monotonic replay, physical purge, and startup refusal. It is not a production disaster recovery rehearsal.",
+    "status": {
+      "local_offline_mechanism": "IMPLEMENTED AND TESTED",
+      "production_rehearsal": "OPEN",
+      "undeclared_or_uncheckpointed_disaster_recovery": "NOT CLAIMED",
+      "evidence_serving_follow_up": "IMPLEMENTED AND TESTED; separate ADR0022 revision"
+    },
+    "implementation_proof": {
+      "files_at_implementation_revision": [
+        {
+          "path": "exulanica/deletion/restore.py",
+          "sha256": "c15acc281ba3bc40d1f91bb079f74cec30ec2942b80264e3a884a82b2dbacecf"
+        },
+        {
+          "path": "exulanica/migrations/0036_restore_tombstone_replay.sql",
+          "sha256": "3bc94db00fda71af0c35e1dc46c4fcbf611013c6adac828d832adcfeb475b1bd"
+        },
+        {
+          "path": "exulanica/api/app.py",
+          "sha256": "38311f83fc575577d271215d660224e039d74a4358e8b25fd0727f1ce1e8f3a7"
+        },
+        {
+          "path": "exulanica/api/services.py",
+          "sha256": "134ef99862088ee9c27f3e9b862b4d8aed718e59188ef626ea841805188b85e3"
+        },
+        {
+          "path": "exulanica/db/roles.py",
+          "sha256": "141af0d1325890af21028274b56cc808e6a4d8fdb83f1b9e6a1562e9449cb452"
+        },
+        {
+          "path": "tests/test_restore_replay.py",
+          "sha256": "7232523beb0727ab1cd51d390c898a3717f05f0bcd72a2f01c0cc349616d95d2"
+        },
+        {
+          "path": "docs/adr/0019-offline-restore-tombstone-replay.md",
+          "sha256": "033e6fa84aaca5cab0a9f92c5184903af5ab9934ed0394623304748d148825a3"
+        }
+      ],
+      "source_archive_completeness": "A focused case inserts committed tombstones in two workspaces, verifies both in the checkpoint, then proves the source rejects a subsequent raw INSERT. The narrowed workspace-query production mutation fails that assertion.",
+      "independent_restore_refusal": "The test runs actual pg_dump and psql, restores old object-store bytes, verifies the old database has no tombstones or restore_control row and its old graph is populated, then verifies external pending state still refuses API startup before replay.",
+      "erasure_and_serving": "After replay the instrumented pre-backup object inventory is absent, all originally recorded span byte endpoints refuse, graph occurrences and scene groups are absent, and all affected aggregates are stale. Original tombstone identity remains. At the core C implementation revision these byte endpoints returned404 after physical purge. The separately committed ADR0022 follow-up now returns410 from the canonical withdrawal predicate even while physical bytes remain, and updates the restore assertion accordingly.",
+      "idempotence": "Repeating the same restore attempt leaves tombstone row count and complete receipt unchanged. A completed database paired with restored old object bytes is physically purged again, so prior done jobs cannot certify old bytes.",
+      "partial_failure": "An injected store failure happens after replayed tombstones commit. It leaves no new receipt, pending external state, and refusal before any derivative worker can start. A healthy retry completes.",
+      "privileges_and_isolation": "Runtime cannot INSERT/UPDATE control tables after required provisioning and cannot DELETE control, tombstone or capture rows. Purger uses the existing cross-workspace release predicate. A foreign live capture holding identical bytes stays live with its bytes intact; completion is refused.",
+      "address_binding": "An actual backup predating creation of a later hash-blocklisted capture is restored. Replay refuses the missing required capture-to-blob binding rather than falsely declaring a blocklist enforceable."
+    },
+    "counts": {
+      "what_these_are": "Executable synthetic local mechanism checks and executed mutation controls; none is retrieval, identity, detector or model accuracy.",
+      "new_focused_tests": 7,
+      "executed_negative_controls": 12,
+      "focused_regression_passed": 389,
+      "focused_regression_skipped": 0,
+      "final_restore_and_retained_record_checks_passed": 26,
+      "final_restore_and_retained_record_checks_skipped": 0,
+      "forward_migrations_added": 1,
+      "historical_migrations_rewritten": 0,
+      "scope_note": "Top-level test and mutation counts describe coreC at0a5cf67. The five evidence cases and four additional controls are reported separately in evidence_follow_up, not added to the historical389-pass invocation."
+    },
+    "verification": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "database_execution": "PostgreSQL18.6 with real schema migrations in disposable schemas; tests serialized under an exclusive database slot.",
+      "corpus": "Synthetic geometric JPEG from tests/conftest.py with scripted CountingVisionModel observations; generated temporary files only. The blocklist-binding case adds a second synthetic EXIF JPEG after backup. No real personal media and no model endpoint calls.",
+      "regression_command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest tests/test_restore_replay.py tests/test_purge.py tests/test_api.py tests/test_migration.py tests/test_row_level_security.py tests/test_ingest_preconditions.py",
+      "regression_result": "389 passed,1 existing FastAPI/Starlette deprecation warning",
+      "final_command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest tests/test_restore_replay.py tests/test_retained_evaluation_records.py",
+      "final_result": "26 passed,1 existing FastAPI/Starlette deprecation warning",
+      "ruff_passed": true,
+      "import_contracts_kept": 4,
+      "import_contracts_broken": 0,
+      "full_program_backend_and_web_gate": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+      "root_owned_historical_record_migration_test_controls": [
+        {
+          "name": "frozen-migration-checksum",
+          "production_file": "exulanica/migrations/__init__.py",
+          "test": "tests/test_migration.py::test_historical_migrations_0001_through_0035_are_byte_identical",
+          "exit_code": 1,
+          "summary": "1 failed in 0.04s",
+          "restored": true
+        },
+        {
+          "name": "historical-record-prefix",
+          "production_file": "exulanica/migrations/__init__.py",
+          "test": "tests/test_retained_evaluation_records.py::test_the_answer_records_migration_counts_describe_the_repository",
+          "exit_code": 1,
+          "summary": "1 failed in 0.09s",
+          "restored": true
+        },
+        {
+          "name": "forward-migration-transaction",
+          "production_file": "exulanica/migrations/0036_restore_tombstone_replay.sql",
+          "test": "tests/test_migration.py::test_every_migration_is_a_single_transaction_with_no_down_path[0036]",
+          "exit_code": 1,
+          "summary": "1 failed in 0.08s",
+          "restored": true
+        }
+      ]
+    },
+    "found_by_reviewing_this_goal": [
+      {
+        "finding": "PostgreSQL18 dump COPY failed in the recursive JSON-schema validator with empty search_path.",
+        "disposition": "FIXED in migration0036 and tested with the original unmodified dump/restore plus executed negative control."
+      },
+      {
+        "finding": "The default unversioned local pg_dump was14 while the server was18.",
+        "disposition": "Test prerequisite corrected to use a compatible versioned PostgreSQL18 client or EXULANICA_POSTGRES_BIN; no server substitution."
+      },
+      {
+        "finding": "A backup older than a blocklisted capture loses the capture-to-blob join needed to enforce the deletion intent.",
+        "disposition": "FIXED by refusing replay when a required interval/blocklist capture binding is absent; actual older backup restoration and negative control executed."
+      },
+      {
+        "finding": "Shared content legitimately retained by another live workspace cannot satisfy complete physical-erasure replay.",
+        "disposition": "SUPPORTED REFUSAL, explicitly documented and tested. Shared-content holdback completion is deferred; purge authority is not widened."
+      },
+      {
+        "finding": "Evidence original, region and permalink delivery did not consult tombstones before asynchronous physical purge; the prior one-hour private cache could avoid subsequent withdrawal checks.",
+        "disposition": "FIXED separately in ADR0022 and revision5425735fb26ca1d7925811e40476490faefb8f2d. Five new cases, four executed production controls and the restore compatibility assertion verify the boundary without expanding the core offline restore protocol."
+      }
+    ],
+    "evidence_follow_up": {
+      "status": "IMPLEMENTED AND TESTED; separate serving-boundary decision discovered during GoalC",
+      "implementation_revision": "5425735fb26ca1d7925811e40476490faefb8f2d",
+      "files_at_implementation_revision": [
+        {
+          "path": "exulanica/api/routes/evidence.py",
+          "sha256": "1f87f4bd3ad557c24d490e1289f9b2a4f9c15ce1f7e09b50008d5505cbe5a3d5"
+        },
+        {
+          "path": "tests/test_evidence_withdrawal.py",
+          "sha256": "19b68f99b64e8ca53042b47773244779947efa59705e74656fc357530be06ec4"
+        },
+        {
+          "path": "tests/test_restore_replay.py",
+          "sha256": "00664de89a2556a431661652368a8a86bcd95ba4f8d278fc9f9e448cc5dbcb1a"
+        },
+        {
+          "path": "docs/adr/0022-withdrawal-at-evidence-serving.md",
+          "sha256": "4e29ccf1a9c9e80c374b40658e22b367bc24f65c08b21dd8696f949684ea8d16"
+        }
+      ],
+      "finding": "Original, region and permalink handlers could serve committed withdrawn evidence before asynchronous purge. Physical object absence was the only prior post-purge refusal in the restore case.",
+      "result": "All entrypoints consult the existing canonical predicate before reading stored bytes. Original, range, region and410 responses use private,no-store. Foreign workspace404 and ordinary deliberate same-workspace reimport remain compatible.",
+      "new_test_cases": 5,
+      "executed_negative_controls_count": 4,
+      "verification": {
+        "database": "postgresql://localhost:5433/exulanica_spine_test",
+        "corpus": "Existing test_api synthetic local deployment fixture; synthetic database evidence and object-store bytes. No model endpoint, personal media or accuracy measurement.",
+        "regression_tests": [
+          "tests/test_evidence_withdrawal.py",
+          "tests/test_api.py",
+          "tests/test_restore_replay.py"
+        ],
+        "regression_result": "190 passed,1 existing FastAPI/Starlette warning in37.57s",
+        "final_after_410_cache_policy_tests": [
+          "tests/test_evidence_withdrawal.py",
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+        ],
+        "final_after_410_cache_policy_result": "6 passed in2.58s",
+        "restored_production_result": "5 passed in4.87s",
+        "provenance": "Executed serially and reported by implementing agentA; production bytes retained above bind its separately committed result."
+      },
+      "executed_negative_controls": [
+        {
+          "control": "both evidence withdrawal guards removed",
+          "production_path": "exulanica/api/routes/evidence.py",
+          "tests": [
+            "tests/test_evidence_withdrawal.py",
+            "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+          ],
+          "exit_code": 1,
+          "summary": [
+            "6 failed, 1 warning in 3.59s"
+          ],
+          "executed": true,
+          "production_mutation_reverted": true,
+          "interpretation": "Expected failure under an intentionally broken production boundary; not an accuracy measurement."
+        },
+        {
+          "control": "private cache lifetime restored",
+          "production_path": "exulanica/api/routes/evidence.py",
+          "tests": [
+            "tests/test_evidence_withdrawal.py::test_every_evidence_entrypoint_refuses_withdrawal_before_bytes_are_purged"
+          ],
+          "exit_code": 1,
+          "summary": [
+            "3 failed, 1 warning in 4.83s"
+          ],
+          "executed": true,
+          "production_mutation_reverted": true,
+          "interpretation": "Expected failure under an intentionally broken production boundary; not an accuracy measurement."
+        },
+        {
+          "control": "blanket workspace tombstone replaces canonical reimport rule",
+          "production_path": "exulanica/api/routes/evidence.py",
+          "tests": [
+            "tests/test_evidence_withdrawal.py::test_deliberate_same_workspace_reimport_uses_the_canonical_release_rule"
+          ],
+          "exit_code": 1,
+          "summary": [
+            "1 failed, 1 warning in 1.74s"
+          ],
+          "executed": true,
+          "production_mutation_reverted": true,
+          "interpretation": "Expected failure under an intentionally broken production boundary; not an accuracy measurement."
+        },
+        {
+          "control": "410 cache refusal removed",
+          "production_path": "exulanica/api/routes/evidence.py",
+          "tests": [
+            "tests/test_evidence_withdrawal.py::test_every_evidence_entrypoint_refuses_withdrawal_before_bytes_are_purged"
+          ],
+          "exit_code": 1,
+          "summary": [
+            "3 failed, 1 warning in 1.79s"
+          ],
+          "executed": true,
+          "production_mutation_reverted": true,
+          "interpretation": "Expected failure under an intentionally broken production boundary; not an accuracy measurement."
+        }
+      ],
+      "c_test_compatibility": "Core C revision0a5cf67 expected404 after purge. Revision5425735 updates that assertion to410 because replayed tombstones now refuse before byte lookup. The restore mechanism and its seven cases remain the same.",
+      "limitations": [
+        "No retroactive revocation of already delivered client copies.",
+        "No cancellation of a response already delivered or a read whose query preceded a concurrent tombstone commit.",
+        "No browser representation, world-package export or purge-privilege change."
+      ]
+    },
+    "known_limitations": [
+      "This is an explicit offline protocol. All traffic, background workers, CLI writers and direct SQL writers must stop before sealing and stay stopped until replay completes. The source seal rejects tombstones but does not itself stop an already-running API or every other write.",
+      "No automatic detection of an undeclared restore is claimed. The configured external marker must survive independently of both backup domains and must be checked by startup.",
+      "No disaster recovery completeness guarantee is claimed for deletions after the source resumes without a new current complete checkpoint, or for deletions lost before any current independent checkpoint was retained.",
+      "A checkpoint digest binds bytes and detects accidental corruption; operator custody supplies authority. Malicious operators or independently rolled-back control storage are outside this mechanism.",
+      "A correctly retained object held by live data leaves this version refusing completion. It never grants the purger broader destruction authority to make a restore pass.",
+      "A missing capture-to-blob binding needed for an interval or blocklist causes refusal. No synthetic binding is invented from an absent historical capture.",
+      "Existing interval-erasure limits remain. Replay reproduces existing tombstone/serving semantics; no video repair, physical stub deletion, new modality or model-based regeneration is introduced.",
+      "All aggregates in affected workspaces become stale. Restoring their deterministic live closure is separate work; this goal never declares a model artifact exactly regenerated.",
+      "Prepared checkpoints whose database/file boundary was interrupted are unusable until administratively reconciled; the mechanism prefers refusal to claiming a complete checkpoint.",
+      "The two global control tables expose only checkpoint metadata and counts to runtime reads; they are intentionally not workspace-scoped content tables.",
+      "Role reprovisioning after migration is mandatory, because existing default table grants can initially include writes on new administrative tables."
+    ],
+    "standing_constraints_held": [
+      "P-1 remains unanswered. No biometric writer, template derivation or model endpoint call was added.",
+      "Historical migrations0001 through0035 were not edited; only forward0036 was introduced.",
+      "Goal C focused verification used only postgresql://localhost:5433/exulanica_spine_test was used, in disposable schemas, with serialized test runs.",
+      "Purging retains existing workspace isolation and live-holder checks; runtime DELETE and purge-role grants are unchanged.",
+      "No numerical result is published against an OPEN model, identity or production-rehearsal evaluation item.",
+      "User-owned README, roadmap, demo runbook and landing-page edits were not edited, staged or reverted by this goal."
+    ],
+    "still_open_after_this_goal": [
+      {
+        "id": "production-rehearsal",
+        "status": "OPEN",
+        "reason": "Named owner, cloud/account/region/domain choices and committed A-8 evidence remain unmet; no deployment occurred."
+      },
+      {
+        "id": "X-12-operational-disaster-recovery",
+        "status": "OPEN beyond the declared local offline mechanism",
+        "reason": "Current independent checkpoint custody, backup retention, failure-domain separation and uncheckpointed later deletions have not been rehearsed operationally."
+      },
+      {
+        "id": "P-1",
+        "status": "OPEN, unchanged"
+      },
+      {
+        "id": "A-8",
+        "status": "OPEN, unchanged"
+      }
+    ],
+    "decisions": [
+      {
+        "number": 1,
+        "name": "Independent complete deletion checkpoint and mandatory offline replay",
+        "adr": "docs/adr/0019-offline-restore-tombstone-replay.md",
+        "invariant": "A declared restore may neither serve nor start a derivative worker until every committed tombstone in its current sealed independent checkpoint has been reapplied and its purge verified. An external pending marker survives restoration of the database and object store. A prior receipt cannot authorize a different restore attempt.",
+        "rationale": "A pre-deletion database backup cannot contain the subsequent deletion. The checkpoint is read through an administrative cross-workspace view under an exclusive tombstone-table lock, and the source then rejects further tombstone INSERTs including raw SQL. Operator custody and the source seal make that external checkpoint authoritative; the digest binds its contents but does not authenticate a hostile operator. A new external attempt UUID prevents an old restored receipt from certifying a new restore.",
+        "canonical_representation": "The checkpoint is an exulanica.digest-bound-record/v1 envelope whose record profile is exulanica.restore-tombstone-checkpoint/v1 and whose SHA-256 covers canonical_json(record). It retains all tombstone identity, workspace, scope, target, actor, times, interval and blocklist fields, excluding purge_completed_at, plus every purge target including completed jobs. The independent exulanica.restore-state/v1 marker binds checkpoint ID, checkpoint SHA-256 and restore attempt UUID to pending/complete. restore_control states are sealed/replaying/complete; restore_replay_receipt is keyed by attempt UUID. Files use atomic replacement and file/directory fsync.",
+        "compatibility_impact": "Forward migration0036 adds two administrative control tables and a tombstone INSERT seal. API startup always checks the database gate, including test-only verify=False calls; EXULANICA_RESTORE_STATE_PATH supplies the independent marker. Runtime role reprovisioning is mandatory after migration so default INSERT/UPDATE grants are revoked from the new tables. Existing undeclared instances have no restore-control row and retain prior startup behaviour. Purge role grants, DELETE privileges, historical migrations and evidence addresses are unchanged. No HTTP route or browser payload is added.",
+        "failure_behaviour": "A prepared rather than sealed checkpoint, corrupt digest, missing marker, conflicting tombstone, missing capture-to-blob binding required by interval/hash-blocklist intent, narrow administrative view, incomplete purge, shared-live-byte holdback, exhausted job or mismatched receipt refuses replay completion or startup. Partial replay may commit monotonic deletions and destroy bytes; it issues no new receipt and retains pending state. Retrying reuses original IDs plus stable UUIDv5 replay IDs, reruns existing triggers, resets original/replay jobs and verifies actual store absence before recording completion. All aggregates in affected workspaces are invalidated rather than trusted after restore. Other workspaces are not invalidated.",
+        "affected_surfaces": {
+          "migrations": [
+            "0036_restore_tombstone_replay.sql"
+          ],
+          "workers": [
+            "exulanica/deletion/restore.py orchestrates existing PurgeWorker without altering its destruction algorithm",
+            "API derivative worker starts only after restore verification"
+          ],
+          "evidence": [
+            "Existing evidence and source stub identities are retained; served bytes are absent after purge"
+          ],
+          "apis": [
+            "exulanica/api/app.py::_lifespan",
+            "exulanica/api/services.py::Services.restore_state_path",
+            "exulanica/api/services.py::build_services"
+          ],
+          "exports": [
+            "Private operational checkpoint export; no world-package export format change"
+          ],
+          "deletion_paths": [
+            "exulanica/deletion/restore.py::checkpoint",
+            "exulanica/deletion/restore.py::prepare_restore",
+            "exulanica/deletion/restore.py::replay"
+          ],
+          "browser_consumers": [],
+          "schemas": [
+            "restore_control",
+            "restore_replay_receipt",
+            "tombstone INSERT trigger",
+            "existing purge_job and tombstone completion state",
+            "derived_artifact.stale"
+          ]
+        },
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates",
+          "tests/test_restore_replay.py::test_backup_older_than_blocklisted_capture_refuses_missing_address_binding",
+          "tests/test_restore_replay.py::test_checkpoint_seals_raw_sql_and_only_administrators_can_certify_restore",
+          "tests/test_restore_replay.py::test_completed_database_jobs_do_not_certify_restored_old_object_bytes",
+          "tests/test_restore_replay.py::test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt",
+          "tests/test_restore_replay.py::test_partial_replay_refuses_startup_before_any_worker_can_start",
+          "tests/test_restore_replay.py::test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact"
+        ],
+        "negative_control": "Eleven executed production controls exercise this decision; each failed and was reverted. The separate twelfth control below exercises the real pg_dump validator repair. In particular, ignoring the independent marker allowed startup after restoring a database with no restore_control row, and the test failed DID NOT RAISE."
+      },
+      {
+        "number": 2,
+        "name": "Recursive CHECK validators retain their schema during a real PostgreSQL restore",
+        "adr": "docs/adr/0019-offline-restore-tombstone-replay.md",
+        "invariant": "A normal, unmodified pg_dump dump can restore predicate rows whose JSON-schema CHECK constraints call recursive schema-local validators even when the restorer sets an empty search_path.",
+        "rationale": "The first actual PostgreSQL18 dump/psql restoration reached COPY predicate and failed because jsonschema_unsupported_keyword recursively called its unqualified name while the restoring session had an empty search_path. This was an existing restoration defect that a hand-reconstructed fixture would not have exposed.",
+        "canonical_representation": "Migration0036 binds jsonschema_unsupported_keyword(jsonb) and jsonschema_violation(jsonb,jsonb,text) to the schema in which the migration runs, followed by pg_catalog and pg_temp, using ALTER FUNCTION search_path settings retained by pg_dump.",
+        "compatibility_impact": "No predicate or schema definition changes, no historical migration edits and no digest/address changes. It changes only name resolution inside the two existing recursive validators. The real restore test uses a compatible PostgreSQL18 client discovered through EXULANICA_POSTGRES_BIN, standard versioned installation paths or PATH.",
+        "failure_behaviour": "Removing the new function bindings again makes psql COPY predicate fail with jsonschema_unsupported_keyword(jsonb) does not exist. A missing or incompatible client is a failed restoration prerequisite, never a skipped proof.",
+        "affected_surfaces": {
+          "migrations": [
+            "0036_restore_tombstone_replay.sql"
+          ],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [
+            "PostgreSQL operational dump/restore"
+          ],
+          "deletion_paths": [
+            "Pre-deletion backup restoration preceding mandatory replay"
+          ],
+          "browser_consumers": [],
+          "schemas": [
+            "jsonschema_unsupported_keyword(jsonb)",
+            "jsonschema_violation(jsonb,jsonb,text)"
+          ]
+        },
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates",
+          "tests/test_restore_replay.py::test_backup_older_than_blocklisted_capture_refuses_missing_address_binding"
+        ],
+        "negative_control": "Removed the ALTER FUNCTION schema bindings from0036 and executed the actual dump/restore test. One test failed at psql COPY predicate with the original missing recursive-function error. Restored the exact migration bytes afterward."
+      },
+      {
+        "number": 3,
+        "name": "Committed withdrawal is enforced at every evidence serving boundary before asynchronous purge",
+        "adr": "docs/adr/0022-withdrawal-at-evidence-serving.md",
+        "invariant": "After workspace authorization, row-ID originals including ranges, region crops and permalinks consult the canonical tombstone predicate before reading stored bytes. A covered address returns HTTP410 while purge is still pending. Foreign or nonexistent evidence remains HTTP404. Successful and withdrawn evidence responses use private,no-store so a new request observes the serving boundary.",
+        "rationale": "Review of the restore test found that physical purge caused404, but the evidence handlers had no tombstone predicate. Original, region and permalink routes could still deliver committed withdrawn evidence before asynchronous purge. The former one-hour private cache freshness period could also reuse an earlier response without checking withdrawal.",
+        "canonical_representation": "The existing tombstone_blocks_span(workspace_id,blob_sha256,track_key,t_start_ns,t_end_ns) SQL predicate supplies a withdrawn Boolean over the stored evidence address in both evidence queries. Covered local addresses raise410 with evidence was withdrawn and Cache-Control: private, no-store. No separate Python deletion rule, new address, schema or digest is introduced.",
+        "compatibility_impact": "Committed withdrawn evidence awaiting purge changes from successful delivery to410; physically absent withdrawn evidence changes from404 to410. New original, range and region responses and410 refusals use private,no-store. Foreign and unknown addresses remain404. A same-workspace deliberate live reimport still releases an ordinary capture tombstone according to the canonical predicate; stronger interval and hash-blocklist rules are unchanged. Already delivered client copies cannot be revoked by this server change.",
+        "failure_behaviour": "Authorization and row visibility determine404 before exposing local withdrawal. A visible covered address receives410 before original or crop store access even when a different workspace holds the same bytes. Integrity errors are not converted into missing-object or withdrawal errors. The query observes committed tombstones visible to it; it cannot retroactively cancel a response already delivered.",
+        "affected_surfaces": {
+          "schemas": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [
+            "Canonical withdrawal predicate applied before all HTTP evidence store reads; original evidence addresses and original-photograph entity-deletion policy unchanged"
+          ],
+          "apis": [
+            "exulanica/api/routes/evidence.py::original",
+            "exulanica/api/routes/evidence.py::region",
+            "exulanica/api/routes/evidence.py::by_uri",
+            "exulanica/api/routes/evidence.py::_address",
+            "exulanica/api/routes/evidence.py::_ranged"
+          ],
+          "exports": [],
+          "deletion_paths": [
+            "Read existing committed tombstones; no purge machinery or role changes"
+          ],
+          "browser_consumers": [
+            "Evidence responses now forbid private cache storage; existing410 handling and browser payload remain unchanged"
+          ]
+        },
+        "tests": [
+          "tests/test_evidence_withdrawal.py::test_every_evidence_entrypoint_refuses_withdrawal_before_bytes_are_purged[capture]",
+          "tests/test_evidence_withdrawal.py::test_every_evidence_entrypoint_refuses_withdrawal_before_bytes_are_purged[interval]",
+          "tests/test_evidence_withdrawal.py::test_every_evidence_entrypoint_refuses_withdrawal_before_bytes_are_purged[workspace]",
+          "tests/test_evidence_withdrawal.py::test_foreign_shared_bytes_do_not_make_withdrawn_owner_evidence_readable",
+          "tests/test_evidence_withdrawal.py::test_deliberate_same_workspace_reimport_uses_the_canonical_release_rule",
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+        ],
+        "negative_control": "Four executed and reverted production controls removed both SQL guards, restored the old private freshness lifetime, replaced the canonical same-workspace reimport rule with blanket withdrawal, and removed no-store from410. Their focused invocations failed6,3,1 and3 cases respectively. Every new evidence test failed under the removed-guard control."
+      },
+      {
+        "number": 4,
+        "name": "A test URL does not authorize database creation",
+        "invariant": "empty_replay_database skips before connecting or creating anything unless EXULANICA_TEST_ALLOW_DATABASE_CREATION is exactly the string 1. The program does not enable that opt-in.",
+        "rationale": "The user's sole allowed database URL overrides the legacy fixture's assumption that any database whose name contains test is safe as an administrative base for creating another database.",
+        "canonical_representation": "The fixture calls production env_get('TEST_ALLOW_DATABASE_CREATION') and compares it to '1' before reading TEST_DATABASE_URL. A separate focused test sets the sole allowed URL, removes the opt-in, replaces psycopg.connect with a forbidden-call stub, and directly invokes the fixture generator expecting pytest.skip.Exception.",
+        "compatibility_impact": "The legacy full clean-replay integration test becomes an explicit opt-in test and skips by default. The other replay checks remain runnable. No production code, schema, API or database role changes are retained.",
+        "failure_behaviour": "Missing, empty or any non-1 opt-in value yields a skip without a connection. The new focused test fails if a connection is attempted without that opt-in. Its production negative control overrides only the relevant env_get suffix; the forbidden connection stub ensures the control cannot open a database.",
+        "affected_surfaces": {
+          "schemas": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "test_file": "tests/test_evaluation_replay.py",
+        "tests": [
+          "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in"
+        ],
+        "negative_control": "Temporarily made production env_get return 1 for TEST_ALLOW_DATABASE_CREATION. The focused test failed at its forbidden psycopg.connect stub (1 failed in 0.26s), before any connection opened or database creation statement ran. Production source was restored."
+      }
+    ],
+    "negative_controls": [
+      {
+        "control": "omit_replay",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "    applied: list[tuple[uuid.UUID, uuid.UUID]] = [] =>     return restore_id\n    applied: list[tuple[uuid.UUID, uuid.UUID]] = []",
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates",
+          "tests/test_restore_replay.py::test_completed_database_jobs_do_not_certify_restored_old_object_bytes"
+        ],
+        "exit_code": 1,
+        "summary": "2 failed, 1 warning in 20.42s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_startup_gate",
+        "production_file": "exulanica/api/app.py",
+        "mutation": "    verify_restore(services.database, services.restore_state_path)\n => ",
+        "tests": [
+          "tests/test_restore_replay.py::test_partial_replay_refuses_startup_before_any_worker_can_start"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.03s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_source_seal",
+        "production_file": "exulanica/migrations/0036_restore_tombstone_replay.sql",
+        "mutation": "  if exists (select 1 from restore_control where state = 'sealed') then =>   if false and exists (select 1 from restore_control where state = 'sealed') then",
+        "tests": [
+          "tests/test_restore_replay.py::test_checkpoint_seals_raw_sql_and_only_administrators_can_certify_restore"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 0.92s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_checkpoint_digest",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "    if envelope.get(\"record_sha256\") != digest: =>     if False and envelope.get(\"record_sha256\") != digest:",
+        "tests": [
+          "tests/test_restore_replay.py::test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 0.82s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_shared_content_guard",
+        "production_file": "exulanica/deletion/worker.py",
+        "mutation": "            if not row[\"releases\"]: =>             if False and not row[\"releases\"]:",
+        "tests": [
+          "tests/test_restore_replay.py::test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.13s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_receipt_identity",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "        if marker is not None:\n            receipt = =>         if False and marker is not None:\n            receipt =",
+        "tests": [
+          "tests/test_restore_replay.py::test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.06s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_aggregate_invalidation",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "update derived_artifact set stale=true where workspace_id=%s => update derived_artifact set stale=stale where workspace_id=%s",
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.63s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "narrow_checkpoint_workspace",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "from tombstone t order by t.workspace_id,t.tombstone_id => from tombstone t where t.workspace_id=current_workspace() order by t.workspace_id,t.tombstone_id",
+        "tests": [
+          "tests/test_restore_replay.py::test_checkpoint_seals_raw_sql_and_only_administrators_can_certify_restore"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.13s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "grant_runtime_control_writes",
+        "production_file": "exulanica/db/roles.py",
+        "mutation": "    \"restore_control\",\n    \"restore_replay_receipt\",\n => ",
+        "tests": [
+          "tests/test_restore_replay.py::test_checkpoint_seals_raw_sql_and_only_administrators_can_certify_restore"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 0.96s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_missing_capture_binding",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "                if binding is None: =>                 if False and binding is None:",
+        "tests": [
+          "tests/test_restore_replay.py::test_backup_older_than_blocklisted_capture_refuses_missing_address_binding"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.86s",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_recursive_validator_schema_path",
+        "production_file": "exulanica/migrations/0036_restore_tombstone_replay.sql",
+        "mutation": "Remove ALTER FUNCTION schema search_path bindings from0036",
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 1.38s",
+        "failure": "psql COPY predicate: jsonschema_unsupported_keyword(jsonb) does not exist",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "control": "omit_independent_marker",
+        "production_file": "exulanica/deletion/restore.py",
+        "mutation": "Ignore external marker in verify_restore",
+        "tests": [
+          "tests/test_restore_replay.py::test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates"
+        ],
+        "exit_code": 1,
+        "summary": "1 failed, 1 warning in 2.05s",
+        "failure": "Restored old database has no restore_control row; startup DID NOT RAISE without independent marker",
+        "executed": true,
+        "production_mutation_reverted": true,
+        "interpretation": "Expected assertion failure under an intentionally broken production invariant; not an accuracy measurement."
+      },
+      {
+        "name": "frozen-migration-checksum",
+        "production_file": "exulanica/migrations/__init__.py",
+        "test": "tests/test_migration.py::test_historical_migrations_0001_through_0035_are_byte_identical",
+        "exit_code": 1,
+        "summary": "1 failed in 0.04s",
+        "restored": true
+      },
+      {
+        "name": "historical-record-prefix",
+        "production_file": "exulanica/migrations/__init__.py",
+        "test": "tests/test_retained_evaluation_records.py::test_the_answer_records_migration_counts_describe_the_repository",
+        "exit_code": 1,
+        "summary": "1 failed in 0.09s",
+        "restored": true
+      },
+      {
+        "name": "forward-migration-transaction",
+        "production_file": "exulanica/migrations/0036_restore_tombstone_replay.sql",
+        "test": "tests/test_migration.py::test_every_migration_is_a_single_transaction_with_no_down_path[0036]",
+        "exit_code": 1,
+        "summary": "1 failed in 0.08s",
+        "restored": true
+      },
+      {
+        "production_mutation": "env_get returns 1 for TEST_ALLOW_DATABASE_CREATION despite an absent explicit opt-in",
+        "production_path": "exulanica/env.py",
+        "pytest_selector": "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in",
+        "exit_code": 1,
+        "failed": 1,
+        "observed_summary": "1 failed in 0.26s",
+        "failure_message": "database connection attempted without database-creation opt-in",
+        "database_connections_opened": 0,
+        "database_creation_attempts": 0,
+        "production_restored": true
+      }
+    ],
+    "test_database_safety_supplement": {
+      "profile": "exulanica.test-database-creation-safety/v1",
+      "scope": "Prevent an existing clean-replay test fixture from treating a configured test database URL as permission to create additional databases.",
+      "constraint_deviation": {
+        "discovered_during": "The mandatory full backend suite for the unblocked backend program.",
+        "what_happened": "The legacy empty_replay_database fixture created disposable exulanica_replay_test_<suffix> databases even though the configured URL named only postgresql://localhost:5433/exulanica_spine_test. This violated the program's sole-database constraint; a test-named database was not sufficient authorization.",
+        "root_reported_disposable_databases_created": 2,
+        "root_reported_cleanup": "Both disposable test databases were removed and the absence of remaining matching databases was verified by the root agent. No production database was accessed.",
+        "qualification": "This is a disclosed constraint deviation, not a claim that the earlier run complied. The reviewing subagent did not independently open a database to repeat root's cleanup check.",
+        "earlier_full_runs": [
+          {
+            "passed": 1503,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          },
+          {
+            "passed": 1504,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          }
+        ]
+      },
+      "decision": {
+        "number": 4,
+        "name": "A test URL does not authorize database creation",
+        "invariant": "empty_replay_database skips before connecting or creating anything unless EXULANICA_TEST_ALLOW_DATABASE_CREATION is exactly the string 1. The program does not enable that opt-in.",
+        "rationale": "The user's sole allowed database URL overrides the legacy fixture's assumption that any database whose name contains test is safe as an administrative base for creating another database.",
+        "canonical_representation": "The fixture calls production env_get('TEST_ALLOW_DATABASE_CREATION') and compares it to '1' before reading TEST_DATABASE_URL. A separate focused test sets the sole allowed URL, removes the opt-in, replaces psycopg.connect with a forbidden-call stub, and directly invokes the fixture generator expecting pytest.skip.Exception.",
+        "compatibility_impact": "The legacy full clean-replay integration test becomes an explicit opt-in test and skips by default. The other replay checks remain runnable. No production code, schema, API or database role changes are retained.",
+        "failure_behaviour": "Missing, empty or any non-1 opt-in value yields a skip without a connection. The new focused test fails if a connection is attempted without that opt-in. Its production negative control overrides only the relevant env_get suffix; the forbidden connection stub ensures the control cannot open a database.",
+        "affected_surfaces": {
+          "schemas": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "test_file": "tests/test_evaluation_replay.py",
+        "tests": [
+          "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in"
+        ],
+        "negative_control": "Temporarily made production env_get return 1 for TEST_ALLOW_DATABASE_CREATION. The focused test failed at its forbidden psycopg.connect stub (1 failed in 0.26s), before any connection opened or database creation statement ran. Production source was restored."
+      },
+      "verification": {
+        "status": "focused checks and executed production negative control complete; parent will measure the final compliant full suite",
+        "database_creation_opt_in_during_verification": "0; never enabled for a real database fixture",
+        "initial_file_run": {
+          "passed": 2,
+          "skipped": 1,
+          "duration_ms": 250
+        },
+        "restored_file_run": {
+          "passed": 2,
+          "skipped": 1,
+          "duration_ms": 1370
+        },
+        "default_gate_unit_test": "passed; direct fixture invocation skipped before its forbidden connection stub was called",
+        "legacy_clean_replay_integration": "skipped because explicit database-creation opt-in was absent",
+        "other_replay_unit_check": "administrative-database refusal test passed",
+        "ruff": "tests/test_evaluation_replay.py clean",
+        "negative_control": {
+          "production_mutation": "env_get returns 1 for TEST_ALLOW_DATABASE_CREATION despite an absent explicit opt-in",
+          "production_path": "exulanica/env.py",
+          "pytest_selector": "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in",
+          "exit_code": 1,
+          "failed": 1,
+          "observed_summary": "1 failed in 0.26s",
+          "failure_message": "database connection attempted without database-creation opt-in",
+          "database_connections_opened": 0,
+          "database_creation_attempts": 0,
+          "production_restored": true
+        }
+      },
+      "implementation_commit": "864c63794d055cea0622082a69b5c51e1497aabe"
+    },
+    "program_record": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+    "completed_date": "2026-09-05"
+  },
+  "record_sha256": "cda1caeb7a312c8bd096a9e56aa1c08458219befacf55e79e24190a5528d6eac"
+}

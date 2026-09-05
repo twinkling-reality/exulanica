@@ -1,0 +1,362 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.unblocked-backend-program-goal-d/v1",
+    "goal": "D",
+    "status": "Completed the requested experiment; whole-closure A-24 remains open on observed differences.",
+    "implementation_commit": "864c63794d055cea0622082a69b5c51e1497aabe",
+    "scope": "SYNTH-1 deletion of one scripted confirmed exemplar, actual deterministic byte regeneration, and two fresh CPU pose executions over a synthetic multiview room. No personal media, model endpoint or production deployment.",
+    "decisions": [
+      {
+        "number": 1,
+        "name": "Only independently observed content is claimed identical",
+        "adr": "docs/adr/0021-observed-recomputation-scope.md",
+        "invariant": "The exemplar payload and dependencies rebuilt after deletion must equal a baseline created before the deleted source existed. Stored payloads must agree with their canonical key. Recomputing intake and rendition means evicting their bytes and verifying absence before the real stages run. No model-backed exactness claim is permitted.",
+        "rationale": "A cache hit and a deterministic flag are insufficient evidence of recomputation. Append-only history and derived aggregate metadata can differ even when the canonical surviving exemplars reproduce. The brief explicitly accepts retained mismatches; claiming whole-state equality would contradict the observed graph and pose receipts.",
+        "canonical_representation": "Strict canonical_json of identity-match-context/v1 payload and typed graph projections; raw SHA-256 of actual artifact bytes; existing float-bearing colmap-pose-receipt/v2 retained as exact separate artifacts. The envelope carries only integer-safe values and hashes. Nothing is rounded to create equality.",
+        "compatibility_impact": "Adds IntegrityError refusal for a live stored exemplar payload that disagrees with its content-derived key. No schema migration, stage identity, API or browser shape changes. Historical stale generations remain stale.",
+        "failure_behaviour": "Deleted inputs are excluded and a corrupt index raises. Nondeterministic rendition output fails the experiment and the existing deterministic writer flags repair. Real scene and pose mismatches are retained and block broad exactness claims; the experiment does not assert that current aggregate defects are desirable behaviour.",
+        "affected_surfaces": {
+          "schemas": [],
+          "migrations": [],
+          "workers": [
+            "exulanica/identity/match_context.py"
+          ],
+          "evidence": [
+            "exulanica/ingest/stages/intake.py",
+            "exulanica/ingest/stages/rendition.py"
+          ],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [
+            "exulanica/identity/match_context.py"
+          ],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_recomputation_closure.py::test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes",
+          "tests/test_exact_recomputation.py",
+          "tests/test_unblocked_program_record.py::test_program_measurements_do_not_outgrow_their_observed_scope"
+        ]
+      }
+    ],
+    "negative_controls": [
+      {
+        "name": "deleted-anchor-read",
+        "production_file": "exulanica/identity/match_context.py",
+        "test": "tests/test_recomputation_closure.py::test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes",
+        "exit_code": 1,
+        "summary": "1 failed in 41.60s",
+        "restored": true
+      },
+      {
+        "name": "nondeterministic-index",
+        "production_file": "exulanica/identity/match_context.py",
+        "test": "tests/test_recomputation_closure.py::test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes",
+        "exit_code": 1,
+        "summary": "1 failed in 18.91s",
+        "restored": true
+      },
+      {
+        "name": "canonical-key-integrity",
+        "production_file": "exulanica/identity/match_context.py",
+        "test": "tests/test_recomputation_closure.py::test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes",
+        "exit_code": 1,
+        "summary": "1 failed in 8.52s",
+        "restored": true
+      },
+      {
+        "name": "nondeterministic-rendition",
+        "production_file": "exulanica/ingest/derivatives.py",
+        "test": "tests/test_recomputation_closure.py::test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes",
+        "exit_code": 1,
+        "summary": "1 failed in 2.54s",
+        "restored": true
+      },
+      {
+        "name": "canonical-encoding-drift",
+        "production_file": "exulanica/canonical.py",
+        "mutation": {
+          "old": "sort_keys=True,",
+          "new": "sort_keys=False,"
+        },
+        "test": "tests/test_unblocked_program_record.py::test_program_goals_are_complete_bound_records_with_checkable_decisions",
+        "exit_code": 1,
+        "summary": "1 failed in 0.06s",
+        "restored": true
+      },
+      {
+        "name": "metric-blocker-refuses-retained-number",
+        "production_file": "exulanica/evaluation/metrics.py",
+        "mutation": {
+          "old": "\"number with a 0.90 bar\",\n        blocked_on=None,",
+          "new": "\"number with a 0.90 bar\",\n        blocked_on=\"negative control: component blocked\","
+        },
+        "test": "tests/test_unblocked_program_record.py::test_program_measurements_do_not_outgrow_their_observed_scope",
+        "exit_code": 1,
+        "summary": "1 failed in 0.06s",
+        "restored": true
+      }
+    ],
+    "closure_observation": {
+      "profile": "exulanica.exemplar-recomputation-observation/v1",
+      "corpus_class": "synthetic",
+      "corpus": {
+        "generator_seed": 20260905,
+        "frames_per_trip": 3,
+        "selected_trip": "courtyard-spring",
+        "source_sha256": [
+          "cd816136674829b47ad11266a9414eef856fae3f9b7bf502a5829fb8b487906c",
+          "377e47169957d5ea2135c3bb3e5f237cead1f0a9fe0d85ba6d41c85314358fb3",
+          "bdf427135082df5a459759eef5f8e659a7b18171141032bc994573b2052e2bf4"
+        ]
+      },
+      "model_source": "CountingVisionModel scripted satchel observations, not model accuracy",
+      "remaining_source_count": 2,
+      "canonical_exemplar_payload_sha256": "9c66ab0538457dd85a640dcb3835a27c53bfa2ced3238fc0098ddd1661606be8",
+      "canonical_exemplar_payload_identical": true,
+      "baseline_exemplar_payload": {
+        "anchors": [
+          {
+            "capture_id": "01a071df-f6ae-7a38-bdde-4dc593945fd6",
+            "class": "object",
+            "display_name": "Synthetic satchel",
+            "entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809",
+            "label": "satchel",
+            "occurrence_id": "01a071df-f6ce-7c4a-a548-4dc5a9ab067c",
+            "source_entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809"
+          },
+          {
+            "capture_id": "01a071df-f73d-795e-bb89-77532ffaa13b",
+            "class": "object",
+            "display_name": "Synthetic satchel",
+            "entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809",
+            "label": "satchel",
+            "occurrence_id": "01a071df-f75a-7996-826d-c525c4d1b243",
+            "source_entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809"
+          }
+        ],
+        "profile": "exulanica.identity-match-context/v1"
+      },
+      "rebuilt_exemplar_payload": {
+        "anchors": [
+          {
+            "capture_id": "01a071df-f6ae-7a38-bdde-4dc593945fd6",
+            "class": "object",
+            "display_name": "Synthetic satchel",
+            "entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809",
+            "label": "satchel",
+            "occurrence_id": "01a071df-f6ce-7c4a-a548-4dc5a9ab067c",
+            "source_entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809"
+          },
+          {
+            "capture_id": "01a071df-f73d-795e-bb89-77532ffaa13b",
+            "class": "object",
+            "display_name": "Synthetic satchel",
+            "entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809",
+            "label": "satchel",
+            "occurrence_id": "01a071df-f75a-7996-826d-c525c4d1b243",
+            "source_entity_id": "01a071df-f6d2-7a64-b38a-8374ab0db809"
+          }
+        ],
+        "profile": "exulanica.identity-match-context/v1"
+      },
+      "dependency_set_identical": true,
+      "stored_payload_tampering_refused": true,
+      "historical_generation_identical": false,
+      "baseline_generation_id": "1410f715-6aba-5288-a36d-9b40b8fe1459",
+      "rebuilt_generation_id": "9e8e95be-fbf1-5a9f-bdbf-24a932a8a850",
+      "deterministic_artifact_sha256": [
+        "0e75c643231aae7a82d32d5c33849d87e0eed656e9e6cb151e893f280978aa29",
+        "611825bd96668670bce7028c19398ac7b4cd5dfea9c5f2409d63483f1f5b80f9",
+        "65a401a6df451c05e494304f34acdd36a1a473efeeb7eba68a200639c9b49e60",
+        "f0c4cd31c972d7277651a158276f9b5f47f0c846428cda06a1f542456282b93c"
+      ],
+      "intake_and_rendition_bytes_identical": true,
+      "scene_group_projection_identical": false,
+      "scene_groups_before": [
+        {
+          "capture_ids": [
+            "01a071df-f6ae-7a38-bdde-4dc593945fd6"
+          ],
+          "centroid_lat_e7": 514512684,
+          "centroid_lon_e7": -1234911,
+          "first_utc": "2026-04-18T09:14:29+00:00",
+          "group_id": "28548eca-e4bc-57f0-8140-2348b62bf709",
+          "last_utc": "2026-04-18T09:14:29+00:00",
+          "member_count": 1,
+          "ordinal": 0,
+          "positioned_member_count": 1,
+          "radius_m": 0,
+          "rung": null,
+          "rung_capture_count": 0
+        },
+        {
+          "capture_ids": [
+            "01a071df-f6ae-7a38-bdde-4dc593945fd6",
+            "01a071df-f73d-795e-bb89-77532ffaa13b"
+          ],
+          "centroid_lat_e7": 514512150,
+          "centroid_lon_e7": -1235041,
+          "first_utc": "2026-04-18T09:14:29+00:00",
+          "group_id": "f152d0e8-a92d-5172-bbcf-d70f5716c5be",
+          "last_utc": "2026-04-18T09:16:00+00:00",
+          "member_count": 2,
+          "ordinal": 0,
+          "positioned_member_count": 2,
+          "radius_m": 6,
+          "rung": null,
+          "rung_capture_count": 0
+        }
+      ],
+      "scene_groups_after": [
+        {
+          "capture_ids": [
+            "01a071df-f6ae-7a38-bdde-4dc593945fd6"
+          ],
+          "centroid_lat_e7": 514512684,
+          "centroid_lon_e7": -1234911,
+          "first_utc": "2026-04-18T09:14:29+00:00",
+          "group_id": "28548eca-e4bc-57f0-8140-2348b62bf709",
+          "last_utc": "2026-04-18T09:14:29+00:00",
+          "member_count": 1,
+          "ordinal": 0,
+          "positioned_member_count": 1,
+          "radius_m": 0,
+          "rung": null,
+          "rung_capture_count": 0
+        },
+        {
+          "capture_ids": [
+            "01a071df-f6ae-7a38-bdde-4dc593945fd6",
+            "01a071df-f73d-795e-bb89-77532ffaa13b"
+          ],
+          "centroid_lat_e7": 514512150,
+          "centroid_lon_e7": -1235041,
+          "first_utc": "2026-04-18T09:14:29+00:00",
+          "group_id": "f152d0e8-a92d-5172-bbcf-d70f5716c5be",
+          "last_utc": "2026-04-18T09:16:00+00:00",
+          "member_count": 2,
+          "ordinal": 0,
+          "positioned_member_count": 2,
+          "radius_m": 6,
+          "rung": null,
+          "rung_capture_count": 0
+        },
+        {
+          "capture_ids": [
+            "01a071df-f6ae-7a38-bdde-4dc593945fd6",
+            "01a071df-f73d-795e-bb89-77532ffaa13b"
+          ],
+          "centroid_lat_e7": 514512015,
+          "centroid_lon_e7": -1234658,
+          "first_utc": "2026-04-18T09:14:29+00:00",
+          "group_id": "6a235472-6707-517e-89e3-3194eb42fffb",
+          "last_utc": "2026-04-18T09:17:14+00:00",
+          "member_count": 2,
+          "ordinal": 0,
+          "positioned_member_count": 3,
+          "radius_m": 7,
+          "rung": null,
+          "rung_capture_count": 0
+        }
+      ],
+      "vision_or_depth_exactness_claim": false,
+      "model_calls_during_recomputation": 0
+    },
+    "pose_observation": {
+      "profile": "exulanica.pose-recomputation-comparison/v1",
+      "corpus_class": "synthetic",
+      "source_manifest_sha256": "a419ad40ce6dd4769750a40eedb687fe3bc39c734ecabfed2dea4d78d2a0ec0f",
+      "camera_manifest_sha256": "b3d3eba249f4a52045f8a29c9f6216ee4f1086c090c56a73d7d0cc593e29af59",
+      "pose_manifest_sha256": "3599fbf721ceeecf13de9fe33587a0f3ad07767f8b8b1d7ca170eea5fef2bc87",
+      "runtime": {
+        "python": "3.11.6",
+        "system": "Darwin",
+        "machine": "arm64",
+        "packages": {
+          "pycolmap": "4.2.0",
+          "numpy": "2.4.6",
+          "pillow": "12.3.0"
+        },
+        "python_executable_sha256": "3cd9c793e46d0df807a7318decd886b28211f02647d3d25a2a337d73fea1e303"
+      },
+      "runs": [
+        {
+          "receipt_sha256": "33bc404e84c87eea49c69410cc421d9984bd8fc333934d96bf6eb312eba1728c",
+          "quality_sha256": "586289128d775f3e8fe98fa3b0fb4a935b0cb8cef3a3ef1c30e1e6df757bbe31",
+          "registered_images": [
+            "view_00.jpg",
+            "view_01.jpg",
+            "view_02.jpg",
+            "view_03.jpg",
+            "view_04.jpg",
+            "view_05.jpg",
+            "view_06.jpg",
+            "view_07.jpg"
+          ],
+          "accepted": true,
+          "reused": false,
+          "receipt_artifact": "docs/evaluation/artifacts/2026-09-05-unblocked-backend-program/pose-receipt-0.json"
+        },
+        {
+          "receipt_sha256": "1f9f3a2e8f52e6e81bdce69aefdd30df99d3a8e36184d25b24089f64a78a7395",
+          "quality_sha256": "29b533ba9d8e557c2dcee32af9b2073fd8ad15256a8fd1f700a84bdacf0deec5",
+          "registered_images": [
+            "view_00.jpg",
+            "view_01.jpg",
+            "view_02.jpg",
+            "view_03.jpg",
+            "view_04.jpg",
+            "view_05.jpg",
+            "view_06.jpg",
+            "view_07.jpg"
+          ],
+          "accepted": true,
+          "reused": false,
+          "receipt_artifact": "docs/evaluation/artifacts/2026-09-05-unblocked-backend-program/pose-receipt-1.json"
+        }
+      ],
+      "receipt_bytes_identical": false,
+      "quality_bytes_identical": false,
+      "limitations": [
+        "Two fresh runs on one machine; no cross-machine reproducibility claim.",
+        "Local runtime fingerprint is not a container image or production execution.",
+        "No vision/depth output, metric scale, corridor or real-world quality was measured."
+      ]
+    },
+    "excluded_model_stages": [
+      "depth",
+      "vision"
+    ],
+    "experiment_files": {
+      "scripts/measure_pose_recomputation.py": "d75833687535dcda26b9733fbd353172e78edda35badb6f45f633271af1112de",
+      "tests/test_recomputation_closure.py": "fd94e9b6ba08b90f48fbc7337a9471da45c325038b2a868d239680a8742bcefe"
+    },
+    "reproduction": [
+      "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test EXULANICA_RECOMPUTATION_OBSERVATION=/tmp/closure.json uv run pytest tests/test_recomputation_closure.py",
+      "uv run python scripts/measure_pose_recomputation.py --out /tmp/fresh-pose-comparison"
+    ],
+    "verification": {
+      "initial_focused_test": "1 passed in 1.23s",
+      "integration_gate": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+      "pose_extra": "installed pycolmap 4.2.0",
+      "pose_baseline_revision": "e576168f9d784bdc60d4c817224f0530f4a49fa8"
+    },
+    "limitations": [
+      "Identity payload equality is over the same surviving source IDs, within one workspace and runtime. It is not equality of a newly imported workspace with different capture and entity IDs.",
+      "Historical derived generation IDs, ledger events and clocks are deliberately not identical; no bit-identical database snapshot is claimed.",
+      "The production scene_group projection retained three live historical rows after deletion, versus two before the third source existed. The third row filters its deleted member but retains centroid, radius, last_utc and positioned_member_count derived from it. Ordinary aggregate withdrawal and whole-closure A-24 remain open.",
+      "The index alone is a subset of the deterministic closure. Model-produced observations are retained inputs to the test, not reproduced model outputs.",
+      "Two fresh CPU pose runs both recovered eight cameras and passed their configured quality gate; their exact receipt and quality digests differed. Same-host pose nondeterminism is demonstrated. No cross-host bound or production rendering result is claimed.",
+      "No vision or depth exactness, metric-scale source, corridor registration, Rung 1 or production rehearsal is established."
+    ],
+    "program_record": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+    "completed_date": "2026-09-05",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-unblocked-goal-b.json",
+      "record_sha256": "cfae4a87b6e4606841421c78d8e4e91e4ac277422777a042020f123050fa0005"
+    }
+  },
+  "record_sha256": "b9789207509d5c9e0f363240d1f41755ade6082048ff34bac7a9b513649bbcd2"
+}

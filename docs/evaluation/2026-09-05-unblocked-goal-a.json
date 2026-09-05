@@ -1,0 +1,397 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.non-biometric-match-proposals/v1",
+    "goal": "A",
+    "implementation_commit": "2ae395a1a77c530a3deb423a8dcdb5d4b269e600",
+    "scope": "Production contextual proposals may create explicitly provisional organizational links; their confirmed-exemplar input is a consumed canonical derived artifact. No biometric feature, personal-media ingest, probability calibration, or proposal-accuracy claim is introduced.",
+    "corpus": {
+      "id": "synthetic-contextual-proposals-two-capture-fixture-2026-09-05",
+      "kind": "synthetic fixture, not OGC-1",
+      "source": "tests/test_match_proposals.py::corpus",
+      "description": "Two repository-built capture/evidence/occurrence fixtures, GPS positions and one shared scene group. Names are test literals, not a personal corpus. Vision quality is not measured by this fixture.",
+      "authorized_use": "Local deterministic plumbing and policy checks only."
+    },
+    "entry_gates_held_throughout": [
+      "P-1 remains unanswered. PRODUCIBLE_MODALITIES is exactly context_place, context_cooccurrence and user_text; no biometric template producer was added.",
+      "Historical migrations 0001 through 0035 were not changed. Goal A introduces no migration.",
+      "Goal A focused database verification used only postgresql://localhost:5433/exulanica_spine_test, with one exclusive test slot.",
+      "The packet remains non-citable under INCLUDE_PROPOSALS, and a confirmed link still needs a human user_confirm decision.",
+      "No number is published against an OPEN evaluation metric.",
+      "The user-owned uncommitted README, roadmap, demo and landing-page changes were not modified or staged by Goal A."
+    ],
+    "decisions": [
+      {
+        "number": 1,
+        "name": "Contextual proposals may organize as explicit non-citable guesses",
+        "adr": "docs/adr/0018-contextual-provisional-links.md",
+        "invariant": "Only a unique best entity reaching the recorded organizational threshold may receive an auto_provisional link. No automatic path writes confirmed. INCLUDE_PROPOSALS widens real Selection results, and the resulting packet is not citable and yields AMBIGUOUS abstention. Confirm and reject transition the real proposal link; undo restores proposed.",
+        "rationale": "The explicit program authorizes the deliberately dormant provisional-link machinery. Unvalidated contextual arithmetic may organize a view, but it supplies neither human confirmation nor a probability of factual truth. Entity ties remain questions only; duplicate exemplars of one entity do not cast extra votes.",
+        "canonical_representation": "PROPOSER_PARAMS version 2 uses integer milli-units: context_place=400, context_cooccurrence=400, user_text=800, surface_threshold=500, auto_provisional_threshold=800. Proposal basis stores sorted modalities, extractor_versions including params_digest, weights_milli, thresholds_milli and a calibration-unavailable reason. The existing basis_digest encoding is retained. Proposal outcome remains surfaced because a provisional link still awaits a human answer; link method is context_weighted_sum with no deciding user.",
+        "compatibility_impact": "No migration, API signature, browser read-model shape or export change. ProposalReport gains auto_provisional link ids. Existing proposal emit keys are preserved, so old recorded questions are not rewritten or retroactively linked under new arithmetic. The former never-write-a-link test is superseded by the explicit non-citable organization contract.",
+        "failure_behaviour": "No corroborating modality writes no question. A single contextual modality is recorded below the surface threshold. Rejection memory suppresses covered signal sets. A tied best score receives no automatic link. Proposal and link writes share a transaction. Database confirmation requirements remain enforced. Scores are not added to graph responses or answer packets.",
+        "calibration_decision": "calibrated_p remains NULL and no calibration writer is introduced. There are no observed per-user confirmation/rejection bins, and the current calibration schema does not establish per-user provenance. Synthetic fixture decisions are not a substitute for observed calibration. A-26 stays unvalidated. user_text remains dormant because no caller supplies annotation_text.",
+        "affected_surfaces": {
+          "schemas": [
+            "match_proposal",
+            "entity_link",
+            "derived_artifact"
+          ],
+          "migrations": [],
+          "workers": [
+            "exulanica/identity/proposer.py",
+            "exulanica/identity/match_context.py"
+          ],
+          "evidence": [
+            "exulanica/identity/keys.py"
+          ],
+          "apis": [
+            "exulanica/api/routes/identity.py",
+            "exulanica/selection/executor.py",
+            "exulanica/selection/packet.py"
+          ],
+          "exports": [],
+          "deletion_paths": [
+            "exulanica/identity/recomputation.py",
+            "exulanica/identity/decisions.py",
+            "exulanica/identity/undo.py"
+          ],
+          "browser_consumers": [
+            "web/packages/graph-client/src/read-model.ts"
+          ]
+        },
+        "tests": [
+          "tests/test_match_proposals.py::test_the_producer_widens_selection_without_making_a_citable_claim",
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index",
+          "tests/test_match_proposals.py::test_a_surfaceable_question_below_the_auto_threshold_remains_unlinked",
+          "tests/test_ingest_preconditions.py",
+          "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities"
+        ],
+        "negative_control": "A-NC-01 through A-NC-07 and A-NC-10 were executed against production source. Removing auto-link production, Selection admission, packet refusal, the confirm/reject transitions, either undo-to-proposed branch or the auto threshold each caused its targeted test to fail. Originals were restored."
+      },
+      {
+        "number": 2,
+        "name": "Identity recomputation invalidates a production index the proposer consumes",
+        "adr": "docs/adr/0018-contextual-provisional-links.md",
+        "invariant": "The proposer consumes the persisted canonical identity_match_context exemplar index. Every anchor records its source and resolved entities, occurrence and capture; confirm/reject/merge/split/undo can invalidate an index through those real dependency keys. Refresh reconstructs source membership and never clears a historical stale bit.",
+        "rationale": "A hypothetical caption written only by a test would leave identity invalidation vacuous. The canonical confirmed-exemplar index is a concrete input to the existing contextual scorer. Resolving merged entities preserves source exemplars while tracking both identities for future invalidation.",
+        "canonical_representation": "Payload profile exulanica.identity-match-context/v1 contains anchors sorted by resolved entity_id then occurrence_id, with source_entity_id, entity_id, occurrence_id, capture_id, class, label and the user-stated display_name cache. dep_index contains sorted entity:, occurrence: and capture: keys; depends_on is the corresponding sorted kind/id representation; source_ids names captures. The first identity is workspace-scoped UUID5 over the canonical payload digest. An unchanged live payload is reused; rebuilding identical content after historical invalidation allocates a later generation.",
+        "compatibility_impact": "Existing derived_artifact schema and dependency invalidator are reused. No new top-level package, model stage, external export or database role is added. Identity transaction writers and refresh share a workspace advisory lock. The identity package inventory grows from eighteen to nineteen modules and its existing structural test is updated.",
+        "failure_behaviour": "Refresh excludes deleted source captures, source/resolved entities and tombstoned evidence spans. A stale-on-arrival derivative is refused by its consumer. Older generations remain stale. Explicit recomputation does not recreate vision or depth artifacts. Full temporal history identities and timestamps are not promised to match canonical payload bytes.",
+        "affected_surfaces": {
+          "schemas": [
+            "derived_artifact",
+            "entity",
+            "entity_link",
+            "occurrence",
+            "capture"
+          ],
+          "migrations": [],
+          "workers": [
+            "exulanica/identity/match_context.py",
+            "exulanica/identity/proposer.py"
+          ],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [
+            "exulanica/identity/recomputation.py",
+            "exulanica/identity/repository.py",
+            "exulanica/identity/decisions.py",
+            "exulanica/identity/undo.py"
+          ],
+          "browser_consumers": []
+        },
+        "tests": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index",
+          "tests/test_identity.py::test_the_package_docstring_accounts_for_every_module_in_the_package"
+        ],
+        "negative_control": "A-NC-08 disabled production dependency invalidation and both decision cases failed their stale assertion. A-NC-09 removed the new module from the package inventory and the existing architecture test failed. Originals were restored."
+      }
+    ],
+    "observed_plumbing": {
+      "corpus_id": "synthetic-contextual-proposals-two-capture-fixture-2026-09-05",
+      "confirmed_selection_matches": 1,
+      "include_proposals_selection_matches": 2,
+      "proposal_packet_citable": false,
+      "proposal_abstention": "AMBIGUOUS",
+      "qualification": "These are exact outcomes of the named synthetic fixture, not precision, recall, person-recognition performance or a product accuracy claim."
+    },
+    "verification": {
+      "focused_backend": {
+        "corpus_id": "synthetic-and-scripted-local-fixtures-in-the-five-named-test-modules",
+        "database": "postgresql://localhost:5433/exulanica_spine_test",
+        "exclusive_test_slot": true,
+        "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest tests/test_match_proposals.py tests/test_identity.py tests/test_selection.py tests/test_selection_answer.py tests/test_ingest_preconditions.py",
+        "passed": 124,
+        "duration_ms": 15430,
+        "qualification": "Regression and plumbing checks over their local synthetic/scripted fixtures, not evaluated model accuracy."
+      },
+      "restored_threshold_check": {
+        "passed": 1,
+        "duration_ms": 430
+      },
+      "ruff": "exulanica/identity plus tests/test_match_proposals.py and tests/test_identity.py: clean",
+      "import_contracts": {
+        "kept": 4,
+        "broken": 0
+      }
+    },
+    "limitations": [
+      "No empirical proposal accuracy, calibration quality, person recall, or real-media safety measurement is claimed.",
+      "user_text has no active caller and contributed to no observed proposal in this experiment.",
+      "An all-anchors index cannot invalidate on membership newly added under an entity/occurrence key it never contained. Direct naming-assertion retraction may clear the name cache without an identity invalidation event. Therefore stale=false alone is not a proof that this global index is current: its only production consumer always calls refresh from live source rows before use.",
+      "Canonical payload/dependency equality excludes computed_at and historical generation identifiers. A stale row is never silently reactivated.",
+      "Goal A does not validate capture-deletion closure, model recomputation or concurrent identity/tombstone operations. Goal D separately examines the deterministic closure and records observed differences.",
+      "The initially committed index trusted the stored payload under its content-derived id. Adversarial review identified missing payload-integrity verification; the guard and its executed negative control were completed under Goal D in revision e5eddc7. Do not attribute that later guard or its control to the initial Goal A verification."
+    ],
+    "quality_metrics_published": [],
+    "negative_controls": [
+      {
+        "id": "A-NC-01",
+        "production_mutation": "automatic-link producer disabled",
+        "production_path": "exulanica/identity/proposer.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_the_producer_widens_selection_without_making_a_citable_claim"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 510,
+        "observed_summary": "1 failed in 0.51s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-02",
+        "production_mutation": "Selection proposal admission removed",
+        "production_path": "exulanica/selection/executor.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_the_producer_widens_selection_without_making_a_citable_claim"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 430,
+        "observed_summary": "1 failed in 0.43s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-03",
+        "production_mutation": "packet proposal refusal removed",
+        "production_path": "exulanica/selection/packet.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_the_producer_widens_selection_without_making_a_citable_claim"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 440,
+        "observed_summary": "1 failed in 0.44s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-04",
+        "production_mutation": "confirmation does not revoke superseded proposal",
+        "production_path": "exulanica/identity/decisions.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index[confirm]"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 510,
+        "observed_summary": "1 failed in 0.51s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-05",
+        "production_mutation": "rejection does not reject provisional link",
+        "production_path": "exulanica/identity/decisions.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index[reject]"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 740,
+        "observed_summary": "1 failed in 0.74s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-06",
+        "production_mutation": "confirmation undo does not restore proposed state",
+        "production_path": "exulanica/identity/undo.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index[confirm]"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 480,
+        "observed_summary": "1 failed in 0.48s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-07",
+        "production_mutation": "rejection undo does not restore proposed state",
+        "production_path": "exulanica/identity/undo.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index[reject]"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 420,
+        "observed_summary": "1 failed in 0.42s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-08",
+        "production_mutation": "dependency invalidation disabled",
+        "production_path": "exulanica/identity/recomputation.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_real_proposal_decisions_and_undo_invalidate_the_consumed_index"
+        ],
+        "exit_code": 1,
+        "failed": 2,
+        "duration_ms": 550,
+        "observed_summary": "2 failed in 0.55s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-09",
+        "production_mutation": "new module omitted from package inventory",
+        "production_path": "exulanica/identity/__init__.py",
+        "pytest_selectors": [
+          "tests/test_identity.py::test_the_package_docstring_accounts_for_every_module_in_the_package"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 40,
+        "observed_summary": "1 failed in 0.04s",
+        "production_restored": true
+      },
+      {
+        "id": "A-NC-10",
+        "production_mutation": "automatic threshold removed",
+        "production_path": "exulanica/identity/proposer.py",
+        "pytest_selectors": [
+          "tests/test_match_proposals.py::test_a_surfaceable_question_below_the_auto_threshold_remains_unlinked"
+        ],
+        "exit_code": 1,
+        "failed": 1,
+        "duration_ms": 460,
+        "observed_summary": "1 failed in 0.46s",
+        "production_restored": true
+      },
+      {
+        "id": "A-TIE-NC-01",
+        "source": "exulanica/identity/proposer.py",
+        "test": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+        "before": "best_by_entity[anchor.entity_id] = scored_anchor",
+        "after": "best_by_entity[anchor.context.capture_id] = scored_anchor",
+        "exit_code": 1,
+        "pycache_invalidated_before_run_and_after_restore": true,
+        "original_source_sha256": "83059fe1e00af54b3f123f414645c3d518b88b84b020682cc15f60fc3960876c",
+        "executed": true,
+        "reverted": true,
+        "observed_failure": "Actual match_proposal ranks became [0, 2] instead of [0, 1]; duplicate exemplars occupied a candidate rank.",
+        "observed_summary": "1 failed in 0.76s"
+      },
+      {
+        "id": "A-TIE-NC-02",
+        "source": "exulanica/identity/proposer.py",
+        "test": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+        "before": "unique_best=rank == 0 and (len(scored) == 1 or score_milli > scored[1][0]),",
+        "after": "unique_best=rank == 0,",
+        "exit_code": 1,
+        "pycache_invalidated_before_run_and_after_restore": true,
+        "original_source_sha256": "83059fe1e00af54b3f123f414645c3d518b88b84b020682cc15f60fc3960876c",
+        "executed": true,
+        "reverted": true,
+        "observed_failure": "ProposalReport contained one auto_provisional link instead of an empty list; a tied entity was automatically selected.",
+        "observed_summary": "1 failed in 0.97s"
+      }
+    ],
+    "supplemental_policy_verification": {
+      "profile": "exulanica.non-biometric-match-proposals-supplement/v1",
+      "implementation_commit": "9bdb0a8ffb7c7aafc9b99df2884d4bc41ea1b734",
+      "test": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+      "scope": "Supplemental deterministic policy coverage only; no production change or accuracy measurement.",
+      "corpus": {
+        "id": "synthetic-multi-anchor-tied-object-entities-2026-09-05",
+        "kind": "synthetic repository fixture, not OGC-1 or a model run",
+        "source": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+        "capture_count": 4,
+        "object_occurrence_count": 4,
+        "confirmed_anchor_count": 3,
+        "named_entity_count": 2,
+        "unlinked_candidate_count": 1,
+        "description": "Four distinct fixture blobs create object occurrences labeled red cube with identical synthetic GPS and a shared scene group. Two named entities have confirmed exemplars. The entity sorting first receives a second confirmed exemplar. The fourth occurrence is the only unlinked candidate. Both entities have the same two contextual signals and arithmetic score 0.8."
+      },
+      "invariants": [
+        "Several confirmed exemplars of one entity yield one candidate rank; the two entity proposals have ranks 0 and 1.",
+        "Equal best scores retain two surfaced questions and no automatic, proposed or confirmed link for the candidate."
+      ],
+      "verification": {
+        "database_url": "postgresql://localhost:5433/exulanica_spine_test",
+        "exclusive_database_slot": true,
+        "baseline": {
+          "tests": 1,
+          "passed": 1,
+          "exit_code": 0
+        },
+        "restored_suite": {
+          "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest -o addopts= tests/test_match_proposals.py",
+          "collected": 21,
+          "passed": 21,
+          "failed": 0,
+          "exit_code": 0,
+          "elapsed_ms": 3200
+        },
+        "lint": {
+          "command": "uv run ruff check tests/test_match_proposals.py",
+          "exit_code": 0
+        },
+        "production_restored": true,
+        "source_sha256": "83059fe1e00af54b3f123f414645c3d518b88b84b020682cc15f60fc3960876c",
+        "new_test_functions": 1,
+        "executed_production_mutants": 2,
+        "runner_note": "Both retained controls are actual failed pytest runs after deleting proposer bytecode. Source bytes were restored and bytecode invalidated in finally. The temporary runner additionally used an overstrict output-string assertion, which fired after pytest had already failed and restoration completed; it was corrected. Retained pytest failures, rather than runner exit status, are the evidence."
+      },
+      "negative_controls": [
+        {
+          "id": "A-TIE-NC-01",
+          "source": "exulanica/identity/proposer.py",
+          "test": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+          "before": "best_by_entity[anchor.entity_id] = scored_anchor",
+          "after": "best_by_entity[anchor.context.capture_id] = scored_anchor",
+          "exit_code": 1,
+          "pycache_invalidated_before_run_and_after_restore": true,
+          "original_source_sha256": "83059fe1e00af54b3f123f414645c3d518b88b84b020682cc15f60fc3960876c",
+          "executed": true,
+          "reverted": true,
+          "observed_failure": "Actual match_proposal ranks became [0, 2] instead of [0, 1]; duplicate exemplars occupied a candidate rank.",
+          "observed_summary": "1 failed in 0.76s"
+        },
+        {
+          "id": "A-TIE-NC-02",
+          "source": "exulanica/identity/proposer.py",
+          "test": "tests/test_match_proposals.py::test_duplicate_exemplars_do_not_break_a_tie_between_entities",
+          "before": "unique_best=rank == 0 and (len(scored) == 1 or score_milli > scored[1][0]),",
+          "after": "unique_best=rank == 0,",
+          "exit_code": 1,
+          "pycache_invalidated_before_run_and_after_restore": true,
+          "original_source_sha256": "83059fe1e00af54b3f123f414645c3d518b88b84b020682cc15f60fc3960876c",
+          "executed": true,
+          "reverted": true,
+          "observed_failure": "ProposalReport contained one auto_provisional link instead of an empty list; a tied entity was automatically selected.",
+          "observed_summary": "1 failed in 0.97s"
+        }
+      ],
+      "residuals": [
+        "No person identity, model accuracy, calibration or proposal precision/recall claim is licensed by this fixture."
+      ]
+    },
+    "program_record": "docs/evaluation/2026-09-05-unblocked-backend-program.json",
+    "completed_date": "2026-09-05",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-04-semantic-answers-and-memory-lifecycle.json",
+      "record_sha256": "a072965782bb4cb45293d82a21a14500f1fa1d1d0331c57c8230ee0158bd989b"
+    }
+  },
+  "record_sha256": "2e57f73dc9d685d966abba28d6b96b2d053994fe1da25eba0e878137d7b4db98"
+}

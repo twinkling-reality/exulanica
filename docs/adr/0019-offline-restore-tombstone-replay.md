@@ -43,7 +43,8 @@ holdbacks is deferred; the refusal and the preserved foreign bytes are tested.
 The existing interval-withdrawal limits remain: replay reproduces its tombstone and serving
 refusals, and does not invent video repair or broader erasure semantics. Source and evidence stub
 rows remain as the existing audit design requires; absence means absence from serving, with
-404 for the evidence-byte endpoint after physical purge. No promise of physical deletion of every PostgreSQL stub
+410 for withdrawn evidence endpoints under the subsequent ADR-0022, before or after physical
+purge. No promise of physical deletion of every PostgreSQL stub
 is made. This local exercise does not close production rehearsal, backup retention operations,
 A-8, P-1, a cloud deployment, or disaster recovery completeness after an uncheckpointed deletion.
 

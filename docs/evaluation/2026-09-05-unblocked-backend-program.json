@@ -1,0 +1,351 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.unblocked-backend-program/v1",
+    "completed_date": "2026-09-05",
+    "brief": "docs/goal-brief-2026-09-05-unblocked-backend-program.md",
+    "brief_sha256": "045e9efc1680790a7e7e4b7e1e4a5ee26917bf9a0125c1ec02dff1195468d48f",
+    "starting_revision": "2fcabda2732d2bbc440e334279dd72393c6371b8",
+    "implementation_revision": "864c63794d055cea0622082a69b5c51e1497aabe",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-unblocked-goal-d.json",
+      "record_sha256": "b9789207509d5c9e0f363240d1f41755ade6082048ff34bac7a9b513649bbcd2"
+    },
+    "goal_records": [
+      {
+        "goal": "A",
+        "path": "docs/evaluation/2026-09-05-unblocked-goal-a.json",
+        "record_sha256": "2e57f73dc9d685d966abba28d6b96b2d053994fe1da25eba0e878137d7b4db98"
+      },
+      {
+        "goal": "C",
+        "path": "docs/evaluation/2026-09-05-unblocked-goal-c.json",
+        "record_sha256": "cda1caeb7a312c8bd096a9e56aa1c08458219befacf55e79e24190a5528d6eac"
+      },
+      {
+        "goal": "B",
+        "path": "docs/evaluation/2026-09-05-unblocked-goal-b.json",
+        "record_sha256": "cfae4a87b6e4606841421c78d8e4e91e4ac277422777a042020f123050fa0005"
+      },
+      {
+        "goal": "D",
+        "path": "docs/evaluation/2026-09-05-unblocked-goal-d.json",
+        "record_sha256": "b9789207509d5c9e0f363240d1f41755ade6082048ff34bac7a9b513649bbcd2"
+      }
+    ],
+    "outcome": "All four requested goals have implementations or the expressly permitted bounded experimental conclusion. A provisional links and live dependency index; C offline restore mechanism and pre-purge evidence refusal; B manifest gold and honest scoped scoring; D observed exact subset plus measured scene and pose mismatches. Blocked work remains blocked.",
+    "frozen_migrations": {
+      "exulanica/migrations/0001_spine.sql": "05909f3d36fba433f2adc22f57af4e0ce1cef5c8894a05d56fce8a6f53f6412e",
+      "exulanica/migrations/0002_naming_and_admission.sql": "08250a55180ba6ac1174625d0e5007688a8f693664625aa4fddfe03a3e056300",
+      "exulanica/migrations/0003_intake_batch.sql": "9e4304dae50f60b9e8d619e50c5200a60c9a1e20b3003b1da2e46b4dd5cd5173",
+      "exulanica/migrations/0004_stage_reused.sql": "61040674bb27f37d40778a554c1cdefbf477ff07016c0b055ecc9704ddfe38fd",
+      "exulanica/migrations/0005_reconstruction_rung.sql": "0d005aa84a64554727105ad1f94265a7759a71cf4db0e32665718210fd603996",
+      "exulanica/migrations/0006_functional_predicates.sql": "e4e2110efec6269136596a35f656201b35dc536e00754aaaeb32f82afc87fa33",
+      "exulanica/migrations/0007_a_vocabulary_row_states_whether_it_names.sql": "1dde0d4134de293e3126a63650e43676188e0b378f27755618d2472301eb344a",
+      "exulanica/migrations/0008_match_proposals_from_context.sql": "d0cbc0f413a1dbd5cb4a891ba0257f183ecd833be2216f178104bd7d78570386",
+      "exulanica/migrations/0009_functional_predicates_corrected.sql": "8f9bc42ce40d6a9ee6310b68d459e47643ac42c9c30f44eb8d4b4f38ef19e616",
+      "exulanica/migrations/0010_entity_renamed.sql": "0b8faf2bd38e9670bffcffdc7c646669da95b26c2fa6b9dd81f27a2ea15821aa",
+      "exulanica/migrations/0011_no_derivative_of_tombstoned_bytes.sql": "e8424d8d9547f139ef9453216b46d6b17ca72012951140043eded2aac6ebad1b",
+      "exulanica/migrations/0012_one_live_job_per_batch.sql": "b70bb1261b079f3e593ffa0305ebcd9565e6c6710a7f0b3000e607cb9125779a",
+      "exulanica/migrations/0013_the_purge_queue_has_a_reader.sql": "98b775fac728553b08263631e2ef2f311eaba78724f13b7b8939e125edc64491",
+      "exulanica/migrations/0014_a_value_schema_is_enforced.sql": "46cc44a17b3af7d077858bfe09d3d5332d2f705afdb39af0464e9712ebbaf79d",
+      "exulanica/migrations/0015_a_tombstone_marks_what_it_deletes.sql": "b66eed0e288a0b25994285dc44d7d7bc3843c15ac1ca500c623c5466665161a8",
+      "exulanica/migrations/0016_a_claimed_job_holds_a_lease.sql": "369fb8a502220238149cf77faac2ffa7594f6001225c247bef725f916a453037",
+      "exulanica/migrations/0017_adaptive_world_styles.sql": "7ebc764ba48f83f6a0cd60ca9b6c1e2a4e33434a99ca22a7f69ba490e36ded85",
+      "exulanica/migrations/0018_production_derivative_jobs.sql": "53d6f3ada2ea50cdd3def16388bc6e7e70649a22f259f5a8937d7cb8856b66b1",
+      "exulanica/migrations/0019_evaluation_model_attempts.sql": "f1cb348a6cc7602a3b7192494f4fcaabf2e42a72328f1206be7b0f3c3aac0ead",
+      "exulanica/migrations/0020_durable_spatial_authority.sql": "36f951579afb29cb930388f353a73f4893824e3f8a703a746534e8c78a7d4262",
+      "exulanica/migrations/0021_interaction_policy_versions.sql": "b1579836aaae4d848db82e708a338c14f34e646d7bdf7bfec870d5ec9e9e65e4",
+      "exulanica/migrations/0022_world_memory_package_exports.sql": "6fbce45468e39c3f2d0957ab36d25a7e4a97558e8623575b895af9bb3a567d6d",
+      "exulanica/migrations/0023_frontend_world_recipe_contract.sql": "4dcddc82fd95ccf78e4afac82f73cc487dc2d5884a02789b45fbc17bba061527",
+      "exulanica/migrations/0024_a_scene_is_a_subject_deletion_can_reach.sql": "bc11ed3928ec17b2bb4a1c1cf93d5e20403109e606e634e0b55384beaec74696",
+      "exulanica/migrations/0025_a_rung_over_a_set_of_photographs.sql": "2419f702b54764fc6015a2a72b64957db8ef8f9c37ac930f25a4155e04ffcd21",
+      "exulanica/migrations/0026_production_scene_reconstruction.sql": "92d59d62447265497e1e7d99e11690216622d3a880cf24c89b7888246eed3a26",
+      "exulanica/migrations/0027_versioned_scene_builds.sql": "a462b000291f105ee056cbe0001aa875bdfce868dcd185eaa09db52917d10517",
+      "exulanica/migrations/0028_exulanica_namespace.sql": "dea14ffa802d37c6d56ef0571ea19b4eb280898dc1437ac5dc4653e511299257",
+      "exulanica/migrations/0029_reconstruction_privacy_admission.sql": "81e74e6e058fb7cb6717d2c866efea8ff43b1b6af9f17ebde1fc3c3795a78067",
+      "exulanica/migrations/0030_person_scoped_derivative_withdrawal.sql": "05de5e5a7456bd606ff8d27d00f64d9de3310ad971bdf3598bc124cad3927401",
+      "exulanica/migrations/0031_scene_rung_withdrawal.sql": "d26cc740342e95530838962e1567047b312cff8ac5569f5ff6ff5e65d2d3bffb",
+      "exulanica/migrations/0032_upright_display_space.sql": "49ca35fbfc9f4301a52bb927a23264c3f3477f1aa85fa424dbae8f223a8b2dc2",
+      "exulanica/migrations/0033_span_digest_input_shape.sql": "86eb68c55fcae9385056a04ecc9d063183b03e520979480403e207a5f6ce3d84",
+      "exulanica/migrations/0034_ocr_is_a_region_not_a_transcript.sql": "a499bf47d63d9a7ae7f2d043bc21131a6b26100acefd9b002684ecc5250b280c",
+      "exulanica/migrations/0035_a_withdrawal_reaches_forward.sql": "bc6ac3bf51058ce1ff4c9ad6ef6e7adccfe2133675cc17fda4702dca28e8ff2f"
+    },
+    "forward_migrations": [
+      "exulanica/migrations/0036_restore_tombstone_replay.sql"
+    ],
+    "standing_constraints": {
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "database_verification_serialized": true,
+      "personal_media_admitted": false,
+      "biometric_template_added": false,
+      "production_deployment": false,
+      "legacy_full_suite_database_deviation": {
+        "discovered_during": "The mandatory full backend suite for the unblocked backend program.",
+        "what_happened": "The legacy empty_replay_database fixture created disposable exulanica_replay_test_<suffix> databases even though the configured URL named only postgresql://localhost:5433/exulanica_spine_test. This violated the program's sole-database constraint; a test-named database was not sufficient authorization.",
+        "root_reported_disposable_databases_created": 2,
+        "root_reported_cleanup": "Both disposable test databases were removed and the absence of remaining matching databases was verified by the root agent. No production database was accessed.",
+        "qualification": "This is a disclosed constraint deviation, not a claim that the earlier run complied. The reviewing subagent did not independently open a database to repeat root's cleanup check.",
+        "earlier_full_runs": [
+          {
+            "passed": 1503,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          },
+          {
+            "passed": 1504,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          }
+        ]
+      },
+      "original_uncommitted_paths_at_entry": {
+        "README.md": "d8d6f654df3f0e15f300692694d6c4c6e427bdf047440b98fcc5c437bdef6642",
+        "docs/demo-runbook.md": "23ae9a4a1f4d887b13aa3afa63ffcf59422e4c6f8064817f33c8ba70df262174",
+        "docs/frontier-roadmap.md": "92ecd10f78e438663714afa26dff5548670e23c54e98b21de6403b3467e38fcf",
+        "web/README.md": "6af1fa01faa53e6cbde5e29cb8c3ee68591ef2f7c0e338fb3743f98c9a7d8867",
+        "web/packages/landing/README.md": "30f728beddff63577a975ebf7ffdc182208c19161dc3f7a3c397f79cc28ac837",
+        "web/packages/landing/index.html": "208852f8f813a5c4f7684c4bb07f01b798cf0914d474676affe233cd76f0d233",
+        "web/packages/landing/src/main.ts": "ce9ae9bf1194306f4d5f793013a4b371caaa5faf8068fd58331334b082b7c785",
+        "web/packages/landing/src/style.css": "5e20124c66ef0b773fff3305e1b3853150be33b509648e1d7eff273826227e85",
+        "web/packages/landing/src/ui/capabilities.ts": "e9969ac6c02d85e2e759b4b10dc0acdd8826e7ec452f4d7d65414b5a5ccb1534",
+        "web/packages/landing/src/ui/chrome.ts": "aae203f4220da99e99807020b785291cb60906aaba29f81f01233fa767d4476d",
+        "web/packages/landing/src/ui/ladder-figure.ts": null,
+        "web/packages/landing/src/ui/manifesto.ts": null,
+        "web/packages/landing/src/ui/method.ts": null,
+        "web/packages/landing/test/informational-pages.test.ts": "ab4fe8cec13450767eb4f5f85cd792f170e5655560fbe7ae29d5969c6bcb8aee",
+        "web/packages/landing/test/title-screen.test.ts": "fb99e23cfc71ed0ba48fb4e010f6e88e66c24e4c43d7673bde3d554faf0371d1",
+        "web/packages/landing/vite.config.ts": "95c1da6037613cbab3706bb82440cda18304b7c32d7b252ff03ca3c466772906",
+        "web/packages/landing/src/ui/purpose.ts": "925c0280a2f4e35859561117f8dad61f2855e12bd2c3ba7a8f81839a083beb10"
+      },
+      "current_uncommitted_path_hashes": {
+        "README.md": "d8d6f654df3f0e15f300692694d6c4c6e427bdf047440b98fcc5c437bdef6642",
+        "docs/demo-runbook.md": "23ae9a4a1f4d887b13aa3afa63ffcf59422e4c6f8064817f33c8ba70df262174",
+        "docs/frontier-roadmap.md": "92ecd10f78e438663714afa26dff5548670e23c54e98b21de6403b3467e38fcf",
+        "web/README.md": "6af1fa01faa53e6cbde5e29cb8c3ee68591ef2f7c0e338fb3743f98c9a7d8867",
+        "web/packages/landing/README.md": "f2c036e2a4b3cff584dbc979c58946dff328cce1b76c8ed4e8ea65db4c49844f",
+        "web/packages/landing/index.html": "208852f8f813a5c4f7684c4bb07f01b798cf0914d474676affe233cd76f0d233",
+        "web/packages/landing/src/main.ts": "b53441e60b718de9fdaa95466d0f69c1a9d2aa92bab03978f65b92219e8012f3",
+        "web/packages/landing/src/style.css": "e2260ae2580d1ca57b4bfbfaf888401adbd8442e000751fff37940b74781b4bf",
+        "web/packages/landing/src/ui/capabilities.ts": "267c97270022703f979f7b316a8fa88a5f7b4a34f6a32d95c13ca355a55d4d8b",
+        "web/packages/landing/src/ui/chrome.ts": "aae203f4220da99e99807020b785291cb60906aaba29f81f01233fa767d4476d",
+        "web/packages/landing/src/ui/ladder-figure.ts": null,
+        "web/packages/landing/src/ui/manifesto.ts": null,
+        "web/packages/landing/src/ui/method.ts": null,
+        "web/packages/landing/test/informational-pages.test.ts": "5faf71a9f73bc062ef2fd0c9958972f7872bf2b72b369cbcf5a9de551f809feb",
+        "web/packages/landing/test/title-screen.test.ts": "8b6fa837cec24de06c280486bc53dec3f7290fee47e686ffbedfe0fe54f00e80",
+        "web/packages/landing/vite.config.ts": "95c1da6037613cbab3706bb82440cda18304b7c32d7b252ff03ca3c466772906",
+        "web/packages/landing/src/ui/purpose.ts": "8fa76b365e9c23c95e74a38cdf2d1b0a2377b6c0760e079e956c523a6b7a204d"
+      },
+      "concurrent_changes_outside_this_program": [
+        "web/packages/landing/README.md",
+        "web/packages/landing/src/main.ts",
+        "web/packages/landing/src/style.css",
+        "web/packages/landing/src/ui/capabilities.ts",
+        "web/packages/landing/test/informational-pages.test.ts",
+        "web/packages/landing/test/title-screen.test.ts",
+        "web/packages/landing/src/ui/purpose.ts"
+      ],
+      "additional_concurrent_user_paths": {
+        "web/packages/landing/src/ui/title.ts": "81700dd7ce5e93fdc8316396a73e3c937e42a4af137dd82cb0f7b6610e86a5a2",
+        "web/packages/landing/test/viewport-boundary.test.ts": "74dad4bed10cd929737798e5aa4fa939460e7e0fe48ffb2124a365747b4556fe",
+        "web/packages/landing/src/ui/gradient-forms/geometry.ts": "3f091f09d759447d133150f3f2f69f97629324ec13e69d8fbca4bf59033ac6c4",
+        "web/packages/landing/src/ui/gradient-forms/index.ts": "290c21a4f4edf3467da7a7d1e500385276247bf93249679f4b3ee289dc85b5b0",
+        "web/packages/landing/src/ui/gradient-forms/presets.ts": "13dea5d286f874f63158875f2e58bb4c54f6dc17f7470b0a1ece969370048d87",
+        "web/packages/landing/src/ui/gradient-forms/style.css": "6f3dbfa01e9c64c1c55bb6dda37ae6d5384ae05a2b0f9f13df18bf0dbf41f93f",
+        "web/packages/landing/src/ui/surface-transition.ts": "6a91d0eb7e8060ee5729c276ea954cb180f03a45d15699a40d9e616de5e9e5ba",
+        "web/packages/landing/test/gradient-forms.test.ts": "dda5f79313df6578ff5af6dedb9387accbb9e23cdfbfa8a067138c94ca34529c",
+        "web/packages/landing/test/surface-transition.test.ts": "5052ef3bfde7bec6a413303ce64545a66a6cae5f7c0b0c4426eb5f2a4720c6ad"
+      },
+      "preservation_note": "This program did not edit, stage or revert these paths. Landing paths changed concurrently after the entry snapshot and new landing files appeared. The maps retain the observed current hashes; this program did not alter their content and excluded all of these paths from its commits."
+    },
+    "verification": {
+      "completed_at_utc": "2026-09-05T14:31:52.264642+00:00",
+      "what_these_counts_mean": "Executed verification cases over synthetic/scripted fixtures and source files; these are not model accuracy, latency or production measurements.",
+      "full_backend": {
+        "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test EXULANICA_TEST_ALLOW_DATABASE_CREATION=0 uv run pytest",
+        "passed": 1504,
+        "skipped": 3,
+        "warnings": 3,
+        "collected": 1507,
+        "baseline_collected": 1481,
+        "tests_added": 26,
+        "summary": "1504 passed, 3 skipped, 3 warnings in 507.48s",
+        "database_creation_opt_in": "0",
+        "single_database_constraint": true,
+        "skip_reasons": [
+          "Two existing evaluation tests require a default generated corpus that is absent; the explicit SYNTH-1 measurement did run.",
+          "One legacy clean evaluation replay needs a new disposable database and is skipped because database creation is not authorized."
+        ],
+        "warning_reasons": [
+          "One existing Starlette/httpx deprecation.",
+          "Two expected oversized-image warnings in pixel-budget tests."
+        ]
+      },
+      "web": {
+        "command": "cd web && pnpm run typecheck && pnpm run boundaries && pnpm run test",
+        "typecheck": "passed",
+        "boundaries": {
+          "status": "passed",
+          "modules": 324,
+          "dependencies": 1057
+        },
+        "test_files_passed": 89,
+        "tests_passed": 685,
+        "scope": "Includes concurrent user-owned landing changes as present during the final check. This program made no web edits.",
+        "source_fingerprint_sha256": "ae1cf451bd34f04bd87976321486aa3bb4ed18ca49c68833f4e75baa12e4b133",
+        "source_fingerprint_encoding": "SHA-256 of canonical_json over repository-relative web file paths and their raw-byte SHA-256 values at verification time."
+      },
+      "ruff": {
+        "command": "uv run ruff check .",
+        "status": "passed"
+      },
+      "import_contracts": {
+        "command": "uv run lint-imports",
+        "kept": 4,
+        "broken": 0
+      },
+      "recomputation_and_foundation_regression": {
+        "passed": 176,
+        "scope": "tests/test_recomputation_closure.py tests/test_exact_recomputation.py tests/test_migration.py tests/test_retained_evaluation_records.py"
+      },
+      "verification_order": "All backend runs and production-mutant checks used exclusive slots. The final web and static checks followed the compliant backend run."
+    },
+    "still_open": [
+      {
+        "id": "P-1",
+        "reason": "No human biometric decision; no template writer or person recall evaluation added."
+      },
+      {
+        "id": "A-8",
+        "reason": "Written zero-data-retention confirmation for exact model IDs remains absent."
+      },
+      {
+        "id": "OGC-1",
+        "reason": "No authorized labelled corpus, consent/screening receipts or blind fixture exists. Synthetic measurements do not substitute."
+      },
+      {
+        "id": "production-rehearsal",
+        "reason": "Local restore mechanism is tested. Named operator, unattended window, cloud account/project/region/domain and A-8 are still required."
+      },
+      {
+        "id": "live-model-evaluation",
+        "reason": "No NEBIUS_API_KEY in the execution environment; M2/M3/M13 and model-plan validity remain unmeasured, with frozen labels and timing/modality prerequisites also required."
+      },
+      {
+        "id": "A-24/X-8-whole-closure",
+        "reason": "Only canonical exemplar content/dependencies and four deterministic intake/rendition payloads reproduced. Historical state, scene aggregates and pose receipts did not."
+      },
+      {
+        "id": "scene-aggregate-withdrawal",
+        "reason": "Existing live scene_group rows retain aggregate time/GPS metadata from a deleted member. The exact before/after serving projections are retained in Goal D. This needs a separate forward repair and lifecycle decision."
+      },
+      {
+        "id": "scene-pose-residual",
+        "reason": "Measured non-identical on two fresh same-host eight-camera runs. Exact reproduction and cross-machine bounds remain unresolved."
+      },
+      {
+        "id": "identity-index-invalidation",
+        "reason": "The current proposer always refreshes from authoritative rows. The stale flag alone does not cover a newly named entity absent from previous dependencies or direct assertion retraction; other consumers must refresh too."
+      },
+      {
+        "id": "calibration",
+        "reason": "No populated user-specific observed-decision bins. Raw score remains an internal proposal heuristic, not a displayed probability."
+      },
+      {
+        "id": "rung-2-and-rung-1",
+        "reason": "Authorized screened multi-capture corpus, joint registration and independent metric scale remain absent; measured Rung 1 also needs reviewed GPU path and predeclared held-out views."
+      }
+    ],
+    "test_isolation_correction": {
+      "profile": "exulanica.test-database-creation-safety/v1",
+      "scope": "Prevent an existing clean-replay test fixture from treating a configured test database URL as permission to create additional databases.",
+      "constraint_deviation": {
+        "discovered_during": "The mandatory full backend suite for the unblocked backend program.",
+        "what_happened": "The legacy empty_replay_database fixture created disposable exulanica_replay_test_<suffix> databases even though the configured URL named only postgresql://localhost:5433/exulanica_spine_test. This violated the program's sole-database constraint; a test-named database was not sufficient authorization.",
+        "root_reported_disposable_databases_created": 2,
+        "root_reported_cleanup": "Both disposable test databases were removed and the absence of remaining matching databases was verified by the root agent. No production database was accessed.",
+        "qualification": "This is a disclosed constraint deviation, not a claim that the earlier run complied. The reviewing subagent did not independently open a database to repeat root's cleanup check.",
+        "earlier_full_runs": [
+          {
+            "passed": 1503,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          },
+          {
+            "passed": 1504,
+            "skipped": 2,
+            "complied_with_sole_database_constraint": false
+          }
+        ]
+      },
+      "decision": {
+        "number": 4,
+        "name": "A test URL does not authorize database creation",
+        "invariant": "empty_replay_database skips before connecting or creating anything unless EXULANICA_TEST_ALLOW_DATABASE_CREATION is exactly the string 1. The program does not enable that opt-in.",
+        "rationale": "The user's sole allowed database URL overrides the legacy fixture's assumption that any database whose name contains test is safe as an administrative base for creating another database.",
+        "canonical_representation": "The fixture calls production env_get('TEST_ALLOW_DATABASE_CREATION') and compares it to '1' before reading TEST_DATABASE_URL. A separate focused test sets the sole allowed URL, removes the opt-in, replaces psycopg.connect with a forbidden-call stub, and directly invokes the fixture generator expecting pytest.skip.Exception.",
+        "compatibility_impact": "The legacy full clean-replay integration test becomes an explicit opt-in test and skips by default. The other replay checks remain runnable. No production code, schema, API or database role changes are retained.",
+        "failure_behaviour": "Missing, empty or any non-1 opt-in value yields a skip without a connection. The new focused test fails if a connection is attempted without that opt-in. Its production negative control overrides only the relevant env_get suffix; the forbidden connection stub ensures the control cannot open a database.",
+        "affected_surfaces": {
+          "schemas": [],
+          "migrations": [],
+          "workers": [],
+          "evidence": [],
+          "apis": [],
+          "exports": [],
+          "deletion_paths": [],
+          "browser_consumers": []
+        },
+        "test_file": "tests/test_evaluation_replay.py",
+        "tests": [
+          "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in"
+        ],
+        "negative_control": "Temporarily made production env_get return 1 for TEST_ALLOW_DATABASE_CREATION. The focused test failed at its forbidden psycopg.connect stub (1 failed in 0.26s), before any connection opened or database creation statement ran. Production source was restored."
+      },
+      "verification": {
+        "status": "focused checks and executed production negative control complete; parent will measure the final compliant full suite",
+        "database_creation_opt_in_during_verification": "0; never enabled for a real database fixture",
+        "initial_file_run": {
+          "passed": 2,
+          "skipped": 1,
+          "duration_ms": 250
+        },
+        "restored_file_run": {
+          "passed": 2,
+          "skipped": 1,
+          "duration_ms": 1370
+        },
+        "default_gate_unit_test": "passed; direct fixture invocation skipped before its forbidden connection stub was called",
+        "legacy_clean_replay_integration": "skipped because explicit database-creation opt-in was absent",
+        "other_replay_unit_check": "administrative-database refusal test passed",
+        "ruff": "tests/test_evaluation_replay.py clean",
+        "negative_control": {
+          "production_mutation": "env_get returns 1 for TEST_ALLOW_DATABASE_CREATION despite an absent explicit opt-in",
+          "production_path": "exulanica/env.py",
+          "pytest_selector": "tests/test_evaluation_replay.py::test_clean_replay_database_creation_requires_explicit_opt_in",
+          "exit_code": 1,
+          "failed": 1,
+          "observed_summary": "1 failed in 0.26s",
+          "failure_message": "database connection attempted without database-creation opt-in",
+          "database_connections_opened": 0,
+          "database_creation_attempts": 0,
+          "production_restored": true
+        }
+      },
+      "implementation_commit": "864c63794d055cea0622082a69b5c51e1497aabe"
+    },
+    "prior_disclosed_findings_not_repaired": [
+      "The source scan cannot follow arbitrary composed SQL; the runtime biometric absence tests remain passing.",
+      "Authenticated model/integrity error handlers can echo raw exception details; a coherent error-surface decision remains deferred."
+    ],
+    "review_findings_closed": [
+      "New index/proposal path makes existing decision and invalidation branches reachable.",
+      "Restore tests exercise a real pg_dump restore; recursive JSON validators gained a forward search_path fix.",
+      "Evidence serving checks tombstones before purge and emits no-store responses, while canonical reimport remains allowed.",
+      "Gold scoring validates actual displayed counts, retains bounded failures in denominators and preserves model-quality blockers.",
+      "Recomputation evicts bytes before execution and pose measurements require recovered cameras."
+    ]
+  },
+  "record_sha256": "f397997b6cd4e12730805d4661d34a660623da1530bf52f4c96a812105e3a6e2"
+}

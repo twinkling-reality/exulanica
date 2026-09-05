@@ -8,6 +8,20 @@ Every fact below was checked against the tree at `ef73866` rather than against t
 this brief and the code disagree, the code is right and this document is stale: say so and
 correct it.
 
+Executed on 2026-09-05. The linked implementation, measurement and verification records start at
+[`2026-09-05-unblocked-backend-program.json`](evaluation/2026-09-05-unblocked-backend-program.json).
+The findings below describe the starting state. A, B and C now have implementations; C establishes
+the offline restore mechanism, not the production rehearsal. D measured identical exemplar
+content and intake/rendition bytes, but differing scene aggregates and pose receipts, so the
+whole-closure exactness claim remains open. The records name the remaining blockers.
+
+Execution found one mismatch between this brief and the old suite: the clean evaluation replay
+fixture created a separate disposable database despite the configured URL. That fixture now
+requires `EXULANICA_TEST_ALLOW_DATABASE_CREATION=1` before opening any connection. Leave it unset
+under this program's single-database rule; the legacy whole-database replay test is then skipped.
+The new tombstone-restore tests run in disposable schemas of the permitted database. The program
+record discloses the earlier fixture runs and their cleanup.
+
 ---
 
 ## 1. Read these first, in this order
