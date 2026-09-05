@@ -33,6 +33,13 @@ class Recomputation:
     def __init__(self, repository: IdentityRepository) -> None:
         self._repository = repository
 
+    def serialize(self) -> None:
+        """Keep the exemplar index refresh in the same order as identity decisions."""
+        self._repository.connection.execute(
+            "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            (f"identity-match-context:{self._repository.workspace_id}",),
+        )
+
     def mark_stale(self, *, entity: Subjects = None, occurrence: Subjects = None) -> int:
         """Flag every derived artifact that depended on any of these, and say how many.
 

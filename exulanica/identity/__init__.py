@@ -5,10 +5,12 @@ occurrence is not a persistent entity, and promotion between them requires expli
 confirmation. Model confidence is never user confirmation, and a rejected match is never
 re-proposed identically.
 
-Eighteen modules in three groups. Six carry the argument, and the split between the last three of
+Nineteen modules in three groups. Six carry the argument, and the split between the last three of
 those is the one worth knowing. Eight more are the tables themselves, one module per table, and
-:mod:`exulanica.identity.repository` is the index of them. The remaining four are the producer and
-its command line: :mod:`exulanica.identity.proposer` writes ``match_proposal`` and never a link,
+:mod:`exulanica.identity.repository` is the index of them. The remaining five are the producer and
+its command line: :mod:`exulanica.identity.proposer` writes questions and organizational
+guesses,
+:mod:`exulanica.identity.match_context` supplies its confirmed exemplar index,
 :mod:`exulanica.identity.signals` is the three context signals it scores a pair on, and
 :mod:`exulanica.identity.cli` with :mod:`exulanica.identity.__main__` are how it is run by hand.
 

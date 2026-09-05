@@ -419,22 +419,90 @@ def test_no_proposal_is_written_when_nothing_corroborates(repository):
     assert report.uncorroborated == 1, report
 
 
-def test_the_producer_never_writes_a_link(corpus):
-    """It proposes and it does not decide. There is no auto-link branch and its absence is the
-    strongest available statement that an uncalibrated number is not linking anybody.
-    """
+def test_the_producer_widens_selection_without_making_a_citable_claim(corpus):
+    from exulanica.selection import (
+        Abstention,
+        EntitySelector,
+        EpistemicScope,
+        Intent,
+        SelectionPlan,
+        Session,
+        abstain,
+        build_packet,
+        execute,
+        validate,
+    )
+
     repository, run_id, _captures, occurrences = corpus
-    _name_first(repository, occurrences[0], uuid.uuid4())
-    before = repository.connection.execute(
-        "select count(*) as n from entity_link where workspace_id = %s",
-        (repository.workspace_id,),
-    ).fetchone()["n"]
-    _propose(repository, run_id)
-    after = repository.connection.execute(
-        "select count(*) as n from entity_link where workspace_id = %s",
-        (repository.workspace_id,),
-    ).fetchone()["n"]
-    assert after == before
+    actor = uuid.uuid4()
+    entity_id = _name_first(repository, occurrences[0], actor)
+    identity, report = _propose(repository, run_id)
+    assert len(report.auto_provisional) == 1
+    link = identity.links.for_occurrence(occurrences[1], states=("auto_provisional",))
+    assert link is not None and link.decided_by is None
+    pending = identity.proposals.pending(occurrence_id=occurrences[1], entity_id=entity_id)
+    assert pending["basis"]["weights_milli"] == {
+        "context_place": 400, "context_cooccurrence": 400,
+    }
+    assert pending["basis"]["thresholds_milli"]["auto_provisional"] == 800
+    assert "calibration" in pending["basis"]
+    assert "user_text" not in pending["basis"]["modalities"]
+    counts = []
+    for scope in (EpistemicScope.CONFIRMED, EpistemicScope.INCLUDE_PROPOSALS):
+        plan = SelectionPlan(intent=Intent.CAPTURES,
+                             entities=EntitySelector(ids=[entity_id]), epistemic=scope)
+        result = execute(repository.connection, validate(
+            repository.connection, plan, Session(workspace_id=repository.workspace_id, actor=actor)
+        ))
+        counts.append(result.total_matched)
+        packet = build_packet(repository.connection, result, workspace_id=repository.workspace_id)
+        if scope is EpistemicScope.INCLUDE_PROPOSALS:
+            assert not packet.citable
+            assert abstain(packet)[1] is Abstention.AMBIGUOUS
+    assert counts == [1, 2]
+
+
+@pytest.mark.parametrize("decision", ["confirm", "reject"])
+def test_real_proposal_decisions_and_undo_invalidate_the_consumed_index(corpus, decision):
+    from exulanica.identity.match_context import MATCH_CONTEXT_KIND, refresh_match_context
+    from exulanica.identity.undo import undo
+
+    repository, run_id, _captures, occurrences = corpus
+    actor = uuid.uuid4()
+    entity_id = _name_first(repository, occurrences[0], actor)
+    identity, report = _propose(repository, run_id)
+    proposal_link = report.auto_provisional[0]
+    index = repository.connection.execute(
+        "select derived_id, dep_index, payload from derived_artifact "
+        "where workspace_id = %s and kind = %s and not stale",
+        (repository.workspace_id, MATCH_CONTEXT_KIND),
+    ).fetchone()
+    assert f"entity:{entity_id}" in index["dep_index"]
+    assert f"occurrence:{occurrences[0]}" in index["dep_index"]
+    assert index["payload"]["anchors"][0]["occurrence_id"] == str(occurrences[0])
+    operation = confirm_link if decision == "confirm" else reject_link
+    operation(identity, occurrence_id=occurrences[1], entity_id=entity_id, actor=actor)
+    event = identity.events.recent(limit=1)[0]
+    state = repository.connection.execute(
+        "select state from entity_link where link_id = %s", (proposal_link,),
+    ).fetchone()["state"]
+    assert state == ("revoked" if decision == "confirm" else "rejected")
+    if decision == "confirm":
+        assert event["payload"]["superseded_proposal"] == str(proposal_link)
+    assert repository.connection.execute(
+        "select stale from derived_artifact where derived_id = %s", (index["derived_id"],),
+    ).fetchone()["stale"] is True
+    rebuilt = refresh_match_context(identity)
+    assert len(rebuilt["anchors"]) == (2 if decision == "confirm" else 1)
+    undo(identity, event_id=event["event_id"], actor=actor)
+    assert repository.connection.execute(
+        "select state from entity_link where link_id = %s", (proposal_link,),
+    ).fetchone()["state"] == "proposed"
+    assert repository.connection.execute(
+        "select count(*) as n from derived_artifact where workspace_id = %s "
+        "and kind = %s and not stale", (repository.workspace_id, MATCH_CONTEXT_KIND),
+    ).fetchone()["n"] == 0
+
 
 
 def test_the_surface_threshold_is_a_parameter_and_not_a_constant():
@@ -537,3 +605,15 @@ def test_a_rejected_proposal_reads_as_suppressed_even_though_its_row_still_says_
     snapshot = read_snapshot(repository.connection, repository.workspace_id)
     assert [p.suppressed_by_rejection for p in snapshot.proposals] == [True]
     assert [e.open_question_count for e in snapshot.entities] == [0]
+
+
+def test_a_surfaceable_question_below_the_auto_threshold_remains_unlinked(corpus, monkeypatch):
+    repository, run_id, _captures, occurrences = corpus
+    _name_first(repository, occurrences[0], uuid.uuid4())
+    monkeypatch.setitem(PROPOSER_PARAMS, "auto_provisional_threshold_milli", 801)
+    identity, report = _propose(repository, run_id)
+    assert len(report.surfaced) == 1
+    assert report.auto_provisional == []
+    assert identity.links.for_occurrence(
+        occurrences[1], states=("auto_provisional", "confirmed"),
+    ) is None

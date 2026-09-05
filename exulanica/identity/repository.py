@@ -87,4 +87,5 @@ class IdentityRepository:
         that no event records, and the ledger would no longer describe the state.
         """
         with self._db.transaction():
+            self.recomputation.serialize()
             yield self._db

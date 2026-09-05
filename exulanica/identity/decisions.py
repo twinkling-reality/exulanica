@@ -26,7 +26,7 @@ again, which is the opposite failure and just as bad.
 **What is deliberately absent.** No function here computes, stores or compares an embedding of
 any kind. Identity is established by the account holder pointing at a photograph and saying who
 that is. Automatic proposal from non-biometric signals (time proximity, scene grouping, place,
-co-occurrence) is the next rung and would write ``match_proposal`` rows through
+co-occurrence) writes ``match_proposal`` rows and organizational guesses through
 :meth:`exulanica.identity.proposals.Proposals.record`; face embeddings are a separate decision with
 legal weight and open item P-1 has not been answered.
 """

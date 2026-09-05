@@ -955,8 +955,8 @@ def test_the_facade_holds_no_sql():
 def test_the_package_docstring_accounts_for_every_module_in_the_package():
     """The three-way split at the top of ``exulanica.identity`` is a partition, not a gesture.
 
-    A docstring that says six modules carry the argument, eight are the tables and four are the
-    producer is a claim about all eighteen files, and the arithmetic is the point of writing it
+    A docstring that says six modules carry the argument, eight are the tables and five are the
+    producer is a claim about all nineteen files, and the arithmetic is the point of writing it
     that way. The eight are named one rung down, in ``repository.py``'s index, so the two
     docstrings are read together. Add a module and name it in neither and this goes red, which
     is what stops a count nobody can reproduce from the code turning into decoration.
@@ -968,5 +968,5 @@ def test_the_package_docstring_accounts_for_every_module_in_the_package():
 
     assert on_disk - named == set(), "modules that neither docstring accounts for"
     assert named - on_disk == set(), "a docstring naming a module that is gone"
-    assert len(on_disk) == 18
-    assert "Eighteen modules in three groups" in exulanica.identity.__doc__
+    assert len(on_disk) == 19
+    assert "Nineteen modules in three groups" in exulanica.identity.__doc__

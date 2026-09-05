@@ -4,10 +4,11 @@ This is the second rung of identity. The first is the account holder saying who 
 that stays the only thing that creates an entity. What this adds is a question: given a person
 already named in one photograph, is this detection in another photograph the same person?
 
-**It proposes and it never links.** The producer writes ``match_proposal`` and touches no other
-table. There is no auto-link branch, and its absence is deliberate rather than unimplemented: the
-recall figures that would justify one are extrapolated rather than measured, and the fallback the
-domain model already chose is proposal-only, "which is a weaker product and a more honest one".
+**It proposes; a unique best contextual match may also organize as a guess.** At the recorded
+threshold it writes ``auto_provisional``, never ``confirmed``. The Selection's explicit
+``INCLUDE_PROPOSALS`` scope may include that link, but its packet remains non-citable. These
+unvalidated weights are a layout/filtering policy, not a calibrated probability or a factual
+claim. Human confirmation is the only route to a confirmed link (ADR-0018).
 
 **It is not biometric and cannot become so from here.** Face, voice and gait have no producer.
 The decision that would permit a face embedding belongs to a human, is recorded as open in
@@ -34,6 +35,7 @@ from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.identity.keys import PRODUCIBLE_MODALITIES, basis_digest, normalise_modalities
+from exulanica.identity.match_context import refresh_match_context
 from exulanica.identity.repository import IdentityRepository
 from exulanica.identity.signals import CaptureContext, ContextSignals, corroborating_modalities
 
@@ -48,7 +50,7 @@ OCCURRENCE_ENTITY: Final = "occurrence_entity"
 #: than applied retroactively to rows produced under different arithmetic. The depth stage's
 #: parameters carry the same warning for the same reason.
 PROPOSER_PARAMS: Final[dict[str, Any]] = {
-    "version": 1,
+    "version": 2,
     # The same figure scene grouping uses for its own clustering, so the two agree about what
     # "the same place" means rather than disagreeing by a number nobody chose.
     "max_place_distance_m": 250,
@@ -63,7 +65,8 @@ PROPOSER_PARAMS: Final[dict[str, Any]] = {
     # signals agreeing is what earns a question. At 300 this sat below the smallest score any
     # corroborated pair can have, so `dropped` was unreachable and the threshold decided nothing.
     "surface_threshold_milli": 500,
-    # There is deliberately NO auto_link_threshold. See the module docstring.
+    # An explicit organizational guess. It is never a factual-confidence threshold.
+    "auto_provisional_threshold_milli": 800,
     "algorithm": "corroborating_modalities_weighted_sum",
 }
 
@@ -113,6 +116,7 @@ class ProposalReport:
     surfaced: list[uuid.UUID] = field(default_factory=list)
     dropped: list[uuid.UUID] = field(default_factory=list)
     suppressed: list[uuid.UUID] = field(default_factory=list)
+    auto_provisional: list[uuid.UUID] = field(default_factory=list)
     #: Pairs that produced no corroborating modality at all and were therefore never written.
     #: Counted rather than stored: a row asserting "nothing suggested this" would be a row per
     #: pair of everything in the library.
@@ -153,7 +157,9 @@ def propose_matches(
         return report
 
     for candidate in candidates:
-        scored: list[tuple[int, tuple[str, ...], Anchor]] = []
+        best_by_entity: dict[uuid.UUID, tuple[int, tuple[str, ...], Anchor]] = {}
+        already_present = {a.entity_id for a in anchors
+                           if a.context.capture_id == candidate.context.capture_id}
         for anchor in anchors:
             # Hard constraints, before anything is scored. Same class, same detector label, and
             # never a candidate in a capture the anchor is already confirmed in: two person
@@ -162,7 +168,7 @@ def propose_matches(
                 continue
             if anchor.label != candidate.label:
                 continue
-            if anchor.context.capture_id == candidate.context.capture_id:
+            if anchor.entity_id in already_present:
                 continue
             # `never_same` is deliberately not consulted. It constrains an entity against an
             # entity, and a candidate here is by construction linked to no entity at all, so
@@ -184,11 +190,15 @@ def propose_matches(
                 # everything in the library, and it would assert nothing.
                 report.uncorroborated += 1
                 continue
-            scored.append((_score_milli(producible), producible, anchor))
+            scored_anchor = (_score_milli(producible), producible, anchor)
+            previous = best_by_entity.get(anchor.entity_id)
+            if previous is None or scored_anchor[0] > previous[0]:
+                best_by_entity[anchor.entity_id] = scored_anchor
 
         # Best first, and the entity id breaks a tie so two runs over unchanged data produce the
         # same ranks. Ranking is within one occurrence's candidate set and means nothing across
         # occurrences; the index on (workspace, occurrence, rank) says the same thing.
+        scored = list(best_by_entity.values())
         scored.sort(key=lambda item: (-item[0], str(item[2].entity_id)))
         for rank, (score_milli, modalities, anchor) in enumerate(scored):
             _write_proposal(
@@ -200,6 +210,7 @@ def propose_matches(
                 score_milli=score_milli,
                 rank=rank,
                 run_id=run_id,
+                unique_best=rank == 0 and (len(scored) == 1 or score_milli > scored[1][0]),
             )
     return report
 
@@ -214,10 +225,17 @@ def _write_proposal(
     score_milli: int,
     rank: int,
     run_id: uuid.UUID,
+    unique_best: bool,
 ) -> None:
     normalised = normalise_modalities(modalities)
     basis = {
         "modalities": list(normalised),
+        "weights_milli": {name: PROPOSER_PARAMS[_WEIGHTS[name]] for name in normalised},
+        "thresholds_milli": {
+            "surface": PROPOSER_PARAMS["surface_threshold_milli"],
+            "auto_provisional": PROPOSER_PARAMS["auto_provisional_threshold_milli"],
+        },
+        "calibration": "unavailable_no_observed_user_calibration",
         "extractor_versions": {
             "context_signals": str(PROPOSER_PARAMS["version"]),
             "params": params_digest(),
@@ -247,23 +265,32 @@ def _write_proposal(
     emit_key = (
         f"match:{candidate.identity_key.hex()}:{anchor.entity_id}:{'+'.join(normalised)}"
     )
-    proposal_id = repository.proposals.record(
-        occurrence_id=candidate.occurrence_id,
-        entity_id=anchor.entity_id,
-        score=score_milli / 1000,
-        rank=rank,
-        basis_digest=digest,
-        basis=basis,
-        outcome=outcome,
-        produced_by_run=run_id,
-        emit_key=emit_key,
-        new_modality=new_modality,
-    )
-    if proposal_id is None:
-        return
-    {"surfaced": report.surfaced, "dropped": report.dropped}.get(
-        outcome, report.suppressed
-    ).append(proposal_id)
+    with repository.transaction():
+        proposal_id = repository.proposals.record(
+            occurrence_id=candidate.occurrence_id,
+            entity_id=anchor.entity_id,
+            score=score_milli / 1000,
+            rank=rank,
+            basis_digest=digest,
+            basis=basis,
+            outcome=outcome,
+            produced_by_run=run_id,
+            emit_key=emit_key,
+            new_modality=new_modality,
+        )
+        if proposal_id is None:
+            return
+        {"surfaced": report.surfaced, "dropped": report.dropped}.get(
+            outcome, report.suppressed
+        ).append(proposal_id)
+        if (outcome == "surfaced" and unique_best
+                and score_milli >= int(PROPOSER_PARAMS["auto_provisional_threshold_milli"])):
+            # The proposal stays surfaced: an organizational guess still awaits a human answer.
+            report.auto_provisional.append(repository.links.insert(
+                occurrence_id=candidate.occurrence_id, entity_id=anchor.entity_id,
+                state="auto_provisional", method="context_weighted_sum", basis_digest=digest,
+                score=score_milli / 1000,
+            ))
 
 
 def _read_anchors(
@@ -274,26 +301,18 @@ def _read_anchors(
     A confirmed link and not merely a display name: an entity nobody has confirmed anywhere has
     no capture to compare against, so it can corroborate nothing.
     """
-    rows = repository.connection.execute(
-        "select e.entity_id, e.display_name, o.class, o.quality, o.capture_id "
-        "from entity e "
-        "join entity_link l on l.entity_id = e.entity_id and l.state = 'confirmed' "
-        "join occurrence o on o.occurrence_id = l.occurrence_id "
-        "where e.workspace_id = %s and e.deleted_at is null and e.merged_into is null "
-        "order by e.entity_id, o.capture_id",
-        (repository.workspace_id,),
-    ).fetchall()
+    rows = refresh_match_context(repository)["anchors"]
     anchors: list[Anchor] = []
     for row in rows:
-        context = signals.of(row["capture_id"])
+        context = signals.of(uuid.UUID(row["capture_id"]))
         if context is None:
             continue
         anchors.append(
             Anchor(
-                entity_id=row["entity_id"],
+                entity_id=uuid.UUID(row["entity_id"]),
                 display_name=row["display_name"],
                 occurrence_class=row["class"],
-                label=_label_of(row["quality"]),
+                label=row["label"],
                 context=context,
             )
         )
@@ -313,6 +332,7 @@ def _read_candidates(
         "select o.occurrence_id, o.identity_key, o.class, o.quality, o.capture_id "
         "from occurrence o "
         "where o.workspace_id = %s "
+        "  and not tombstone_blocks_any_span(o.workspace_id, o.span_ids) "
         "  and not exists (select 1 from entity_link l "
         "                   where l.occurrence_id = o.occurrence_id "
         "                     and l.state in ('confirmed', 'auto_provisional', 'proposed')) "
