@@ -1,0 +1,14 @@
+# The reviewed base provides torch 2.7.1 / torchvision 0.22.1 / CUDA 12.8.
+# Transitive resolved versions are retained in the resulting digest-pinned image inventory.
+torch==2.7.1
+torchvision==0.22.1
+numpy==2.2.6
+scipy==1.15.3
+pillow==12.3.0
+pycolmap==4.2.0
+torchmetrics==1.7.2
+ninja==1.11.1.4
+jaxtyping==0.3.2
+rich==14.0.0
+plyfile==1.1.2
+imageio==2.37.0

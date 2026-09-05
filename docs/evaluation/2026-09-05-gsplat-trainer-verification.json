@@ -1,0 +1,108 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.gsplat-trainer-verification/v1",
+    "date": "2026-09-05",
+    "implementation_present": true,
+    "cuda_training_executed": false,
+    "image_built": false,
+    "trained_scene_accepted": false,
+    "database_access": false,
+    "hardware": {
+      "os": "Darwin",
+      "architecture": "arm64",
+      "processor": "Apple M3 Pro",
+      "torch": "2.14.0",
+      "cuda_available": false,
+      "mps_available": true
+    },
+    "actual_runtime_capability_refusal": "gsplat training requires an NVIDIA CUDA GPU; this host has none",
+    "checks": {
+      "focused_tests": {
+        "command": "uv run pytest tests/test_gsplat_runner.py tests/test_gsplat_dataset.py tests/test_gsplat_container.py tests/test_reconstruction_splat.py",
+        "passed": 37
+      },
+      "ruff": "passed on owned Python files",
+      "import_contracts": {
+        "kept": 4,
+        "broken": 0
+      },
+      "uv_lock_check": "passed",
+      "production_mutants_killed": 41,
+      "combined_non_database_verification": {
+        "passed": 74,
+        "files": [
+          "tests/test_gsplat_runner.py",
+          "tests/test_gsplat_dataset.py",
+          "tests/test_gsplat_container.py",
+          "tests/test_reconstruction_splat.py",
+          "tests/test_reconstruction_scene_gate.py",
+          "tests/test_reference_inputs.py",
+          "tests/test_retained_evaluation_records.py"
+        ]
+      },
+      "mutation_reproducer": "uv run python scripts/verify_gsplat_controls.py",
+      "native_library_isolation_sequence": {
+        "command": "uv run pytest tests/test_reconstruction_pose.py tests/test_gsplat_runner.py tests/test_gsplat_dataset.py",
+        "passed": 17,
+        "duplicate_runtime_override": false
+      }
+    },
+    "test_evidence_scope": [
+      "Real CPU Adam optimizer continuation is bit-identical including scheduler and RNG states.",
+      "Real native pycolmap rectification ran on generated test camera/image fixtures; this is not a reference scene.",
+      "Actual launcher child processes exercised a declared local Docker-protocol stand-in: cooperative exit75, forced kill, disconnected CLI, concurrent stop/exit race, ownership refusal, uncertain-state protection, and reconciliation. No real Docker daemon or GPU execution was performed.",
+      "No GPU convergence, image quality, GPU resource use, trained-scene runtime bill, or browser appearance was measured by this verification.",
+      "Appearance acceptance is explicitly independent of recorded rung; a nonmetric pose may train but cannot earn physical scale.",
+      "All Torch-bearing checks execute in child pytest processes, preserving real CPU Adam/RNG/checkpoint assertions without loading Torch into the COLMAP test process."
+    ],
+    "remaining": [
+      "NVIDIA CUDA compute access and any required paid allocation approval",
+      "Built/reviewed immutable runner image",
+      "Authorized source scene through existing privacy admission",
+      "Real interrupted GPU continuation and held-out/visual quality evaluation",
+      "Independent physical scale and coverage evidence before any recorded rung1 claim"
+    ],
+    "source_sha256": {
+      "exulanica/reconstruction/gsplat_runner.py": "743c30fb9d561cc0239ce224bff39563143ffadf169f8b13574eb561ca1c7c89",
+      "exulanica/reconstruction/gsplat_protocol.py": "845579aeb8713718da90a1e41ff97a4e18f39572f68e26d587a4c5e69b2a28a7",
+      "exulanica/reconstruction/gsplat_container.py": "d04cd04802eb6b62f29a088b5bda7205217a9a383519a29ca4bbdc50975f5c7d",
+      "exulanica/reconstruction/splat.py": "033876fc970063ecb8629ee58eb7086a8ba41ecfe466b8ce4afe5fff1cfb20de",
+      "tests/test_gsplat_runner.py": "db8afb0ed246e4d7c5c6c9102f1820cdc95d073b2fd22e7e86dd493e2187b0aa",
+      "tests/test_gsplat_dataset.py": "57a4369d4bc0302cf1f0e65c09434eca6e8a6416fa9da5e250e0ce6fc59003e7",
+      "tests/test_reconstruction_splat.py": "ed409db532f55b737932fa06e89f63ce20fdbd9829f36872bfe04bffc422d229",
+      "deploy/gsplat/Dockerfile": "95aa58f3ee1c0a461b31b1129f2ee6122f4c7bb417ac55f71be5f3e72ef6702b",
+      "deploy/gsplat/requirements.txt": "72fc29ed614300790d55c9a07cbe87702299981f5cecf700ed56afdda9dd03fd",
+      "docs/gsplat-scene-jobs.md": "927c7852a3d0b73d71077f4c4169f272b4c0c4152b3bdea097b1544be91698e3",
+      "scripts/verify_gsplat_controls.py": "e205cc0e35831d8170215ba2edf4358b6e46a4fff4c73091fda867e8ffbbcaf6",
+      "deploy/gsplat/compressor/package.json": "780922ad9608715c6e40513b3340fec8e92afb30a02f12a4e58bb0a68c939304",
+      "deploy/gsplat/compressor/package-lock.json": "4e608c12bf1f1f0bc740f277a255886e52fa1c5889ace1d14924901ffcb1d04f",
+      "docs/adr/gsplat-training-and-recorded-rung.md": "69785c1a7f6cb5507b120173a6c5fb15131e0e7a6bc94464b825718638c1d2b6",
+      "exulanica/evaluation/reference_inputs.py": "7100a5729489eb47925c5b437d799cb1594246fbdc26924432efb6090ad68ad9",
+      "tests/test_reference_inputs.py": "0a0f7d5c25d64185eaf87a54ebb61f2fcdf9ce32ab3ad695e55438ed5dcd7b40",
+      "tests/test_gsplat_container.py": "e75df4864cccc61bd656cef435cdd88edf3cb833e7cc3e7cbde75d440d7c1705"
+    },
+    "negative_controls_sha256": "26db4ed3416bf3e0614bd85ea187886c1aa4204e5024978abf34b5c4e0d55b2b",
+    "recorded_rung_scale_gate_preserved": true,
+    "nonmetric_optimization_allowed_without_rung_promotion": true,
+    "real_cpu_compressor_smoke": {
+      "corpus_class": "generated-format-fixture-only",
+      "trained_scene": false,
+      "package": "@playcanvas/splat-transform",
+      "version": "3.3.3",
+      "upstream_revision": "d092ae94e6e1d5161990ce5ca960f659ea9faf5f",
+      "gaussian_count": 512,
+      "meta_version": 2,
+      "zip_compression_methods": [
+        0
+      ],
+      "byte_length": 16168,
+      "sog_sha256": "cc165ad93f290bbce4492f54d469fdb9daf436cab8b671ec8ae15e87961b7ade",
+      "source_ply_sha256": "eae289028b8a46927daa8753148b6e0d07b8ba177c653b86b9f727374f1eaef2",
+      "measured_converter_report_duration_ms": 568,
+      "duration_scope": "converter-reported-test-only-CPU-conversion-not-training",
+      "output_retention": "temporary-test-material-not-a-reference-scene"
+    }
+  },
+  "record_sha256": "34dc72046590ed87b12c1fc70e4846a2bd6d42e0f2dbda5cacf32d91fbf8c6b5"
+}

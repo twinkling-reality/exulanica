@@ -1,0 +1,7 @@
+{
+  "name": "exulanica-gsplat-compressor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned PlayCanvas CPU SOG converter for scene-job delivery",
+  "dependencies": {"@playcanvas/splat-transform": "3.3.3"}
+}

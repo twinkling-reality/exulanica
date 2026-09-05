@@ -1,4 +1,4 @@
-"""Preemptible per-scene gsplat job controller and rung-1 quality gate.
+"""Preemptible per-scene gsplat job controller and appearance quality gate.
 
 The controller is intentionally narrower than a trainer.  It invokes a digest-pinned execution
 image's reviewed ``exulanica-gsplat-scene-v1`` entrypoint, validates the actual runtime and quality
@@ -9,7 +9,8 @@ the selected PlayCanvas compressor.  This repository does not silently substitut
 
 Only ``nerfstudio-project/gsplat`` under Apache-2.0 is accepted.  Common INRIA package names are a
 hard manifest refusal rather than a warning.  Training state stays outside the delivery inventory;
-only the accepted SOG and versioned receipts are publication outputs.
+only the accepted SOG and versioned receipts are publication outputs. Appearance acceptance
+never independently promotes a recorded scene rung; scale and coverage gates remain separate.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from exulanica.reconstruction.gsplat_protocol import TRAINING_PROTOCOL
 from exulanica.reconstruction.pose import CommandResult
 
 __all__ = [
@@ -89,6 +91,7 @@ class SplatBuildManifest:
     checkpoint_every: int
     gaussian_cap: int
     heldout_every: int
+    heldout_source_sha256: tuple[str, ...]
     usd_per_gpu_hour: float
     min_psnr: float
     min_ssim: float
@@ -122,6 +125,14 @@ class SplatBuildManifest:
                 raise ValueError(f"{field} must be positive")
         if self.checkpoint_every > self.max_iterations:
             raise ValueError("checkpoint_every cannot exceed max_iterations")
+        if (
+            not self.heldout_source_sha256
+            or len(set(self.heldout_source_sha256)) != len(self.heldout_source_sha256)
+            or not set(self.heldout_source_sha256) < set(self.source_sha256)
+        ):
+            raise ValueError(
+                "heldout_source_sha256 must be a unique proper subset of source hashes"
+            )
         _positive(self.usd_per_gpu_hour, "usd_per_gpu_hour", allow_zero=True)
         _positive(self.min_psnr, "min_psnr", allow_zero=True)
         if not 0 <= self.min_ssim <= 1:
@@ -149,6 +160,7 @@ class SplatBuildManifest:
                 "strategy": "mcmc",
                 "runner_profile": _RUNNER_PROFILE,
             },
+            "training_protocol": TRAINING_PROTOCOL,
             "execution_image": self.execution_image,
             "dependency_inventory": list(self.dependency_inventory),
             "requested_gpu": self.requested_gpu,
@@ -157,6 +169,7 @@ class SplatBuildManifest:
                 "checkpoint_every": self.checkpoint_every,
                 "gaussian_cap": self.gaussian_cap,
                 "heldout_every": self.heldout_every,
+                "heldout_source_sha256": list(self.heldout_source_sha256),
             },
             "cost_rate": {"usd_per_gpu_hour": self.usd_per_gpu_hour},
             "quality_thresholds": {
@@ -198,6 +211,7 @@ class SplatQuality:
     def as_payload(self) -> dict[str, object]:
         return {
             "profile": _QUALITY_PROFILE,
+            "acceptance_scope": "image-quality-and-byte-budget-only; recorded-rung-is-independent",
             "heldout_views": self.heldout_views,
             "psnr": self.psnr,
             "ssim": self.ssim,
@@ -298,19 +312,39 @@ def _runtime_and_metrics(
     for field in ("gpu", "cuda_version", "driver_version"):
         if not isinstance(runtime.get(field), str) or not runtime[field]:
             raise ValueError(f"runtime.{field} must record the actual execution environment")
+    if (
+        runtime.get("manifest_digest") != manifest.digest
+        or metrics.get("manifest_digest") != manifest.digest
+    ):
+        raise ValueError("runner receipts do not bind the exact build manifest")
+    if runtime.get("duration_accounting_complete") is not True:
+        raise ValueError("runner duration is incomplete after an unclean interruption")
+    if runtime.get("training_protocol") != TRAINING_PROTOCOL:
+        raise ValueError("runner training and metric protocol differs from the manifest")
+    if runtime.get("ply_sha256") != _digest_file(output / "accepted.ply"):
+        raise ValueError("runner PLY bytes do not match their measured receipt")
     imports = runtime.get("loaded_packages")
     if not isinstance(imports, list):
         raise ValueError("runtime.loaded_packages must be an exact array")
     normalized = {str(item).lower().replace("_", "-") for item in imports}
+    if "gsplat" not in normalized:
+        raise ValueError("runtime package inventory omits gsplat")
     if normalized & _BLOCKED_DEPENDENCIES:
         raise ValueError("the runtime loaded a blocked INRIA rasterizer")
     return runtime, metrics
 
 
-def _verify_pose_receipt(manifest: SplatBuildManifest, path: Path) -> None:
+def _verify_pose_receipt(manifest: SplatBuildManifest, path: Path, dataset_dir: Path) -> str:
     receipt = _object(path)
     if receipt.get("manifest_digest") != manifest.pose_manifest_digest:
         raise ValueError("the pose receipt does not match the splat manifest")
+    pose_manifest = receipt.get("manifest")
+    if (
+        receipt.get("profile") != "exulanica.colmap-pose-receipt/v2"
+        or not isinstance(pose_manifest, dict)
+        or _digest_bytes(_canonical(pose_manifest)) != manifest.pose_manifest_digest
+    ):
+        raise ValueError("the carried pose manifest does not match its digest")
     quality = receipt.get("quality")
     if not isinstance(quality, dict):
         raise ValueError("the pose receipt has no quality payload")
@@ -319,13 +353,55 @@ def _verify_pose_receipt(manifest: SplatBuildManifest, path: Path) -> None:
     if quality.get("accepted") is not True:
         raise ValueError("the pose quality gate did not accept this scene")
     scale = quality.get("metric_scale_metres_per_unit")
-    if isinstance(scale, bool) or not isinstance(scale, int | float) or scale <= 0:
+    if scale is not None and (
+        isinstance(scale, bool)
+        or not isinstance(scale, int | float)
+        or not math.isfinite(scale)
+        or scale <= 0
+    ):
         raise ValueError("rung 1 requires a measured metric pose scale")
     if (
-        quality.get("jointly_coregistered") is True
+        scale is not None
+        and quality.get("jointly_coregistered") is True
         and quality.get("shared_metric_frame") is not True
     ):
         raise ValueError("joint capture sets have not earned a shared metric frame")
+
+    frames = pose_manifest.get("frames")
+    if not isinstance(frames, list) or not frames:
+        raise ValueError("the carried pose manifest has no exact source frame inventory")
+    declared = {item.get("filename"): item.get("sha256") for item in frames}
+    actual = {
+        path.relative_to(dataset_dir / "images").as_posix(): _digest_file(path)
+        for path in (dataset_dir / "images").rglob("*")
+        if path.is_file()
+    }
+    if len(declared) != len(frames) or declared != actual:
+        raise ValueError(
+            "dataset filenames and source hashes differ from the accepted pose manifest"
+        )
+    selected = quality.get("connected_model")
+    if not isinstance(selected, str) or not selected or Path(selected).name != selected:
+        raise ValueError("pose receipt does not select one valid connected sparse model")
+    inventory = quality.get("artifact_inventory")
+    if not isinstance(inventory, list) or not inventory:
+        raise ValueError("pose receipt has no measured sparse artifact inventory")
+    expected = {
+        item.get("path"): (item.get("sha256"), item.get("byte_length")) for item in inventory
+    }
+    sparse = dataset_dir / "sparse"
+    if any(path.is_symlink() for path in sparse.rglob("*")):
+        raise ValueError("pose sparse artifacts may not be symlinks")
+    observed = {
+        path.relative_to(sparse).as_posix(): (_digest_file(path), path.stat().st_size)
+        for path in sparse.rglob("*")
+        if path.is_file()
+    }
+    if len(expected) != len(inventory) or observed != expected or not (sparse / selected).is_dir():
+        raise ValueError(
+            "dataset sparse model bytes differ from the accepted pose artifact inventory"
+        )
+    return selected
 
 
 def _verify_dataset_sources(manifest: SplatBuildManifest, dataset_dir: Path) -> None:
@@ -362,6 +438,8 @@ def _quality(
     floaters = _finite(metrics.get("floaters_fraction"), "floaters_fraction")
     coverage = _finite(metrics.get("coverage_fraction"), "coverage_fraction")
     duration = _finite(runtime.get("duration_seconds"), "duration_seconds")
+    if duration <= 0:
+        raise ValueError("runtime duration must be positive")
     fractions = (
         (ssim, "ssim"),
         (lpips, "lpips"),
@@ -427,7 +505,7 @@ def run_gsplat_job(
     if not dataset_dir.is_dir():
         raise ValueError("the authorized COLMAP dataset directory does not exist")
     _verify_dataset_sources(manifest, dataset_dir)
-    _verify_pose_receipt(manifest, pose_receipt)
+    _verify_pose_receipt(manifest, pose_receipt, dataset_dir)
     jobs_root.mkdir(parents=True, exist_ok=True)
     job = jobs_root / manifest.digest
     job.mkdir(exist_ok=True)
@@ -457,6 +535,8 @@ def run_gsplat_job(
             _RUNNER_PROFILE,
             "--manifest",
             str(manifest_path),
+            "--pose-receipt",
+            str(pose_receipt),
             "--dataset",
             str(dataset_dir),
             "--output",
@@ -515,6 +595,20 @@ def run_gsplat_job(
             )
             return SplatJobResult("completed", manifest.digest, job, quality, False)
 
+        version_command = (compressor_executable, "--version")
+        version = executor(version_command, job)
+        expected_version = TRAINING_PROTOCOL["compressor"]["version"]
+        if version.returncode != 0 or not re.search(
+            rf"\bv{re.escape(expected_version)}\b", version.stdout
+        ):
+            return SplatJobResult(
+                "failed",
+                manifest.digest,
+                job,
+                None,
+                False,
+                "SOG compressor does not match the manifest protocol version",
+            )
         compress_command = (
             compressor_executable,
             "--no-tty",
@@ -529,6 +623,8 @@ def run_gsplat_job(
             job / "compression-attempt.json",
             {
                 "command": list(compress_command),
+                "version_output": version.stdout.strip(),
+                "protocol": TRAINING_PROTOCOL["compressor"],
                 "returncode": compressed.returncode,
                 "duration_ms": compressed.duration_ms,
                 "stdout_sha256": _digest_bytes(compressed.stdout.encode()),

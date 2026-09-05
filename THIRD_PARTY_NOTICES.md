@@ -433,3 +433,18 @@ than silently reconciled.
 
 Last built: **2026-08-28**. Rebuild this file whenever a dependency manifest or the model manifest
 changes, and re-check section 9 before submission.
+
+## Scene Gaussian training and compression (2026-09-05)
+
+The optional `deploy/gsplat` runtime uses `nerfstudio-project/gsplat` v1.5.3 at commit
+`937e29912570c372bed6747a5c9bf85fed877bae` under Apache-2.0. The image retains the upstream checkout,
+including its LICENSE and third-party notices, at `/opt/gsplat`. Exulanica's independent training
+loop uses the public rasterization, MCMC strategy, and PLY export APIs. It does not include or use
+the restricted INRIA `gaussian-splatting` / `diff-gaussian-rasterization` implementation.
+Source: <https://github.com/nerfstudio-project/gsplat/tree/937e29912570c372bed6747a5c9bf85fed877bae>.
+
+The separate pinned CPU delivery converter is `@playcanvas/splat-transform` 3.3.3 (MIT), installed
+through `deploy/gsplat/compressor/package-lock.json`; npm preserves the package's license files.
+Source: <https://github.com/playcanvas/splat-transform/tree/d092ae94e6e1d5161990ce5ca960f659ea9faf5f>.
+Its generated SOG container records the converter version. Other runtime dependencies retain their
+respective distributions and licenses in the image; the runtime receipt records their versions.

@@ -96,6 +96,8 @@ pose = [
 ]
 
 [project.scripts]
+# Scene-specific Gaussian training uses the manifest's digest-pinned CUDA container.
+exulanica-gsplat-scene-v1 = "exulanica.reconstruction.gsplat_container:main"
 # `uv run exulanica-ingest ingest ./photos`. Safe to run repeatedly: the second run reports what
 # it skipped and issues no model calls.
 exulanica-ingest = "exulanica.ingest.cli:main"
