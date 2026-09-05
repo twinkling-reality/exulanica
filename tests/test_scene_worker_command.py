@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 from exulanica.ingest import scene_worker_command
@@ -19,6 +20,18 @@ def test_startup_refuses_to_guess_a_database_or_pose_provenance():
     assert event["component"] == "scene-worker"
     assert event["event"] == "startup_failed"
     assert event["failure_class"] == "DatabaseNotConfigured"
+
+
+def test_worker_makes_a_configured_relative_data_directory_absolute(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    configured = Path("campaign/data")
+
+    resolved = scene_worker_command._worker_data_directory(
+        {scene_worker_command.env_name("DATA_DIR"): str(configured)}
+    )
+
+    assert resolved == tmp_path / configured
+    assert resolved.is_absolute()
 
 
 def test_once_mode_sweeps_scratch_and_reports_scene_outcomes(monkeypatch):

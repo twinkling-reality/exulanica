@@ -11,6 +11,7 @@ import sys
 import threading
 import uuid
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica.db.migrate import verify_schema
@@ -47,6 +48,11 @@ def _emit(stream: Any, event: str, **fields: Any) -> None:
     )
 
 
+def _worker_data_directory(environment: Mapping[str, str]) -> Path:
+    """Keep pycolmap source paths stable after its executor changes directories."""
+    return resolve_data_dir(environment).resolve()
+
+
 def _build(
     args: argparse.Namespace, environment: Mapping[str, str]
 ) -> SceneReconstructionWorker:
@@ -54,7 +60,7 @@ def _build(
     verify_schema(database)
     with database.unscoped() as connection:
         assert_runtime_role(connection)
-    data_directory = resolve_data_dir(environment)
+    data_directory = _worker_data_directory(environment)
     return SceneReconstructionWorker(
         database,
         LocalContentAddressedStore(data_directory / "blobs"),
