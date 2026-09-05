@@ -108,6 +108,17 @@ color is neutral gray). **COLMAP geometry and camera estimation may condition on
 images.** These are appearance-held-out scores with pose/geometry conditioning, not an independent
 pose-recovery generalization result.
 
+MEASURED 2026-09-05 on the first real trained scene (51 bowl photographs, 7 held out): PSNR
+25.38 dB, SSIM 0.896, LPIPS 0.310 and coverage 0.983 all passed their predeclared rules, and the
+held-out renders matched the photographs on inspection, but the floater proxy measured 0.472 against
+a predeclared 0.15 and refused delivery. The proxy counts opacity mass farther than five times the
+median sparse neighbour spacing from any sparse point; that spacing was 0.0093 units because COLMAP
+matched the bowl densely, so every Gaussian on the plain table around it counted as a floater. The
+proxy therefore stays a retained diagnostic and the request's ceiling is a divergence guard (0.9 in
+the retained requests); floaters a person can see are judged in the visual pass, and a scale-aware
+or visibility-based floater measure is future work. Changing the ceiling is a new request and a
+new build; the refused run's receipt and evaluation bundle remain retained.
+
 Evaluation renders every held-out view at the documented rectified resolution without exposure
 matching or color correction. It records per-view and mean PSNR, SSIM, AlexNet LPIPS, source and
 render digests, and pixel dimensions. Coverage is the mean held-out pixel fraction with rendered
