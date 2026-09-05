@@ -304,13 +304,24 @@ something about the content. For a still, it does not.
 - The `capture` assertion class is thin for a photograph corpus: file hash, byte size, pixel dimensions,
   EXIF device model, EXIF GPS, EXIF timestamps. Everything else a photograph "says" is inference.
 
-**OPEN.** EXIF Orientation has **eight** values, including four mirrored variants. The `media_track`
-schema carries `rotation smallint` constrained to `0 | 90 | 180 | 270`, which cannot express a flip. A
-mirrored original would place normalized regions on the wrong side of the image. The research does not
-address this. It must be resolved before v1 is frozen, because `region.display` is inside `span_digest`.
-Settling it is an inspection, not an experiment: read EXIF Orientation across the actual corpus, then
-either widen the field to the eight EXIF values or normalize pixels at ingest and record that the
-normalization happened.
+**CLOSED 2026-09-04, ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md).**
+EXIF Orientation has **eight** values, including four mirrored variants, and `media_track.rotation`
+cannot express a flip. Of the two resolutions this document offered, the second was taken:
+**pixels are normalised at ingest and the normalisation is recorded.** All eight values are
+admitted; none is refused. The consequences are enforced rather than conventional:
+
+- a photograph's display space **is** its upright pixel space, so every `img` region carries
+  `display.rotation = 0`, refused by `EvidenceAddress._validate_shape` and by the check constraint
+  `evidence_span_image_region_is_upright` otherwise;
+- `media_track.rotation` means *clockwise degrees still to apply*, and is therefore `0` on every
+  image track. The comment in `0001_spine.sql` saying ingest refuses mirrored orientations described
+  the branch that was **not** taken and was superseded by migration `0032_upright_display_space.sql`;
+- the EXIF value, the applied rotation, the mirror flag and `normalised_at_ingest` live in
+  `media_track.probe_json -> 'orientation'`, outside every digest. An image track that does not
+  record the normalisation is refused by `media_track_image_is_upright`.
+
+No `span_digest` changed: `region` and `probe_json` were both untouched. Pinned by
+`tests/test_upright_display_space.py` and `tests/test_exif_orientation.py`.
 
 **OPEN.** Whether OCR text spans over photographs reuse `modality = 'transcript_text'` with the
 `text_anchor` pointing at an OCR artifact, or take their own modality value, is not settled by the
@@ -1768,7 +1779,7 @@ timebase item specifically at first video ingest.
 
 | Item | Status | Why it is inside the address | What settles it |
 | --- | --- | --- | --- |
-| EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | **OPEN** | `region.display` carries `rotation`, and the region is normalised against display space. A mirrored original puts every region on the wrong side of the image, permanently | Inspect EXIF Orientation across the real corpus, then either widen the field to the eight EXIF values or normalise pixels at ingest and record that it happened. Ingest currently **refuses** mirrored orientations rather than guessing, so this blocks ingesting any corpus that contains one |
+| EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | **CLOSED 2026-09-04** | `region.display` carries `rotation`, and the region is normalised against display space. A mirrored original puts every region on the wrong side of the image, permanently | Settled by ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md): pixels are normalised at ingest, all eight values are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" and is 0. Enforced by two check constraints in `0032_upright_display_space.sql`. No digest changed |
 | Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | **OPEN** | `modality` is a digest input. Adding a new value (`ocr_text`, say) is additive and costs nothing. **Re-labelling spans already written under `transcript_text` is not additive**: it changes their digests, so it is a v2 span format, not a rename | A naming decision, and it must be made before OCR spans are written rather than before they are read. The research named the field `transcript_artifact_id` in an audio-first context, which is where the ambiguity came from |
 | The tie direction of `round_half_down` | **OPEN** | It is the rounding rule of the frozen tick-to-nanosecond formula, so it determines `t_start_ns` and `t_end_ns` for any span derived from ticks | Confirm or reject the implemented reading, ties toward zero, matching `decimal.ROUND_HALF_DOWN`. It differs from the alternative only on exact negative halves, and negative `t_ns` is real whenever `start_pts` is later than track zero. A decision, not an experiment (section 1.4) |
 | Tick to ns to tick is not the identity | **KNOWN DEFECT, PINNED** | Both formulas are frozen by mig-4, and both produce values that go into the digest | Decide before the first video ingest whether to correct it, at which point it is free, or to carry it, at which point correcting it later is a `span_format_version` event. Pinned meanwhile by `tests/test_timebase.py::test_tick_round_trip_is_lossy_under_the_frozen_rounding_rule` (section 1.4) |
@@ -1780,7 +1791,7 @@ timebase item specifically at first video ingest.
 
 | Item | Status | What settles it |
 | --- | --- | --- |
-| EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **OPEN** | Inspect EXIF Orientation across the actual corpus, then widen the field or normalize pixels at ingest and record that it happened. Must be closed before v1 is frozen, because `region.display` is inside `span_digest` |
+| EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **CLOSED 2026-09-04** | Pixels are normalised at ingest and the normalisation is recorded. ADR-0004, ADR-0012, section 9.1 |
 | Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **OPEN** | A naming decision, but it must be made before v1 is frozen for the same reason: `modality` is inside `span_digest` and a rename is not additive |
 | Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | Inspection of the corpus. If it does, those files carry a genuine `v:0` track and the general video path applies unchanged |
 | The tie direction of `round_half_down` | **OPEN** | A decision, recorded in 9.1. Ties toward zero is implemented and unratified |

@@ -91,7 +91,10 @@ def run(
                 coded_h=facts.coded_height,
                 disp_w=display_size[0],
                 disp_h=display_size[1],
-                rotation=facts.orientation.rotation_degrees,
+                # Zero, not the rotation that was applied. The column means "still to apply"
+                # (ADR-0012), the pixels behind disp_w/disp_h are already upright, and what was
+                # applied is in probe_json -> 'orientation' where nothing hashes it.
+                rotation=0,
                 codec=facts.codec,
                 probe_json=facts.as_probe_json(),
             )

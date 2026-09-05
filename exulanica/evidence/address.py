@@ -190,6 +190,16 @@ class EvidenceAddress:
             raise InvalidAddressError("audio_time lives on an 'a:N' track")
         if modality in _VISUAL_TRACK_MODALITIES and track.startswith("a:"):
             raise InvalidAddressError(f"{modality} cannot address an audio track")
+        if self.region is not None and track == IMAGE_TRACK_KEY and self.region.display.rotation:
+            # ADR-0012. A photograph's display space IS its upright pixel space, because ingest
+            # normalises orientation once and stores the result. A region claiming a rotated
+            # display space is not a stale row to repair later: the address denotes the wrong
+            # pixels, and `region` is inside span_digest, so it would be permanent.
+            raise InvalidAddressError(
+                f"a region on the '{IMAGE_TRACK_KEY}' track must carry display.rotation 0, got "
+                f"{self.region.display.rotation}. Photograph pixels are normalised upright at "
+                "ingest, so there is no second rotation for a reader to apply."
+            )
 
     # -- construction helpers ------------------------------------------------------------
 

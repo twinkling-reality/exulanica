@@ -39,29 +39,36 @@ PPM: Final = 1_000_000
 
 _ALLOWED_ROTATIONS: Final = (0, 90, 180, 270)
 
-#: EXIF Orientation values that include a mirror. The committed ``media_track`` schema carries
-#: ``rotation smallint`` constrained to 0/90/180/270, which cannot express a flip, and the
-#: domain document records this as OPEN and blocking for the v1 freeze. Until it is settled,
-#: ingest refuses these rather than placing regions on the wrong side of the image.
+#: EXIF Orientation values that include a mirror. ``rotation`` is four values and cannot express
+#: a flip, which is why deriving a display rotation from a raw EXIF value is only ever valid for
+#: the other four. ADR-0004 and ADR-0012 took the branch where that derivation never happens:
+#: ingest normalises the pixels, so every photograph's display space is upright and these four
+#: values are admitted like any other.
 MIRRORED_EXIF_ORIENTATIONS: Final = frozenset({2, 4, 5, 7})
 
 _EXIF_ROTATION: Final = {1: 0, 3: 180, 6: 90, 8: 270}
 
 
 def rotation_for_exif_orientation(orientation: int) -> int:
-    """Map an EXIF Orientation value to the stored ``rotation``, or refuse.
+    """Map an EXIF Orientation value to a display ``rotation``, or refuse.
 
-    Refusing is the point. The alternative, silently treating a mirrored original as its
-    unmirrored rotation, puts every normalised region on the wrong side of the image, and
-    because ``region`` is inside ``span_digest`` those wrong regions would be baked into
-    permanent citation addresses.
+    **This is the guard on the branch Exulanica did not take, and it is kept because the branch
+    is still reachable by mistake.** ADR-0012 records the semantics: a photograph's display space
+    is its upright pixel space, ingest normalises the pixels, and every ``img`` region therefore
+    carries ``display.rotation == 0``. Nothing in the pipeline calls this function.
+
+    What it exists to stop is the plausible-looking shortcut of skipping normalisation and
+    turning the EXIF tag straight into a display rotation. That works for exactly four of the
+    eight values. For the other four it silently drops a mirror, which puts every region on the
+    wrong side of the image, and because ``region`` is inside ``span_digest`` those wrong regions
+    are baked into permanent citation addresses rather than showing up as a crooked picture.
     """
     if orientation in MIRRORED_EXIF_ORIENTATIONS:
         raise InvalidAddressError(
-            f"EXIF Orientation {orientation} is mirrored, and media_track.rotation cannot "
-            "express a flip. This is the OPEN item in the domain model section 1.5: widen the "
-            "field to the eight EXIF values, or normalise pixels at ingest and record that it "
-            "happened. Refusing rather than mis-placing a region that enters span_digest."
+            f"EXIF Orientation {orientation} is mirrored and no rotation expresses a flip. "
+            "Normalise the pixels at ingest instead, the way exulanica.ingest.exif does, and "
+            "leave display.rotation at 0. Refusing rather than mis-placing a region that "
+            "enters span_digest."
         )
     try:
         return _EXIF_ROTATION[orientation]

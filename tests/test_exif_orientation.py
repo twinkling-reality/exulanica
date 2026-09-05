@@ -80,9 +80,10 @@ def test_the_recorded_transform_matches_what_was_actually_applied(orientation):
 def test_rotation_agrees_with_the_evidence_layer_for_unmirrored_values(orientation):
     """``exulanica.evidence.region`` refuses mirrored values; where it answers, we must match.
 
-    That module refuses because it assumes pixels were NOT normalised, in which case a flip
-    cannot be expressed in the ``rotation`` column. Ingest takes the other branch the domain
-    model allows. The two must still agree wherever both have an opinion.
+    That module refuses because it describes the branch ADR-0004 rejected, in which pixels are
+    NOT normalised and a flip cannot be expressed in the ``rotation`` column. Ingest takes the
+    other branch. The two must still agree wherever both have an opinion, so a change to the
+    ingest table cannot drift away from the evidence layer unnoticed.
     """
     _, rotation = _ORIENTATION_TRANSFORM[orientation]
     assert rotation == rotation_for_exif_orientation(orientation)

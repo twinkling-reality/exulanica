@@ -88,6 +88,8 @@ and their consequences, so that a later reader can tell a considered choice from
 | [adr/0008-generated-geometry.md](adr/0008-generated-geometry.md) | Generatively completed geometry is refused from the reconstruction ladder, with the checklist that a later admission would have to satisfy | ACCEPTED: refused, with a stated path |
 | [adr/0009-the-ladder-above-rung-3.md](adr/0009-the-ladder-above-rung-3.md) | A layered gate composes receipts into rungs 1 and 2, rung 2 no longer requires a splat, a model-derived scale never opens the query path, and a posed multi-view set is a rung 3 sub-state | ACCEPTED; production rung 3 implemented, rung 2 and rung 1 producers blocked on real measurements and compute |
 | [adr/0010-opm-2.md](adr/0010-opm-2.md) | The point-map container evolves to version 2 with an authoritative section list, a 4-byte tags section, a declared alpha meaning, and placement kept outside the file | ACCEPTED and implemented |
+| [adr/0011-exulanica-namespace.md](adr/0011-exulanica-namespace.md) | `exulanica` is the canonical backend package namespace, cut over in one release rather than aliased | ACCEPTED and implemented |
+| [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md) | A photograph's display space is its upright pixel space: all eight EXIF orientations are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" | ACCEPTED; closes the section 9.1 orientation freeze blocker |
 
 ## Current state
 
@@ -119,6 +121,9 @@ the claim:
 - **DECISION** records a choice together with the alternative that was rejected and why.
 - **ASSUMPTION** is unvalidated, and names the experiment that would settle it.
 - **OPEN** is unresolved, and says what would resolve it.
+- **CLOSED** marks an item that was OPEN and no longer is, naming the ADR that settled it, the
+  artefact that enforces it, and the test that fails when it is violated. A decision recorded only
+  in prose is not CLOSED.
 - **CORRECTED** marks a claim rewritten against what was actually built, naming the artefact and the
   test that forced the correction.
 
