@@ -95,6 +95,21 @@ def test_the_capture_pipeline_reaches_the_refusal_rather_than_ingesting_frame_on
 # -- the personal-media gate ------------------------------------------------------------------
 
 
+#: Every way this package could put a row into `embedding`. Three shapes rather than one:
+#: `insert into embedding`, the same with a quoted identifier, and `copy embedding`, which is
+#: how a bulk load would arrive and which the previous single pattern would not have seen.
+#: Matched case-insensitively, over SQL as well as Python, because a writer added inside a
+#: migration or a plpgsql function is a writer.
+_EMBEDDING_WRITER = re.compile(
+    r"""(?:insert\s+into|copy)\s+"?embedding"?\b""", re.IGNORECASE
+)
+
+#: The modules the answer path is built from. `exulanica.graph` is here because the read model
+#: the answer's Selection resolves against is assembled there, and `exulanica.store.resolve` is
+#: what turns a citation back into original bytes.
+_ANSWER_PATH = ("selection", "graph", "store")
+
+
 def test_nothing_in_the_package_writes_an_embedding():
     """P-1 is unanswered, so the table that would hold a biometric template has no writer.
 
@@ -102,14 +117,44 @@ def test_nothing_in_the_package_writes_an_embedding():
     is deliberate and is the whole of the current answer to "when may a template exist": never
     yet. A writer appearing here means P-1 was answered by somebody adding a feature, which is
     the one way it must not be answered.
+
+    The scan covers `*.sql` as well as `*.py`. It used to cover only Python, which made the
+    guard narrower than the fact it was guarding: nothing in a migration would have tripped it,
+    and migrations are where this schema's triggers and functions live.
     """
     writers = []
-    for path in sorted(_PACKAGE.rglob("*.py")):
+    for path in sorted([*_PACKAGE.rglob("*.py"), *_PACKAGE.rglob("*.sql")]):
         text = path.read_text(encoding="utf-8")
-        for match in re.finditer(r"insert\s+into\s+embedding\b", text, re.IGNORECASE):
+        for match in _EMBEDDING_WRITER.finditer(text):
             line = text[: match.start()].count("\n") + 1
             writers.append(f"{path.relative_to(_PACKAGE.parent)}:{line}")
     assert not writers, f"an embedding writer appeared: {writers}"
+
+
+def test_the_answer_path_does_not_name_the_table_a_template_would_live_in():
+    """The gate is about the ANSWER path, so it is asserted about those modules by name.
+
+    The scan above is a floor over the whole package. This is the specific claim: nothing the
+    question-to-answer path is built from mentions the embedding table or asks the model client
+    for a vector. "Semantic answers" is the name of a goal that most naturally reaches for
+    vector retrieval, and `ModelClient.embed` is a live capability bound to a real manifest
+    role, so the shortest path from this goal to a biometric template runs straight through
+    these modules.
+
+    Two patterns, and neither is a keyword ban. `embedding` as a whole word is the table; the
+    executor's `to_tsvector` is lexical search over text somebody's own photograph carried and
+    is not matched by either. If a semantic-retrieval feature is ever wanted here, this test is
+    the conversation about P-1 that has to happen first.
+    """
+    named = []
+    for package in _ANSWER_PATH:
+        for path in sorted((_PACKAGE / package).rglob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            for pattern in (r"\bembedding\b", r"\.embed\("):
+                for match in re.finditer(pattern, text):
+                    line = text[: match.start()].count("\n") + 1
+                    named.append(f"{path.relative_to(_PACKAGE.parent)}:{line}")
+    assert not named, f"the answer path reached for a vector: {named}"
 
 
 def test_the_vision_schema_has_no_field_a_name_could_arrive_in():

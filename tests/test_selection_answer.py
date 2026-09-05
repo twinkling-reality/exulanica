@@ -771,3 +771,40 @@ def test_a_plan_that_matched_photographs_is_answered_rather_than_refused(answere
     assert outcome.abstention is None, "it refused a question the evidence could answer"
     assert not outcome.packet.is_empty
     assert _historical_citations(outcome), "answered with no factual clause at all"
+
+
+# -- the answer path derives no template ------------------------------------------------------
+
+
+def test_answering_a_question_persists_no_biometric_template(answered):
+    """P-1's entry gate, asserted at run time rather than only by reading the source.
+
+    ``tests/test_ingest_preconditions.py`` pins the absence of an embedding writer by scanning
+    the package, which is the durable half. This is the observable one: a real question goes all
+    the way through plan, execute, packet, compose and validate against a real database, and the
+    table that would hold a template is empty afterwards.
+
+    Both halves are needed and neither replaces the other. A scan cannot see a write composed at
+    run time, and a row count cannot see a writer that exists but did not fire on this question.
+
+    The last assertion is the line itself. A person in a photograph becomes an occurrence with a
+    ``frame_region`` span and quality keys that describe the detection, and there is no column
+    on it a template or a name could arrive in.
+    """
+    connection = answered.repository.connection
+    bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
+    client = answered.client([_answer_body(bad), _answer_body(bad)])
+    outcome = answer_question(
+        connection, client, "which photographs?", answered.session,
+        plan=SelectionPlan(intent=Intent.CAPTURES),
+    )
+    assert _historical_citations(outcome), "an answer that never ran proves nothing"
+
+    assert connection.execute("select count(*) as n from embedding").fetchone()["n"] == 0
+    quality = connection.execute(
+        "select quality from occurrence where workspace_id = %s and class = 'person'",
+        (answered.session.workspace_id,),
+    ).fetchall()
+    assert quality, "there is a person in this corpus, so this is not vacuous"
+    for row in quality:
+        assert set(row["quality"]) <= {"confidence_band", "salience", "label", "trust_tier"}
