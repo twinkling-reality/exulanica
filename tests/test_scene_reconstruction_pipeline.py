@@ -32,6 +32,7 @@ from exulanica.ingest.stages import (
     artifact_id_for,
     idempotency_key,
     input_digest_of,
+    scene_pose_quality_thresholds,
     stage,
 )
 from exulanica.reconstruction.pose import CommandResult
@@ -250,6 +251,23 @@ def test_scene_pose_manifest_uses_the_exact_quantized_stage_policy(
         "min_camera_translation_units": 0.5,
     }
     assert receipt["quality"]["accepted"] is True
+
+
+def test_current_scene_pose_policy_is_bound_to_the_two_fixed_calibration_runs():
+    current = STAGES["scene_pose"]
+    thresholds = scene_pose_quality_thresholds(current)
+    calibration = current.params["calibration"]
+
+    assert current.version == 2
+    assert thresholds.min_registered_fraction == 0.8
+    assert thresholds.max_mean_reprojection_error_px == 1.0
+    assert thresholds.min_camera_translation_units == 9.0
+    assert calibration["synthetic_pose_evaluation_sha256"] == (
+        "dc0680b24fc85ba3ebe2ed55d3ed92a10e9ea161ded9701b73014c336808c5d7"
+    )
+    assert calibration["benchmark_pose_evaluation_sha256"] == (
+        "68640ca95fce5adf54d8217b53139a4706edf6c6430cd6d854b58079b59408d8"
+    )
 
 
 def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_history(

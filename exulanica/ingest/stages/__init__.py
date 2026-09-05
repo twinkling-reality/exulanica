@@ -274,15 +274,46 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_pose": StageSpec(
         key="scene_pose",
-        version=1,
+        # Version 2 closes the unmeasured policy after the fixed synthetic and licensed ETH3D
+        # pipes runs. The calibration record is part of the parameter digest so later corpus
+        # evidence cannot silently change what this version meant. COLMAP normalizes a sparse
+        # reconstruction to an extent of 10 units. The translation threshold is therefore a
+        # normalized non-degeneracy check, not a metric-distance claim.
+        version=2,
         output_kind="pose_receipt",
         deterministic=True,
         params={
             "controller": "colmap-sparse-checkpointed",
             "receipt_profile": "exulanica.colmap-pose-receipt/v2",
-            "min_registered_fraction": None,
-            "max_mean_reprojection_error_px": None,
-            "min_camera_translation_units": None,
+            "min_registered_fraction_millionths": 800_000,
+            "max_mean_reprojection_error_micropixels": 1_000_000,
+            "min_camera_translation_microunits": 9_000_000,
+            "calibration": {
+                "profile": "exulanica.scene-pose-policy-calibration/v1",
+                "synthetic_pose_evaluation_sha256": (
+                    "dc0680b24fc85ba3ebe2ed55d3ed92a10e9ea161ded9701b73014c336808c5d7"
+                ),
+                "benchmark_pose_evaluation_sha256": (
+                    "68640ca95fce5adf54d8217b53139a4706edf6c6430cd6d854b58079b59408d8"
+                ),
+                "colmap_normalization_extent_microunits": 10_000_000,
+                "observed": {
+                    "registered_fraction_millionths_min": 1_000_000,
+                    "mean_reprojection_error_micropixels_max": 571_911,
+                    "camera_translation_extent_microunits_min": 9_757_480,
+                },
+                "selection_rule": {
+                    "registered_fraction": (
+                        "product specification 80 percent floor, validated below both runs"
+                    ),
+                    "reprojection_error": (
+                        "smallest whole-pixel ceiling above the maximum observed error"
+                    ),
+                    "camera_translation": (
+                        "greatest whole normalized unit below the minimum observed extent"
+                    ),
+                },
+            },
         },
     ),
     "scene_placement": StageSpec(

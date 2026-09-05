@@ -1,6 +1,6 @@
 # Reconstruction quality gate
 
-Status: **implemented measurement contract; real gate blocked**.
+Status: **implemented; first benchmark-calibrated pose policy verified 2026-09-04**.
 
 `exulanica.reconstruction.validate_opm` now validates every production point map before it is
 persisted. The PlayCanvas reader independently validates its untrusted byte boundary before it
@@ -62,3 +62,23 @@ to their declared units only at the pose manifest boundary. The current version 
 contains no measured values, so this correction changes no awarded rung. A future measured policy
 will change both its stage version and parameter digest, queue a new build, and retain the old
 unmeasured receipt rather than rewriting it.
+
+**VERIFIED 2026-09-04:** the fixed synthetic scene and licensed ETH3D `pipes` scene both completed
+the production pose path. The synthetic run registered 8 of 8 views with 0.256429 pixel mean
+reprojection error and 9.757480 normalized camera-translation units. The benchmark run registered
+14 of 14 views with 0.571911 pixel mean reprojection error and 10.915851 normalized units. Against
+ETH3D's supplied cameras, similarity-aligned camera centres had 0.006594 ground-truth-unit RMS
+error and 0.014844 maximum error over a 2.593471-unit camera extent. Maximum relative-rotation
+error was 0.354748 degrees.
+
+Stage `scene_pose` version 2 binds both evaluation-record digests and selects three integer policy
+values by declared rules: the product specification's 80 percent registration floor, the smallest
+whole-pixel ceiling above the largest observed reprojection error, and the greatest whole
+normalized unit below the smallest observed camera extent. This yields 0.8, 1.0 pixel, and 9.0
+normalized units. The last value is not a metric-distance claim. COLMAP normalizes reconstructions
+to an extent of 10 units, so it is only a non-degeneracy check within this exact controller.
+
+This is a strict first calibration from one synthetic and one indoor benchmark scene. It is not a
+representative personal-photo threshold study. New corpus evidence must create a new stage version
+and new build rather than changing version 2 in place. The retained benchmark comparison is
+`evaluation/2026-09-04-benchmark-pose.json`.
