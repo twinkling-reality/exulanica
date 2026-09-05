@@ -13,6 +13,11 @@ TRAINING_PROTOCOL: dict[str, Any] = {
         "package": "@playcanvas/splat-transform",
         "version": "3.3.3",
         "format": "sog-v2",
+        # MEASURED 2026-09-05: the compressor's CPU k-means over the 45 higher-band SH
+        # coefficients of one million Gaussians ran for more than an hour without finishing.
+        # Delivery keeps band 0 (view-independent colour) only; held-out scores are measured on
+        # the full trained model before compression and the receipt says so.
+        "delivered_sh_bands": 0,
     },
     "sh_degree": 3,
     "sh_degree_interval": 1000,

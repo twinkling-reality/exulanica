@@ -135,8 +135,16 @@ directory's `node_modules/.bin` on the worker PATH or pass its executable explic
 PlayCanvas CLI shape is:
 
 ```text
-splat-transform --no-tty --overwrite -g cpu input.ply output.sog
+splat-transform --no-tty --overwrite -g cpu -H 0 input.ply output.sog
 ```
+
+`-H 0` keeps spherical-harmonic band 0 only. MEASURED 2026-09-05: with the full degree-3 model
+of one million Gaussians, the compressor's CPU k-means over the 45 higher-band coefficients ran
+for more than an hour on the rented host without finishing, so the first accepted real training
+had no browser asset. The delivered scene therefore carries view-independent colour; the held-out
+PSNR, SSIM and LPIPS in the receipt are measured on the full trained model before compression,
+and `delivered_sh_bands` in the protocol records the difference. Restoring the higher bands needs
+GPU k-means on the compression host, which is future work.
 
 The output SOG size/digest enters the gate receipt. An actual local CPU conversion of 512 generated
 test-only Gaussians verified version-2 `meta.json` and ZIP STORE entries; this format smoke test

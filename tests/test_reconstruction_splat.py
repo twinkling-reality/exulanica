@@ -191,6 +191,16 @@ def test_accepted_scene_is_compressed_once_and_reused_from_its_receipt(tmp_path)
     assert first.quality.delivery_sha256 is not None
     assert len(fake.calls) == 3
     assert fake.calls[1][0] == "splat-transform"
+    # Delivery keeps SH band 0 only; the full model was scored before this command ran.
+    assert fake.calls[2][:7] == (
+        "splat-transform",
+        "--no-tty",
+        "--overwrite",
+        "-g",
+        "cpu",
+        "-H",
+        "0",
+    )
 
 
 def test_quality_failure_keeps_rung_three_and_never_builds_a_delivery_asset(tmp_path):

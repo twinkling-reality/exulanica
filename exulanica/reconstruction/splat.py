@@ -625,6 +625,8 @@ def run_gsplat_job(
             "--overwrite",
             "-g",
             "cpu",
+            "-H",
+            str(TRAINING_PROTOCOL["compressor"]["delivered_sh_bands"]),
             str(ply),
             str(delivery),
         )
