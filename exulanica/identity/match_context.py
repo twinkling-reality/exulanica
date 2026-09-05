@@ -13,6 +13,7 @@ from typing import Any
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
+from exulanica.errors import IntegrityError
 from exulanica.identity.repository import IdentityRepository
 
 __all__ = ["MATCH_CONTEXT_KIND", "refresh_match_context"]
@@ -112,4 +113,6 @@ def _refresh_match_context(repository: IdentityRepository) -> dict[str, Any]:
         ).fetchone()
         if current is None:
             raise RuntimeError("identity match context was withdrawn during refresh")
+        if current["payload"] != payload:
+            raise IntegrityError("stored identity match context disagrees with its canonical key")
         return current["payload"]
