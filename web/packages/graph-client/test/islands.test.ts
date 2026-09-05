@@ -127,6 +127,54 @@ describe('what an island is, decided by the client', () => {
  * little to place. The count beside the rung says how much of the region is behind it, so a
  * count reported next to no rung is a measurement behind a claim that was not made.
  */
+describe('what an exact reconstruction set does to regions', () => {
+  const member = (captureId: string, ordinal: number) => ({
+    capture_id: captureId, ordinal, registered: true, exclusion_reason: null, placement: null,
+  });
+  const scene = (sceneId: string, captureIds: readonly string[], substrate: 'posed_point_maps' | 'gaussian_splats' = 'posed_point_maps') => ({
+    scene_id: sceneId, member_digest: '1'.repeat(64), pose_receipt_sha256: '2'.repeat(64),
+    placement_receipt_sha256: '3'.repeat(64), gate_digest: '4'.repeat(64), recorded_rung: 3,
+    recorded_reasons: [], displayed_rung: 3 as const, display_reasons: [], member_count: captureIds.length,
+    registered_member_count: captureIds.length, receipt_state: 'available' as const,
+    placement_state: 'available' as const, rendering_substrate: substrate,
+    members: captureIds.map((captureId, ordinal) => member(captureId, ordinal)),
+  });
+
+  it('joins the ungrouped members of an exact set to the one group its other members share', () => {
+    const snapshot = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes: [scene('exact', ['c1', 'c2', 'c9', 'c10'])] });
+    expect(snapshot.islands.map((island) => island.islandId)).toEqual(['g1']);
+    expect(snapshot.islands[0]!.captureIds).toEqual(['c1', 'c2', 'c9', 'c10']);
+    expect(snapshot.islands[0]!.reconstructionSceneId).toBe('exact');
+    expect(snapshot.reconstructionScenes![0]!.islandId).toBe('g1');
+    // The group's own aggregates describe 2 photographs, not 4, so the region does not claim them.
+    expect(snapshot.islands[0]!.spreadMetres).toBeNull();
+  });
+
+  it('keeps a set that spans two measured groups split rather than overriding the grouping', () => {
+    const second = { ...GROUP, group_id: 'g2', capture_ids: ['c3'] };
+    const snapshot = adaptSnapshot({ ...PAYLOAD, scene_groups: [GROUP, second],
+      reconstruction_scenes: [scene('spanning', ['c1', 'c3', 'c9'])] });
+    expect(snapshot.reconstructionScenes![0]!.islandId).toBeNull();
+    expect(snapshot.islands.map((island) => island.islandId).sort()).toEqual(['c9', 'g1', 'g2']);
+  });
+
+  it('displays the most complete scene of a region and leaves the overlapping smaller one recorded', () => {
+    const snapshot = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes: [
+      scene('group-scene', ['c1', 'c2'], 'gaussian_splats'), scene('exact', ['c1', 'c2', 'c9']),
+    ] });
+    expect(snapshot.islands).toHaveLength(1);
+    expect(snapshot.islands[0]!.reconstructionSceneId).toBe('exact');
+    expect(snapshot.reconstructionScenes!.map((item) => [item.sceneId, item.islandId]))
+      .toEqual([['group-scene', 'g1'], ['exact', 'g1']]);
+    // Equal coverage prefers trained geometry, then the stable scene identity order.
+    const tied = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes: [
+      scene('b-maps', ['c1', 'c2']), scene('a-maps', ['c1', 'c2']), scene('z-trained', ['c1', 'c2'], 'gaussian_splats'),
+    ] });
+    expect(tied.islands[0]!.reconstructionSceneId).toBe('z-trained');
+    expect(tied.islands[0]!.renderingSubstrate).toBe('gaussian_splats');
+  });
+});
+
 describe('what a rung says, and what the count beside it says', () => {
   const withRung = (rung: number | null, count: number): GraphPayload => ({
     ...PAYLOAD,

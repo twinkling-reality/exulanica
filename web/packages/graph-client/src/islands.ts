@@ -44,12 +44,24 @@ export function groupIslands(payload: GraphPayload): IslandOf {
   }
   // An operator-authorized exact set can reconstruct photographs whose honest metadata did not
   // qualify for automatic scene grouping. When every member is still ungrouped, the immutable
-  // reconstruction scene is their one durable shared identity. A partially grouped set remains
-  // split instead of letting the reconstruction override a measured grouping decision.
+  // reconstruction scene is their one durable shared identity. When its grouped members all sit in
+  // one group, the ungrouped members join that group's island: the scene is one rigid recovered
+  // frame, and a grouping decision was never made about those photographs, so nothing measured is
+  // overridden. MEASURED 2026-09-05 on the first retained real collection: 40 of 51 exact-set
+  // photographs carried group metadata, and splitting the other 11 into standalone islands left the
+  // accepted scene unable to resolve to any region at all. A set spanning two groups stays split
+  // rather than letting the reconstruction override a measured grouping decision.
   for (const scene of payload.reconstruction_scenes) {
-    if (scene.members.some((member) => byCapture.has(member.capture_id))) continue;
+    const grouped = new Set(
+      scene.members.flatMap((member) => {
+        const island = byCapture.get(member.capture_id);
+        return island === undefined ? [] : [island];
+      }),
+    );
+    if (grouped.size > 1) continue;
+    const island = grouped.size === 1 ? [...grouped][0]! : (scene.scene_id as IslandIdRef);
     for (const member of scene.members) {
-      byCapture.set(member.capture_id, scene.scene_id as IslandIdRef);
+      if (!byCapture.has(member.capture_id)) byCapture.set(member.capture_id, island);
     }
   }
   return (captureId) => byCapture.get(captureId) ?? (captureId as IslandIdRef);
@@ -126,11 +138,7 @@ export function buildIslands(
   const islands: IslandRecord[] = [];
   for (const [islandId, captureIds] of capturesByIsland) {
     const group = groupWhollyIn(groupsByIsland.get(islandId), captureIds, islandId, islandOf);
-    const reconstruction = payload.reconstruction_scenes.find((scene) =>
-      scene.members.length === captureIds.length
-      && scene.members.every((member) => islandOf(member.capture_id) === islandId)
-      && captureIds.every((captureId) => scene.members.some((member) => member.capture_id === captureId))
-    );
+    const reconstruction = displayedScene(payload, captureIds, islandId, islandOf);
     const reconstructionPresentation = reconstruction === undefined
       ? {
           recordedSceneRung: null,
@@ -190,6 +198,36 @@ export function buildIslands(
     if (left !== right) return left - right;
     return a.islandId < b.islandId ? -1 : a.islandId > b.islandId ? 1 : 0;
   });
+}
+
+/**
+ * The one reconstruction scene this region displays, or undefined when none lies wholly inside it.
+ *
+ * A region can hold several current scenes over overlapping photographs: the automatic group scene
+ * and an operator's exact set, or an earlier smaller selection beside a fuller one. Drawing all of
+ * them stacks the same photographs' geometry twice. One region shows one scene: the one covering
+ * the most of its photographs, then the one whose substrate is trained geometry, then the stable
+ * scene identity order. Every other scene stays in the graph and in the status list; the geometry
+ * loader is told which scenes a region displays and reports the rest rather than hiding them.
+ */
+export function displayedScene(
+  payload: GraphPayload,
+  captureIds: readonly string[],
+  islandId: IslandIdRef,
+  islandOf: IslandOf,
+): GraphPayload['reconstruction_scenes'][number] | undefined {
+  const candidates = payload.reconstruction_scenes.filter((scene) =>
+    scene.members.length > 0
+    && scene.members.every((member) => islandOf(member.capture_id) === islandId
+      && captureIds.includes(member.capture_id)),
+  );
+  const substrateRank = (scene: GraphPayload['reconstruction_scenes'][number]): number =>
+    scene.rendering_substrate === 'gaussian_splats' ? 2
+      : scene.rendering_substrate === 'posed_point_maps' ? 1 : 0;
+  return candidates.sort((a, b) =>
+    b.members.length - a.members.length
+    || substrateRank(b) - substrateRank(a)
+    || (a.scene_id < b.scene_id ? -1 : a.scene_id > b.scene_id ? 1 : 0))[0];
 }
 
 /**

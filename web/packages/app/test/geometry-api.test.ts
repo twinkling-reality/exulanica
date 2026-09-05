@@ -364,6 +364,33 @@ describe('production reconstruction geometry', () => {
     }
   });
 
+  it('draws only the scenes its regions display and reports the rest without fetching', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const shown = sceneRecord(digest, bytes.byteLength);
+    const superseded = { ...shown, sceneId: 'scene-0', members: shown.members.slice(0, 1), memberCount: 1,
+      registeredMemberCount: 1 };
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([superseded, shown], regions, undefined, new Set(['scene-1']));
+
+    expect(session.issues).toEqual([expect.objectContaining({ sceneId: 'scene-0', state: 'not_displayed' })]);
+    expect(session.issues[0]!.reason).toMatch(/not drawn/u);
+    expect(session.renderingByScene.get('scene-0')).toBe('source_photographs');
+    expect(session.renderingByScene.get('scene-1')).toBe('posed_point_maps');
+    expect(session.placedPointMaps).toHaveLength(2);
+    expect(requests.map((request) => request.path)).toEqual([
+      '/api/geometry/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '/api/geometry/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    ]);
+    // Without the set every scene still loads, which is the contract older callers rely on.
+    const everything = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([superseded], regions);
+    expect(everything.renderingByScene.get('scene-0')).toBe('posed_point_maps');
+  });
+
   it('keeps valid scene members when one map is corrupt and falls back when none verify', async () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);

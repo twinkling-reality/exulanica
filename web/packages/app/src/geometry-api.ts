@@ -53,6 +53,7 @@ export type GeometryIssueState =
   | 'undecodable'
   | 'unplaced'
   | 'no_region'
+  | 'not_displayed'
   | 'unauthorized'
   | 'timed_out'
   | 'error';
@@ -354,11 +355,19 @@ export class GeometryClient {
     });
   }
 
-  /** Load every placed map named by validated reconstruction-scene records. */
+  /**
+   * Load every placed map named by validated reconstruction-scene records.
+   *
+   * `displayed` names the scenes the resolved regions chose to show, one per region. A current
+   * scene the regions did not choose, such as an automatic group scene beside an operator's fuller
+   * exact set over the same photographs, is reported as `not_displayed` and fetches nothing, so
+   * the same photographs' geometry is never stacked twice. Without the set every scene loads.
+   */
   async loadScenes(
     scenes: readonly ReconstructionSceneRecord[],
     regionOf: RegionOfCapture,
     held?: HeldPointMaps,
+    displayed?: ReadonlySet<string>,
   ): Promise<GeometrySession> {
     const pointMaps = new Map<IslandId, PointMap>();
     const placedPointMaps: PlacedScenePointMap[] = [];
@@ -379,6 +388,16 @@ export class GeometryClient {
       const islandId = resolvedIslands.size === 1 && scene.members.every(
         (member) => regionOf.has(member.captureId),
       ) ? [...resolvedIslands][0]! : null;
+      if (displayed !== undefined && !displayed.has(scene.sceneId)) {
+        issues.push({
+          sceneId: scene.sceneId, captureId: scene.members[0]?.captureId ?? '', islandId,
+          state: 'not_displayed',
+          reason: 'Its region displays a more complete reconstruction of the same photographs; '
+            + 'this scene remains recorded and is not drawn.',
+        });
+        renderingByScene.set(scene.sceneId, 'source_photographs');
+        continue;
+      }
 
       for (const member of scene.members) {
         if (member.recoveredCamera != null && member.registered && scene.receiptState === 'available'

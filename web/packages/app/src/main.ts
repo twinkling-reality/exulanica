@@ -168,6 +168,7 @@ let pointMaps_: ReadonlyMap<IslandId, PointMap> | undefined;
 let placedPointMaps_: readonly PlacedScenePointMap[] | undefined;
 let trainedGeometry_: readonly TrainedSceneGeometry[] = Object.freeze([]);
 let recoveredCameras_: readonly RecoveredSceneCamera[] = Object.freeze([]);
+let notDrawnScenes_: ReadonlySet<string> = new Set();
 /** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
 let heldPointMaps_: HeldPointMaps | undefined;
 
@@ -444,7 +445,13 @@ async function loadGeometry(
     });
     const regions = regionsByCapture(from.islands);
     const scenes = from.reconstructionScenes ?? [];
-    const sceneGeometry = await client.loadScenes(scenes, regions, heldPointMaps_);
+    // Regions already chose one scene each; the loader draws those and reports the rest.
+    const displayed = new Set(from.islands.flatMap((island) =>
+      island.reconstructionSceneId == null ? [] : [island.reconstructionSceneId]));
+    const sceneGeometry = await client.loadScenes(scenes, regions, heldPointMaps_, displayed);
+    notDrawnScenes_ = new Set(sceneGeometry.issues
+      .filter((issue) => issue.state === 'not_displayed' && issue.sceneId !== undefined)
+      .map((issue) => issue.sceneId!));
     const sceneCaptures = new Set(
       scenes.flatMap((scene) => scene.members.map((member) => member.captureId)),
     );
@@ -464,7 +471,7 @@ async function loadGeometry(
       ...legacyGeometry.issues,
     ]);
     browserMeasurement?.endGeometryLoad(geometryIssues_);
-    reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene);
+    reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene, notDrawnScenes_);
   } catch (error) {
     pointMaps_ = undefined;
     placedPointMaps_ = undefined;
@@ -486,12 +493,15 @@ async function loadGeometry(
 function reconstructionRungsFor(
   scenes: readonly ReconstructionSceneRecord[],
   actual: ReadonlyMap<string, RenderingSubstrate>,
+  notDrawn: ReadonlySet<string> = new Set(),
 ): readonly ReconstructionRungDisclosure[] {
   return Object.freeze(scenes.map((scene) => {
     const substrate = actual.get(scene.sceneId) ?? 'source_photographs';
     const displayedRung = substrate === 'source_photographs' ? 4 : Math.max(scene.recordedRung ?? 3, 3);
     const reasons = [...scene.displayReasons];
-    if (substrate !== scene.renderingSubstrate) {
+    if (notDrawn.has(scene.sceneId)) {
+      reasons.push('Not drawn: its region displays a more complete reconstruction of the same photographs.');
+    } else if (substrate !== scene.renderingSubstrate) {
       reasons.push(
         substrate === 'source_photographs'
           ? 'This browser has no loaded reconstruction; the original source photographs remain available.'
@@ -545,6 +555,7 @@ const GEOMETRY_NOTICE: Record<GeometryIssueState, string> = {
   undecodable: 'Reconstruction could not be read',
   unplaced: 'Reconstruction not placed',
   no_region: 'Reconstruction has no region',
+  not_displayed: 'Reconstruction not drawn',
   unauthorized: 'Reconstruction not authorized',
   timed_out: 'Reconstruction timed out',
   error: 'Reconstruction loading error',
@@ -1420,7 +1431,7 @@ async function mount(): Promise<void> {
   const actualRendering = new Map<string, RenderingSubstrate>();
   for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
-  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering);
+  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, notDrawnScenes_);
   geometryNotices = Object.freeze([...geometryNotices, ...atlas.binding.trainedSceneFailures
     .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
   const refreshedStatus = renderReconstructionStatus();
