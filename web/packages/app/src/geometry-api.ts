@@ -622,7 +622,7 @@ export class GeometryClient {
       // upright, centred and at walking scale in its region. Receipts and identities are untouched.
       const samples = sceneCameras.length > 0
         ? sceneCameras.map((camera) => colmapCameraSample(camera.sceneFromCameraRowMajor))
-        : scenePlaced.map((placed) => opmCameraSample(placed.sceneFromOpmRowMajor));
+        : scenePlaced.map((placed) => opmCameraSample(placed.sceneFromOpmRowMajor, placed.map.header.viewpoint.position));
       const corners = [
         ...scenePlaced.flatMap((placed) => transformedBoxCorners(placed.map.header.bounds, placed.sceneFromOpmRowMajor)),
         ...sceneTrained.flatMap((trained) => transformedBoxCorners(trained.bounds, trained.sceneFromAssetRowMajor)),

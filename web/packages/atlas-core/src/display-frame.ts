@@ -188,11 +188,25 @@ export function colmapCameraSample(sceneFromCamera: readonly number[]): CameraPo
   };
 }
 
-/** Camera pose read from a row-major `scene_from_opm` matrix; OPM cameras look along -Z, +Y up. */
-export function opmCameraSample(sceneFromOpm: readonly number[]): CameraPoseSample {
+/**
+ * Camera pose read from a row-major `scene_from_opm` matrix and the map's declared viewpoint.
+ *
+ * OPM cameras look along local -Z with +Y up; the container fixes both. The camera position is
+ * the header's viewpoint, which a camera-centred monocular map declares at its origin and a
+ * synthetic fixture may place elsewhere, so it is transformed rather than assumed.
+ */
+export function opmCameraSample(
+  sceneFromOpm: readonly number[],
+  viewpointPosition: Vec3 = [0, 0, 0],
+): CameraPoseSample {
   const m = sceneFromOpm;
+  const [x, y, z] = viewpointPosition;
   return {
-    position: [m[3]!, m[7]!, m[11]!],
+    position: [
+      m[0]! * x + m[1]! * y + m[2]! * z + m[3]!,
+      m[4]! * x + m[5]! * y + m[6]! * z + m[7]!,
+      m[8]! * x + m[9]! * y + m[10]! * z + m[11]!,
+    ],
     forward: unit([-m[2]!, -m[6]!, -m[10]!]),
     up: unit([m[1]!, m[5]!, m[9]!]),
   };

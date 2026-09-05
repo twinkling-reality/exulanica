@@ -375,6 +375,38 @@ describe('production reconstruction geometry', () => {
     }
   });
 
+  it('composes the display scale into the declared scalar exactly once', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch } = serve([], bytes);
+    const base = sceneRecord(digest, bytes.byteLength);
+    // Receipt placements at twice the OPM scale, rotated so each camera looks straight down at its
+    // map: the geometry then lies below the cameras, the frame has a real ground to stand on, and
+    // the display scale is not one, so a scalar left unscaled cannot pass the placement validator.
+    const doubledLookingDown = (ordinal: number) => [
+      2, 0, 0, ordinal * 3,
+      0, 0, 2, 0,
+      0, -2, 0, 0,
+      0, 0, 0, 1,
+    ];
+    const doubled = { ...base, members: base.members.map((member) => ({ ...member, placement: {
+      ...member.placement!, sceneFromOpmRowMajor: doubledLookingDown(member.ordinal), localUnitsToSceneUnits: 2,
+    } })) };
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([doubled], regions);
+    const frame = session.displayFrames.get('scene-1')!;
+    expect(frame.scale).toBeGreaterThan(0);
+    expect(frame.scale).not.toBeCloseTo(1, 3);
+    expect(session.issues).toEqual([]);
+    expect(session.placedPointMaps).toHaveLength(2);
+    for (const placed of session.placedPointMaps) {
+      expect(placed.localUnitsToSceneUnits).toBeCloseTo(2 * frame.scale, 9);
+      const m = placed.sceneFromOpmRowMajor;
+      expect(Math.hypot(m[0]!, m[4]!, m[8]!)).toBeCloseTo(placed.localUnitsToSceneUnits, 9);
+    }
+  });
+
   it('draws only the scenes its regions display and reports the rest without fetching', async () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);

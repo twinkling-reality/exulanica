@@ -100,5 +100,6 @@ describe('the display frame of a recovered scene', () => {
     const identity = [1, 0, 0, 3, 0, 1, 0, 4, 0, 0, 1, 5, 0, 0, 0, 1];
     expect(colmapCameraSample(identity)).toEqual({ position: [3, 4, 5], forward: [0, 0, 1], up: [-0, -1, -0] });
     expect(opmCameraSample(identity)).toEqual({ position: [3, 4, 5], forward: [-0, -0, -1], up: [0, 1, 0] });
+    expect(opmCameraSample(identity, [0, 1.5, 0]).position).toEqual([3, 5.5, 5]);
   });
 });
