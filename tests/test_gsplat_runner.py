@@ -198,7 +198,6 @@ def test_manifest_refuses_changed_metric_definition_before_training(tmp_path):
 
 
 @_isolated_torch
-@_isolated_torch
 def test_seed_gaussians_are_single_precision_before_any_device_transfer():
     """The first real CUDA iteration refused Double scales beside Float means (2026-09-05)."""
     import numpy as np
@@ -255,6 +254,7 @@ def test_decoded_image_cache_returns_exact_pixels_and_decodes_each_view_once(tmp
         gsplat_runner.decode_rgb_uint8 = original
 
 
+@_isolated_torch
 def test_cpu_host_cannot_claim_cuda_runtime(monkeypatch):
     import torch
 
