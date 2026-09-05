@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 
 import pytest
+from exulanica.reconstruction import gsplat_runner
 from exulanica.reconstruction.gsplat_runner import (
     capture_rng,
     dataset_digest,
@@ -210,6 +211,48 @@ def test_seed_gaussians_are_single_precision_before_any_device_transfer():
     assert {value.dtype for value in values.values()} == {torch.float32}
     assert values["means"].shape == (64, 3) and values["scales"].shape == (64, 3)
     assert torch.isfinite(values["scales"]).all()
+
+
+@_isolated_torch
+def test_decoded_image_cache_returns_exact_pixels_and_decodes_each_view_once(tmp_path):
+    """Per-iteration JPEG decoding starved the GPU on the first real run (2026-09-05)."""
+    import numpy as np
+    import torch
+    from PIL import Image
+
+    rng = np.random.default_rng(3)
+    views = []
+    for name in ("a", "b"):
+        path = tmp_path / f"{name}.png"
+        Image.fromarray(rng.integers(0, 256, size=(6, 8, 3), dtype=np.uint8)).save(path)
+        views.append({"path": path})
+    decodes = 0
+    original = gsplat_runner.decode_rgb_uint8
+
+    def counting(view):
+        nonlocal decodes
+        decodes += 1
+        return original(view)
+
+    gsplat_runner.decode_rgb_uint8 = counting
+    try:
+        cache = gsplat_runner.DecodedImages(torch, device="cpu")
+        first = cache.pixels(views[0])
+        again = cache.pixels(views[0])
+        other = cache.pixels(views[1])
+        expected = torch.from_numpy(original(views[0]).astype(np.float32) / 255.0).unsqueeze(0)
+        assert torch.equal(first, expected) and torch.equal(again, expected)
+        assert first.dtype == torch.float32 and first.shape == (1, 6, 8, 3)
+        assert not torch.equal(other, expected)
+        assert decodes == 2
+        first.mul_(0)  # a caller mutating its tensor must not touch the cached bytes
+        assert torch.equal(cache.pixels(views[0]), expected)
+        uncached = gsplat_runner.DecodedImages(torch, budget_bytes=0, device="cpu")
+        assert torch.equal(uncached.pixels(views[0]), expected)
+        assert torch.equal(uncached.pixels(views[0]), expected)
+        assert decodes == 4
+    finally:
+        gsplat_runner.decode_rgb_uint8 = original
 
 
 def test_cpu_host_cannot_claim_cuda_runtime(monkeypatch):

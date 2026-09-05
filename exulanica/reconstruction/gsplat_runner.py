@@ -472,14 +472,53 @@ def load_dataset(
     return views, points
 
 
-def _image(view: dict[str, Any], torch: Any) -> Any:
+def decode_rgb_uint8(view: dict[str, Any]) -> Any:
+    """The exact training pixels of one view as an HxWx3 uint8 array."""
     import numpy as np
 
     from exulanica.corpus.decode import open_sensor
 
     with open_sensor(view["path"].read_bytes()) as source:
-        pixels = np.array(source.convert("RGB"), dtype=np.float32) / 255.0
-    return torch.from_numpy(pixels).to("cuda").unsqueeze(0)
+        return np.array(source.convert("RGB"), dtype=np.uint8)
+
+
+# Enough for about 180 twelve-megapixel views as bytes; the L40S that measured this holds 46 GiB.
+DEFAULT_IMAGE_CACHE_BYTES = 16 * 1024**3
+
+
+class DecodedImages:
+    """Exact training pixels, decoded once per view and held as bytes on the training device.
+
+    MEASURED 2026-09-05 on the first real CUDA run: decoding each twelve-megapixel JPEG on every
+    iteration held the trainer at one CPU core and the GPU at 24 percent utilization, about 2.5
+    iterations per second. Held as uint8 and converted to float on the device per step, the values
+    are identical to decoding afresh, so no metric or protocol changes. A byte budget bounds device
+    memory; a view beyond the budget decodes as before.
+    """
+
+    def __init__(
+        self, torch: Any, budget_bytes: int = DEFAULT_IMAGE_CACHE_BYTES, device: str = "cuda"
+    ) -> None:
+        self._torch = torch
+        self._budget = budget_bytes
+        self._device = device
+        self._held: dict[Path, Any] = {}
+        self._bytes = 0
+
+    def pixels(self, view: dict[str, Any]) -> Any:
+        key = view["path"]
+        held = self._held.get(key)
+        if held is None:
+            held = self._torch.from_numpy(decode_rgb_uint8(view)).to(self._device)
+            if self._bytes + held.numel() <= self._budget:
+                self._held[key] = held
+                self._bytes += held.numel()
+        # A fresh float tensor each call; the cached bytes are never mutated.
+        return held.to(self._torch.float32).div_(255.0).unsqueeze(0)
+
+
+def _image(view: dict[str, Any], torch: Any) -> Any:
+    return DecodedImages(torch, budget_bytes=0).pixels(view)
 
 
 def seed_values(points: Any, manifest: SplatBuildManifest, torch: Any) -> dict[str, Any]:
@@ -544,7 +583,12 @@ def _render(splats: Any, view: dict[str, Any], step: int, torch: Any) -> Any:
 
 
 def evaluate(
-    splats: Any, views: list[dict[str, Any]], points: Any, step: int, output: Path
+    splats: Any,
+    views: list[dict[str, Any]],
+    points: Any,
+    step: int,
+    output: Path,
+    images: DecodedImages | None = None,
 ) -> dict[str, Any]:
     import numpy as np
     import torch
@@ -562,7 +606,9 @@ def evaluate(
             if not view["heldout"]:
                 continue
             colors, alphas, _ = _render(splats, view, step - 1, torch)
-            actual = _image(view, torch).permute(0, 3, 1, 2)
+            actual = (images.pixels(view) if images is not None else _image(view, torch)).permute(
+                0, 3, 1, 2
+            )
             predicted = colors.clamp(0, 1).permute(0, 3, 1, 2)
             mse = torch.mean((predicted - actual) ** 2).item()
             if mse <= 0:
@@ -764,6 +810,7 @@ def _train_locked(
             peak_vram_bytes=peak,
         )
 
+    images = DecodedImages(torch)
     attempt(False)
     try:
         while step < manifest.max_iterations:
@@ -771,7 +818,7 @@ def _train_locked(
                 sampler = {"order": random.sample(train_indices, len(train_indices)), "cursor": 0}
             view = views[sampler["order"][sampler["cursor"]]]
             sampler["cursor"] += 1
-            pixels = _image(view, torch)
+            pixels = images.pixels(view)
             colors, _, info = _render(splats, view, step, torch)
             l1 = (colors - pixels).abs().mean()
             structural = 1 - ssim(
@@ -798,7 +845,7 @@ def _train_locked(
             if preempted:
                 return 75
         checkpoint()
-        metrics = evaluate(splats, views, points, step, output)
+        metrics = evaluate(splats, views, points, step, output, images)
         _write_atomic(output / "metrics.json", {**metrics, **identity})
         exporter(**dict(splats.items()), format="ply", save_to=str(output / "accepted.ply"))
         duration = attempt(True)
