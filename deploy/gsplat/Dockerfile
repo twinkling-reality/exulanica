@@ -3,14 +3,11 @@
 ARG CUDA_BASE
 FROM ${CUDA_BASE}
 ARG CUDA_BASE
-ARG CODE_REVISION
 ARG TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"
 ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
     TORCH_HOME=/opt/torch-cache \
-    PYTHONDONTWRITEBYTECODE=1 \
-    EXULANICA_BUILD_REVISION=${CODE_REVISION}
-# Refuse mutable base references or an unbound Exulanica build.
-RUN python -c 'import os,re; assert re.fullmatch("[0-9a-f]{40}", os.environ["EXULANICA_BUILD_REVISION"])'
+    PYTHONDONTWRITEBYTECODE=1
+# Refuse mutable base references.
 RUN case "${CUDA_BASE}" in *@sha256:*) ;; *) exit 1 ;; esac
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -22,6 +19,11 @@ RUN git clone --recursive https://github.com/nerfstudio-project/gsplat.git /opt/
     && python -m pip install --no-deps --no-build-isolation -e /opt/gsplat
 # Populate LPIPS weights at build time. Scene execution has no network access.
 RUN python -c 'from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity as L; L(net_type="alex", normalize=True)'
+# Exulanica enters after the compiled dependency layers, so a code revision rebuild reuses them.
+# Refuse an unbound Exulanica build.
+ARG CODE_REVISION
+ENV EXULANICA_BUILD_REVISION=${CODE_REVISION}
+RUN python -c 'import os,re; assert re.fullmatch("[0-9a-f]{40}", os.environ["EXULANICA_BUILD_REVISION"])'
 COPY exulanica /app/exulanica
 COPY LICENSE THIRD_PARTY_NOTICES.md /app/
 ENV PYTHONPATH=/app
