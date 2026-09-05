@@ -58,7 +58,13 @@ so beside the rung.
   the displayed bounds. The loader composes it into every placed map, the trained asset and every
   recovered camera of that scene, so all three stay consistent, and records it as
   `displayFrames`. The status reads, for example, "Displayed upright at 0.159× nonmetric exhibit
-  scale, with the recovered cameras at eye height."
+  scale, with the recovered cameras at eye height." When the cameras share no up direction the
+  sentence says so instead of claiming an upright: MEASURED 2026-09-05, the 210 volcanic point maps
+  have a mean camera up of length 0.34 and 41 percent of cameras point their up against the best
+  common axis, because the rock was photographed from all around and turned over between series.
+  No gravity axis exists in that recovered frame, so the scene axes stand and the status reads
+  "its recovered cameras do not agree on an up direction, so no upright is claimed." The bowl's 51
+  recovered cameras agree (mean up length 0.68) and it stands upright.
 - **Grounding.** A reconstructed region's placement height is the authored landscape height at
   its centre, so local y = 0 is the ground the visitor stands on. Source-first regions keep the
   solver plane and compensate per veil, as before.

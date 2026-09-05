@@ -114,6 +114,7 @@ import {
   regionsByCapture,
   type GeometryIssue,
   type GeometryIssueState,
+  displayFrameSentence,
   type HeldPointMaps,
 } from './geometry-api.js';
 import { browserValidation } from './browser-validation.js';
@@ -511,10 +512,7 @@ function reconstructionRungsFor(
     const frame = displayFrames.get(scene.sceneId);
     if (frame !== undefined && substrate !== 'source_photographs') {
       // The presentation frame is a layout decision and is said out loud beside the rung.
-      reasons.push(frame.upMethod === 'scene-axes'
-        ? `Displayed on its recovered axes at ${frame.scale.toPrecision(3)}× nonmetric exhibit scale.`
-        : `Displayed upright at ${frame.scale.toPrecision(3)}× nonmetric exhibit scale, `
-          + 'with the recovered cameras at eye height.');
+      reasons.push(displayFrameSentence(frame));
     }
     if (notDrawn.has(scene.sceneId)) {
       reasons.push('Not drawn: its region displays a more complete reconstruction of the same photographs.');

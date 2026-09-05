@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { displayCameraTransform } from '@exulanica/atlas-core';
+import { displayCameraTransform, identityDisplayFrame, sceneDisplayFrame } from '@exulanica/atlas-core';
 import { readFileSync } from 'node:fs';
 import type { ReconstructionSceneRecord } from '@exulanica/graph-client';
 import {
   GeometryClient,
   regionsByCapture,
   type GeometryLoadMeasurement,
+  displayFrameSentence,
 } from '../src/geometry-api.js';
 
 /**
@@ -817,5 +818,34 @@ describe('regions are resolved from the snapshot the world was drawn from', () =
     expect(byCapture.get(CAPTURE_A)).toBe(REGION);
     expect(byCapture.get(CAPTURE_B)).toBe(REGION);
     expect(byCapture.get('never-ingested')).toBeUndefined();
+  });
+});
+
+describe('the presentation frame is said out loud beside the rung', () => {
+  it('claims upright only when the cameras agreed, and says so when they did not', () => {
+    const agreeing = sceneDisplayFrame(
+      [
+        { position: [0, 3, 4], forward: [0, -0.6, -0.8], up: [0, 0.8, -0.6] },
+        { position: [0, 3, -4], forward: [0, -0.6, 0.8], up: [0, 0.8, 0.6] },
+      ],
+      [[-1, 0, -1], [1, 0.5, 1]],
+    );
+    expect(agreeing.upMethod).toBe('camera-up-mean');
+    expect(displayFrameSentence(agreeing)).toMatch(/^Displayed upright at [0-9.]+× nonmetric exhibit scale, with the recovered cameras at eye height\.$/);
+
+    // A subject photographed from all around and turned over between series: opposite ups.
+    const disagreeing = sceneDisplayFrame(
+      [
+        { position: [1, 0, 0], forward: [-1, 0, 0], up: [0, 1, 0] },
+        { position: [-1, 0, 0], forward: [1, 0, 0], up: [0, -1, 0] },
+      ],
+      [],
+    );
+    expect(disagreeing.upMethod).toBe('scene-axes');
+    expect(displayFrameSentence(disagreeing)).toMatch(
+      /^Displayed on its recovered axes at [0-9.]+× nonmetric exhibit scale; its recovered cameras do not agree on an up direction, so no upright is claimed\.$/,
+    );
+
+    expect(displayFrameSentence(identityDisplayFrame())).toBe('Displayed on its recovered axes at 1.00× nonmetric exhibit scale.');
   });
 });

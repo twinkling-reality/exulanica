@@ -119,6 +119,25 @@ export type GeometryLoadObserver = (measurement: GeometryLoadMeasurement) => voi
 export type HeldPointMaps = ReadonlyMap<string, PointMap>;
 
 /**
+ * The one sentence the status shows for a scene's presentation frame, beside its rung.
+ *
+ * A frame is a layout decision, so it is said out loud with its scale. When the cameras agreed on
+ * an up direction the scene stands upright with the cameras at eye height. When they did not
+ * (MEASURED 2026-09-05: a rock photographed from all around and turned over between series has
+ * no gravity axis in its recovered frame) the scene axes stand and the sentence says no upright
+ * is claimed, so a tilted exhibit reads as a fact about the photographs rather than a bug.
+ */
+export function displayFrameSentence(frame: SceneDisplayFrame): string {
+  const scale = `${frame.scale.toPrecision(3)}× nonmetric exhibit scale`;
+  if (frame.upMethod !== 'scene-axes') {
+    return `Displayed upright at ${scale}, with the recovered cameras at eye height.`;
+  }
+  return frame.cameraCount > 0
+    ? `Displayed on its recovered axes at ${scale}; its recovered cameras do not agree on an up direction, so no upright is claimed.`
+    : `Displayed on its recovered axes at ${scale}.`;
+}
+
+/**
  * How long one request may take before it is abandoned.
  *
  * Two numbers because the two requests are not alike: the list is a few hundred bytes of JSON
