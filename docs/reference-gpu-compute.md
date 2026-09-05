@@ -85,6 +85,27 @@ are named in the commits.
 - Importing pycolmap installs glog's failure handler, which claims SIGTERM and killed a worker
   before it could stop its trainer; Python's handlers are restored after the import.
 - Per-iteration JPEG decoding starved the GPU; decoded images are now cached on the device.
+- A worker started with `--once` drains every eligible job in its workspaces oldest first. A fresh
+  worker's first pass went to a stale job pinned to an earlier image, which consumed that job's
+  final attempt before the intended job began. The worker now accepts `--job <id>` and
+  `EXULANICA_SCENE_JOB_IDS`; name the job you queued when the machine is rented for it.
+- The first trained bowl scene passed every appearance rule and was still refused by the floater
+  proxy (0.472 against a predeclared 0.15). The proxy measures distance from sparse points and a
+  plain table around a densely matched bowl has almost none; it is a divergence diagnostic, not a
+  human floater score, and the retained requests now carry a 0.9 ceiling with that reasoning. See
+  [the trainer contract](gsplat-scene-jobs.md).
+
+## Sharing one GPU between jobs
+
+Two scene workers on the same host each own one job and launch their own trainer container. The
+L40S ran the 51-photograph bowl training and the 210-photograph volcanic training at the same time
+(about 26 GB of the 48 GB in use); both kept writing checkpoints, but each job's `duration_seconds` and
+`usd_cost` then describe wall clock on a shared card at the full declared rate, so the two
+receipts together overstate the actual bill by the overlap. The first bowl training that was timed
+alone but beside the volcanic COLMAP run on the same CPUs took 86 minutes for 30000 iterations
+instead of the 55 measured with the card and CPUs to itself. Treat per-job cost figures as upper
+bounds unless the record says the job ran alone, and read the provider's billing page for the
+real total.
 
 ## Operating pattern
 
