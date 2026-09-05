@@ -1,0 +1,228 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.scene-withdrawal-evaluation/v1",
+    "measured_at": "2026-09-05T00:50:02Z",
+    "corpus_class": "benchmark",
+    "notice": "Licensed ETH3D benchmark deletion evidence only. This is not personal-media acceptance.",
+    "source": {
+      "benchmark": "ETH3D pipes",
+      "source_manifest_sha256": "4402e042b99153d1cbf247449b16b36f2864338bac28e44dc59f631a25815814",
+      "deleted_manifest_member": "DSC_0634.JPG",
+      "deleted_source_sha256": "661b824a1db24687e7ba7aa9efefc12d3efc9d95994bd75473363de7e496dcf7",
+      "original_benchmark_file_deleted": false
+    },
+    "implementation_revisions": {
+      "browser_measurement": "3857f1434309b6017048613fe2573c9dc3301532",
+      "scene_rung_retraction": "abf148dc4f9c06dc526837bf423160878c590a9e",
+      "purged_blob_reimport": "0da9751a6e2d22105bc65ec0cd84e35d29158b54",
+      "wmp_capture_claim_closure": "d711fa3ff774b1e3791fd68caac777d486f66f51"
+    },
+    "before": {
+      "graph_sha256": "71b0b907427b29733f848dad370753a5fa228d11bc6d28a1781e5c6cccaeaf53",
+      "scene": {
+        "scene_id": "456369cc-86e7-5eab-8b8f-72f85de42030",
+        "member_digest": "f8fda8543738074ce6fc81a2fd7e4f52387d000fafb3bd69b38b4c3bf136702d",
+        "member_count": 14,
+        "registered_member_count": 14,
+        "recorded_rung": 3,
+        "displayed_rung": 3,
+        "rendering_substrate": "posed_point_maps",
+        "current_build_job_id": "bd1c2329-a6d9-5b00-8f47-808c0422bcb0",
+        "pose_receipt_sha256": "21d50e971b29d8663d1a6fedb3b97589f31bfd91a6e9014a3f02bf3a9f097104",
+        "placement_receipt_sha256": "1745a27d819c5291512fc2956cb0e75ed15a6ba7728b9f254647b672bb60305d",
+        "gate_digest": "b24cd513a6e655a7b04f5542d87a27cbe599a4c1f40f7ee6be9451b690921cef"
+      },
+      "live_point_map_count": 14,
+      "live_capture_artifact_count": 42,
+      "world_package": {
+        "export_id": "b6582a0c-19bb-4cd5-ab8e-668a2a2d27a4",
+        "profile_version": "exulanica-wmp-1.0",
+        "manifest_sha256": "bde1cc3c94c5ead4b9b2329c9a77ba82321b70de157182dc957499af9b8263b9",
+        "merkle_root_sha256": "ee8c2f6687e762581b2569b427e017494f5fdc0b4742c74ec6144d2d91524ef7",
+        "verified": true,
+        "scene_count": 1,
+        "scene_artifact_count": 3,
+        "reconstruction_item_count": 45
+      }
+    },
+    "withdrawal": {
+      "tombstone_id": "01a06f03-9874-71b5-b3af-c6d586160c1b",
+      "scope": "capture",
+      "capture_id": "01a06e51-8d4a-77d0-b1bb-dae7e70e238c",
+      "requested_by": "3bbd6caf-0b5d-5cc1-891d-ddef3838344c",
+      "effective_at": "2026-09-05T00:41:41.747124Z",
+      "reason": "authorized benchmark reconstruction withdrawal after publication",
+      "scene_retraction": {
+        "assertion_id": "01a06efb-947d-7491-a722-25627882fe8a",
+        "retraction_id": "01a06f06-a662-754a-ad0d-d8ee600cf529",
+        "status": "retracted",
+        "retracted_at": "2026-09-05T00:41:41.747124Z",
+        "actor_matches_tombstone": true,
+        "basis_names_tombstone": true
+      }
+    },
+    "immediate_delivery": {
+      "graph_sha256": "2526d6fec4725de629e6273f0aaa19a13711419d20800e276e5c9772f795cec9",
+      "scene_count": 0,
+      "scene_removed_before_purge": true,
+      "browser": {
+        "fresh_navigation": true,
+        "observed_at": "2026-09-05T00:45:19.441Z",
+        "page_message": "No live memories are available",
+        "page_explanation": "This view contains no live regions or occurrences. Source files retained by policy remain outside the Atlas until they support a live memory.",
+        "scene_rendered": false,
+        "geometry_issue_logged": false
+      }
+    },
+    "worker_republication_guard": {
+      "historical_builds": [
+        {
+          "job_id": "fc31c16d-7c94-52ae-a24a-d698b4897437",
+          "status": "succeeded",
+          "attempts": 2,
+          "blocked_by_tombstone": true
+        },
+        {
+          "job_id": "bd1c2329-a6d9-5b00-8f47-808c0422bcb0",
+          "status": "succeeded",
+          "attempts": 1,
+          "blocked_by_tombstone": true
+        }
+      ],
+      "post_withdrawal_scene_worker_probe": {
+        "jobs_claimed": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "cancelled": 0
+      },
+      "queued_or_retrying_scene_job_count": 0
+    },
+    "purge": {
+      "role": "exulanica_purge",
+      "job_count": 10,
+      "done_job_count": 9,
+      "skipped_job_count": 1,
+      "actionable_job_count": 0,
+      "destroyed_object_count": 9,
+      "already_absent_object_count": 0,
+      "failed_job_count": 0,
+      "scene_artifacts": [
+        {
+          "kind": "pose_receipt",
+          "content_sha256": "aefd299cd8899e577bac8e72342f9168548fa1978b5fe5f1b0b72f3b2fcfea6b",
+          "state": "purged",
+          "file_absent": true
+        },
+        {
+          "kind": "point_map_placement",
+          "content_sha256": "685ffd70134c92cf7d10272df3f1cc597fd7ec3ad1e0e0a40fc2d805f069a06d",
+          "state": "purged",
+          "file_absent": true
+        },
+        {
+          "kind": "scene_gate_receipt",
+          "content_sha256": "0c759a31edbd38698237f754a5c1d911c64dac65bc88e384c1b8e33922a5b296",
+          "state": "purged",
+          "file_absent": true
+        },
+        {
+          "kind": "pose_receipt",
+          "content_sha256": "21d50e971b29d8663d1a6fedb3b97589f31bfd91a6e9014a3f02bf3a9f097104",
+          "state": "purged",
+          "file_absent": true
+        },
+        {
+          "kind": "point_map_placement",
+          "content_sha256": "1745a27d819c5291512fc2956cb0e75ed15a6ba7728b9f254647b672bb60305d",
+          "state": "purged",
+          "file_absent": true
+        },
+        {
+          "kind": "scene_gate_receipt",
+          "content_sha256": "c2df7ae1cb770038e41af32cec4754ce5dabb43d5e33c80dcaf71082e8f95de3",
+          "state": "purged",
+          "file_absent": true
+        }
+      ],
+      "deleted_capture_unique_artifacts_purged": [
+        "point_map",
+        "rendition"
+      ],
+      "deleted_source_bytes_purged_before_reimport": true,
+      "shared_probe": {
+        "content_sha256": "4416cb2866fb7ff80c581ff3252ac6cd1d2a9480dfe9be799de9887aa5c1a2c9",
+        "state": "skipped",
+        "reason": "something live still holds these bytes"
+      },
+      "surviving_original_point_map_count": 13,
+      "all_surviving_original_point_map_files_present": true,
+      "tombstone_purge_completed_at": null,
+      "completion_state_reason": "The shared probe remains live for unrelated captures. A later deliberate re-import also made the exact source blob live under a new capture identity. The skipped job remains a durable non-collateral-deletion receipt."
+    },
+    "reimport": {
+      "requested_source_sha256": "661b824a1db24687e7ba7aa9efefc12d3efc9d95994bd75473363de7e496dcf7",
+      "accepted": true,
+      "old_capture_id": "01a06e51-8d4a-77d0-b1bb-dae7e70e238c",
+      "new_capture_id": "01a06f08-8e73-73f1-8081-447d36b360e5",
+      "identity_changed": true,
+      "blob_registry_restored": true,
+      "source_file_present": true,
+      "old_scene_visible_after_reimport": false,
+      "old_scene_graph_sha256_after_reimport": "2526d6fec4725de629e6273f0aaa19a13711419d20800e276e5c9772f795cec9",
+      "new_capture_point_map_count": 0,
+      "derivative_jobs": [
+        {
+          "job_id": "01a06f08-8e90-787f-b75a-c91ae22b1b54",
+          "state": "failed",
+          "attempts": 1,
+          "failure_class": "PrivacyAdmissionError",
+          "reason": "point-map inference requires an exact eligible privacy screening receipt"
+        },
+        {
+          "job_id": "01a06f0a-66e0-71fa-8c1f-a773d72a1c56",
+          "state": "failed",
+          "attempts": 1,
+          "failure_class": "PrivacyAdmissionError",
+          "reason": "point-map inference requires an exact eligible privacy screening receipt"
+        }
+      ],
+      "privacy_fail_closed": true
+    },
+    "after_world_package": {
+      "export_id": "3e5f4aa7-bea1-4600-8125-8b89ed6b4e21",
+      "profile_version": "exulanica-wmp-1.0",
+      "parent_merkle_root_sha256": "ee8c2f6687e762581b2569b427e017494f5fdc0b4742c74ec6144d2d91524ef7",
+      "manifest_sha256": "97eb4bab8979d8f498d356d141bb509eaf7f47d45ec4d1ff883095be7af3623d",
+      "merkle_root_sha256": "4152b771709e5977e47c743efce48a0e27637d9d63346e0263c00313c58ba740",
+      "verified": true,
+      "semantic_diff_changed": true,
+      "scene_count": 0,
+      "scene_artifact_count": 0,
+      "capture_rung_claim_count": 13,
+      "dangling_capture_assertion_count": 0,
+      "reconstruction_item_count": 42,
+      "historical_purged_descriptors_retained": true
+    },
+    "outcome": {
+      "scene_withdrawn_immediately": true,
+      "rung_assertion_retracted_durably": true,
+      "scene_artifact_bytes_purged": true,
+      "browser_scene_absent": true,
+      "world_package_scene_absent": true,
+      "old_scene_identity_not_resurrected": true,
+      "unrelated_point_maps_survived": true,
+      "shared_bytes_not_destroyed": true,
+      "status": "passed-with-declared-shared-byte-deferral"
+    },
+    "limitations": [
+      "This exercise deleted one benchmark capture identity, not the licensed source file retained outside Exulanica.",
+      "A capture tombstone intentionally permits a later deliberate import of the same bytes under a new capture identity.",
+      "The tombstone remains open because one shared probe object was correctly not destroyed and the source blob later became live again under the new identity.",
+      "The re-import had no new human privacy screening, so the normal worker failed closed before point-map creation.",
+      "One indoor benchmark scene cannot establish broad photograph or personal-media acceptance.",
+      "No personal media was admitted or evaluated."
+    ]
+  },
+  "record_sha256": "0f8eca4f797792bafbedd6f45c8fc7a3853acce5e1563b89d028fd7f87917c3a"
+}
