@@ -22,7 +22,9 @@ NODE_DIR="${NODE_DIR:-$HOME/node}"
 WORKER_IMAGE="$(docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/exulanica-scene-worker:${CODE_REVISION:0:7}")"
 case "$WORKER_IMAGE" in *@sha256:*) ;; *) echo "worker image has no registry digest; push it first" >&2; exit 1 ;; esac
 mkdir -p "$DATA_DIR" "$HOME/worker-home"
-exec docker run --rm --network host \
+# The image's liveness probe is the API's /healthz; a worker has no HTTP port, so it is disabled
+# here exactly as compose does for the non-HTTP services.
+exec docker run --rm --network host --no-healthcheck \
   --user "$(id -u):$(id -g)" --group-add "$(stat -c %g /var/run/docker.sock)" \
   -e HOME=/tmp/worker-home -v "$HOME/worker-home:/tmp/worker-home" \
   -v /var/run/docker.sock:/var/run/docker.sock \
