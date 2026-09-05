@@ -1,6 +1,8 @@
 /**
- * One signed-out navigation set, built once and shared by the title and Method surfaces. Destinations
- * keep the same order and interaction; only the current marker and Home affordance change.
+ * One signed-out navigation set shared by every landing surface.
+ *
+ * Resources remains one Companion station. Its ordinary links live in a secondary disclosure, so
+ * documentation and source code do not become extra primary destinations.
  */
 
 import { el } from './dom.js';
@@ -10,12 +12,13 @@ export const REPOSITORY_URL = 'https://github.com/twinkling-reality/exulanica';
 /** The documents this page is built from, which are the same ones it is checked against. */
 export const DOCS_URL = `${REPOSITORY_URL}/tree/main/docs`;
 
-/** Where the visitor is. The bar marks the current one and offers Home from everywhere else. */
-export type Surface = 'title' | 'method';
+/** Where the visitor is. Informational surfaces retain a direct return to the title. */
+export type Surface = 'title' | 'purpose' | 'capabilities';
 
 export interface ChromeActions {
   onHome(): void;
-  onMethod(): void;
+  onPurpose(): void;
+  onCapabilities(): void;
 }
 
 export interface ChromeOptions extends ChromeActions {
@@ -39,7 +42,13 @@ function destination(
     id,
   };
   if (href !== undefined) {
-    return el('a', { ...attrs, href, rel: 'noreferrer' }, inner);
+    const link = el('a', {
+      ...attrs,
+      href,
+      ...(href.startsWith('http') ? { rel: 'noreferrer' } : {}),
+    }, inner);
+    link.addEventListener('click', onPick);
+    return link;
   }
   const b = el('button', { ...attrs, type: 'button' }, inner);
   b.addEventListener('click', onPick);
@@ -54,44 +63,80 @@ export interface Chrome {
 export function buildChrome(options: ChromeOptions): Chrome {
   const bar = el('nav', { class: 'topbar', 'aria-label': 'Primary navigation' });
 
-  const home = destination('Home', 'path-home', options.onHome);
-  const method = destination('Method', 'path-how', options.onMethod);
-  const atlas =
-    options.atlasHref === null
-      ? el('p', {
-          class: 'entry-status',
-          role: 'status',
-          text: 'Atlas is not connected in this build.',
-        })
-      : destination('Enter Atlas', 'path-enter', () => {}, options.atlasHref, true);
+  const home = destination('Return', 'path-home', options.onHome, '#title');
+  const purpose = destination('Purpose', 'path-purpose', options.onPurpose, '#purpose');
+  const capabilities = destination(
+    'Capabilities',
+    'path-capabilities',
+    options.onCapabilities,
+    '#capabilities',
+  );
+  const atlas = destination(
+    'Enter Exulanica',
+    'path-enter',
+    () => {},
+    options.atlasHref ?? undefined,
+    true,
+  );
+  const atlasStatus = el('p', {
+    class: 'entry-status',
+    id: 'atlas-status',
+    role: 'status',
+    text: 'The world is not connected in this build.',
+  });
+  if (options.atlasHref === null) {
+    const disabledAtlas = atlas as HTMLButtonElement;
+    disabledAtlas.disabled = true;
+    disabledAtlas.setAttribute('aria-describedby', atlasStatus.id);
+  } else {
+    atlasStatus.hidden = true;
+  }
+
+  const resources = destination('Resources', 'path-resources', () => {});
+  resources.setAttribute('aria-expanded', 'false');
+  resources.setAttribute('aria-controls', 'resource-links');
+
+  const resourceLinks = el('div', {
+    class: 'resource-disclosure',
+    id: 'resource-links',
+    'aria-label': 'Resources',
+  });
+  resourceLinks.hidden = true;
+  const resourceBack = destination('Back', 'resource-back', () => {});
+  const documentation = destination('Documentation', 'resource-docs', () => {}, DOCS_URL);
+  const github = destination('GitHub', 'resource-github', () => {}, REPOSITORY_URL);
+  resourceLinks.append(resourceBack, documentation, github);
 
   const left = el('div', { class: 'destinations' });
   const marker = createCompanionMenuMarker();
-  const documentation = destination('Documentation', 'path-docs', () => {}, DOCS_URL);
-  const github = destination('GitHub', 'path-github', () => {}, REPOSITORY_URL);
   left.append(
     marker,
     home,
     atlas,
-    method,
-    documentation,
-    github,
+    atlasStatus,
+    purpose,
+    capabilities,
+    resourceLinks,
+    resources,
   );
 
-  const defaultTarget = atlas.matches('a, button') ? atlas : method;
-  const targets = atlas.matches('a, button')
-    ? [atlas, method, documentation, github]
-    : [method, documentation, github];
+  const targets = [home, atlas, purpose, capabilities, resources];
   let currentSurface: Surface = 'title';
   let hovered: HTMLElement | null = null;
   let focused: HTMLElement | null = null;
-  let previousTarget = defaultTarget;
+  let previousTarget = atlas;
   let motionPhase = false;
+  let outsideListener: ((event: PointerEvent) => void) | null = null;
+  let escapeListener: ((event: KeyboardEvent) => void) | null = null;
+
+  const defaultTarget = (): HTMLElement => {
+    if (currentSurface === 'purpose') return purpose;
+    if (currentSurface === 'capabilities') return capabilities;
+    return atlas;
+  };
 
   const placeMarker = (): void => {
-    marker.toggleAttribute('hidden', currentSurface !== 'title');
-    if (marker.hasAttribute('hidden')) return;
-    const target = focused ?? hovered ?? defaultTarget;
+    const target = focused ?? hovered ?? defaultTarget();
     marker.dataset['state'] = focused !== null || hovered !== null ? 'attending' : 'resting';
     marker.dataset['target'] = target.id;
     if (target !== previousTarget) {
@@ -115,6 +160,54 @@ export function buildChrome(options: ChromeOptions): Chrome {
     });
   };
 
+  const applyPrimaryVisibility = (): void => {
+    const resourcesOpen = !resourceLinks.hidden;
+    home.hidden = resourcesOpen || currentSurface === 'title';
+    atlas.hidden = resourcesOpen || currentSurface !== 'title';
+    atlasStatus.hidden =
+      resourcesOpen || currentSurface !== 'title' || options.atlasHref !== null;
+    purpose.hidden = resourcesOpen;
+    capabilities.hidden = resourcesOpen;
+  };
+
+  const closeResources = (restoreFocus: boolean): void => {
+    if (resourceLinks.hidden) return;
+    resourceLinks.hidden = true;
+    resources.setAttribute('aria-expanded', 'false');
+    applyPrimaryVisibility();
+    if (outsideListener) document.removeEventListener('pointerdown', outsideListener);
+    if (escapeListener) document.removeEventListener('keydown', escapeListener);
+    outsideListener = null;
+    escapeListener = null;
+    if (restoreFocus) resources.focus({ preventScroll: true });
+  };
+
+  const openResources = (): void => {
+    if (!resourceLinks.hidden) {
+      closeResources(false);
+      return;
+    }
+    resourceLinks.hidden = false;
+    resources.setAttribute('aria-expanded', 'true');
+    applyPrimaryVisibility();
+    focused = resources;
+    placeMarker();
+
+    outsideListener = (event): void => {
+      if (event.target instanceof Node && left.contains(event.target)) return;
+      closeResources(false);
+    };
+    escapeListener = (event): void => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeResources(true);
+    };
+    document.addEventListener('pointerdown', outsideListener);
+    document.addEventListener('keydown', escapeListener);
+  };
+  resources.addEventListener('click', openResources);
+  resourceBack.addEventListener('click', () => closeResources(true));
+
   for (const target of targets) {
     target.addEventListener('pointerenter', () => {
       hovered = target;
@@ -134,18 +227,31 @@ export function buildChrome(options: ChromeOptions): Chrome {
     });
   }
 
+  resourceLinks.addEventListener('focusin', () => {
+    focused = resources;
+    placeMarker();
+  });
+  resourceLinks.addEventListener('focusout', (event) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && resourceLinks.contains(next)) return;
+    if (focused === resources && document.activeElement !== resources) focused = null;
+    placeMarker();
+  });
+
   bar.append(left);
 
   return {
     root: bar,
     setSurface(surface) {
       currentSurface = surface;
-      // Home is the way back, so it is not offered from the place it goes to.
-      home.hidden = surface === 'title';
-      // Enter Atlas belongs to the title menu; Method keeps a compact way home instead.
-      atlas.hidden = surface !== 'title';
-      // `aria-current` rather than a class alone, so the marking is not purely visual.
-      for (const [node, owns] of [[method, surface === 'method']] as const) {
+      closeResources(false);
+      hovered = null;
+      focused = null;
+      applyPrimaryVisibility();
+      for (const [node, owns] of [
+        [purpose, surface === 'purpose'],
+        [capabilities, surface === 'capabilities'],
+      ] as const) {
         if (owns) node.setAttribute('aria-current', 'page');
         else node.removeAttribute('aria-current');
       }

@@ -1,0 +1,22 @@
+.gradient-forms {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.gradient-forms-shift { opacity: 0; }
+.gradient-forms[data-motion='color'] .gradient-forms-shift {
+  animation: gradient-forms-color var(--forms-duration, 24s) ease-in-out infinite;
+}
+.gradient-forms-grain { mix-blend-mode: soft-light; }
+@keyframes gradient-forms-color {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gradient-forms[data-motion='color'] .gradient-forms-shift { animation: none !important; }
+}
+@media (forced-colors: active) {
+  .gradient-forms { display: none; }
+}

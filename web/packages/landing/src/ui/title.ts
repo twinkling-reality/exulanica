@@ -1,6 +1,8 @@
-/** Exulanica's signed-out title: one wordmark, one proposition, and one incomplete memory. */
+/** Exulanica's signed-out title: one wordmark, one proposition, and one field of near-touching gradient forms. */
 
 import { el } from './dom.js';
+import { createGradientForms } from './gradient-forms/index.js';
+import { HOME_FORMS } from './gradient-forms/presets.js';
 
 export function buildTitle(): HTMLElement {
   const root = el('section', {
@@ -9,8 +11,8 @@ export function buildTitle(): HTMLElement {
     tabindex: '-1',
     'aria-labelledby': 'title-wordmark',
   });
-  const aperture = el('div', { class: 'memory-aperture', 'aria-hidden': 'true' });
-  aperture.append(el('div', { class: 'memory-crescent' }));
+  const artwork = el('div', { class: 'title-artwork', 'aria-hidden': 'true' });
+  artwork.append(createGradientForms(HOME_FORMS).element);
 
   const stack = el('div', { class: 'title' });
   stack.append(
@@ -23,6 +25,6 @@ export function buildTitle(): HTMLElement {
     el('span', { text: 'Twinkling Reality' }),
   ]);
 
-  root.append(aperture, stack, publisher);
+  root.append(artwork, stack, publisher);
   return root;
 }

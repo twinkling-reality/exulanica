@@ -1,0 +1,14 @@
+/* UI theme: independent of the decorative artwork palette and composition. */
+:root,
+:root[data-theme='landing-light'] {
+  --landing-canvas: #f7f9f7;
+  --landing-ink: #121715;
+  --landing-ink-soft: #35413b;
+  --landing-ink-faint: #59655f;
+
+  --landing-wordmark-start: #303638;
+  --landing-wordmark-middle: #535d62;
+  --landing-wordmark-end: #7a858d;
+
+  --landing-focus: #235c43;
+}

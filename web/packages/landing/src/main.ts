@@ -1,5 +1,5 @@
 /**
- * Exulanica's signed-out surfaces: the title and Method.
+ * Exulanica's signed-out title, Purpose, and Capabilities surfaces.
  *
  * The Atlas itself has one composition root in `@exulanica/app`. The landing page does not build a
  * second Atlas, second Companion, or scripted formation journey. Entering follows the configured
@@ -12,8 +12,10 @@ import './style.css';
 import { atlasDestinationFromEnvironment } from './atlas-destination.js';
 import { readEnv, watchReducedMotion } from './env.js';
 import { buildChrome, type Surface } from './ui/chrome.js';
-import { buildMethod } from './ui/method.js';
+import { buildCapabilities } from './ui/capabilities.js';
+import { buildPurpose } from './ui/purpose.js';
 import { buildTitle } from './ui/title.js';
+import { createSurfaceTransition } from './ui/surface-transition.js';
 import { boundaryReason, buildViewportBoundary, readViewport } from './ui/viewport-boundary.js';
 
 const overlay = document.getElementById('overlay');
@@ -22,20 +24,37 @@ if (!overlay) throw new Error('landing: expected #overlay in the document');
 const env = readEnv();
 const destination = atlasDestinationFromEnvironment(window.location.href);
 const title = buildTitle();
-const method = buildMethod();
+const purpose = buildPurpose();
+const capabilities = buildCapabilities();
 const chrome = buildChrome({
   atlasHref: destination?.href ?? null,
   onHome: () => go('title'),
-  onMethod: () => go('method'),
+  onPurpose: () => go('purpose'),
+  onCapabilities: () => go('capabilities'),
 });
 
-// The title precedes navigation so its first Tab stop is Enter Atlas. Navigation precedes Method so
-// the visually top controls also precede the article's footer citation in keyboard order.
-overlay.append(title, chrome.root, method);
+// Keep the same decorative world mounted while the text planes travel through it.
+const landscape = document.createElement('div');
+landscape.className = 'landing-landscape';
+landscape.setAttribute('aria-hidden', 'true');
+const artwork = title.querySelector('.title-artwork');
+if (artwork) landscape.append(artwork);
+// Decoration has no focus stops; the title still precedes navigation.
+overlay.append(landscape, title, chrome.root, purpose, capabilities);
 
-const PANES: Readonly<Record<Surface, HTMLElement>> = { title, method };
+const PANES: Readonly<Record<Surface, HTMLElement>> = { title, purpose, capabilities };
+const transition = createSurfaceTransition(PANES, () => env.reducedMotion, landscape);
 let surface: Surface = 'title';
-go('title');
+const surfaceFromHash = (): Surface => {
+  if (window.location.hash === '#purpose') return 'purpose';
+  if (window.location.hash === '#capabilities') return 'capabilities';
+  return 'title';
+};
+go(surfaceFromHash());
+window.addEventListener('hashchange', () => {
+  const next = surfaceFromHash();
+  if (next !== surface) go(next);
+});
 
 /** Show a signed-out surface without constructing or pretending to enter an Atlas. */
 function go(next: Surface): void {
@@ -45,18 +64,13 @@ function go(next: Surface): void {
   document.documentElement.dataset['theme'] = 'landing-light';
   chrome.setSurface(next);
 
-  for (const [key, pane] of Object.entries(PANES) as [Surface, HTMLElement][]) {
-    pane.hidden = key !== next;
-  }
-
+  transition.show(next);
   const shown = PANES[next];
-  shown.classList.add('is-faded');
-  requestAnimationFrame(() => shown.classList.remove('is-faded'));
   if (next === 'title') {
     shown.focus({ preventScroll: true });
   } else if (!chrome.root.contains(document.activeElement)) {
-    // Pointer/keyboard activation leaves focus on Method naturally. This branch covers any future
-    // programmatic entry without dropping focus into the article ahead of the visible navigation.
+    // Pointer/keyboard activation leaves focus on its destination naturally. This branch covers
+    // programmatic entry without dropping focus into the article ahead of visible navigation.
     document.getElementById('path-home')?.focus({ preventScroll: true });
   }
 }
@@ -97,11 +111,15 @@ function checkViewport(): void {
 }
 checkViewport();
 
-window.addEventListener('resize', checkViewport);
+window.addEventListener('resize', () => {
+  checkViewport();
+  transition.refresh();
+});
 window.matchMedia('(pointer: coarse)').addEventListener('change', checkViewport);
 
 watchReducedMotion((reduced) => {
   env.reducedMotion = reduced;
+  if (reduced) transition.finish();
   document.documentElement.dataset['reducedMotion'] = reduced ? 'true' : 'false';
 });
 document.documentElement.dataset['reducedMotion'] = env.reducedMotion ? 'true' : 'false';

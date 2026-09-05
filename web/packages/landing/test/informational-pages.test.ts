@@ -2,50 +2,37 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { CAPABILITY_GROUPS, buildCapabilities } from '../src/ui/capabilities.js';
-import { buildManifesto } from '../src/ui/manifesto.js';
+import { buildCapabilities } from '../src/ui/capabilities.js';
+import { buildPurpose } from '../src/ui/purpose.js';
 
-describe('the signed-out informational pages', () => {
-  it('keeps the Manifesto a semantic page of convictions rather than a status inventory', () => {
-    const manifesto = buildManifesto();
-
-    expect(manifesto.id).toBe('manifesto');
-    expect(manifesto.getAttribute('aria-labelledby')).toBe('manifesto-title');
-    expect(manifesto.querySelector('h1')?.textContent).toBe('Manifesto');
-    expect(Array.from(manifesto.querySelectorAll('h2'), (node) => node.textContent)).toEqual([
-      'Evidence comes before geometry',
-      'An inference is not a fact',
-      'Every place should show what it earned',
-      'Uncertainty is allowed to remain',
-      'Operational limits belong in the product',
-    ]);
-    expect(manifesto.textContent).not.toContain('Built and tested');
-    expect(manifesto.textContent).not.toContain('Planned');
+describe('the signed-out reading surfaces', () => {
+  it.each([
+    ['purpose', 'Purpose', buildPurpose],
+    ['capabilities', 'Capabilities', buildCapabilities],
+  ] as const)('keeps %s accessible with a named page', (id, name, build) => {
+    const page = build();
+    expect(page.id).toBe(id);
+    const heading = page.querySelector('h1');
+    expect(heading?.textContent).toBe(name);
+    expect(heading?.classList.contains('sr-only')).toBe(true);
+    expect(page.getAttribute('aria-labelledby')).toBe(heading?.id);
+    expect(page.querySelector('hr, strong, em, a')).toBeNull();
   });
 
-  it('publishes an explicit, bounded status taxonomy on Capabilities', () => {
+  it('keeps Purpose uninterrupted and gives each Capabilities outcome a named section', () => {
+    const purpose = buildPurpose();
     const capabilities = buildCapabilities();
-
-    expect(capabilities.id).toBe('capabilities');
-    expect(capabilities.getAttribute('aria-labelledby')).toBe('capabilities-title');
-    expect(capabilities.querySelector('h1')?.textContent).toBe('Capabilities');
-    expect(CAPABILITY_GROUPS.map((group) => group.status)).toEqual([
-      'Built and tested',
-      'Built, real-world validation pending',
-      'Planned',
-      'Not deployed',
-    ]);
-    expect(Array.from(capabilities.querySelectorAll('h2'), (node) => node.textContent)).toEqual(
-      CAPABILITY_GROUPS.map((group) => group.status),
-    );
-    expect(capabilities.textContent).toContain('not a hosted product');
-    expect(capabilities.textContent).toContain('No user-authorized personal library');
-  });
-
-  it('keeps Atlas as the name of the navigable product space', () => {
-    const text = `${buildManifesto().textContent} ${buildCapabilities().textContent}`;
-
-    expect(text).toContain('Atlas');
-    expect(text).not.toContain('Enter World');
+    expect(purpose.querySelectorAll('p')).toHaveLength(1);
+    expect(purpose.querySelector('h2')).toBeNull();
+    const sections = capabilities.querySelectorAll('.capability-section');
+    expect(sections).toHaveLength(2);
+    for (const section of sections) {
+      const heading = section.querySelector('h2');
+      expect(heading?.textContent).toBeTruthy();
+      expect(section.getAttribute('aria-labelledby')).toBe(heading?.id);
+      expect(section.querySelectorAll('p')).toHaveLength(1);
+    }
+    expect(capabilities.textContent).toContain('World Memory Package');
+    expect(`${purpose.textContent} ${capabilities.textContent}`).not.toMatch(/[—–]/);
   });
 });
