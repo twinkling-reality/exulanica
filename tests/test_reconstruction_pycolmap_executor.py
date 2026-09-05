@@ -107,9 +107,7 @@ def test_the_in_process_backend_recovers_poses_through_the_unmodified_controller
     assert checkpoint.is_file()
 
 
-def test_a_completed_job_is_reused_rather_than_recomputed(
-    synthetic_capture: Path, tmp_path: Path
-):
+def test_a_completed_job_is_reused_rather_than_recomputed(synthetic_capture: Path, tmp_path: Path):
     """The expensive half of the controller's contract, against a real backend.
 
     A second call must return the stored receipt without invoking COLMAP again. The executor here
@@ -151,3 +149,25 @@ def test_an_unknown_stage_is_a_failed_result_and_not_a_raised_exception():
     outcome = PycolmapExecutor()(("pycolmap", "point_triangulator"), Path.cwd())
     assert outcome.returncode == 1
     assert "point_triangulator" in outcome.stderr
+
+
+def test_importing_pycolmap_leaves_the_process_termination_handling_in_python():
+    """glog's failure handler claimed SIGTERM and killed a worker mid-shutdown (2026-09-05)."""
+    import subprocess
+    import sys
+
+    program = (
+        "import os, signal, sys\n"
+        "seen = []\n"
+        "signal.signal(signal.SIGTERM, lambda *_: seen.append('python'))\n"
+        "from exulanica.reconstruction.pycolmap_executor import _pycolmap\n"
+        "_pycolmap()\n"
+        "os.kill(os.getpid(), signal.SIGTERM)\n"
+        "signal.sigtimedwait([signal.SIGTERM], 0) if False else None\n"
+        "import time; time.sleep(0.2)\n"
+        "sys.exit(0 if seen == ['python'] else 3)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, check=False, timeout=120
+    )
+    assert result.returncode == 0, (result.returncode, result.stdout, result.stderr[-800:])

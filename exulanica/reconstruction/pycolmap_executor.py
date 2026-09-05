@@ -84,6 +84,16 @@ def pycolmap_version() -> str:
 
 
 def _pycolmap() -> Any:
+    # Importing pycolmap installs glog's failure signal handler, and glog claims SIGTERM along with
+    # the crash signals: the process prints a native stack trace and dies. MEASURED 2026-09-05 on
+    # the first real run: a scene worker asked to stop died that way before it could request its
+    # trainer's shutdown or confirm the container's cleanup, leaving the trainer running. The
+    # process's own termination handling is therefore restored once the import has happened.
+    import signal
+    import threading
+
+    numbers = (signal.SIGINT, signal.SIGTERM)
+    preserved = {number: signal.getsignal(number) for number in numbers}
     try:
         import pycolmap
     except ModuleNotFoundError as error:  # pragma: no cover - the extra is absent in CI
@@ -91,6 +101,12 @@ def _pycolmap() -> Any:
             "pycolmap is not installed. It is the 'pose' extra: "
             "uv sync --extra pose. Without it, pose recovery has no backend."
         ) from error
+    # Python's signal module still reports the old handler after the import because glog replaced
+    # the disposition beneath it, so the restore is unconditional rather than change-detected.
+    if threading.current_thread() is threading.main_thread():
+        for number, handler in preserved.items():
+            if handler is not None:
+                signal.signal(number, handler)
     return pycolmap
 
 
