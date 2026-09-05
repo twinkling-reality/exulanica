@@ -1,0 +1,156 @@
+{
+  "profile": "exulanica.span-digest-conformance/v1",
+  "span_format_version": 1,
+  "hash_algorithm": "sha-256",
+  "canonicalisation": "rfc8785-subset",
+  "vectors": [
+    {
+      "name": "whole photograph",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/img#v=1&m=still_image&t=0,0.000000001",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "img",
+        "t_start_ns": 0,
+        "t_end_ns": 1,
+        "modality": "still_image"
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"still_image\",\"span_format_version\":1,\"t_end_ns\":1,\"t_start_ns\":0,\"track_key\":\"img\"}",
+      "canonical_json_byte_length": 177,
+      "span_digest_sha256": "48c478e359ceef1851e0574f1cd41597fbc03e5a61367a1ea4c1584abb00b462"
+    },
+    {
+      "name": "region in a photograph, upright display space",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/img#v=1&m=frame_region&t=0,0.000000001&xywh=percent:31.2000,22.0000,18.4000,40.1000&disp=4032x3024,0,1:1",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "img",
+        "t_start_ns": 0,
+        "t_end_ns": 1,
+        "modality": "frame_region",
+        "region": {
+          "kind": "rect",
+          "rect": {
+            "x": 312000,
+            "y": 220000,
+            "w": 184000,
+            "h": 401000
+          },
+          "display": {
+            "w": 4032,
+            "h": 3024,
+            "rotation": 0,
+            "sar_num": 1,
+            "sar_den": 1
+          }
+        }
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"frame_region\",\"region\":{\"display\":{\"h\":3024,\"rotation\":0,\"sar_den\":1,\"sar_num\":1,\"w\":4032},\"kind\":\"rect\",\"rect\":{\"h\":401000,\"w\":184000,\"x\":312000,\"y\":220000}},\"span_format_version\":1,\"t_end_ns\":1,\"t_start_ns\":0,\"track_key\":\"img\"}",
+      "canonical_json_byte_length": 323,
+      "span_digest_sha256": "1f5eae0dfba47e71784528d8b04eeb05cee68385df8238c788acbada7ce46e06"
+    },
+    {
+      "name": "video interval starting before track zero",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/v:0#v=1&m=video_time&t=-1.000000001,18.25",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "v:0",
+        "t_start_ns": -1000000001,
+        "t_end_ns": 18250000000,
+        "modality": "video_time"
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"video_time\",\"span_format_version\":1,\"t_end_ns\":18250000000,\"t_start_ns\":-1000000001,\"track_key\":\"v:0\"}",
+      "canonical_json_byte_length": 196,
+      "span_digest_sha256": "31a7e602f3cb699de43e29e358e34734376a4a74642f687c01d28517291ec49c"
+    },
+    {
+      "name": "region in a rotated video frame",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/v:1#v=1&m=frame_region&t=0,0.000000001&xywh=percent:0.0000,0.0000,100.0000,100.0000&disp=1920x1080,270,4:3",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "v:1",
+        "t_start_ns": 0,
+        "t_end_ns": 1,
+        "modality": "frame_region",
+        "region": {
+          "kind": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 1000000,
+            "h": 1000000
+          },
+          "display": {
+            "w": 1920,
+            "h": 1080,
+            "rotation": 270,
+            "sar_num": 4,
+            "sar_den": 3
+          }
+        }
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"frame_region\",\"region\":{\"display\":{\"h\":1080,\"rotation\":270,\"sar_den\":3,\"sar_num\":4,\"w\":1920},\"kind\":\"rect\",\"rect\":{\"h\":1000000,\"w\":1000000,\"x\":0,\"y\":0}},\"span_format_version\":1,\"t_end_ns\":1,\"t_start_ns\":0,\"track_key\":\"v:1\"}",
+      "canonical_json_byte_length": 317,
+      "span_digest_sha256": "11821be2eec6d4f313da8cd216ad1a16733ecaf6681b65a8639affbb49d5f4a9"
+    },
+    {
+      "name": "audio interval on a 48 kHz tick boundary",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/a:0#v=1&m=audio_time&t=0.000020833,0.0000625",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "a:0",
+        "t_start_ns": 20833,
+        "t_end_ns": 62500,
+        "modality": "audio_time"
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"audio_time\",\"span_format_version\":1,\"t_end_ns\":62500,\"t_start_ns\":20833,\"track_key\":\"a:0\"}",
+      "canonical_json_byte_length": 184,
+      "span_digest_sha256": "1d6884645ee54de63282b9dd4ca48d7550de4dbaabdc2cba4ed3eeb0ee7f670d"
+    },
+    {
+      "name": "transcript span with no exact quote",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/a:0#v=1&m=transcript_text&t=0,0.000001&text=8f14e45f-ceea-567d-861d-4f5b1b2a3c4d,0,12",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "a:0",
+        "t_start_ns": 0,
+        "t_end_ns": 1000,
+        "modality": "transcript_text",
+        "text_anchor": {
+          "artifact_id": "8f14e45f-ceea-567d-861d-4f5b1b2a3c4d",
+          "char_start": 0,
+          "char_end": 12
+        }
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"transcript_text\",\"span_format_version\":1,\"t_end_ns\":1000,\"t_start_ns\":0,\"text_anchor\":{\"artifact_id\":\"8f14e45f-ceea-567d-861d-4f5b1b2a3c4d\",\"char_end\":12,\"char_start\":0},\"track_key\":\"a:0\"}",
+      "canonical_json_byte_length": 282,
+      "span_digest_sha256": "dcb7ea9b3a3e11f31aa63240d1df90cad2ff3a12e7af30bb30238c01cdd14343"
+    },
+    {
+      "name": "transcript span whose quote needs every escape decision",
+      "uri": "exulanica://blob/ni:///sha-256;bbJrhAC1Q66zz_hKIugJbSmPpyJlSYnw_wJRlj_1lGg/a:0#v=1&m=transcript_text&t=0,0.000001&text=8f14e45f-ceea-567d-861d-4f5b1b2a3c4d,0,12&exact=caf%C3%A9%20%22x%22%5Cy%09z%C3%A9%CC%81",
+      "digest_input": {
+        "span_format_version": 1,
+        "blob_sha256": "6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468",
+        "track_key": "a:0",
+        "t_start_ns": 0,
+        "t_end_ns": 1000,
+        "modality": "transcript_text",
+        "text_anchor": {
+          "artifact_id": "8f14e45f-ceea-567d-861d-4f5b1b2a3c4d",
+          "char_start": 0,
+          "char_end": 12,
+          "exact": "café \"x\"\\y\tzé́"
+        }
+      },
+      "canonical_json": "{\"blob_sha256\":\"6db26b8400b543aeb3cff84a22e8096d298fa722654989f0ff0251963ff59468\",\"modality\":\"transcript_text\",\"span_format_version\":1,\"t_end_ns\":1000,\"t_start_ns\":0,\"text_anchor\":{\"artifact_id\":\"8f14e45f-ceea-567d-861d-4f5b1b2a3c4d\",\"char_end\":12,\"char_start\":0,\"exact\":\"café \\\"x\\\"\\\\y\\tzé́\"},\"track_key\":\"a:0\"}",
+      "canonical_json_byte_length": 314,
+      "span_digest_sha256": "061800cb20a626c7ddf25d9bfb3c9806c65f365b7ca8617ae37ebc7821faf441"
+    }
+  ]
+}
