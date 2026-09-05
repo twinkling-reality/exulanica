@@ -64,6 +64,8 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
     ("GET", "/operations/reconstruction-scenes"): {},
+    # Authentication must precede body validation; the complete review path has its own tests.
+    ("POST", "/operations/reconstruction-admission"): {"json": {}},
     ("GET", "/operations/reconstruction-scenes/{job_id}"): {},
     ("POST", "/operations/reconstruction-scenes/{job_id}/retry"): {},
     ("GET", "/world/styles/catalog"): {},

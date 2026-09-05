@@ -1,0 +1,165 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.reference-workflow-negative-controls/v1",
+    "date": "2026-09-05",
+    "isolated_source_copy": true,
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "database_creation_allowed": false,
+    "baseline_returncode": 0,
+    "baseline_output_sha256": "a1723917b8d743fe1dee2c4f30773bb48a8001a1ca9f47edede5d9606629deec",
+    "records": [
+      {
+        "mutation": "manifest_digest",
+        "production_file": "exulanica/evaluation/reference_inputs.py",
+        "replace": "value != envelope(record)",
+        "with": "False",
+        "test_selector": "test_changed_source",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "49a3cc479db73a466928227464663de1487fd626a0788f849321e07431ea1820"
+      },
+      {
+        "mutation": "source_bytes",
+        "production_file": "exulanica/evaluation/reference_inputs.py",
+        "replace": "digest_file(path) != item[\"sha256\"]",
+        "with": "False",
+        "test_selector": "test_changed_source",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "9034c898825b1975acd9e1f9b7ce216cf5ca9483927d97007ab4b782cb82f379"
+      },
+      {
+        "mutation": "frozen_split",
+        "production_file": "exulanica/evaluation/reference_inputs.py",
+        "replace": "if manifest.exists() and manifest.read_bytes() != payload:",
+        "with": "if False:",
+        "test_selector": "test_preparation",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "774f78c4f9df77b2b77e60058b6b66bf7a3c3816e0daa67383c8ed97498a4838"
+      },
+      {
+        "mutation": "human_attestation",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "attestation != HUMAN_ATTESTATION",
+        "with": "False",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "b878cca195caebe5c2aac42bc6550c693bcc1b9bf446baf38325f657c1cf2bc5"
+      },
+      {
+        "mutation": "named_human",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "not reviewed_by_name.strip()",
+        "with": "False",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "214e2aa6042e3eccd3ff67be0ac14a54f6c3460b42cf9527a43613a3e60fd1f1"
+      },
+      {
+        "mutation": "review_time",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "if reviewed_at > dt.datetime.now(dt.UTC) + dt.timedelta(minutes=5):",
+        "with": "if False:",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "8f580027715fad226548d4a9721034564915d44b9790c3c270fb9bf30e9cf123"
+      },
+      {
+        "mutation": "client_actor_refusal",
+        "production_file": "exulanica/api/routes/reconstruction_admission.py",
+        "replace": "class BenchmarkReview(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")",
+        "with": "class BenchmarkReview(BaseModel):\n    model_config = ConfigDict(extra=\"ignore\")",
+        "test_selector": "test_review_needs_session",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "de4c03657f596ed922b29aa6fc1dbbf60940030519662a18100e2e10a2ea17cb"
+      },
+      {
+        "mutation": "benchmark_class",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "source_manifest.get(\"corpus_class\") == \"benchmark\"",
+        "with": "True",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "e5ae571bce0ce98a6b9713eed0200072ed0c2469b20c518f90994f038a95e285"
+      },
+      {
+        "mutation": "retrieval_date",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "source_manifest[\"retrieval_date\"] == retrieval_date",
+        "with": "True",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "dba66819202f2d06989d7cfc15517e5a17986937960dc1c6ef9a2010cb4f9f50"
+      },
+      {
+        "mutation": "complete_manifest",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "if not valid_manifest:",
+        "with": "if False:",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "50066cd0167c1bc93d5c12fc716e0816452b3e876de6deb6823d2cc837e955fc"
+      },
+      {
+        "mutation": "disjoint_heldout",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "and not set(train) & set(heldout)",
+        "with": "and True",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "dab17237ec7589480d1c9137211fc3839e4f1abfebd3bd865dc4744c477d86cd"
+      },
+      {
+        "mutation": "capture_bytes",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "or capture.blob_id.hex != expected",
+        "with": "",
+        "test_selector": "test_review_refuses",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "f3e74c71bdc661f096e3cbbd846a8d7deed7944145b50f6be6d46b95c4477082"
+      },
+      {
+        "mutation": "authenticated_actor",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "reviewed_by=actor,",
+        "with": "reviewed_by=uuid.UUID(int=1),",
+        "test_selector": "test_exact_review",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "64e657f9e86944104d8aa8842fa44d628acc0adb499edb6d56538533549f6664"
+      },
+      {
+        "mutation": "retained_split",
+        "production_file": "exulanica/ingest/reference_admission.py",
+        "replace": "\"source_manifest\": source_manifest,",
+        "with": "\"source_manifest\": {},",
+        "test_selector": "test_exact_review",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "be51a507e9f18840dfbf91b578044aab43a4cdcd7dc83cafda3dcb2c8437b372"
+      },
+      {
+        "mutation": "source_composition_bytes",
+        "production_file": "exulanica/orchestration/reference_world.py",
+        "replace": "or capture.blob_id.hex != expected_sha256",
+        "with": "",
+        "test_selector": "test_reference_source_topology",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "156a8645f7ea04b6efd2fc8819dcf2250aeaa6a343bf447e21177ebca6b81b0c"
+      }
+    ]
+  },
+  "record_sha256": "4d6756f6d93676324af59c20b2d1c6443e755ef4e3a2104aaf8dffa8e6608c83"
+}

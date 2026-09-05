@@ -100,7 +100,7 @@ The accepted chain has three independently versioned records:
 | Record | Current profile | What it binds |
 | --- | --- | --- |
 | Pose receipt | `exulanica.colmap-pose-receipt/v2` | exact source manifest, source digests, code revision, pycolmap version, runtime image digest, commands, sparse outputs, recovered cameras, registration and quality |
-| Placement | `exulanica.posed-point-map-placement/v1` | scene id, complete ordered member set, pose receipt digest, pose manifest digest, each current point-map artifact id and content digest, transform, scale status, and every exclusion |
+| Placement | `exulanica.posed-point-map-placement/v2` | scene id, complete ordered member set, pose receipt digest, pose manifest digest, each current point-map artifact id and content digest, correspondence-fit evidence, transform, scale status, and every exclusion |
 | Gate | `exulanica.reconstruction-scene-gate/v1` | every receipt digest it read, complete and registered counts, awarded rung, and all withholding reasons |
 
 Artifact ids are deterministic functions of the scene, stage version and parameters, and exact
@@ -123,9 +123,13 @@ right, +Y up, -Z forward. The placement producer first applies `diag(1, -1, -1)`
 into COLMAP camera axes, then applies the inverse recovered camera pose. The stored transform is a
 row-major 4 by 4 `scene_from_opm` matrix.
 
-COLMAP world units are scale ambiguous. Version 1 records `local_units_to_scene_units = 1.0` and
-`scale_status = unvalidated-identity` for display only. It explicitly says the result is not metric.
-No query, corridor, navigation, or rung gate may treat those units as metres.
+COLMAP world units are scale ambiguous. Historical placement version1 used
+`local_units_to_scene_units = 1.0` and `scale_status = unvalidated-identity` for display only.
+As of2026-09-05, [placement version2](scene-placement-alignment.md) fits and validates scale against
+exact COLMAP image/track correspondences; legacy identity placements are withheld until rebuilt.
+This alignment is still nonmetric. No query, corridor, navigation, or rung gate may treat those
+units as metres. The [retained reference workflow](retained-reference-workflow.md) records the
+current real-input state and the independent requirements for a visual baseline.
 
 ## 4. Graph delivery and rendering
 
