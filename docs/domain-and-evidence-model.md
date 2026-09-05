@@ -324,11 +324,20 @@ admitted; none is refused. The consequences are enforced rather than conventiona
 No `span_digest` changed: `region` and `probe_json` were both untouched. Pinned by
 `tests/test_upright_display_space.py` and `tests/test_exif_orientation.py`.
 
-**OPEN.** Whether OCR text spans over photographs reuse `modality = 'transcript_text'` with the
-`text_anchor` pointing at an OCR artifact, or take their own modality value, is not settled by the
-research, which named the field `transcript_artifact_id` in an audio-first context. This must be
-decided before v1 is frozen, for the same reason: `modality` is inside `span_digest`, and a rename is
-not an additive change. Collected with the other freeze blockers in section 9.1.
+**CLOSED 2026-09-04, [adr/0016-ocr-is-a-region.md](adr/0016-ocr-is-a-region.md).** Neither of the two
+options as posed. **Text read off a photograph is addressed by the pixels it was read from**: a
+`frame_region` span carrying an `ocr_text_is` assertion, which is what the ingest pipeline has always
+written. A `text_anchor` is a character range in a versioned text artifact, which audio needs because
+the media axis alone cannot locate a word; a photograph does not have that problem, and an offset
+into an OCR artifact would make the address depend on a derivative, which spine-1 forbids. A new
+`ocr_text` value would be additive and free, and would also be a second name for an address shape
+that already exists.
+
+`transcript_text` is reserved for time-anchored transcripts and is now **refused on the `img`
+track**, by `EvidenceAddress._validate_shape` and by the `transcript_is_not_an_image_track` check
+constraint in `0034_ocr_is_a_region_not_a_transcript.sql`. No span carries it, so no digest changed.
+A text-anchored OCR artifact, if one is ever genuinely needed, takes its own additive modality value
+rather than reusing this one.
 
 **OPEN.** Whether the corpus contains motion photographs or bursts (image containers holding a real
 video track) is not established. If it does, those files carry a genuine `v:0` track with genuine PTS
@@ -1783,7 +1792,7 @@ timebase item specifically at first video ingest.
 | Item | Status | Why it is inside the address | What settles it |
 | --- | --- | --- | --- |
 | EXIF Orientation has eight values, four of them mirrored; `media_track.rotation` allows only 0/90/180/270 | **CLOSED 2026-09-04** | `region.display` carries `rotation`, and the region is normalised against display space. A mirrored original puts every region on the wrong side of the image, permanently | Settled by ADR-0004 and [adr/0012-upright-display-space.md](adr/0012-upright-display-space.md): pixels are normalised at ingest, all eight values are admitted, `img` regions carry `display.rotation = 0`, and `media_track.rotation` means "still to apply" and is 0. Enforced by two check constraints in `0032_upright_display_space.sql`. No digest changed |
-| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | **OPEN** | `modality` is a digest input. Adding a new value (`ocr_text`, say) is additive and costs nothing. **Re-labelling spans already written under `transcript_text` is not additive**: it changes their digests, so it is a v2 span format, not a rename | A naming decision, and it must be made before OCR spans are written rather than before they are read. The research named the field `transcript_artifact_id` in an audio-first context, which is where the ambiguity came from |
+| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own value | **CLOSED 2026-09-04** | `modality` is a digest input, and re-labelling spans already issued changes their digests | Neither. [adr/0016-ocr-is-a-region.md](adr/0016-ocr-is-a-region.md): OCR text is a `frame_region` span carrying an `ocr_text_is` assertion, which is what was already written. `transcript_text` is reserved for time-anchored transcripts and refused on the `img` track. The five modality values are unchanged |
 | The tie direction of `round_half_down` | **CLOSED 2026-09-04** | It determines the quantisation of every region coordinate and every EXIF position | Ratified as ties toward zero by [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md). It no longer takes part in the timebase at all |
 | Tick to ns to tick is not the identity | **CLOSED 2026-09-04** | Both formulas produce values that go into the digest | Corrected, not carried: `ns_from_ticks` rounds up, the round trip is exact on every representable timebase, and it cost nothing because the conversion had no callers and no video or audio track had ever been written. ADR-0015, section 1.4 |
 | The region encoding: parts per million on a `[0, 1_000_000]` integer grid | **CLOSED 2026-09-04** | `region` is a digest input, and a float has no canonical rendering that two implementations agree on. Changing the grid changes every region digest | Ratified as it stands by [adr/0013-region-encoding.md](adr/0013-region-encoding.md), and now enforced by `evidence_span_region_shape` in `0033_span_digest_input_shape.sql` rather than described in a comment. Nine malformed tuples are refused by `tests/test_span_digest_input_shape.py` |
@@ -1795,7 +1804,7 @@ timebase item specifically at first video ingest.
 | Item | Status | What settles it |
 | --- | --- | --- |
 | EXIF Orientation has 8 values including mirrored variants; `media_track.rotation` allows only 4 | **CLOSED 2026-09-04** | Pixels are normalised at ingest and the normalisation is recorded. ADR-0004, ADR-0012, section 9.1 |
-| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **OPEN** | A naming decision, but it must be made before v1 is frozen for the same reason: `modality` is inside `span_digest` and a rename is not additive |
+| Whether OCR text spans reuse `modality = 'transcript_text'` or take their own modality value | **CLOSED 2026-09-04** | Neither: OCR text is a `frame_region` span with an `ocr_text_is` assertion. ADR-0016, section 9.1 |
 | Whether the corpus contains motion photographs or bursts carrying a real embedded video track | **OPEN** | Inspection of the corpus. If it does, those files carry a genuine `v:0` track and the general video path applies unchanged |
 | The tie direction of `round_half_down` | **CLOSED 2026-09-04** | Ratified as ties toward zero, ADR-0015 and section 9.1 |
 | Tick to ns to tick is not the identity under the frozen formulas | **CLOSED 2026-09-04** | Corrected inside its decision window; the round trip is now exact. ADR-0015 and section 9.1 |

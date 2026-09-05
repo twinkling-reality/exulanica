@@ -190,6 +190,18 @@ class EvidenceAddress:
             raise InvalidAddressError("audio_time lives on an 'a:N' track")
         if modality in _VISUAL_TRACK_MODALITIES and track.startswith("a:"):
             raise InvalidAddressError(f"{modality} cannot address an audio track")
+        if modality is Modality.TRANSCRIPT_TEXT and track == IMAGE_TRACK_KEY:
+            # ADR-0016. A photograph has no transcript. Text read off a surface is addressed by
+            # the pixels it was read from, which is a region, and it is carried as an
+            # `ocr_text_is` assertion over that region. Allowing transcript_text here would
+            # create a second address shape for the same fact, and `modality` is inside
+            # span_digest, so re-labelling later is a v2 span format rather than a rename.
+            raise InvalidAddressError(
+                f"transcript_text cannot address the '{IMAGE_TRACK_KEY}' track: a photograph "
+                "has no transcript. Text read off a photograph is a frame_region span carrying "
+                "an ocr_text_is assertion. A text-anchored OCR artifact, if one is ever needed, "
+                "takes its own additive modality value rather than this one."
+            )
         if self.region is not None and track == IMAGE_TRACK_KEY and self.region.display.rotation:
             # ADR-0012. A photograph's display space IS its upright pixel space, because ingest
             # normalises orientation once and stores the result. A region claiming a rotated

@@ -217,9 +217,12 @@ class Box(BaseModel):
     def clamped(self) -> tuple[Box, bool]:
         """Return the box inside the unit square, and whether clamping changed it.
 
-        Models routinely emit 1.02 for an edge. Clamping is recorded in the artifact rather
-        than done quietly, because a box that had to be moved is weaker evidence of where a
-        thing is than one that did not.
+        Models routinely emit 1.02 for an edge, so the box a span is built from is the clamped
+        one. The unclamped box is not lost: the vision artifact stores what the model wrote
+        **verbatim**, so the difference between the artifact and the region on the span is the
+        record that clamping happened, and a box that had to be moved is recoverably weaker
+        evidence of where a thing is than one that did not. There is deliberately no second
+        flag saying so, because two records of one fact drift.
         """
         x = min(max(self.x, 0.0), 1.0)
         y = min(max(self.y, 0.0), 1.0)

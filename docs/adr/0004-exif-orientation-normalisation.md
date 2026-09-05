@@ -79,7 +79,11 @@ when cropping a region out of the original, so the crop and the address agree.
 
 ## Still open
 
-Whether OCR text spans over photographs reuse `modality = 'transcript_text'` or take their own
-modality value remains **OPEN** and blocking for the same reason. This ADR does not settle it. The
-ingest path currently attaches OCR text to a `frame_region` or `still_image` span and stores the text
-as an `ocr_text_is` assertion, which needs no new modality value; a text-anchored OCR artifact would.
+*Closed 2026-09-04.* Whether OCR text spans over photographs reuse `modality = 'transcript_text'` or
+take their own modality value was **OPEN** and blocking for the same reason. This ADR did not settle
+it; [0016-ocr-is-a-region.md](0016-ocr-is-a-region.md) does, and it ratifies exactly the behaviour
+described here: the ingest path attaches OCR text to a `frame_region` or `still_image` span and
+stores the text as an `ocr_text_is` assertion, which needs no new modality value.
+
+The consequences of this ADR that were left conventional rather than enforced are closed by
+[0012-upright-display-space.md](0012-upright-display-space.md).
