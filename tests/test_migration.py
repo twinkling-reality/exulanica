@@ -69,6 +69,14 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
     "0025": "2419f702b54764fc6015a2a72b64957db8ef8f9c37ac930f25a4155e04ffcd21",
     "0026": "92d59d62447265497e1e7d99e11690216622d3a880cf24c89b7888246eed3a26",
     "0027": "a462b000291f105ee056cbe0001aa875bdfce868dcd185eaa09db52917d10517",
+    "0028": "dea14ffa802d37c6d56ef0571ea19b4eb280898dc1437ac5dc4653e511299257",
+    "0029": "81e74e6e058fb7cb6717d2c866efea8ff43b1b6af9f17ebde1fc3c3795a78067",
+    "0030": "05de5e5a7456bd606ff8d27d00f64d9de3310ad971bdf3598bc124cad3927401",
+    "0031": "d26cc740342e95530838962e1567047b312cff8ac5569f5ff6ff5e65d2d3bffb",
+    "0032": "49ca35fbfc9f4301a52bb927a23264c3f3477f1aa85fa424dbae8f223a8b2dc2",
+    "0033": "86eb68c55fcae9385056a04ecc9d063183b03e520979480403e207a5f6ce3d84",
+    "0034": "a499bf47d63d9a7ae7f2d043bc21131a6b26100acefd9b002684ecc5250b280c",
+    "0035": "bc6ac3bf51058ce1ff4c9ad6ef6e7adccfe2133675cc17fda4702dca28e8ff2f",
 }
 
 
@@ -80,12 +88,12 @@ def test_the_migrations_are_numbered_and_ordered():
     assert len(files) >= 8, "a migration went missing from the directory"
 
 
-def test_historical_migrations_0001_through_0027_are_byte_identical():
-    """The Exulanica cutover keeps already applied pre-release SQL byte for byte."""
+def test_historical_migrations_0001_through_0035_are_byte_identical():
+    """The backend program freezes every previously applied migration byte for byte."""
     actual = {
         migration.version: migration.checksum.hex()
         for migration in migrations()
-        if migration.version <= "0027"
+        if migration.version <= "0035"
     }
     assert actual == HISTORICAL_MIGRATION_CHECKSUMS
 

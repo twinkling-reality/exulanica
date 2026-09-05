@@ -27,6 +27,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
@@ -76,6 +77,8 @@ class Services:
     #: hand-constructed Services, which is how every test builds one, does not start a thread
     #: nobody asked for. ``build_services`` reads the environment and defaults the other way.
     runs_derivative_worker: bool = False
+    #: Independent of the database and blob backups, set by the offline restore protocol.
+    restore_state_path: Path | None = None
 
     @property
     def warnings(self) -> tuple[str, ...]:
@@ -178,6 +181,9 @@ def build_services(
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
+        restore_state_path=(
+            Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
+        ),
     )
 
 

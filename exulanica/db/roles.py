@@ -69,6 +69,8 @@ PURGE_ROLE: Final = "exulanica_purge"
 
 #: Tables the runtime may read and may not write. See the module docstring for why each.
 READ_ONLY_TABLES: Final = (
+    "restore_control",
+    "restore_replay_receipt",
     "interaction_capability_registry",
     "predicate",
     "schema_migrations",

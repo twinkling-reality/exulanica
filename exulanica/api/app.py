@@ -59,6 +59,7 @@ from exulanica.api.routes import (
 from exulanica.api.services import Services, build_services
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
+from exulanica.deletion.restore import verify_restore
 from exulanica.errors import (
     BlobNotFoundError,
     EpistemicViolation,
@@ -117,6 +118,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         verify_schema(services.database)
         with services.database.unscoped() as connection:
             assert_runtime_role(connection)
+    verify_restore(services.database, services.restore_state_path)
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:

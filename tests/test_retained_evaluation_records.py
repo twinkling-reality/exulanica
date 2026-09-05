@@ -251,7 +251,11 @@ def test_the_answer_records_migration_counts_describe_the_repository():
     versions = sorted(migration.version for migration in migrations())
     historical = [f"{n:04d}" for n in range(1, 35)]
     assert versions[: len(historical)] == historical, "a migration 0001-0034 is missing"
-    assert len(versions) - len(historical) == record["counts"]["migrations_added"]
+    # This is an immutable historical record. Later forward migrations do not belong to
+    # this goal, and must not require rewriting its digest (and every successor's binding).
+    # Check its complete migration prefix against the repository, while allowing successors.
+    completed_count = len(historical) + record["counts"]["migrations_added"]
+    assert versions[:completed_count] == [f"{n:04d}" for n in range(1, completed_count + 1)]
     assert record["counts"]["historical_migrations_rewritten"] == 0
 
 
