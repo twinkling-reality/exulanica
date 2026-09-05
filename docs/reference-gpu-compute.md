@@ -107,6 +107,25 @@ instead of the 55 measured with the card and CPUs to itself. Treat per-job cost 
 bounds unless the record says the job ran alone, and read the provider's billing page for the
 real total.
 
+## Next time
+
+Things the first day showed would save money or time, none of them done yet:
+
+- Push the two built images to a private registry the host can pull from, so a fresh host skips
+  the 25-minute base pull and gsplat compile (about $0.45 of idle GPU each time). The local
+  registry on the host was chosen for immutable digests without an account; a remote one gives the
+  same digests and survives instance deletion.
+- Queue the training request and start the worker with `--job` in one step, so a rented card
+  never waits on an operator or picks up a stale job.
+- Run one training at a time on one card unless the receipts' cost figures are corrected for
+  overlap; the shared run inflated both jobs' `usd_cost`.
+- Replace the floater proxy with a measure that does not penalize plain surfaces, or add a
+  scale-relative distance term, before treating its ceiling as a quality rule again.
+- Exhaustive COLMAP matching is 45 of the 210-photograph run's minutes on CPU; sequential or
+  vocabulary-tree matching would cut that for ordered captures, as a versioned stage change.
+- Check the provider's spot or reserved pricing before a long run; the L40S list rate was used
+  throughout because the whole day fit in the prepaid balance.
+
 ## Operating pattern
 
 The step-by-step commands are in [the reference workflow](retained-reference-workflow.md) under
