@@ -617,3 +617,72 @@ def test_a_surfaceable_question_below_the_auto_threshold_remains_unlinked(corpus
     assert identity.links.for_occurrence(
         occurrences[1], states=("auto_provisional", "confirmed"),
     ) is None
+
+
+def test_duplicate_exemplars_do_not_break_a_tie_between_entities(repository):
+    """Three object anchors mean two tied entities, not three votes or an automatic winner."""
+    from exulanica.evidence import EvidenceAddress
+    from exulanica.evidence.blob import BlobId
+    from exulanica.identity.keys import occurrence_identity_key
+    from exulanica.ingest.ledger import Ledger
+
+    run = Ledger.start_run(repository, trigger="ingest")
+    captures, occurrences = [], []
+    for index in range(4):
+        payload = f"synthetic-tied-object-{index}".encode()
+        blob = BlobId.of_bytes(payload)
+        repository.upsert_blob(
+            blob, byte_size=len(payload), media_type="image/jpeg", storage_key=f"tie-{index}",
+        )
+        capture = repository.insert_capture(blob, device_id="synthetic-probe", started_at=None)
+        address = EvidenceAddress.photograph(blob)
+        span = repository.upsert_span(address)
+        occurrences.append(repository.insert_occurrence(
+            capture_id=capture.capture_id, occurrence_class="object", primary_span_id=span,
+            span_ids=[span], presence=[(0, 1)], produced_by_run=run.run_id,
+            detector_version="synthetic-context:1",
+            identity_key=occurrence_identity_key(address, "object"),
+            emit_key=f"tie:object:{index}", quality={"label": "red cube"},
+        ))
+        repository.insert_assertion(
+            kind="capture", predicate_key="gps_position_is",
+            subject_ref={"type": "capture", "id": str(capture.capture_id)},
+            object_value={"lat": 51.5007, "lon": -0.1246},
+            emit_key=f"tie:gps:{index}", support_span_ids=[span],
+        )
+        captures.append(capture.capture_id)
+    repository.upsert_derived_artifact(
+        derived_id=uuid.uuid4(), kind=SCENE_GROUP_KIND,
+        depends_on=[{"kind": "capture", "id": str(c)} for c in captures],
+        dep_index=[f"capture:{c}" for c in captures], source_ids=captures,
+        payload={"capture_ids": [str(c) for c in captures], "ordinal": 0},
+    )
+    identity = IdentityRepository(repository.connection, repository.workspace_id)
+    actor = uuid.uuid4()
+    entities = sorted((
+        name_occurrence(
+            identity, AssertionWriter(repository.connection, repository.workspace_id),
+            occurrence_id=occurrences[index], display_name=f"Synthetic box {index}", actor=actor,
+        ).entity_id for index in range(2)
+    ), key=str)
+    # Duplicate the entity that sorts first. If anchors are ranked without deduplication,
+    # idempotent proposal writes hide its second row but leave the other entity at rank 2.
+    confirm_link(identity, occurrence_id=occurrences[2], entity_id=entities[0], actor=actor)
+
+    identity, report = _propose(repository, run.run_id)
+    assert report.anchors == 3 and report.candidates == 1
+    rows = repository.connection.execute(
+        "select entity_id, rank, score, outcome from match_proposal "
+        "where workspace_id=%s and occurrence_id=%s order by rank",
+        (repository.workspace_id, occurrences[3]),
+    ).fetchall()
+    assert [row["entity_id"] for row in rows] == entities
+    assert [row["rank"] for row in rows] == [0, 1]
+    assert [(row["score"], row["outcome"]) for row in rows] == [
+        (0.8, "surfaced"), (0.8, "surfaced"),
+    ]
+    assert len(report.surfaced) == 2
+    assert report.auto_provisional == []
+    assert identity.links.for_occurrence(
+        occurrences[3], states=("auto_provisional", "confirmed", "proposed"),
+    ) is None
