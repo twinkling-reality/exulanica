@@ -151,6 +151,8 @@ export interface AtlasBindingOptions {
   readonly recoveredCameras?: readonly RecoveredSceneCamera[];
   /** Caller-authorized media presentation keyed by the scene's evidence handles. */
   readonly sourceMedia?: SourceMediaCatalog;
+  /** Keep original photographs in the authorized inspector instead of placing optical sheets in the world. */
+  readonly sourcePresentation?: 'world' | 'inspection';
   readonly deviceTypes?: readonly string[];
   readonly blend?: boolean;
   readonly sizeGain?: number;
@@ -257,6 +259,7 @@ export class AtlasBinding {
   private navigationElapsedMs = 0;
   private navigationTargetIsland: IslandId | null = null;
   private readonly recoveredCameras: readonly RecoveredSceneCamera[];
+  private readonly sourcePresentation: 'world' | 'inspection';
   private inspection: {
     readonly returnPose: NavigationPose;
     readonly returnFov: number;
@@ -328,6 +331,7 @@ export class AtlasBinding {
     initialProfile: WorldArtProfile,
     residencyCatalog: readonly ResidencyAsset[],
     residencyBudget: number,
+    sourcePresentation: 'world' | 'inspection',
   ) {
     this.app = app;
     this.device = app.graphicsDevice;
@@ -345,6 +349,7 @@ export class AtlasBinding {
     this.trainedScenes = trainedScenes;
     this.trainedSceneFailures = trainedSceneFailures;
     this.recoveredCameras = recoveredCameras;
+    this.sourcePresentation = sourcePresentation;
     this.navigationWorld = navigationWorld;
     this.field = field;
     this.sourceFirst = sourceFirst;
@@ -516,8 +521,7 @@ export class AtlasBinding {
     renderRoot.addChild(field.entity);
     const sourceFirst = createSourceFirstGrove(
       app,
-      { ...options.scene, islands: options.scene.islands.map((island) =>
-        availableReconstruction.has(island.islandId) ? island : { ...island, rung: 4 as const }) },
+      sourceGroveScene(options.scene, availableReconstruction, options.sourcePresentation),
       options.sourceMedia ?? new Map(),
       initialArtProfile,
       theme,
@@ -624,39 +628,7 @@ export class AtlasBinding {
       }
     }
 
-    // Open on the source axis. UI must never be used as a reason to shove the world off-centre;
-    // the first source and its atmospheric depth own the starter composition.
-    const first = options.scene.islands[0];
-    const start: CameraState =
-      first === undefined
-        ? {
-            x: navigationWorld.centre.x,
-            y: (navigationWorld.surface.sample(
-              navigationWorld.centre.x,
-              navigationWorld.centre.z + 10,
-            )?.height ?? 0) + navigationWorld.eyeHeight,
-            z: navigationWorld.centre.z + 10,
-            yaw: 0,
-            pitch: -0.085,
-          }
-        : (() => {
-            const distance = Math.max(3.6, Math.min(4.4, first.footprintRadiusLocal * 0.22));
-            const x = first.placement.position.x + Math.sin(first.placement.yaw) * distance;
-            const z = first.placement.position.z + Math.cos(first.placement.yaw) * distance;
-            const height = navigationWorld.surface.sample(x, z)?.height ?? 0;
-            const sourceLocal = sourceFirstCardLocalPosition(first);
-            const source = localToAtlas(first.placement, sourceLocal);
-            const sourceHeight = atlasLandscapeHeight(source.x, source.z) +
-              SOURCE_VEIL_HEIGHT * first.placement.scale;
-            const horizontal = Math.max(1, Math.hypot(source.x - x, source.z - z));
-            return {
-              x,
-              y: height + navigationWorld.eyeHeight,
-              z,
-              yaw: first.placement.yaw,
-              pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
-            };
-          })();
+    const start = initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
 
     const controls = new FirstPersonControls(options.canvas, start, DEFAULT_CONTROLS, navigationWorld);
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
@@ -712,6 +684,7 @@ export class AtlasBinding {
       initialArtProfile,
       Object.freeze(residencyCatalog),
       options.residencyBudget ?? 96,
+      options.sourcePresentation ?? 'world',
     );
   }
 
@@ -1060,7 +1033,7 @@ export class AtlasBinding {
         // layout space while the memory sits behind them.
         this.navigationTransition = Object.freeze({
           ...planned,
-          to: sourceFirstArrivalPose(island, planned.to),
+          to: sourceFirstArrivalPose(island, planned.to, this.sourcePresentation),
         });
       } else {
         this.navigationTransition = planned;
@@ -1472,9 +1445,64 @@ export class AtlasBinding {
   }
 }
 
+/** Only this renderer input changes; the authoritative scene, source catalog, and topology stay intact. */
+export function sourceGroveScene(
+  scene: AtlasScene,
+  availableReconstruction: ReadonlySet<IslandId>,
+  sourcePresentation: 'world' | 'inspection' = 'world',
+): AtlasScene {
+  return { ...scene, islands: sourcePresentation === 'inspection' ? [] : scene.islands.map((island) =>
+    availableReconstruction.has(island.islandId) ? island : { ...island, rung: 4 as const }) };
+}
+
+/** Preserve safe startup positions; only a visible in-world source may own the upward framing. */
+export function initialAtlasCameraState(
+  scene: AtlasScene,
+  navigationWorld: NavigationWorld,
+  sourcePresentation: 'world' | 'inspection' = 'world',
+): CameraState {
+  const first = scene.islands[0];
+  return first === undefined
+    ? {
+        x: navigationWorld.centre.x,
+        y: (navigationWorld.surface.sample(
+          navigationWorld.centre.x,
+          navigationWorld.centre.z + 10,
+        )?.height ?? 0) + navigationWorld.eyeHeight,
+        z: navigationWorld.centre.z + 10,
+        yaw: 0,
+        pitch: -0.085,
+      }
+    : (() => {
+        const distance = Math.max(3.6, Math.min(4.4, first.footprintRadiusLocal * 0.22));
+        const x = first.placement.position.x + Math.sin(first.placement.yaw) * distance;
+        const z = first.placement.position.z + Math.cos(first.placement.yaw) * distance;
+        const height = navigationWorld.surface.sample(x, z)?.height ?? 0;
+        if (sourcePresentation === 'inspection') {
+          return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
+        }
+        const sourceLocal = sourceFirstCardLocalPosition(first);
+        const source = localToAtlas(first.placement, sourceLocal);
+        const sourceHeight = atlasLandscapeHeight(source.x, source.z) +
+          SOURCE_VEIL_HEIGHT * first.placement.scale;
+        const horizontal = Math.max(1, Math.hypot(source.x - x, source.z - z));
+        return {
+          x,
+          y: height + navigationWorld.eyeHeight,
+          z,
+          yaw: first.placement.yaw,
+          pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
+        };
+      })();
+}
+
 /** Preserve the validated destination position while facing a rung-4 arrival toward its source. */
-export function sourceFirstArrivalPose(island: Island, pose: NavigationPose): NavigationPose {
-  if (island.rung !== 4) return pose;
+export function sourceFirstArrivalPose(
+  island: Island,
+  pose: NavigationPose,
+  sourcePresentation: 'world' | 'inspection' = 'world',
+): NavigationPose {
+  if (sourcePresentation === 'inspection' || island.rung !== 4) return pose;
   const card = localToAtlas(island.placement, sourceFirstCardLocalPosition(island));
   const source = atlasVec3(
     card.x,

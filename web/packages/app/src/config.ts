@@ -31,6 +31,12 @@ const PREVIEW_TOKEN = 'atlas-preview-read-only';
 const PRODUCT_TITLE = 'Exulanica';
 const PREVIEW_TITLE = 'Exulanica: synthetic read-only development preview';
 
+/** Reconstruction review keeps originals in the inspector instead of world-space photo veils. */
+export function sourcePresentation(): 'world' | 'inspection' {
+  return import.meta.env['VITE_EXULANICA_SOURCE_PRESENTATION'] === 'inspection'
+    ? 'inspection' : 'world';
+}
+
 export interface Credentials {
   readonly baseUrl: string;
   readonly token: string;

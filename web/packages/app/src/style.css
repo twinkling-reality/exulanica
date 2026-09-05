@@ -754,6 +754,41 @@ button.ghost {
   opacity: 0.82;
 }
 
+.reconstruction-availability {
+  position: fixed;
+  left: clamp(1.2rem, 4vw, 4rem);
+  top: clamp(6rem, 18vh, 10rem);
+  width: min(27rem, calc(100vw - 2.4rem));
+  max-height: calc(100vh - 12rem);
+  overflow: auto;
+  padding: 1.4rem 1.6rem;
+  display: grid;
+  gap: 0.8rem;
+  background: var(--raised);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  font: 400 0.9rem/1.5 var(--ui-font-body);
+  text-shadow: none;
+  pointer-events: auto;
+  z-index: 60;
+}
+.reconstruction-availability h2 {
+  margin: 0;
+  font: 500 1.65rem/1.15 var(--ui-font-display);
+  max-width: 20ch;
+}
+.reconstruction-availability .reconstruction-availability-kicker {
+  color: var(--ink-faint);
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.reconstruction-availability-collection { display: grid; justify-items: start; gap: 0.6rem; }
+.reconstruction-availability-collection > p { font-weight: 500; }
+#shell:not([data-primary='world']) .reconstruction-availability,
+#shell[data-camera='map'] .reconstruction-availability,
+#shell:has(.reconstruction-inspector:not([hidden])) .reconstruction-availability { display: none; }
+
 .reconstruction-loading {
   position: fixed;
   bottom: 1rem;

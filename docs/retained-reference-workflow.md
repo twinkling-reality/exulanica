@@ -62,10 +62,17 @@ uv run python scripts/reference_instance.py web --scene volcanic --port 5181
 ```
 
 Open `http://127.0.0.1:5180/` for the bowl or `http://127.0.0.1:5181/` for the volcanic sample.
-Use a desktop viewport wider than 60 rem; comparisons use 1280 × 720 CSS pixels. Expand the source
-status, choose **Inspect source photographs**, switch sources, then **Return to Atlas**.
-The existing Aeroheart appearance and world/source-slot architecture are reused. The decorative
-world and photographic source planes are not reconstructed surfaces.
+Use a desktop viewport wider than 60 rem; comparisons use 1280 × 720 CSS pixels. The `web` command
+sets `VITE_EXULANICA_SOURCE_PRESENTATION=inspection`, so these review instances keep the original
+photographs in the inspector instead of placing the ordinary world's photo veils in the landscape.
+A veil is a flat photograph with softened, animated edges; during reconstruction review it read as
+floating geometry, which is why review instances omit veils and the camera targeting that aimed at
+them. While no reconstruction has loaded, a prominent **No 3D reconstruction is loaded** panel names
+the exact authorized source inventory and offers **Inspect source photographs**; switch sources, then
+**Return to Atlas**. The footer's smaller "grouped photographs" count is metadata group membership
+(40 for the bowl), while the panel and inspector count the authorized originals (51). Ordinary Atlas
+without that setting keeps its world presentation unchanged. The existing Aeroheart appearance and
+world/source-slot architecture are reused. The decorative world is not a reconstructed surface.
 
 The bowl's metadata-derived group has 40 photographs; its explicitly authored gallery includes
 all 51 selected originals. Authored gallery membership does not invent timestamps or assert a
@@ -222,6 +229,14 @@ Representative actual browser captures are retained under
 `docs/evaluation/artifacts/2026-09-05-reference/`: source-world and source-inspection views for each
 collection, plus `atlas-unavailable.png`. They establish source fallback and service-retry behavior.
 A reconstructed walkthrough, held-out scores and traversal performance remain unavailable.
+
+Those captures show the earlier world presentation, in which each review instance placed a source
+veil in the landscape; they remain historical. The later
+[source-presentation correction record](evaluation/2026-09-05-source-presentation-correction.json)
+binds the inspection presentation, its tests and executed mutation controls, and repeatable
+1280 × 720 captures under `docs/evaluation/artifacts/2026-09-05-source-presentation/`, taken with
+the retained headless capture script beside them. It records an honest unavailable state, not
+reconstruction progress.
 
 ## Exact dependencies to resume real reconstruction
 

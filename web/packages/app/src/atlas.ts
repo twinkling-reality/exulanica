@@ -63,6 +63,7 @@ export async function mountAtlas(
     readonly artProfile?: WorldArtProfile;
     readonly artProfileParameters?: WorldStyleParameters;
     readonly sourceMedia?: SourceMediaCatalog;
+    readonly sourcePresentation?: 'world' | 'inspection';
     readonly reducedMotion?: boolean;
     readonly pointMaps?: ReadonlyMap<IslandId, PointMap>;
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
@@ -77,6 +78,7 @@ export async function mountAtlas(
     scene,
     pointMaps: presentation?.pointMaps ?? NO_POINT_MAPS,
     recoveredCameras: presentation?.recoveredCameras ?? [],
+    sourcePresentation: presentation?.sourcePresentation ?? 'world',
     ...(presentation?.trainedGeometry === undefined ? {} : { trainedGeometry: presentation.trainedGeometry }),
     ...(presentation?.placedPointMaps === undefined
       ? {}

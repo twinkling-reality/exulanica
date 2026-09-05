@@ -29,6 +29,10 @@ export interface StatusInput {
   readonly onInspectSources?: (sceneId: string) => void;
   /** Live photograph groups before a reconstruction job has created a scene receipt. */
   readonly sourceRegions?: readonly { readonly regionId: string; readonly captureCount: number }[];
+  /** Explicit reconstruction-review presentation; counts are the exact inspector inventories. */
+  readonly reconstructionFocus?: {
+    readonly collections: readonly { readonly sceneId: string; readonly sourceCount: number }[];
+  };
 }
 
 export interface ReconstructionRungDisclosure {
@@ -47,6 +51,31 @@ function counted(count: number, singular: string, plural: string): string {
 
 export function buildStatus(input: StatusInput): HTMLElement {
   const bar = el('footer', { class: 'status' });
+  const sourceOnly = input.reconstructionFocus !== undefined
+    && !(input.reconstructionScenes ?? []).some((scene) => scene.renderingSubstrate !== 'source_photographs');
+  if (sourceOnly) {
+    const collections = input.reconstructionFocus!.collections.filter((collection) => collection.sourceCount > 0);
+    const notice = el('section', { class: 'reconstruction-availability', 'aria-label': 'Reconstruction availability' });
+    notice.append(
+      el('p', { class: 'reconstruction-availability-kicker', text: 'Source collection' }),
+      el('h2', { text: 'No 3D reconstruction is loaded' }),
+      el('p', { text: collections.length > 0
+        ? 'The landscape is authored. Use the source inspector to view the original photographs.'
+        : 'The landscape is authored. No source photographs are available in this session.' }),
+    );
+    for (const [index, collection] of collections.entries()) {
+      const row = el('div', { class: 'reconstruction-availability-collection' });
+      row.append(el('p', { text: counted(collection.sourceCount, 'original photograph', 'original photographs') }));
+      if (input.onInspectSources !== undefined) {
+        const inspect = el('button', { type: 'button', text: collections.length === 1
+          ? 'Inspect source photographs' : `Inspect collection ${index + 1}` });
+        inspect.addEventListener('click', () => input.onInspectSources?.(collection.sceneId));
+        row.append(inspect);
+      }
+      notice.append(row);
+    }
+    bar.append(notice);
+  }
 
   const undrawableCount = [...input.undrawable.values()].reduce(
     (total, count) => total + count,

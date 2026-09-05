@@ -66,6 +66,7 @@ import {
   developmentToken,
   isAtlasPreview,
   previewCredentials,
+  sourcePresentation,
 } from './config.js';
 import { EvidenceCache } from './evidence.js';
 import { listBatches, watchBatch, type BatchSummary } from './formation.js';
@@ -1207,21 +1208,25 @@ async function mount(): Promise<void> {
       showTravelStatus('No verified reconstruction cameras are available. The original sources remain in Index.', 'failure');
     }
   };
-  const inspectSceneSources = (sceneId: string): void => {
-    atlas?.binding.endSceneInspection();
-    dispatchShell({ type: 'show-world' });
+  // Both the availability panel and inspector count the same authorized, deduplicated set.
+  const sourcesForScene = (sceneId: string) => {
     const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
     const region = current.islands.find((island) => island.islandId === (record?.islandId ?? sceneId));
     const captures = new Set(record?.members.map((member) => member.captureId) ?? region?.captureIds ?? []);
     const regionId = record?.islandId ?? region?.islandId;
     const seen = new Set<string>();
-    const sources = [...(previewSourceMedia?.values() ?? [])].filter((source) => {
+    return [...(previewSourceMedia?.values() ?? [])].filter((source) => {
       if (seen.has(source.evidenceRef)) return false;
       if ((regionId === undefined || source.regionId !== regionId)
         && !source.captureIds?.some((id) => captures.has(id))) return false;
       seen.add(source.evidenceRef);
       return true;
     });
+  };
+  const inspectSceneSources = (sceneId: string): void => {
+    atlas?.binding.endSceneInspection();
+    dispatchShell({ type: 'show-world' });
+    const sources = sourcesForScene(sceneId);
     const choices = sources.map((source, index) => ({
       id: `source:${source.evidenceRef}`, kind: 'source-only' as const,
       label: `Photograph ${index + 1}`, source,
@@ -1237,6 +1242,15 @@ async function mount(): Promise<void> {
       .filter((island) => !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
       .map((island) => ({ regionId: island.islandId, captureCount: island.captureIds.length })),
     onInspectScene: inspectReconstruction, onInspectSources: inspectSceneSources,
+    ...(sourcePresentation() === 'inspection' ? {
+      reconstructionFocus: {
+        collections: current.islands.map((island) => {
+          const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
+            ?? island.islandId;
+          return { sceneId, sourceCount: sourcesForScene(sceneId).length };
+        }),
+      },
+    } : {}),
   });
   let reconstructionStatus = renderReconstructionStatus();
   replace(shell!, [
@@ -1392,6 +1406,7 @@ async function mount(): Promise<void> {
     ...(pointMaps_ === undefined ? {} : { pointMaps: pointMaps_ }),
     ...(placedPointMaps_ === undefined ? {} : { placedPointMaps: placedPointMaps_ }),
     trainedGeometry: trainedGeometry_,
+    sourcePresentation: sourcePresentation(),
     recoveredCameras: recoveredCameras_,
     reducedMotion: systemReducedMotion.matches,
   }, browserMeasurement === null ? undefined : (binding) => {

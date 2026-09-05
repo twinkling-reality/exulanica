@@ -67,6 +67,17 @@ test material, not a trained reference, and is never loaded by production code.
 
 ## Sources and startup
 
+`sourcePresentation` is the one renderer input that decides where originals appear.
+The default `world` presentation keeps the source-first grove: each rung-4 region shows
+a veil, a flat photograph with softened edges, and the startup and arrival cameras aim
+at it. `inspection` omits every veil and that camera targeting while the authoritative
+scene, topology, source authorization and inspector stay unchanged, and the app shows a
+**No 3D reconstruction is loaded** panel whose count is the inspector's exact inventory.
+The panel is hidden as soon as any scene renders point maps or Gaussians, while the
+inspector is open, and in Index or Map. It is an unavailable state, never a
+reconstruction result. The reference launcher selects inspection through
+`VITE_EXULANICA_SOURCE_PRESENTATION=inspection`; without that setting Atlas uses world.
+
 Source cards use authoritative topology region membership, so a scene does not
 need detected entities to expose its original photographs. Source descriptors carry
 active capture membership resolved from the same workspace and evidence blob.

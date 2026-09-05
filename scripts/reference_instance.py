@@ -106,6 +106,7 @@ def main():
         ]
     elif args.command == "web":
         env["VITE_EXULANICA_TOKEN"] = scene["token"]
+        env["VITE_EXULANICA_SOURCE_PRESENTATION"] = "inspection"
         port = str(args.port)
         cmd = [
             "pnpm",
