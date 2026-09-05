@@ -354,6 +354,26 @@ def test_processing_state_distinguishes_what_has_been_looked_at(library):
     assert library.matched(unseen) == set()
 
 
+def test_a_capture_that_matched_always_carries_something_to_cite(library):
+    """A match with no support is an answer that cannot be given about photographs that exist.
+
+    `is_unconstrained` is false the moment any dimension is set, so this plan took neither the
+    time branch nor any per-dimension one and every capture came back with `support=()`. The
+    packet built from that is empty, and an empty packet abstains with "Nothing in your library
+    matches" over four photographs that did.
+
+    The dimension is asserted as well as the presence, because labelling this a time match would
+    make the Selection say a time window put the photograph there when no window was asked for.
+    """
+    plan = _plan(capture=CaptureSelector(processing_states=[ProcessingState.COMPLETE]))
+    result = library.run(plan)
+    assert result.total_matched == 4
+    assert result.captures
+    for capture in result.captures:
+        assert capture.support, f"{capture.capture_id} matched and has nothing to cite"
+        assert {support.dimension for support in capture.support} == {"capture"}
+
+
 # -- the entities intent -----------------------------------------------------------------
 
 

@@ -668,6 +668,41 @@ def test_an_unanswerable_question_refuses_over_http_without_calling_the_model(de
     assert transport.call_count == 0, "an empty packet reached the model"
 
 
+def test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code(deployment):
+    """A refusal has to arrive as a refusal, not as the server falling over.
+
+    `propose_plan` re-raises after one repair, deliberately: an empty plan is legal and means
+    "everything", so returning one would answer a question nobody asked. Without a handler that
+    refusal left the boundary as an unhandled exception, which a caller cannot tell from a crash.
+
+    502 rather than 500, because the models are an upstream this instance depends on and does
+    not control. The one 500 this API issues stays reserved for `integrity_failure`.
+    """
+    from exulanica.models.transport import HttpResponse
+
+    from model_fakes import chat_body
+
+    # One entity id with mode 'together' fails `_multi_entity_modes_need_two`, which is a
+    # Pydantic model validator and therefore invisible to a schema-enforcing endpoint.
+    unsatisfiable = json.dumps(
+        {
+            "intent": "entities",
+            "entities": {"ids": [str(uuid.uuid4())], "mode": "together"},
+            "time": [], "place": None, "capture": None,
+            "epistemic": "confirmed", "semantic_query": None, "limit": 10,
+        }
+    )
+    body = HttpResponse(status_code=200, text=json.dumps(chat_body(unsatisfiable)))
+    transport = _with_model(deployment, [body, body])
+
+    response = deployment.as_owner(
+        "POST", "/selection/plan", json={"question": "who was with me at the waterfall?"}
+    )
+    assert response.status_code == 502, response.text
+    assert response.json()["code"] == "model_refused"
+    assert transport.call_count == 2, "one try and one repair, then the refusal"
+
+
 # -- identity -----------------------------------------------------------------------------
 
 

@@ -71,7 +71,9 @@ class Support:
 
     span_id: uuid.UUID
     assertion_id: uuid.UUID | None
-    #: One of ``entity``, ``place``, ``time``, ``text``. Which dimension put this here.
+    #: One of ``entity``, ``place``, ``time``, ``text``, ``capture``. Which dimension put this
+    #: here. ``capture`` is the last of them and means the photograph matched on a property of
+    #: itself, with the whole-photograph span as the record of that property.
     dimension: str
     #: The entity this support is about, when the dimension is entity or place.
     entity_id: uuid.UUID | None = None
@@ -387,6 +389,25 @@ def _describe_captures(
             # photograph is the record of that.
             reasons.append(
                 Support(span_id=row["span_id"], assertion_id=None, dimension="time")
+            )
+        elif not reasons:
+            # **A capture that matched must never leave here with nothing to cite.**
+            #
+            # `is_unconstrained` is false as soon as any dimension is set, including one that
+            # produces no support of its own. A plan whose only dimension is
+            # `capture.processing_states` is legal, is one the planner is free to emit, and used
+            # to reach this line with `reasons` empty: `_support_for` returns nothing without
+            # entity ids, place ids or a semantic query, and the branch above does not fire
+            # without a time window. Every capture then carried `support=()`, the packet
+            # collected no spans, and the question was answered "Nothing in your library
+            # matches, so there is nothing I could cite" while `total_matched` was four.
+            #
+            # That is a false abstention (M3), and it is worse than a wrong answer because it is
+            # stated as a fact about the library. The photograph matched on a property of the
+            # capture itself, and the whole-photograph span is the record of that property, so
+            # it is cited under its own dimension rather than mislabelled as a time match.
+            reasons.append(
+                Support(span_id=row["span_id"], assertion_id=None, dimension="capture")
             )
         captures.append(
             SelectedCapture(

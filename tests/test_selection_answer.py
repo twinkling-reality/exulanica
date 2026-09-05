@@ -744,3 +744,30 @@ def test_a_citation_permalink_parses_back_to_the_same_digest(answered):
         reparsed = parse_uri(item.uri)
         assert reparsed == item.address
         assert reparsed.span_digest == item.address.span_digest
+
+
+def test_a_plan_that_matched_photographs_is_answered_rather_than_refused(answered):
+    """The other half of the refusal guarantee: refuse only what cannot be supported.
+
+    A refusal that fires when the evidence is there is not caution, it is a false statement
+    about somebody's own library, and it is the failure ``evaluation-methodology.md`` scores as
+    M3 ``false_abstention_rate``. This plan sets one dimension, ``capture.processing_states``,
+    which used to leave every matching capture with nothing to cite and produced
+    ``UNANSWERABLE_NOT_CAPTURED`` over photographs the same Selection had just counted.
+    """
+    from exulanica.selection import CaptureSelector, ProcessingState
+
+    plan = SelectionPlan(
+        intent=Intent.CAPTURES,
+        capture=CaptureSelector(processing_states=[ProcessingState.COMPLETE]),
+    )
+    bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
+    client = answered.client([_answer_body(bad), _answer_body(bad)])
+    outcome = answer_question(
+        answered.repository.connection, client, "which photographs have been looked at?",
+        answered.session, plan=plan,
+    )
+    assert outcome.result.total_matched >= 1
+    assert outcome.abstention is None, "it refused a question the evidence could answer"
+    assert not outcome.packet.is_empty
+    assert _historical_citations(outcome), "answered with no factual clause at all"

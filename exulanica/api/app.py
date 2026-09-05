@@ -72,6 +72,7 @@ from exulanica.identity.subjects import (
     NotUndoable,
     UnknownSubject,
 )
+from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
     InvalidInteractionData,
@@ -215,6 +216,25 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # they are stored under means a citation has stopped verifying, and serving anything at
         # all here would hide it.
         return _problem(500, "integrity_failure", str(exc))
+
+    @app.exception_handler(ModelError)
+    async def _model(_request: Request, exc: ModelError) -> JSONResponse:
+        # **A question that could not be planned or answered is refused, not crashed.**
+        #
+        # `propose_plan` re-raises StructuredOutputError after its one repair, because there is
+        # no honest default plan: an empty plan is legal and means "everything", so returning
+        # one would answer a question the user did not ask. That refusal reached the boundary as
+        # an unhandled exception, which is a 500 with no body and no code, and a caller cannot
+        # tell it from the server falling over.
+        #
+        # 502 rather than 500, and it is not decoration. The models are an upstream this
+        # instance depends on and does not control, so the failure is about that dependency
+        # rather than about stored state, and the one 500 this API issues stays reserved for
+        # `integrity_failure`, where it means a citation has stopped verifying. A budget ceiling
+        # is the exception: nothing upstream failed, this instance declined to spend.
+        if isinstance(exc, BudgetExceededError):
+            return _problem(429, "budget_exceeded", str(exc))
+        return _problem(502, "model_refused", str(exc))
 
     @app.exception_handler(InvalidStyleData)
     async def _invalid_style(_request: Request, exc: InvalidStyleData) -> JSONResponse:
