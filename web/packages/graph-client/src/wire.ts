@@ -61,6 +61,19 @@ export interface ReconstructionScenePayload {
       readonly content_sha256: string;
       readonly byte_size: number;
     } | null;
+    /** The trainer's measured held-out appearance and accounting; absent from older payloads. */
+    readonly quality?: {
+      readonly heldout_views: number;
+      readonly psnr: number;
+      readonly ssim: number;
+      readonly lpips: number;
+      readonly coverage_fraction: number;
+      readonly floaters_fraction: number;
+      readonly iterations_completed: number;
+      readonly duration_seconds: number;
+      readonly usd_cost: number;
+      readonly gpu: string;
+    };
   } | null;
   readonly members: readonly {
     readonly capture_id: string;

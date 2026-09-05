@@ -533,6 +533,7 @@ function reconstructionRungsFor(
       memberCount: scene.memberCount,
       renderingSubstrate: substrate,
       reasons: Object.freeze(reasons),
+      ...(scene.trainedGeometry?.quality === undefined ? {} : { trainingQuality: scene.trainedGeometry.quality }),
     });
   }));
 }

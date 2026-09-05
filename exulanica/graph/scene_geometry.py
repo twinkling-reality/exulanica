@@ -13,7 +13,11 @@ import psycopg
 from exulanica.errors import BlobNotFoundError, IntegrityError, TombstonedError
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.geometry import GeometryBytes
-from exulanica.graph.payload import SceneGeometryReferenceRow, SceneTrainedGeometryRow
+from exulanica.graph.payload import (
+    SceneGeometryReferenceRow,
+    SceneTrainedGeometryRow,
+    SceneTrainingQualityRow,
+)
 from exulanica.reconstruction.scene_gate import SceneGateDecision, validate_scene_gate_decision
 from exulanica.store.base import ContentAddressedStore
 
@@ -105,6 +109,25 @@ def trained_geometry_row(
             state = "bytes_missing"
         except IntegrityError:
             state = "invalid"
+        measured = {
+            key: quality[key]
+            for key in (
+                "heldout_views",
+                "psnr",
+                "ssim",
+                "lpips",
+                "coverage_fraction",
+                "floaters_fraction",
+                "iterations_completed",
+                "duration_seconds",
+                "usd_cost",
+                "gpu",
+            )
+        }
+        if any(
+            isinstance(value, float) and not math.isfinite(value) for value in measured.values()
+        ):
+            raise ValueError("trained scene quality receipt carries a non-finite measurement")
         return SceneTrainedGeometryRow(
             artifact_id=artifact_id,
             content_sha256=digest.hex,
@@ -112,6 +135,7 @@ def trained_geometry_row(
             scene_from_asset_row_major=_IDENTITY,
             bounds=bounds,
             state=state,
+            quality=SceneTrainingQualityRow(**measured),
             reference=(
                 SceneGeometryReferenceRow(
                     href=f"/scene-geometry/{artifact_id}",

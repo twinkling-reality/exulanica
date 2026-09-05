@@ -207,6 +207,27 @@ class ReconstructionSceneMemberRow(BaseModel):
     recovered_camera: SceneRecoveredCameraRow | None = None
 
 
+class SceneTrainingQualityRow(BaseModel):
+    """The measured held-out appearance and accounting behind an accepted trained scene.
+
+    Appearance-held-out numbers with pose conditioning, exactly as the trainer's quality receipt
+    recorded them; a summary for the status line, never a rung or a physical-scale claim.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    heldout_views: int
+    psnr: float
+    ssim: float
+    lpips: float
+    coverage_fraction: float
+    floaters_fraction: float
+    iterations_completed: int
+    duration_seconds: float
+    usd_cost: float
+    gpu: str
+
+
 class SceneTrainedGeometryRow(BaseModel):
     """A trained representation with its own bytes; it never carries a rung assertion."""
 
@@ -219,6 +240,7 @@ class SceneTrainedGeometryRow(BaseModel):
     bounds: dict[str, list[float]]
     state: Literal["available", "bytes_missing", "invalid"]
     reference: SceneGeometryReferenceRow | None
+    quality: SceneTrainingQualityRow
 
 
 class ReconstructionSceneRow(BaseModel):

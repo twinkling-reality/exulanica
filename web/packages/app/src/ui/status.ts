@@ -4,6 +4,7 @@ import type {
   OccurrenceKind,
   ReconstructionRungRef,
   RenderingSubstrate,
+  TrainingQualityRecord,
 } from '@exulanica/graph-client';
 import { rungSentence } from '@exulanica/formation';
 import { el } from './dom.js';
@@ -43,6 +44,21 @@ export interface ReconstructionRungDisclosure {
   readonly memberCount: number;
   readonly renderingSubstrate: RenderingSubstrate;
   readonly reasons: readonly string[];
+  /** The trainer's measured held-out appearance and accounting, shown beside a trained substrate. */
+  readonly trainingQuality?: TrainingQualityRecord;
+}
+
+/** Measured numbers stay numbers: fixed decimals, units named, no adjectives. */
+export function trainingQualitySentences(quality: TrainingQualityRecord): readonly [string, string] {
+  const minutes = quality.durationSeconds / 60;
+  return [
+    `Held-out appearance over ${counted(quality.heldoutViews, 'photograph', 'photographs')}: `
+      + `PSNR ${quality.psnr.toFixed(2)} dB, SSIM ${quality.ssim.toFixed(3)}, LPIPS ${quality.lpips.toFixed(3)}; `
+      + `coverage ${quality.coverageFraction.toFixed(3)}, floater proxy ${quality.floatersFraction.toFixed(3)}. `
+      + 'Pose conditioning used every photograph; scores describe appearance only.',
+    `Trained ${quality.iterationsCompleted.toLocaleString('en-US')} iterations in ${minutes.toFixed(1)} min `
+      + `on ${quality.gpu} for $${quality.usdCost.toFixed(2)} at the declared rate.`,
+  ];
 }
 
 function counted(count: number, singular: string, plural: string): string {
@@ -127,6 +143,11 @@ export function buildStatus(input: StatusInput): HTMLElement {
       const reasons = el('ul', { class: 'reconstruction-rung-reasons' });
       for (const reason of scene.reasons) reasons.append(el('li', { text: reason }));
       details.append(reasons);
+    }
+    if (scene.trainingQuality !== undefined && scene.renderingSubstrate === 'gaussian_splats') {
+      for (const sentence of trainingQualitySentences(scene.trainingQuality)) {
+        details.append(el('p', { class: 'reconstruction-rung-quality', text: sentence }));
+      }
     }
     if (scene.renderingSubstrate !== 'source_photographs' && input.onInspectScene !== undefined) {
       const inspect = el('button', { type: 'button', text: 'Inspect reconstruction' });

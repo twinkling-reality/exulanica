@@ -207,6 +207,9 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
         bounds: { min: [-2, -3, -4], max: [2, 3, 4] },
         reference: { href: '/scene-geometry/trained-artifact', authorization: 'workspace-bearer',
           content_sha256: '6'.repeat(64), byte_size: 1234 },
+        quality: { heldout_views: 4, psnr: 26.5, ssim: 0.86, lpips: 0.14, coverage_fraction: 0.92,
+          floaters_fraction: 0.02, iterations_completed: 1000, duration_seconds: 3600, usd_cost: 0,
+          gpu: 'NVIDIA test fixture' },
       },
     }] });
     expect(snapshot.reconstructionScenes![0]).toMatchObject({
@@ -217,6 +220,9 @@ describe('a receipt-backed reconstruction scene remains distinct from its island
         bounds: { min: [-2, -3, -4], max: [2, 3, 4] },
         reference: { href: '/scene-geometry/trained-artifact', authorization: 'workspace-bearer',
           contentSha256: '6'.repeat(64), byteSize: 1234 },
+        quality: { heldoutViews: 4, psnr: 26.5, ssim: 0.86, lpips: 0.14, coverageFraction: 0.92,
+          floatersFraction: 0.02, iterationsCompleted: 1000, durationSeconds: 3600, usdCost: 0,
+          gpu: 'NVIDIA test fixture' },
       },
     });
   });

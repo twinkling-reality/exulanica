@@ -492,6 +492,21 @@ def test_nonmetric_trained_scene_uses_normal_publication_and_keeps_recorded_rung
     assert scene.scene_id == result.scene_id and scene.recorded_rung == 3
     assert scene.rendering_substrate == "gaussian_splats"
     assert scene.trained_geometry is not None and scene.trained_geometry.state == "available"
+    # The status line shows the trainer's own measured numbers, not a summary someone typed.
+    quality = scene.trained_geometry.quality.model_dump()
+    assert {
+        key: quality[key] for key in quality if key not in ("duration_seconds", "usd_cost")
+    } == {
+        "heldout_views": 4,
+        "psnr": 28.0,
+        "ssim": 0.86,
+        "lpips": 0.14,
+        "coverage_fraction": 0.92,
+        "floaters_fraction": 0.02,
+        "iterations_completed": 1000,
+        "gpu": "NVIDIA L40S serial-redacted",
+    }
+    assert quality["duration_seconds"] > 0 and quality["usd_cost"] >= 0
     artifact_id = scene.trained_geometry.artifact_id
     found = read_scene_geometry(repository.connection, repository.workspace_id, artifact_id, store)
     assert found is not None and found.payload == b"SOG-delivery"

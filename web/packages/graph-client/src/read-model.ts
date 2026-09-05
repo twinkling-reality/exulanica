@@ -324,6 +324,24 @@ export interface TrainedGeometryRecord {
     readonly contentSha256: string;
     readonly byteSize: number;
   } | null;
+  /**
+   * Appearance-held-out measurements with pose conditioning, as the trainer's quality receipt
+   * recorded them. A number beside the rung, never a rung or a physical-scale claim.
+   */
+  readonly quality?: TrainingQualityRecord;
+}
+
+export interface TrainingQualityRecord {
+  readonly heldoutViews: number;
+  readonly psnr: number;
+  readonly ssim: number;
+  readonly lpips: number;
+  readonly coverageFraction: number;
+  readonly floatersFraction: number;
+  readonly iterationsCompleted: number;
+  readonly durationSeconds: number;
+  readonly usdCost: number;
+  readonly gpu: string;
 }
 
 export interface ReconstructionPointMapRecord {

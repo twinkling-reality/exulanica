@@ -38,6 +38,24 @@ describe('reconstruction rung disclosure', () => {
     expect(status.querySelector('button')).toBeNull();
   });
 
+  it('states the measured held-out appearance and accounting beside a trained substrate', () => {
+    const quality = { heldoutViews: 7, psnr: 24.1234, ssim: 0.8123, lpips: 0.2104, coverageFraction: 0.931,
+      floatersFraction: 0.0213, iterationsCompleted: 30000, durationSeconds: 3312, usdCost: 0.9, gpu: 'NVIDIA L40S' };
+    const scene = { sceneId: 'scene-1', recordedRung: 3 as const, displayedRung: 3 as const,
+      registeredMemberCount: 51, memberCount: 51, renderingSubstrate: 'gaussian_splats' as const, reasons: [],
+      trainingQuality: quality };
+    const status = buildStatus({ omittedRegionCount: 0, undrawable: new Map(), reconstructionScenes: [scene] });
+    const lines = [...status.querySelectorAll('.reconstruction-rung-quality')].map((p) => p.textContent);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('7 photographs: PSNR 24.12 dB, SSIM 0.812, LPIPS 0.210; coverage 0.931, floater proxy 0.021');
+    expect(lines[0]).toContain('appearance only');
+    expect(lines[1]).toBe('Trained 30,000 iterations in 55.2 min on NVIDIA L40S for $0.90 at the declared rate.');
+    // Falling back to point maps or sources hides numbers that describe geometry not on screen.
+    const fallen = buildStatus({ omittedRegionCount: 0, undrawable: new Map(),
+      reconstructionScenes: [{ ...scene, renderingSubstrate: 'posed_point_maps' as const }] });
+    expect(fallen.querySelector('.reconstruction-rung-quality')).toBeNull();
+  });
+
   it('keeps the recorded gate result separate from the substrate this browser displays', () => {
     const status = buildStatus({
       omittedRegionCount: 0,
