@@ -1,6 +1,9 @@
 # Person regions, masking and presentation consent
 
-Design note, 2026-09-06. Not implemented. Written after the first real reconstructions showed
+Design note, 2026-09-06. **First pass implemented 2026-09-05 and covered by unit tests; the
+database migration and every database-backed path are written but UNEXECUTED.** See "What exists
+now" at the foot of this note for exactly what has and has not run. Written after the first real
+reconstructions showed
 that the current gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
@@ -75,3 +78,70 @@ and generative fill of masked areas. Masked areas are neutral, and the status sa
 The human screening receipt stays the gate. Its content changes from a statement of absence to a
 confirmed region list with states. The two retained collections would be re-screened under the
 new stage; the bowl would record two unnamed present people, hidden, and the volcanic set none.
+
+## What exists now
+
+**IMPLEMENTED AND UNIT-TESTED 2026-09-05.** Everything below runs under
+`uv run pytest -m "not postgres"`. Nothing below has touched a database: migration 0037 has not
+been applied, and no test using the `spine_schema`, `ingest_spine`, `repository` or `cli_database`
+fixtures has been run. Read every claim here as "the code does this", never as "this was observed
+against PostgreSQL".
+
+| Piece | Where | State |
+| --- | --- | --- |
+| Five states, three consents, receipt fold | `exulanica/consent/states.py` | unit-tested |
+| Region outlines, ppm integers, evidence-keyed | `exulanica/consent/regions.py` | unit-tested |
+| Deterministic masking and dilation | `exulanica/ingest/masking.py` | unit-tested |
+| Detector interface and adapters | `exulanica/ingest/person_detectors.py` | unit-tested |
+| Immutable receipts and the two digests | `exulanica/ingest/person_receipts.py` | unit-tested |
+| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | pure cores tested; database path unexecuted |
+| Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes |
+| Masked-geometry count | `exulanica/ingest/masked_geometry.py` | unit-tested |
+| Graph payload fields | `exulanica/graph/payload.py` | typed; resolver unexecuted |
+| Atlas presentation rule | `web/packages/graph-client/src/person-presentation.ts` | unit-tested |
+| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | **written, never applied** |
+
+### Two decisions that differ from this note
+
+**The detector is pinned in the stage parameters, and the stage stays deterministic.** This note
+asks for a stage "deterministic over exact source bytes and a pinned detector". Making it
+model-backed would have been the obvious reading, and `StageSpec` would then require
+`deterministic=False`, which would drag `person_regions` into the exact-recomputation exclusion
+sentence and into `docs/evaluation/2026-09-05-unblocked-goal-d.json`, whose bytes are digest-pinned
+twice by the backend-program record. Editing a dated record of an executed measurement to
+accommodate a stage that did not exist when it ran would be a false claim about what was measured.
+Instead the detector's identity is a stage parameter and the stage refuses a detector that does not
+match it, so a swap is a hard error rather than a corpus silently keyed as though nothing changed.
+
+**No new detector was written, and the one that ships reads detections this system already made.**
+MEASURED 2026-09-05: neither extra contains anything that finds people. torchvision, transformers,
+ultralytics, mediapipe, onnxruntime, rembg and segment-anything are all absent, and
+`opencv-python-headless` resolves to 5.0.0, which removed `cv2.HOGDescriptor` and ships an empty
+`cv2/data`. So `RecordedObservationDetector` reads the `person_objects` the `vision` stage already
+records, which are real detections with real boxes and cost no new model call. They are boxes, not
+outlines; the region records `shape='box'` and nothing downstream calls it a silhouette. A real
+segmenter remains the interface's purpose and is not written.
+
+### Not done, and not pretended
+
+- **Migration 0037 has never been applied.** Its SQL is unverified against PostgreSQL.
+- **Splat training on a masked scene is refused**, in `scene_selection.py`, rather than run.
+  `SplatBuildManifest` requires the held-out hashes to be a subset of the source hashes, and under
+  masking those are derivative digests; relaxing that without a digest map would make the whole
+  held-out set silently become training views. Pose, placement and the gate run fully masked.
+- **The masked-geometry count is not yet in the evaluation bundle.** It is a function with tests,
+  not a stage wired into `_train_splat`.
+- **The reviewer's edit screen does not exist.** The receipt shapes it would write do.
+- **No subject-facing consent link.** The receipt carries `actor_role: "subject"` so adding one is
+  a route rather than a schema change, but until it exists this layer is, in this note's own word,
+  theater, and the owner decides for everybody.
+- **Source delivery still serves originals.** `GET /evidence/{span_id}` resolves the bytes a
+  citation names, and those are the original bytes by definition; a masked sibling route and the
+  three client draw sites that would use it are not written. Until then "the world never draws
+  pixels for a masked region" holds for reconstructed geometry and not for the source-photograph
+  fallback.
+- **The two retained collections have not been re-screened.** Bumping the policy to
+  `exulanica.reconstruction-privacy/v2` changes the digest embedded in every receipt, so their
+  version 1 screenings are now provably old-policy, which is the intended cost.
+- **Consistency across views, reflections and screens, and generative fill** remain as this note
+  left them.
