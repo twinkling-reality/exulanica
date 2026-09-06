@@ -50,7 +50,17 @@ export class ExulanicaClient implements GraphSource {
    * to move authentication into a cookie, which is a session mechanism this API does not have.
    */
   async evidenceBytes(handle: EvidenceHandle): Promise<Blob> {
-    const response = await this.#transport.getBytes(`/evidence/${handle}`);
+    // The masked view, not the original. This is the byte path behind the citation image in the
+    // detail pane, which is a photograph shown to somebody looking at the screen; the server
+    // returns the original when nobody in the frame is hidden, the masked derivative when
+    // somebody is, and refuses outright when a mask is required and missing.
+    //
+    // `/evidence/{handle}` still exists and still resolves the exact bytes a citation names,
+    // because those bytes are inside the span digest and an archived citation verifies against
+    // them. That endpoint is for resolving evidence; this call is for showing a picture, and
+    // until it was pointed here it was the last path by which an unconsented person reached a
+    // viewer's screen.
+    const response = await this.#transport.getBytes(`/evidence/${handle}/masked`);
     return response.blob();
   }
 

@@ -1,9 +1,11 @@
 # Person regions, masking and presentation consent
 
-Design note, 2026-09-06. **Components built and migrated; NOT connected, and this hides nobody
-today.** The stages exist and are never invoked, no row is ever written to the consent tables, and
-the client drops the fields it would need. See "What exists now" at the foot of this note before
-relying on anything here. Written after the first real reconstructions showed
+Design note, 2026-09-06. **Implemented and wired end to end, and exercised against a real
+database.** A detected person leaves a row, the row forces a masked derivative, reconstruction
+reads that derivative, the database refuses geometry over the original, and a reviewer can confirm
+who is present and record what each of them agreed to. Read "What exists now" at the foot of this
+note for what is still missing, which is not nothing. Written after the first real reconstructions
+showed
 that the current gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
@@ -81,76 +83,79 @@ new stage; the bowl would record two unnamed present people, hidden, and the vol
 
 ## What exists now
 
-**BUILT BUT NOT CONNECTED. THIS HIDES NOBODY TODAY.** Read that sentence before the table
-below, because the table lists working parts and the parts are not joined to each other. An
-adversarial audit on 2026-09-06 raised 83 candidate gaps and confirmed 46, thirteen of them
-critical, and they converge on one fact: every component exists, is tested, and is unreachable
-from the running system.
+**IMPLEMENTED AND DATABASE-TESTED 2026-09-06.** The chain runs: `person_regions` proposes and
+writes rows, `masked_source` fills every unconsented person, `depth` reads the masked image and
+records which bytes it read, the scene worker stages masked bytes for COLMAP, and
+`tg_geometry_reads_the_masked_derivative` refuses a point map over the original.
+`tests/test_person_masking_end_to_end.py` executes that against PostgreSQL and asserts what
+landed, including the database's own refusal. A stub that hid nobody now fails four of those tests.
 
-The chain breaks in five independent places, any one of which is sufficient on its own:
-
-1. `exulanica/ingest/pipeline.py:501` runs rendition, vision and depth. Neither `person_regions`
-   nor `masked_source` is invoked by anything except tests.
-2. `exulanica/ingest/pipeline.py:532` hands the depth stage `prepared.upright`, the original
-   image. The principle at the head of this note, that depth reads the masked derivative, is
-   **not true of the code**.
-3. Nothing writes a `person_region`, `person_subject` or `person_presentation_consent` row. The
-   `person_regions` stage would not help if it ran: it writes an artifact, not a region row. So
-   `capture_requires_masking()` is false for every capture and the geometry trigger in 0037 has
-   never fired.
-4. `web/packages/graph-client/src/snapshot.ts:205` drops `person_regions` and
-   `person_review_state` when parsing the payload, so the fields the server sends never reach a
-   draw site.
-5. Nothing calls the presentation predicates. Four draw sites are ungated: the world veils, the
-   reconstruction inspector, the detail-pane citation image, and `GET /evidence/{span_id}`.
-
-**Migration 0037 also removed a guard before its replacement worked.** 0029 blocked any screening
-naming a person at all. The first version of the replacement accepted a region in state `unknown`
--- somebody was seen and nobody decided -- as eligible, which is exactly the case default deny
-exists for, and for several commits this branch was less safe than what it replaced. Corrected on
-2026-09-06: a region in any masked state now blocks until masking is actually wired.
-
-The suite result below says the schema and the pure functions agree. It does not say anybody is
-protected: no test inserts a person region, so a stub that hides nobody passes all of it.
-
-**Suite, 2026-09-06:** 1748 passed, 3 skipped, 0 failed against
-`postgresql://localhost:5433/exulanica_spine_test`, `ruff check` clean, four import contracts
-kept, web workspace green. `EXULANICA_TEST_ALLOW_DATABASE_CREATION` stayed unset.
+**Suite, 2026-09-06:** 1778 passed, 3 skipped, 0 failed in 4m33s; `ruff check` clean; four import
+contracts kept; web typecheck, 343-module boundary check and 768 tests green.
+`EXULANICA_TEST_ALLOW_DATABASE_CREATION` stayed unset.
 
 | Piece | Where | State |
 | --- | --- | --- |
 | Five states, three consents, receipt fold | `exulanica/consent/states.py` | unit-tested |
-| Region outlines, ppm integers, evidence-keyed | `exulanica/consent/regions.py` | unit-tested |
+| Region outlines, evidence-keyed | `exulanica/consent/regions.py` | unit-tested |
 | Deterministic masking and dilation | `exulanica/ingest/masking.py` | unit-tested |
-| Detector interface and adapters | `exulanica/ingest/person_detectors.py` | unit-tested; **the adapter reads `objects`, which the vision schema instructs the model not to put people in** |
+| Detector interface and adapters | `exulanica/ingest/person_detectors.py` | see the detector note below |
 | Immutable receipts and the two digests | `exulanica/ingest/person_receipts.py` | unit-tested |
-| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | registered; **never invoked by the pipeline** |
-| Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes; **never reached, because no masked derivative is ever produced** |
-| Masked-geometry count | `exulanica/ingest/masked_geometry.py` | unit-tested |
-| Graph payload fields | `exulanica/graph/payload.py` | sent by the server; **dropped by the client parser** |
-| Atlas presentation rule | `web/packages/graph-client/src/person-presentation.ts` | unit-tested; **dead code, no draw site calls it** |
-| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | applied; **trigger has never fired, no writer exists for the tables** |
+| The three stages | `exulanica/ingest/stages/` | **run in the pipeline**, database-tested |
+| Region and consent writers | `exulanica/ingest/spine/person_consent.py` | database-tested |
+| Depth reads the masked image | `exulanica/ingest/stages/depth.py` | database-tested |
+| Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes |
+| Masked-geometry count | `exulanica/ingest/masked_geometry.py` | unit-tested, never run on a trained scene |
+| Graph payload and client read model | `exulanica/graph/`, `graph-client/src/snapshot.ts` | carried through to the app |
+| Masked byte delivery | `GET /evidence/{span_id}/masked`, `world/repository.py` | database-tested |
+| Reviewer routes | `exulanica/api/routes/person_consent.py` | database-tested |
+| Reviewer screen | `web/packages/app/src/ui/person-review.ts` | unit-tested |
+| Tables, RLS, resolvers, trigger | `exulanica/migrations/0037_...sql` | applied; the trigger fires |
 
-### Two decisions that differ from this note
+### How a photograph is protected now
 
-**The detector is pinned in the stage parameters, and the stage stays deterministic.** This note
-asks for a stage "deterministic over exact source bytes and a pinned detector". Making it
-model-backed would have been the obvious reading, and `StageSpec` would then require
-`deterministic=False`, which would drag `person_regions` into the exact-recomputation exclusion
-sentence and into `docs/evaluation/2026-09-05-unblocked-goal-d.json`, whose bytes are digest-pinned
-twice by the backend-program record. Editing a dated record of an executed measurement to
-accommodate a stage that did not exist when it ran would be a false claim about what was measured.
-Instead the detector's identity is a stage parameter and the stage refuses a detector that does not
-match it, so a swap is a hard error rather than a corpus silently keyed as though nothing changed.
+A photograph containing somebody who has not consented to their likeness cannot become geometry:
+the trigger refuses the point map unless it names a masked derivative of those exact bytes. It also
+cannot be shown: `/world/source-media` withholds it when a mask is required and missing, and
+otherwise resolves to the masked view, and the citation image in the detail pane reads the same
+masked route. `GET /evidence/{span_id}` still returns the exact bytes a citation names, because
+those bytes are inside the span digest and an archived citation verifies against them.
 
-**No new detector was written, and the one that ships reads detections this system already made.**
-MEASURED 2026-09-05: neither extra contains anything that finds people. torchvision, transformers,
-ultralytics, mediapipe, onnxruntime, rembg and segment-anything are all absent, and
+### The performance fix worth knowing about
+
+`region_state_for_capture` runs for every photograph on the ingest path. Asking through
+`person_region_current`, a `distinct on` view, took one test file from 44 seconds to 3 minutes 28
+(MEASURED 2026-09-06, with a control run isolating the query). An indexed existence check now
+answers the common case of a photograph with no regions, and the view is read only for photographs
+that have somebody in them.
+
+### Two decisions that differ from this note, and one claim that was wrong
+
+**The detector is named by a contract, not pinned to one literal, and the stage stays
+deterministic.** This note asks for a stage "deterministic over exact source bytes and a pinned
+detector". Making it model-backed would force `deterministic=False`, which would drag
+`person_regions` into the exact-recomputation exclusion sentence and into
+`docs/evaluation/2026-09-05-unblocked-goal-d.json`, whose bytes are digest-pinned twice by the
+backend-program record; editing a dated record of an executed measurement to accommodate a stage
+that did not exist when it ran would be a false claim about what was measured. The first attempt
+pinned one detector name in the parameters, and that was wrong for a different reason: it refused
+every detector but one, including the suite's own doubles. The property that actually matters is
+that swapping a detector regenerates rather than reusing stale regions, and that now lives in the
+stage's **input** digest, per photograph, with the parameters declaring the contract.
+
+**CORRECTED 2026-09-06: the shipped adapter reads a field that is specified to be empty.** This
+note previously recorded that `RecordedObservationDetector` reads "real detections the vision stage
+already made". That was wrong, and an audit found it. `exulanica/ingest/vision.py` describes
+`objects` as "Distinct things visible in the image. Do not list people here; people are handled
+elsewhere and are not part of this record." `person_objects` is a defensive filter for a model that
+disobeys that instruction, not a detector. So the adapter finds almost nobody, its label set is an
+exact-match whitelist of singular nouns that does not match arms or hands, and the honest statement
+is that **a human adding regions through the review screen is the detector today**.
+
+MEASURED 2026-09-05, and still true: neither extra contains anything that finds people. torchvision,
+transformers, ultralytics, mediapipe, onnxruntime, rembg and segment-anything are all absent, and
 `opencv-python-headless` resolves to 5.0.0, which removed `cv2.HOGDescriptor` and ships an empty
-`cv2/data`. So `RecordedObservationDetector` reads the `person_objects` the `vision` stage already
-records, which are real detections with real boxes and cost no new model call. They are boxes, not
-outlines; the region records `shape='box'` and nothing downstream calls it a silhouette. A real
-segmenter remains the interface's purpose and is not written.
+`cv2/data`. Nothing was fabricated to fill the gap.
 
 The three new tables brought the count of tables under FORCE row-level security keyed on
 `current_workspace()` from 59 to 62. That number is stated in three docstrings and asserted against
@@ -158,23 +163,25 @@ the live schema, which is the gate that caught them.
 
 ### Not done, and not pretended
 
+- **The detector finds almost nobody.** `RecordedObservationDetector` reads `person_objects` from
+  a vision observation, and `exulanica/ingest/vision.py` instructs the model **not** to list people
+  in `objects`: that field is a defensive filter for a model that disobeys, not a detector. Its
+  person labels are also an exact-match whitelist of singular nouns, so "arms", "hands" and
+  "diners" match none of them. In practice a human adding regions through the review screen is the
+  real detector today, and the stage says "unavailable" rather than "found none" when no detector
+  is configured. A pinned segmenter remains the interface's purpose and is not written.
+- **No subject-facing consent.** Every receipt these routes write records `actor_role: "owner"`,
+  and the route refuses to let a request name its own actor or role, so the owner cannot
+  manufacture the subject's decision. But the photographed person still has no way to answer for
+  themselves, and until they do this layer is, in this note's own word, theater. The column and
+  the receipt already admit `subject`, so adding that route is a route rather than a schema change.
 - **Splat training on a masked scene is refused**, in `scene_selection.py`, rather than run.
-  `SplatBuildManifest` requires the held-out hashes to be a subset of the source hashes, and under
-  masking those are derivative digests; relaxing that without a digest map would make the whole
-  held-out set silently become training views. Pose, placement and the gate run fully masked.
-- **The masked-geometry count is not yet in the evaluation bundle.** It is a function with tests,
-  not a stage wired into `_train_splat`.
-- **The reviewer's edit screen does not exist.** The receipt shapes it would write do.
-- **No subject-facing consent link.** The receipt carries `actor_role: "subject"` so adding one is
-  a route rather than a schema change, but until it exists this layer is, in this note's own word,
-  theater, and the owner decides for everybody.
-- **Source delivery still serves originals.** `GET /evidence/{span_id}` resolves the bytes a
-  citation names, and those are the original bytes by definition; a masked sibling route and the
-  three client draw sites that would use it are not written. Until then "the world never draws
-  pixels for a masked region" holds for reconstructed geometry and not for the source-photograph
-  fallback.
-- **The two retained collections have not been re-screened.** Bumping the policy to
-  `exulanica.reconstruction-privacy/v2` changes the digest embedded in every receipt, so their
-  version 1 screenings are now provably old-policy, which is the intended cost.
+- **The masked-geometry count has never seen a trained scene.** Its tests build PLY bytes vertex by
+  vertex, and it is not wired into the evaluation bundle.
+- **The two retained collections have not been re-screened.** The policy bump to
+  `exulanica.reconstruction-privacy/v2` makes their version 1 screenings provably old-policy.
+- **A revoked consent produces a new build; it does not purge the old one.** Existing geometry from
+  a build made while somebody was `shown` stays until the ordinary withdrawal path reaches it.
 - **Consistency across views, reflections and screens, and generative fill** remain as this note
   left them.
+
