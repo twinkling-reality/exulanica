@@ -254,10 +254,16 @@ rung, cannot be cited, and cannot enter a receipt chain.
       source blob at all, so there is no span that could name it.
       `test_a_generation_cannot_become_an_assertion_support_span` asserts that absence. It does not
       attempt the write, because there is nothing to attempt.
-- [ ] An executed mutation control per invariant, in `scripts/verify_world_read_controls.py`
+- [x] An executed mutation control per invariant, in `scripts/verify_world_read_controls.py`
       following the shape of `scripts/verify_gsplat_controls.py`: the mutant must be killed by a
       named test selector, the unmutated baseline must pass first, and the record is written
-      digest-bound under `docs/evaluation/`.
+      digest-bound under `docs/evaluation/`. EXECUTED 2026-09-06: fourteen controls, fourteen
+      killed, baseline and restored suite green
+      (`docs/evaluation/2026-09-06-world-read-negative-controls.json`). One earlier control
+      survived and was a correct result: it removed the supersession filter, which makes the read
+      more permissive, and the test it named filed nothing superseded. It was replaced by the
+      mutation that reinstates the original defect, plus a second control and a second test for
+      supersession itself.
 
 **Files.** New: `scripts/verify_generated_tier_controls.py`, `tests/test_generated_tier.py`.
 
