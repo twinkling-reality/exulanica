@@ -195,6 +195,44 @@ Observation schema version 2 fixes that at the source rather than by widening a 
 The vision stage moved to version 3 and the prompt digest moved with it, so every photograph is
 re-observed rather than keeping an answer given under the old question.
 
+### The vision stage is gated, 2026-09-06
+
+Until this change the depth stage required an eligible privacy screening for the exact bytes and
+the vision stage required nothing. That is the wrong way round twice over. Vision is the **first**
+stage to touch a photograph after intake, and it is the one that sends it to a hosted model, so
+the ungated stage was the one with egress. It is also now the stage that enumerates every visible
+trace of a person, which would have meant locating people in order to protect them by first
+sending them somewhere else.
+
+Vision now takes the same receipt depth does:
+
+- **No screening: unavailable, not failed.** Nothing is sent, the ledger records the reason, and
+  ``outcome.stages_unavailable`` gains ``vision``. Raising would have made the one-shot ingest
+  path impossible rather than merely quiet, because a screening is keyed to a capture that does
+  not exist until intake has committed; and an ingest that errors on every unscreened photograph
+  is an ingest somebody switches off.
+- **A stale, blocked or superseded receipt raises.** Having looked and been refused is not the
+  same as never having asked.
+- **The screening digest is deliberately NOT in vision's input digest**, unlike depth's.
+  Re-recording a receipt does not change what is in the photograph, and keying on it would re-bill
+  a model call every time one was superseded. The receipt id is stored on the artifact instead.
+- **The derivative worker resolves the capture's current eligible receipt** and hands it to both
+  paid stages, so this is production wiring and not only a parameter.
+
+**What this costs, stated plainly.** An unscreened photograph now gets no description, no person
+occurrences, no OCR and no place proposal. `exulanica-ingest ingest ./photos` will not describe
+anything until somebody has screened it. That is a real change in what the product does between
+upload and review, and it is the honest consequence of deciding that sending a personal photograph
+to a third party needs an authorization.
+
+The test suite absorbed it through `tests/conftest.py::ingest_observed`, which does intake,
+records a synthetic authorization and exemption, then runs derivatives. That is not a bypass: the
+test corpus is generated media with nobody in it, and a database trigger refuses the synthetic
+exemption for benchmark or personal bytes. One measured sequence genuinely changed and was
+re-recorded rather than quietly edited: the `find_artifact` order over an unscreened `ingest_file`
+is now three calls instead of five, and position three is still the rendition persist, which is
+the only part the sibling race test depends on.
+
 ### Not done, and not pretended
 
 - **The detector asks a hosted model, and its recall on real photographs is unmeasured.** Schema
