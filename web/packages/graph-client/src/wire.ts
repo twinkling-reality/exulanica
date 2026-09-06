@@ -105,6 +105,42 @@ export interface ReconstructionScenePayload {
       } | null;
     } | null;
   }[];
+  /**
+   * Content a world model imagined for this scene, in its own tier below every recorded rung.
+   *
+   * A separate field from `trained_geometry` rather than a flag on it, and that is the whole
+   * design: to draw one of these a client has to read a field whose name says what it is. A
+   * client that ignores this field sees exactly the world that was photographed, which is the
+   * correct default for every consumer that has not thought about the distinction.
+   *
+   * An empty array means nothing was generated. An entry with `state: 'invalid'` means a
+   * generation exists whose receipt did not verify, which is a different fact and is never
+   * silently dropped: a dropped generation is indistinguishable from no generation.
+   *
+   * Absent from older payloads. Treat an absent field as unknown rather than as empty, and draw
+   * nothing either way.
+   */
+  readonly generated_geometry?: readonly {
+    readonly artifact_id: string;
+    readonly receipt_sha256: string | null;
+    readonly tier: 'generated';
+    readonly state: 'available' | 'invalid';
+    readonly state_reason: string | null;
+    readonly model: {
+      readonly provider: string;
+      readonly model_id: string;
+      readonly model_version: string;
+    } | null;
+    readonly prompt_sha256: string | null;
+    /** Exactly what the model was shown, digest by digest. */
+    readonly conditioning: readonly { readonly role: string; readonly sha256: string }[];
+    readonly world_read_bundle_sha256: string | null;
+    readonly container: string | null;
+    readonly content_sha256: string | null;
+    readonly byte_size: number | null;
+    /** Where the record stops, in words. Shown to the viewer; never omitted from a valid entry. */
+    readonly seam: string | null;
+  }[];
 }
 
 /** What the API's `GET /graph` answers with. Server terms, not read-model terms. */

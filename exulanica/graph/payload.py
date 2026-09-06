@@ -22,6 +22,8 @@ __all__ = [
     "ProposalRow",
     "ReconstructionSceneMemberRow",
     "ReconstructionSceneRow",
+    "SceneGeneratedGeometryRow",
+    "SceneGenerationModelRow",
     "SceneGeometryReferenceRow",
     "SceneGroupRow",
     "ScenePointMapPlacementRow",
@@ -243,6 +245,45 @@ class SceneTrainedGeometryRow(BaseModel):
     quality: SceneTrainingQualityRow
 
 
+class SceneGenerationModelRow(BaseModel):
+    """Which model produced a generated surface, at which version."""
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    provider: str
+    model_id: str
+    model_version: str
+
+
+class SceneGeneratedGeometryRow(BaseModel):
+    """Content a world model imagined, in its own tier below every recorded rung.
+
+    A separate model from :class:`SceneTrainedGeometryRow` rather than a flag on it, because a
+    client that ignored a flag would draw imagination as record. To draw one of these a client has
+    to have read a field whose name says what it is.
+
+    ``seam`` is where the record stops, in words, and it is required of every valid generation.
+    ``conditioning`` is what the model was actually shown, digest by digest, which is what makes
+    "conditioned on the real place" checkable rather than asserted.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    artifact_id: uuid.UUID
+    receipt_sha256: str | None
+    tier: Literal["generated"]
+    state: Literal["available", "invalid"]
+    state_reason: str | None
+    model: SceneGenerationModelRow | None
+    prompt_sha256: str | None
+    conditioning: list[dict[str, str]]
+    world_read_bundle_sha256: str | None
+    container: str | None
+    content_sha256: str | None
+    byte_size: int | None
+    seam: str | None
+
+
 class ReconstructionSceneRow(BaseModel):
     """A durable multi-photograph scene with recorded and deliverable state kept separate."""
 
@@ -264,6 +305,11 @@ class ReconstructionSceneRow(BaseModel):
     rendering_substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"]
     trained_geometry: SceneTrainedGeometryRow | None = None
     members: list[ReconstructionSceneMemberRow]
+    #: Without a default, following this file's rule. A scene row assembled without deciding what
+    #: to say about generated content would report an empty list, and an empty list of generations
+    #: is the one thing a viewer must always be able to trust: it means nothing was generated, not
+    #: that nobody looked.
+    generated_geometry: list[SceneGeneratedGeometryRow]
 
 
 class GraphPayload(BaseModel):

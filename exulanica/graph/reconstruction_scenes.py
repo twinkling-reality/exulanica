@@ -18,6 +18,7 @@ import psycopg
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.generated_geometry import generated_geometry_rows
 from exulanica.graph.geometry import POINT_MAP_KIND
 from exulanica.graph.payload import (
     ReconstructionSceneMemberRow,
@@ -306,6 +307,7 @@ def _scene_row(
         rendering_substrate=substrate,
         trained_geometry=trained,
         members=output_members,
+        generated_geometry=generated_geometry_rows(connection, workspace, scene_id, store),
     )
 
 
@@ -463,6 +465,11 @@ def _fallback(
             )
             for member in members
         ],
+        # The fallback is reached when the receipts are unreadable, and it cannot resolve
+        # generations either. An empty list here is honest only because it sits beside a
+        # receipt_state that already says this reader could not read the scene: a client that
+        # draws generated content at all reads `receipt_state` first.
+        generated_geometry=[],
     )
 
 

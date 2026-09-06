@@ -287,6 +287,7 @@ function sceneRecord(
   return {
     sceneId: 'scene-1',
     islandId: REGION,
+    generatedGeometry: [],
     memberDigest: '1'.repeat(64),
     poseReceiptSha256: '2'.repeat(64),
     placementReceiptSha256: '3'.repeat(64),

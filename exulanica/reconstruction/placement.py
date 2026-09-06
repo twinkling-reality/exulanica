@@ -37,6 +37,11 @@ __all__ = [
 PLACEMENT_PROFILE: Final = "exulanica.posed-point-map-placement/v2"
 _POSE_PROFILE: Final = "exulanica.colmap-pose-receipt/v2"
 
+#: Read from the shared alignment policy rather than repeated, so the reader's cap and the
+#: producer's cap cannot drift apart. `pose.py` truncates each image's retained observations to
+#: this; a receipt carrying more is malformed under this reader.
+_MAX_SPARSE_OBSERVATIONS: Final = int(ALIGNMENT_POLICY["max_sparse_observations_per_image"])
+
 
 def _canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
@@ -305,7 +310,10 @@ def _read_pose_receipt(data: bytes) -> _PoseReceipt:
                 raise ValueError("camera image dimensions are malformed")
             size = (raw_size[0], raw_size[1])
         raw_observations = raw.get("sparse_observations", [])
-        if not isinstance(raw_observations, list) or len(raw_observations) > 4096:
+        if (
+            not isinstance(raw_observations, list)
+            or len(raw_observations) > _MAX_SPARSE_OBSERVATIONS
+        ):
             raise ValueError("camera sparse observations are malformed")
         observations = tuple(_numbers(item, 8, "sparse observation") for item in raw_observations)
         if len({item[0] for item in observations}) != len(observations):
@@ -376,6 +384,84 @@ def _scene_from_opm(camera: _PoseCamera, scale: float) -> tuple[float, ...]:
         0.0,
         1.0,
     )
+
+
+def sparse_observation_records(pose_receipt: bytes) -> dict[str, object]:
+    """Group the retained COLMAP tracks by 3D point, so a surface can name what photographed it.
+
+    This is the recorded answer to "which photographs observed this point", and it is recorded
+    rather than inferred: COLMAP's ``point_id`` is global across every image in the selected model,
+    so grouping the retained observations by it reconstructs the actual multi-view track. The
+    alternative, reprojecting a clicked world point into each recovered camera and ranking by
+    visibility, is a geometric guess about what a camera could have seen. These are different
+    claims and only one of them is provenance.
+
+    Two limits travel with the answer because a consumer that did not know them would overstate it.
+
+    ``retained_per_image`` is 4096: the pose stage keeps a bounded, hash-ordered sample of each
+    image's observations rather than all of them, so the observations held for a point are a subset
+    of the images that saw it. ``track_length`` is COLMAP's full count, read from ``points3D.txt``
+    before any truncation, so the difference between it and the number of observations returned is
+    exactly what was dropped. A viewer told "3 photographs" for a point with a track length of 40
+    would be misled by omission, which is why both numbers are here and neither is optional.
+
+    Returns ``{}`` for an unaccepted receipt, matching :func:`recovered_camera_records`: an
+    unaccepted pose has no delivered cameras to attach an observation to.
+    """
+    receipt = _read_pose_receipt(pose_receipt)
+    if json.loads(pose_receipt)["quality"].get("accepted") is not True:
+        return {}
+    captures = {filename: capture for capture, filename in receipt.frames}
+
+    points: dict[int, dict[str, object]] = {}
+    for camera in receipt.cameras:
+        capture_ref = captures.get(camera.image_name)
+        if capture_ref is None:
+            raise ValueError("a recovered camera names an image outside the pose manifest")
+        for row in camera.sparse_observations:
+            point_id = int(row[0])
+            world = (row[3], row[4], row[5])
+            track_length = int(row[7])
+            existing = points.get(point_id)
+            if existing is None:
+                points[point_id] = {
+                    "point_id": point_id,
+                    "world_xyz": list(world),
+                    "track_length": track_length,
+                    "observations": [],
+                }
+                existing = points[point_id]
+            elif existing["world_xyz"] != list(world) or existing["track_length"] != track_length:
+                # Two images reporting different world coordinates or track lengths for one point
+                # id means the receipt does not describe a single consistent model, and picking a
+                # winner would publish a coordinate no camera actually agreed on.
+                raise ValueError(
+                    f"sparse point {point_id} disagrees with itself across recovered cameras"
+                )
+            observations = existing["observations"]
+            assert isinstance(observations, list)
+            observations.append(
+                {
+                    "capture_ref": capture_ref,
+                    "image_name": camera.image_name,
+                    "x": row[1],
+                    "y": row[2],
+                    "reprojection_error_px": row[6],
+                }
+            )
+
+    for entry in points.values():
+        observations = entry["observations"]
+        assert isinstance(observations, list)
+        observations.sort(key=lambda item: str(item["capture_ref"]))
+        # What is held, beside what actually exists. The gap is the truncation, stated per point
+        # rather than as a footnote a caller can skip.
+        entry["observations_retained"] = len(observations)
+
+    return {
+        "retained_per_image": _MAX_SPARSE_OBSERVATIONS,
+        "points": [points[key] for key in sorted(points)],
+    }
 
 
 def recovered_camera_records(pose_receipt: bytes) -> dict[str, dict[str, object]]:

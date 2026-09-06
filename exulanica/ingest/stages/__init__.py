@@ -427,6 +427,30 @@ STAGES: Final[dict[str, StageSpec]] = {
             "delivery": "private-operational-artifact-no-browser-route",
         },
     ),
+    "generated_scene": StageSpec(
+        key="generated_scene",
+        version=1,
+        output_kind="generated_scene",
+        # A model produced these bytes, so they are not bit-reproducible and a content difference
+        # between two runs is not a fault. ADR-0017 follows from this flag: a generated artifact is
+        # REMOVED on deletion, never regenerated, because re-running a sampled generation would
+        # produce different bytes and an exactness claim over them would be false.
+        deterministic=False,
+        # No `model_role`, deliberately, and this is not an oversight to be tidied up. A role names
+        # a slot the platform routes through its own reviewed model manifest; the model here is
+        # supplied per generation by whoever is generating, and its identity travels in the
+        # receipt rather than in a registry entry. The stage's model identity therefore reaches
+        # the artifact through `generation_input_digest`, which folds model, version, prompt digest
+        # and every conditioning digest into `input_digest`, so a model swap produces a different
+        # artifact id. See `exulanica/reconstruction/generated.py`.
+        params={
+            "profile": "exulanica.generated-scene/v1",
+            "tier": "generated",
+            "below_every_recorded_rung": True,
+            "citable": False,
+            "promotes_rung": False,
+        },
+    ),
     "scene_gate": StageSpec(
         key="scene_gate",
         version=1,

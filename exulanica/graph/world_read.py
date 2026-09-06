@@ -31,6 +31,11 @@ place at one capture. The bundle says so in its own ``addressing`` block rather 
 per-person layer exists, the bundle is ``internal_only`` and says what that basis does not
 establish.
 
+**Two digests, not one.** ``recorded_sha256`` covers the observed world alone; ``bundle_sha256``
+covers the whole response including anything a model has since generated. A generation cites the
+first, so filing it does not change the thing it cited and two models can read the same observed
+world and both say so. A recipient verifying the payload in front of it checks the second.
+
 The scene read here is the same ``reconstruction_scene_rows`` that builds the graph payload Atlas
 draws. That is deliberate rather than incidental: a bundle
 assembled from its own queries would eventually disagree with the world on screen about which
@@ -41,7 +46,6 @@ either side.
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 from typing import Any, Final
 
 import psycopg
@@ -54,6 +58,16 @@ from exulanica.graph.payload import (
 )
 from exulanica.graph.read_consent import consent_for_captures, person_consent_state, release_state
 from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
+from exulanica.graph.wire_numbers import (
+    NUMBER_DECIMALS,
+    NUMBER_ENCODING,
+)
+from exulanica.graph.wire_numbers import (
+    decimal_string as _decimal,
+)
+from exulanica.graph.wire_numbers import (
+    decimal_strings as _decimals,
+)
 from exulanica.store import ContentAddressedStore
 from exulanica.world import DEFAULT_WORLD_ID, WorldStructureRepository
 
@@ -65,17 +79,6 @@ __all__ = [
 
 WORLD_READ_PROFILE: Final = "exulanica.world-read-bundle/v1"
 
-#: Fractional digits in every decimal-string number. Twelve matches the existing synthetic-fixture
-#: encoding and is comfortably beyond float64's ~15 significant decimal digits for the magnitudes
-#: here (normalised scene units and pixel coordinates), so the string round-trips to the same
-#: double. It is stated in the bundle because a recipient recomputing the digest needs the format,
-#: not a guess at it.
-NUMBER_DECIMALS: Final = 12
-
-_NUMBER_ENCODING: Final = (
-    f"every measured number is a decimal string with exactly {NUMBER_DECIMALS} fractional digits; "
-    "canonical JSON admits no floats, because no two implementations agree on how to render one"
-)
 
 _REGION_SLOTS: Final = """
 select ts.region_id,
@@ -96,24 +99,6 @@ select ts.region_id,
    and ts.topology_digest = %s
  order by ts.region_id nulls last, ts.slot_key
 """
-
-
-def _decimal(value: float) -> str:
-    """One float as a fixed-precision decimal string.
-
-    Via :class:`~decimal.Decimal` rather than ``f"{value:.12f}"`` for one reason: the format
-    specifier renders a float that overflows the fixed notation, such as a corrupt transform
-    carrying ``1e30``, as thirty digits and a point, which is a different string on a platform with
-    a different repr and would silently break the cross-implementation digest claim. ``Decimal``
-    quantises exactly and refuses a non-finite value outright, which is the correct failure: a NaN
-    in a transform is a bug upstream, not a number to encode.
-    """
-    quantised = Decimal(value).quantize(Decimal(1).scaleb(-NUMBER_DECIMALS))
-    return f"{quantised:f}"
-
-
-def _decimals(values: list[float]) -> list[str]:
-    return [_decimal(value) for value in values]
 
 
 def _reference(reference: SceneGeometryReferenceRow | None) -> dict[str, Any] | None:
@@ -168,10 +153,12 @@ def _geometry(scene: ReconstructionSceneRow) -> list[dict[str, Any]]:
     """Every buildable geometry entry for the scene, each labelled with the tier that made it.
 
     ``tier`` is ``recorded`` throughout, because every entry here descends from photographs through
-    reviewed deterministic or model stages that are bound to those exact bytes. Phase 10 capability
-    2 adds a ``generated`` tier, and it is a separate value on this same key rather than a separate
-    list, so a consumer that ignores the key cannot silently treat imagination as record: it would
-    have to have written code that reads ``tier`` and discards it.
+    reviewed deterministic or model stages that are bound to those exact bytes. Content a model
+    imagined is not in this list at all: it is the bundle's separate ``generated`` key, for the
+    same reason the graph payload keeps ``generated_geometry`` apart from ``trained_geometry``. A
+    consumer must write code that reads a field whose name says what it is before it can condition
+    on imagination, and a consumer that ignores the new key sees exactly the recorded world.
+    ``tier`` stays on every entry so that an entry separated from its list still says what it is.
     """
     entries: list[dict[str, Any]] = []
     for member in scene.members:
@@ -223,6 +210,42 @@ def _geometry(scene: ReconstructionSceneRow) -> list[dict[str, Any]]:
             }
         )
     return entries
+
+
+def _generated(scene: ReconstructionSceneRow) -> list[dict[str, Any]]:
+    """What a model imagined for this scene, in its own list and never in ``geometry``.
+
+    Each entry carries the model, its version, the prompt digest and the exact conditioning
+    digests it received, so a recipient can recompute the bundle the model actually read and check
+    the claim rather than accept it. ``seam`` is the sentence a viewer is shown.
+
+    An entry whose receipt did not verify appears with ``state: invalid`` and its reason rather
+    than being dropped, because a dropped generation looks identical to no generation, and the one
+    thing a reader must be able to trust is that an empty list means nothing was generated.
+    """
+    return [
+        {
+            "tier": "generated",
+            "artifact_id": str(row.artifact_id),
+            "receipt_sha256": row.receipt_sha256,
+            "state": row.state,
+            "state_reason": row.state_reason,
+            "model": None if row.model is None else row.model.model_dump(),
+            "prompt_sha256": row.prompt_sha256,
+            "conditioning": list(row.conditioning),
+            "world_read_bundle_sha256": row.world_read_bundle_sha256,
+            "container": row.container,
+            "content_sha256": row.content_sha256,
+            "byte_size": row.byte_size,
+            "seam": row.seam,
+            "epistemics": {
+                "citable": False,
+                "promotes_rung": False,
+                "is_evidence": False,
+            },
+        }
+        for row in scene.generated_geometry
+    ]
 
 
 def _region_graph(
@@ -360,7 +383,7 @@ def world_read_bundle(
 
     bundle: dict[str, Any] = {
         "profile": WORLD_READ_PROFILE,
-        "number_encoding": _NUMBER_ENCODING,
+        "number_encoding": NUMBER_ENCODING,
         "addressing": {
             "by": "reconstruction_scene",
             "scene_id": str(scene.scene_id),
@@ -374,6 +397,7 @@ def world_read_bundle(
         "rungs": _rungs(scene),
         "views": [_view(member, consent[str(member.capture_id)]) for member in scene.members],
         "geometry": _geometry(scene),
+        "generated": _generated(scene),
         "region_graph": _region_graph(
             connection,
             workspace,
@@ -402,6 +426,13 @@ def world_read_bundle(
             ),
         },
     }
+    # Two digests, and the difference is the whole point. `recorded_sha256` covers everything
+    # except the generated list, so it is the digest a generation is conditioned on: filing a
+    # generation must not change the thing that generation cited, and two models must be able to
+    # read the same observed world and each say so. `bundle_sha256` covers the whole response,
+    # including generations, which is what a recipient verifying this exact payload checks.
+    recorded = {key: value for key, value in bundle.items() if key != "generated"}
+    bundle["recorded_sha256"] = sha256_of_canonical(recorded).hex()
     return {
         "profile": WORLD_READ_PROFILE,
         "bundle": bundle,

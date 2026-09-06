@@ -1632,9 +1632,12 @@ design, and a neural forward pass differs across accelerators and library versio
 temperature zero, so a re-run of a model stage produces a *different artifact*, not the same bytes.
 
 Stages that are not exactly recomputable, and therefore excluded from that claim: `vision`,
-`depth`, `scene_splat_training`, and `scene_splat_delivery`. The first two carry a `model_role`;
-all four have `stage_registry.deterministic=false`. The Gaussian stages optimize scene-specific
-parameters and compress their result; their presence does not establish reproducible GPU output.
+`depth`, `scene_splat_training`, `scene_splat_delivery`, and `generated_scene`. The first two carry
+a `model_role`; all five have `stage_registry.deterministic=false`. The Gaussian stages optimize
+scene-specific parameters and compress their result; their presence does not establish reproducible
+GPU output. `generated_scene` is a world model's own sampled output, which differs run to run by
+design; it carries no `model_role` because the generating model is supplied per generation rather
+than routed through the reviewed model manifest, and its identity travels in the generation receipt.
 `StageSpec` now refuses to construct a stage that names a model role and declares itself
 deterministic, so the exclusion cannot be lost by editing a flag.
 

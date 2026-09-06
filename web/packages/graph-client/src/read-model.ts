@@ -406,6 +406,36 @@ export interface ReconstructionSceneRecord {
   readonly renderingSubstrate: RenderingSubstrate;
   readonly members: readonly ReconstructionSceneMemberRecord[];
   readonly trainedGeometry?: TrainedGeometryRecord | null;
+  /**
+   * What a world model imagined for this scene. Never merged into `trainedGeometry`.
+   *
+   * Empty means nothing was generated. A surface here was produced by a model and observed by no
+   * camera: it supports no claim, satisfies no gate, and carries no rung.
+   */
+  readonly generatedGeometry: readonly GeneratedGeometryRecord[];
+}
+
+/** One generation, with everything needed to say what made it and what it was shown. */
+export interface GeneratedGeometryRecord {
+  readonly artifactId: string;
+  readonly receiptSha256: string | null;
+  readonly tier: 'generated';
+  /** `invalid` means the generation exists but its receipt did not verify. Never drawn. */
+  readonly state: 'available' | 'invalid';
+  readonly stateReason: string | null;
+  readonly model: {
+    readonly provider: string;
+    readonly modelId: string;
+    readonly modelVersion: string;
+  } | null;
+  readonly promptSha256: string | null;
+  readonly conditioning: readonly { readonly role: string; readonly sha256: string }[];
+  readonly worldReadBundleSha256: string | null;
+  readonly container: string | null;
+  readonly contentSha256: string | null;
+  readonly byteSize: number | null;
+  /** Where the record stops, in words. Shown beside the surface, never omitted. */
+  readonly seam: string | null;
 }
 
 export interface IslandRecord {

@@ -188,6 +188,28 @@ export function adaptSnapshot(
           gpu: row.trained_geometry.quality.gpu,
         } }),
       },
+        // An absent field is an older payload that predates the generated tier, and it maps to an
+        // empty list rather than to a claim: either way nothing is drawn, and the field's name is
+        // what a caller must read before anything can be.
+        generatedGeometry: (row.generated_geometry ?? []).map((entry) => ({
+          artifactId: entry.artifact_id,
+          receiptSha256: entry.receipt_sha256,
+          tier: entry.tier,
+          state: entry.state,
+          stateReason: entry.state_reason,
+          model: entry.model === null ? null : {
+            provider: entry.model.provider,
+            modelId: entry.model.model_id,
+            modelVersion: entry.model.model_version,
+          },
+          promptSha256: entry.prompt_sha256,
+          conditioning: entry.conditioning,
+          worldReadBundleSha256: entry.world_read_bundle_sha256,
+          container: entry.container,
+          contentSha256: entry.content_sha256,
+          byteSize: entry.byte_size,
+          seam: entry.seam,
+        })),
         islandId: islandIds.size === 1 ? [...islandIds][0]! : null,
         memberDigest: row.member_digest,
         poseReceiptSha256: row.pose_receipt_sha256,

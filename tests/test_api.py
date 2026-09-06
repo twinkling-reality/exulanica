@@ -54,6 +54,18 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/geometry/{artifact_id}"): {},
     ("GET", "/scene-geometry/{artifact_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}"): {},
+    ("GET", "/world-read/scenes/{scene_id}/observations"): {},
+    ("POST", "/world-write/scenes/{scene_id}/generated"): {
+        "json": {
+            "model": {"provider": "p", "model_id": "m", "model_version": "v"},
+            "prompt_sha256": "0" * 64,
+            "conditioning": [{"role": "world-read-bundle", "sha256": "1" * 64}],
+            "container": "sog/1",
+            "content_sha256": "2" * 64,
+            "byte_size": 1,
+            "seam": "where the record stops and the imagining begins",
+        }
+    },
     ("GET", "/selection/catalogue"): {},
     ("POST", "/selection"): {"json": {"intent": "captures"}},
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},

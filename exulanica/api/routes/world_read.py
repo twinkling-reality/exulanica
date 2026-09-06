@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
+from exulanica.graph.observations import scene_observations
 from exulanica.graph.world_read import world_read_bundle
 
 router = APIRouter(prefix="/world-read", tags=["world-read"])
@@ -73,3 +74,29 @@ def scene_bundle(
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
             return _problem(404, "unknown_reference", "no such scene")
     return JSONResponse(content=bundle)
+
+
+@router.get(
+    "/scenes/{scene_id}/observations",
+    summary="Which photographs actually observed each retained sparse point.",
+)
+def scene_observation_graph(
+    scene_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> JSONResponse:
+    """Click-to-evidence's recorded half.
+
+    A scene with no accepted pose receipt answers 404 alongside a missing and a foreign one. That
+    is deliberate: "this scene exists but its pose was refused" is a fact about somebody's library,
+    and the read surface does not distinguish reasons a caller may not have.
+    """
+    with connection.transaction():
+        connection.execute("set transaction isolation level repeatable read read only")
+        records = scene_observations(connection, session.workspace_id, scene_id, services.store)
+        if records is None:
+            if _withdrawn(connection, session.workspace_id, scene_id):
+                return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
+            return _problem(404, "unknown_reference", "no observation graph for this scene")
+    return JSONResponse(content=records)
