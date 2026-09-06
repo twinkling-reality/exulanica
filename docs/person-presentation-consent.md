@@ -233,6 +233,27 @@ re-recorded rather than quietly edited: the `find_artifact` order over an unscre
 is now three calls instead of five, and position three is still the rendition persist, which is
 the only part the sibling race test depends on.
 
+### Why the bowl photographs still cannot be observed
+
+Running the vision stage over them needs an eligible screening, and there is no honest version 2
+screening that produces one:
+
+- an empty region list is eligible, and asserts nobody is visible in photographs that contain
+  diners' arms, hands and clothing, which is the exact statement this note was written about;
+- a region list carrying anyone `unknown`, `present` or `withdrawn` is blocked;
+- a region list where everyone is `shown` asserts the diners consented to their likeness, and
+  they neither did nor can be asked.
+
+There is also a loop: vision proposes the regions a reviewer confirms, and vision now needs the
+screening that confirming produces. Masking cannot break it, because vision reads the original.
+
+Breaking it honestly needs a receipt this schema does not have: a screening method that authorizes
+sending a photograph to a model **for the purpose of finding the people in it**, records that
+purpose, and does not thereby make the capture eligible for geometry. That is a migration for the
+`screening_method` check plus a split between "may be observed" and "may become geometry", and it
+is the honest way to process a collection like the bowl, which is CC0 public data whose
+photographer published it and whose diners never agreed to anything.
+
 ### Not done, and not pretended
 
 - **The detector asks a hosted model, and its recall on real photographs is unmeasured.** Schema
@@ -251,8 +272,19 @@ the only part the sibling race test depends on.
 - **Splat training on a masked scene is refused**, in `scene_selection.py`, rather than run.
 - **The masked-geometry count has never seen a trained scene.** Its tests build PLY bytes vertex by
   vertex, and it is not wired into the evaluation bundle.
-- **The two retained collections have not been re-screened.** The policy bump to
-  `exulanica.reconstruction-privacy/v2` makes their version 1 screenings provably old-policy.
+- **The two retained collections have not been re-screened, and now cannot be used until they
+  are.** CORRECTED 2026-09-06: the policy bump to `exulanica.reconstruction-privacy/v2` was
+  described here and in the evaluation record as making their version 1 receipts old-policy, with
+  the implication that this stopped them being used. It did not.
+  `privacy_screening_allows_capture` never compared `policy_version`, so every version 1 receipt
+  kept passing and the invalidation existed only in prose; checked against the live bowl
+  workspace, all 51 receipts still returned `allowed = true`. The resolver now compares against
+  `current_privacy_policy()`, and a test binds that function to
+  `exulanica.ingest.privacy.PRIVACY_POLICY_VERSION` so the two cannot drift.
+
+  This is worth recording as a class of bug rather than a typo: the receipt had stored
+  `policy_version` and `policy_params_digest` from the beginning, and storing a digest nothing
+  compares is the same as not having one.
 - **A revoked consent produces a new build; it does not purge the old one.** Existing geometry from
   a build made while somebody was `shown` stays until the ordinary withdrawal path reaches it.
 - **Consistency across views, reflections and screens, and generative fill** remain as this note
