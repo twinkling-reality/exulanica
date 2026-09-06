@@ -56,6 +56,7 @@ from exulanica.api.routes import (
     reconstruction_admission,
     selection,
     world,
+    world_read,
 )
 from exulanica.api.services import Services, build_services
 from exulanica.db.migrate import verify_schema
@@ -164,6 +165,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(reconstruction_admission.router)
     app.include_router(world.router)
     app.include_router(interaction.router)
+    app.include_router(world_read.router)
 
     @app.exception_handler(BodyTooLarge)
     async def _too_large(_request: Request, exc: BodyTooLarge) -> JSONResponse:

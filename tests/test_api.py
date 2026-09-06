@@ -53,6 +53,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/geometry"): {},
     ("GET", "/geometry/{artifact_id}"): {},
     ("GET", "/scene-geometry/{artifact_id}"): {},
+    ("GET", "/world-read/scenes/{scene_id}"): {},
     ("GET", "/selection/catalogue"): {},
     ("POST", "/selection"): {"json": {"intent": "captures"}},
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},
@@ -210,6 +211,7 @@ class Deployment:
             .replace("{source_id}", str(uuid.uuid4()))
             .replace("{job_id}", str(uuid.uuid4()))
             .replace("{artifact_id}", str(self.artifact_id))
+            .replace("{scene_id}", str(uuid.uuid4()))
         )
 
 
