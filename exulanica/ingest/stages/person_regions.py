@@ -28,6 +28,7 @@ import datetime as dt
 import json
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from PIL import Image
@@ -43,7 +44,24 @@ from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
 from exulanica.ingest.vision import VisionObservation, validate_observation
 
-__all__ = ["located_people", "observation_of", "run", "unlocated_people"]
+__all__ = ["ObservedTrace", "located_people", "observation_of", "run", "unlocated_people"]
+
+
+@dataclass(frozen=True, slots=True)
+class ObservedTrace:
+    """One person the observation placed, as the detector adapter needs it.
+
+    A named shape rather than a tuple. It was a five-member tuple destructured by position in a
+    different module, which is the kind of contract that silently gains a sixth member and starts
+    assigning `part` to `confidence` somewhere else entirely.
+    """
+
+    x: float
+    y: float
+    w: float
+    h: float
+    confidence: str
+    part: str
 
 
 def observation_of(document: dict[str, Any]) -> VisionObservation:
@@ -57,16 +75,20 @@ def observation_of(document: dict[str, Any]) -> VisionObservation:
     return validate_observation(document["observation"])
 
 
-def located_people(document: dict[str, Any]) -> list[tuple[float, float, float, float, str]]:
+def located_people(document: dict[str, Any]) -> list[ObservedTrace]:
     """Every person the observation placed, as clamped normalised boxes."""
-    found: list[tuple[float, float, float, float, str]] = []
-    for person in observation_of(document).person_objects:
+    found: list[ObservedTrace] = []
+    for person in observation_of(document).person_traces:
         if person.box is None:
             continue
         clamped, _ = person.box.clamped()
         if clamped.is_degenerate:
             continue
-        found.append((clamped.x, clamped.y, clamped.w, clamped.h, person.confidence))
+        found.append(
+            ObservedTrace(
+                clamped.x, clamped.y, clamped.w, clamped.h, person.confidence, person.part
+            )
+        )
     return found
 
 
@@ -77,7 +99,7 @@ def unlocated_people(document: dict[str, Any]) -> int:
     located person would mask an empty rectangle and leave the person beside it visible.
     """
     total = 0
-    for person in observation_of(document).person_objects:
+    for person in observation_of(document).person_traces:
         if person.box is None:
             total += 1
             continue
@@ -246,6 +268,7 @@ def _record_regions(
             sequence=0,
             action="detected",
             shape=found.shape,
+            part=found.part,
             silhouette=found.silhouette,
             subject_id=None,
             actor=None,
@@ -261,6 +284,7 @@ def _record_regions(
             sequence=0,
             action="detected",
             shape=found.shape,
+            part=found.part,
             silhouette=found.silhouette.as_digest_input(),
             subject_id=None,
             detector_id=detector_id,

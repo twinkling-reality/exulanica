@@ -194,6 +194,10 @@ class DetectedPerson:
     shape: Literal["box", "polygon"]
     confidence: Literal["low", "medium", "high"]
     detector: str
+    #: Which visible trace this is, when the detector said. A reviewer shown an outline on a
+    #: neutral field cannot otherwise tell a hand at the frame edge from a coat on a chair, and
+    #: the partial traces are exactly the ones the old whitelist missed.
+    part: str | None = None
 
 
 class PersonDetector(Protocol):

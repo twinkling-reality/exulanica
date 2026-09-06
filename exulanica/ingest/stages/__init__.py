@@ -37,7 +37,7 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.evidence.blob import BlobId
-from exulanica.ingest.vision import prompt_digest
+from exulanica.ingest.vision import SCHEMA_VERSION, prompt_digest
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
 
 __all__ = [
@@ -191,7 +191,10 @@ def vision_stage_params() -> dict[str, Any]:
     version integer the rebuilt parameters stop moving and the test fails.
     """
     return {
-        "schema_version": 1,
+        # Derived, never restated. It was the literal 1 while the observation schema moved to 2,
+        # which is the same class of bug the prompt digest below exists to prevent: a number
+        # somebody has to remember to bump is a number that silently stops describing the thing.
+        "schema_version": SCHEMA_VERSION,
         # The computed digest of the actual prompt text, never a hand-maintained integer. A
         # version integer is a thing somebody has to remember to bump, and the symptom of
         # forgetting is a corpus that silently never reprocesses after a prompt edit: the
@@ -239,12 +242,18 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "vision": StageSpec(
         key="vision",
-        # Version 2: a located person now becomes a scene-local occurrence. Version 1 recorded
-        # the person labels in the artifact and wrote no occurrence for them, so a corpus
-        # ingested at version 1 has people in its observations and none in its occurrence table.
-        # That is a change in what the stage produces, which is exactly what this number is for:
-        # the bump regenerates rather than leaving two incompatible corpora sharing one key.
-        version=2,
+        # Version 3: people have their own field in the observation schema, and it asks for
+        # partial traces by name. Version 2 told the model NOT to list people in `objects` and
+        # then filtered `objects` for them against a whitelist of singular nouns, so the field a
+        # person could appear in was one the model had been told to leave them out of, and the
+        # filter matched none of "arms", "hands" or "diners". MEASURED against the retained bowl
+        # photographs' own review: those are exactly the traces that collection contains. The new
+        # field also drops the free-text label for a person, so the model no longer writes a
+        # description of somebody who has not consented to being described.
+        #
+        # Version 2 recorded a located person as a scene-local occurrence, which version 1 did
+        # not; that behaviour is unchanged here.
+        version=3,
         output_kind="vision_observation",
         deterministic=False,
         model_role="vision",

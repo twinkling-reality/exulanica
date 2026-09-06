@@ -54,6 +54,7 @@ class PersonRegionRow:
     region_key: bytes
     action: str
     shape: str
+    part: str | None
     silhouette: dict[str, Any]
     subject_id: uuid.UUID | None
     detector_id: str | None
@@ -121,6 +122,7 @@ def insert_region_edit(
     sequence: int,
     action: str,
     shape: str,
+    part: str | None,
     silhouette: dict[str, Any],
     subject_id: uuid.UUID | None,
     detector_id: str | None,
@@ -141,9 +143,9 @@ def insert_region_edit(
     """
     scope.connection.execute(
         "insert into person_region (region_edit_id,workspace_id,capture_id,source_sha256,"
-        "region_key,sequence,action,shape,silhouette,subject_id,detector_id,confidence,"
+        "region_key,sequence,action,shape,part,silhouette,subject_id,detector_id,confidence,"
         "confirmed_by,recorded_at,region_record,region_canonical,region_digest) "
-        "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+        "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
         "on conflict (region_edit_id) do nothing",
         (
             region_edit_id,
@@ -154,6 +156,7 @@ def insert_region_edit(
             sequence,
             action,
             shape,
+            part,
             Jsonb(silhouette),
             subject_id,
             detector_id,
@@ -204,7 +207,7 @@ def current_regions(
     if not capture_ids:
         return {}
     rows = scope.connection.execute(
-        "select capture_id,region_key,action,shape,silhouette,subject_id,detector_id,"
+        "select capture_id,region_key,action,shape,part,silhouette,subject_id,detector_id,"
         "confidence,confirmed_by,region_digest from person_region_current "
         "where workspace_id=%s and capture_id=any(%s::uuid[]) and action <> 'deleted' "
         "order by capture_id,region_key",
@@ -218,6 +221,7 @@ def current_regions(
                 region_key=bytes(row["region_key"]),
                 action=row["action"],
                 shape=row["shape"],
+                part=row["part"],
                 silhouette=dict(row["silhouette"]),
                 subject_id=row["subject_id"],
                 detector_id=row["detector_id"],

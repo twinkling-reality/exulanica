@@ -50,6 +50,7 @@ def _edit(**overrides):
         sequence=1,
         action="confirmed",
         shape="box",
+        part=None,
         silhouette=OUTLINE,
         subject_id=SUBJECT,
         actor=ACTOR,

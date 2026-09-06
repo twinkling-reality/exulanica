@@ -56,6 +56,12 @@ create table person_region (
   sequence        integer not null check (sequence >= 0),
   action          text not null check (action in ('detected', 'confirmed', 'added', 'deleted')),
   shape           text not null check (shape in ('box', 'polygon')),
+  -- Which visible trace of a person this region covers, from the observation schema's closed
+  -- vocabulary. Null for a region a human drew, who is under no obligation to classify it. It is
+  -- here because a reviewer looking at an outline on a neutral field cannot otherwise tell a hand
+  -- at the frame edge from a false positive, and the partial traces are the whole point.
+  part            text check (part in ('full_body', 'partial_body', 'head', 'torso', 'arm',
+                                       'hand', 'leg', 'foot', 'reflection', 'on_screen')),
   silhouette      jsonb not null check (jsonb_typeof(silhouette) = 'object'),
   subject_id      uuid,
   detector_id     text,
@@ -141,7 +147,7 @@ end $$;
 -- The live state of one region: the last edit wins, and a deleted region is gone.
 create view person_region_current as
 select distinct on (r.workspace_id, r.capture_id, r.region_key)
-       r.workspace_id, r.capture_id, r.source_sha256, r.region_key, r.action, r.shape,
+       r.workspace_id, r.capture_id, r.source_sha256, r.region_key, r.action, r.shape, r.part,
        r.silhouette, r.subject_id, r.detector_id, r.confidence, r.confirmed_by, r.region_digest
   from person_region r
  order by r.workspace_id, r.capture_id, r.region_key, r.sequence desc;

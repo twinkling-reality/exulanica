@@ -26,6 +26,7 @@ from exulanica.ingest.person_detectors import (
     StubRegionDetector,
     whole_image_silhouette,
 )
+from exulanica.ingest.stages.person_regions import ObservedTrace
 from PIL import Image
 
 ENCODER = {"format": "JPEG", "quality": 95, "subsampling": "4:4:4", "optimize": False}
@@ -125,11 +126,12 @@ def test_an_unlocated_person_masks_the_whole_photograph():
 
 def test_a_recorded_box_is_reported_as_a_box_and_never_as_a_silhouette():
     detected = RecordedObservationDetector().detect(
-        _photo(), {"person_boxes": ((0.1, 0.2, 0.3, 0.4, "high"),)}
+        _photo(), {"person_boxes": (ObservedTrace(0.1, 0.2, 0.3, 0.4, "high", "hand"),)}
     )
     assert detected[0].shape == "box"
     assert detected[0].confidence == "high"
     assert detected[0].detector == "recorded-vision-observation/v1"
+    assert detected[0].part == "hand", "a reviewer must be able to tell a hand from a whole body"
 
 
 def test_finding_nothing_is_not_the_same_double_as_never_looking():

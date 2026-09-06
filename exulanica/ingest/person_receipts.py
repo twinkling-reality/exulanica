@@ -83,6 +83,7 @@ def person_region_list(
             {
                 "region_key": key.hex(),
                 "shape": found.shape,
+                "part": found.part,
                 "confidence": found.confidence,
                 "silhouette": found.silhouette.as_digest_input(),
                 "confirmed_by": None,
@@ -101,6 +102,7 @@ def region_edit_receipt(
     sequence: int,
     action: str,
     shape: str,
+    part: str | None,
     silhouette: Silhouette,
     subject_id: uuid.UUID | None,
     actor: uuid.UUID | None,
@@ -127,6 +129,7 @@ def region_edit_receipt(
         "sequence": sequence,
         "action": action,
         "shape": shape,
+        "part": part,
         "silhouette": silhouette.as_digest_input(),
         "subject_id": str(subject_id) if subject_id else None,
         "detector_id": detector_id,

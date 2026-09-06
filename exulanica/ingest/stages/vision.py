@@ -206,7 +206,7 @@ def _observation_rows(
     )
 
     # People first, so their emit-key ordinals are stable as the object list changes.
-    for index, person in enumerate(observation.person_objects):
+    for index, person in enumerate(observation.person_traces):
         span_id, address = _region_span(writes, blob_id, person.box, display, image_span_id)
         emit(
             predicate_key="person_present",
@@ -231,12 +231,12 @@ def _observation_rows(
             emit_key=f"{key}:p:{index}",
             quality={
                 "confidence_band": person.confidence,
-                "salience": person.salience,
-                # The detector's own word for what it saw, kept because it is evidence
-                # about the detection. It is NOT a name and there is no column for one:
-                # `occurrence` has no display_name, and `entity.display_name` is enforced
-                # by trigger to require an active user assertion.
-                "label": person.label,
+                # Which visible trace this is, from a closed vocabulary. Schema version 1 stored
+                # the model's free-text label here instead, and a label is a description of
+                # somebody: "woman in a red coat" is exactly the sentence a person who has not
+                # consented to being described should not have written about them. A part is
+                # where they are, which is all this needs in order to hide them.
+                "part": person.part,
                 "trust_tier": "T2",
             },
         )

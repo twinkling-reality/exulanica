@@ -186,9 +186,7 @@ def test_the_vision_schema_has_no_field_a_name_could_arrive_in():
         assert f"'{forbidden}'" not in encoded, forbidden
 
 
-def test_a_person_occurrence_carries_an_address_and_no_template(
-    tmp_path, photo_dir, repository
-):
+def test_a_person_occurrence_carries_an_address_and_no_template(tmp_path, photo_dir, repository):
     """The line is at the template. "Somebody is here" is a box; it is not face geometry."""
     import copy
 
@@ -217,9 +215,10 @@ def test_a_person_occurrence_carries_an_address_and_no_template(
     assert len(rows) == 1
     assert rows[0]["modality"] == "frame_region"
     assert rows[0]["identity_key"] is not None
-    # The detector's own word for what it saw is evidence about the detection. It is not a name,
-    # and there is no column for one.
-    assert set(rows[0]["quality"]) <= {"confidence_band", "salience", "label", "trust_tier"}
-    assert repository.connection.execute(
-        "select count(*) as n from embedding"
-    ).fetchone()["n"] == 0
+    # TIGHTENED 2026-09-06 with schema version 2. The detector's own free-text word for what it
+    # saw is gone: it was evidence about the detection and it was also a description of a person,
+    # and "woman in a red coat" is a sentence nobody consented to. `part` is a closed vocabulary
+    # of visible traces, which locates somebody without characterising them.
+    assert set(rows[0]["quality"]) <= {"confidence_band", "part", "trust_tier"}
+    assert "label" not in rows[0]["quality"]
+    assert repository.connection.execute("select count(*) as n from embedding").fetchone()["n"] == 0

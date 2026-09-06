@@ -210,7 +210,8 @@ def test_a_fabricated_token_is_a_lookup_failure_not_a_judgement(answered):
     answer = Answer(
         clauses=[
             AnswerClause(
-                text="You were at the waterfall.", type=ClauseType.HISTORICAL,
+                text="You were at the waterfall.",
+                type=ClauseType.HISTORICAL,
                 citations=["ZZZZZZZZZZ"],
             )
         ]
@@ -292,9 +293,7 @@ def test_a_number_that_is_only_a_substring_of_a_value_is_refused(answered):
 
     legitimate = Answer(
         clauses=[
-            AnswerClause(
-                text="That was in 2026.", type=ClauseType.META, value_refs=[date.key]
-            )
+            AnswerClause(text="That was in 2026.", type=ClauseType.META, value_refs=[date.key])
         ]
     )
     assert validate_answer(legitimate, packet) is legitimate
@@ -303,9 +302,7 @@ def test_a_number_that_is_only_a_substring_of_a_value_is_refused(answered):
 def test_a_value_reference_the_packet_does_not_have_is_refused(answered):
     packet = answered.packet()
     answer = Answer(
-        clauses=[
-            AnswerClause(text="3 photographs.", type=ClauseType.META, value_refs=["invented"])
-        ]
+        clauses=[AnswerClause(text="3 photographs.", type=ClauseType.META, value_refs=["invented"])]
     )
     with pytest.raises(AnswerRejected, match="does not have"):
         validate_answer(answer, packet)
@@ -349,9 +346,7 @@ def test_a_valid_answer_is_returned_unchanged(answered):
 
 def test_one_bad_answer_is_repaired_rather_than_discarded(answered):
     packet = answered.packet()
-    bad = Answer(
-        clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)]
-    )
+    bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     good = Answer(
         clauses=[
             AnswerClause(
@@ -519,9 +514,7 @@ def test_the_plan_is_kept_with_the_answer(answered):
     # builds its own packet and its tokens are drawn per request, so an answer prepared here
     # against an earlier packet could not resolve. That is the unforgeability guarantee, and it
     # constrains the test rather than the other way round.
-    good = Answer(
-        clauses=[AnswerClause(text="Some photographs match.", type=ClauseType.META)]
-    )
+    good = Answer(clauses=[AnswerClause(text="Some photographs match.", type=ClauseType.META)])
     client = answered.client([_answer_body(good)])
     outcome = answer_question(
         answered.repository.connection,
@@ -535,6 +528,7 @@ def test_the_plan_is_kept_with_the_answer(answered):
     assert outcome.result.total_matched >= 1
     assert outcome.abstention is None
     assert not outcome.deterministic
+
 
 # -- which model does which job, and why it is not the other way round ------------------------
 
@@ -607,6 +601,7 @@ def test_a_citation_still_resolves_when_the_model_keeps_the_brackets(answered):
     assert packet.resolve(f"[{real}]") is packet.resolve(real) is not None
     assert packet.resolve("[NOTATOKEN1]") is None
     assert packet.resolve("NOTATOKEN1") is None
+
 
 def test_a_plan_that_breaks_a_rule_the_schema_cannot_express_is_repaired_once(answered):
     """The endpoint enforces the JSON Schema. It cannot enforce a Pydantic model validator.
@@ -739,7 +734,10 @@ def test_every_factual_clause_cites_a_token_that_resolves_to_a_stored_span_diges
     bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     client = answered.client([_answer_body(bad), _answer_body(bad)])
     outcome = answer_question(
-        connection, client, "which photographs?", answered.session,
+        connection,
+        client,
+        "which photographs?",
+        answered.session,
         plan=SelectionPlan(intent=Intent.CAPTURES),
     )
     assert outcome.deterministic, "the floor is what this test is asserting about"
@@ -772,7 +770,10 @@ def test_a_citation_permalink_parses_back_to_the_same_digest(answered):
     bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     client = answered.client([_answer_body(bad), _answer_body(bad)])
     outcome = answer_question(
-        connection, client, "which photographs?", answered.session,
+        connection,
+        client,
+        "which photographs?",
+        answered.session,
         plan=SelectionPlan(intent=Intent.CAPTURES),
     )
     citations = _historical_citations(outcome)
@@ -803,8 +804,11 @@ def test_a_plan_that_matched_photographs_is_answered_rather_than_refused(answere
     bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     client = answered.client([_answer_body(bad), _answer_body(bad)])
     outcome = answer_question(
-        answered.repository.connection, client, "which photographs have been looked at?",
-        answered.session, plan=plan,
+        answered.repository.connection,
+        client,
+        "which photographs have been looked at?",
+        answered.session,
+        plan=plan,
     )
     assert outcome.result.total_matched >= 1
     assert outcome.abstention is None, "it refused a question the evidence could answer"
@@ -843,7 +847,10 @@ def test_answering_a_question_persists_no_biometric_template(answered):
     bad = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
     client = answered.client([_answer_body(bad), _answer_body(bad)])
     outcome = answer_question(
-        connection, client, "which photographs?", answered.session,
+        connection,
+        client,
+        "which photographs?",
+        answered.session,
         plan=SelectionPlan(intent=Intent.CAPTURES),
     )
     assert _historical_citations(outcome), "an answer that never ran proves nothing"
@@ -855,4 +862,10 @@ def test_answering_a_question_persists_no_biometric_template(answered):
     ).fetchall()
     assert quality, "there is a person in this corpus, so this is not vacuous"
     for row in quality:
-        assert set(row["quality"]) <= {"confidence_band", "salience", "label", "trust_tier"}
+        # TIGHTENED 2026-09-06 with schema version 2. A person occurrence no longer carries the
+        # model's free-text `label`, which could and did read "woman in a red coat": a description
+        # of somebody who has not consented to being described. `part` replaces it and comes from
+        # a closed vocabulary of visible traces, which says where somebody is and nothing about
+        # who they are. The set is smaller than it was, deliberately.
+        assert set(row["quality"]) <= {"confidence_band", "part", "trust_tier"}
+        assert "label" not in row["quality"]

@@ -49,6 +49,9 @@ from model_fakes import FakeTransport, chat_body, model_not_found
 
 VALID = {
     "scene_description": "A waterfall in low winter light.",
+    # Required from schema version 2 onward: people have their own field rather than being
+    # filtered out of `objects`, which the model is told to keep them out of.
+    "people": [],
     "objects": [{"label": "waterfall", "salience": "primary", "confidence": "high", "box": None}],
     "legible_text": [],
     "proposed_place": None,

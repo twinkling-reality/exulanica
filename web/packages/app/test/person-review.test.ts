@@ -30,6 +30,7 @@ const detected = (over: Partial<ReviewRegion> = {}): ReviewRegion => ({
   shape: 'box',
   silhouette: OUTLINE,
   detectorId: 'recorded-vision-observation/v1',
+  part: 'hand',
   confidence: 'medium',
   confirmedBy: null,
   subjectId: null,
@@ -124,6 +125,12 @@ describe('the person review screen', () => {
     const shape = node.querySelector('svg polygon');
     expect(shape?.getAttribute('class')).toBe('person-outline-hidden');
     expect(node.innerHTML).not.toContain('opacity');
+  });
+
+  it('says which visible trace a region is, so a hand is not just a grey shape', () => {
+    expect(panel().textContent).toContain("Somebody's hand.");
+    const drawn = panel({ regions: [detected({ part: null, detectorId: null })] });
+    expect(drawn.textContent).toContain('Drawn by a person');
   });
 
   it('states plainly that an undecided person is hidden', () => {

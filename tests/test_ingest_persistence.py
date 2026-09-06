@@ -237,7 +237,11 @@ def test_a_located_person_becomes_an_occurrence_and_never_anything_more(ingested
 
     person = people[0]
     assert len(bytes(person["identity_key"])) == 32
-    assert person["quality"]["label"] == "person"
+    # `part`, not `label`. Schema version 2 stopped routing people through the object list, so
+    # the model no longer writes free text about somebody: a part from a closed vocabulary says
+    # where they are without saying anything about who they are.
+    assert person["quality"]["part"] == "full_body"
+    assert "label" not in person["quality"]
     assert person["quality"]["trust_tier"] == "T2"
 
     # The occurrence points at a REGION of the photograph, not at the whole frame. Without that
@@ -434,9 +438,7 @@ def _pil_image_open_calls(tree: ast.Module) -> list[ast.Call]:
         called = _dotted_name(node.func)
         if called is None:
             continue
-        if called in direct or (
-            called.endswith(".open") and called[: -len(".open")] in modules
-        ):
+        if called in direct or (called.endswith(".open") and called[: -len(".open")] in modules):
             calls.append(node)
     return calls
 
@@ -639,9 +641,7 @@ def test_the_ledger_records_the_prompt_and_schema_version_in_the_artifact_it_poi
     assert header["prompt_sha256"] == prompt_digest()
 
 
-def test_a_failed_stage_is_recorded_as_failed_with_its_error_class(
-    tmp_path, photo_dir, repository
-):
+def test_a_failed_stage_is_recorded_as_failed_with_its_error_class(tmp_path, photo_dir, repository):
     class Exploding:
         model_id = "MiniMaxAI/MiniMax-M3"
 
@@ -754,9 +754,7 @@ def test_an_explicit_hash_blocklist_refuses_the_write_and_cancels_the_run(ingest
     not have failed however the pipeline behaved. It was a test of nothing.
     """
     repository, store, pipeline, path, first = ingested
-    _capture, tombstone_id = _delete_capture(
-        repository, reason="never again", blocklist_hash=True
-    )
+    _capture, tombstone_id = _delete_capture(repository, reason="never again", blocklist_hash=True)
     _purge_every_blob(store, tombstone_id)
     assert not store.exists(first.blob_id), "the fixture must start from genuinely erased bytes"
     assert list(store.iter_blob_ids()) == []
@@ -837,9 +835,7 @@ def _ingest_package_modules() -> list[pathlib.Path]:
     reaches the stage modules and the upload route by name, so the sweep cannot go quiet again
     by code moving away from it.
     """
-    return sorted(
-        path for package in _swept_packages() for path in package.rglob("*.py")
-    )
+    return sorted(path for package in _swept_packages() for path in package.rglob("*.py"))
 
 
 def _store_write_call_sites() -> list[str]:
@@ -1421,11 +1417,7 @@ def test_the_object_lock_is_taken_before_the_first_content_write(
     # And say which zero this is. The statements that DO precede the lock are named, so this
     # test cannot be satisfied one day by an insert nobody noticed moving ahead of it.
     ahead = sorted(
-        {
-            s.lower().split()[2]
-            for s in statements[:lock_at]
-            if s.lower().startswith("insert into ")
-        }
+        {s.lower().split()[2] for s in statements[:lock_at] if s.lower().startswith("insert into ")}
     )
     assert ahead == ["pipeline_event", "pipeline_run"], (
         f"{ahead} are written before the object lock. Only the ledger may be, because a ledger "

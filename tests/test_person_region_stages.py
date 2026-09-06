@@ -49,15 +49,19 @@ def _person(box, label="person", confidence="high"):
 
 def test_a_located_person_becomes_a_clamped_box():
     found = located_people(_document([_person({"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4})]))
-    assert found == [(0.1, 0.2, 0.3, 0.4, "high")]
+    assert len(found) == 1
+    assert (found[0].x, found[0].y, found[0].w, found[0].h) == (0.1, 0.2, 0.3, 0.4)
+    assert found[0].confidence == "high"
+    # A version 1 observation says only that somebody is there, so the trace is a whole body.
+    assert found[0].part == "full_body"
 
 
 def test_a_box_running_off_the_frame_is_clamped_rather_than_refused():
     """Models routinely emit 1.02 for an edge; refusing would unmask the person."""
     found = located_people(_document([_person({"x": 0.8, "y": 0.8, "w": 0.5, "h": 0.5})]))
     assert len(found) == 1
-    x, y, w, h, _ = found[0]
-    assert x + w <= 1.0 and y + h <= 1.0
+    assert found[0].x + found[0].w <= 1.0
+    assert found[0].y + found[0].h <= 1.0
 
 
 def test_a_person_with_no_box_is_counted_as_unlocated():

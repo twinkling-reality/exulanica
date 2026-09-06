@@ -76,13 +76,16 @@ class RecordedObservationDetector:
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         del image  # The observation was made against these bytes; re-reading them adds nothing.
         found: list[DetectedPerson] = []
-        for x, y, width, height, confidence in context.get("person_boxes", ()):
+        for trace in context.get("person_boxes", ()):
             found.append(
                 DetectedPerson(
-                    silhouette=Silhouette.from_rect(Rect.from_normalised(x, y, width, height)),
+                    silhouette=Silhouette.from_rect(
+                        Rect.from_normalised(trace.x, trace.y, trace.w, trace.h)
+                    ),
                     shape="box",
-                    confidence=confidence,
+                    confidence=trace.confidence,
                     detector=self.model_id,
+                    part=trace.part,
                 )
             )
         for _ in range(int(context.get("unlocated_people", 0))):
@@ -92,6 +95,9 @@ class RecordedObservationDetector:
                     shape="box",
                     confidence="low",
                     detector=self.model_id,
+                    # Somebody the observation named without saying where. The whole frame is
+                    # masked because no smaller answer is honest.
+                    part="partial_body",
                 )
             )
         return tuple(found)

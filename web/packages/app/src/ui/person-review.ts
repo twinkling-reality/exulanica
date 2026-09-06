@@ -33,6 +33,10 @@ export interface ReviewRegion {
   readonly shape: 'box' | 'polygon';
   readonly silhouette: { readonly kind: string; readonly points: readonly (readonly number[])[] };
   readonly detectorId: string | null;
+  /** Which visible trace this is, when the detector said. Null for a region a human drew. */
+  readonly part:
+    | 'full_body' | 'partial_body' | 'head' | 'torso' | 'arm'
+    | 'hand' | 'leg' | 'foot' | 'reflection' | 'on_screen' | null;
   readonly confidence: 'low' | 'medium' | 'high' | null;
   readonly confirmedBy: string | null;
   readonly subjectId: string | null;
@@ -86,6 +90,31 @@ function outline(region: ReviewRegion): SVGSVGElement {
   shape.setAttribute('class', region.masked ? 'person-outline-hidden' : 'person-outline-shown');
   svg.append(shape);
   return svg;
+}
+
+const PART_COPY: Record<string, string> = {
+  full_body: 'A whole person.',
+  partial_body: 'Part of a person.',
+  head: "Somebody's head.",
+  torso: "Somebody's torso.",
+  arm: "Somebody's arm.",
+  hand: "Somebody's hand.",
+  leg: "Somebody's leg.",
+  foot: "Somebody's foot.",
+  reflection: 'Somebody reflected in a surface.',
+  on_screen: 'Somebody on a screen inside the photograph.',
+};
+
+/**
+ * What kind of trace this is, in words.
+ *
+ * A reviewer is looking at an outline on a neutral field with no photograph behind it, so without
+ * this a hand at the edge of a frame and a coat on a chair are the same grey shape. The partial
+ * traces are the ones the old detector missed entirely, and they are the ones hardest to judge.
+ */
+function partSentence(region: ReviewRegion): string {
+  if (region.part === null) return 'Drawn by a person reviewing this photograph.';
+  return PART_COPY[region.part] ?? 'A trace of a person.';
 }
 
 function provenance(region: ReviewRegion): string {
@@ -164,6 +193,7 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
 
     item.append(
       outline(region),
+      el('p', { class: 'person-review-part', text: partSentence(region) }),
       el('p', { class: 'person-review-state', text: STATE_COPY[region.state] }),
       el('p', { class: 'person-review-provenance', text: provenance(region) }),
       controls,
