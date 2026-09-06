@@ -53,6 +53,22 @@ Three owners, and the split is by file, not by intent.
 the end of their model or interface, away from the person fields, so the merge is textual rather
 than semantic.
 
+**Merge state, checked 2026-09-06.** `git merge-tree --write-tree` against the privacy chat's
+committed tip is clean, and both branches' required payload fields are satisfied at both
+construction sites of `ReconstructionSceneRow` and `ReconstructionSceneMemberRow`
+(`_scene_row` and `_fallback` in `reconstruction_scenes.py`), because both branches edited both.
+Two things are not covered by that check:
+
+- The privacy worktree holds uncommitted work, which the trial merge cannot see. Its
+  `web/packages/app/src/ui/status.ts` inserts into `buildStatus` at the same point this branch's
+  proof-tier line does. That hunk is the one place a human has to choose an order; everything else
+  is textual.
+- `exulanica/graph/read_consent.py` detects the privacy layer by importing
+  `exulanica.graph.person_regions`, so the merge flips `PERSON_CONSENT_AVAILABLE` on its own and
+  `test_the_release_state_is_internal_only_until_person_consent_lands` fails by design. That
+  failure is the handover: the release rule then has to be decided from the per-person receipts
+  rather than inherited from the coarse screening receipt.
+
 ### The migration number, which is a hard constraint
 
 `tests/test_migration.py::test_the_migrations_are_numbered_and_ordered` asserts the applied
