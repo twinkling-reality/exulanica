@@ -1,7 +1,7 @@
 """Where a person is in a photograph, and never who they are.
 
 Default deny is a property of this module's silence rather than of a policy call somewhere else:
-a region carries no state at all. :mod:`exulanica.identity.person_consent` resolves one, and only
+a region carries no state at all. :mod:`exulanica.consent.states` resolves one, and only
 from receipts, so a region nobody has decided about resolves to ``unknown`` and ``unknown`` masks.
 Nothing here can produce a state, which is what stops a detector from admitting anybody.
 
@@ -169,7 +169,7 @@ class DetectedPerson:
     """One candidate region, before any human has looked at it.
 
     ``confidence`` is the detector's own band and is never a threshold: a low confidence
-    detection still masks, because the states in :mod:`exulanica.identity.person_consent` decide
+    detection still masks, because the states in :mod:`exulanica.consent.states` decide
     that and absence of a decision is not consent. It is carried so a reviewer can sort.
     """
 

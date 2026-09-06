@@ -17,8 +17,8 @@ that principle false, and each has a test here.
 from __future__ import annotations
 
 import pytest
+from exulanica.consent.regions import DetectedPerson, Silhouette
 from exulanica.evidence.region import PPM, Rect
-from exulanica.identity.person_regions import DetectedPerson, Silhouette
 from exulanica.ingest.masking import NEUTRAL_FILL, build_coverage, encode_masked_source, mask_image
 from exulanica.ingest.person_detectors import (
     NoRegionDetector,

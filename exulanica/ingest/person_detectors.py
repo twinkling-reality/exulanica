@@ -34,8 +34,8 @@ from typing import Any, Final
 
 from PIL import Image
 
+from exulanica.consent.regions import DetectedPerson, Silhouette
 from exulanica.evidence.region import PPM, Rect
-from exulanica.identity.person_regions import DetectedPerson, Silhouette
 
 __all__ = [
     "WHOLE_IMAGE",

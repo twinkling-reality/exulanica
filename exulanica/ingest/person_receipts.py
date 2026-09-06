@@ -26,8 +26,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
-from exulanica.identity.person_consent import CONSENT_SCOPES, ResolvedPresentation
-from exulanica.identity.person_regions import DetectedPerson, Silhouette
+from exulanica.consent.regions import DetectedPerson, Silhouette
+from exulanica.consent.states import CONSENT_SCOPES, ResolvedPresentation
 
 __all__ = [
     "CONSENT_NAMESPACE",

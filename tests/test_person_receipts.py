@@ -18,9 +18,9 @@ import uuid
 
 import pytest
 from exulanica.canonical import canonical_json
+from exulanica.consent.regions import DetectedPerson, Silhouette
+from exulanica.consent.states import ResolvedPresentation
 from exulanica.evidence.region import Rect
-from exulanica.identity.person_consent import ResolvedPresentation
-from exulanica.identity.person_regions import DetectedPerson, Silhouette
 from exulanica.ingest.person_receipts import (
     consent_receipt,
     consent_state_digest,

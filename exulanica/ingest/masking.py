@@ -34,8 +34,8 @@ from typing import Final
 from PIL import Image, ImageFilter
 
 from exulanica.canonical import ceil_div, round_half_down
+from exulanica.consent.regions import Silhouette
 from exulanica.evidence.region import PPM
-from exulanica.identity.person_regions import Silhouette
 
 __all__ = ["NEUTRAL_FILL", "build_coverage", "encode_masked_source", "mask_image"]
 

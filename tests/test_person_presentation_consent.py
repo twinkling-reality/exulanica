@@ -21,14 +21,14 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from exulanica.evidence.blob import BlobId
-from exulanica.evidence.region import PPM, DisplayGeometry, Rect
-from exulanica.identity.person_consent import (
+from exulanica.consent.regions import Silhouette, region_key
+from exulanica.consent.states import (
     MASKED_STATES,
     ConsentTransition,
     resolve_presentation,
 )
-from exulanica.identity.person_regions import Silhouette, region_key
+from exulanica.evidence.blob import BlobId
+from exulanica.evidence.region import PPM, DisplayGeometry, Rect
 
 DISPLAY = DisplayGeometry(w=4000, h=3000)
 BLOB = BlobId(bytes(range(32)))

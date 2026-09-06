@@ -437,6 +437,96 @@ STAGES: Final[dict[str, StageSpec]] = {
             "policy": "highest-complete-accepted-receipt-chain",
         },
     ),
+    "person_regions": StageSpec(
+        key="person_regions",
+        version=1,
+        output_kind="person_region_list",
+        # Deterministic, and the detector is pinned HERE rather than resolved at run time. The
+        # obvious alternative is `model_role="person_detector"`, which would put the detector in
+        # the run-time binding; it was rejected for two reasons. It would make this stage
+        # model-backed, which ADR-0017 requires to be `deterministic=False`, and that would drag
+        # `person_regions` into the exact-recomputation exclusion sentence AND into
+        # `docs/evaluation/2026-09-05-unblocked-goal-d.json`, whose bytes are digest-pinned twice
+        # by the backend-program record. Editing a dated record of an executed measurement to
+        # accommodate a stage that did not exist when it ran is not a maintenance chore, it is a
+        # false claim about what was measured.
+        #
+        # Pinning the detector in `params` gets the property that mattered without any of that:
+        # `run` refuses a detector whose `model_id` is not this string, so swapping detectors
+        # without editing this line is a hard error rather than a corpus silently keyed as though
+        # nothing changed. A future detector that runs a real model on the pixels IS model-backed
+        # and would take `model_role` and a version bump at that point, deliberately.
+        deterministic=True,
+        params={
+            "profile": "exulanica.person-region-list/v1",
+            # The exact detector this stage version means. `run` compares it to the detector it
+            # was handed and refuses a mismatch.
+            "detector": "recorded-vision-observation/v1",
+            # Bodies, not faces. Clothing, tattoos, hands and posture identify people, so a region
+            # covers the whole silhouette and a face-only detector does not satisfy this stage.
+            "scope": "whole-silhouette-not-face",
+            # Vertices are integers in parts per million of the upright unit square, the grid
+            # `exulanica.evidence.region` froze. A polygon enters a digest and a detector's last
+            # float bit is not a fact; `canonical_json` refuses floats outright.
+            "coordinate_units": "ppm-of-upright-unit-square",
+            "coordinate_space": "upright-display",
+            # A person the detector could not locate masks the whole photograph. Reconstructing
+            # somebody because nobody could say where they were is the failure this design exists
+            # to prevent, and a smaller default would be a guess about where they were not.
+            "unlocated_person_policy": "mask-whole-image",
+            # Nothing this stage writes is a decision. A region is unconfirmed until a human
+            # reviews it, and `masked_source` reads the confirmed list rather than this artifact.
+            "review_state_default": "unconfirmed",
+            # No embedding, descriptor or keypoint set is produced or stored. Recorded as a
+            # parameter so that a detector which did produce one would be a new stage version
+            # rather than a quiet change of posture.
+            "biometric_template": "never",
+        },
+    ),
+    "masked_source": StageSpec(
+        key="masked_source",
+        version=1,
+        output_kind="masked_source",
+        # No model runs here. The inputs are the exact source bytes, the confirmed outlines as
+        # parts-per-million integers, and the resolved consent-state digest; the operation is an
+        # integer scanline, an integer dilation and a per-pixel select. Per ADR-0017 this flag
+        # declares that a content difference is a fault worth an event, and claims nothing more.
+        deterministic=True,
+        params={
+            "profile": "exulanica.masked-source/v1",
+            # Neutral, never generative. A generated fill would be a claim about what was behind
+            # a person; the design note puts that out of scope and the status says the area is
+            # blank rather than pretending it was never occupied.
+            "fill": "neutral-flat",
+            "fill_srgb": [128, 128, 128],
+            # Grown before filling, in millionths of the longest edge. A mask cut exactly on a
+            # detector's boundary leaves a rim of the person's own pixels, which is the difference
+            # between hiding somebody and outlining them.
+            "dilation_millionths": 8_000,
+            # Encoder settings live here for the reason rendition's do: a changed quality changes
+            # the bytes, and a change that did not move the stage digest would leave two different
+            # derivatives sharing one artifact row. `optimize` is False for the reason rendition
+            # version 2 records, that libjpeg's entropy optimisation fails on ordinary images.
+            "format": "JPEG",
+            "quality": 95,
+            "subsampling": "4:4:4",
+            "optimize": False,
+            "orientation": "display",
+        },
+    ),
+    "masked_source_manifest": StageSpec(
+        key="masked_source_manifest",
+        version=1,
+        output_kind="masked_source_manifest",
+        deterministic=True,
+        params={
+            # Its own stage, and its own artifact row, because `persist_artifact` writes one
+            # payload per run and both the image and the manifest have to be reachable by the
+            # tombstone and purge paths. A manifest that lived only inside the image's metadata
+            # could not be found by a withdrawal looking for what to destroy.
+            "profile": "exulanica.masked-source-manifest/v1",
+        },
+    ),
 }
 
 
