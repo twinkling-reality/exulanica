@@ -22,7 +22,7 @@ export function buildCapabilities(): HTMLElement {
         el('h2', { id: 'capability-agents', class: 'capability-heading', text: 'Power your personal agents with context from your life' }),
         el('p', {
           class: 'reading-copy',
-          text: 'Export a World Memory Package that organizes your memories, relationships, and the context you add into a format software can read. It provides the foundation for personal agents to use that history when helping you, with references to the original sources.',
+          text: 'Export a World Memory Package that organizes your memories, relationships, and the context you add into a format software can read. It provides the foundation for personal agents to use that history when helping you, with references to the original sources. The same package describes a real place rather than a plausible one, which is what a world model needs if it is to render somewhere you have actually been.',
         }),
       ]),
     ]),

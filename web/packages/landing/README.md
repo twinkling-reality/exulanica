@@ -45,8 +45,9 @@ navigation, the geometric Companion, evidence, Map, and Index inside the canonic
   navigation menu and one explicit entry into Exulanica. It uses no scenic or photographic
   backdrop.
 - **Purpose** presents one uninterrupted paragraph about connecting scattered records of a life,
-  personal media, and the context a person contributes. It describes the ambition; Capabilities
-  explains the concrete actions that give it substance.
+  personal media, and the context a person contributes, and then places that against the
+  generative world models of 2026 which imagine a place for a session and forget it. It describes
+  the ambition; Capabilities explains the concrete actions that give it substance.
 - **Capabilities** presents two named sections: exploring connected memories and powering personal
   agents with context through the World Memory Package. Both use the existing reading measure and
   restrained typography, with space between outcomes and no dividers. Purpose remains a single
@@ -74,6 +75,14 @@ and explains that the destination is not connected; it does not invent a deploym
 Capabilities describes the intended product experience in present tense, without a development-status
 footer. Reconstruction remains conditional on the source images. Current implementation evidence
 remains in the repository README and frontier roadmap.
+
+The world-model position lives in Purpose and not in Capabilities, and that placement is a rule
+rather than an editorial preference. `frontier-roadmap.md` records that the four capabilities which
+would make Exulanica the layer a generative model reads from "are tracked as work, not claimed",
+and the World Read API is in progress. Purpose is the surface written in the "is being built"
+tense, so it is the only one that can carry a position without asserting a capability. What
+Capabilities says about world models is limited to what is true of the package itself: it
+describes a real place rather than a plausible one.
 
 ## Reusable gradient forms
 
