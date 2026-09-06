@@ -55,14 +55,21 @@ than semantic.
 
 **Merge state, checked 2026-09-06.** `git merge-tree --write-tree` against the privacy chat's
 committed tip is clean, and both branches' required payload fields are satisfied at both
-construction sites of `ReconstructionSceneRow` and `ReconstructionSceneMemberRow`
-(`_scene_row` and `_fallback` in `reconstruction_scenes.py`), because both branches edited both.
-Two things are not covered by that check:
+construction sites of `ReconstructionSceneRow` and `ReconstructionSceneMemberRow` (`_scene_row`
+and `_fallback` in `reconstruction_scenes.py`), because both branches edited both.
 
-- The privacy worktree holds uncommitted work, which the trial merge cannot see. Its
-  `web/packages/app/src/ui/status.ts` inserts into `buildStatus` at the same point this branch's
-  proof-tier line does. That hunk is the one place a human has to choose an order; everything else
-  is textual.
+It was not clean at first, and the fix is worth recording because the same thing will happen again.
+Both branches inserted at the identical point in two files: into `buildStatus` right after the
+registration paragraph in `web/packages/app/src/ui/status.ts`, and between the `GraphPayload` and
+`IslandOf` exports in `web/packages/graph-client/src/index.ts`. Neither insertion cared where it
+went. This branch moved both of its hunks away, with a comment at each saying why, and the trial
+merge is clean. **In a shared file, put a new block somewhere the other branch is not, and say so
+in a comment;** a conflict over an ordering nobody has an opinion about is pure cost.
+
+Two things a clean trial merge still does not cover:
+
+- The privacy worktree holds uncommitted work the trial merge cannot see, so this check is against
+  its committed tip and will need repeating.
 - `exulanica/graph/read_consent.py` detects the privacy layer by importing
   `exulanica.graph.person_regions`, so the merge flips `PERSON_CONSENT_AVAILABLE` on its own and
   `test_the_release_state_is_internal_only_until_person_consent_lands` fails by design. That
