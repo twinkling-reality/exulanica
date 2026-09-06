@@ -429,3 +429,17 @@ export {
   transformPoint,
   transformedBoxCorners,
 } from './display-frame.js';
+
+export type {
+  PickCalibration,
+  PickCamera,
+  PickOptions,
+  PickResult,
+  SparseObservedPoint,
+} from './observation-pick.js';
+export {
+  canvasToSourcePixel,
+  observationSentence,
+  pickObservedPoint,
+  projectToSourcePixel,
+} from './observation-pick.js';
