@@ -130,11 +130,23 @@ CONTROLS = [
         "test_a_generation_cannot_satisfy_any_reconstruction_gate",
     ),
     (
+        # The mutant that matters is the ORIGINAL defect: reading through artifact_current, whose
+        # distinct-on key every generation for one scene shares, so all but one become invisible.
+        # An earlier version of this control removed the supersession filter instead and survived,
+        # correctly: that mutation makes the read more permissive and the test files nothing
+        # superseded, so nothing changes. The control now reinstates the actual defect.
         "every_generation_for_a_scene_stays_visible",
+        "exulanica/graph/generated_geometry.py",
+        "  from artifact a\n",
+        "  from artifact_current a\n",
+        "test_two_generations_for_one_scene_are_both_visible",
+    ),
+    (
+        "a_superseded_generation_is_not_offered_beside_its_replacement",
         "exulanica/graph/generated_geometry.py",
         "   and a.superseded_by is null",
         "   and a.artifact_id is not null  -- mutant: no supersession filter",
-        "test_two_generations_for_one_scene_are_both_visible",
+        "test_a_superseded_generation_is_withdrawn_from_the_graph",
     ),
     (
         "the_observation_graph_is_guarded_scene_wide",
@@ -241,9 +253,13 @@ def main() -> int:
         print(name, result.returncode, "killed" if killed else "SURVIVED", flush=True)
 
     restored = _run(work, env, None)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.strip()
     record = {
         "profile": "exulanica.world-read-negative-controls/v1",
         "date": "2026-09-06",
+        "head": head,
         "database": DATABASE,
         "isolated_source_copy": True,
         "baseline_passed": True,

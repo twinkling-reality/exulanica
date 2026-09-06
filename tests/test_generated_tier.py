@@ -469,3 +469,44 @@ def test_two_generations_for_one_scene_are_both_visible(repository, tmp_path):
     visible = {str(entry.artifact_id) for entry in scene.generated_geometry}
     assert visible == {str(first.artifact_id), str(second.artifact_id)}
     assert all(entry.state == "available" for entry in scene.generated_geometry)
+
+
+def test_a_superseded_generation_is_withdrawn_from_the_graph(repository, generated):
+    """Supersession is the other half of "current", and it needs its own exercise.
+
+    The visibility test above files two live generations, so it cannot see a supersession filter at
+    all: removing that filter changes nothing when nothing is superseded. This marks one generation
+    superseded by the other and requires it to leave the graph.
+    """
+    store, scene_id, _receipt, first = generated
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    second = record_generated_scene(
+        repository,
+        store,
+        scene_id=scene_id,
+        receipt=_receipt_for(envelope, content=_sha("the replacement sampling")),
+        expected_recorded_sha256=envelope["bundle"]["recorded_sha256"],
+    )
+    assert second.inserted
+
+    snapshot = read_snapshot(repository.connection, repository.workspace_id, store)
+    scene = next(s for s in snapshot.reconstruction_scenes if s.scene_id == scene_id)
+    assert {str(entry.artifact_id) for entry in scene.generated_geometry} == {
+        str(first.artifact_id),
+        str(second.artifact_id),
+    }
+
+    repository.connection.execute(
+        "update artifact set superseded_by=%s where workspace_id=%s and artifact_id=%s",
+        (second.artifact_id, repository.workspace_id, first.artifact_id),
+    )
+    snapshot = read_snapshot(repository.connection, repository.workspace_id, store)
+    scene = next(s for s in snapshot.reconstruction_scenes if s.scene_id == scene_id)
+    assert [str(entry.artifact_id) for entry in scene.generated_geometry] == [
+        str(second.artifact_id)
+    ]
+
+
+def _receipt_for(envelope, *, content: str) -> GeneratedSceneReceipt:
+    return _receipt(envelope["bundle"]["recorded_sha256"], content_sha256=content)

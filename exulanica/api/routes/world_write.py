@@ -46,19 +46,34 @@ from exulanica.reconstruction.generated import (
 router = APIRouter(prefix="/world-write", tags=["world-write"])
 
 
+#: Bounds on every free-text field a caller supplies.
+#:
+#: Not decoration. A generation receipt is stored, and then re-read, re-parsed and re-hashed on
+#: every graph snapshot and every World Read bundle for that scene, for as long as the scene
+#: exists. An unbounded ``seam`` or a conditioning list of a hundred thousand digests is therefore
+#: not one large request, it is a permanent per-read cost that no later change can take back
+#: without deleting the artifact. The body limit in :mod:`exulanica.api.body_limit` caps one
+#: request; it does not cap what one request leaves behind.
+_MAX_TEXT = 200
+_MAX_SEAM = 2_000
+_MAX_CONDITIONING = 512
+
+
 class GenerationModelBody(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
-    provider: str
-    model_id: str
-    model_version: str
+    provider: str = Field(max_length=_MAX_TEXT)
+    model_id: str = Field(max_length=_MAX_TEXT)
+    model_version: str = Field(max_length=_MAX_TEXT)
 
 
 class ConditioningBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    role: str
-    sha256: str
+    role: str = Field(max_length=_MAX_TEXT)
+    #: Length-bounded here as well as pattern-checked in the receipt, so an oversized string is
+    #: refused before it is copied into an exception message.
+    sha256: str = Field(max_length=64)
 
 
 class GeneratedSceneBody(BaseModel):
@@ -72,12 +87,14 @@ class GeneratedSceneBody(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     model: GenerationModelBody
-    prompt_sha256: str
-    conditioning: list[ConditioningBody] = Field(min_length=1)
-    container: str
-    content_sha256: str
-    byte_size: int
-    seam: str
+    prompt_sha256: str = Field(max_length=64)
+    conditioning: list[ConditioningBody] = Field(min_length=1, max_length=_MAX_CONDITIONING)
+    container: str = Field(max_length=_MAX_TEXT)
+    content_sha256: str = Field(max_length=64)
+    #: A generated payload larger than this is not a scene surface, and the field exists to bound
+    #: what the receipt claims rather than to permit it: nothing here fetches those bytes.
+    byte_size: int = Field(gt=0, le=1 << 40)
+    seam: str = Field(max_length=_MAX_SEAM)
 
 
 class GeneratedSceneView(BaseModel):
