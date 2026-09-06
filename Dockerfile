@@ -48,14 +48,15 @@ FROM python:3.11-slim-trixie AS runtime
 LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exulanica"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-# One apt package, and it is the only one: psycopg[binary] ships its own libpq and Pillow ships
-# its own image libraries, so the runtime needs nothing else from Debian. libvulkan1 is the
-# Vulkan loader the SOG compressor's WebGPU backend opens when the scene worker runs on a GPU
-# host with the NVIDIA runtime's graphics capability; without a GPU it is inert. MEASURED
-# 2026-09-06: the compressor's k-means over one million Gaussians took hours on a CPU core and
-# under a minute on the training GPU. Every package added here is a package somebody has to patch.
+# Three apt packages, and only these: psycopg[binary] ships its own libpq and Pillow ships its
+# own image libraries, so the runtime needs nothing else from Debian. libvulkan1 is the Vulkan
+# loader the SOG compressor's WebGPU backend opens when the scene worker runs on a GPU host with
+# the NVIDIA runtime's graphics capability; the NVIDIA Vulkan ICD it then loads is
+# libGLX_nvidia.so.0, which links libX11 and libXext even with no display (MEASURED 2026-09-06:
+# the loader reported "libX11.so.6: cannot open shared object file" and found no driver). Without
+# a GPU all three are inert. Every package added here is a package somebody has to patch.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libvulkan1 \
+ && apt-get install -y --no-install-recommends libvulkan1 libx11-6 libxext6 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 exulanica \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home exulanica \
