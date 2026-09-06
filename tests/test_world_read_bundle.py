@@ -289,3 +289,34 @@ def test_two_reads_of_an_unchanged_scene_produce_the_same_digest(published, repo
     second = world_read_bundle(repository.connection, repository.workspace_id, scene_id, reopened)
     assert first is not None and second is not None
     assert first["bundle_sha256"] == second["bundle_sha256"]
+
+
+def test_a_recipient_reproduces_the_recorded_digest_from_the_keys_the_bundle_names(
+    published, repository
+):
+    """The half the first version got wrong, found by a real scene rather than by this file.
+
+    MEASURED 2026-09-06 against the retained bowl scene: a recipient recomputing the recorded
+    digest by removing ``generated`` got a different answer, because the wire bundle also carries
+    ``recorded_sha256`` itself, which was not an input to its own hash. The before-and-after test
+    below could not see that, because it compared two of this code's own answers. This one follows
+    the bundle's stated recipe from outside.
+    """
+    store, _captures, scene_id = published
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    received = json.loads(json.dumps(envelope))["bundle"]
+
+    recorded = {key: received[key] for key in received["recorded_keys"]}
+    assert hashlib.sha256(_canonical(recorded)).hexdigest() == received["recorded_sha256"]
+
+    # The recipe must not name itself or the generated tier, or the digest becomes either
+    # self-referential or sensitive to filing a generation. Both were real defects.
+    assert "recorded_sha256" not in received["recorded_keys"]
+    assert "generated" not in received["recorded_keys"]
+    assert "recorded_keys" not in received["recorded_keys"]
+    assert set(received["recorded_keys"]) | {
+        "generated",
+        "recorded_keys",
+        "recorded_sha256",
+    } == set(received)

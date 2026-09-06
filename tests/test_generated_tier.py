@@ -297,9 +297,10 @@ def test_a_generation_cannot_become_an_assertion_support_span(repository, genera
     ``evidence_span`` references ``blob``. A generated artifact has no source blob at all, so
     there is no span that could name it; this asserts the absence rather than assuming it.
     """
-    store, _scene_id, _receipt, record = generated
+    _store, _scene_id, _receipt, record = generated
     row = repository.connection.execute(
-        "select source_blob_sha256, scene_id from artifact where workspace_id=%s and artifact_id=%s",
+        "select source_blob_sha256, scene_id from artifact "
+        "where workspace_id=%s and artifact_id=%s",
         (repository.workspace_id, record.artifact_id),
     ).fetchone()
     assert row["source_blob_sha256"] is None

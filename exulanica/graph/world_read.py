@@ -36,6 +36,12 @@ covers the whole response including anything a model has since generated. A gene
 first, so filing it does not change the thing it cited and two models can read the same observed
 world and both say so. A recipient verifying the payload in front of it checks the second.
 
+The recorded digest's input is the keys named in ``recorded_keys``, listed in the bundle rather than
+described, because a recipient who has to infer which keys were excluded is a recipient who cannot
+check the digest. That was measured, not anticipated: the first version excluded ``generated`` by
+description and a recomputation over the real bowl scene disagreed, because the wire bundle also
+carries ``recorded_sha256`` itself.
+
 The scene read here is the same ``reconstruction_scene_rows`` that builds the graph payload Atlas
 draws. That is deliberate rather than incidental: a bundle
 assembled from its own queries would eventually disagree with the world on screen about which
@@ -426,13 +432,22 @@ def world_read_bundle(
             ),
         },
     }
-    # Two digests, and the difference is the whole point. `recorded_sha256` covers everything
-    # except the generated list, so it is the digest a generation is conditioned on: filing a
-    # generation must not change the thing that generation cited, and two models must be able to
-    # read the same observed world and each say so. `bundle_sha256` covers the whole response,
-    # including generations, which is what a recipient verifying this exact payload checks.
-    recorded = {key: value for key, value in bundle.items() if key != "generated"}
-    bundle["recorded_sha256"] = sha256_of_canonical(recorded).hex()
+    # Two digests, and the difference is the whole point. `recorded_sha256` covers the observed
+    # world alone, so it is the digest a generation is conditioned on: filing a generation must not
+    # change the thing that generation cited, and two models must be able to read the same observed
+    # world and each say so. `bundle_sha256` covers the whole response, including generations,
+    # which is what a recipient verifying this exact payload checks.
+    #
+    # The covered keys are LISTED rather than described as "everything except the generated list".
+    # MEASURED 2026-09-06 against the retained bowl scene: a recipient recomputing the recorded
+    # digest by removing `generated` got a different answer, because the wire bundle also carries
+    # `recorded_sha256` itself, which was not an input to its own hash. A self-referential digest
+    # whose input a recipient has to infer is a digest they cannot check. Naming the keys makes the
+    # recipe exact and makes adding a key to the recorded world a deliberate edit here.
+    bundle["recorded_keys"] = sorted(key for key in bundle if key != "generated")
+    bundle["recorded_sha256"] = sha256_of_canonical(
+        {key: bundle[key] for key in bundle["recorded_keys"]}
+    ).hex()
     return {
         "profile": WORLD_READ_PROFILE,
         "bundle": bundle,
