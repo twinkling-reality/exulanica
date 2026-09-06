@@ -48,11 +48,16 @@ FROM python:3.11-slim-trixie AS runtime
 LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exulanica"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-# No apt packages at all, and that is a property rather than an omission: psycopg[binary] ships
-# its own libpq and Pillow ships its own image libraries, so the runtime needs nothing from
-# Debian that python:3.11-slim does not already carry. Every package added here is a package
-# somebody has to patch.
-RUN groupadd --system --gid 10001 exulanica \
+# One apt package, and it is the only one: psycopg[binary] ships its own libpq and Pillow ships
+# its own image libraries, so the runtime needs nothing else from Debian. libvulkan1 is the
+# Vulkan loader the SOG compressor's WebGPU backend opens when the scene worker runs on a GPU
+# host with the NVIDIA runtime's graphics capability; without a GPU it is inert. MEASURED
+# 2026-09-06: the compressor's k-means over one million Gaussians took hours on a CPU core and
+# under a minute on the training GPU. Every package added here is a package somebody has to patch.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libvulkan1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 10001 exulanica \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home exulanica \
  && mkdir -p /app /var/lib/exulanica \
  && chown exulanica:exulanica /app /var/lib/exulanica

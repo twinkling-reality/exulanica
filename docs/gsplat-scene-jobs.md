@@ -135,16 +135,19 @@ directory's `node_modules/.bin` on the worker PATH or pass its executable explic
 PlayCanvas CLI shape is:
 
 ```text
-splat-transform --no-tty --overwrite -g cpu -H 0 input.ply output.sog
+splat-transform --no-tty --overwrite -g <device> input.ply output.sog
 ```
 
-`-H 0` keeps spherical-harmonic band 0 only. MEASURED 2026-09-05: with the full degree-3 model
-of one million Gaussians, the compressor's CPU k-means over the 45 higher-band coefficients ran
-for more than an hour on the rented host without finishing, so the first accepted real training
-had no browser asset. The delivered scene therefore carries view-independent colour; the held-out
-PSNR, SSIM and LPIPS in the receipt are measured on the full trained model before compression,
-and `delivered_sh_bands` in the protocol records the difference. Restoring the higher bands needs
-GPU k-means on the compression host, which is future work.
+`<device>` is the worker's `EXULANICA_COMPRESSOR_GPU` setting: `cpu` by default, or a WebGPU
+adapter index. Every spherical-harmonic band is delivered either way, and the device is recorded
+in `compression-attempt.json`. MEASURED 2026-09-06 on one million degree-3 Gaussians: the
+compressor's k-means over 65536 clusters of 45 coefficients ran for three hours on one CPU core
+without finishing, and completed in 4.1 s (10.8 s wall clock for the whole compression, 15.3 MB
+output) on the L40S through Vulkan. The scene worker container therefore carries the Vulkan
+loader and `deploy/gsplat/run-scene-worker.sh` gives it the GPU with graphics capability. An
+attempt to sidestep the cost by dropping higher bands with `-H 0` did not take effect in the
+position it was given and was withdrawn; the delivered format is unchanged from the protocol's
+first version.
 
 The output SOG size/digest enters the gate receipt. An actual local CPU conversion of 512 generated
 test-only Gaussians verified version-2 `meta.json` and ZIP STORE entries; this format smoke test

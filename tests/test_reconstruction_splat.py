@@ -191,16 +191,32 @@ def test_accepted_scene_is_compressed_once_and_reused_from_its_receipt(tmp_path)
     assert first.quality.delivery_sha256 is not None
     assert len(fake.calls) == 3
     assert fake.calls[1][0] == "splat-transform"
-    # Delivery keeps SH band 0 only; the full model was scored before this command ran.
-    assert fake.calls[2][:7] == (
-        "splat-transform",
-        "--no-tty",
-        "--overwrite",
-        "-g",
-        "cpu",
-        "-H",
-        "0",
+    # Every SH band is delivered; the device defaults to the CPU path the tests can run.
+    assert fake.calls[2][:5] == ("splat-transform", "--no-tty", "--overwrite", "-g", "cpu")
+    assert "-H" not in fake.calls[2]
+
+
+def test_the_compressor_device_is_passed_verbatim_and_recorded(tmp_path):
+    """MEASURED 2026-09-06: k-means over one million Gaussians took hours on a CPU core and
+    under a minute on the training GPU; the operator's device choice must be auditable."""
+    manifest = _manifest()
+    fake = FakeRunner(manifest)
+
+    result = run_gsplat_job(
+        manifest,
+        dataset_dir=_dataset(tmp_path / "dataset"),
+        pose_receipt=_pose_receipt(tmp_path / "pose.json", manifest),
+        jobs_root=tmp_path / "jobs",
+        compressor_gpu="0",
+        executor=fake,
     )
+
+    assert result.status == "completed" and result.quality is not None
+    assert fake.calls[2][3:5] == ("-g", "0")
+    attempt = json.loads((result.job_directory / "compression-attempt.json").read_text())
+    assert attempt["gpu_device"] == "0"
+    assert attempt["command"][3:5] == ["-g", "0"]
+    assert "v3.3.3" in attempt["version_output"]
 
 
 def test_quality_failure_keeps_rung_three_and_never_builds_a_delivery_asset(tmp_path):

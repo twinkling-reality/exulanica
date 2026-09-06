@@ -204,7 +204,10 @@ daemon, so the worker itself must run on that host, not through a remote Docker 
    `--job <job id>` (or `EXULANICA_SCENE_JOB_IDS`) so the rented worker claims exactly the job you
    queued: `--once` otherwise drains every eligible job in the workspace oldest first, and
    MEASURED 2026-09-05 a fresh worker's first pass went to a stale job pinned to an older image,
-   which failed on its final attempt before the intended job started.
+   which failed on its final attempt before the intended job started. The launcher also gives the
+   worker container the GPU with graphics capability and sets `EXULANICA_COMPRESSOR_GPU=0`, so the
+   SOG compressor's k-means runs on the card (MEASURED 2026-09-06: 10.8 s against three unfinished
+   hours on a CPU core); the host needs the NVIDIA driver's Vulkan ICD, which the driver installs.
 7. Pull results back with `rsync -a --ignore-existing <host>:~/exulanica-data/blobs/
    .exulanica/reference-baseline/runtime/blobs/`; the store is content-addressed, so the merge is
    safe. The database rows already point at those objects. Reload ordinary Atlas.

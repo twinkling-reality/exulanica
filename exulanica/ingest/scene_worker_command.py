@@ -22,11 +22,26 @@ from exulanica.ingest.scene_worker import SceneReconstructionWorker
 from exulanica.ingest.worker_command import parse_workspaces
 from exulanica.store.local import LocalContentAddressedStore
 
-__all__ = ["JOB_IDS_ENV", "main", "parse_job_ids"]
+__all__ = ["COMPRESSOR_GPU_ENV", "JOB_IDS_ENV", "main", "parse_compressor_gpu", "parse_job_ids"]
 
 CODE_REVISION_ENV: Final = env_name("CODE_REVISION")
 POSE_IMAGE_ENV: Final = env_name("POSE_RUNTIME_IMAGE")
 JOB_IDS_ENV: Final = env_name("SCENE_JOB_IDS")
+COMPRESSOR_GPU_ENV: Final = env_name("COMPRESSOR_GPU")
+
+
+def parse_compressor_gpu(environment: Mapping[str, str]) -> str:
+    """``cpu`` (default) or a WebGPU adapter index for the SOG compressor's k-means.
+
+    MEASURED 2026-09-06: one million degree-3 Gaussians compressed in under a minute on the
+    training GPU and did not finish in three hours on one CPU core. The value is passed to the
+    compressor verbatim and recorded in the compression attempt, so a wrong index fails loudly
+    there rather than silently falling back.
+    """
+    value = (env_get("COMPRESSOR_GPU", environment) or "cpu").strip()
+    if value != "cpu" and not value.isdigit():
+        raise ValueError(f"{COMPRESSOR_GPU_ENV} must be 'cpu' or a GPU adapter index")
+    return value
 
 
 def parse_job_ids(values: list[str], environment: Mapping[str, str]) -> frozenset[uuid.UUID] | None:
@@ -75,9 +90,7 @@ def _worker_data_directory(environment: Mapping[str, str]) -> Path:
     return resolve_data_dir(environment).resolve()
 
 
-def _build(
-    args: argparse.Namespace, environment: Mapping[str, str]
-) -> SceneReconstructionWorker:
+def _build(args: argparse.Namespace, environment: Mapping[str, str]) -> SceneReconstructionWorker:
     database = Database.from_env(environment)
     verify_schema(database)
     with database.unscoped() as connection:
@@ -95,6 +108,7 @@ def _build(
         heartbeat_seconds=args.heartbeat_seconds,
         abandoned_after_seconds=args.abandoned_after_seconds,
         job_ids=parse_job_ids(args.job, environment),
+        compressor_gpu=parse_compressor_gpu(environment),
     )
 
 
@@ -144,9 +158,7 @@ def main(
         requested.set()
         worker.request_stop()
 
-    previous = {
-        signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)
-    }
+    previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
     try:
         if args.once:
             outcomes = worker.drain_observed()

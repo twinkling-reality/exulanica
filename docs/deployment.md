@@ -374,6 +374,8 @@ is done, no claim is made here about range requests being on the browser path.
 | `EXULANICA_READONLY_DATABASE_URL` | The Selection executor's role | Optional, and `/readyz` says so when it is absent |
 | `EXULANICA_DERIVATIVE_WORKER` | Whether this process drains what `POST /intake` queues | Defaults to **on**. Off is for an instance that leaves the queue to somebody else, and `/readyz` reports which it is: a queue nobody drains and a queue drained elsewhere look identical from outside |
 | `EXULANICA_WORKSPACE_IDS` | Comma-separated UUIDs the dedicated derivative worker is authorised to drain | Required by the worker command unless one or more `--workspace` flags are supplied. An empty set is a startup failure, not a healthy idle process |
+| `EXULANICA_SCENE_JOB_IDS` | Comma-separated scene job UUIDs the scene worker may claim | Optional. Without it (or `--job`) the scene worker drains every eligible job in its workspaces oldest first |
+| `EXULANICA_COMPRESSOR_GPU` | `cpu` or a WebGPU adapter index for the SOG compressor's k-means | Optional, default `cpu`. On a GPU host give the scene worker container the GPU with graphics capability and set `0`; recorded in each compression attempt |
 | `EXULANICA_DEPTH_MODEL` | Selects the production depth implementation | Compose sets `moge` on the derivative worker. Other processes leave it unavailable |
 | `EXULANICA_DEPTH_MODEL_ID` | Reviewed MoGe repository identifier | Defaults to `Ruicheng/moge-2-vitl`; changing it changes the point-map artifact binding |
 | `EXULANICA_DEPTH_MODEL_REVISION` | Full Git commit for the MoGe checkpoint | Defaults to the measured `39c4d5e957afe587e04eec59dc2bcc3be5ecd968`; mutable branches and tags are refused |

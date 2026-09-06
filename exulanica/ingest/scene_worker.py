@@ -82,6 +82,7 @@ class SceneReconstructionWorker:
         heartbeat_seconds: float = 30.0,
         abandoned_after_seconds: float = 3600.0,
         job_ids: frozenset[uuid.UUID] | None = None,
+        compressor_gpu: str = "cpu",
     ) -> None:
         if not workspaces:
             raise ValueError("a scene worker needs at least one configured workspace")
@@ -100,6 +101,7 @@ class SceneReconstructionWorker:
         self._heartbeat_seconds = heartbeat_seconds
         self._abandoned_after_seconds = abandoned_after_seconds
         self._job_ids = job_ids
+        self._compressor_gpu = compressor_gpu
         self._stop = threading.Event()
 
     def request_stop(self) -> None:
@@ -162,6 +164,7 @@ class SceneReconstructionWorker:
                     self._scratch_root,
                     code_revision=self._code_revision,
                     execution_image=self._execution_image,
+                    compressor_gpu=self._compressor_gpu,
                     external_cancellation=keeper.lost.is_set,
                     stop_requested=self._stop.is_set,
                 ).process(claimed)

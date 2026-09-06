@@ -151,6 +151,7 @@ class SceneReconstructionProcessor:
         external_cancellation: Callable[[], bool] | None = None,
         stop_requested: Callable[[], bool] | None = None,
         splat_executor: CommandExecutor | None = None,
+        compressor_gpu: str = "cpu",
     ) -> None:
         self._repository = repository
         self._store = store
@@ -163,6 +164,7 @@ class SceneReconstructionProcessor:
         self._external_cancellation = external_cancellation
         self._stop_requested = stop_requested or (lambda: False)
         self._splat_executor = splat_executor
+        self._compressor_gpu = compressor_gpu
 
     def process(self, claimed: ClaimedSceneJob) -> SceneBuildOutcome:
         """Run or resume one claim, flush guarded bytes, then publish the scene."""
@@ -446,6 +448,7 @@ class SceneReconstructionProcessor:
             dataset_dir=dataset,
             pose_receipt=pose_directory / "receipt.json",
             jobs_root=pose_directory.parent.parent / "splat",
+            compressor_gpu=self._compressor_gpu,
             executor=self._splat_executor
             or cancellable_executor(lambda: self._cancelled(claimed), self._stop_requested),
         )

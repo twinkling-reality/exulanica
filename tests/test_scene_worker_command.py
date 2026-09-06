@@ -15,9 +15,12 @@ from exulanica.ingest.scene_worker import SceneReconstructionWorker
 
 def test_startup_refuses_to_guess_a_database_or_pose_provenance():
     output = io.StringIO()
-    assert scene_worker_command.main(
-        ["--once", "--workspace", str(uuid.uuid4())], environ={}, stream=output
-    ) == 1
+    assert (
+        scene_worker_command.main(
+            ["--once", "--workspace", str(uuid.uuid4())], environ={}, stream=output
+        )
+        == 1
+    )
     event = json.loads(output.getvalue())
     assert event["component"] == "scene-worker"
     assert event["event"] == "startup_failed"
@@ -114,3 +117,13 @@ def test_a_scoped_worker_reports_its_jobs_at_startup_and_refuses_an_empty_scope(
             execution_image="image@sha256:" + "0" * 64,
             job_ids=frozenset(),
         )
+
+
+def test_the_compressor_device_defaults_to_cpu_and_accepts_only_an_adapter_index():
+    assert scene_worker_command.parse_compressor_gpu({}) == "cpu"
+    assert (
+        scene_worker_command.parse_compressor_gpu({scene_worker_command.COMPRESSOR_GPU_ENV: " 0 "})
+        == "0"
+    )
+    with pytest.raises(ValueError, match="adapter index"):
+        scene_worker_command.parse_compressor_gpu({scene_worker_command.COMPRESSOR_GPU_ENV: "gpu"})

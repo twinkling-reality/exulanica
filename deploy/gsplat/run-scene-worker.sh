@@ -12,7 +12,9 @@
 # Optional: EXULANICA_DATA_DIR (default ~/exulanica-data), PGOPTIONS (default -c role=exulanica_app),
 # REPO_DIR (default ~/orimera, must hold deploy/gsplat/compressor/node_modules), NODE_DIR (~/node),
 # EXULANICA_SCENE_JOB_IDS (comma separated; the worker then claims only those jobs instead of
-# draining the workspaces oldest first, which on a rented GPU can spend the pass on a stale job).
+# draining the workspaces oldest first, which on a rented GPU can spend the pass on a stale job),
+# EXULANICA_COMPRESSOR_GPU (default 0 here: the WebGPU adapter index the SOG compressor uses for
+# its k-means; the container is given the GPU with graphics capability so Vulkan can open it).
 # Usage: deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <worker-name> [--job <id>]
 set -euo pipefail
 : "${CODE_REVISION:?set CODE_REVISION to the exact 40-character Git revision the images were built at}"
@@ -27,6 +29,8 @@ mkdir -p "$DATA_DIR" "$HOME/worker-home"
 # The image's liveness probe is the API's /healthz; a worker has no HTTP port, so it is disabled
 # here exactly as compose does for the non-HTTP services.
 exec docker run --rm --network host --no-healthcheck \
+  --gpus all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
+  -e EXULANICA_COMPRESSOR_GPU="${EXULANICA_COMPRESSOR_GPU:-0}" \
   --user "$(id -u):$(id -g)" --group-add "$(stat -c %g /var/run/docker.sock)" \
   -e HOME=/tmp/worker-home -v "$HOME/worker-home:/tmp/worker-home" \
   -v /var/run/docker.sock:/var/run/docker.sock \
