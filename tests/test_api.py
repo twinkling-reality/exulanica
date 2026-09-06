@@ -62,6 +62,14 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/evidence/{span_id}"): {},
     ("GET", "/evidence/{span_id}/region"): {},
     ("GET", "/evidence/{span_id}/masked"): {},
+    ("GET", "/person-regions/{capture_id}"): {},
+    ("POST", "/person-regions/{capture_id}/edits"): {
+        "json": {"edits": [{"region_key": "aa" * 32, "action": "confirm"}]}
+    },
+    ("POST", "/person-subjects"): {"json": {}},
+    ("POST", "/person-subjects/{subject_id}/consents"): {
+        "json": {"consent_scope": "likeness", "decision": "granted"}
+    },
     ("GET", "/identity/events"): {},
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
