@@ -794,6 +794,7 @@ _SPINE_MODULES = (
     "derived.py",
     "inferences.py",
     "occurrences.py",
+    "person_consent.py",
     "privacy.py",
     "reconstruction_jobs.py",
     "reconstruction_scenes.py",

@@ -39,6 +39,9 @@ The modules, and the question each one answers:
                       advance it?
 :mod:`privacy`        Which exact source authorization and screening permitted geometry,
                       and did the exact ordered scene set pass the current policy?
+:mod:`person_consent` Who is in this photograph, where, and what did each of them agree
+                      to, with no column anywhere for anything that could recognise
+                      them somewhere else?
 :mod:`counts`         How many rows are in one of the thirteen tables this corpus may
                       be counted by, and in which scope is that number true?
 ===================== ============================================================

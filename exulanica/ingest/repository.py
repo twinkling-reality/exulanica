@@ -63,6 +63,7 @@ from exulanica.ingest.spine import (
     derived,
     inferences,
     occurrences,
+    person_consent,
     privacy,
     reconstruction_jobs,
     reconstruction_scenes,
@@ -141,9 +142,7 @@ class IngestRepository:
         """
         blobs.lock_stored_object(self._scope, blob_id)
 
-    def locked_stored_objects(
-        self, blob_ids: list[BlobId]
-    ) -> AbstractContextManager[None]:
+    def locked_stored_objects(self, blob_ids: list[BlobId]) -> AbstractContextManager[None]:
         """Hold purge-compatible locks across a post-commit object-store flush."""
         return blobs.locked_stored_objects(self._scope, blob_ids)
 
@@ -176,9 +175,7 @@ class IngestRepository:
         self, blob_id: BlobId, *, device_id: str | None, started_at: str | None
     ) -> CaptureRow:
         """Register that this workspace holds these bytes."""
-        return captures.insert(
-            self._scope, blob_id, device_id=device_id, started_at=started_at
-        )
+        return captures.insert(self._scope, blob_id, device_id=device_id, started_at=started_at)
 
     def upsert_image_track(
         self,
@@ -381,27 +378,53 @@ class IngestRepository:
         """Persist one immutable fail-closed screening result."""
         return privacy.insert_screening(self._scope, **values)
 
-    def privacy_screening(
-        self, screening_id: uuid.UUID
-    ) -> privacy.PrivacyScreeningRow | None:
+    def privacy_screening(self, screening_id: uuid.UUID) -> privacy.PrivacyScreeningRow | None:
         """Read one screening and its corpus classification."""
         return privacy.screening(self._scope, screening_id)
 
-    def privacy_screening_allows(
-        self, capture_id: uuid.UUID, screening_id: uuid.UUID
-    ) -> bool:
+    def privacy_screening_allows(self, capture_id: uuid.UUID, screening_id: uuid.UUID) -> bool:
         """Whether this exact current source remains eligible for geometry."""
         return privacy.screening_allows(self._scope, capture_id, screening_id)
 
-    def latest_privacy_screening(
-        self, capture_id: uuid.UUID
-    ) -> privacy.PrivacyScreeningRow | None:
+    def latest_privacy_screening(self, capture_id: uuid.UUID) -> privacy.PrivacyScreeningRow | None:
         """Resolve the newest current eligible receipt for exact capture bytes."""
         return privacy.latest_screening(self._scope, capture_id)
 
     def insert_privacy_admission(self, **values: Any) -> privacy.PrivacyAdmissionRow:
         """Persist one decision over an exact ordered capture set."""
         return privacy.admit(self._scope, **values)
+
+    def insert_person_subject(self, **values: Any) -> uuid.UUID:
+        """Create a person, named or not, as somebody a decision can be about."""
+        return person_consent.insert_subject(self._scope, **values)
+
+    def next_person_region_sequence(self, **values: Any) -> int:
+        """The next edit number for one region, allocated in the writing transaction."""
+        return person_consent.next_region_sequence(self._scope, **values)
+
+    def insert_person_region_edit(self, **values: Any) -> uuid.UUID:
+        """Append one immutable edit to one region's history."""
+        return person_consent.insert_region_edit(self._scope, **values)
+
+    def current_person_regions(
+        self, *, capture_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[person_consent.PersonRegionRow]]:
+        """Every live region on these photographs, deleted ones excluded."""
+        return person_consent.current_regions(self._scope, capture_ids=capture_ids)
+
+    def next_person_consent_sequence(self, **values: Any) -> int:
+        """The next number in one consent chain."""
+        return person_consent.next_consent_sequence(self._scope, **values)
+
+    def insert_person_consent(self, **values: Any) -> uuid.UUID:
+        """Append one immutable consent transition."""
+        return person_consent.insert_consent(self._scope, **values)
+
+    def person_consent_transitions(
+        self, *, subject_id: uuid.UUID
+    ) -> list[person_consent.ConsentTransitionRow]:
+        """The whole recorded chain for one person, for the caller to fold."""
+        return person_consent.consent_transitions(self._scope, subject_id=subject_id)
 
     # -- tombstones ---------------------------------------------------------------------
 
@@ -469,9 +492,7 @@ class IngestRepository:
         self, *, capture_ids: list[uuid.UUID], kind: str
     ) -> dict[uuid.UUID, artifacts.CaptureArtifactRow]:
         """Resolve current complete per-capture artifacts for a scene producer."""
-        return artifacts.current_for_captures(
-            self._scope, capture_ids=capture_ids, kind=kind
-        )
+        return artifacts.current_for_captures(self._scope, capture_ids=capture_ids, kind=kind)
 
     def exact_capture_artifacts(
         self,
