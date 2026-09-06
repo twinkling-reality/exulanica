@@ -1,9 +1,9 @@
 # Person regions, masking and presentation consent
 
-Design note, 2026-09-06. **First pass implemented, migrated and tested 2026-09-05: migration 0037
-is applied and the complete suite passes, 1747 passed and 3 skipped.** See "What exists now" at the
-foot of this note for what has and has not run. Written after the first real reconstructions
-showed
+Design note, 2026-09-06. **Components built and migrated; NOT connected, and this hides nobody
+today.** The stages exist and are never invoked, no row is ever written to the consent tables, and
+the client drops the fields it would need. See "What exists now" at the foot of this note before
+relying on anything here. Written after the first real reconstructions showed
 that the current gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
@@ -81,28 +81,55 @@ new stage; the bowl would record two unnamed present people, hidden, and the vol
 
 ## What exists now
 
-**IMPLEMENTED AND DATABASE-TESTED 2026-09-05.** Migration 0037 was applied to
-`postgresql://localhost:5433/exulanica_spine_test` through the ordinary migration test, and the
-complete suite then passed: **1747 passed, 3 skipped, 0 failed**, with `ruff check` clean, all four
-import contracts kept, and the web workspace green (typecheck, 341-module boundary check, 756
-tests). `EXULANICA_TEST_ALLOW_DATABASE_CREATION` stayed unset and no other database was contacted.
+**BUILT BUT NOT CONNECTED. THIS HIDES NOBODY TODAY.** Read that sentence before the table
+below, because the table lists working parts and the parts are not joined to each other. An
+adversarial audit on 2026-09-06 raised 83 candidate gaps and confirmed 46, thirteen of them
+critical, and they converge on one fact: every component exists, is tested, and is unreachable
+from the running system.
 
-Read that as "the schema and the code agree", not as "a corpus behaves this way". No human has
-confirmed a person region on a real photograph, and no reconstruction or training has run.
+The chain breaks in five independent places, any one of which is sufficient on its own:
+
+1. `exulanica/ingest/pipeline.py:501` runs rendition, vision and depth. Neither `person_regions`
+   nor `masked_source` is invoked by anything except tests.
+2. `exulanica/ingest/pipeline.py:532` hands the depth stage `prepared.upright`, the original
+   image. The principle at the head of this note, that depth reads the masked derivative, is
+   **not true of the code**.
+3. Nothing writes a `person_region`, `person_subject` or `person_presentation_consent` row. The
+   `person_regions` stage would not help if it ran: it writes an artifact, not a region row. So
+   `capture_requires_masking()` is false for every capture and the geometry trigger in 0037 has
+   never fired.
+4. `web/packages/graph-client/src/snapshot.ts:205` drops `person_regions` and
+   `person_review_state` when parsing the payload, so the fields the server sends never reach a
+   draw site.
+5. Nothing calls the presentation predicates. Four draw sites are ungated: the world veils, the
+   reconstruction inspector, the detail-pane citation image, and `GET /evidence/{span_id}`.
+
+**Migration 0037 also removed a guard before its replacement worked.** 0029 blocked any screening
+naming a person at all. The first version of the replacement accepted a region in state `unknown`
+-- somebody was seen and nobody decided -- as eligible, which is exactly the case default deny
+exists for, and for several commits this branch was less safe than what it replaced. Corrected on
+2026-09-06: a region in any masked state now blocks until masking is actually wired.
+
+The suite result below says the schema and the pure functions agree. It does not say anybody is
+protected: no test inserts a person region, so a stub that hides nobody passes all of it.
+
+**Suite, 2026-09-06:** 1748 passed, 3 skipped, 0 failed against
+`postgresql://localhost:5433/exulanica_spine_test`, `ruff check` clean, four import contracts
+kept, web workspace green. `EXULANICA_TEST_ALLOW_DATABASE_CREATION` stayed unset.
 
 | Piece | Where | State |
 | --- | --- | --- |
 | Five states, three consents, receipt fold | `exulanica/consent/states.py` | unit-tested |
 | Region outlines, ppm integers, evidence-keyed | `exulanica/consent/regions.py` | unit-tested |
 | Deterministic masking and dilation | `exulanica/ingest/masking.py` | unit-tested |
-| Detector interface and adapters | `exulanica/ingest/person_detectors.py` | unit-tested |
+| Detector interface and adapters | `exulanica/ingest/person_detectors.py` | unit-tested; **the adapter reads `objects`, which the vision schema instructs the model not to put people in** |
 | Immutable receipts and the two digests | `exulanica/ingest/person_receipts.py` | unit-tested |
-| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | registered and tested; no corpus has run them |
-| Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes |
+| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | registered; **never invoked by the pipeline** |
+| Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes; **never reached, because no masked derivative is ever produced** |
 | Masked-geometry count | `exulanica/ingest/masked_geometry.py` | unit-tested |
-| Graph payload fields | `exulanica/graph/payload.py` | typed and delivered; resolver exercised by the suite |
-| Atlas presentation rule | `web/packages/graph-client/src/person-presentation.ts` | unit-tested |
-| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | applied and tested |
+| Graph payload fields | `exulanica/graph/payload.py` | sent by the server; **dropped by the client parser** |
+| Atlas presentation rule | `web/packages/graph-client/src/person-presentation.ts` | unit-tested; **dead code, no draw site calls it** |
+| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | applied; **trigger has never fired, no writer exists for the tables** |
 
 ### Two decisions that differ from this note
 

@@ -1,8 +1,22 @@
 {
   "profile": "exulanica.digest-bound-record/v1",
   "record": {
+    "audit_2026_09_06": {
+      "candidates": 83,
+      "confirmed": 46,
+      "confirmed_critical": 13,
+      "detector_error": "exulanica/ingest/vision.py:139 instructs the model not to list people in `objects`, and `objects` is the only place RecordedObservationDetector looks. The adapter reads a field specified to be empty, so it detects nobody. The earlier claim in this record that it reads real recorded detections was wrong.",
+      "method": "Eight independent adversarial lenses hunted for ways an unconsented person still becomes visible or reconstructed; each candidate was then given to a separate skeptic instructed to refute it, defaulting to refuted when the exposure could not be demonstrated.",
+      "structural_breaks": [
+        "exulanica/ingest/pipeline.py:501 never invokes person_regions or masked_source.",
+        "exulanica/ingest/pipeline.py:532 hands depth the original upright image.",
+        "No code path writes person_region, person_subject or person_presentation_consent, so capture_requires_masking is always false and the 0037 trigger has never fired.",
+        "web/packages/graph-client/src/snapshot.ts:205 drops person_regions and person_review_state when parsing the payload.",
+        "No draw site calls the presentation predicates; four byte paths are ungated."
+      ]
+    },
     "branch": "person-consent-masking",
-    "claim": "A first pass of person regions, masked source derivatives and presentation consent. Migration 0037 was applied to the permitted test database and the complete suite passed, so the database-backed paths are executed rather than merely written. No reconstruction, no Gaussian training and no real photograph was processed.",
+    "claim": "Components for person regions, masked source derivatives and presentation consent, built and migrated. THEY ARE NOT CONNECTED TO EACH OTHER AND THIS HIDES NOBODY TODAY. The stages are never invoked by the pipeline, nothing writes a person region row, and the client drops the payload fields. The suite result below measures that the schema installs and the pure functions are correct, not that any person is protected.",
     "design_note": "docs/person-presentation-consent.md",
     "executed": {
       "database": {
@@ -37,7 +51,7 @@
         "duration_seconds": 198,
         "exit_code": 0,
         "failed": 0,
-        "passed": 1747,
+        "passed": 1748,
         "skipped": 3
       },
       "import_contracts": {
@@ -126,9 +140,11 @@
     },
     "head_revision": "2d9fc53",
     "limitations": [
-      "A green suite establishes that the schema and the code agree, not that a corpus behaves this way. No person region has been confirmed by a human on a real photograph.",
-      "A box from a recorded vision observation is not a measured whole-person silhouette, and the region records shape 'box' so nothing downstream claims otherwise.",
-      "Source photograph delivery still serves original bytes, so the no-pixels rule holds for reconstructed geometry and not yet for the source fallback.",
+      "This hides nobody today. Every component is unreachable from the running system.",
+      "No test inserts a person region row, so the 0037 trigger's refusal branch has never executed and the graph resolver has never returned a row. A stub that hides nobody would pass all 1748 tests.",
+      "The shipped detector reads a field the vision schema tells the model to leave empty, and its person label set is an exact-match whitelist of singular nouns that does not match arms, hands or diners, which is the case that motivated the design.",
+      "No human has confirmed a person region on a real photograph; there is no screen to do it.",
+      "No subject-facing consent exists, so the owner still decides for everyone in a photograph.",
       "The API on port 8000 was left running during the run, against the runbook's advice to stop it; tests use isolated disposable schemas and none failed, but the run was not performed under the runbook's exact preconditions."
     ],
     "not_executed": [
@@ -145,7 +161,12 @@
     },
     "profile": "exulanica.person-consent-implementation/v1",
     "rebased_onto": "164b20f",
-    "recorded_date": "2026-09-05"
+    "recorded_date": "2026-09-05",
+    "regression_introduced_and_fixed": {
+      "effect": "For several commits this branch admitted geometry over an undecided person that the pre-existing rule would have blocked, so the change was a net privacy regression.",
+      "fixed": "2026-09-06. A region in any masked state (unknown, present, withdrawn) or with no state now blocks. Only 'shown' and 'hidden', both of which have consented to likeness, pass.",
+      "what": "Migration 0029 blocked any screening naming a person. 0037 removed that rule, and the first replacement in record_human_screening accepted a region in state 'unknown', meaning somebody was seen and nobody decided, as eligible."
+    }
   },
-  "record_sha256": "ef39dd61106d0e172af5c29a4a12f319f87a42af6c85956eb9929dac5f2df626"
+  "record_sha256": "1e96c0113a51000cb660aab8f0194cb856b5d906e9cce4eab8389d9699aa238d"
 }
