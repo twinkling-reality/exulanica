@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
+from exulanica.ingest.masked_inputs import masked_source_declarations
 from exulanica.ingest.privacy import admit_reconstruction_scene
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_splat import SceneSplatRequest
@@ -107,6 +108,14 @@ def _enqueue_capture_set(
     )
     if admission.eligibility_state != "eligible":
         return None
+    masked_sources = masked_source_declarations(repository, capture_ids)
+    if masked_sources and splat_training is not None:
+        # Refused rather than trained on originals. `SplatBuildManifest` requires the held-out
+        # hashes to be a subset of the source hashes, and those come from the pose frames, which
+        # under masking are the derivative digests; relaxing that without a digest map would make
+        # `load_dataset` match no held-out view and silently promote the whole held-out set into
+        # training. Pose, placement and the gate run fully masked; training waits for the remap.
+        return None
     build_inputs = {
         "profile": "exulanica.reconstruction-scene-build-input/v1",
         "point_maps": [
@@ -123,6 +132,11 @@ def _enqueue_capture_set(
             "policy_version": admission.policy_version,
             "policy_params_sha256": admission.policy_params_digest.hex(),
         },
+        # Absent when nobody in the set is hidden, so a corpus with no people in it produces the
+        # same build input digest it did before this existed. Present, it changes the digest and
+        # therefore the job id, which is exactly the design's requirement that a consent change
+        # produce a new build rather than mutate an accepted one.
+        **({"masked_sources": masked_sources} if masked_sources else {}),
         "stages": [
             {
                 "key": key,

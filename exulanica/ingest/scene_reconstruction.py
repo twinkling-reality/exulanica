@@ -15,6 +15,7 @@ from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.committed_store import committed_writes
 from exulanica.ingest.ledger import Ledger, StageRecorder
+from exulanica.ingest.masked_inputs import apply_masked_sources
 from exulanica.ingest.reconstruction_scratch import (
     ScratchBusy,
     ScratchSource,
@@ -532,6 +533,11 @@ class SceneReconstructionProcessor:
     def _manifest(
         self, claimed: ClaimedSceneJob
     ) -> tuple[PoseBuildManifest, tuple[ScratchSource, ...]]:
+        # Reconstruction reads the masked derivative wherever this job declared one, so a person
+        # who never consented is already neutral fill by the time COLMAP sees a pixel. Rebound
+        # here and nowhere else: `claimed.members` elsewhere in this class is the deletion and
+        # tombstone boundary and must keep naming the original capture bytes.
+        claimed = apply_masked_sources(self._repository, claimed)
         capture_set = str(
             claimed.selection_policy.get("source", {}).get("group_key", claimed.scene_id)
             if isinstance(claimed.selection_policy.get("source"), dict)
