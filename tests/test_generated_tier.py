@@ -17,7 +17,8 @@ from exulanica.errors import EpistemicViolation
 from exulanica.graph import read_snapshot
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.ingest.generated_scene import record_generated_scene
-from exulanica.ingest.stages import STAGES, stage
+from exulanica.ingest.scene_reconstruction import _scene_key
+from exulanica.ingest.stages import STAGES, artifact_id_for, stage
 from exulanica.reconstruction.generated import (
     GENERATED_SCENE_KIND,
     GENERATED_SCENE_STAGE,
@@ -510,3 +511,16 @@ def test_a_superseded_generation_is_withdrawn_from_the_graph(repository, generat
 
 def _receipt_for(envelope, *, content: str) -> GeneratedSceneReceipt:
     return _receipt(envelope["bundle"]["recorded_sha256"], content_sha256=content)
+
+
+def test_the_generated_artifact_key_is_the_ordinary_scene_artifact_key(repository, generated):
+    """One construction for every scene artifact, not a second copy of a frozen digest recipe.
+
+    The first version reimplemented it and diverged on the length prefix, four bytes where the
+    original uses eight, under a comment saying the two were identical on purpose. Nothing
+    collided, because this stage owns its own key space, so the divergence was invisible. This
+    recomputes the id from the shared function and requires it to be what was stored.
+    """
+    _store, scene_id, receipt, record = generated
+    key = _scene_key(scene_id, GENERATED_SCENE_STAGE, generation_input_digest(receipt))
+    assert artifact_id_for(key) == record.artifact_id

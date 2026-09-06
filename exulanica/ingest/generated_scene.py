@@ -27,16 +27,15 @@ one substantive claim, that the model was shown this real place, would be unfals
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from dataclasses import dataclass
-from typing import Final
 
 from exulanica.errors import EpistemicViolation
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.committed_store import committed_writes
 from exulanica.ingest.ledger import Ledger
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.scene_reconstruction import _scene_key
 from exulanica.ingest.stages import artifact_id_for, stage
 from exulanica.reconstruction.generated import (
     GENERATED_SCENE_STAGE,
@@ -46,8 +45,6 @@ from exulanica.reconstruction.generated import (
 from exulanica.store import ContentAddressedStore
 
 __all__ = ["GeneratedSceneRecord", "record_generated_scene"]
-
-_KEY_DOMAIN: Final = b"exulanica/scene-artifact-key"
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,24 +91,13 @@ def record_generated_scene(
     payload = receipt.canonical_bytes()
     content_id = BlobId.of_bytes(payload)
 
-    # The same construction ``exulanica.ingest.scene_reconstruction._scene_key`` uses, and it is
-    # repeated rather than imported because that function is private to the scene processor and
-    # sharing it would make one worker's retry policy a dependency of this route. The domain
-    # prefix and format byte are identical on purpose: two scene artifacts of different stages
-    # must never collide, and two of the same stage and inputs must.
-    hasher = hashlib.sha256()
-    for part in (
-        _KEY_DOMAIN,
-        b"1",
-        scene_id.bytes,
-        spec.key.encode("utf-8"),
-        str(spec.version).encode("ascii"),
-        spec.params_digest,
-        input_digest,
-    ):
-        hasher.update(len(part).to_bytes(4, "big"))
-        hasher.update(part)
-    key = hasher.hexdigest()
+    # Imported rather than reimplemented, and the first version proves why. It copied
+    # `_scene_key`'s construction by hand and got the length prefix wrong: four bytes where the
+    # original uses eight. Nothing collided, because this stage is the only user of its own key
+    # space, so the divergence would have sat there indefinitely under a comment claiming the two
+    # were identical on purpose. A private name reached across two modules of one package is a
+    # smaller cost than a second copy of a frozen digest construction.
+    key = _scene_key(scene_id, spec.key, input_digest)
     artifact_id = artifact_id_for(key)
 
     # "manual" rather than a new trigger value: `pipeline_run.trigger` is a closed CHECK set
