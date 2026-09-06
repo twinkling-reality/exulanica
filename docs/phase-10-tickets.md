@@ -1,9 +1,12 @@
 # Phase 10 tickets: the memory layer for world models
 
-Status: **PLAN, 2026-09-06**. This turns [`frontier-roadmap.md`](frontier-roadmap.md) Phase 10 into
-tickets in the first-week order that phase states. It is a plan, not a claim: a ticket is done when
-its exit criteria have been executed and the evidence retained, and until then its checkbox is
-empty no matter how much code exists.
+Status: **PLAN AND PROGRESS, 2026-09-06**. This turns [`frontier-roadmap.md`](frontier-roadmap.md)
+Phase 10 into tickets in the first-week order that phase states. It is a plan, not a claim: a
+ticket is done when its exit criteria have been executed and the evidence retained, and until then
+its checkbox is empty no matter how much code exists.
+
+Progress is recorded by ticking exit criteria, never by moving a ticket to a "done" heading. A
+ticket with code and no ticked criteria has code and no result.
 
 Phase 10's five capabilities are numbered in the roadmap. Ticket ids keep that numbering
 (`P10-1-*` is capability 1) so a ticket can be read against the phase without a lookup table.
@@ -85,16 +88,16 @@ cannot record what it was conditioned on, and the tier is unfalsifiable.
 
 **Exit.**
 
-- [ ] A clean client recomputes `bundle_sha256` from the returned canonical bytes offline, with no
+- [x] A clean client recomputes `bundle_sha256` from the returned canonical bytes offline, with no
       database and no repository code, asserted by a test that reimplements the hash in the test
       file rather than calling the production function.
-- [ ] `exulanica.canonical.canonical_json` accepts the bundle, which means every measured number in
+- [x] `exulanica.canonical.canonical_json` accepts the bundle, which means every measured number in
       it is an integer. Focal lengths, principal points and transforms are quantised on the way in
       by an explicitly named unit (the existing convention is `_micro`/`_milli` suffixes), and the
       quantisation is stated in the bundle, not assumed.
-- [ ] Mutating one byte of any referenced artifact digest changes `bundle_sha256`.
-- [ ] The bundle names its own profile, `exulanica.world-read-bundle/v1`.
-- [ ] Nothing derived is presented as evidence: the bundle's geometry entries carry the rung that
+- [x] Mutating one byte of any referenced artifact digest changes `bundle_sha256`.
+- [x] The bundle names its own profile, `exulanica.world-read-bundle/v1`.
+- [x] Nothing derived is presented as evidence: the bundle's geometry entries carry the rung that
       produced them and no `support_span_ids`, and a test asserts that no key named for evidence
       appears under a geometry entry.
 
@@ -115,13 +118,13 @@ property a third party will ask about first.
 
 **Exit.**
 
-- [ ] A bearer for workspace A requesting a scene in workspace B receives 404, not 403, matching the
+- [x] A bearer for workspace A requesting a scene in workspace B receives 404, not 403, matching the
       existing rule that the surface is not an existence oracle (`exulanica/api/app.py`, M10).
-- [ ] An unauthenticated request receives 401 and the route appears in the `routable_paths`
+- [x] An unauthenticated request receives 401 and the route appears in the `routable_paths`
       authorisation sweep in `tests/test_api.py`.
-- [ ] A withdrawn scene returns 410 through the existing `tombstone_blocks_scene` path, not an empty
+- [x] A withdrawn scene returns 410 through the existing `tombstone_blocks_scene` path, not an empty
       bundle.
-- [ ] The route is registered in `create_app` and its `summary` states what it serves.
+- [x] The route is registered in `create_app` and its `summary` states what it serves.
 
 **Files.** New: `exulanica/api/routes/world_read.py`. Edit: `exulanica/api/app.py` (import and one
 `include_router` line), `tests/test_api.py`.
@@ -139,10 +142,10 @@ exists to prevent.
 
 **Exit.**
 
-- [ ] `release.state` is `internal_only` whenever the per-person consent layer is absent, and the
+- [x] `release.state` is `internal_only` whenever the per-person consent layer is absent, and the
       bundle says which basis it used (`human-screening-receipt`) and what that basis does not
       establish.
-- [ ] A test asserts `internal_only` is what the current tree produces, so the day the privacy
+- [x] A test asserts `internal_only` is what the current tree produces, so the day the privacy
       branch lands, that test fails and forces the value to be reconsidered rather than inherited.
 
 **Files.** `exulanica/graph/world_read.py`, `tests/test_world_read_bundle.py`.
@@ -165,17 +168,17 @@ output has nowhere to go but into the record.
 
 **Exit.**
 
-- [ ] The stage is in `STAGES` and registers a `stage_definition` row, so a `pipeline_event` naming
+- [x] The stage is in `STAGES` and registers a `stage_definition` row, so a `pipeline_event` naming
       it is accepted by `tg_pipeline_event_uses_registered_stage`.
-- [ ] `deterministic=False`, and `docs/domain-and-evidence-model.md`'s list of
+- [x] `deterministic=False`, and `docs/domain-and-evidence-model.md`'s list of
       non-exactly-recomputable stages names it, because `tests/test_exact_recomputation.py` derives
       that set from the registry and asserts the document matches. A generated artifact is
       **removed, not regenerated** on deletion, per ADR-0017.
-- [ ] The model identity, model version, prompt digest and conditioning digests are bound into the
+- [x] The model identity, model version, prompt digest and conditioning digests are bound into the
       artifact's `input_digest`, so swapping the model produces a different `artifact_id` rather
       than silently reusing the old one. Asserted by a test that changes only the model version and
       observes a different id.
-- [ ] `model_role` is **not** set. `model_role` names a role the platform routes through its own
+- [x] `model_role` is **not** set. `model_role` names a role the platform routes through its own
       reviewed model manifest, and a third-party world model supplied per request is not that.
       Setting it would also change `sorted(key for key, spec in STAGES.items() if spec.model_role)`,
       which `tests/test_unblocked_program_record.py` asserts against the digest-bound record
@@ -200,7 +203,7 @@ seam between generated and recorded.
 
 **Exit.**
 
-- [ ] `generated_geometry` is a different field from `trained_geometry` in
+- [x] `generated_geometry` is a different field from `trained_geometry` in
       `exulanica/graph/payload.py` and in `web/packages/graph-client/src/wire.ts`, and no code path
       assigns one from the other.
 - [ ] The scene status names the model and the seam, in the same sentence style as the display-frame
@@ -219,12 +222,12 @@ rung, cannot be cited, and cannot enter a receipt chain.
 
 **Exit.**
 
-- [ ] `SceneReceipt.kind` remains `pose|placement|scale|coverage|corridor|splat`, so a generated
+- [x] `SceneReceipt.kind` remains `pose|placement|scale|coverage|corridor|splat`, so a generated
       artifact is structurally unable to enter `decide_scene_rung`. A test constructs a generated
       artifact and asserts the scene's rung is unchanged.
-- [ ] A generated artifact cannot become an assertion's support span. A test attempts it and gets
+- [x] A generated artifact cannot become an assertion's support span. A test attempts it and gets
       the existing epistemic refusal.
-- [ ] An executed mutation control per invariant, in a new `scripts/verify_generated_tier_controls.py`
+- [ ] An executed mutation control per invariant, in `scripts/verify_world_read_controls.py`
       following the shape of `scripts/verify_gsplat_controls.py`: the mutant must be killed by a
       named test selector, the unmutated baseline must pass first, and the record is written
       digest-bound under `docs/evaluation/`.
@@ -248,13 +251,21 @@ person able to check it without reading JSON.
 
 **Exit.**
 
-- [ ] Colour is decided in `@exulanica/presentation` and delivered to the renderer as a uniform,
+- [x] Colour is decided in `@exulanica/presentation` and delivered to the renderer as a uniform,
       not chosen inside `atlas-react`. `pnpm boundaries` passes, which is what enforces this.
-- [ ] The lens has a legend naming each tier in words, because a colour without a legend is a claim
-      nobody can check.
-- [ ] A region whose scene is not drawn keeps its existing "Not drawn" disclosure under the lens
+- [x] The lens has a legend naming each tier in words, because a colour without a legend is a claim
+      nobody can check. The status panel prints the tier label and its sentence per scene
+      (`proofTierDisclosure`), which is also what a screen reader and a screenshot get.
+- [ ] **The 3D view is not yet coloured.** The tier decision, its palette and its words exist and
+      are tested; nothing writes the palette into the renderer's per-frame island uniform. Until
+      that lands the lens is a sentence in the panel, not a colour in the world, and this ticket is
+      open. The wiring point is the existing `visual.uIsland` write in `atlas-binding.ts`, and it
+      cannot be covered by a test in this workspace: no test imports the engine, by the rule
+      `atlas-react/test/opm.test.ts` states, so it needs the bake-off page or a real scene on
+      screen.
+- [x] A region whose scene is not drawn keeps its existing "Not drawn" disclosure under the lens
       rather than being coloured as though it were showing something.
-- [ ] Toggling the lens changes no scene, no rung and no receipt, asserted by a test on the state it
+- [x] Toggling the lens changes no scene, no rung and no receipt, asserted by a test on the state it
       writes.
 
 **Files.** New: a lens module in `web/packages/presentation/src/`, tests under
@@ -272,17 +283,17 @@ product's whole epistemic claim made physical.
 
 **Exit.**
 
-- [ ] The gesture lives in the **reconstruction inspector**, not in traverse mode. Traverse holds
+- [x] The gesture lives in the **reconstruction inspector**, not in traverse mode. Traverse holds
       Pointer Lock, which freezes cursor coordinates
       (`web/packages/atlas-react/src/playcanvas/controls.ts`), and the focus solver's header states
       that it must never take a screen-space input. The inspector already exits pointer lock and
       already stands on a calibrated recovered camera, so a click there has real coordinates and a
       real projection.
-- [ ] The answer is **recorded provenance, not inference**: it comes from
+- [x] The answer is **recorded provenance, not inference**: it comes from
       `quality.cameras[].sparse_observations` inside the pose receipt, whose rows are
       `[point id, source x, source y, world x, world y, world z, reprojection error, track length]`
       and whose `point id` is COLMAP's global `points3D` id shared across every image in the model.
-- [ ] The retained observation set is capped at 4096 per image, hash-ordered by point id
+- [x] The retained observation set is capped at 4096 per image, hash-ordered by point id
       (`exulanica/reconstruction/pose.py`). The UI therefore reports the point's full
       `track_length` beside the number of observations actually held, and says the held set is a
       bounded sample. A UI that showed "3 photographs" for a point with a track length of 40 would
@@ -290,14 +301,23 @@ product's whole epistemic claim made physical.
 - [ ] Clicking trained (SOG) geometry, which carries no per-splat provenance, either resolves
       through the same sparse points or says it cannot. It never reprojects into cameras and
       presents the result as though it were recorded observation.
-- [ ] Each listed photograph carries its consent state from the member row, and a photograph whose
-      person state forbids it is not offered.
-- [ ] A new authenticated route serving pose-receipt observations, guarded by
+- [x] Each listed observation carries the photograph's consent state, from the same seam the World
+      Read bundle uses (`consent_for_captures`).
+- [ ] A photograph whose person state forbids it is not offered. Open, and it is P10-5's to close:
+      no per-person state exists yet, so today every observation reports `person_consent:
+      unavailable` and the caller has nothing to filter on.
+- [x] A new authenticated route serving pose-receipt observations, guarded by
       `tombstone_blocks_scene` (not `tombstone_blocks_capture`, which is the wrong reduction for a
       fact about N photographs) and `person_withdrawal_blocks_artifact`.
 
+- [ ] **The inspector does not yet listen for a click.** `pickObservedPoint` and
+      `canvasToSourcePixel` are built and tested against a known camera, and
+      `GET /world-read/scenes/{id}/observations` serves the recorded graph, but nothing in
+      `reconstruction-inspector.ts` binds a pointer event to them or draws the result. Until that
+      lands a visitor cannot click anything, and this ticket is open.
+
 **Files.** New: `exulanica/graph/observations.py`, `exulanica/api/routes/world_read.py` (second
-route), `web/packages/atlas-core/src/observation-pick.ts`, tests in both workspaces. Edit:
+route), `web/packages/atlas-core/src/observation-pick.ts`, tests in both workspaces. Still to edit:
 `web/packages/app/src/ui/reconstruction-inspector.ts`, `web/packages/app/src/main.ts`.
 
 ---
@@ -315,9 +335,9 @@ place captured once. So this week delivers the design and the fixture, and the e
 
 **Exit.**
 
-- [ ] A design note `docs/place-identity.md`: the alignment method, what a `place` entity is, the
+- [x] A design note `docs/place-identity.md`: the alignment method, what a `place` entity is, the
       forward migration, how Atlas merges regions and exposes time, and the refusal conditions.
-- [ ] A numeric test fixture: two synthetic captures of one synthetic place with a known ground-truth
+- [x] A numeric test fixture: two synthetic captures of one synthetic place with a known ground-truth
       relative transform, so the aligner can be measured before real captures exist.
 - [ ] **Open until real data.** Two consented captures of one real place, weeks apart, share one
       frame within a stated tolerance, and the world shows both versions in place. Not achievable
@@ -348,13 +368,13 @@ The memory-layer branch's obligation is one seam, not an implementation:
 
 **Exit for the memory-layer branch.**
 
-- [ ] `exulanica/graph/world_read.py` reads consent through one named function, so that when
+- [x] `exulanica/graph/world_read.py` reads consent through one named function, so that when
       `person-consent-masking` merges, the change is that function's body and nothing else.
-- [ ] The stub is default-deny and says so: absent the privacy layer, the bundle reports
+- [x] The stub is default-deny and says so: absent the privacy layer, the bundle reports
       `person_consent: unavailable` and `release.state: internal_only`. It never reports "no people"
       from the absence of a person layer, which is the exact confusion that made the 2026-09-05
       screening statement too coarse.
-- [ ] A test pins the stub's output so the merge cannot pass silently.
+- [x] A test pins the stub's output so the merge cannot pass silently.
 
 **Exit for the phase.** Held by the privacy chat: a request for a scene containing a person without
 likeness consent receives that person masked, verified by test.
