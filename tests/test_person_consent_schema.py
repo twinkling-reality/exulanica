@@ -182,3 +182,23 @@ def test_an_undecided_person_never_produces_an_eligible_screening():
 
     assert "unknown" in MASKED_STATES
     assert MASKED_STATES < _REGION_STATES, "a masked state must still be a recordable state"
+
+
+def test_a_receipt_written_under_a_superseded_policy_no_longer_counts():
+    """The bump has to bite, or it is a number in a docstring.
+
+    Every screening stored `policy_version` and `policy_params_digest` from the beginning and
+    nothing compared either, so moving the policy to v2 invalidated nothing: the two retained
+    collections kept their version 1 receipts and those receipts kept passing. The claim that they
+    "must be re-screened" was true of the intent and false of the code.
+    """
+    resolver = CONSENT_SQL.split("create or replace function privacy_screening_allows_capture")[1]
+    assert "s.policy_version = current_privacy_policy()" in resolver
+
+
+def test_the_database_and_python_name_the_same_current_policy():
+    """One place each, and a test between them, because two literals drift."""
+    from exulanica.ingest.privacy import PRIVACY_POLICY_VERSION
+
+    declared = CONSENT_SQL.split("create function current_privacy_policy()")[1].split("$fn$")[1]
+    assert PRIVACY_POLICY_VERSION in declared

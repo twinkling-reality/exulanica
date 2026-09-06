@@ -242,6 +242,19 @@ comment on column artifact.read_source_sha256 is
   'that requires masking must name the masked derivative here, which is what makes "mask before, '
   'not only after" a database rule rather than a convention in Python.';
 
+-- The policy a receipt has to have been written under to still count.
+--
+-- Every screening already stores `policy_version` and `policy_params_digest`, and until now
+-- nothing ever compared them: a receipt written under version 1 kept passing after the policy
+-- moved to version 2, so bumping the policy invalidated nothing and the invalidation existed only
+-- in prose. That is the shape of bug this schema exists to prevent, recorded in a digest and
+-- never checked.
+--
+-- A function rather than a literal inside the resolver, so there is one place to move it and one
+-- place for a test to compare against `exulanica.ingest.privacy.PRIVACY_POLICY_VERSION`.
+create function current_privacy_policy() returns text
+language sql immutable as $fn$ select 'exulanica.reconstruction-privacy/v2' $fn$;
+
 create or replace function privacy_screening_allows_capture(
   p_workspace uuid,
   p_capture uuid,
@@ -265,6 +278,11 @@ language sql volatile as $fn$
        and a.source_sha256 = s.source_sha256
        and a.authorization_scope = s.authorization_scope
        and s.eligibility_state = 'eligible'
+       -- Written under the policy in force. A receipt recorded when "is anybody visible?" was
+       -- the whole question does not carry forward to a policy whose answer is a region list
+       -- with a consent state per person, and the two retained collections are exactly that
+       -- case: reviewed under version 1, and not yet re-screened.
+       and s.policy_version = current_privacy_policy()
        and (s.valid_until is null or s.valid_until > clock_timestamp())
        and (a.valid_until is null or a.valid_until > clock_timestamp())
        and c.deleted_at is null
