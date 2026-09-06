@@ -531,6 +531,16 @@ function reconstructionRungsFor(
       memberCount: scene.memberCount,
       renderingSubstrate: substrate,
       reasons: Object.freeze(reasons),
+      // What the proof lens reads. `drawn` is already decided above, and passing it rather than
+      // letting the panel infer it from the substrate is the point: a scene can have trained
+      // geometry and still be showing the visitor nothing, because its region draws another one.
+      drawn: !notDrawn.has(scene.sceneId),
+      // A generation only counts as in view when it verified. An `invalid` entry is a generation
+      // whose receipt did not check out, and it is never drawn, so it must not colour the region
+      // as though a model surface were on screen.
+      showingGenerated:
+        !notDrawn.has(scene.sceneId)
+        && scene.generatedGeometry.some((entry) => entry.state === 'available'),
       ...(scene.trainedGeometry?.quality === undefined ? {} : { trainingQuality: scene.trainedGeometry.quality }),
     });
   }));

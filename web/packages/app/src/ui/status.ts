@@ -7,6 +7,12 @@ import type {
   TrainingQualityRecord,
 } from '@exulanica/graph-client';
 import { rungSentence } from '@exulanica/formation';
+import {
+  PROOF_TIER_LABELS,
+  PROOF_TIER_SENTENCES,
+  proofTierOf,
+  type ProofTier,
+} from '@exulanica/presentation';
 import { el } from './dom.js';
 
 /** Fixed by interaction-model.md 6.2 and shown with Atlas Map, where layout can be misread. */
@@ -46,6 +52,37 @@ export interface ReconstructionRungDisclosure {
   readonly reasons: readonly string[];
   /** The trainer's measured held-out appearance and accounting, shown beside a trained substrate. */
   readonly trainingQuality?: TrainingQualityRecord;
+  /**
+   * Whether this scene is the one its region draws.
+   *
+   * A scene whose region displays a more complete reconstruction of the same photographs is still
+   * listed, and the proof lens must say it is showing nothing rather than colour it as though it
+   * were showing reconstruction.
+   */
+  readonly drawn?: boolean;
+  /** Whether a model-generated surface is among what this scene draws. */
+  readonly showingGenerated?: boolean;
+}
+
+/**
+ * What the proof lens says about one scene, as text.
+ *
+ * The lens colours the world; this is the same fact in the panel where every other honesty claim
+ * in this product already lives, and it is what a screen reader and a screenshot both get. The
+ * label and the sentence come from `@exulanica/presentation` verbatim rather than being reworded
+ * here, so the colour and the words cannot drift apart.
+ */
+export function proofTierDisclosure(scene: ReconstructionRungDisclosure): {
+  readonly tier: ProofTier;
+  readonly label: string;
+  readonly sentence: string;
+} {
+  const tier = proofTierOf({
+    substrate: scene.renderingSubstrate,
+    drawn: scene.drawn ?? true,
+    showingGenerated: scene.showingGenerated ?? false,
+  });
+  return { tier, label: PROOF_TIER_LABELS[tier], sentence: PROOF_TIER_SENTENCES[tier] };
 }
 
 /** Measured numbers stay numbers: fixed decimals, units named, no adjectives. */
@@ -139,6 +176,13 @@ export function buildStatus(input: StatusInput): HTMLElement {
         text: `${scene.registeredMemberCount} of ${scene.memberCount} photographs registered.`,
       }),
     );
+    const proof = proofTierDisclosure(scene);
+    const proofLine = el('p', {
+      class: 'reconstruction-proof-tier',
+      text: `${proof.label}. ${proof.sentence}`,
+    });
+    proofLine.dataset.proofTier = proof.tier;
+    details.append(proofLine);
     if (scene.reasons.length > 0) {
       const reasons = el('ul', { class: 'reconstruction-rung-reasons' });
       for (const reason of scene.reasons) reasons.append(el('li', { text: reason }));
