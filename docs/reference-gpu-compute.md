@@ -96,6 +96,10 @@ are named in the commits.
   final checkpoint instead of retraining.
 - The stage-binding currency check ran after pose recovery. A stale retryable job spent thirty
   minutes of COLMAP on 210 photographs before being refused; the check now runs first.
+- SOG compression of one million degree-3 Gaussians with `-g cpu` runs k-means over 45
+  coefficients per Gaussian on one CPU core; it had not finished after an hour. Delivery now keeps
+  band 0 only (`-H 0`, recorded in the protocol as `delivered_sh_bands`), which makes compression a
+  matter of seconds. GPU k-means on the compression host would restore the higher bands.
 - The first trained bowl scene passed every appearance rule and was still refused by the floater
   proxy (0.472 against a predeclared 0.15). The proxy measures distance from sparse points and a
   plain table around a densely matched bowl has almost none; it is a divergence diagnostic, not a
