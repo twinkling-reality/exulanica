@@ -77,6 +77,12 @@ create table person_region (
     or (action in ('confirmed', 'added', 'deleted') and confirmed_by is not null))
 );
 create index person_region_capture_idx on person_region (workspace_id, capture_id);
+-- Supports `person_region_current`, which is read once per photograph on the ingest path. The
+-- view is a `distinct on (workspace_id, capture_id, region_key) ... order by ... sequence desc`,
+-- and without an index in exactly that order every read sorts the whole table. That is invisible
+-- on an empty table and is a corpus-sized problem later, which is the wrong moment to find it.
+create index person_region_live_idx
+  on person_region (workspace_id, capture_id, region_key, sequence desc);
 create index person_region_subject_idx on person_region (workspace_id, subject_id)
   where subject_id is not null;
 
