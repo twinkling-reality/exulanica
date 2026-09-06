@@ -62,15 +62,21 @@
           "PIL"
         ]
       },
+      "detector_corrected": {
+        "fix": "Observation schema version 2 gives people their own array and asks for partial traces by name, with a closed part vocabulary carried through to the review screen. The vision stage moved to version 3, so every photograph is re-observed.",
+        "not_measured": "Recall on real photographs. Nothing has run the vision stage over the retained collections, so what this actually finds on the bowl frames is unknown.",
+        "privacy_effect": "A person entry carries no free-text label. Occurrence quality keys went from {confidence_band, salience, label, trust_tier} to {confidence_band, part, trust_tier}, and both biometric-boundary tests were tightened to assert `label` is absent.",
+        "what_was_wrong": "The shipped adapter read `person_objects`, and the observation schema instructs the model not to list people in `objects`. Its label set is an exact-match whitelist of 16 singular nouns matching none of 'arms', 'hands', 'diners', 'elbow' or 'shoulder', which are the traces the retained bowl photographs contain."
+      },
       "environment": {
         "disk_full_incident": "The host filled to 100 percent (3.0 GiB free of 460 GiB) during this work, which caused psycopg DiskFull and 23-minute suite runs. Cleared by the operator; the suite returned to 4m33s. Sixteen leaked exulanica_test_* schemas from interrupted runs, totalling 64.5 MiB, were dropped with the operator's authorization."
       },
       "full_suite": {
         "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest",
-        "duration_seconds": 273,
+        "duration_seconds": 581,
         "exit_code": 0,
         "failed": 0,
-        "passed": 1778,
+        "passed": 1798,
         "skipped": 3
       },
       "import_contracts": {
@@ -132,12 +138,12 @@
       }
     },
     "files": {
-      "docs/person-presentation-consent.md": "83a6b923514a61b3d8982162a5e94735c2c61ddcc8134495f8a502115b5607e2",
+      "docs/person-presentation-consent.md": "5e4ccd352c9ebcf9b6c2ed9229f1a5988bf9472db45fe8654ad66e2af1fe4c76",
       "exulanica/api/app.py": "a36be73e3b6d92507e5b7e036355ebd7c9485a3c114fd825c54efc205e63bfcc",
       "exulanica/api/routes/evidence.py": "c39ce18b73c88f9c1f4dc174b7042cba0418cd3dbfd8b7f253a86cf6e8eaef14",
       "exulanica/api/routes/person_consent.py": "e7547a15584dde57daf5a4f4fe9b1390a5bd3de2e8e377b22fba7c209a386a87",
       "exulanica/consent/__init__.py": "5561e061f5cb896ec8f3c875cd9661d22796331c09bb6acba55ba69006a7481d",
-      "exulanica/consent/regions.py": "802425f5826cdc2eccbe1b3b6ca6517ac301a8d290358293e9a28a1fd1cc5842",
+      "exulanica/consent/regions.py": "0f6acabbb91d80d203123422c3ad8235377bcaf925a62ea2953ac5d1394a8f81",
       "exulanica/consent/states.py": "fe684ee60fb43fd6835c8216a5d619be34f7f14977ec6f7dec4b82b91e6eaa16",
       "exulanica/db/session.py": "2462c39de19561a33dbb67f2d06298af7b34bec8c88a2892c3d59ba104566e85",
       "exulanica/graph/payload.py": "cbf16418dcf3f8c82f768cbdca286edc933bc69f0084724d61038c15c5302e7a",
@@ -146,9 +152,9 @@
       "exulanica/ingest/masked_geometry.py": "cd4ecc4ec739b642241f0da6bff53bc1fb6c8016ba7a5e7a101934f1c9ba2b2f",
       "exulanica/ingest/masked_inputs.py": "bd3bfcae23df0bdf18be145363cd325732d25c4d697bad0fc86a7290fba19ab3",
       "exulanica/ingest/masking.py": "2d6e7552fd6ef2f3b9e773ecef95bed5e086f433a2de22c91ed296c3ee484c51",
-      "exulanica/ingest/person_detectors.py": "a45f7102f58783add07c74364981e556cc1f9ed396bd376c475f6200ba1d8a4d",
-      "exulanica/ingest/person_receipts.py": "406e942ddb9fccd73005afa17d44b23d8e1f2dd1edd3c6b236d16cce956268de",
-      "exulanica/ingest/person_review.py": "9405ab183972b4895e03c827b70fe249e8a809c5251b8f87cc229d0f1c3bf9f9",
+      "exulanica/ingest/person_detectors.py": "a0a7ebeaecc05dc878048fa30f284d5dfd00cce7747aeccb047ba0539ffbf977",
+      "exulanica/ingest/person_receipts.py": "fd171cb9e63a4fdf6e48946ddb61b3c14e1cb4877ccf24831801775dc74f5eb0",
+      "exulanica/ingest/person_review.py": "cc580dcccad080c2de0d65761ef8ba22442f84eed742849c03478d87b30ebd11",
       "exulanica/ingest/person_state.py": "4613c7fa2ee7ba8404117c37732c5018dea625cba25eb7ccbe084d2d5054fe54",
       "exulanica/ingest/pipeline.py": "088f815e0b3090c5c3947e418bdd7f21e6e36a0b2aeb732d7924c25919cb187a",
       "exulanica/ingest/privacy.py": "36dac1368519ba5bebf2ccfa8b34fbd916ce3a3d29a458b43745280f6d0789bf",
@@ -157,34 +163,40 @@
       "exulanica/ingest/scene_selection.py": "d41b7f92a70f89bcd3ff61a764f1471e1d83ddacc116fbccab4f2349284a872a",
       "exulanica/ingest/spine/__init__.py": "eb90c8dce2680816f17c5b935ff62bc23e72dd9b3de49bef8e198f9efb18bab0",
       "exulanica/ingest/spine/artifacts.py": "f281b22d72891971b9cce9cd779b30514fe30f44573d2ae984414739b034a274",
-      "exulanica/ingest/spine/person_consent.py": "9a6211171f1fef782aec607cfcffe9616db2e2f8ffbf3b98d44b829baa215587",
-      "exulanica/ingest/stages/__init__.py": "508de5fc840b9b1d006ac428b3c2f60c81c40b31ee12870065292695ae17c0b8",
+      "exulanica/ingest/spine/person_consent.py": "e38339702c00f5a0a4c09c72726cd07e9ef0707076f0530f20b036bef4e638c4",
+      "exulanica/ingest/stages/__init__.py": "445ee12cdc160222673d688d86961292eb47bf871c47bc414ac4e2fa5a29011f",
       "exulanica/ingest/stages/depth.py": "edbc96af13ef917a8937343bc9e0e81c82c25963ba0742a7819f52aac26ce7c0",
       "exulanica/ingest/stages/masked_source.py": "d62505478867170ae9b83d625bc060f5d0501f6627ea3d5f6c913e53ce43104d",
-      "exulanica/ingest/stages/person_regions.py": "716fbb0e50689e7166671e037cf5ab17d08e99ee538ce79be11d4876a4f14616",
-      "exulanica/ingest/stages/vision.py": "45650f0b74e4dbb08601e74a3a9c90ba59a25d5c97c3fcaa6f650985d259276f",
+      "exulanica/ingest/stages/person_regions.py": "943018446060f8c105d8a9bbd227882582e315cb9caa10b9f0537cd12c1399d4",
+      "exulanica/ingest/stages/vision.py": "ba66dd0c123c98e6e647b4d511c1ce011ce4e17c305789d0abf05fec0ebb1c4f",
       "exulanica/ingest/stages/writes.py": "bdb2beb81251f7954964fe0d651b2c01eedb653c77aa9b048fcc840ae1bc7cb7",
+      "exulanica/ingest/vision.py": "4b10f6a07cf02fe853e10a16cb8a1dddd233a0f2ff011c9f1e998e499406c023",
       "exulanica/ingest/worker.py": "24a191eb1d051af19430f4bf11ceb3f3c29669163275eb388d3b609c9343427b",
       "exulanica/ingest/worker_command.py": "f28e90303c87abf8f75ae11c58976e3952a9dabd4371fed0ba43137da802904d",
-      "exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql": "7abd4612e268df1889b2ac1b62cc42c16698e91451bac0d40406207722d5a0a8",
+      "exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql": "b7492efcd5eaf34b4f2f6a50e5b5bf62e248d273cbd3f80394d066e7e9cc4199",
       "exulanica/world/repository.py": "c73310b53846be78d4a7d651056c3612418d4cb230612adc98f446b8fcc7382c",
       "pyproject.toml": "e6eba250f90d1b2ba91637fb94361dcd60ed391ec19942ee81c00b9d763fa4ed",
       "tests/test_api.py": "7adc65bf4fed9975fbb92180f1f3b0064dcd6686514fc5cfca2264df6358bbf7",
       "tests/test_ingest_idempotency.py": "e0637999d147d646a9aa2bc2019f2f4900f163d509530cc165ce883e03a22f83",
-      "tests/test_ingest_persistence.py": "77096b7baf36fa77cb9e061b5166482ef45a51e16ed44b2be0d0552021785942",
+      "tests/test_ingest_persistence.py": "2b5952c8daaeb5d2305447a4cb39c52663e132deacd8fdcda3b6eaf6a3de2f7b",
+      "tests/test_ingest_preconditions.py": "e7aa3f98bf8b2dec4f829c0bcc8f607b7275d7e6f1c816f18dba0f4d40dd63a6",
       "tests/test_masked_geometry.py": "1f6c5f025929216139621e273ecda0bf63bd21c67ebd21bf41f55d14b9feee75",
       "tests/test_masked_scene_inputs.py": "b6e170c08cd969206a29d581a15ff8151b4a1ecb323ac64e014ca3f97da275fe",
       "tests/test_migration.py": "8053be27fab47fff5088e315f6ac316976e62c545394e06a980aadc4fa012fe8",
       "tests/test_person_consent_schema.py": "ffed6e8b6730ea7ff2e4f20f27421625440749cf83a5fc61093586f250958de9",
-      "tests/test_person_masking.py": "18fd8ab08f0732554c648ff76164bba1a6cded776c7881342e2ca869397ec750",
+      "tests/test_person_detection_finds_partial_bodies.py": "60c1d85d1ce344e42addab411f1fa27606a39ed0015f6353a081c62156fe36f3",
+      "tests/test_person_masking.py": "f881de0a94c47384c26d7bea88d631753a15b96917159c3c7e74f683e3228785",
       "tests/test_person_masking_end_to_end.py": "00a1b459788cd32dfa46ec4dff59ec98110246c1ae84a1844ad70327564fe642",
       "tests/test_person_presentation_consent.py": "05dba639ae7d6dc6b374731d453b01eec71f0a926fb6861be9af3c85a12f8a99",
-      "tests/test_person_receipts.py": "3af04437e7578362c76ef0fa0a328fbf9d4af5ba6d8b9b04102c19f138de4365",
-      "tests/test_person_region_stages.py": "3804beab5fb6428df5e2672ec8393d5de7e87a5b5e62f7beeeae7bd4d1dc7143",
-      "web/packages/app/src/ui/person-review.ts": "96b90acd63ab20b81c46192bf2859b1d8647f128a08da27e205a917985e28c46",
+      "tests/test_person_receipts.py": "d8d7303c999af55ae78fd414c504a7a4c1dcb6bae5cc8c1c9acd78ab958def61",
+      "tests/test_person_region_stages.py": "913a7d55f4b155869b417b11f7c45268a07de288cc6e0db3173c5488ffba685d",
+      "tests/test_selection_answer.py": "42ce5213f1d628d8468452a7b01c9814a27c550347aa433c48ca2fed74649d11",
+      "tests/test_vision_contract.py": "71c49077702a3779d87b6a5f93afdab7605d689621ab7a48180bc2d055ef23e2",
+      "web/packages/app/src/ui/person-review.ts": "9fbcbd9fedd9a3edb884b464ba79e11876d7bbbe7a6582f953a424cd1a82d786",
       "web/packages/app/src/ui/status.ts": "e412c60f7176207fef92203388ce44d38ca277ebd7c8e1b0c03f86221d893384",
       "web/packages/app/test/geometry-api.test.ts": "185db30df4f7ff5c0165b1d9baa497c11034edc6ecf9ceeda282ba8e0d41c4a3",
-      "web/packages/app/test/person-review.test.ts": "a06fcabfef6b9d87677360df74910b00e7b59cd688bdc221394fc79400708cf1",
+      "web/packages/app/test/person-review.test.ts": "d51534edcc832eef36b38b45ab4d7989154c1ca29f3041f85eefa03e544d1229",
+      "web/packages/graph-client/src/client.ts": "d608b948f1eb45f3fdde768a7d62e1de8b222eff2bd5b853432ece754cfbf67b",
       "web/packages/graph-client/src/index.ts": "070376038d693c37304d17c2cdc1a9119e8b91baca8248b2f7acef075e501efe",
       "web/packages/graph-client/src/person-presentation.ts": "c703fccd69f3aad18a7b7ff1811f5c47cf3e22274f078bb40e22b9411e706143",
       "web/packages/graph-client/src/read-model.ts": "392b7eda57520f5f8fc7e50367241421afbf4b54c3f22aca697c6c42240c1fd9",
@@ -194,8 +206,8 @@
     },
     "head_revision": "2d9fc53",
     "limitations": [
-      "The shipped detector reads exulanica/ingest/vision.py's `objects`, which the schema instructs the model NOT to put people in, so it finds almost nobody. A human adding regions through the review screen is the detector today. An earlier version of this record wrongly described that adapter as reading real recorded detections.",
-      "Every consent recorded is the account holder's, as actor_role owner. The photographed person has no way to answer for themselves, so this layer remains what the design note calls theater.",
+      "The detector is a hosted multimodal model doing open-vocabulary detection, not a segmenter. Regions are boxes and are recorded as shape='box'. Its recall on real photographs is unmeasured, and enumeration happens off this machine.",
+      "Every consent recorded is the account holder's, as actor_role owner. The photographed person still has no way to answer for themselves.",
       "A revoked consent produces a new build; it does not purge geometry from an earlier build.",
       "A green suite establishes that the code and schema agree and that the guards fire, not that a corpus behaves this way. No human has confirmed a region on a real photograph.",
       "The API on port 8000 was left running throughout, against the runbook's advice to stop it."
@@ -221,5 +233,5 @@
       "what": "Migration 0029 blocked any screening naming a person. 0037 removed that rule, and the first replacement in record_human_screening accepted a region in state 'unknown', meaning somebody was seen and nobody decided, as eligible."
     }
   },
-  "record_sha256": "d786a6cdae34059196edca017771dff5d57877b1f6ea3e4828166d94f06c3e19"
+  "record_sha256": "5010926c92e45967dc2aac002b1856086a07c61e3ede53fa25a986adf38781cd"
 }

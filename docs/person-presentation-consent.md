@@ -161,15 +161,50 @@ The three new tables brought the count of tables under FORCE row-level security 
 `current_workspace()` from 59 to 62. That number is stated in three docstrings and asserted against
 the live schema, which is the gate that caught them.
 
+### The detector, corrected 2026-09-06
+
+The first pass shipped an adapter that read `person_objects` from the vision observation, and an
+audit found that `exulanica/ingest/vision.py` instructs the model **not** to list people in
+`objects`. That field is a defensive filter for a model that disobeys, not a detector, and its
+label set is an exact-match whitelist of sixteen singular nouns: "arms", "hands", "diners",
+"elbow" and "shoulder" match none of them. Those are precisely the traces the retained bowl
+photographs contain, so the detector could not have found the thing this note was written about.
+
+Observation schema version 2 fixes that at the source rather than by widening a whitelist:
+
+- **People have their own array**, and the description asks for "every visible trace of a human
+  being, including partial ones", naming a hand at the edge of the frame, an arm, a leg, a
+  shoulder, clothing on a body, a reflection, and somebody on a screen inside the photograph.
+- **The part is a closed vocabulary** (`full_body`, `partial_body`, `head`, `torso`, `arm`,
+  `hand`, `leg`, `foot`, `reflection`, `on_screen`), so an unrecognised value is refused rather
+  than silently dropped, and it reaches the review screen: a reviewer looking at an outline on a
+  neutral field can otherwise not tell a hand from a coat on a chair.
+- **The prompt tells the model a miss is worse than a false positive**, which is the right trade
+  under default deny: an extra region costs a reviewer one click, a missed one reconstructs
+  somebody who never agreed.
+- **A person entry carries no label and no salience.** Routing people through the object list meant
+  the model wrote free text about them, and "woman in a red coat" is a description of somebody who
+  has not consented to being described. The occurrence quality keys went from
+  `{confidence_band, salience, label, trust_tier}` to `{confidence_band, part, trust_tier}`, and
+  the two biometric-boundary tests were tightened to assert `label` is absent rather than
+  permitted.
+- **Observations stored under version 1 still read.** `person_traces` falls back to the old object
+  filter, so an existing corpus does not silently become a corpus with nobody in it, and that
+  fallback also still catches a model that ignores the instruction.
+
+The vision stage moved to version 3 and the prompt digest moved with it, so every photograph is
+re-observed rather than keeping an answer given under the old question.
+
 ### Not done, and not pretended
 
-- **The detector finds almost nobody.** `RecordedObservationDetector` reads `person_objects` from
-  a vision observation, and `exulanica/ingest/vision.py` instructs the model **not** to list people
-  in `objects`: that field is a defensive filter for a model that disobeys, not a detector. Its
-  person labels are also an exact-match whitelist of singular nouns, so "arms", "hands" and
-  "diners" match none of them. In practice a human adding regions through the review screen is the
-  real detector today, and the stage says "unavailable" rather than "found none" when no detector
-  is configured. A pinned segmenter remains the interface's purpose and is not written.
+- **The detector asks a hosted model, and its recall on real photographs is unmeasured.** Schema
+  version 2 gives people their own field and asks for partial traces by name, so a hand at a frame
+  edge is now something the model is told to report; what it actually reports on the retained bowl
+  photographs has not been measured, and cannot be until somebody runs the vision stage over them.
+  It is a multimodal model doing open-vocabulary detection, not a segmenter: the regions are boxes,
+  recorded as `shape='box'`, and no code calls them silhouettes. A pinned local segmenter remains
+  the interface's purpose and is still not written, which also means every photograph's people are
+  enumerated by a hosted model rather than on this machine.
 - **No subject-facing consent.** Every receipt these routes write records `actor_role: "owner"`,
   and the route refuses to let a request name its own actor or role, so the owner cannot
   manufacture the subject's decision. But the photographed person still has no way to answer for
