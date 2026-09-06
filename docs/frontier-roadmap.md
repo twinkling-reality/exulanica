@@ -33,6 +33,33 @@ This is the correct scope for a frontier project. The frontier claim is not that
 world. It is that heterogeneous perception, memory, reconstruction, interaction, personalization,
 and provenance can be assembled into one inspectable world without confusing inference with fact.
 
+Stated against the generative world models of 2026 (added 2026-09-06): those models are stateless
+imagination. They dream a plausible world for a session, know nothing about a specific person's
+life or a specific place, and cannot say which of their pixels are real. Exulanica is the memory
+they lack: a persistent, per-entity world built from real captures, with geometry, camera poses,
+time, the people who consented and the original pixels behind every part. A generative model that
+renders your kitchen should read it from here and be unable to deviate from what is real without
+saying so. The rung labels are what let imagination and record share one world without lying. The
+entity is a person first, and the same machinery serves a family, a place, a project or an
+institution. To become that layer in fact, not only in position, four things beyond today's
+reconstruction are required and are tracked as work, not claimed: a read interface a generative
+model can condition on (posed views, geometry, masks, consent state); a write-back path that stores
+generated content as its own labeled tier below every recorded rung; recognition of the same place
+and object across captures and years; and object-level entities that persist as the world grows.
+
+### 1.1 Public product and runtime naming
+
+Public entry points name the product, not its current internal runtime. The landing action is
+**Enter Exulanica**. “Enter World” is not used because it is generic, and “Enter Atlas” exposes a
+subsystem name as though it were a second product.
+
+Atlas remains the internal name of the navigable world runtime for now. A future Atlas-to-Exulanica
+technical migration is a separate release decision, not a landing-copy change. Before scheduling
+it, inventory persisted browser keys, environment variables, routes, package names, tests, and
+operator documentation; then choose either a pre-release clean cutover or an explicitly versioned
+compatibility migration. Until that decision, public surfaces say Exulanica and technical runtime
+documents may say Atlas.
+
 ## 2. Non-negotiable contracts
 
 Every phase below preserves these rules.
@@ -251,8 +278,11 @@ Deliverables:
   `© 2026 Twinkling Reality` convention used by the rest of the product family;
 - replace the title menu's line selector with one non-interactive miniature Companion moving among
   four quiet registration stations; use one restrained distance-aware glide and optical colour wake,
-  respond equally to pointer hover and keyboard focus, yield to focus when they conflict, remain
-  static under reduced motion, and leave Method's current-page underline intact;
+  respond equally to pointer hover and keyboard focus, yield to focus when they conflict, and remain
+  static under reduced motion;
+- retain that lower-left Companion navigation on the title, Purpose, and Capabilities surfaces;
+  keep Resources as one primary station whose Documentation and GitHub links appear in a
+  keyboard-operable secondary disclosure rather than becoming additional Companion stations;
 - move the Companion's renderer-neutral silhouette, eye-pose, palette, and state blueprint into the
   shared presentation contract before the landing uses it, so the miniature and Atlas presence are
   two presentations of one identity rather than drifting copies;
@@ -514,6 +544,45 @@ Exit gate: verification succeeds in a clean environment with no database access;
 manifest mutation fails; prohibited private/runtime material is absent; and a post-deletion export
 has a new root whose diff names the removed and recomputed state.
 
+### Phase 7B: training-use consent and consented dataset export
+
+Status: **PROPOSED 2026-09-06**, sequenced after the person-region masking and presentation
+consent layer (`docs/person-presentation-consent.md`), which it depends on.
+
+Premise: labs building world models need real, diverse, rights-clean environments with camera
+poses, and cannot get them cleanly. The pipeline already produces posed multi-view captures with
+human screening receipts, per-person consent state, provenance digests, frozen held-out splits and a
+verifiable package. Making that licensable turns the trust layer into a product, with the user, not
+the platform, as the licensor. It is an option on top of the memory product, never a change to it:
+default off, opt-in per package, and revocable.
+
+Deliverables:
+
+- a fourth consent, **training use**, recorded per package as an immutable receipt with scope
+  (which model classes, which licensee, which term), separate from presence, naming and likeness;
+- inheritance rules: a package is exportable for training only when every person in it has a
+  training-use consent or is masked out of the export; a later withdrawal revokes the licence for
+  future exports and is recorded against past ones;
+- a **dataset export profile** of the World Memory Package: exact source images, recovered
+  cameras and calibration, masked derivatives, sparse and trained geometry, capture metadata, the
+  held-out split, and the provenance chain, all digest-bound and independently verifiable;
+- a **ledger** of exports with licensee, terms, digests and attribution or payment, readable by the
+  user, so licensing is auditable rather than implied;
+- a prohibited-content scan and default exclusions equal to or stricter than the package's; and
+- honest framing in every export manifest: recorded captures with rung labels, no simulation or
+  adaptation claims.
+
+Exit gate: an export refuses when any pictured person lacks training-use consent and is not masked;
+a revocation changes the next export's root and names the removed material; a licensee can verify
+an export offline; and at least two prospective licensees have evaluated a sample export and stated
+in writing what they would pay for what volume (experiment FR-11). Without that demand evidence the
+phase stays a design, and the memory product does not depend on it.
+
+Risks named up front: personal captures are small and messy compared with what labs want; value
+is in aggregation, which pulls against the user-as-licensor stance unless the marketplace is ours;
+and the moment users believe their memories train someone else's model by default, the trust story
+that makes the memory product work is at risk. Default off is not negotiable.
+
 ### Phase 8: end-to-end frontier demonstration
 
 Status: **IMPLEMENTED AND DEVELOPMENT-EXIT-GATED; AUTHORIZED PERSONAL-CORPUS RUN PENDING**. See
@@ -573,6 +642,51 @@ Biometric embedding training remains blocked until the consent rule in the produ
 specifications is decided. Private-memory-derived weights are excluded from the World Memory Package
 by default.
 
+### Phase 10: the memory layer for world models
+
+Status: **DECIDED 2026-09-06, STARTING**. This phase turns the north-star positioning (a persistent,
+real, per-entity world that generative world models read from and write to) into interfaces and
+tiers. It precedes Phase 7B, whose dataset export is this phase's read interface served as a file.
+
+Five capabilities, in delivery order:
+
+1. **World Read API.** For an entity, a place and a time, one authenticated route returns what a
+   generative model may condition on and nothing else: posed views (masked where consent requires),
+   camera calibration, point maps or trained geometry, the region graph, rung labels and consent
+   state, digest-bound. Built from the existing graph payload and artifact routes in
+   `exulanica/graph`. Exit: a clean client reconstructs the bundle's digests offline; a request for
+   a scene containing a person without likeness consent receives that person masked, verified by
+   test; nothing derived is presented as evidence.
+2. **World Write API and the generated tier.** Content a world model imagines for unobserved parts
+   is stored as a `generated_scene` artifact in its own tier below every recorded rung, with the
+   model, version, prompt digest and the exact conditioning digests it received. It is never
+   citable and never promotes a rung. Atlas renders it only under a visible label. Exit: the graph
+   carries `generated_geometry` separately from recorded geometry; a generated scene cannot satisfy
+   any gate; the status names the model and the seam.
+3. **One place across captures and time.** Cross-scene alignment through shared sparse features
+   links separate captures of the same place into one `place` entity with versions by capture time
+   (forward migration). Atlas merges the regions and exposes time as a dimension. This is experiment
+   FR-2 made product. Exit: two consented captures of one real place, weeks apart, share one frame
+   within a measured tolerance, and the world shows both versions in place.
+4. **Persistent objects.** Detections link into object entities across captures with user
+   confirmation; people are excluded from automatic linking (no biometric templates). Exit: an
+   object named once is found in later captures with a measured precision on a blind split, or the
+   feature stays confirmation-only.
+5. **Consent on every read.** The person-region and presentation-consent layer
+   (`docs/person-presentation-consent.md`) gates the read API. No third party sees an export before
+   this lands.
+
+Atlas work in the same phase: a **proof lens** (colour by tier: photographed, reconstructed,
+generated), **click-to-evidence** (select a surface, see the photographs that observed it, with
+their consent states), and the generated tier drawn under the lens. Infrastructure in parallel: a
+GPU dispatcher and an image registry so a read of an unbuilt place can trigger its build without
+an operator.
+
+First-week sequence: read API and generated tier (they define the product), proof lens and
+click-to-evidence (they show it), place alignment started, dispatcher in parallel. Explicitly cut
+to make room: the volcanic collection, a streamed Earth mode (kept as a later bridge view), viewer
+polish, metric scale, and any training of our own models.
+
 ## 8. Experiment register
 
 These experiments are the decision points, not optional polish.
@@ -589,6 +703,8 @@ These experiments are the decision points, not optional polish.
 | FR-8 | Does deletion propagate honestly into export? | Export, delete/redact, recompute, re-export, and inspect the root plus semantic diff | Export remains disabled until closure is complete |
 | FR-9 | Does any fine-tuning earn its complexity? | Compare fixed baseline and candidate on untouched blind data, cost, latency, privacy, deletion, and model-lifecycle risk | Use the base model and reviewed pipeline |
 | FR-10 | Does the complete build reproduce? | Run twice from the same manifest and source set; compare canonical state and enumerate expected nondeterministic provider fields | Fix nondeterminism or weaken only the precise affected claim |
+| FR-12 | Does a generative world model conditioned through the read API stay inside the recorded parts, and is the seam visible? | Condition a generative model on one scene's read bundle; measure held-out agreement inside the recorded region and label agreement at the seam; record the model, version and digests | Keep the generated tier off by default and label it as unreliable fill |
+| FR-11 | Will anyone pay for consented, posed, verifiable captures? | Produce a sample dataset export from the retained collections under the Phase 7B profile; put it in front of at least two world-model or spatial-AI teams; record what they would pay for what volume and format, and what they reject | Keep Phase 7B as a design; the memory product does not depend on it |
 
 Every experiment stores its manifest, code revision, environment, raw measurements, result, and the
 decision it changed. A screenshot without the run record is not an experiment.
@@ -603,6 +719,7 @@ The word “training” covers four different activities here and must not be us
 | Base-model inference for vision, reasoning, and embeddings | **YES, already used** | Versioned model calls with schema validation and provenance; no local weight update |
 | User adaptation through versioned state | **YES, Phase 5** | Safer, inspectable personalization through preferences/proposals rather than hidden weight changes |
 | Fine-tuning a general or user-specific neural model | **NO CURRENT JUSTIFICATION** | No measured failure, consented training set, blind result, deletion policy, or lifecycle advantage yet |
+| Licensing consented captures for a third party's model training | **PROPOSED, Phase 7B, opt-in only** | Rights-clean posed captures are what world-model labs lack; requires a separate training-use consent per person and package, a verifiable export profile and a ledger; default off |
 
 The default technical strategy is therefore: use reviewed pretrained models as replaceable sensors,
 keep durable memory in explicit versioned state, and train only the scene representation whose
