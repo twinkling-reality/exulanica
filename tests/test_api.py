@@ -61,6 +61,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/evidence"): {"params": {"uri": "exulanica://blob/x/img#t=0,1"}},
     ("GET", "/evidence/{span_id}"): {},
     ("GET", "/evidence/{span_id}/region"): {},
+    ("GET", "/evidence/{span_id}/masked"): {},
     ("GET", "/identity/events"): {},
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
@@ -369,7 +370,10 @@ def test_a_stranger_never_gets_a_403(deployment, method, path):
     )
 
 
-@pytest.mark.parametrize("path", ["/evidence/{span_id}", "/evidence/{span_id}/region"])
+@pytest.mark.parametrize(
+    "path",
+    ["/evidence/{span_id}", "/evidence/{span_id}/region", "/evidence/{span_id}/masked"],
+)
 def test_a_stranger_gets_the_same_answer_for_a_real_id_and_an_invented_one(deployment, path):
     """The IDOR case, explicitly: U1's span id substituted into U2's session."""
     real = deployment.as_stranger("GET", deployment.fill(path))
@@ -599,8 +603,11 @@ def _refused_answer_body():
 
     from model_fakes import chat_body
 
-    answer = {"clauses": [{"text": "You were there.", "type": "historical",
-                           "citations": [], "value_refs": []}]}
+    answer = {
+        "clauses": [
+            {"text": "You were there.", "type": "historical", "citations": [], "value_refs": []}
+        ]
+    }
     return HttpResponse(status_code=200, text=json.dumps(chat_body(json.dumps(answer))))
 
 
@@ -618,7 +625,8 @@ def test_an_answers_citations_open_the_evidence_they_name_and_only_for_its_owner
     """
     transport = _with_model(deployment, [_refused_answer_body(), _refused_answer_body()])
     response = deployment.as_owner(
-        "POST", "/selection/ask",
+        "POST",
+        "/selection/ask",
         json={"question": "which photographs?", "plan": {"intent": "captures"}},
     )
     assert response.status_code == 200, response.text
@@ -651,13 +659,15 @@ def test_an_unanswerable_question_refuses_over_http_without_calling_the_model(de
     """
     transport = _with_model(deployment, [_refused_answer_body()])
     response = deployment.as_owner(
-        "POST", "/selection/ask",
+        "POST",
+        "/selection/ask",
         json={
             "question": "was I ever in Antarctica?",
             "plan": {
                 "intent": "captures",
-                "time": [{"start": "1999-01-01T00:00:00+00:00",
-                          "end": "1999-12-31T00:00:00+00:00"}],
+                "time": [
+                    {"start": "1999-01-01T00:00:00+00:00", "end": "1999-12-31T00:00:00+00:00"}
+                ],
             },
         },
     )
@@ -691,8 +701,12 @@ def test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code(deployment
         {
             "intent": "entities",
             "entities": {"ids": [str(uuid.uuid4())], "mode": "together"},
-            "time": [], "place": None, "capture": None,
-            "epistemic": "confirmed", "semantic_query": None, "limit": 10,
+            "time": [],
+            "place": None,
+            "capture": None,
+            "epistemic": "confirmed",
+            "semantic_query": None,
+            "limit": 10,
         }
     )
     body = HttpResponse(status_code=200, text=json.dumps(chat_body(unsatisfiable)))
@@ -744,14 +758,10 @@ def test_the_other_two_model_failures_get_their_own_codes(deployment, failure, s
     app = deployment.client.app
     app.state.services = dataclasses.replace(
         app.state.services,
-        model_client=ModelClient(
-            api_key="test-key-not-real", transport=transport, budget=budget
-        ),
+        model_client=ModelClient(api_key="test-key-not-real", transport=transport, budget=budget),
     )
 
-    response = deployment.as_owner(
-        "POST", "/selection/plan", json={"question": "where was I?"}
-    )
+    response = deployment.as_owner("POST", "/selection/plan", json={"question": "where was I?"})
     assert response.status_code == status, response.text
     assert response.json()["code"] == code
 

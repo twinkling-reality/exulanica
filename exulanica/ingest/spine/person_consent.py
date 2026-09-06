@@ -36,6 +36,7 @@ __all__ = [
     "PersonRegionRow",
     "consent_transitions",
     "current_regions",
+    "has_regions",
     "insert_consent",
     "insert_region_edit",
     "insert_subject",
@@ -171,6 +172,25 @@ def insert_region_edit(
     if row is None or bytes(row["region_digest"]) != region_digest:
         raise ValueError("an existing person region edit disagrees with this receipt")
     return region_edit_id
+
+
+def has_regions(scope: WorkspaceScope, *, capture_id: uuid.UUID) -> bool:
+    """Whether anybody has ever been proposed or recorded on this photograph.
+
+    A plain indexed existence check, and it exists for a measured reason. The ingest path asks
+    about every photograph it processes, and almost every photograph has no regions at all. Asking
+    that through ``person_region_current`` means a ``distinct on`` over the table for each one:
+    MEASURED 2026-09-06, doing so took one test file from 44 seconds to 3 minutes 28. This answers
+    the common case from ``person_region_capture_idx`` and leaves the view for the rare photograph
+    that actually has somebody in it.
+    """
+    row = scope.connection.execute(
+        "select exists(select 1 from person_region "
+        "where workspace_id=%s and capture_id=%s) as present",
+        (scope.workspace_id, capture_id),
+    ).fetchone()
+    assert row is not None
+    return bool(row["present"])
 
 
 def current_regions(

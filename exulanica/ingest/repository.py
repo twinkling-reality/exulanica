@@ -406,6 +406,10 @@ class IngestRepository:
         """Append one immutable edit to one region's history."""
         return person_consent.insert_region_edit(self._scope, **values)
 
+    def capture_has_person_regions(self, *, capture_id: uuid.UUID) -> bool:
+        """Whether this photograph has any recorded region, answered from an index."""
+        return person_consent.has_regions(self._scope, capture_id=capture_id)
+
     def current_person_regions(
         self, *, capture_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, list[person_consent.PersonRegionRow]]:

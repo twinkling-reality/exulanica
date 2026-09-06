@@ -54,6 +54,10 @@ def region_state_for_capture(
     and a subject-wide one apply to different regions and must not be merged by the query. A
     region with no subject is folded from an empty chain, which resolves to ``unknown``.
     """
+    if not repository.capture_has_person_regions(capture_id=capture_id):
+        # The overwhelmingly common case, answered from an index rather than from a `distinct on`
+        # over the whole table. See `has_regions` for the measurement that put this here.
+        return CaptureRegionState({}, {}, {})
     rows = repository.current_person_regions(capture_ids=[capture_id]).get(capture_id, [])
     outlines: dict[bytes, Silhouette] = {}
     resolved: dict[bytes, ResolvedPresentation] = {}

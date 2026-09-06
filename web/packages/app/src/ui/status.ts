@@ -6,6 +6,7 @@ import type {
   RenderingSubstrate,
   TrainingQualityRecord,
 } from '@exulanica/graph-client';
+import { personPresenceSentence } from '@exulanica/graph-client';
 import { rungSentence } from '@exulanica/formation';
 import { el } from './dom.js';
 
@@ -44,6 +45,11 @@ export interface ReconstructionRungDisclosure {
   readonly memberCount: number;
   readonly renderingSubstrate: RenderingSubstrate;
   readonly reasons: readonly string[];
+  /** How many people in this scene are not being drawn, and across how many photographs. */
+  readonly hiddenPersonCount?: number;
+  readonly maskedMemberCount?: number;
+  /** Photographs nobody has screened for people, which are withheld rather than shown. */
+  readonly unscreenedMemberCount?: number;
   /** The trainer's measured held-out appearance and accounting, shown beside a trained substrate. */
   readonly trainingQuality?: TrainingQualityRecord;
 }
@@ -139,6 +145,17 @@ export function buildStatus(input: StatusInput): HTMLElement {
         text: `${scene.registeredMemberCount} of ${scene.memberCount} photographs registered.`,
       }),
     );
+    // Appended here rather than through `notices`, which carries `status-warning source-status`
+    // and would frame somebody's consent decision as a load failure. A hidden person is not an
+    // error; a photograph nobody has screened is, and the sentence says which is which.
+    const presence = personPresenceSentence({
+      hiddenPersonCount: scene.hiddenPersonCount ?? 0,
+      maskedMemberCount: scene.maskedMemberCount ?? 0,
+      unscreenedMemberCount: scene.unscreenedMemberCount ?? 0,
+    });
+    if (presence !== null) {
+      details.append(el('p', { class: 'reconstruction-person-presence', text: presence }));
+    }
     if (scene.reasons.length > 0) {
       const reasons = el('ul', { class: 'reconstruction-rung-reasons' });
       for (const reason of scene.reasons) reasons.append(el('li', { text: reason }));
