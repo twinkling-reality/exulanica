@@ -233,26 +233,34 @@ re-recorded rather than quietly edited: the `find_artifact` order over an unscre
 is now three calls instead of five, and position three is still the rendition persist, which is
 the only part the sibling race test depends on.
 
-### Why the bowl photographs still cannot be observed
+### Looking is now a separate permission from building
 
-Running the vision stage over them needs an eligible screening, and there is no honest version 2
-screening that produces one:
+Version 2 as first written created a loop with no honest way in. A screening is eligible when a
+human has confirmed a region list with a consent state per person; producing that list means
+looking at the photograph; and looking means showing it to a detector, which needed a screening.
+For a collection like the retained bowl photographs, containing diners nobody can ask, the loop
+had no entry at all: an empty region list asserts nobody is there, a list naming them is blocked,
+and masking cannot help because the detector reads the original.
 
-- an empty region list is eligible, and asserts nobody is visible in photographs that contain
-  diners' arms, hands and clothing, which is the exact statement this note was written about;
-- a region list carrying anyone `unknown`, `present` or `withdrawn` is blocked;
-- a region list where everyone is `shown` asserts the diners consented to their likeness, and
-  they neither did nor can be asked.
+`person_detection_only` is the way out, and it is deliberately narrow.
 
-There is also a loop: vision proposes the regions a reviewer confirms, and vision now needs the
-screening that confirming produces. Masking cannot break it, because vision reads the original.
+- It says an actor authorized sending these exact bytes to a detector **for the purpose of finding
+  the people in them**, and the purpose is recorded in the receipt.
+- It is stored as `blocked`, because blocked is what it is for geometry, and the blocking reason
+  says so in words.
+- The split is enforced by there being **two predicates rather than one flag**.
+  `privacy_screening_allows_capture` still gates geometry and does not admit this method;
+  `privacy_screening_allows_observation` admits it and is what the vision stage asks. A single
+  function with a boolean would eventually be called with the wrong boolean, and that failure is a
+  photograph reconstructed on the strength of a receipt that only ever permitted looking at it.
+- `tests/test_person_detection_screening.py` pins both directions, including that the **database**
+  refuses a point map carrying a detection receipt, so a future caller cannot route around the
+  Python check.
 
-Breaking it honestly needs a receipt this schema does not have: a screening method that authorizes
-sending a photograph to a model **for the purpose of finding the people in it**, records that
-purpose, and does not thereby make the capture eligible for geometry. That is a migration for the
-`screening_method` check plus a split between "may be observed" and "may become geometry", and it
-is the honest way to process a collection like the bowl, which is CC0 public data whose
-photographer published it and whose diners never agreed to anything.
+**It is not consent, and the receipt does not pretend otherwise.** Nobody in the photograph has
+agreed to anything. An account holder has authorized a search for them so that they can be hidden.
+`human_review_required` is false because no human reviewed the image, and `reviewed_by` names the
+actor who authorized the detection, so the row never reads as a review that did not happen.
 
 ### Not done, and not pretended
 
