@@ -20,12 +20,14 @@ The whole file skips when ``EXULANICA_TEST_DATABASE_URL`` is unset; see ``tests/
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import psycopg
 import pytest
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest import vision as vision_module
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.report import IngestReport
 from exulanica.ingest.stages import (
     STAGES,
     StageSpec,
@@ -39,10 +41,41 @@ from exulanica.ingest.vision import NebiusVisionModel, prompt_digest
 from exulanica.models.manifest import Role
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import CountingVisionModel, write_photo
+from conftest import CountingVisionModel, ingest_observed, write_photo
 
 # No module-level postgres marker. tests/conftest.py marks each test by the fixtures it
 # actually requests, so the handful here that need no server stay runnable without one.
+
+
+def _photographs(directory: Path, limit: int | None = None) -> list[Path]:
+    """The files a directory ingest would walk, in the same deterministic order."""
+    paths = sorted(path for path in directory.rglob("*") if path.is_file())
+    return paths if limit is None else paths[:limit]
+
+
+def ingest_observed_directory(pipeline, repository, directory, *, limit=None):
+    """``ingest_directory``, with a screening receipt recorded for each photograph.
+
+    The vision stage sends the photograph to a hosted model, so it now requires an eligible
+    privacy screening over those exact bytes, and ``ingest_directory`` has no way to supply one:
+    a receipt is keyed to a capture that does not exist until intake has committed. Without it
+    vision reports itself unavailable and every count in this file would be zero for a reason
+    that has nothing to do with idempotency, which is the failure mode worth naming, because it
+    is silent: the assertions that say "the second run called nothing" pass perfectly when the
+    first run called nothing either.
+
+    So each photograph goes through ``conftest.ingest_observed``: intake, an authorization and a
+    synthetic exemption over this synthetic corpus, then the derivative stages. The outcomes are
+    the pipeline's own and only the report around them is assembled here, so every assertion
+    below still reads ``ingested``, ``unchanged``, ``failed``, ``outcomes``, ``model_calls`` and
+    ``pipeline_digest`` off the same type a directory run returns.
+    """
+    report = IngestReport(pipeline_digest=pipeline.pipeline_digest)
+    report.outcomes = [
+        ingest_observed(pipeline, repository, path)
+        for path in _photographs(Path(directory), limit)
+    ]
+    return report
 
 
 @pytest.fixture
@@ -58,12 +91,12 @@ def test_a_second_run_makes_zero_model_calls(bench):
     repository, store, vision, photos = bench
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
 
-    first = pipeline.ingest_directory(photos)
+    first = ingest_observed_directory(pipeline, repository, photos)
     assert len(first.ingested) == 2
     assert vision.calls == 2
     assert first.model_calls == 2
 
-    second = pipeline.ingest_directory(photos)
+    second = ingest_observed_directory(pipeline, repository, photos)
     assert vision.calls == 2, "the second run called the model again; idempotency is broken"
     assert second.model_calls == 0
     assert len(second.unchanged) == 2
@@ -79,11 +112,20 @@ def test_a_second_run_on_a_new_connection_makes_zero_model_calls(bench, ingest_s
     """
     repository, store, vision, photos = bench
     _, open_another = ingest_spine
-    PhotoIngestPipeline(repository, store, vision=vision).ingest_directory(photos)
+    ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=vision), repository, photos
+    )
     assert vision.calls == 2
 
     reopened = CountingVisionModel()
-    report = PhotoIngestPipeline(open_another(), store, vision=reopened).ingest_directory(photos)
+    # Named rather than passed inline, because the second run's screening is recorded through
+    # this connection too. The whole point of the test is that everything the re-run resolves
+    # from is what the database committed, so nothing it needs may be handed to it by the
+    # session that is still open.
+    another = open_another()
+    report = ingest_observed_directory(
+        PhotoIngestPipeline(another, store, vision=reopened), another, photos
+    )
 
     assert reopened.calls == 0, "the reopened database re-billed the whole corpus"
     assert report.model_calls == 0
@@ -94,12 +136,12 @@ def test_a_second_run_writes_no_new_rows(bench):
     """Re-running must not duplicate spans, assertions, occurrences or artifacts."""
     repository, store, vision, photos = bench
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    pipeline.ingest_directory(photos)
+    ingest_observed_directory(pipeline, repository, photos)
     before = {
         table: repository.rows_in_schema(table)
         for table in ("blob", "capture", "evidence_span", "artifact", "assertion", "occurrence")
     }
-    pipeline.ingest_directory(photos)
+    ingest_observed_directory(pipeline, repository, photos)
     after = {table: repository.rows_in_schema(table) for table in before}
     assert after == before
 
@@ -151,7 +193,9 @@ def test_two_files_with_identical_bytes_share_one_capture_and_one_set_of_derivat
 
     store = LocalContentAddressedStore(tmp_path / "blobs")
     vision = CountingVisionModel()
-    PhotoIngestPipeline(repository, store, vision=vision).ingest_directory(photo_dir)
+    ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=vision), repository, photo_dir
+    )
 
     assert vision.calls == 1
     assert repository.rows_in_schema("blob") == 1
@@ -167,7 +211,7 @@ def test_bumping_a_stage_version_regenerates_only_that_stage(bench, monkeypatch)
     """
     repository, store, vision, photos = bench
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    pipeline.ingest_directory(photos)
+    ingest_observed_directory(pipeline, repository, photos)
     assert vision.calls == 2
     artifacts_before = repository.rows_in_schema("artifact")
 
@@ -178,7 +222,9 @@ def test_bumping_a_stage_version_regenerates_only_that_stage(bench, monkeypatch)
     monkeypatch.setitem(STAGES, "vision", dataclasses.replace(STAGES["vision"], version=bumped))
     # A stage definition is reviewed at process startup. Rebuild the pipeline as the new
     # deployment would, so the additive definition is registered before its first event.
-    third = PhotoIngestPipeline(repository, store, vision=vision).ingest_directory(photos)
+    third = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=vision), repository, photos
+    )
 
     assert vision.calls == 4, "a version bump must reprocess"
     assert third.model_calls == 2
@@ -196,7 +242,7 @@ def test_changing_a_stage_parameter_changes_the_key_without_a_version_bump(bench
     """
     repository, store, vision, photos = bench
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    pipeline.ingest_directory(photos)
+    ingest_observed_directory(pipeline, repository, photos)
     digest_before = pipeline_digest()
     calls_before = vision.calls
 
@@ -206,7 +252,9 @@ def test_changing_a_stage_parameter_changes_the_key_without_a_version_bump(bench
     )
 
     assert pipeline_digest() != digest_before
-    fourth = PhotoIngestPipeline(repository, store, vision=vision).ingest_directory(photos)
+    fourth = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=vision), repository, photos
+    )
     assert [o.stages_run for o in fourth.outcomes] == [["rendition"]] * 2
     assert vision.calls == calls_before
 
@@ -219,14 +267,16 @@ def test_a_rendition_change_that_does_change_the_pixels_does_rebill_vision(
     store = LocalContentAddressedStore(tmp_path / "blobs")
     vision = CountingVisionModel()
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    pipeline.ingest_directory(photo_dir)
+    ingest_observed_directory(pipeline, repository, photo_dir)
     assert vision.calls == 1
 
     params = dict(STAGES["rendition"].params) | {"max_edge_px": 512}
     monkeypatch.setitem(
         STAGES, "rendition", dataclasses.replace(STAGES["rendition"], params=params)
     )
-    again = PhotoIngestPipeline(repository, store, vision=vision).ingest_directory(photo_dir)
+    again = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=vision), repository, photo_dir
+    )
     assert again.outcomes[0].stages_run == ["rendition", "vision"]
     assert vision.calls == 2
 
@@ -254,18 +304,18 @@ def test_a_crashed_run_is_healed_rather_than_duplicated(bench, monkeypatch):
         return original(*args, **kwargs)
 
     monkeypatch.setattr(vision_stage, "_observation_rows", explode)
-    crashed = pipeline.ingest_directory(photos, limit=1)
+    crashed = ingest_observed_directory(pipeline, repository, photos, limit=1)
     assert crashed.failed
 
     monkeypatch.setattr(vision_stage, "_observation_rows", original)
-    healed = pipeline.ingest_directory(photos, limit=1)
+    healed = ingest_observed_directory(pipeline, repository, photos, limit=1)
     assert not healed.failed
     inference_rows = repository.connection.execute(
         "select count(*) as n from assertion where kind = 'inference'"
     ).fetchone()["n"]
     assert inference_rows > 0
 
-    again = pipeline.ingest_directory(photos, limit=1)
+    again = ingest_observed_directory(pipeline, repository, photos, limit=1)
     assert again.model_calls == 0
     assert (
         repository.connection.execute(
@@ -368,9 +418,9 @@ def test_editing_the_prompt_reprocesses_the_corpus(bench, monkeypatch):
     """
     repository, store, model, photos = bench
     pipeline = PhotoIngestPipeline(repository, store, vision=model)
-    pipeline.ingest_directory(photos)
+    ingest_observed_directory(pipeline, repository, photos)
     assert model.calls == 2
-    assert pipeline.ingest_directory(photos).model_calls == 0
+    assert ingest_observed_directory(pipeline, repository, photos).model_calls == 0
     digest_before = pipeline.pipeline_digest
 
     monkeypatch.setattr(vision_module, "_SYSTEM_TEMPLATE", _EDITED_SYSTEM_TEMPLATE)
@@ -378,7 +428,9 @@ def test_editing_the_prompt_reprocesses_the_corpus(bench, monkeypatch):
         STAGES, "vision", dataclasses.replace(STAGES["vision"], params=vision_stage_params())
     )
 
-    report = PhotoIngestPipeline(repository, store, vision=model).ingest_directory(photos)
+    report = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=model), repository, photos
+    )
 
     assert model.calls == 4, "editing the prompt made no model call; the corpus never reprocessed"
     assert report.model_calls == 2
@@ -395,18 +447,24 @@ def test_swapping_the_model_reprocesses_the_corpus(bench):
     ``model_ref`` a claim the corpus cannot support.
     """
     repository, store, model, photos = bench
-    PhotoIngestPipeline(repository, store, vision=model).ingest_directory(photos)
+    ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=model), repository, photos
+    )
     assert model.calls == 2
 
     replacement = CountingVisionModel(model_id="Qwen/Qwen3-VL-30B-A3B-Instruct")
-    report = PhotoIngestPipeline(repository, store, vision=replacement).ingest_directory(photos)
+    report = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=replacement), repository, photos
+    )
 
     assert replacement.calls == 2, "the new model reused the old model's answers"
     assert report.model_calls == 2
     assert [o.stages_run for o in report.outcomes] == [["vision"]] * 2
 
     # And swapping back is free, because the first model's artifacts were never overwritten.
-    back = PhotoIngestPipeline(repository, store, vision=model).ingest_directory(photos)
+    back = ingest_observed_directory(
+        PhotoIngestPipeline(repository, store, vision=model), repository, photos
+    )
     assert back.model_calls == 0 and model.calls == 2
 
 

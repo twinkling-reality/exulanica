@@ -34,7 +34,13 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo, write_point_map
+from conftest import (
+    DEFAULT_PAYLOAD,
+    CountingVisionModel,
+    ingest_observed,
+    write_photo,
+    write_point_map,
+)
 
 #: Routes that are deliberately unauthenticated, with the reason each one is.
 PUBLIC_ROUTES: dict[str, str] = {
@@ -242,7 +248,7 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
         }
     ]
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel(payload=payload))
-    outcome = pipeline.ingest_file(write_photo(photo_dir, "a.jpg"))
+    outcome = ingest_observed(pipeline, repository, write_photo(photo_dir, "a.jpg"))
     assert outcome.error is None, outcome.error
 
     owner = repository.workspace_id

@@ -60,6 +60,7 @@ from conftest import (
     TEST_CEILING_USD,
     TEST_MAX_CALLS,
     CountingVisionModel,
+    ingest_observed,
     write_photo,
 )
 from model_fakes import FakeTransport, chat_body
@@ -137,7 +138,7 @@ def answered(tmp_path, photo_dir, repository):
     ):
         vision = CountingVisionModel(payload=_payload(caption=caption, ocr=ocr))
         pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-        outcome = pipeline.ingest_file(write_photo(photo_dir, name, when=when))
+        outcome = ingest_observed(pipeline, repository, write_photo(photo_dir, name, when=when))
         assert outcome.error is None, outcome.error
 
     identity = IdentityRepository(repository.connection, repository.workspace_id)

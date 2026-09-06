@@ -532,6 +532,7 @@ class PhotoIngestPipeline:
             prepared.facts,
             ledger,
             outcome,
+            privacy_screening_id,
         )
         # Between vision and depth, and in this order for a reason. The region stage reads the
         # observation vision stored and writes one `detected` row per proposed person, which is

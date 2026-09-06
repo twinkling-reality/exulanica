@@ -23,6 +23,7 @@ from exulanica.evidence.region import DisplayGeometry, Rect, Region
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
@@ -53,12 +54,25 @@ def run(
     facts: ExifFacts,
     ledger: Ledger,
     outcome: IngestOutcome,
+    privacy_screening_id: uuid.UUID | None = None,
 ) -> StageResult | None:
     """Observe one photograph, or report honestly that nothing looked.
 
     Returns its ``StageResult`` so a later stage can read the observation it stored. ``None`` means
     no observation exists, which is not the same fact as an observation that found nobody: the
     person-region stage treats a missing observation as unscreened rather than as empty.
+
+    **This stage sends the photograph to a model, so it is gated like the one that reconstructs
+    it.** Until 2026-09-06 it was not: depth required an eligible screening receipt and vision
+    required nothing, which meant the first thing to touch a photograph after intake handed it to
+    a hosted service with no authorization recorded anywhere. That is the wrong way round. Vision
+    is also the stage that now enumerates every visible trace of a person, so running it ungated
+    would locate people in order to protect them by first sending them somewhere else.
+
+    The screening's digest is deliberately NOT in the input digest, unlike depth's. Re-recording a
+    screening does not change what is in the photograph, and keying on it would re-bill a model
+    call every time a receipt was superseded. The receipt id is recorded on the artifact instead,
+    so the provenance is kept without paying for it twice.
     """
     spec = stage("vision")
     if model is None:
@@ -74,6 +88,26 @@ def run(
             input_blob=blob_id,
         )
         return None
+    if privacy_screening_id is None:
+        # Unavailable, not failed, and the distinction is the same one the no-model branch above
+        # draws. Nothing went wrong: nobody has authorized sending this photograph to a model, so
+        # it was not sent. Raising instead would make the one-shot ingest path impossible rather
+        # than merely quiet, because a screening is keyed to a capture that does not exist until
+        # intake has run; and an ingest that errors on every unscreened photograph is an ingest
+        # somebody switches off. The ledger records the reason either way, and the important
+        # property holds: no bytes left this machine.
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(
+            spec,
+            reason="no privacy screening receipt authorizes sending these bytes to a model",
+            input_blob=blob_id,
+        )
+        return None
+    # An expired, blocked, withdrawn or superseded receipt DOES raise. Having looked and been
+    # refused is not the same as never having asked, and a photograph whose screening was
+    # revoked must not keep being observed on the strength of an old one.
+    screening = require_privacy_screening(writes.repository, capture_id, privacy_screening_id)
     input_digest = input_digest_of([rendition.content_sha256])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
@@ -150,6 +184,7 @@ def run(
                 outcome=outcome,
                 pending=pending,
                 produced_by_event=recorder.stage_started_event,
+                privacy_screening_id=screening.screening_id,
             )
             emitted = _observation_rows(
                 writes,

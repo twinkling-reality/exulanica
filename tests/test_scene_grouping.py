@@ -20,7 +20,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.scenes import group_captures, metres_between, run_scene_grouping
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import CountingVisionModel, write_photo
+from conftest import CountingVisionModel, ingest_observed, write_photo
 
 # No module-level postgres marker. tests/conftest.py marks each test by the fixtures it
 # actually requests, so the handful here that need no server stay runnable without one.
@@ -77,13 +77,21 @@ def test_the_centroid_and_radius_are_integers_computed_the_same_way_every_run():
 
 @pytest.fixture
 def grouped(tmp_path, photo_dir, repository):
-    write_photo(photo_dir, "a.jpg", when="2026:08:27 10:00:00", gps=(64.3271, -20.1199))
-    write_photo(
-        photo_dir, "b.jpg", when="2026:08:27 10:05:00", gps=(64.3271, -20.1199), size=(120, 90)
-    )
-    write_photo(photo_dir, "c.jpg", when="2026:08:27 16:00:00", size=(100, 100))
+    paths = [
+        write_photo(photo_dir, "a.jpg", when="2026:08:27 10:00:00", gps=(64.3271, -20.1199)),
+        write_photo(
+            photo_dir, "b.jpg", when="2026:08:27 10:05:00", gps=(64.3271, -20.1199), size=(120, 90)
+        ),
+        write_photo(photo_dir, "c.jpg", when="2026:08:27 16:00:00", size=(100, 100)),
+    ]
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    PhotoIngestPipeline(repository, store, vision=CountingVisionModel()).ingest_directory(photo_dir)
+    pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
+    # One photograph at a time rather than ``ingest_directory``, because the place proposal these
+    # tests are about is drawn from what vision inferred, and vision now needs a privacy screening
+    # for the exact bytes. A screening is keyed to a capture, which does not exist until intake
+    # has committed, so the directory walk has no place to put one.
+    for path in paths:
+        ingest_observed(pipeline, repository, path)
     return repository
 
 

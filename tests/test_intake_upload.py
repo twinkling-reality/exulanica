@@ -64,8 +64,43 @@ class Upload:
     def one(self, data: bytes | None = None, name: str = "a.jpg", media: str = "image/jpeg"):
         return self.post([("files", (name, photo_bytes() if data is None else data, media))])
 
-    def drain(self):
+    def screen(self):
+        """Record a synthetic exemption for every live capture, as an operator would.
+
+        The worker resolves each capture's current eligible receipt and hands it to the paid
+        stages. Depth has always needed one; vision needs one from 2026-09-06 because it sends
+        the photograph to a hosted model. Without this the worker drains, observes nothing, and
+        says so, which is correct behaviour and not what these tests are about.
+
+        A synthetic exemption rather than a fabricated human review: this corpus is generated
+        test media, and the database refuses this exemption for benchmark or personal bytes.
+        """
+        import uuid as _uuid
+
+        from exulanica.ingest.privacy import (
+            authorize_synthetic_capture,
+            record_synthetic_exemption,
+        )
+
+        for row in self.rows("select capture_id from capture where deleted_at is null"):
+            authorization = authorize_synthetic_capture(
+                self.repository,
+                capture_id=row["capture_id"],
+                actor=_uuid.UUID("a244f9d0-9bd9-5f55-a133-2712cd05d720"),
+                generator_manifest={
+                    "profile": "exulanica.synthetic-test-corpus/v1",
+                    "notice": "SYNTHETIC TEST FIXTURE",
+                },
+                authorization_scope={"purpose": "intake upload test"},
+            )
+            record_synthetic_exemption(
+                self.repository, authorization_id=authorization.authorization_id
+            )
+
+    def drain(self, *, screened: bool = True):
         """Run the worker to exhaustion, synchronously. No thread, so no waiting and no flake."""
+        if screened:
+            self.screen()
         return DerivativeWorker(
             self.database,
             self.store,

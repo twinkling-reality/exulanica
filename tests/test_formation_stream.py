@@ -30,7 +30,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.scenes import run_scene_grouping
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, iso, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, iso, write_photo
 
 #: The client's copy of the ordered stage list. It lives in its own package because two
 #: surfaces need it and neither may import the other: the signed-out page demonstrates formation
@@ -83,15 +83,28 @@ def test_the_terminal_states_are_the_same_set_on_both_sides():
 @pytest.fixture
 def ingested(repository, photo_dir, tmp_path):
     """One watched intake of three photographs, grouped, closed."""
-    for index, hour in enumerate((10, 11, 12)):
+    paths = [
         write_photo(photo_dir, f"{index}.jpg", when=iso(hour), gps=(64.3271, -20.1199))
+        for index, hour in enumerate((10, 11, 12))
+    ]
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(
         repository, store, vision=CountingVisionModel(payload=DEFAULT_PAYLOAD)
     )
     batch = IntakeBatch.open(repository, label="test")
-    report = pipeline.ingest_directory(photo_dir, batch=batch)
-    assert not report.failed, report.failed
+    # One photograph at a time rather than ``ingest_directory``, because entity indexing IS the
+    # vision stage and vision now needs a privacy screening for the exact bytes. A screening is
+    # keyed to a capture, which does not exist until intake has committed, so the directory walk
+    # has nowhere to put one.
+    #
+    # The declaration of size is the one thing ``ingest_directory`` owned that this stream reads,
+    # and it is the denominator of every counter below. So it is written here in the same order
+    # that method writes it: the batch exists before the walk, and the total is written once,
+    # from what the walk found, rather than accumulated as it goes.
+    batch.declare_size(len(paths))
+    for path in paths:
+        outcome = ingest_observed(pipeline, repository, path, batch_id=batch.batch_id)
+        assert outcome.error is None, outcome.error
     run_scene_grouping(
         repository,
         ledger=Ledger.start_run(repository, trigger="ingest", batch_id=batch.batch_id),

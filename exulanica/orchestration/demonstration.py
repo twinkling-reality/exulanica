@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import psycopg
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -29,6 +29,10 @@ from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.formation import project_formation
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.privacy import (
+    authorize_synthetic_capture,
+    record_synthetic_exemption,
+)
 from exulanica.ingest.report import IngestOutcome, IngestReport
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.vision import VisionModel
@@ -321,6 +325,66 @@ def run_frontier_demonstration(
     return receipt
 
 
+#: One fixed actor, so a rerun of the demonstration mints the same authorization ids.
+_DEMONSTRATION_ACTOR: Final = uuid.UUID("6f2c1a4e-8b93-5d17-a0c6-2e4b7f8d91a3")
+
+
+def _ingest_one(
+    pipeline: PhotoIngestPipeline,
+    repository: IngestRepository,
+    path: Path,
+    batch_id: uuid.UUID,
+) -> Any:
+    """Intake, authorize, exempt, then derive. Two calls where there used to be one.
+
+    This demonstration runs over ``exulanica.corpus``, which is generated from a seed and contains
+    no people by construction, so ``record_synthetic_exemption`` is the honest receipt for it: the
+    database refuses that exemption for anything whose authorization is not itself synthetic.
+
+    It is two calls because the vision stage now needs an eligible screening for the exact bytes,
+    the same receipt depth has always needed, and a screening is keyed to a capture that does not
+    exist until intake has committed. An acceptance path that skipped the receipt would be
+    demonstrating a pipeline nobody is allowed to run.
+    """
+    intake = pipeline.ingest_intake(path.read_bytes(), filename=path.name, batch_id=batch_id)
+    if intake.capture_id is None:
+        return intake
+    authorization = authorize_synthetic_capture(
+        repository,
+        capture_id=intake.capture_id,
+        actor=_DEMONSTRATION_ACTOR,
+        generator_manifest={
+            "profile": "exulanica.synthetic-corpus/v1",
+            "notice": "GENERATED CORPUS, NO PERSON PARTICIPATED",
+        },
+        authorization_scope={"purpose": "frontier demonstration"},
+    )
+    screening = record_synthetic_exemption(
+        repository, authorization_id=authorization.authorization_id
+    )
+    outcome = pipeline.ingest_derivatives(
+        intake.capture_id, batch_id=batch_id, privacy_screening_id=screening.screening_id
+    )
+    # `ingest_derivatives` names its outcome by capture id, because it is reached from a queue
+    # that holds identifiers rather than paths. This pass came from a file and the receipt reports
+    # a path relative to the photograph root, so the caller's own name is put back.
+    outcome.path = path
+    # One photograph is now two calls, and the receipt describes the photograph. Without this
+    # merge the repeat pass reports intake as neither run nor reused, because the reuse happened
+    # in the call whose outcome was discarded, and the demonstration would claim a stage vanished
+    # rather than that it was satisfied from an existing row.
+    for source, target in (
+        (intake.stages_run, outcome.stages_run),
+        (intake.stages_reused, outcome.stages_reused),
+        (intake.stages_skipped, outcome.stages_skipped),
+        (intake.stages_unavailable, outcome.stages_unavailable),
+    ):
+        for stage_key in source:
+            if stage_key not in target:
+                target.insert(0, stage_key)
+    return outcome
+
+
 def _ingest_pass(
     pipeline: PhotoIngestPipeline,
     repository: IngestRepository,
@@ -333,7 +397,7 @@ def _ingest_pass(
     batch.declare_size(len(paths))
     report = IngestReport(pipeline_digest=pipeline.pipeline_digest, batch_id=batch.batch_id)
     for path in paths:
-        report.outcomes.append(pipeline.ingest_file(path, batch_id=batch.batch_id))
+        report.outcomes.append(_ingest_one(pipeline, repository, path, batch.batch_id))
     continuity = run_continuity(repository, batch_id=batch.batch_id)
     batch.close(
         IntakeBatch.outcome_for(

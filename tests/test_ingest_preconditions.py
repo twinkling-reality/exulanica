@@ -193,7 +193,7 @@ def test_a_person_occurrence_carries_an_address_and_no_template(tmp_path, photo_
     from exulanica.ingest.pipeline import PhotoIngestPipeline
     from exulanica.store.local import LocalContentAddressedStore
 
-    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
     payload = copy.deepcopy(DEFAULT_PAYLOAD)
     located = [entry for entry in payload["objects"] if entry["label"] == "person"]
@@ -202,9 +202,8 @@ def test_a_person_occurrence_carries_an_address_and_no_template(tmp_path, photo_
 
     path = write_photo(photo_dir, "a.jpg")
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    outcome = PhotoIngestPipeline(
-        repository, store, vision=CountingVisionModel(payload=payload)
-    ).ingest_file(path)
+    pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel(payload=payload))
+    outcome = ingest_observed(pipeline, repository, path)
     assert outcome.error is None
 
     rows = repository.connection.execute(

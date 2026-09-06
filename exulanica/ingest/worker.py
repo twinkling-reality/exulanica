@@ -611,11 +611,19 @@ class DerivativeWorker:
                 progress_total=total,
             ):
                 raise _LeaseLost
+            # The capture's current eligible receipt, resolved here rather than assumed. Both
+            # paid stages need it: depth has always refused without one, and vision now does too
+            # because it sends the photograph to a hosted model. A capture nobody has screened
+            # gets neither, and the stages record themselves unavailable with the reason, which
+            # is the honest outcome rather than an error: nothing went wrong, nobody authorized
+            # sending it anywhere.
+            screening = repository.latest_privacy_screening(capture_id)
             result = pipeline.ingest_derivatives(
                 capture_id,
                 batch_id=claimed.batch_id,
                 delivery_job_id=claimed.job_id,
                 delivery_claim_token=claimed.claim_token,
+                privacy_screening_id=None if screening is None else screening.screening_id,
             )
             outcome.model_calls += result.model_calls
             outcome.input_tokens += result.input_tokens

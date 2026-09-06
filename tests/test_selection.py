@@ -40,7 +40,7 @@ from exulanica.selection import (
 from exulanica.selection.plan import CaptureSelector, ProcessingState
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
 #: Boxes far enough apart that the 16x16 identity-key grid puts them in different cells, so two
 #: people in one photograph are two occurrences rather than one.
@@ -125,7 +125,9 @@ def library(tmp_path, photo_dir, repository):
     for name, people, place, when, caption in plates:
         vision = CountingVisionModel(payload=_payload(people=people, place=place, caption=caption))
         pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-        outcome = pipeline.ingest_file(write_photo(photo_dir, f"{name}.jpg", when=when))
+        outcome = ingest_observed(
+            pipeline, repository, write_photo(photo_dir, f"{name}.jpg", when=when)
+        )
         assert outcome.error is None, outcome.error
         built.captures[name] = outcome.capture_id
 
