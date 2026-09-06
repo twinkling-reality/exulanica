@@ -3,7 +3,7 @@
   "record": {
     "profile": "exulanica.phase-10-read-paths/v1",
     "date": "2026-09-06",
-    "head": "fc69b98d8ad757a080cb8b84864b7c533b58fc7e",
+    "head": "bcf7049873ef0204922b76bf05e1b41791cf02cd",
     "database": "postgresql://localhost:5433/exulanica_spine_test",
     "store": ".exulanica/reference-baseline/runtime/blobs",
     "read_only": true,
@@ -158,8 +158,8 @@
       }
     ],
     "verification": {
-      "backend": null,
-      "web": null
+      "backend": "1716 passed, 3 skipped (serialized, 5m26s)",
+      "web": "793 passed; tsc --build clean"
     },
     "limitations": [
       "No per-person consent layer exists in this tree, so every bundle reports person_consent unavailable and release internal_only. That is the honest state, not a passing result.",
@@ -170,5 +170,5 @@
       "Place alignment is measured against numeric fixtures only. No two real captures of one place exist."
     ]
   },
-  "record_sha256": "bff3ba86a58df8a7de890edbef14e192308747b82a5f0bf8467a495b4f066f92"
+  "record_sha256": "31dbba03a172309929f98fd46f880a2bb0c8971358d2e347c0308cbec906a867"
 }
