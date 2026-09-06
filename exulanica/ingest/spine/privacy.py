@@ -23,6 +23,7 @@ __all__ = [
     "latest_screening",
     "screening",
     "screening_allows",
+    "screening_allows_observation",
 ]
 
 
@@ -239,9 +240,7 @@ def screening(scope: WorkspaceScope, screening_id: uuid.UUID) -> PrivacyScreenin
     )
 
 
-def screening_allows(
-    scope: WorkspaceScope, capture_id: uuid.UUID, screening_id: uuid.UUID
-) -> bool:
+def screening_allows(scope: WorkspaceScope, capture_id: uuid.UUID, screening_id: uuid.UUID) -> bool:
     row = scope.connection.execute(
         "select privacy_screening_allows_capture(%s,%s,%s) as allowed",
         (scope.workspace_id, capture_id, screening_id),
@@ -250,9 +249,23 @@ def screening_allows(
     return bool(row["allowed"])
 
 
-def latest_screening(
-    scope: WorkspaceScope, capture_id: uuid.UUID
-) -> PrivacyScreeningRow | None:
+def screening_allows_observation(
+    scope: WorkspaceScope, capture_id: uuid.UUID, screening_id: uuid.UUID
+) -> bool:
+    """Whether this receipt permits showing the photograph to a detector.
+
+    A different question from :func:`screening_allows`, and a different SQL function, so a caller
+    cannot reach geometry with a receipt that only ever permitted looking.
+    """
+    row = scope.connection.execute(
+        "select privacy_screening_allows_observation(%s,%s,%s) as allowed",
+        (scope.workspace_id, capture_id, screening_id),
+    ).fetchone()
+    assert row is not None
+    return bool(row["allowed"])
+
+
+def latest_screening(scope: WorkspaceScope, capture_id: uuid.UUID) -> PrivacyScreeningRow | None:
     row = scope.connection.execute(
         "select s.screening_id from reconstruction_privacy_screening s "
         "where s.workspace_id=%s and s.capture_id=%s "

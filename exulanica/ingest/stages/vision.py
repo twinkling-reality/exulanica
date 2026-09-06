@@ -23,7 +23,7 @@ from exulanica.evidence.region import DisplayGeometry, Rect, Region
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
-from exulanica.ingest.privacy import require_privacy_screening
+from exulanica.ingest.privacy import require_observation_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
@@ -104,10 +104,15 @@ def run(
             input_blob=blob_id,
         )
         return None
-    # An expired, blocked, withdrawn or superseded receipt DOES raise. Having looked and been
-    # refused is not the same as never having asked, and a photograph whose screening was
-    # revoked must not keep being observed on the strength of an old one.
-    screening = require_privacy_screening(writes.repository, capture_id, privacy_screening_id)
+    # The OBSERVATION question, not the geometry one. An eligible receipt permits both, and a
+    # `person_detection_only` receipt permits only this: somebody authorized looking for the
+    # people in this photograph so they can be hidden, which is what lets a collection be screened
+    # at all. It buys no point map; `require_privacy_screening` is a different function and the
+    # database enforces the split.
+    #
+    # An expired, withdrawn or superseded receipt still raises. Having looked and been refused is
+    # not the same as never having asked.
+    screening = require_observation_screening(writes.repository, capture_id, privacy_screening_id)
     input_digest = input_digest_of([rendition.content_sha256])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)

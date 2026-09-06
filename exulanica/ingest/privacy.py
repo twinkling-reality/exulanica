@@ -44,7 +44,9 @@ __all__ = [
     "authorize_personal_capture",
     "authorize_synthetic_capture",
     "record_human_screening",
+    "record_person_detection_screening",
     "record_synthetic_exemption",
+    "require_observation_screening",
     "require_privacy_screening",
 ]
 
@@ -421,6 +423,77 @@ def record_human_screening(
         screened_at=screened_at,
         valid_until=valid_until,
     )
+
+
+def record_person_detection_screening(
+    repository: IngestRepository,
+    *,
+    authorization_id: uuid.UUID,
+    authorized_by: uuid.UUID,
+    purpose: str,
+    screened_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> PrivacyScreeningRow:
+    """Permit showing these exact bytes to a detector, and permit nothing else.
+
+    **What this is for.** Finding the people in a photograph means showing it to something that
+    can find them, and the detector here is a hosted model. But the confirmed region list that
+    makes a screening eligible is the *output* of that looking, so a photograph containing
+    somebody who has not consented had no way to be looked at at all: an empty region list asserts
+    nobody is there, and a list naming them is blocked. This receipt is the narrow way out.
+
+    **What it does not do.** It records ``blocked``, because blocked is what it is for geometry,
+    and the blocking reason says so in words. ``privacy_screening_allows_capture`` does not admit
+    it, so no point map, pose, placement or trained scene can be produced on its strength; only
+    ``privacy_screening_allows_observation`` does. A caller who wanted geometry and reached for
+    this would find it refused by the database rather than by a code review.
+
+    **It is not consent, and the wording matters.** Nobody in the photograph has agreed to
+    anything here. An account holder has authorized a search for them so that they can be hidden,
+    which is a different act with a different actor, and ``purpose`` is recorded so the receipt
+    says which act it was.
+    """
+    authorization = repository.reconstruction_authorization(authorization_id)
+    if authorization is None:
+        raise PrivacyAdmissionError("the reconstruction authorization does not exist")
+    if not purpose.strip():
+        raise PrivacyAdmissionError(
+            "a detection authorization records why the photograph is being looked at"
+        )
+    return _record_screening(
+        repository,
+        authorization=authorization,
+        method="person_detection_only",
+        reviewed_by=authorized_by,
+        sensitive_regions=[],
+        eligibility_state="blocked",
+        blocking_reasons=[
+            "authorized for person detection only; geometry needs a confirmed region list "
+            f"with a consent state per person. Purpose: {purpose.strip()}"
+        ],
+        screened_at=screened_at,
+        valid_until=valid_until,
+    )
+
+
+def require_observation_screening(
+    repository: IngestRepository,
+    capture_id: uuid.UUID,
+    screening_id: uuid.UUID,
+) -> PrivacyScreeningRow:
+    """Resolve one receipt that permits showing these bytes to a detector, or stop.
+
+    Separate from :func:`require_privacy_screening` on purpose. The two questions are "may this be
+    looked at" and "may this become geometry", and a single function with a flag would eventually
+    be called with the wrong flag; the failure mode there is a photograph reconstructed on the
+    strength of a receipt that only ever permitted looking at it.
+    """
+    screening = repository.privacy_screening(screening_id)
+    if screening is None or screening.capture_id != capture_id:
+        raise PrivacyAdmissionError("privacy screening is missing for the exact capture")
+    if not repository.privacy_screening_allows_observation(capture_id, screening_id):
+        raise PrivacyAdmissionError("no current receipt permits showing these bytes to a detector")
+    return screening
 
 
 def require_privacy_screening(

@@ -242,6 +242,60 @@ comment on column artifact.read_source_sha256 is
   'that requires masking must name the masked derivative here, which is what makes "mask before, '
   'not only after" a database rule rather than a convention in Python.';
 
+-- A third screening method, and the loop it exists to break.
+--
+-- Finding the people in a photograph means showing the photograph to something that can find
+-- them, and this deployment's detector is a hosted model. So observing needs an authorization.
+-- But the region list a reviewer confirms is what an eligible screening is MADE of, and a
+-- photograph containing somebody who has not consented can never produce one: an empty list
+-- asserts nobody is there, and a list naming them is blocked. Vision reads the original, so
+-- masking cannot break the loop either. Under version 2 as first written, a collection like the
+-- retained bowl photographs could never be looked at at all.
+--
+-- `person_detection_only` is the narrow way out. It says: an actor authorized sending these exact
+-- bytes to a detector FOR THE PURPOSE of finding the people in them, and that authorization does
+-- not make the capture eligible for anything else. It is recorded as `blocked`, because blocked
+-- is what it is for geometry, and the reason says so. The split is enforced by there being two
+-- predicates rather than one flag: `privacy_screening_allows_capture` still gates geometry and
+-- does not admit this method, and `privacy_screening_allows_observation` below admits it.
+alter table reconstruction_privacy_screening
+  drop constraint if exists reconstruction_privacy_screening_screening_method_check;
+
+do $$
+declare
+  doomed text;
+begin
+  for doomed in
+    select conname from pg_constraint
+     where conrelid = 'reconstruction_privacy_screening'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) like '%synthetic_exemption%'
+  loop
+    execute format(
+      'alter table reconstruction_privacy_screening drop constraint %I', doomed);
+  end loop;
+end $$;
+
+alter table reconstruction_privacy_screening
+  add constraint a_screening_method_says_what_was_done check (
+    (screening_method = 'synthetic_exemption'
+      and model_id is null and model_revision is null
+      and not human_review_required and reviewed_by is null
+      and jsonb_array_length(sensitive_regions) = 0
+      and eligibility_state = 'eligible')
+    or
+    (screening_method = 'human_review'
+      and model_id is null and model_revision is null
+      and human_review_required and reviewed_by is not null)
+    or
+    -- Nobody reviewed the image, and somebody authorized looking at it. Both halves are recorded:
+    -- `human_review_required` is false because no review happened, and `reviewed_by` is the actor
+    -- who authorized the detection, so the receipt never reads as a review that did not occur.
+    (screening_method = 'person_detection_only'
+      and model_id is null and model_revision is null
+      and not human_review_required and reviewed_by is not null
+      and eligibility_state = 'blocked'));
+
 -- The policy a receipt has to have been written under to still count.
 --
 -- Every screening already stores `policy_version` and `policy_params_digest`, and until now
@@ -283,6 +337,43 @@ language sql volatile as $fn$
        -- with a consent state per person, and the two retained collections are exactly that
        -- case: reviewed under version 1, and not yet re-screened.
        and s.policy_version = current_privacy_policy()
+       and (s.valid_until is null or s.valid_until > clock_timestamp())
+       and (a.valid_until is null or a.valid_until > clock_timestamp())
+       and c.deleted_at is null
+       and not tombstone_blocks_capture(p_workspace, p_capture));
+$fn$;
+
+-- May this photograph be shown to a detector? A separate question from whether it may become
+-- geometry, and deliberately a separate function: one predicate with a flag would eventually be
+-- called with the wrong flag, and the failure would be a photograph reconstructed on the strength
+-- of a receipt that only ever permitted looking at it.
+--
+-- An eligible receipt permits observation too, because anything admitted for geometry has already
+-- cleared the higher bar. A `person_detection_only` receipt permits observation and nothing else.
+create function privacy_screening_allows_observation(
+  p_workspace uuid,
+  p_capture uuid,
+  p_screening uuid)
+returns boolean
+language sql volatile as $fn$
+  select exists (
+    select 1
+      from reconstruction_privacy_screening s
+      join capture_reconstruction_authorization a
+        on a.workspace_id = s.workspace_id
+       and a.authorization_id = s.authorization_id
+      join capture c
+        on c.workspace_id = s.workspace_id
+       and c.capture_id = s.capture_id
+     where s.workspace_id = p_workspace
+       and s.capture_id = p_capture
+       and s.screening_id = p_screening
+       and s.source_sha256 = c.blob_sha256
+       and a.capture_id = s.capture_id
+       and a.source_sha256 = s.source_sha256
+       and s.policy_version = current_privacy_policy()
+       and (s.eligibility_state = 'eligible'
+            or s.screening_method = 'person_detection_only')
        and (s.valid_until is null or s.valid_until > clock_timestamp())
        and (a.valid_until is null or a.valid_until > clock_timestamp())
        and c.deleted_at is null

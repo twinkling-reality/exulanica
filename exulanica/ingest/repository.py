@@ -386,6 +386,12 @@ class IngestRepository:
         """Whether this exact current source remains eligible for geometry."""
         return privacy.screening_allows(self._scope, capture_id, screening_id)
 
+    def privacy_screening_allows_observation(
+        self, capture_id: uuid.UUID, screening_id: uuid.UUID
+    ) -> bool:
+        """Whether this receipt permits showing these bytes to a detector, and nothing more."""
+        return privacy.screening_allows_observation(self._scope, capture_id, screening_id)
+
     def latest_privacy_screening(self, capture_id: uuid.UUID) -> privacy.PrivacyScreeningRow | None:
         """Resolve the newest current eligible receipt for exact capture bytes."""
         return privacy.latest_screening(self._scope, capture_id)
