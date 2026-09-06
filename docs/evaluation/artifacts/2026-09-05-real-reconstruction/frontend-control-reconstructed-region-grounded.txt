@@ -1,0 +1,26 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/app/test/scene.test.ts (14 tests | 1 failed | 13 skipped) 4ms
+   × graph data becomes a scene > stands a reconstructed region on the landscape so its ground, cameras and arrival agree 3ms
+     → expected +0 to be close to 1.2163088370954072, received difference is 1.2163088370954072, but expected 5e-10
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  15:25:35
+   Duration  407ms (transform 113ms, setup 0ms, collect 148ms, tests 4ms, environment 0ms, prepare 44ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/scene.test.ts > graph data becomes a scene > stands a reconstructed region on the landscape so its ground, cameras and arrival agree
+AssertionError: expected +0 to be close to 1.2163088370954072, received difference is 1.2163088370954072, but expected 5e-10
+ ❯ packages/app/test/scene.test.ts:162:31
+    160|     const built = buildScene(snapshotOf([island('a')], [occurrence('o1…
+    161|     const placed = built.scene.islands[0]!.placement;
+    162|     expect(placed.position.y).toBeCloseTo(atlasLandscapeHeight(placed.…
+       |                               ^
+    163|     const plain = buildScene(snapshotOf([island('a')], [occurrence('o1…
+    164|     expect(plain.position.y).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,1557 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.retained-real-reconstruction/v1",
+    "date": "2026-09-05",
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-05-retained-reference-progress.json",
+        "record_sha256": "5a2d08ec810f5a980720e915f5c082bc213219c9c0843dc8293ef38126ca6b98"
+      },
+      {
+        "path": "docs/evaluation/2026-09-05-source-presentation-correction.json",
+        "record_sha256": "e65d1b51c3dace4246288ceff4b379f62d2abb58c69b255578d819fd8b63053f"
+      }
+    ],
+    "human_screening": {
+      "reviewer": "Glendon Chin",
+      "reviewed_at_utc": "2026-09-05T17:26:09+00:00",
+      "statement": "I, Glendon Chin, looked at every one of the 51 bowl and 210 volcanic photographs and found no visible people or sensitive person regions",
+      "method": "The named human reviewed the exact-byte galleries at http://127.0.0.1:8765/review-bowl.html and /review-volcanic.html and gave the statement in this session; the review forms were completed from it with the exact attestation sentence and submitted through the authenticated admission endpoint, which queued ordinary derivative work for both workspaces.",
+      "receipts_written": "one privacy screening and one authorization receipt per photograph in each workspace, by the endpoint, not by hand"
+    },
+    "gpu_host": {
+      "hostname": "brev-9lbb1sfer",
+      "os": "Ubuntu 22.04.5 LTS",
+      "kernel": "6.8.0-90-generic",
+      "cpus": 12,
+      "memory_gib": 70,
+      "gpu": "NVIDIA L40S",
+      "driver": "580.126.09",
+      "gpu_memory_mib": 46068,
+      "docker": "Docker version 29.1.5, build 0e6fee6",
+      "images": [
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "6390592",
+          "size": "641MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "6390592",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "8386920",
+          "size": "434MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "8386920",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "67f5f12",
+          "size": "431MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "67f5f12",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "3c9ff91",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "3c9ff91",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "1297018",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "1297018",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "416a2fb",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "416a2fb",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "63fe966",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "63fe966",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-gsplat",
+          "tag": "fe4bce8",
+          "size": "18.6GB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "fe4bce8",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "b0fbc4f",
+          "size": "429MB"
+        },
+        {
+          "repository": "localhost:5000/exulanica-scene-worker",
+          "tag": "07cc0d9",
+          "size": "429MB"
+        },
+        {
+          "repository": "pytorch/pytorch",
+          "tag": "2.7.1-cuda12.8-cudnn9-devel",
+          "size": "16.9GB"
+        }
+      ],
+      "digests": [
+        "localhost:5000/exulanica-scene-worker@sha256:43856210335c1002b6787f11067afbd6f1c9b3fd8d4edac4d9a0f03aad3d296e",
+        "localhost:5000/exulanica-gsplat@sha256:f96e7ccf7197bcd89863aaf32a8cad0450a4b5d2d5788d1fc8cd2b37cbb597f3",
+        "localhost:5000/exulanica-scene-worker@sha256:13f19f3fabfebb4c9b9155f7deb28561fa7fc43bc71dba3f2c873e2fc0cc93ba",
+        "localhost:5000/exulanica-gsplat@sha256:e8fb6c390e18e62e8b9c473c1f0981bfc1bccbc77ec97c04012a020e98f96adb",
+        "localhost:5000/exulanica-scene-worker@sha256:bfe73e5acbf0f89ef9d602036b2f724ab0d71dcb89581835cf39354a3a65abf6",
+        "localhost:5000/exulanica-gsplat@sha256:ae7fe94945adb8ba9125b5b9257a5fc580e842076aca7dd2cb779d7dfd4c73df",
+        "localhost:5000/exulanica-scene-worker@sha256:bcf7a2b36ff7b805a12500d54357da564c34e11b29b18cebf1b6df8bed04d279",
+        "localhost:5000/exulanica-gsplat@sha256:200e0f571280eeff51db57f9615acae0065e070322f2a169c41cc37245a86d48",
+        "localhost:5000/exulanica-gsplat@sha256:5dd707be015f12cbd206e71e471a7289aed3f385b5a0e0c3c9c813d34ed86bb0",
+        "localhost:5000/exulanica-scene-worker@sha256:293ccd629306772a6461030642798bbdd0abe25bfc6d6ed378f10970c7bda644",
+        "localhost:5000/exulanica-gsplat@sha256:e684bc3ca3cf0bee8141113f2f9681d489fc2888e511b920955349a88e730eb1",
+        "localhost:5000/exulanica-scene-worker@sha256:93625e5e06aca92943a5710399532d4c62a14153faf2a8309d08a956b5ad1509",
+        "localhost:5000/exulanica-gsplat@sha256:d159f8e90235d819a6bab18877b9432b755d82dc97d4f6b15f19174951240c7b",
+        "localhost:5000/exulanica-scene-worker@sha256:18c34ae7f249342a041dd74b068b95720c724db9705a955469b7235677ebccdd",
+        "localhost:5000/exulanica-gsplat@sha256:f91fb181bd6caba6a0a3971699f319a46ee35d981f303e6ef41539d7c19b14a3",
+        "localhost:5000/exulanica-scene-worker@sha256:86c103f94c3b774c57c2eef2209abaa5b71d4a050c35f77bc3a391c794ee4181",
+        "localhost:5000/exulanica-scene-worker@sha256:bc4e0f5fe63e26f04552cd336f68adba603e1bde093810ef99086c1ef0f8ba2c",
+        "localhost:5000/exulanica-scene-worker@sha256:de68a6ba5c2e5bd9b6bfba5a5d196430c769f044bd04ceac49ffdf07dbb7c132"
+      ],
+      "provider": "NVIDIA Brev, MassedCompute L40S instance type massedcompute_L40S, pre-release option",
+      "instance_name": "exulanica-gsplat",
+      "declared_usd_per_gpu_hour": "1.06",
+      "instance_started_utc": "2026-09-05T17:30:28+00:00",
+      "facts_collected_utc": "2026-09-06T03:34:39+00:00",
+      "prepaid_balance_before_usd": "51.17",
+      "spend_cap_usd": "51.17"
+    },
+    "scenes": [
+      {
+        "label": "bowl",
+        "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+        "database_counts": {
+          "capture": 51,
+          "capture_reconstruction_authorization": 51,
+          "reconstruction_privacy_screening": 51,
+          "reconstruction_scene": 2,
+          "reconstruction_scene_job": 8
+        },
+        "scene_jobs": [
+          {
+            "job_id": "f3b936fd-55a2-5a75-a068-f75403f14372",
+            "scene_id": "52ec40fd-4b9d-5898-b897-41107e240332",
+            "status": "succeeded",
+            "attempts": 2,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-05T17:28:25.506111+00:00",
+            "completed_at": "2026-09-05T17:54:11.236586+00:00"
+          },
+          {
+            "job_id": "8215581f-0fd8-594b-99e0-42e82b257e2d",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "failed",
+            "attempts": 3,
+            "failure_class": "ValueError",
+            "failure_message": "resumed training dataset has changed input bytes",
+            "created_at": "2026-09-05T18:01:14.012285+00:00",
+            "completed_at": "2026-09-05T18:22:06.957647+00:00"
+          },
+          {
+            "job_id": "37aec211-b9d9-5795-9350-fbc170cbdf21",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "failed",
+            "attempts": 3,
+            "failure_class": "ValueError",
+            "failure_message": "the scene job stage bindings are no longer current",
+            "created_at": "2026-09-05T18:14:54.355234+00:00",
+            "completed_at": "2026-09-05T18:43:53.329844+00:00"
+          },
+          {
+            "job_id": "de9d2994-ef98-5f45-adfe-dc0951574878",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "failed",
+            "attempts": 3,
+            "failure_class": "RuntimeError",
+            "failure_message": "gsplat runner exited 1: gsplat runner refused: runner image Exulanica revision differs from the build manifest; rung 3 fallback",
+            "created_at": "2026-09-05T18:40:13.286087+00:00",
+            "completed_at": "2026-09-05T20:52:08.128147+00:00"
+          },
+          {
+            "job_id": "85b2b2e6-9c16-53a9-ac63-52a64e6d719b",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "succeeded",
+            "attempts": 1,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-05T19:11:33.943373+00:00",
+            "completed_at": "2026-09-05T20:42:06.874880+00:00"
+          },
+          {
+            "job_id": "fe2fbce0-6668-598e-ac73-556658951afb",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "running",
+            "attempts": 3,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-05T20:50:42.832262+00:00",
+            "completed_at": null
+          },
+          {
+            "job_id": "1b15f27a-c39b-5745-bd62-155c72b8f6ed",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "failed",
+            "attempts": 2,
+            "failure_class": "RuntimeError",
+            "failure_message": "gsplat runner exited 1: gsplat runner refused: manifest contains unsupported or changed training protocol; rung 3 fallback",
+            "created_at": "2026-09-06T00:03:31.940577+00:00",
+            "completed_at": null
+          },
+          {
+            "job_id": "a5ef0b97-a7de-51d7-8727-42c73cd676bd",
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "status": "succeeded",
+            "attempts": 1,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-06T02:07:46.498494+00:00",
+            "completed_at": "2026-09-06T03:25:13.670324+00:00"
+          }
+        ],
+        "first_training_run": {
+          "job_id": "85b2b2e6-9c16-53a9-ac63-52a64e6d719b",
+          "status": "succeeded as a rung-3 point-map scene; trained delivery refused",
+          "heldout_views": 7,
+          "psnr": "25.382149",
+          "ssim": "0.895814",
+          "lpips": "0.309922",
+          "coverage_fraction": "0.982744",
+          "floaters_fraction": "0.472158",
+          "iterations_completed": 30000,
+          "duration_seconds": "5156.184361",
+          "usd_cost": "1.51821",
+          "gpu": "NVIDIA L40S",
+          "peak_vram_bytes": 8824338432,
+          "refusal": "floater fraction is above the manifest threshold (predeclared 0.15)",
+          "why_refused": "The proxy counts opacity mass farther than 5x the median sparse spacing (0.0093 units) from any sparse point; a plain table around a densely matched bowl has almost no sparse support, so legitimate table Gaussians count as floaters. Held-out renders were inspected and match the photographs.",
+          "held_out_comparisons": [
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00000-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00008-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00016-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00024-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00032-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00040-photograph-vs-render.jpg",
+            "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/view-00048-photograph-vs-render.jpg"
+          ],
+          "per_view_psnr": [
+            "25.36",
+            "23.73",
+            "25.32",
+            "28.73",
+            "23.58",
+            "25.14",
+            "25.8"
+          ],
+          "held_out_comparison_summary": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-85b2b2e6/comparisons.json",
+          "comparison_tool": "scripts/heldout_comparisons.py (verifies every file against the bundle inventory and binds the render digests the metrics scored)"
+        },
+        "second_training_run": {
+          "job_id": "fe2fbce0-6668-598e-ac73-556658951afb",
+          "status": "training accepted; compression unfinished at 00:05 UTC",
+          "psnr": "25.2858",
+          "ssim": "0.8957",
+          "lpips": "0.306",
+          "coverage_fraction": "0.9832",
+          "floaters_fraction": "0.4643",
+          "heldout_views": 7,
+          "iterations_completed": 30000,
+          "duration_seconds_attempt_1": "7080.3",
+          "peak_vram_bytes": 8765844992,
+          "attempt_1": "refused at the compressor version check (banner on stderr); fixed in 177f6b8",
+          "attempt_2": "resumed from the 30000-iteration checkpoint in 54 s through the stderr-merging shim; SOG compression with the fixed command (-g cpu, full SH) ran past one hour",
+          "shared_gpu": "trained beside volcanic 9a52c1ae from 20:56 to 22:17 UTC"
+        },
+        "third_training_run": {
+          "job_id": "1b15f27a-c39b-5745-bd62-155c72b8f6ed",
+          "request": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/bowl-training-request-2.json",
+          "trainer_image": "localhost:5000/exulanica-gsplat@sha256:200e0f571280eeff51db57f9615acae0065e070322f2a169c41cc37245a86d48",
+          "worker_image": "localhost:5000/exulanica-scene-worker@sha256:bcf7a2b36ff7b805a12500d54357da564c34e11b29b18cebf1b6df8bed04d279",
+          "code_revision": "3c9ff9126886edf102f441f85b8b3d4609acb5a2",
+          "worker": "brev-bowl-train-4, started 00:04 UTC with --job so it claims only this job",
+          "protocol_change": "delivered_sh_bands 0 (compress with -H 0); same thresholds as the second request",
+          "status": "training completed and accepted (metrics in scratch); SOG compression on CPU killed after seven minutes once the GPU path was measured; job left failed with retries; superseded by the fourth run"
+        },
+        "fourth_training_run": {
+          "job_id": "a5ef0b97-a7de-51d7-8727-42c73cd676bd",
+          "request": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/bowl-training-request-4.json",
+          "trainer_image": "localhost:5000/exulanica-gsplat@sha256:f96e7ccf7197bcd89863aaf32a8cad0450a4b5d2d5788d1fc8cd2b37cbb597f3",
+          "worker_image": "localhost:5000/exulanica-scene-worker@sha256:43856210335c1002b6787f11067afbd6f1c9b3fd8d4edac4d9a0f03aad3d296e",
+          "code_revision": "639059285e6ede34d0d3cf4792b14fb47eb9d5b9",
+          "worker": "brev-bowl-train-5 with --job, GPU granted with graphics capability, EXULANICA_COMPRESSOR_GPU=0; the container listed the NVIDIA L40S as WebGPU adapter 0 before the run",
+          "protocol": "every SH band delivered; compressor device recorded in compression-attempt.json",
+          "status": "succeeded with an accepted trained delivery displayed in Atlas",
+          "training_receipt_sha256": "976c5ef480d87b52eae6d8340522c5d2011ea15209bb645fd84cf5b706cb6a18",
+          "evaluation_bundle_sha256": "113b15e89c713730a3aa00bb8014d72ee0b56bdb0e386822205eae8d2cf14508",
+          "delivery_sha256": "844678b9374043b5f7e30038741fdf733e16a3da0d79b29078dd3d0b5f28eaa7",
+          "delivery_artifact_id": "c37d30fa-50b7-5612-8b22-e306ec7fa5ae",
+          "browser_bytes": 15337279,
+          "heldout_views": 7,
+          "psnr": "25.2784",
+          "ssim": "0.8959",
+          "lpips": "0.3091",
+          "coverage_fraction": "0.9831",
+          "floaters_fraction": "0.466",
+          "iterations_completed": 30000,
+          "duration_seconds": "4455.7",
+          "usd_cost": "1.312",
+          "gpu": "NVIDIA L40S",
+          "gpu_sharing": "alone on the card for training; compression on the same GPU through Vulkan",
+          "held_out_comparison_summary": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/heldout-a5ef0b97/comparisons.json",
+          "per_view_psnr": [
+            "25.46",
+            "23.24",
+            "24.95",
+            "28.91",
+            "23.97",
+            "24.77",
+            "25.65"
+          ]
+        }
+      },
+      {
+        "label": "volcanic",
+        "workspace_id": "79004d44-ca24-4d17-9eef-56786415e233",
+        "database_counts": {
+          "capture": 210,
+          "capture_reconstruction_authorization": 210,
+          "reconstruction_privacy_screening": 210,
+          "reconstruction_scene": 1,
+          "reconstruction_scene_job": 4
+        },
+        "scene_jobs": [
+          {
+            "job_id": "3483a109-7381-5dbf-ae16-a1c04d62cbc9",
+            "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+            "status": "succeeded",
+            "attempts": 1,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-05T17:34:31.738924+00:00",
+            "completed_at": "2026-09-05T18:34:53.918389+00:00"
+          },
+          {
+            "job_id": "10ef5b6e-8016-5ed3-b70f-5b0166124a89",
+            "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+            "status": "failed",
+            "attempts": 3,
+            "failure_class": "ValueError",
+            "failure_message": "the scene job stage bindings are no longer current",
+            "created_at": "2026-09-05T18:14:55.365405+00:00",
+            "completed_at": "2026-09-05T22:50:07.740783+00:00"
+          },
+          {
+            "job_id": "9a52c1ae-c74a-521f-9103-30e6d34b4eb1",
+            "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+            "status": "succeeded",
+            "attempts": 1,
+            "failure_class": null,
+            "failure_message": null,
+            "created_at": "2026-09-05T19:12:31.420461+00:00",
+            "completed_at": "2026-09-05T22:17:40.490588+00:00"
+          },
+          {
+            "job_id": "e0e693b4-67fd-53b1-8643-875ef7944ac9",
+            "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+            "status": "failed",
+            "attempts": 3,
+            "failure_class": "ValueError",
+            "failure_message": "evaluation bundle exceeds its retained-byte budget",
+            "created_at": "2026-09-05T20:51:14.865254+00:00",
+            "completed_at": "2026-09-06T02:07:08.917415+00:00"
+          }
+        ],
+        "display_frame_measurement": {
+          "measured_at_utc": "2026-09-05T21:30:00+00:00",
+          "source": "210 placed point-map transforms of the displayed volcanic group scene 45ad50b7, read from GET /graph",
+          "mean_camera_up_length": "0.337",
+          "mean_camera_forward_length": "0.156",
+          "camera_right_vector_covariance_eigenvalues": [
+            "0.0669",
+            "0.4439",
+            "0.4892"
+          ],
+          "cameras_with_up_against_the_best_axis_fraction": "0.41",
+          "interpretation": "The rock was photographed from all around and turned over between series, so the recovered cameras share no up direction and no gravity axis exists in the scene frame. The scene-axes display fallback is the correct outcome for this collection, not an estimator defect; an orbit-axis estimator was considered and not built because the measurement shows no axis to find. The bowl's 51 recovered cameras agree (mean up length 0.675, right-vector null eigenvalue 0.0072), so it stands upright on the mean camera up."
+        },
+        "first_training_run": {
+          "job_id": "9a52c1ae-c74a-521f-9103-30e6d34b4eb1",
+          "status": "succeeded as a rung-3 point-map scene; trained delivery refused",
+          "training_receipt_sha256": "b2f971e5257ffff6b4e1e76212802be83d2898c71cde2fee85898410bdcf6611",
+          "evaluation_bundle_sha256": "1cccf4705a98b50e10041abb41cf00186f51408ee94152aa65330af9e5be3ed5",
+          "predeclared": {
+            "min_psnr_millionths": "18",
+            "min_ssim_millionths": "0.6",
+            "max_lpips_millionths": "0.45",
+            "max_floaters_fraction_millionths": "0.15",
+            "min_coverage_fraction_millionths": "0.75"
+          },
+          "heldout_views": 27,
+          "psnr": "19.756592",
+          "ssim": "0.888226",
+          "lpips": "0.244094",
+          "coverage_fraction": "0.730379",
+          "floaters_fraction": "0.228319",
+          "iterations_completed": 30000,
+          "duration_seconds": "7387.988008",
+          "usd_cost": "2.175352",
+          "gpu": "NVIDIA L40S",
+          "peak_vram_bytes": 14264419328,
+          "refusal_reasons": [
+            "floater fraction is above the manifest threshold",
+            "coverage is below the manifest threshold"
+          ],
+          "shared_gpu": "the bowl training fe2fbce0 ran on the same L40S from about 20:56 UTC until this run finished at 22:17 UTC, so duration and cost are wall clock on a shared card",
+          "held_out_comparison_summary": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/heldout-9a52c1ae/comparisons.json",
+          "per_view_psnr": [
+            "26.42",
+            "28.53",
+            "18.09",
+            "7.42",
+            "26.24",
+            "28.86",
+            "23.2",
+            "20.61",
+            "25.39",
+            "27.39",
+            "27.09",
+            "26.37",
+            "26.51",
+            "27.97",
+            "17.53",
+            "10.02",
+            "10.15",
+            "14.7",
+            "19.8",
+            "17.8",
+            "15.05",
+            "11.11",
+            "19.09",
+            "17.82",
+            "9.81",
+            "18.17",
+            "12.31"
+          ],
+          "visual_reading": "Views from the dark-backdrop series render the rock crisply (PSNR 23 to 29 dB, SSIM above 0.95). Views from the series photographed from above against a white background render as a washed-out, nearly transparent rock over a white field (PSNR 7 to 12 dB). The rock was turned over between series and the backdrop changed, so the backdrop is not static scene content; the model cannot learn one background for both and its coverage over the frame is 0.73. The rock geometry itself is consistent across series in the sparse model.",
+          "why_refused": "floater proxy 0.228 above the predeclared 0.15, and coverage 0.730 below the predeclared 0.75. The second request e0e693b4 raises only the floater ceiling to 0.9; it will measure coverage on the same input."
+        },
+        "second_training_run": {
+          "job_id": "e0e693b4-67fd-53b1-8643-875ef7944ac9",
+          "predeclared": {
+            "min_psnr": "18",
+            "min_ssim": "0.6",
+            "max_lpips": "0.45",
+            "max_floaters_fraction": "0.9",
+            "min_coverage_fraction": "0.75"
+          },
+          "measured": {
+            "psnr": "20.2726",
+            "ssim": "0.9007",
+            "lpips": "0.2371",
+            "coverage_fraction": "0.6289",
+            "floaters_fraction": "0.2544",
+            "heldout_views": 27,
+            "iterations_completed": 30000
+          },
+          "outcome": "training completed and would have been refused on coverage alone (0.629 below 0.75; the floater proxy 0.254 passed the raised 0.9 ceiling), but the job failed first while packaging its evaluation bundle: 27 held-out 12 MP renders plus rectified references exceeded the stage's 256 MiB retained-byte budget. The first volcanic run's bundle was 267 MB, just under the budget.",
+          "shared_gpu": "trained beside bowl fe2fbce0 (compression) and bowl 1b15f27a from 00:12 UTC; GPU wall clock is shared",
+          "measured_from": "scratch metrics.json on the GPU host, since the bundle and receipt were never published"
+        }
+      }
+    ],
+    "defects_found_by_real_runs": [
+      {
+        "found_by": "first trainer image build",
+        "defect": "deploy/gsplat/Dockerfile could not COPY its requirements because .dockerignore is an allowlist",
+        "fix_commit": "69d3d11",
+        "control": "build succeeded after the allowlist entry; no unit test"
+      },
+      {
+        "found_by": "first real COLMAP output (bowl, 40 photographs)",
+        "defect": "an image observing one sparse point at two keypoints made the placement reader refuse the pose receipt",
+        "fix_commit": "58721ee",
+        "control": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-pose-duplicate-observation.txt"
+      },
+      {
+        "found_by": "second worker image build",
+        "defect": "a surviving uv cache mount reused a stale project wheel; the image ran the previous commit",
+        "fix_commit": "fe4bce8",
+        "control": "tests/test_deployment.py::test_the_image_never_installs_a_stale_wheel_of_its_own_package"
+      },
+      {
+        "found_by": "first CUDA training attempt",
+        "defect": "seed Gaussian scales were float64 and the rasterizer refused Double beside Float",
+        "fix_commit": "63fe966",
+        "control": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-seed-precision.txt"
+      },
+      {
+        "found_by": "first CUDA training attempt",
+        "defect": "a failed trainer attempt retained only a stderr digest; the failure was nameless",
+        "fix_commit": "63fe966",
+        "control": "tests/test_reconstruction_splat.py::test_a_failed_runner_names_its_last_stderr_line_and_retains_the_tail"
+      },
+      {
+        "found_by": "bowl pose runs measuring 8.13, 8.96 and above 9 units",
+        "defect": "the 9.0-unit camera translation floor refused fully registered real captures at random",
+        "fix_commit": "2fc9a57",
+        "control": "scene_pose stage version 4 with the real observations in its calibration record"
+      },
+      {
+        "found_by": "retry after a code-revision change",
+        "defect": "a shared staged training dataset refused the new pose output's bytes",
+        "fix_commit": "2fc9a57",
+        "control": "tests/test_scene_splat_pipeline.py::test_each_pose_output_stages_its_own_training_dataset"
+      },
+      {
+        "found_by": "stopping a worker during training",
+        "defect": "glog's failure handler, installed by importing pycolmap, claimed SIGTERM and killed the worker before it could stop its trainer",
+        "fix_commit": "8ca13fd",
+        "control": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-pycolmap-signal.txt"
+      },
+      {
+        "found_by": "GPU utilization of 24 percent during training",
+        "defect": "every iteration decoded its 12-megapixel JPEG on one CPU core",
+        "fix_commit": "1297018",
+        "control": "tests/test_gsplat_runner.py::test_decoded_image_cache_returns_exact_pixels_and_decodes_each_view_once; measured 2000 iterations in 13.2 min before and 3.6 min after"
+      },
+      {
+        "found_by": "first exact 51-photograph scene",
+        "defect": "a scene whose members exceed the metadata group could not resolve to any region and would not draw",
+        "fix_commit": "8e71428",
+        "control": "frontend-control-exact-set-joins-group.txt and most-complete-scene-displayed"
+      },
+      {
+        "found_by": "first walking view of the bowl",
+        "defect": "scene geometry drawn on raw COLMAP axes: tilted, off centre, six times too large, under the landscape, and left at residency stub",
+        "fix_commit": "416a2fb, 3bb171b, f151288",
+        "control": "frontend-control-display-*.txt, arrival-at-first-camera, reconstructed-region-grounded, residency-cost-capped"
+      },
+      {
+        "found_by": "starting a second rented worker while a stale job was still retryable",
+        "defect": "a --once worker drains every eligible job oldest first; the fresh bowl worker's first pass went to stale job de9d2994 (pinned to an earlier trainer image), which failed on its final attempt before the intended job fe2fbce0 began",
+        "fix_commit": "41e1238",
+        "control": "tests/test_reconstruction_scene_jobs.py::test_a_job_scoped_claim_takes_only_the_named_job_and_leaves_the_rest_queued and tests/test_scene_worker_command.py (job scope parsing and startup disclosure)"
+      },
+      {
+        "found_by": "the first accepted real training (bowl fe2fbce0, attempt 1)",
+        "defect": "the SOG compressor version check read only stdout; splat-transform 3.3.3 prints its banner on stderr, so an accepted two-hour training was refused at the compression step",
+        "fix_commit": "177f6b8",
+        "control": "tests/test_reconstruction_splat.py fixture now returns the banner on stderr, as the real tool does; the wrong-version test still refuses",
+        "operational_workaround": "the pinned worker revision on the rented host could not be changed without invalidating the request's trainer digest, so ~/compressor-shim/splat-transform (an sh wrapper that runs the pinned /opt/compressor binary with stderr merged into stdout) was put first on the worker's PATH and attempt 2 of the same job resumed from its 30000-iteration checkpoint; the compressor bytes and version are unchanged"
+      },
+      {
+        "found_by": "the old volcanic group job 10ef5b6e reclaimed on its final attempt",
+        "defect": "the stage-binding currency check ran after pose recovery, so a job queued under an earlier stage version spent thirty minutes of COLMAP matching before being refused as stale",
+        "fix_commit": "dd6a0e2",
+        "control": "tests/test_scene_reconstruction_pipeline.py::test_stale_stage_bindings_are_refused_before_any_pose_work_runs"
+      },
+      {
+        "found_by": "the first accepted real training reaching SOG compression (bowl fe2fbce0, attempt 2)",
+        "defect": "splat-transform's CPU k-means over 65536 clusters of the 45 higher-band SH coefficients of one million Gaussians ran for three hours on one core without finishing (two runs), so the fixed -g cpu command shape could not produce a browser asset",
+        "fix_commit": "GPU compressor device (commit after 3c9ff91); 3c9ff91 itself added -H 0 in a position the CLI ignores and was withdrawn",
+        "control": "tests/test_reconstruction_splat.py::test_the_compressor_device_is_passed_verbatim_and_recorded; measured on the host: k-means 4.1 s, 10.8 s wall clock, 15.3 MB SOG with all SH bands",
+        "consequence": "the scene worker container now carries libvulkan1 and is given the GPU with graphics capability; EXULANICA_COMPRESSOR_GPU=0 selects the L40S; every SH band is delivered"
+      },
+      {
+        "found_by": "the second volcanic training run (27 held-out views at 12 MP)",
+        "defect": "the scene_splat_evaluation stage's 256 MiB retained-byte budget is exceeded by 27 held-out PNG renders plus rectified references; the first volcanic bundle passed at 267 MB by chance and the second failed, so the run's receipt and bundle were lost to the store",
+        "fix_commit": "e5bb108",
+        "control": "tests/test_scene_splat_pipeline.py::test_evaluation_bundle_budget_is_the_stage_parameter_and_holds_a_210_photograph_capture"
+      },
+      {
+        "found_by": "the first worker container given the GPU for SOG compression",
+        "defect": "the NVIDIA Vulkan ICD (libGLX_nvidia.so.0) links libX11 and libXext, and its glcore library resolves ErrorF from libglvnd; the slim worker image had none of these, so the Vulkan loader found no driver inside the container while the host listed the L40S",
+        "fix_commit": "8386920 (X11) and 6390592 (glvnd)",
+        "control": "splat-transform --list-gpus inside the rebuilt worker container must list the NVIDIA L40S before the fourth bowl request is queued"
+      }
+    ],
+    "visual_evaluation": {
+      "rubric": "frozen five-dimension rubric from docs/retained-reference-workflow.md, each dimension 1 to 4, pass is at least 3 on every dimension",
+      "bowl_trained_scene": {
+        "captures": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-*.jpg, walkthrough GIF bowl-trained-walkthrough.gif (103 frames through all 51 recovered cameras and their midpoints)",
+        "surfaces": {
+          "score": 4,
+          "note": "bowl, food and table read as solid surfaces at every recovered camera and midpoint; far background is smeared Gaussians at the frame edges"
+        },
+        "colour_and_detail": {
+          "score": 4,
+          "note": "held-out renders match the photographs at web size; herb stems and fish texture are legible; the darkest held-out view is 23.24 dB"
+        },
+        "arrival_and_motion": {
+          "score": 3,
+          "note": "arrival lands on the first recovered camera looking down at the bowl with smeared surroundings at the edges; camera-to-camera traversal is smooth with no popping at 60 fps"
+        },
+        "world_boundary": {
+          "score": 3,
+          "note": "no hard cutoff, but unobserved directions show elongated Gaussian smears rather than an honest edge; a support crop is future work"
+        },
+        "source_loading_failure_return_ux": {
+          "score": 4,
+          "note": "rung summary, four withheld-rung reasons, display-frame sentence and two measured quality sentences are shown; Inspect reconstruction, Inspect original source and Return to Atlas work; after-return capture restores the prior view"
+        },
+        "passes": true
+      },
+      "bowl_point_map_scene_group_40": "rung 3 point maps, captured earlier (bowl-group-* and bowl-pointmaps-gpu-*); passes the rubric at 3 or above with the 51-set trained scene now displayed in its place",
+      "volcanic_point_map_scene": {
+        "captures": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-*.jpg",
+        "surfaces": {
+          "score": 3
+        },
+        "colour_and_detail": {
+          "score": 3
+        },
+        "arrival_and_motion": {
+          "score": 3
+        },
+        "world_boundary": {
+          "score": 3
+        },
+        "source_loading_failure_return_ux": {
+          "score": 4
+        },
+        "passes": true,
+        "note": "19.5 million posed points; recovered axes stand because the cameras share no up direction; no trained delivery (see volcanic training runs)"
+      }
+    },
+    "measurements": {
+      "gpu_timed_traversal_bowl_trained": {
+        "chrome": "headless=new, ANGLE Metal on Apple M3 Pro, 1280x720, deviceScaleFactor 1, requestAnimationFrame driver, 3 s warmup, 60 s measured",
+        "loaded": {
+          "gaussians": 1000000,
+          "point_maps": 50,
+          "points": 9757711,
+          "authenticated_bytes": 210557883
+        },
+        "first_meaningful_render_ms": "24386.8",
+        "geometry_load_ms": "1221.7",
+        "frame_mean_ms": "16.98",
+        "frame_p50_ms": "16.7",
+        "frame_p95_ms": "16.8",
+        "frame_p99_ms": "33.3",
+        "fps_1pct_low": "30.03",
+        "frames_over_16_7_ms_fraction": "0.26",
+        "frames": 3534,
+        "source": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-reconstruction-capture.json (browser_validation_report)"
+      },
+      "gpu_timed_traversal_bowl_point_maps_earlier": {
+        "frame_mean_ms": "30",
+        "frame_p99_ms": 83,
+        "fps_1pct_low": 12,
+        "source": "bowl-pointmaps-gpu-reconstruction-capture.json"
+      },
+      "gpu_timed_traversal_volcanic_point_maps": {
+        "frame_mean_ms": 53,
+        "frame_p99_ms": 167,
+        "fps_1pct_low": 6,
+        "source": "volcanic-pointmaps-gpu-reconstruction-capture.json"
+      },
+      "sog_compression": {
+        "cpu_one_core": "two runs not finished after 3 h and 7 min respectively (killed)",
+        "gpu_l40s_vulkan": "k-means 4.1 s, 10.8 s wall clock, 15.3 MB output with all SH bands (host measurement); in-pipeline compression completed within the job's final minute"
+      }
+    },
+    "captures": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-reconstruction-capture.json",
+        "sha256": "1417a14cb05f88d1bbc1ba09b5ccab9b91991ee6e09864195bb1b98d27fa54a9",
+        "byte_size": 43429,
+        "summary": {
+          "label": "bowl-group-pointmaps",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 12076,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 38,
+              "label": "Source camera 20",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 39,
+              "label": "Between cameras 20 and 21",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+            },
+            {
+              "name": "last-camera",
+              "index": 74,
+              "label": "Source camera 38",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-reconstruction-capture.json",
+        "sha256": "ddd923210fa2fe97b108e55705d226309d5348e8b5fea48822d30ea35b345cb7",
+        "byte_size": 44452,
+        "summary": {
+          "label": "bowl-group-displayframe",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 12070,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 38,
+              "label": "Source camera 20",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 39,
+              "label": "Between cameras 20 and 21",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+            },
+            {
+              "name": "last-camera",
+              "index": 74,
+              "label": "Source camera 38",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-reconstruction-capture.json",
+        "sha256": "7a1414c9870d97d62bab83b6247cf11c2729fc618fba9cd6fb98bdc92b43baf2",
+        "byte_size": 44410,
+        "summary": {
+          "label": "bowl-group-grounded",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 11778,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 38,
+              "label": "Source camera 20",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 39,
+              "label": "Between cameras 20 and 21",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+            },
+            {
+              "name": "last-camera",
+              "index": 74,
+              "label": "Source camera 38",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-reconstruction-capture.json",
+        "sha256": "bbae29e023b44ad44fd2c378099b6ade3f42d59ed5310cc194f5404c9d85457e",
+        "byte_size": 43289,
+        "summary": {
+          "label": "bowl-group-resident",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 12120,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 38,
+              "label": "Source camera 20",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 39,
+              "label": "Between cameras 20 and 21",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+            },
+            {
+              "name": "last-camera",
+              "index": 74,
+              "label": "Source camera 38",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-reconstruction-capture.json",
+        "sha256": "78055f50a944e0a48ed8bdb84332a7c099b053f8fd2bef6d89489fd52995144b",
+        "byte_size": 47785,
+        "summary": {
+          "label": "bowl-pointmaps-gpu",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, ANGLE metal, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 12182,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 38,
+              "label": "Source camera 20",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 39,
+              "label": "Between cameras 20 and 21",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+            },
+            {
+              "name": "last-camera",
+              "index": 74,
+              "label": "Source camera 38",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-reconstruction-capture.json",
+        "sha256": "e9ca2eba30903990a9e6e2f8f217dfa73b4834c6540f4a81225d6f3059e6b1e4",
+        "byte_size": 60365,
+        "summary": {
+          "label": "bowl-trained-gpu",
+          "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, ANGLE metal, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 24979,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+              "view_id": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "851ca35b-31c3-560c-84f9-4e142962755b:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+            },
+            {
+              "name": "central-camera",
+              "index": 50,
+              "label": "Source camera 26",
+              "state": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+              "view_id": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-7658-78ef-a8c0-19cc470dfc73"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 51,
+              "label": "Between cameras 26 and 27",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "851ca35b-31c3-560c-84f9-4e142962755b:midpoint:01a0722b-7658-78ef-a8c0-19cc470dfc73:01a0722b-768f-7a2f-9188-5cfa0b1fe280"
+            },
+            {
+              "name": "last-camera",
+              "index": 100,
+              "label": "Source camera 51",
+              "state": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+              "view_id": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-7bae-7417-9477-92ca3dea160b"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-reconstruction-capture.json",
+        "sha256": "ae48bf13b71ad9105a8d4983c6207d117a7625dde33689f47f5f8d83fa62084e",
+        "byte_size": 115596,
+        "summary": {
+          "label": "volcanic-group-pointmaps",
+          "url": "http://127.0.0.1:5181/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 54271,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:da78401f-01d4-5e57-befe-f9bee43753eb"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:midpoint:01a0722d-8c7b-791e-b304-ee9c31019f1c:01a0722d-8cc9-7960-86ee-bb0e0dfae2d6"
+            },
+            {
+              "name": "central-camera",
+              "index": 210,
+              "label": "Source camera 106",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:71d84c93-c2c4-56ae-b90c-53fb5737f9f2"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 211,
+              "label": "Between cameras 106 and 107",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:midpoint:01a0722d-a4fa-7f7f-aed8-68bddc415f72:01a0722d-a52d-75bf-a994-c7c9d0a5f853"
+            },
+            {
+              "name": "last-camera",
+              "index": 418,
+              "label": "Source camera 210",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:80742d55-3bb8-5ed5-9e1a-dc8c86a948fb"
+            }
+          ],
+          "console_errors": []
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-reconstruction-capture.json",
+        "sha256": "879362ba4d6df033603c315bc305a16b290e5ea9698b35e4c1bd0588df6f920e",
+        "byte_size": 122931,
+        "summary": {
+          "label": "volcanic-pointmaps-gpu",
+          "url": "http://127.0.0.1:5181/?validation=1&validation-seconds=60&validation-warmup=3",
+          "chrome": "headless=new, ANGLE metal, 1280x720 css px, deviceScaleFactor 1",
+          "atlas_mount_ms": 52740,
+          "traversal": [
+            {
+              "name": "first-camera",
+              "index": 0,
+              "label": "Source camera 1",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:da78401f-01d4-5e57-befe-f9bee43753eb"
+            },
+            {
+              "name": "midpoint-after-first",
+              "index": 1,
+              "label": "Between cameras 1 and 2",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:midpoint:01a0722d-8c7b-791e-b304-ee9c31019f1c:01a0722d-8cc9-7960-86ee-bb0e0dfae2d6"
+            },
+            {
+              "name": "central-camera",
+              "index": 210,
+              "label": "Source camera 106",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:71d84c93-c2c4-56ae-b90c-53fb5737f9f2"
+            },
+            {
+              "name": "midpoint-after-central",
+              "index": 211,
+              "label": "Between cameras 106 and 107",
+              "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:midpoint:01a0722d-a4fa-7f7f-aed8-68bddc415f72:01a0722d-a52d-75bf-a994-c7c9d0a5f853"
+            },
+            {
+              "name": "last-camera",
+              "index": 418,
+              "label": "Source camera 210",
+              "state": "Recovered source camera using the point-map field-of-view estimate.",
+              "view_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88:camera:80742d55-3bb8-5ed5-9e1a-dc8c86a948fb"
+            }
+          ],
+          "console_errors": []
+        }
+      }
+    ],
+    "capture_images": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-after-return.jpg",
+        "sha256": "90b378f268e7fe3d5e4ae5ecee31edc8a1d72339ab4465265f49957e648528da",
+        "byte_size": 67550
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-arrival.jpg",
+        "sha256": "5ca4ef441af420788f28f9b5b3e94c0f45145ea807e1169e57ef17ea304e4d46",
+        "byte_size": 46656
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-central-camera.jpg",
+        "sha256": "d35e43d5e2d75bdebcd9876894dea8c2da9df93060e0dc9904db44c178a1ce15",
+        "byte_size": 113097
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-first-camera.jpg",
+        "sha256": "26a65e523bf59ae209810130f65e79c6afd6c29b052581ccbadd84cd2815196c",
+        "byte_size": 169930
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-last-camera.jpg",
+        "sha256": "5bf8078589e135def7ebf8baf0bae96fa5ccd142fce2c1c6769371a379f0d99c",
+        "byte_size": 114639
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-midpoint-after-central.jpg",
+        "sha256": "a9228791159310dfe4f397d8edbf651cee76d2bb4e2595f750aa1264314d633a",
+        "byte_size": 123102
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-midpoint-after-first.jpg",
+        "sha256": "9c818febf971dc574571f6ee10b9985ce698b0687f8ee9284f096ae20acee378",
+        "byte_size": 173203
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-pointmaps-status-expanded.jpg",
+        "sha256": "6af0e481cd2673abff4c247db2377826eba4adfd0ada5c81f6f50da27a14a116",
+        "byte_size": 67613
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-after-return.jpg",
+        "sha256": "5d3ab8a945f687c07857ac4153efcb5691997af0f8893f095ec370190734c12a",
+        "byte_size": 50303
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-arrival.jpg",
+        "sha256": "d3842c36a49694d1ff293c35dd721e918147d3be6155c6cfd9a9362fea7aff22",
+        "byte_size": 26276
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-central-camera.jpg",
+        "sha256": "e669b775970b2332eacc891155642c4a45f6b05e6a2f8e6a03c30bf46bc14576",
+        "byte_size": 133745
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-first-camera.jpg",
+        "sha256": "cd6ad929d2bb04e4c1943de81a2d8aee3cbe00eb4836b50b5e1988a748239ec0",
+        "byte_size": 164667
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-last-camera.jpg",
+        "sha256": "66dd3ea6a1abda8afc8f76d6ae5f909fc197fab93b92a7f083f00439a868da27",
+        "byte_size": 137571
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-midpoint-after-central.jpg",
+        "sha256": "73028afbd8ce61bef33698848f67b9d14f60973cc680ad148ab361372aa77311",
+        "byte_size": 137922
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-midpoint-after-first.jpg",
+        "sha256": "14ab29177a71408edb38ee7fc55630a6fc49eb4db0bea677cc852c2faf0fbc2b",
+        "byte_size": 166819
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-status-expanded.jpg",
+        "sha256": "95608ab142c6bb77a2c3a074b764215894f725ef690cc37750af771650ca4490",
+        "byte_size": 50185
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-after-return.jpg",
+        "sha256": "75ed2366d3e2c48dabad7b954903656a3cee42385469f727ac06c00ba4392900",
+        "byte_size": 49795
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-arrival.jpg",
+        "sha256": "769540fa00efbbdda3c9430d00abc02f544c851ecb2c32fad02d51d88fb4803c",
+        "byte_size": 26308
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-central-camera.jpg",
+        "sha256": "6783c11cfdc06979518f2bacfd7aab64f57702081aecdb3b20881a915f39b403",
+        "byte_size": 187416
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-first-camera.jpg",
+        "sha256": "7c83562d9a1b0cf72ca2e51e191df78d81365776d1d6510ac1c18be26f6aefa6",
+        "byte_size": 195342
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-last-camera.jpg",
+        "sha256": "8530c64ac15f675985adb9a6c5081163db78ffee9ab710dc2dd9ca1687d2f741",
+        "byte_size": 214273
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-midpoint-after-central.jpg",
+        "sha256": "e9359242f020c8bf502d9af6918d35746d56ca23038e3af6a740ff370eb3a42e",
+        "byte_size": 195603
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-midpoint-after-first.jpg",
+        "sha256": "29163f3e925832caed75c86e33fcc655084c25c07740bc4b22edb095c14b0791",
+        "byte_size": 194624
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-grounded-status-expanded.jpg",
+        "sha256": "c119409a5128f4abb4553208b0877d590f809ca7a2d5be40f513e5b8ec2e029b",
+        "byte_size": 50205
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-after-return.jpg",
+        "sha256": "69930c101519ae1f62164374e3d24a84e816b2acb3cafde747014633cf5da8c3",
+        "byte_size": 202766
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-arrival.jpg",
+        "sha256": "7d707ee38c28caaa36e8a18e12455e5762d638a00120fb7bb3c727055c306662",
+        "byte_size": 191071
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-central-camera.jpg",
+        "sha256": "4d2e5d6796cbcd9533a2d30e403aee79c3adeb45cf41d08f1626813a02bbae1c",
+        "byte_size": 187399
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-first-camera.jpg",
+        "sha256": "0217e2b1575945b1db99cdbe41dbbc1fa2dcd2b9554d9bc5c70b7a305340d83a",
+        "byte_size": 195342
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-last-camera.jpg",
+        "sha256": "8530c64ac15f675985adb9a6c5081163db78ffee9ab710dc2dd9ca1687d2f741",
+        "byte_size": 214273
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-midpoint-after-central.jpg",
+        "sha256": "f10a881b6553f9483767a0b2a9f9da497b78864af8e8c7a349332ab0196595d6",
+        "byte_size": 195595
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-midpoint-after-first.jpg",
+        "sha256": "40b21c09dd1ffb1b596c8100d5faac8fc3448cf72935db3cd8badf5eaabf9e1d",
+        "byte_size": 194634
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-resident-status-expanded.jpg",
+        "sha256": "76d113dd8f7402c68c21ecb1fa3e5a015419f908d329daf89c8a81477bc7c3b0",
+        "byte_size": 202789
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-after-return.jpg",
+        "sha256": "bd573ad122a6d879ecd479d2da3a4254ad4a9f978c93f7d5232641bca57009c5",
+        "byte_size": 50154
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-arrival.jpg",
+        "sha256": "a8ce69d794e3e81ef7e7fa90a103f7662da6f79d82b0e4a7e5e9b709540fd2ef",
+        "byte_size": 189100
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-central-camera.jpg",
+        "sha256": "156224c1596ff6d17c01b4c503ed45deb69a6f4e3a028ca1839c5cff1f99abd6",
+        "byte_size": 187530
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-first-camera.jpg",
+        "sha256": "b7d170749cc1d7aec22bfa52a3a26742e8d9ae61b5373944aaf777f112dbd2dc",
+        "byte_size": 195184
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-last-camera.jpg",
+        "sha256": "b3b2f4e2eb533c743836caa4fba1c8539b51c655bdbbf150afdd62b65cc4f5e1",
+        "byte_size": 214276
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-midpoint-after-central.jpg",
+        "sha256": "66a8f9e185cfeefd6ab7dcc6399937cee26f82220bf51fb8cdf5d5ee7b787c96",
+        "byte_size": 195628
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-midpoint-after-first.jpg",
+        "sha256": "a731d33e49d74b35d33e4d3841e80765af28b4ae411bdba45ac80129060c4abb",
+        "byte_size": 194158
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-pointmaps-gpu-status-expanded.jpg",
+        "sha256": "144b48a3e7683d23a5e218d31b417d2e2d5f798091375cc9e2bbe4e50f2bc895",
+        "byte_size": 200638
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-after-return.jpg",
+        "sha256": "4e34d74f25837203e84587d2b6477ccb582a1bf29f2c1adcfb2aea36c7c06703",
+        "byte_size": 73254
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-arrival.jpg",
+        "sha256": "ab7e6c47f6df5a582b1f0f3d77b329fba2eba88b902fbf6f51306522b45a25e7",
+        "byte_size": 110515
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-central-camera.jpg",
+        "sha256": "68f681e6ffc7b2f00f65b7f1c50a5367cf4016b63126f8145f7c39643cfdea2b",
+        "byte_size": 161951
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-first-camera.jpg",
+        "sha256": "60cf0710e8cb90a1f1971dfbd8a17ad07d517822f7756baa8c1031dadbaa2e16",
+        "byte_size": 159189
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-last-camera.jpg",
+        "sha256": "1fbfd895f59f3d587439bae917ed8cd0f09725282cf4a70daab53d1aab8f4aa9",
+        "byte_size": 162924
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-midpoint-after-central.jpg",
+        "sha256": "6337bcba044850f0a2a319cb2eb17d65595f76348109a06d03c43fd566351447",
+        "byte_size": 165808
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-midpoint-after-first.jpg",
+        "sha256": "b80c01133acba103eef43c900d3b2593113c6eae466c8dc4d53a1582c5174ae2",
+        "byte_size": 162640
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-trained-gpu-status-expanded.jpg",
+        "sha256": "750cf7ec308d1c5f0c9dd2db2bb9ee943b5765b894682e380055941f89e2f6d9",
+        "byte_size": 126587
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-after-return.jpg",
+        "sha256": "a44917725da49cc476b414162fcb56895439a6383ce08c2b898ab061df8e3a27",
+        "byte_size": 181173
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-arrival.jpg",
+        "sha256": "cca37047e933b8851cd57c35e3e738e67bdc9f17d8500dc5f6383aceb7be265c",
+        "byte_size": 160167
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-central-camera.jpg",
+        "sha256": "840d25419fbc5c9354fb90171aa9ac17e452d6336d482e8da4e8f6900b2da61c",
+        "byte_size": 195555
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-first-camera.jpg",
+        "sha256": "46996ca72c5a1f52a5b77b387605830a322b6c7ad0f12e0b0c97b20149fdea46",
+        "byte_size": 212640
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-last-camera.jpg",
+        "sha256": "f3aac81b501174a6683d5e6b1ecfdb5490e33f0ece1d77a9df0be4204af25429",
+        "byte_size": 169891
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-midpoint-after-central.jpg",
+        "sha256": "4834db722259e2283df3b6c57f9fba95eb4a6d2290bfbae36aa8a7e8b57c49c3",
+        "byte_size": 192253
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-midpoint-after-first.jpg",
+        "sha256": "14df96bdd4cfb611965b81942b2822af836cbe0b040254f55b493f76d63a4309",
+        "byte_size": 231587
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-group-pointmaps-status-expanded.jpg",
+        "sha256": "fa90affd3050fabb27d4bfe2ab538a2ebe2baad400cb976f0739a424ce9d78a0",
+        "byte_size": 180666
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-after-return.jpg",
+        "sha256": "e02c4ab020fe0c02aaa2a3d33dfdc8809fb26e90ca722360622ae7d92383382e",
+        "byte_size": 49592
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-arrival.jpg",
+        "sha256": "bf9ec951ba5c37d27e80ba1ace948d4251ab18cab6b8c2759602c0211a85ac75",
+        "byte_size": 159507
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-central-camera.jpg",
+        "sha256": "35255a57764dba03b6ef986816c44bd506d51cb4da27baa2b35e11a238f365ce",
+        "byte_size": 195516
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-first-camera.jpg",
+        "sha256": "61235f94842ee4f4fafda2285efbd2b9cfc3cf524e5db04bd250b423d08a0251",
+        "byte_size": 212907
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-last-camera.jpg",
+        "sha256": "9e05a01f873ecba2bdf7f8afe1b2798d8e810d597d9c4dbc42066af2f9fe48ae",
+        "byte_size": 169906
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-midpoint-after-central.jpg",
+        "sha256": "6138f26cb42189820ddda1f2305742d4bc35c43b701d946a21ec90004f07426f",
+        "byte_size": 192419
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-midpoint-after-first.jpg",
+        "sha256": "ddbf9c42d4e4e8329353a983eedbef2f65c40f53346df0049946417968221a7d",
+        "byte_size": 231792
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-volcanic-reconstruction/volcanic-pointmaps-gpu-status-expanded.jpg",
+        "sha256": "2fdfbc3dd682864d3a6a5ab33ca65844ed49d4c08fe2332120974b4118254cf0",
+        "byte_size": 179419
+      }
+    ],
+    "negative_controls": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-pose-duplicate-observation.txt",
+        "sha256": "9874cc93b081bd31eaa16ce238d7184b0bdf26951fd19e98986c3011b6ab3286",
+        "byte_size": 494
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-pycolmap-signal.txt",
+        "sha256": "95d10c0fc414e2a8661cc1d5a4965d460bc2fefe126744c0bcf9cebda058cc45",
+        "byte_size": 286
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/control-seed-precision.txt",
+        "sha256": "3a35babe7a3d17e2f10e9456d792fbfcb1c14648d974a7dad1cb22f8c5b0b055",
+        "byte_size": 368
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-arrival-at-first-camera.txt",
+        "sha256": "830623a58f573befe62fba8d759ee4d6e4e15c615d9015747534e0f2400e4ac4",
+        "byte_size": 1834
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-baseline.txt",
+        "sha256": "dd7c708883f59deaa6349004d5080ea65e5a27c05c795f8dff4d1c68255f79fb",
+        "byte_size": 4863
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-camera-axes-stay-unit.txt",
+        "sha256": "43060867280f08cac60b43be2598c45185fc50d8043a71b35b1b9bb580798719",
+        "byte_size": 1498
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-display-scale-at-eye-height.txt",
+        "sha256": "13061bb94e5bb4304cca05ff0481ccfd50889c88a04e230445037f5ae12fc54e",
+        "byte_size": 1518
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-display-scale-composed-once.txt",
+        "sha256": "738346d8816e56344e7cf943e453222d927e4fc9dcf46735771a6c75ea63352b",
+        "byte_size": 1954
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-display-up-from-cameras.txt",
+        "sha256": "79c03ff01f66507af22ac673601f1037848afe8b99bc25ca7c48f39cb723e12d",
+        "byte_size": 1525
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-exact-set-joins-group.txt",
+        "sha256": "a69c9d40f53fe0fdde9fd0a442a1a2caef04851e8e7779686f693cbf67a6834d",
+        "byte_size": 1624
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-most-complete-scene-displayed.txt",
+        "sha256": "47573bc2ae697bf7ad7ce8d5f2110d146591eef07a27693f2457fed42c2a7aab",
+        "byte_size": 1505
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-reconstructed-region-grounded.txt",
+        "sha256": "739d5c58831fb449e5a1d76b381a6f4fd0c91f814486f0eb9a60a61839ab279b",
+        "byte_size": 1507
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-residency-cost-capped.txt",
+        "sha256": "0e42dd29573db52d9372e68b562acf1a481407d072731beceae844e41a5859a1",
+        "byte_size": 1652
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-restored.txt",
+        "sha256": "71d77b4bf971b316069a969d9870175a5c9dc064b016e97212b4b3831117c5a2",
+        "byte_size": 621
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-control-undisplayed-scene-not-drawn.txt",
+        "sha256": "080d1adbf6f87cf726d176cb2287e033cd03d7c880afa700695bae24ad71e8bc",
+        "byte_size": 1528
+      }
+    ],
+    "verification_logs": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/backend-full-suite.log.txt",
+        "sha256": "bb7dba8da9d35ab82fe74fa70309a074aa0e7d69f5e9880f2d981f075ddb4968",
+        "byte_size": 26262
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/frontend-check.log.txt",
+        "sha256": "d7bffc3c2907f69fadf5c7948d953a1b86323836ed74a592c4287431a203da88",
+        "byte_size": 6988
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-05-real-reconstruction/compress-gpu-test.log.txt",
+        "sha256": "747a5c6e8ac46d989557917627f38b8d3d12cdc324bcc6d2c759506da03171d0",
+        "byte_size": 2431
+      }
+    ],
+    "implementation_commits": [
+      "30d53b8 Fix the three database-backed tests written while the database was reserved",
+      "6390592 Ship the glvnd libraries the NVIDIA GL core resolves against",
+      "8386920 Ship the X11 client libraries the NVIDIA Vulkan driver links against",
+      "67f5f12 Compress SOG deliveries on the GPU host and keep every SH band",
+      "e5bb108 Raise the evaluation bundle budget to 1 GiB under stage version 2",
+      "9d565b1 Add the person-region masking and presentation consent design",
+      "5fb554a Record the CPU compression cost that forced band-0 delivery",
+      "3c9ff91 Deliver band-0 colour only so SOG compression finishes on a CPU host",
+      "9527cd2 Record the compressor banner and late binding-check lessons",
+      "4d82442 Name the unused fixture outputs in the stale-binding test",
+      "177f6b8 Accept the compressor's version banner on stderr where the real tool prints it",
+      "dd6a0e2 Refuse stale scene job bindings before pose recovery instead of after it",
+      "cc5bc86 List the cost and time savings the first GPU day pointed at",
+      "d7600e4 Say why a scene stands on its recovered axes when its cameras share no up direction",
+      "152f62f Bind the pose policy test to stage version 4 and its recorded real captures",
+      "652913f Run the CUDA runtime refusal test in an isolated child like its torch siblings",
+      "00433e3 Add a verified photograph-beside-render tool for retained evaluation bundles",
+      "e2accd6 Record worker scoping and shared-GPU accounting lessons from the first real runs",
+      "41e1238 Let a scene worker claim only explicitly named jobs",
+      "c810290 Record the floater proxy's first real measurement and its role as a diagnostic",
+      "c3e055c Show the trainer's measured held-out quality beside a trained scene's rung",
+      "cb4a3de Record that the trainer image has run on CUDA and what the first run fixed",
+      "52a4a42 Record the GPU compute arrangement, measured costs and first-run lessons",
+      "014584e Read the OPM viewpoint into the display-frame camera sample",
+      "dcf05fc Disable the API liveness probe on the containerized scene worker",
+      "8ca13fd Keep termination handling in Python after pycolmap installs glog's signal handler",
+      "1297018 Decode each training image once instead of on every iteration",
+      "08b865a Add CUDA host bootstrap and worker launch scripts with the remote workflow",
+      "a7d2e14 Document the reconstruction display frame, arrival, grounding and residency contract",
+      "f151288 Cap point-map residency cost so one reconstructed region always stays resident",
+      "3bb171b Stand reconstructed regions on the landscape height",
+      "416a2fb Display reconstructed scenes upright at walking scale and arrive at the first recovered camera",
+      "2fc9a57 Lower the pose translation floor after real captures and key staged datasets by pose output",
+      "63fe966 Seed Gaussians in single precision and name a failed trainer's last error",
+      "8e71428 Resolve exact reconstruction sets to one region and draw one scene per region",
+      "fe4bce8 Rebuild the project wheel whenever its sources change",
+      "b0fbc4f Bind the trainer image revision after its compiled dependency layers",
+      "58721ee Drop sparse points one image observes twice from pose receipts",
+      "69d3d11 Include the gsplat requirements file in the Docker build context"
+    ],
+    "head": "30d53b8077dbf41945ede09d02c487107839c6c1",
+    "limitations": [
+      "Two trainings (bowl fe2fbce0 and volcanic 9a52c1ae) shared the single L40S from about 20:56 UTC; each job's duration_seconds and usd_cost describe wall clock on a shared card at the full declared rate, so those figures are upper bounds and the provider's billing page is the actual total.",
+      "The floater proxy in scene_splat_evaluation counts opacity mass farther than five times the median sparse neighbour spacing from any sparse point; on a densely matched subject over a plain surface it counts legitimate surface Gaussians. It remains a retained diagnostic; the delivered requests carry a 0.9 ceiling as a divergence guard and visible floaters are judged in the visual pass.",
+      "Job fe2fbce0 (second bowl request) is left with a stale running lease on its final attempt after its old-revision worker was stopped; the next worker's cleanup terminalizes it. Job 1b15f27a (third request, band-0 protocol) failed twice at CPU compression and is retryable but superseded. Both are recorded, not hidden.",
+      "The accepted trained bowl is an exhibit-scale reconstruction of an orbit capture: photographed viewpoints and their midpoints render well; unobserved directions show smeared Gaussians and the three-sigma support box spans thousands of scene units because of far background Gaussians. No physical scale, collision or navigability is claimed; the recorded rung stays 3.",
+      "The volcanic collection has no accepted trained delivery: two runs measured coverage 0.73 and 0.63 against the predeclared 0.75 because the rock was turned over between series against different backdrops; the second run also lost its receipt to the 256 MiB bundle budget before the budget was raised. Its rung-3 point-map scene remains displayed.",
+      "Held-out scores were measured on the full trained model before compression; the delivered SOG carries every SH band but is quantized by the compressor, and no post-compression score is taken."
+    ],
+    "requested_objective_complete": true,
+    "strong_reconstructed_baseline_established": true,
+    "float_encoding": "measured numbers are decimal strings with at most six fractional digits; canonical JSON admits no floats"
+  },
+  "record_sha256": "fd9318ddb862356db47f377fe4c87f395f385429f6a18a705a0a48d5fae77988"
+}

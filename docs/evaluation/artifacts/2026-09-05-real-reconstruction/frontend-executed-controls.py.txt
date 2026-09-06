@@ -1,0 +1,58 @@
+"""Isolated production mutations for the region, display-frame, arrival, grounding and residency invariants."""
+from pathlib import Path
+import shutil, subprocess, tempfile, json, hashlib, re
+repo = Path('/Users/glendonchin/dev/Technology/orimera/web')
+scratch = Path(tempfile.mkdtemp(prefix='orimera-reconstruction-display-controls-'))
+shutil.copytree(repo/'test-data', scratch/'test-data')
+for name in ['package.json', 'vitest.config.ts', 'tsconfig.base.json', 'tsconfig.json']:
+    shutil.copy2(repo/name, scratch/name)
+(scratch/'node_modules').symlink_to(repo/'node_modules', target_is_directory=True)
+for name in [p.name for p in (repo/'packages').iterdir() if p.is_dir()]:
+    target = scratch/'packages'/name
+    shutil.copytree(repo/'packages'/name, target, ignore=shutil.ignore_patterns('node_modules', 'dist', '*.tsbuildinfo'))
+    modules = repo/'packages'/name/'node_modules'
+    if modules.exists():
+        (target/'node_modules').symlink_to(modules, target_is_directory=True)
+I = 'packages/graph-client/src/islands.ts'; IT = 'packages/graph-client/test/islands.test.ts'
+G = 'packages/app/src/geometry-api.ts'; GT = 'packages/app/test/geometry-api.test.ts'
+F = 'packages/atlas-core/src/display-frame.ts'; FT = 'packages/atlas-core/test/display-frame.test.ts'
+B = 'packages/atlas-react/src/playcanvas/atlas-binding.ts'; BT = 'packages/atlas-react/test/source-presentation.test.ts'
+S = 'packages/app/src/scene.ts'; ST = 'packages/app/test/scene.test.ts'
+cases = [
+    ('exact-set-joins-group', I, "    if (grouped.size > 1) continue;\n", "    if (grouped.size > 0) continue;\n", IT, 'joins the ungrouped members'),
+    ('most-complete-scene-displayed', I, "    b.members.length - a.members.length\n", "    a.members.length - b.members.length\n", IT, 'displays the most complete scene'),
+    ('undisplayed-scene-not-drawn', G, "      if (displayed !== undefined && !displayed.has(scene.sceneId)) {\n", "      if (false) {\n", GT, 'draws only the scenes its regions display'),
+    ('display-scale-at-eye-height', F, "  const scale = median > 0 ? Math.min(MAX_SCALE, Math.max(MIN_SCALE, eyeHeight / median)) : 1;\n", "  const scale = 1;\n", FT, 'puts the median camera at eye height'),
+    ('display-up-from-cameras', F, "  if (length(meanUp) >= MIN_AGREEMENT) {\n", "  if (false) {\n", FT, 'stands the scene upright'),
+    ('camera-axes-stay-unit', F, "  const rotation = [d[0]! / s, d[1]! / s, d[2]! / s, d[4]! / s, d[5]! / s, d[6]! / s, d[8]! / s, d[9]! / s, d[10]! / s];\n", "  const rotation = [d[0]!, d[1]!, d[2]!, d[4]!, d[5]!, d[6]!, d[8]!, d[9]!, d[10]!];\n", FT, 'is a proper similarity'),
+    ('arrival-at-first-camera', B, "  if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {\n", "  if (false) {\n", BT, 'starts where the first photograph was taken'),
+    ('residency-cost-capped', B, "    full: Math.min(24 * mapCount, budget),\n", "    full: 24 * mapCount,\n", BT, 'lets one region always afford'),
+    ('reconstructed-region-grounded', S, "  if (!reconstructed) return placement;\n", "  return placement;\n", ST, 'stands a reconstructed region on the landscape'),
+    ('display-scale-composed-once', G, "          localUnitsToSceneUnits: frame.scale * placed.localUnitsToSceneUnits };\n", "          localUnitsToSceneUnits: placed.localUnitsToSceneUnits };\n", GT, 'composes the display scale into the declared scalar'),
+]
+baseline = subprocess.run(['pnpm', 'exec', 'vitest', 'run', 'packages/app', 'packages/atlas-react', 'packages/atlas-core', 'packages/graph-client'], cwd=scratch, text=True, capture_output=True)
+(scratch/'baseline.log').write_text(baseline.stdout + baseline.stderr)
+print('BASELINE', baseline.returncode, scratch, flush=True)
+if baseline.returncode != 0:
+    raise SystemExit('isolated baseline failed')
+results = []
+for name, file, before, after, test, pattern in cases:
+    p = scratch/file; source = p.read_text()
+    if source.count(before) != 1:
+        raise RuntimeError(f'mutation {name} anchor count {source.count(before)}')
+    p.write_text(source.replace(before, after))
+    run = subprocess.run(['pnpm', 'exec', 'vitest', 'run', test, '-t', pattern], cwd=scratch, text=True, capture_output=True)
+    p.write_text(source)
+    log = run.stdout + run.stderr
+    (scratch/(name + '.log')).write_text(log)
+    observed = run.returncode != 0 and bool(re.search(r'Tests\s+[1-9][0-9]* failed', log))
+    assertion = next((line.strip() for line in log.splitlines() if 'AssertionError' in line or 'Error:' in line), None)
+    results.append(dict(name=name, production_file='web/' + file, source_sha256=hashlib.sha256(source.encode()).hexdigest(), test='web/' + test, test_filter=pattern, before=before.strip(), after=after.strip(), exit_code=run.returncode, observed_failure=observed, observed_assertion=assertion, log_file=str(scratch/(name + '.log'))))
+    print(name, run.returncode, observed, (assertion or '')[:100], flush=True)
+restored = subprocess.run(['pnpm', 'exec', 'vitest', 'run', IT, GT, FT, BT, ST], cwd=scratch, text=True, capture_output=True)
+(scratch/'restored.log').write_text(restored.stdout + restored.stderr)
+print('RESTORED', restored.returncode, flush=True)
+(scratch/'results.json').write_text(json.dumps(dict(scratch=str(scratch), baseline_exit=baseline.returncode, restored_exit=restored.returncode, controls=results), indent=2) + '\n')
+print('RESULTS', scratch/'results.json', flush=True)
+if not all(r['observed_failure'] for r in results) or restored.returncode != 0:
+    raise SystemExit(1)

@@ -1,0 +1,130 @@
+{
+  "aggregate": {
+    "coverage_fraction": 0.982744208403996,
+    "floaters_fraction": 0.47215795516967773,
+    "heldout_views": 7,
+    "lpips": 0.30992171806948526,
+    "psnr": 25.38214931874315,
+    "ssim": 0.8958135672977993
+  },
+  "bundle_sha256": "1046379cbe8a62c283008982603aa035f8d463c89ff2cb698093e8c1d5287b3b",
+  "claim": "appearance at held-out photographed viewpoints only; no physical scale, completeness or navigability",
+  "comparisons": [
+    {
+      "comparison": "view-00000-photograph-vs-render.jpg",
+      "comparison_sha256": "e6f6f6bb9e3aaf183a76a90f5c6fae3c9698f4650b4b56c3020ae917558b4dee",
+      "reference": "training/undistorted/images/000000.jpg",
+      "reference_sha256": "fe69b815993370370e95c595b4c954e3cd801ec36bfe45239e6de683e4be348c",
+      "render": "heldout/view-00000.png",
+      "render_sha256": "7074cbd24c7aaa8658328f8612955b3dfd2b9d9c8669d7bcf84497c1fcbc550d",
+      "scores": {
+        "coverage_fraction": 0.9901497960090637,
+        "lpips": 0.3129660487174988,
+        "psnr": 25.36438872330965,
+        "ssim": 0.8721141219139099
+      },
+      "source_sha256": "4b1b9ca9886f5b78789fbca62f2f7ee57135e66350a4a3d37c023388b94d23bf",
+      "view": "view-00000"
+    },
+    {
+      "comparison": "view-00008-photograph-vs-render.jpg",
+      "comparison_sha256": "c1a8a51145e5299add31ac4bca8e36233e68097c1459d6e4dbe53f6ac29fcf82",
+      "reference": "training/undistorted/images/000008.jpg",
+      "reference_sha256": "6c23fc52f4636a36f8e95fc4227a72022e69268ef128e40722e10e4e61832f7b",
+      "render": "heldout/view-00008.png",
+      "render_sha256": "5d4218a06038400be52d2cb4cf70076fab55c6844c0a53ba9c0d4e413b49aa7b",
+      "scores": {
+        "coverage_fraction": 0.9777269959449768,
+        "lpips": 0.3640342354774475,
+        "psnr": 23.729069908284124,
+        "ssim": 0.8351942300796509
+      },
+      "source_sha256": "0b08c4ca0941ca9ed379ffa920d1b5b309f87dd253a03deedd787f1bf22f1ca0",
+      "view": "view-00008"
+    },
+    {
+      "comparison": "view-00016-photograph-vs-render.jpg",
+      "comparison_sha256": "d350cf6600b539b60ce0e7d97f33181ac55a0995e132c9bfa6f9adf51dd207f3",
+      "reference": "training/undistorted/images/000016.jpg",
+      "reference_sha256": "b3f4201f662e3096a95239d470183a6dbf603ea81e9d8ff6d3a67526f2d20d5e",
+      "render": "heldout/view-00016.png",
+      "render_sha256": "433b004169364f9f24de14d488037e060e9be9b97e3ccfe0afa414ee8bc3c420",
+      "scores": {
+        "coverage_fraction": 0.9966965913772583,
+        "lpips": 0.32471078634262085,
+        "psnr": 25.32339117401753,
+        "ssim": 0.8833644390106201
+      },
+      "source_sha256": "c87ea6c81c0905d1af9348ac7f97a844b4ee9f207cc5accbafb1b0fbf72974c4",
+      "view": "view-00016"
+    },
+    {
+      "comparison": "view-00024-photograph-vs-render.jpg",
+      "comparison_sha256": "edd4a6e61ffd899cbb8ec7be58bff114cb941c435ed4cc3bfb3f350e00dde53f",
+      "reference": "training/undistorted/images/000024.jpg",
+      "reference_sha256": "69fd94cab59505874b0467bf3b347cb4ea77c2a45cfa900713bf254169fb73ed",
+      "render": "heldout/view-00024.png",
+      "render_sha256": "0192a65a206b093bd3cfacb57a0a4aeb2f877b33669e4ee770e6d50ef035119a",
+      "scores": {
+        "coverage_fraction": 0.9972266554832458,
+        "lpips": 0.2455347329378128,
+        "psnr": 28.732777417215736,
+        "ssim": 0.9351204633712769
+      },
+      "source_sha256": "73ceac1fa42d540af347cacaf24394c5744104f4396da3c9f8ec4f5dd033e975",
+      "view": "view-00024"
+    },
+    {
+      "comparison": "view-00032-photograph-vs-render.jpg",
+      "comparison_sha256": "7d29298cacad44ee9f5b69aa6b4932bf0b7d8ad45365ca4770b0269b35140482",
+      "reference": "training/undistorted/images/000032.jpg",
+      "reference_sha256": "a1f407e0db9fc97ea93e1f3e31b797a10d6fcf0c1aab5d64eb91db109cf2119f",
+      "render": "heldout/view-00032.png",
+      "render_sha256": "91685d0706eb37f0d5d9cbd42e13261183db3866885529d1b0480d1addce38c7",
+      "scores": {
+        "coverage_fraction": 0.9574597477912903,
+        "lpips": 0.2939726412296295,
+        "psnr": 23.582638665803245,
+        "ssim": 0.9155049920082092
+      },
+      "source_sha256": "554a9daf45c739c71b1ecb2f2f7b6467a49df99ff90caec52639256b7c4fb5da",
+      "view": "view-00032"
+    },
+    {
+      "comparison": "view-00040-photograph-vs-render.jpg",
+      "comparison_sha256": "36a2e032a5df2304cbe08324dbe814c6db187b8d9e74ed397b7d9262f7cf2088",
+      "reference": "training/undistorted/images/000040.jpg",
+      "reference_sha256": "93c5983839a653a1065f664ecb770d89b685af37d380c84aa83080881c42d767",
+      "render": "heldout/view-00040.png",
+      "render_sha256": "78fba7a6951ac6c7ca5fa17405e4c2be80e02c96b7979599822e178506211047",
+      "scores": {
+        "coverage_fraction": 0.9883178472518921,
+        "lpips": 0.2700008153915405,
+        "psnr": 25.14054519090577,
+        "ssim": 0.9254957437515259
+      },
+      "source_sha256": "9d4328033464b4e8fe1d9d4393d0cdb384017a0e1f926b2805ba56d16d060e0d",
+      "view": "view-00040"
+    },
+    {
+      "comparison": "view-00048-photograph-vs-render.jpg",
+      "comparison_sha256": "3638bae0d8e98adfbc4e6fa68dd8a578f467e0cf94a380a1b994a614052d40d2",
+      "reference": "training/undistorted/images/000048.jpg",
+      "reference_sha256": "a86a3fcafcace2da5c4d963e738c08f75f276b6f42f005aa4213c4320fb5aaf1",
+      "render": "heldout/view-00048.png",
+      "render_sha256": "19e06d89f97d65b423572491a3891b890266fc38e896b590e20a017d65992256",
+      "scores": {
+        "coverage_fraction": 0.9716318249702454,
+        "lpips": 0.3582327663898468,
+        "psnr": 25.802234151665985,
+        "ssim": 0.9039009809494019
+      },
+      "source_sha256": "7b1fb573deeba373014aeba0705d34e931c8f39178099c7765ea1702607b4cb5",
+      "view": "view-00048"
+    }
+  ],
+  "dataset_digest": "2f8e2e65083d96a833a3c5052aba7f6b23611e6dd8c52075405b5263ac8f95ca",
+  "manifest_digest": "16141ea1195711099232bfc6bc3e6944458ad20d3662e8ed0b2156ed540cb66e",
+  "max_width": 1600,
+  "profile": "exulanica.heldout-comparison-set/v1"
+}

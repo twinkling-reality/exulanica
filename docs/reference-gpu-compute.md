@@ -58,9 +58,12 @@ The cache is `DecodedImages` in `exulanica/reconstruction/gsplat_runner.py`; it 
 bytes on the device up to a 16 GiB budget and produces identical pixels, so no protocol changed.
 
 Rough budget for a new 50-photograph scene from this state: host bootstrap and image pull about
-$0.60, pose and training about $1.10, plus idle time while the operator inspects. Two real
-collections were processed on the first day for roughly $5 of compute including every false start;
-the prepaid balance before work was $51.17.
+$0.60, pose and training about $1.10, plus idle time while the operator inspects. MEASURED across
+the whole engagement (17:30 UTC on 2026-09-05 to the deletion on 2026-09-06): about 10.5 instance
+hours, roughly $11 at the listed rate, for two collections, four bowl training runs, two volcanic
+runs, six image rebuilds and every false start; the prepaid balance before work was $51.17. The
+accepted bowl training itself took 74 minutes alone on the card ($1.31 by its receipt); the rest
+was diagnosis, rebuilds, shared-card slowdown and CPU compression that never finished.
 
 ## Lessons from the first real runs
 

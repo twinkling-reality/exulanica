@@ -1,0 +1,2 @@
+== control: without the restoration, does the same program die under SIGTERM? (git stash-free: run the program against a copy that skips restoration)
+bare import exit code: -15 | stderr head: *** Aborted at 1788635647 (unix time) try "date -d @1788635647" if you are using GNU date ***

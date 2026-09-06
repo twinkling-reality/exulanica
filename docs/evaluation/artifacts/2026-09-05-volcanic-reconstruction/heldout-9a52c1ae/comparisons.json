@@ -1,0 +1,450 @@
+{
+  "aggregate": {
+    "coverage_fraction": 0.7303791035104681,
+    "floaters_fraction": 0.2283189594745636,
+    "heldout_views": 27,
+    "lpips": 0.24409406714969212,
+    "psnr": 19.7565917727357,
+    "ssim": 0.8882258114991365
+  },
+  "bundle_sha256": "1cccf4705a98b50e10041abb41cf00186f51408ee94152aa65330af9e5be3ed5",
+  "claim": "appearance at held-out photographed viewpoints only; no physical scale, completeness or navigability",
+  "comparisons": [
+    {
+      "comparison": "view-00000-photograph-vs-render.jpg",
+      "comparison_sha256": "0f31c7168165ccb85e0d5df5172203690fc0db6b99096bf4d753c52efd4574b3",
+      "reference": "training/undistorted/images/000000.jpg",
+      "reference_sha256": "7999ea65dbffae15a94cbb21c226157bbcc8d70ebfcf19670d1f70ba7bbb8a66",
+      "render": "heldout/view-00000.png",
+      "render_sha256": "8fadf74a7bc7070a24ad5c1d78105f58230e335d03fdde0ca553c51652f17573",
+      "scores": {
+        "coverage_fraction": 0.4604036808013916,
+        "lpips": 0.17633511126041412,
+        "psnr": 26.416244723248376,
+        "ssim": 0.9532068371772766
+      },
+      "source_sha256": "5b09358a5a2e94dd13a469714624fbd559aa1258bdb992b2111740b2614361eb",
+      "view": "view-00000"
+    },
+    {
+      "comparison": "view-00008-photograph-vs-render.jpg",
+      "comparison_sha256": "5afcf5bd3d7450735ec934fe4ebcb36fd2ab5d61051d3fa08b4f455a0261ee17",
+      "reference": "training/undistorted/images/000008.jpg",
+      "reference_sha256": "d3cabc216c0080c99ff830f11300b0b1e6215522530b08523d4edf7b38980efb",
+      "render": "heldout/view-00008.png",
+      "render_sha256": "333571e78175c55dcbfaa0da53a6e2b6868737f58f8f6842309bfe809ef9cad1",
+      "scores": {
+        "coverage_fraction": 0.46548035740852356,
+        "lpips": 0.18781134486198425,
+        "psnr": 28.526298733670554,
+        "ssim": 0.9473748803138733
+      },
+      "source_sha256": "ec468683648eb0b7cc7f5f65c9dc15bebf1e5851c40e6618f354a4b9afd09ba5",
+      "view": "view-00008"
+    },
+    {
+      "comparison": "view-00016-photograph-vs-render.jpg",
+      "comparison_sha256": "6a14b0ef216a58227f4570e08cd1d10f4936152a51251debd6dca6acdc7b9e01",
+      "reference": "training/undistorted/images/000016.jpg",
+      "reference_sha256": "9b7061a48b1ec51e9be386f454ad7adc2f8a8cd8c8992b8d53f17111fb9eaae3",
+      "render": "heldout/view-00016.png",
+      "render_sha256": "e005a7fcabd05ce85197a1315d8e137cc29a4d03fab010cf17d179f00d0a687f",
+      "scores": {
+        "coverage_fraction": 0.7046887874603271,
+        "lpips": 0.25429677963256836,
+        "psnr": 18.086362893073847,
+        "ssim": 0.9122687578201294
+      },
+      "source_sha256": "bfd64a08fa3c2df5377096bbf0cb3aea3385e3fb186e8241d1411d4214005b27",
+      "view": "view-00016"
+    },
+    {
+      "comparison": "view-00024-photograph-vs-render.jpg",
+      "comparison_sha256": "a5e272f6378174d4967afa8598580c58d2c125e8eb7224f57b4f7d8021bfbe7e",
+      "reference": "training/undistorted/images/000024.jpg",
+      "reference_sha256": "65133bd105a3a715b2e18c46759ef7525433283696a3251e71e998c4edc342c7",
+      "render": "heldout/view-00024.png",
+      "render_sha256": "c9b9db0f15e8c7bf6dc34a889d808e342fa2da9de3da69973889268fa4e19e18",
+      "scores": {
+        "coverage_fraction": 0.747454047203064,
+        "lpips": 0.45709919929504395,
+        "psnr": 7.423529393657697,
+        "ssim": 0.5871984958648682
+      },
+      "source_sha256": "694f5254d525a22ee2548a6d05394b5d991f6e8dfa6df6729b5ed16768e275fd",
+      "view": "view-00024"
+    },
+    {
+      "comparison": "view-00032-photograph-vs-render.jpg",
+      "comparison_sha256": "3ba861a073b1079f7d141bca64b471c07d12e771045fede905ec1824007261de",
+      "reference": "training/undistorted/images/000032.jpg",
+      "reference_sha256": "f5b509baee21de15b1455bc812451f74166f9054ce3956d00e426dae9fbb570f",
+      "render": "heldout/view-00032.png",
+      "render_sha256": "0d00d94896df4da53ef99b964457909db335966c14cc353246283ad2d212093e",
+      "scores": {
+        "coverage_fraction": 0.42009237408638,
+        "lpips": 0.20046672224998474,
+        "psnr": 26.2367459835988,
+        "ssim": 0.9511690139770508
+      },
+      "source_sha256": "c1974397e7363a11ad036d4ee6e362ad6eff1b769eaae936b97165b43f827e29",
+      "view": "view-00032"
+    },
+    {
+      "comparison": "view-00040-photograph-vs-render.jpg",
+      "comparison_sha256": "dad361913506e52645cc3c5ecc18e9ee84bc5142d2e919794194b60df753823c",
+      "reference": "training/undistorted/images/000040.jpg",
+      "reference_sha256": "e4e166da12d39bb06e23054de685ea90db91d85f67bf7ba296e6f5a0a5f44351",
+      "render": "heldout/view-00040.png",
+      "render_sha256": "ef36f8ada3f36d6954fdb710daa9f1bd515f299f0885324179b75d4fa76db703",
+      "scores": {
+        "coverage_fraction": 0.4671914279460907,
+        "lpips": 0.15018054842948914,
+        "psnr": 28.85548402972058,
+        "ssim": 0.9689321517944336
+      },
+      "source_sha256": "25b2c60b40b14312cbb9a749f934e59ec1e9ce9f83ee8ffcb9e0a494360d65fc",
+      "view": "view-00040"
+    },
+    {
+      "comparison": "view-00048-photograph-vs-render.jpg",
+      "comparison_sha256": "66cf2603729403df3120ba223b1a4766c1b3d4bb8f59acbcc07c4c95f26fb036",
+      "reference": "training/undistorted/images/000048.jpg",
+      "reference_sha256": "fdbfd1abb530f1ebf19a15fe705bbcc4f01dfcc88d894cab6ea57bc0a691a0af",
+      "render": "heldout/view-00048.png",
+      "render_sha256": "46dec66e3a2a34e494214b083c151e6f2812e37cbcb284a267e061bc7c51b53f",
+      "scores": {
+        "coverage_fraction": 0.45209550857543945,
+        "lpips": 0.16084536910057068,
+        "psnr": 23.195960816949945,
+        "ssim": 0.9671664834022522
+      },
+      "source_sha256": "dc6239dd396e1558b6ef6cacc69a3f7f469fa0e3bf627d7b1fb2258fab35e7fd",
+      "view": "view-00048"
+    },
+    {
+      "comparison": "view-00056-photograph-vs-render.jpg",
+      "comparison_sha256": "61019482a2d2112e1c42e51690bb26b6e62393ebddfe0e260a73ffedcb4c23fa",
+      "reference": "training/undistorted/images/000056.jpg",
+      "reference_sha256": "8fd2bf14d25be6a20a9ccc46cc42fbc41cc5f83bac55835da21065aa1917f7d3",
+      "render": "heldout/view-00056.png",
+      "render_sha256": "6b3d48275e3772c8672321baf4fedd6c7c81a69e752aa18487172dd2dea8b369",
+      "scores": {
+        "coverage_fraction": 0.799125611782074,
+        "lpips": 0.2045668512582779,
+        "psnr": 20.60901452499936,
+        "ssim": 0.9083870053291321
+      },
+      "source_sha256": "9e8b99275e1f656a745a7efa139f686e8cfeab96871608a6990096dec6c5488a",
+      "view": "view-00056"
+    },
+    {
+      "comparison": "view-00064-photograph-vs-render.jpg",
+      "comparison_sha256": "8feb72fe82ad731ea65537b69b92f71894981e5beecc109e9f395683dbd881f1",
+      "reference": "training/undistorted/images/000064.jpg",
+      "reference_sha256": "c803054bc3eb35c9d19b9ba8a818610dddc89eca61b442975b86b8c0b15baef2",
+      "render": "heldout/view-00064.png",
+      "render_sha256": "77a6c69da4c50e01ee42d6d38a34938a810284a297d57f7fd6daaab317cc4eb3",
+      "scores": {
+        "coverage_fraction": 0.7711547017097473,
+        "lpips": 0.1555328369140625,
+        "psnr": 25.394946087273368,
+        "ssim": 0.9636628031730652
+      },
+      "source_sha256": "48db07a1727aaa221c49e2b7ae819a0071313786c45435535bcc3c48255f71af",
+      "view": "view-00064"
+    },
+    {
+      "comparison": "view-00072-photograph-vs-render.jpg",
+      "comparison_sha256": "ef6536e43f7861c787b4a8f6193fdb055b365a86549229e82bd8d311f5e2fd5d",
+      "reference": "training/undistorted/images/000072.jpg",
+      "reference_sha256": "e2ce57352fa860cbce091d11aa1086cb6cdb44d2655647863a27ebb63df87ff3",
+      "render": "heldout/view-00072.png",
+      "render_sha256": "2422562d6130c84aff915f2f4d354f16e9f80a5d6289653830485f51bd58ede8",
+      "scores": {
+        "coverage_fraction": 0.5760598182678223,
+        "lpips": 0.15943801403045654,
+        "psnr": 27.392571184394797,
+        "ssim": 0.9643375873565674
+      },
+      "source_sha256": "da394496f00207381f6e516089d59fe4dcdb8bfd285ad62e764fe043c17e20d0",
+      "view": "view-00072"
+    },
+    {
+      "comparison": "view-00080-photograph-vs-render.jpg",
+      "comparison_sha256": "385145cf35856c73f2cbe7918001b6faa90be28ee180af73b5ad49155916e3aa",
+      "reference": "training/undistorted/images/000080.jpg",
+      "reference_sha256": "52be651a6f3a3fa7b565dc312a8cb33ef5eb79e9b125b7ec7bd12ceb1b2db6ed",
+      "render": "heldout/view-00080.png",
+      "render_sha256": "11abb5af3def23a5fcf97e864722233161516e4cf0d402e83ba290d1f904a7f7",
+      "scores": {
+        "coverage_fraction": 0.5749404430389404,
+        "lpips": 0.15712963044643402,
+        "psnr": 27.088201922800778,
+        "ssim": 0.9600605964660645
+      },
+      "source_sha256": "80c6d10dd1365a39b315e0e2428e8f46136d3cbce3edb3f7eeb3863dacb9001b",
+      "view": "view-00080"
+    },
+    {
+      "comparison": "view-00088-photograph-vs-render.jpg",
+      "comparison_sha256": "39c0d195588b7816bc5132ea9f55090d41931a3c97c5aacf05e583021e111884",
+      "reference": "training/undistorted/images/000088.jpg",
+      "reference_sha256": "f710f8d03dfb14ad6fa343a3d61d710eab636e6a4d9094d135e7ed2f874b7dbb",
+      "render": "heldout/view-00088.png",
+      "render_sha256": "2802ebb175f441e6fe94c208fa102a84de0969d403f787c828f854a4c7b06eb0",
+      "scores": {
+        "coverage_fraction": 0.7179461717605591,
+        "lpips": 0.16665543615818024,
+        "psnr": 26.371830834089746,
+        "ssim": 0.9570152163505554
+      },
+      "source_sha256": "46e322a3b9ed9155cf81cd0f92d3b41f5878f6aec785a9856971fca62955f552",
+      "view": "view-00088"
+    },
+    {
+      "comparison": "view-00096-photograph-vs-render.jpg",
+      "comparison_sha256": "ef539499b51b947613f88005c52511a13acde37aa9c442b80e139487e6f6f8ff",
+      "reference": "training/undistorted/images/000096.jpg",
+      "reference_sha256": "6ce16ea6e7db03a1b002ee2a0b8db7507b6157823dd03c46e44a379564c88495",
+      "render": "heldout/view-00096.png",
+      "render_sha256": "e24a2d500ae89958eec2c3c0b5cd367133d0710073d1cea4f8fb4afdf440a573",
+      "scores": {
+        "coverage_fraction": 0.8831110596656799,
+        "lpips": 0.1553983986377716,
+        "psnr": 26.506567358778472,
+        "ssim": 0.9584440588951111
+      },
+      "source_sha256": "396b7d0c1259cebf2f963b3636deee369a2c81495e8d63105de3c4adcca1707d",
+      "view": "view-00096"
+    },
+    {
+      "comparison": "view-00104-photograph-vs-render.jpg",
+      "comparison_sha256": "38011ce9de5c7a01b0895425432ff430ccdc6db72e7b61c4e075197e0355e58d",
+      "reference": "training/undistorted/images/000104.jpg",
+      "reference_sha256": "1e555d20e7c6263e05d9f15d2d812cb1807347fc8578adbdbba03e4242d547f2",
+      "render": "heldout/view-00104.png",
+      "render_sha256": "25d79004a8a5ad8ee965d845f34fd47062630f778deb36361ce8d659bf83f975",
+      "scores": {
+        "coverage_fraction": 0.6416581869125366,
+        "lpips": 0.1475873589515686,
+        "psnr": 27.971659906748748,
+        "ssim": 0.9682865142822266
+      },
+      "source_sha256": "33f692457a94ac188eb6e6ea67265f528f93855915bda1dd91a1d19ecf212dde",
+      "view": "view-00104"
+    },
+    {
+      "comparison": "view-00112-photograph-vs-render.jpg",
+      "comparison_sha256": "2d4c23a1e354c5d181cc2fd94ac67cb1791db46cb015bb8082a47d7aed95e2ff",
+      "reference": "training/undistorted/images/000112.jpg",
+      "reference_sha256": "0d1a6f84e4a6c19bad1bc55fc261ea6dcf5f89c4323408b51ce3514f2904478a",
+      "render": "heldout/view-00112.png",
+      "render_sha256": "9f5c3aa72cd775e7a3fc136facdeed846dcb331f5fe6a607faa8674ebdda0efa",
+      "scores": {
+        "coverage_fraction": 0.8749091625213623,
+        "lpips": 0.21139872074127197,
+        "psnr": 17.531551860348827,
+        "ssim": 0.9056422114372253
+      },
+      "source_sha256": "98638e47caedb3e46747fad68bf27360ace813643516027397c7786cadadc194",
+      "view": "view-00112"
+    },
+    {
+      "comparison": "view-00120-photograph-vs-render.jpg",
+      "comparison_sha256": "ff04b7e5a324a6dfe0c486d91f833a25dd3773be7c76e3d17fdb2729959bcecd",
+      "reference": "training/undistorted/images/000120.jpg",
+      "reference_sha256": "40e9613508ea9c786567d5d89128fcaa28fead8eef44e571c63c6413acbddf0d",
+      "render": "heldout/view-00120.png",
+      "render_sha256": "8f218a80e1546beeed36d0ce885c2fec5c3c658d7769d39f74d274e6ba14864d",
+      "scores": {
+        "coverage_fraction": 0.9734897613525391,
+        "lpips": 0.4181506931781769,
+        "psnr": 10.022498332695438,
+        "ssim": 0.781498908996582
+      },
+      "source_sha256": "ba1dc679f2d13c3b1088d69ce49678cb1e9916c50158c5376f18c99714595719",
+      "view": "view-00120"
+    },
+    {
+      "comparison": "view-00128-photograph-vs-render.jpg",
+      "comparison_sha256": "1364c30616bfaf0f9573c3ed0a2aa99531fb429927d2beacf0c0917e783b4aa3",
+      "reference": "training/undistorted/images/000128.jpg",
+      "reference_sha256": "afce5170c4796a9c910ad4edf9bebb2b08283042296a251afdcd6dee2213eafa",
+      "render": "heldout/view-00128.png",
+      "render_sha256": "76e119d9140de6cba79e6a837fb27b68b8f4c0e39760756e7b99b5750f933c36",
+      "scores": {
+        "coverage_fraction": 0.8404386043548584,
+        "lpips": 0.35321444272994995,
+        "psnr": 10.151807545918835,
+        "ssim": 0.7387599945068359
+      },
+      "source_sha256": "08743dd77cc746ba52cd58b7e146f6e1805a25157baacec37b5fa4618cf00eb7",
+      "view": "view-00128"
+    },
+    {
+      "comparison": "view-00136-photograph-vs-render.jpg",
+      "comparison_sha256": "eff5d38dd3c3d12a6cf7fadc5ab8b9e295b9c8932631026362825d6fca91fa0a",
+      "reference": "training/undistorted/images/000136.jpg",
+      "reference_sha256": "7c708d42611d26497d53576c65832a09c046a2d331e3e9c3a857928e841b7c88",
+      "render": "heldout/view-00136.png",
+      "render_sha256": "296a899dbd09f9f32e9c78cc15109cbddf4605d0e71e4f3be3f9e12ea58b915e",
+      "scores": {
+        "coverage_fraction": 0.7958486080169678,
+        "lpips": 0.2507376968860626,
+        "psnr": 14.695995199872467,
+        "ssim": 0.8824782967567444
+      },
+      "source_sha256": "6e6d7180dbc3205f0117ab87452ba1cb545b1acd9827cd8645084c7fb5bab15b",
+      "view": "view-00136"
+    },
+    {
+      "comparison": "view-00144-photograph-vs-render.jpg",
+      "comparison_sha256": "8d6f1a25f5de17ee4893601caf49caf9a208463106af34956d3f1ebd9c8146cc",
+      "reference": "training/undistorted/images/000144.jpg",
+      "reference_sha256": "b627298e045084877ca30d093aad77c374dcdce2344f7f0697fa425112ee111e",
+      "render": "heldout/view-00144.png",
+      "render_sha256": "dc03991dc191fc38c31f8b59e7e332c858a762f4dc2bd771ee01cac751a5e27b",
+      "scores": {
+        "coverage_fraction": 0.8466455936431885,
+        "lpips": 0.2485497146844864,
+        "psnr": 19.795620108373445,
+        "ssim": 0.917762279510498
+      },
+      "source_sha256": "8483a58a8e6dfdb8e42d75e6e65730705a326a4e051994d0216724fa667a131e",
+      "view": "view-00144"
+    },
+    {
+      "comparison": "view-00152-photograph-vs-render.jpg",
+      "comparison_sha256": "9a161f12840cd171f2a83c5088e5e26e1546c8802a064f67147f57ce02eaa5f8",
+      "reference": "training/undistorted/images/000152.jpg",
+      "reference_sha256": "54ba080efc9c85c128ac2b62da2e12ffa6b6ee0e6ee461d8094101bd13936a93",
+      "render": "heldout/view-00152.png",
+      "render_sha256": "11fc2ffe4748f17562d804cdc97e8c33406731b68a76b4391b3cd187abd35116",
+      "scores": {
+        "coverage_fraction": 0.7305650115013123,
+        "lpips": 0.21565961837768555,
+        "psnr": 17.801704576418324,
+        "ssim": 0.9218661189079285
+      },
+      "source_sha256": "bc0dedfb3dcc077d8ba9ba97b53fc223f4ec87058bad8ad6f2801353a14f7b7a",
+      "view": "view-00152"
+    },
+    {
+      "comparison": "view-00160-photograph-vs-render.jpg",
+      "comparison_sha256": "3b6643b979adccbd960a76a49b7f5a628c866d340217ff391b20c33f99c47f85",
+      "reference": "training/undistorted/images/000160.jpg",
+      "reference_sha256": "e9266244defb6c85daa58c04dfccd2947a38f931770326d25b2d6431bb7d5825",
+      "render": "heldout/view-00160.png",
+      "render_sha256": "bf009e621801061482af490cee61421b3cb2eb149e07449b1b22853b09a2ddf5",
+      "scores": {
+        "coverage_fraction": 0.9532410502433777,
+        "lpips": 0.262868732213974,
+        "psnr": 15.049887904252495,
+        "ssim": 0.885571300983429
+      },
+      "source_sha256": "6372d5685616a04faf93eef2d805c80df99b6dd4d426bf25bea7efc224719a47",
+      "view": "view-00160"
+    },
+    {
+      "comparison": "view-00168-photograph-vs-render.jpg",
+      "comparison_sha256": "c6f3aa00e1008a48bbdd6f315841cffac93572c5c8262428d339857baae14e8e",
+      "reference": "training/undistorted/images/000168.jpg",
+      "reference_sha256": "bd2ee842316c38ace15c766885e154a6ffea33563664992b9843a007423c239c",
+      "render": "heldout/view-00168.png",
+      "render_sha256": "70ee0ad7f9a11042c59756d5d110d5a8c2d0d0a27ba3c98e94797bf3d3787f02",
+      "scores": {
+        "coverage_fraction": 0.8568403124809265,
+        "lpips": 0.32597750425338745,
+        "psnr": 11.105879587934492,
+        "ssim": 0.8125814199447632
+      },
+      "source_sha256": "28a7a397dc75cc47610b4206116cfc0c42779fa917763545410919418cb7bf34",
+      "view": "view-00168"
+    },
+    {
+      "comparison": "view-00176-photograph-vs-render.jpg",
+      "comparison_sha256": "77239f00d317272671516b9857538c5a768335e9dad5d6ad654174459b2ee5d6",
+      "reference": "training/undistorted/images/000176.jpg",
+      "reference_sha256": "ce623ac53435727081ab22e859871cff2d9059a8d6ec27cba82972ac3a668d86",
+      "render": "heldout/view-00176.png",
+      "render_sha256": "844c6e0f2fbdd3f548cd8a704670fc5389b214db1cec0958faabb3ed5944fb10",
+      "scores": {
+        "coverage_fraction": 0.7067762017250061,
+        "lpips": 0.23601798713207245,
+        "psnr": 19.088470547648235,
+        "ssim": 0.9265685677528381
+      },
+      "source_sha256": "950d7dc36be7893788997f095af44c121f10fb2fa71ff2c9f1fc953e0f0d3813",
+      "view": "view-00176"
+    },
+    {
+      "comparison": "view-00184-photograph-vs-render.jpg",
+      "comparison_sha256": "a9a4416d20aeb8d80c2cb8af5c641dc3f7b9f885cdec56d2220a8fd9c593be46",
+      "reference": "training/undistorted/images/000184.jpg",
+      "reference_sha256": "3d2b0d5f5b683192c942cf9583fa51faade2380c640b44b31ca7767c588700fb",
+      "render": "heldout/view-00184.png",
+      "render_sha256": "d74c51b350a2c7068eeb464cb1151d4f31813c09ffa7c128bc82af93d56181fb",
+      "scores": {
+        "coverage_fraction": 0.6800669431686401,
+        "lpips": 0.24233004450798035,
+        "psnr": 17.82116921128987,
+        "ssim": 0.9086868762969971
+      },
+      "source_sha256": "c37693f182585e0b059c98f8c2890e00307ebdcdf31f9117a699ca431334a233",
+      "view": "view-00184"
+    },
+    {
+      "comparison": "view-00192-photograph-vs-render.jpg",
+      "comparison_sha256": "71f2a22cccee62e99325f7511a9f0d85a203fb9a7402ee3adef2a5d2e1f582d9",
+      "reference": "training/undistorted/images/000192.jpg",
+      "reference_sha256": "03095ebe05f58298af4aed33a5c4488fae71997dd5ed9bedb1c80f4805e3d159",
+      "render": "heldout/view-00192.png",
+      "render_sha256": "2cbdad9a90ce4a6097eb18c5c5be2d9445ae051eadb94f82a61d2b105a615f13",
+      "scores": {
+        "coverage_fraction": 0.7874576449394226,
+        "lpips": 0.4913829565048218,
+        "psnr": 9.810290970981663,
+        "ssim": 0.5845342874526978
+      },
+      "source_sha256": "243be8e0ed7a0a88aea089405eadf2a0979b5f8af7c9777710e4ca38a0a17ea8",
+      "view": "view-00192"
+    },
+    {
+      "comparison": "view-00200-photograph-vs-render.jpg",
+      "comparison_sha256": "bd9236ad6cc1a525e7002648227498e7212e8b4e8b1d2c62d72e86fab49887cc",
+      "reference": "training/undistorted/images/000200.jpg",
+      "reference_sha256": "3a99b6779a86862787d97f1a465d611e693d3cbe8eda787ecebb3832435b6069",
+      "render": "heldout/view-00200.png",
+      "render_sha256": "98d5e2ef1ca46c275085b3c75845ed6f48e570794f6845cbdca173fd4baaa727",
+      "scores": {
+        "coverage_fraction": 0.9968695044517517,
+        "lpips": 0.2654905915260315,
+        "psnr": 18.168179232856236,
+        "ssim": 0.9123144745826721
+      },
+      "source_sha256": "d21d1c1a1bd472611586ac6cc715cf3bfebd489d55b50e7d7284e55aeee80e73",
+      "view": "view-00200"
+    },
+    {
+      "comparison": "view-00208-photograph-vs-render.jpg",
+      "comparison_sha256": "fb40ddf9f847e4092b788909d29bfb56e4992151a38a005285ec5672fb0be7a5",
+      "reference": "training/undistorted/images/000208.jpg",
+      "reference_sha256": "d4424900348b7928788b57f6c59c8056be7e45fba9854a215bc88ef59aa62cd4",
+      "render": "heldout/view-00208.png",
+      "render_sha256": "00e45e2071c930f67660b0cac0d1f86b833c15afb21b5afc2f5d3d3dc26b62e2",
+      "scores": {
+        "coverage_fraction": 0.9956852197647095,
+        "lpips": 0.3354175090789795,
+        "psnr": 12.30950439226859,
+        "ssim": 0.8363217711448669
+      },
+      "source_sha256": "2d27e00e570327d2486a9ecfc2939e9e71ce3a4f62059faafedbf114c77c9c76",
+      "view": "view-00208"
+    }
+  ],
+  "dataset_digest": "155e170240101426ddcaa2f1f37bc252f90dc89949f34b597d1e412cdacfdfc9",
+  "manifest_digest": "fab4d364c117eb84b8cbc683690b17e42f2c58a1037cf589db555336fe5eb622",
+  "max_width": 1600,
+  "profile": "exulanica.heldout-comparison-set/v1"
+}

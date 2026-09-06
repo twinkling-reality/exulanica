@@ -1,0 +1,95 @@
+"""Digest-bound record of the first real reconstruction runs on the retained collections."""
+import argparse, hashlib, json, subprocess, uuid
+from pathlib import Path
+from exulanica.canonical import canonical_json
+from exulanica.db import Database
+
+root = Path('/Users/glendonchin/dev/Technology/orimera')
+base = root / '.exulanica/reference-baseline'
+DB = 'postgresql://localhost:5433/exulanica_spine_test'
+
+def binding(path):
+    data = (root / path).read_bytes()
+    return {'path': path, 'sha256': hashlib.sha256(data).hexdigest(), 'byte_size': len(data)}
+
+def blob(sha):
+    return json.loads((base / 'runtime/blobs/sha-256' / sha[:2] / sha[2:4] / sha).read_bytes())
+
+def git(*args):
+    return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--output', default='docs/evaluation/2026-09-05-real-reconstruction.json')
+parser.add_argument('--vm-facts', required=True, help='JSON file with GPU host facts, image digests, spend')
+parser.add_argument('--captures', nargs='*', default=[], help='capture summary JSON files to bind')
+parser.add_argument('--controls', nargs='*', default=[], help='negative-control logs to bind')
+parser.add_argument('--checks', nargs='*', default=[], help='verification logs to bind')
+parser.add_argument('--notes', default=None, help='JSON file with visual judgments and limitations')
+args = parser.parse_args()
+
+vm = json.loads(Path(args.vm_facts).read_bytes())
+notes = json.loads(Path(args.notes).read_bytes()) if args.notes else {}
+cfg = json.loads((base / 'runtime/access.json').read_bytes())
+db = Database(DB + '?options=-crole%3Dexulanica_ro')
+scenes = []
+for label in ('bowl', 'volcanic'):
+    ws = uuid.UUID(cfg['scenes'][label]['workspace_id'])
+    with db.session(ws) as c:
+        jobs = [dict(r) for r in c.execute(
+            "select job_id, scene_id, status, attempts, failure_class, left(failure_message, 300) as failure_message, "
+            "created_at, completed_at from reconstruction_scene_job where workspace_id=%s order by created_at", (ws,)).fetchall()]
+        counts = {t: c.execute(f'select count(*) as n from {t} where workspace_id=%s', (ws,)).fetchone()['n']
+                  for t in ('capture', 'capture_reconstruction_authorization', 'reconstruction_privacy_screening', 'reconstruction_scene', 'reconstruction_scene_job')}
+    for job in jobs:
+        for k in ('created_at', 'completed_at'):
+            job[k] = job[k].isoformat() if job[k] else None
+        job['job_id'] = str(job['job_id']); job['scene_id'] = str(job['scene_id'])
+    scenes.append({'label': label, 'workspace_id': str(ws), 'database_counts': counts, 'scene_jobs': jobs,
+                   **notes.get(label, {})})
+record = {
+    'profile': 'exulanica.retained-real-reconstruction/v1',
+    'date': '2026-09-05',
+    'predecessor_records': [
+        {'path': 'docs/evaluation/2026-09-05-retained-reference-progress.json',
+         'record_sha256': json.loads((root / 'docs/evaluation/2026-09-05-retained-reference-progress.json').read_bytes())['record_sha256']},
+        {'path': 'docs/evaluation/2026-09-05-source-presentation-correction.json',
+         'record_sha256': json.loads((root / 'docs/evaluation/2026-09-05-source-presentation-correction.json').read_bytes())['record_sha256']},
+    ],
+    'human_screening': notes.get('human_screening'),
+    'gpu_host': vm,
+    'scenes': scenes,
+    'defects_found_by_real_runs': notes.get('defects', []),
+    'visual_evaluation': notes.get('visual_evaluation'),
+    'measurements': notes.get('measurements'),
+    'captures': [{**binding(p), 'summary': {k: v for k, v in json.loads((root / p).read_bytes()).items()
+                                            if k in ('label', 'url', 'chrome', 'atlas_mount_ms', 'traversal', 'console_errors')}}
+                 for p in args.captures],
+    'capture_images': [binding(str(p.relative_to(root))) for c in args.captures
+                       for p in sorted((root / c).parent.glob(Path(c).name.replace('-reconstruction-capture.json', '') + '-*.jpg'))],
+    'negative_controls': [binding(p) for p in args.controls],
+    'verification_logs': [binding(p) for p in args.checks],
+    'implementation_commits': git('log', '--format=%h %s', '07cc0d9..HEAD').splitlines(),
+    'head': git('rev-parse', 'HEAD'),
+    'limitations': notes.get('limitations', []),
+    'requested_objective_complete': notes.get('requested_objective_complete', False),
+    'strong_reconstructed_baseline_established': notes.get('strong_reconstructed_baseline_established', False),
+}
+def quantise(value):
+    """Canonical JSON refuses floats in digest input; measured numbers travel as decimal strings."""
+    if isinstance(value, bool) or value is None or isinstance(value, (int, str)):
+        return value
+    if isinstance(value, float):
+        return f"{value:.6f}".rstrip('0').rstrip('.') if value == value else 'nan'
+    if isinstance(value, dict):
+        return {k: quantise(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [quantise(v) for v in value]
+    return value
+
+record['float_encoding'] = 'measured numbers are decimal strings with at most six fractional digits; canonical JSON admits no floats'
+record = quantise(record)
+envelope = {'profile': 'exulanica.digest-bound-record/v1', 'record': record,
+            'record_sha256': hashlib.sha256(canonical_json(record)).hexdigest()}
+out = root / args.output
+out.write_text(json.dumps(envelope, indent=2) + '\n')
+print(out, envelope['record_sha256'])

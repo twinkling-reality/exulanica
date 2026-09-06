@@ -1,0 +1,36 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/graph-client/test/islands.test.ts (15 tests | 1 failed | 14 skipped) 5ms
+   × what an exact reconstruction set does to regions > joins the ungrouped members of an exact set to the one group its other members share 4ms
+     → expected [ 'g1', 'c10', 'c9' ] to deeply equal [ 'g1' ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  15:25:27
+   Duration  342ms (transform 40ms, setup 0ms, collect 47ms, tests 5ms, environment 0ms, prepare 37ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/graph-client/test/islands.test.ts > what an exact reconstruction set does to regions > joins the ungrouped members of an exact set to the one group its other members share
+AssertionError: expected [ 'g1', 'c10', 'c9' ] to deeply equal [ 'g1' ]
+
+- Expected
++ Received
+
+  Array [
+    "g1",
++   "c10",
++   "c9",
+  ]
+
+ ❯ packages/graph-client/test/islands.test.ts:145:63
+    143|   it('joins the ungrouped members of an exact set to the one group its…
+    144|     const snapshot = adaptSnapshot({ ...PAYLOAD, reconstruction_scenes…
+    145|     expect(snapshot.islands.map((island) => island.islandId)).toEqual(…
+       |                                                               ^
+    146|     expect(snapshot.islands[0]!.captureIds).toEqual(['c1', 'c2', 'c9',…
+    147|     expect(snapshot.islands[0]!.reconstructionSceneId).toBe('exact');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

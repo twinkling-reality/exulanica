@@ -1,0 +1,130 @@
+{
+  "aggregate": {
+    "coverage_fraction": 0.9830815366336277,
+    "floaters_fraction": 0.4659811854362488,
+    "heldout_views": 7,
+    "lpips": 0.3091470961059843,
+    "psnr": 25.2784317004936,
+    "ssim": 0.8959215027945382
+  },
+  "bundle_sha256": "113b15e89c713730a3aa00bb8014d72ee0b56bdb0e386822205eae8d2cf14508",
+  "claim": "appearance at held-out photographed viewpoints only; no physical scale, completeness or navigability",
+  "comparisons": [
+    {
+      "comparison": "view-00000-photograph-vs-render.jpg",
+      "comparison_sha256": "d1b75aa4e85835e940d6ecf194f7beb66e79d57ebb8f29b5e6986250367f274c",
+      "reference": "training/undistorted/images/000000.jpg",
+      "reference_sha256": "ae64dcc5e36404dab3c2b97cbdd2ca88f10f15f7048d300f6b7d822644337fe8",
+      "render": "heldout/view-00000.png",
+      "render_sha256": "769340c8a0755358441c35af5ee5120318307ca3ae63c79ba3e6b24389331922",
+      "scores": {
+        "coverage_fraction": 0.9849452376365662,
+        "lpips": 0.31155455112457275,
+        "psnr": 25.455886622001124,
+        "ssim": 0.872839629650116
+      },
+      "source_sha256": "4b1b9ca9886f5b78789fbca62f2f7ee57135e66350a4a3d37c023388b94d23bf",
+      "view": "view-00000"
+    },
+    {
+      "comparison": "view-00008-photograph-vs-render.jpg",
+      "comparison_sha256": "06c71ccad9028a0365664194a0f22af95995af9d519f64bcded4c3e08306b3c0",
+      "reference": "training/undistorted/images/000008.jpg",
+      "reference_sha256": "ff0fecb9e60a9a4a56cf7a9595b5743695d2c9303ba484a8cb866e47fbb6d952",
+      "render": "heldout/view-00008.png",
+      "render_sha256": "996177c876759ccfb2a89018c242c06c2d142426095c3c68e96e4ffc7127d144",
+      "scores": {
+        "coverage_fraction": 0.9805097579956055,
+        "lpips": 0.3656800389289856,
+        "psnr": 23.244424863532682,
+        "ssim": 0.8347070217132568
+      },
+      "source_sha256": "0b08c4ca0941ca9ed379ffa920d1b5b309f87dd253a03deedd787f1bf22f1ca0",
+      "view": "view-00008"
+    },
+    {
+      "comparison": "view-00016-photograph-vs-render.jpg",
+      "comparison_sha256": "14a3c3d50b8df6d36de416548cdcb233807b1d84f99e9b6ab0aefb00f7825fa1",
+      "reference": "training/undistorted/images/000016.jpg",
+      "reference_sha256": "78d3373978150faf400f65d6513596bb5e6ef0678245b79d0005589ce55ebc60",
+      "render": "heldout/view-00016.png",
+      "render_sha256": "1c07cd614f04f7fff4287ad4b2ba37cc6c99b49ba9755d427803d7e820bd842c",
+      "scores": {
+        "coverage_fraction": 0.9956628084182739,
+        "lpips": 0.3187450170516968,
+        "psnr": 24.94749116905141,
+        "ssim": 0.8830006718635559
+      },
+      "source_sha256": "c87ea6c81c0905d1af9348ac7f97a844b4ee9f207cc5accbafb1b0fbf72974c4",
+      "view": "view-00016"
+    },
+    {
+      "comparison": "view-00024-photograph-vs-render.jpg",
+      "comparison_sha256": "d23d5901f19d997d93904d697d64631b426e1ff10ac16aa329dce724bdcd5ab3",
+      "reference": "training/undistorted/images/000024.jpg",
+      "reference_sha256": "7bec665b92a1b98cce0ac4ab4544cd4aa07d3182820bd354a7a20edd2ae2269c",
+      "render": "heldout/view-00024.png",
+      "render_sha256": "972b3308e97bc0de428ebbfa41a49d97a819707ce59f184c65b3ee6686d39b79",
+      "scores": {
+        "coverage_fraction": 0.9958851337432861,
+        "lpips": 0.24498166143894196,
+        "psnr": 28.91119691186602,
+        "ssim": 0.9357286691665649
+      },
+      "source_sha256": "73ceac1fa42d540af347cacaf24394c5744104f4396da3c9f8ec4f5dd033e975",
+      "view": "view-00024"
+    },
+    {
+      "comparison": "view-00032-photograph-vs-render.jpg",
+      "comparison_sha256": "eceefe6045cc5b35d0e5e3af6a6a4147e5154630d313038676e60c7ecceb0d46",
+      "reference": "training/undistorted/images/000032.jpg",
+      "reference_sha256": "7c76fd0dc931f73fd97f93adee7a9eb2f216bceeb5dbef1a3225a7b2916a8bc6",
+      "render": "heldout/view-00032.png",
+      "render_sha256": "6bec351db0a106f59f69cd0b6c055a4a78a231ca6d55f65a66f4f9c380816927",
+      "scores": {
+        "coverage_fraction": 0.9680683612823486,
+        "lpips": 0.29273009300231934,
+        "psnr": 23.96975341693,
+        "ssim": 0.9161179661750793
+      },
+      "source_sha256": "554a9daf45c739c71b1ecb2f2f7b6467a49df99ff90caec52639256b7c4fb5da",
+      "view": "view-00032"
+    },
+    {
+      "comparison": "view-00040-photograph-vs-render.jpg",
+      "comparison_sha256": "57ff21184ce2869ca73ce1483f04850a9cc350f3217915e1ec9ded0a6f1c7e2a",
+      "reference": "training/undistorted/images/000040.jpg",
+      "reference_sha256": "fc16bf14ff9622da56544a190c12b0f30cc591f26cede13f34eb564a4ccaccf1",
+      "render": "heldout/view-00040.png",
+      "render_sha256": "b4ea5b495a4e2198fa5e37d3223fc3f7d6cf856953d800ff230b5d4fa248e950",
+      "scores": {
+        "coverage_fraction": 0.989117443561554,
+        "lpips": 0.27145349979400635,
+        "psnr": 24.768531948299444,
+        "ssim": 0.925779402256012
+      },
+      "source_sha256": "9d4328033464b4e8fe1d9d4393d0cdb384017a0e1f926b2805ba56d16d060e0d",
+      "view": "view-00040"
+    },
+    {
+      "comparison": "view-00048-photograph-vs-render.jpg",
+      "comparison_sha256": "d03ec8add76f501e20033a15eb38da7f58ab3005cd15024f71223d0840da0842",
+      "reference": "training/undistorted/images/000048.jpg",
+      "reference_sha256": "86c7614eba764a63d025d57f6320c8fbb484098dc55679c3731979b1b6ac749f",
+      "render": "heldout/view-00048.png",
+      "render_sha256": "b5607738658d77e6eda764684437c024016790e8f595eee8b578dde782af53be",
+      "scores": {
+        "coverage_fraction": 0.96738201379776,
+        "lpips": 0.3588848114013672,
+        "psnr": 25.651736971774504,
+        "ssim": 0.9032771587371826
+      },
+      "source_sha256": "7b1fb573deeba373014aeba0705d34e931c8f39178099c7765ea1702607b4cb5",
+      "view": "view-00048"
+    }
+  ],
+  "dataset_digest": "1b3f0e336399147ec046427742b8cf078327ca5526f4efdca18f109652ca6d2e",
+  "manifest_digest": "b61ef8572c707bbd46294e200a68e91846debdacac20f52930193fd4dd274127",
+  "max_width": 1600,
+  "profile": "exulanica.heldout-comparison-set/v1"
+}

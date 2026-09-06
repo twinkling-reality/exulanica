@@ -1,0 +1,26 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/atlas-core/test/display-frame.test.ts (5 tests | 1 failed | 4 skipped) 4ms
+   × the display frame of a recovered scene > is a proper similarity, so composed placements and cameras still pass the renderer checks 4ms
+     → expected 0.4 to be close to 1, received difference is 0.6, but expected 5e-10
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  15:25:32
+   Duration  292ms (transform 27ms, setup 0ms, collect 23ms, tests 4ms, environment 0ms, prepare 43ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-core/test/display-frame.test.ts > the display frame of a recovered scene > is a proper similarity, so composed placements and cameras still pass the renderer checks
+AssertionError: expected 0.4 to be close to 1, received difference is 0.6, but expected 5e-10
+ ❯ packages/atlas-core/test/display-frame.test.ts:78:60
+     76|     near(composed.slice(12), [0, 0, 0, 1]);
+     77|     const camera = displayCameraTransform(frame, [1, 0, 0, 5, 0, 1, 0,…
+     78|     expect(Math.hypot(camera[0]!, camera[4]!, camera[8]!)).toBeCloseTo…
+       |                                                            ^
+     79|     near([camera[3]!, camera[7]!, camera[11]!], transformPoint(frame, …
+     80|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

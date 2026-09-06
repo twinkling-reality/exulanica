@@ -1,0 +1,67 @@
+
+== host
+Linux brev-9lbb1sfer 6.8.0-90-generic #91~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 15:20:45 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+uid=1002(shadeform) gid=1003(shadeform) groups=1003(shadeform),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),110(lxd),999(docker)
+12
+               total        used        free      shared  buff/cache   available
+Mem:              70           1          64           0           5          68
+/dev/sda2       614G   18G  571G   4% /
+== gpu
+name, driver_version, memory.total [MiB]
+NVIDIA L40S, 580.126.09, 46068 MiB
+== docker
+Docker version 29.1.5, build 0e6fee6
+ Runtimes: io.containerd.runc.v2 nvidia runc
+ Default Runtime: nvidia
+== gpu inside docker
+Unable to find image 'ubuntu:24.04' locally
+24.04: Pulling from library/ubuntu
+0926a8eb0e60: Pulling fs layer
+0926a8eb0e60: Verifying Checksum
+0926a8eb0e60: Download complete
+0926a8eb0e60: Pull complete
+Digest: sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
+Status: Downloaded newer image for ubuntu:24.04
+GPU 0: NVIDIA L40S (UUID: GPU-b8951da3-897c-48e8-c8aa-78e51a094a13)
+== uv
+downloading uv 0.12.10 x86_64-unknown-linux-gnu
+uv 0.12.10 (x86_64-unknown-linux-gnu)
+== node
+v22.12.0
+10.9.0
+== local registry
+Unable to find image 'registry:2' locally
+2: Pulling from library/registry
+44cf07d57ee4: Pulling fs layer
+bbbdd6c6894b: Pulling fs layer
+8e82f80af0de: Pulling fs layer
+3493bf46cdec: Pulling fs layer
+6d464ea18732: Pulling fs layer
+6d464ea18732: Waiting
+3493bf46cdec: Waiting
+44cf07d57ee4: Verifying Checksum
+44cf07d57ee4: Download complete
+bbbdd6c6894b: Verifying Checksum
+bbbdd6c6894b: Download complete
+8e82f80af0de: Verifying Checksum
+8e82f80af0de: Download complete
+3493bf46cdec: Verifying Checksum
+3493bf46cdec: Download complete
+6d464ea18732: Verifying Checksum
+6d464ea18732: Download complete
+44cf07d57ee4: Pull complete
+bbbdd6c6894b: Pull complete
+8e82f80af0de: Pull complete
+3493bf46cdec: Pull complete
+6d464ea18732: Pull complete
+Digest: sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+Status: Downloaded newer image for registry:2
+registry Up Less than a second
+== data dir
+total 12
+drwxr-xr-x  3 shadeform shadeform 4096 Sep  5 17:36 .
+drwxrwxr-x 11 shadeform shadeform 4096 Sep  5 17:36 ..
+== git
+git version 2.34.1
+rsync  version 3.2.7  protocol version 31
+exit=141

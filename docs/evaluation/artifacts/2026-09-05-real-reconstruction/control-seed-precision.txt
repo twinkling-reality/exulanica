@@ -1,0 +1,7 @@
+== mutation: drop the float32 cast on seed scales (in place; restored via git checkout of 63fe966)
+mutated
+=========================== short test summary info ============================
+FAILED tests/test_gsplat_runner.py::test_seed_gaussians_are_single_precision_before_any_device_transfer
+1 failed, 8 deselected in 1.55s
+== restored
+1 passed, 8 deselected in 1.06s

@@ -119,6 +119,13 @@ the retained requests); floaters a person can see are judged in the visual pass,
 or visibility-based floater measure is future work. Changing the ceiling is a new request and a
 new build; the refused run's receipt and evaluation bundle remain retained.
 
+DELIVERED 2026-09-06: the fourth bowl request (floater ceiling 0.9, compressor on the GPU) trained
+30000 iterations in 74 minutes alone on the L40S, measured PSNR 25.28 dB, SSIM 0.896, LPIPS 0.309,
+coverage 0.983 and floater proxy 0.466 over the same 7 held-out views, compressed to a 15.3 MB
+SOG with every SH band, and is displayed in Atlas at 60 fps with these numbers beside its rung.
+The three earlier requests are retained as refusals and failures in the
+[real reconstruction record](evaluation/2026-09-05-real-reconstruction.json).
+
 Evaluation renders every held-out view at the documented rectified resolution without exposure
 matching or color correction. It records per-view and mean PSNR, SSIM, AlexNet LPIPS, source and
 render digests, and pixel dimensions. Coverage is the mean held-out pixel fraction with rendered

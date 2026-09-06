@@ -1,0 +1,5 @@
+splat-transform v3.3.3 (d092ae9)
+▸ [2/2] Output /tmp/test-cpu-h0.sog
+  · 1M gaussians · 3 SH bands
+  ▸ Writing
+    · running k-means clustering: dims=45 points=1000000 clusters=65536 iterations=10

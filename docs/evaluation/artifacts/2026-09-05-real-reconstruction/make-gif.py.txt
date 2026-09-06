@@ -1,0 +1,18 @@
+"""Assemble walkthrough frames into one retained GIF with a caption strip; frames stay as evidence."""
+import json, sys
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+summary = json.loads(Path(sys.argv[1]).read_bytes())
+out = Path(sys.argv[2]); width = int(sys.argv[3]) if len(sys.argv) > 3 else 640
+frames = []
+font = ImageFont.load_default()
+for entry in summary['frames']:
+    image = Image.open(entry['file']).convert('RGB')
+    image = image.resize((width, round(image.height * width / image.width)), Image.LANCZOS)
+    strip = Image.new('RGB', (width, image.height + 22), (250, 248, 243))
+    strip.paste(image, (0, 0))
+    ImageDraw.Draw(strip).text((8, image.height + 5), f"{summary['label']} · {entry['label']}", fill=(40, 40, 40), font=font)
+    frames.append(strip.quantize(colors=256, method=Image.Quantize.MEDIANCUT))
+durations = [1400] + [700] * (len(frames) - 2) + [1400] if len(frames) > 2 else [1000] * len(frames)
+frames[0].save(out, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=False)
+print(out, len(frames), 'frames', out.stat().st_size, 'bytes')

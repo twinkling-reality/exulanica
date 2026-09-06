@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# After a trained scene publishes: pull artifacts, capture the GPU-timed traversal, walk every camera, build the GIF.
+# Usage: post_train.sh <label> <port> <artifact-dir>
+set -euo pipefail
+cd /Users/glendonchin/dev/Technology/orimera
+LABEL=$1; PORT=$2; DIR=$3; S=/private/tmp/claude-501/-Users-glendonchin-dev-Technology-orimera/3397c02f-61c3-4cc1-a361-54092de7275c/scratchpad
+mkdir -p "$DIR"
+$S/sync_back.sh 2>&1 | grep -v "Pseudo\|Permanently"
+HEADLESS_GPU=1 node $S/capture_reconstruction.mjs "$LABEL-trained-gpu" "http://127.0.0.1:$PORT/" "$DIR" 8 2>&1 | tail -40
+HEADLESS_GPU=1 node $S/capture_walkthrough.mjs "$LABEL-trained" "http://127.0.0.1:$PORT/" "$DIR/walkthrough-$LABEL" 1000 2>&1 | tail -2
+uv run python $S/make_gif.py "$DIR/walkthrough-$LABEL/$LABEL-trained-walkthrough.json" "$DIR/$LABEL-trained-walkthrough.gif" 400

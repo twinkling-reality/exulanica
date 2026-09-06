@@ -1,0 +1,38 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts (7 tests | 1 failed | 6 skipped) 5ms
+   × residency of a region with many placed point maps > lets one region always afford its full stage while several still compete 4ms
+     → expected { stub: +0, proxy: 24, …(2) } to deeply equal { stub: +0, proxy: 24, …(2) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  15:25:34
+   Duration  897ms (transform 194ms, setup 0ms, collect 506ms, tests 5ms, environment 0ms, prepare 35ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-presentation.test.ts > residency of a region with many placed point maps > lets one region always afford its full stage while several still compete
+AssertionError: expected { stub: +0, proxy: 24, …(2) } to deeply equal { stub: +0, proxy: 24, …(2) }
+
+- Expected
++ Received
+
+  Object {
+    "coarse": 48,
+-   "full": 96,
++   "full": 912,
+    "proxy": 24,
+    "stub": 0,
+  }
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts:98:43
+     96|   it('lets one region always afford its full stage while several still…
+     97|     expect(pointMapResidencyCost(1, 96)).toEqual({ stub: 0, proxy: 4, …
+     98|     expect(pointMapResidencyCost(38, 96)).toEqual({ stub: 0, proxy: 24…
+       |                                           ^
+     99|     const id = islandId('bowl');
+    100|     const plan = planResidency(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

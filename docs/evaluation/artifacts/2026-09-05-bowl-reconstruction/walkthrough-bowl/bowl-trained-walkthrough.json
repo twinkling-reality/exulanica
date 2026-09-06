@@ -1,0 +1,523 @@
+{
+  "label": "bowl-trained",
+  "url": "http://127.0.0.1:5180/",
+  "views": 101,
+  "captured": 103,
+  "hold_ms": 1000,
+  "errors": 0,
+  "frames": [
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-000-arrival.jpg",
+      "label": "Arrival"
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-001-source-camera-1.jpg",
+      "label": "Source camera 1",
+      "index": 0
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-002-between-cameras-1-and-2.jpg",
+      "label": "Between cameras 1 and 2",
+      "index": 1
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-003-source-camera-2.jpg",
+      "label": "Source camera 2",
+      "index": 2
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-004-between-cameras-2-and-3.jpg",
+      "label": "Between cameras 2 and 3",
+      "index": 3
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-005-source-camera-3.jpg",
+      "label": "Source camera 3",
+      "index": 4
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-006-between-cameras-3-and-4.jpg",
+      "label": "Between cameras 3 and 4",
+      "index": 5
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-007-source-camera-4.jpg",
+      "label": "Source camera 4",
+      "index": 6
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-008-between-cameras-4-and-5.jpg",
+      "label": "Between cameras 4 and 5",
+      "index": 7
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-009-source-camera-5.jpg",
+      "label": "Source camera 5",
+      "index": 8
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-010-between-cameras-5-and-6.jpg",
+      "label": "Between cameras 5 and 6",
+      "index": 9
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-011-source-camera-6.jpg",
+      "label": "Source camera 6",
+      "index": 10
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-012-between-cameras-6-and-7.jpg",
+      "label": "Between cameras 6 and 7",
+      "index": 11
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-013-source-camera-7.jpg",
+      "label": "Source camera 7",
+      "index": 12
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-014-between-cameras-7-and-8.jpg",
+      "label": "Between cameras 7 and 8",
+      "index": 13
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-015-source-camera-8.jpg",
+      "label": "Source camera 8",
+      "index": 14
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-016-between-cameras-8-and-9.jpg",
+      "label": "Between cameras 8 and 9",
+      "index": 15
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-017-source-camera-9.jpg",
+      "label": "Source camera 9",
+      "index": 16
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-018-between-cameras-9-and-10.jpg",
+      "label": "Between cameras 9 and 10",
+      "index": 17
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-019-source-camera-10.jpg",
+      "label": "Source camera 10",
+      "index": 18
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-020-between-cameras-10-and-11.jpg",
+      "label": "Between cameras 10 and 11",
+      "index": 19
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-021-source-camera-11.jpg",
+      "label": "Source camera 11",
+      "index": 20
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-022-between-cameras-11-and-12.jpg",
+      "label": "Between cameras 11 and 12",
+      "index": 21
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-023-source-camera-12.jpg",
+      "label": "Source camera 12",
+      "index": 22
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-024-between-cameras-12-and-13.jpg",
+      "label": "Between cameras 12 and 13",
+      "index": 23
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-025-source-camera-13.jpg",
+      "label": "Source camera 13",
+      "index": 24
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-026-between-cameras-13-and-14.jpg",
+      "label": "Between cameras 13 and 14",
+      "index": 25
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-027-source-camera-14.jpg",
+      "label": "Source camera 14",
+      "index": 26
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-028-between-cameras-14-and-15.jpg",
+      "label": "Between cameras 14 and 15",
+      "index": 27
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-029-source-camera-15.jpg",
+      "label": "Source camera 15",
+      "index": 28
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-030-between-cameras-15-and-16.jpg",
+      "label": "Between cameras 15 and 16",
+      "index": 29
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-031-source-camera-16.jpg",
+      "label": "Source camera 16",
+      "index": 30
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-032-between-cameras-16-and-17.jpg",
+      "label": "Between cameras 16 and 17",
+      "index": 31
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-033-source-camera-17.jpg",
+      "label": "Source camera 17",
+      "index": 32
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-034-between-cameras-17-and-18.jpg",
+      "label": "Between cameras 17 and 18",
+      "index": 33
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-035-source-camera-18.jpg",
+      "label": "Source camera 18",
+      "index": 34
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-036-between-cameras-18-and-19.jpg",
+      "label": "Between cameras 18 and 19",
+      "index": 35
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-037-source-camera-19.jpg",
+      "label": "Source camera 19",
+      "index": 36
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-038-between-cameras-19-and-20.jpg",
+      "label": "Between cameras 19 and 20",
+      "index": 37
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-039-source-camera-20.jpg",
+      "label": "Source camera 20",
+      "index": 38
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-040-between-cameras-20-and-21.jpg",
+      "label": "Between cameras 20 and 21",
+      "index": 39
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-041-source-camera-21.jpg",
+      "label": "Source camera 21",
+      "index": 40
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-042-between-cameras-21-and-22.jpg",
+      "label": "Between cameras 21 and 22",
+      "index": 41
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-043-source-camera-22.jpg",
+      "label": "Source camera 22",
+      "index": 42
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-044-between-cameras-22-and-23.jpg",
+      "label": "Between cameras 22 and 23",
+      "index": 43
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-045-source-camera-23.jpg",
+      "label": "Source camera 23",
+      "index": 44
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-046-between-cameras-23-and-24.jpg",
+      "label": "Between cameras 23 and 24",
+      "index": 45
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-047-source-camera-24.jpg",
+      "label": "Source camera 24",
+      "index": 46
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-048-between-cameras-24-and-25.jpg",
+      "label": "Between cameras 24 and 25",
+      "index": 47
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-049-source-camera-25.jpg",
+      "label": "Source camera 25",
+      "index": 48
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-050-between-cameras-25-and-26.jpg",
+      "label": "Between cameras 25 and 26",
+      "index": 49
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-051-source-camera-26.jpg",
+      "label": "Source camera 26",
+      "index": 50
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-052-between-cameras-26-and-27.jpg",
+      "label": "Between cameras 26 and 27",
+      "index": 51
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-053-source-camera-27.jpg",
+      "label": "Source camera 27",
+      "index": 52
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-054-between-cameras-27-and-28.jpg",
+      "label": "Between cameras 27 and 28",
+      "index": 53
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-055-source-camera-28.jpg",
+      "label": "Source camera 28",
+      "index": 54
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-056-between-cameras-28-and-29.jpg",
+      "label": "Between cameras 28 and 29",
+      "index": 55
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-057-source-camera-29.jpg",
+      "label": "Source camera 29",
+      "index": 56
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-058-between-cameras-29-and-30.jpg",
+      "label": "Between cameras 29 and 30",
+      "index": 57
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-059-source-camera-30.jpg",
+      "label": "Source camera 30",
+      "index": 58
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-060-between-cameras-30-and-31.jpg",
+      "label": "Between cameras 30 and 31",
+      "index": 59
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-061-source-camera-31.jpg",
+      "label": "Source camera 31",
+      "index": 60
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-062-between-cameras-31-and-32.jpg",
+      "label": "Between cameras 31 and 32",
+      "index": 61
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-063-source-camera-32.jpg",
+      "label": "Source camera 32",
+      "index": 62
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-064-between-cameras-32-and-33.jpg",
+      "label": "Between cameras 32 and 33",
+      "index": 63
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-065-source-camera-33.jpg",
+      "label": "Source camera 33",
+      "index": 64
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-066-between-cameras-33-and-34.jpg",
+      "label": "Between cameras 33 and 34",
+      "index": 65
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-067-source-camera-34.jpg",
+      "label": "Source camera 34",
+      "index": 66
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-068-between-cameras-34-and-35.jpg",
+      "label": "Between cameras 34 and 35",
+      "index": 67
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-069-source-camera-35.jpg",
+      "label": "Source camera 35",
+      "index": 68
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-070-between-cameras-35-and-36.jpg",
+      "label": "Between cameras 35 and 36",
+      "index": 69
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-071-source-camera-36.jpg",
+      "label": "Source camera 36",
+      "index": 70
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-072-between-cameras-36-and-37.jpg",
+      "label": "Between cameras 36 and 37",
+      "index": 71
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-073-source-camera-37.jpg",
+      "label": "Source camera 37",
+      "index": 72
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-074-between-cameras-37-and-38.jpg",
+      "label": "Between cameras 37 and 38",
+      "index": 73
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-075-source-camera-38.jpg",
+      "label": "Source camera 38",
+      "index": 74
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-076-between-cameras-38-and-39.jpg",
+      "label": "Between cameras 38 and 39",
+      "index": 75
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-077-source-camera-39.jpg",
+      "label": "Source camera 39",
+      "index": 76
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-078-between-cameras-39-and-40.jpg",
+      "label": "Between cameras 39 and 40",
+      "index": 77
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-079-source-camera-40.jpg",
+      "label": "Source camera 40",
+      "index": 78
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-080-between-cameras-40-and-41.jpg",
+      "label": "Between cameras 40 and 41",
+      "index": 79
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-081-source-camera-41.jpg",
+      "label": "Source camera 41",
+      "index": 80
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-082-between-cameras-41-and-42.jpg",
+      "label": "Between cameras 41 and 42",
+      "index": 81
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-083-source-camera-42.jpg",
+      "label": "Source camera 42",
+      "index": 82
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-084-between-cameras-42-and-43.jpg",
+      "label": "Between cameras 42 and 43",
+      "index": 83
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-085-source-camera-43.jpg",
+      "label": "Source camera 43",
+      "index": 84
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-086-between-cameras-43-and-44.jpg",
+      "label": "Between cameras 43 and 44",
+      "index": 85
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-087-source-camera-44.jpg",
+      "label": "Source camera 44",
+      "index": 86
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-088-between-cameras-44-and-45.jpg",
+      "label": "Between cameras 44 and 45",
+      "index": 87
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-089-source-camera-45.jpg",
+      "label": "Source camera 45",
+      "index": 88
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-090-between-cameras-45-and-46.jpg",
+      "label": "Between cameras 45 and 46",
+      "index": 89
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-091-source-camera-46.jpg",
+      "label": "Source camera 46",
+      "index": 90
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-092-between-cameras-46-and-47.jpg",
+      "label": "Between cameras 46 and 47",
+      "index": 91
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-093-source-camera-47.jpg",
+      "label": "Source camera 47",
+      "index": 92
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-094-between-cameras-47-and-48.jpg",
+      "label": "Between cameras 47 and 48",
+      "index": 93
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-095-source-camera-48.jpg",
+      "label": "Source camera 48",
+      "index": 94
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-096-between-cameras-48-and-49.jpg",
+      "label": "Between cameras 48 and 49",
+      "index": 95
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-097-source-camera-49.jpg",
+      "label": "Source camera 49",
+      "index": 96
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-098-between-cameras-49-and-50.jpg",
+      "label": "Between cameras 49 and 50",
+      "index": 97
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-099-source-camera-50.jpg",
+      "label": "Source camera 50",
+      "index": 98
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-100-between-cameras-50-and-51.jpg",
+      "label": "Between cameras 50 and 51",
+      "index": 99
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-101-source-camera-51.jpg",
+      "label": "Source camera 51",
+      "index": 100
+    },
+    {
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/walkthrough-bowl/bowl-trained-102-return.jpg",
+      "label": "Return to Atlas"
+    }
+  ]
+}

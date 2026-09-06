@@ -1,0 +1,31 @@
+{
+  "profile": "exulanica.scene-splat-request/v1",
+  "execution_image": "localhost:5000/exulanica-gsplat@sha256:5dd707be015f12cbd206e71e471a7289aed3f385b5a0e0c3c9c813d34ed86bb0",
+  "requested_gpu": "NVIDIA L40S",
+  "dependency_inventory": [
+    "gsplat",
+    "torch",
+    "torchvision",
+    "torchmetrics",
+    "pycolmap"
+  ],
+  "heldout_source_sha256": [
+    "4b1b9ca9886f5b78789fbca62f2f7ee57135e66350a4a3d37c023388b94d23bf",
+    "0b08c4ca0941ca9ed379ffa920d1b5b309f87dd253a03deedd787f1bf22f1ca0",
+    "c87ea6c81c0905d1af9348ac7f97a844b4ee9f207cc5accbafb1b0fbf72974c4",
+    "73ceac1fa42d540af347cacaf24394c5744104f4396da3c9f8ec4f5dd033e975",
+    "554a9daf45c739c71b1ecb2f2f7b6467a49df99ff90caec52639256b7c4fb5da",
+    "9d4328033464b4e8fe1d9d4393d0cdb384017a0e1f926b2805ba56d16d060e0d",
+    "7b1fb573deeba373014aeba0705d34e931c8f39178099c7765ea1702607b4cb5"
+  ],
+  "max_iterations": 30000,
+  "checkpoint_every": 2000,
+  "gaussian_cap": 1000000,
+  "usd_per_gpu_hour_millionths": 1060000,
+  "min_psnr_millionths": 18000000,
+  "min_ssim_millionths": 600000,
+  "max_lpips_millionths": 450000,
+  "max_floaters_fraction_millionths": 900000,
+  "min_coverage_fraction_millionths": 750000,
+  "max_browser_bytes": 100663296
+}

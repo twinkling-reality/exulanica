@@ -1,0 +1,135 @@
+{
+ "hostname": "brev-9lbb1sfer",
+ "os": "Ubuntu 22.04.5 LTS",
+ "kernel": "6.8.0-90-generic",
+ "cpus": 12,
+ "memory_gib": 70,
+ "gpu": "NVIDIA L40S",
+ "driver": "580.126.09",
+ "gpu_memory_mib": 46068,
+ "docker": "Docker version 29.1.5, build 0e6fee6",
+ "images": [
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "6390592",
+   "size": "641MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "6390592",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "8386920",
+   "size": "434MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "8386920",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "67f5f12",
+   "size": "431MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "67f5f12",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "3c9ff91",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "3c9ff91",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "1297018",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "1297018",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "416a2fb",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "416a2fb",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "63fe966",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "63fe966",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-gsplat",
+   "tag": "fe4bce8",
+   "size": "18.6GB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "fe4bce8",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "b0fbc4f",
+   "size": "429MB"
+  },
+  {
+   "repository": "localhost:5000/exulanica-scene-worker",
+   "tag": "07cc0d9",
+   "size": "429MB"
+  },
+  {
+   "repository": "pytorch/pytorch",
+   "tag": "2.7.1-cuda12.8-cudnn9-devel",
+   "size": "16.9GB"
+  }
+ ],
+ "digests": [
+  "localhost:5000/exulanica-scene-worker@sha256:43856210335c1002b6787f11067afbd6f1c9b3fd8d4edac4d9a0f03aad3d296e",
+  "localhost:5000/exulanica-gsplat@sha256:f96e7ccf7197bcd89863aaf32a8cad0450a4b5d2d5788d1fc8cd2b37cbb597f3",
+  "localhost:5000/exulanica-scene-worker@sha256:13f19f3fabfebb4c9b9155f7deb28561fa7fc43bc71dba3f2c873e2fc0cc93ba",
+  "localhost:5000/exulanica-gsplat@sha256:e8fb6c390e18e62e8b9c473c1f0981bfc1bccbc77ec97c04012a020e98f96adb",
+  "localhost:5000/exulanica-scene-worker@sha256:bfe73e5acbf0f89ef9d602036b2f724ab0d71dcb89581835cf39354a3a65abf6",
+  "localhost:5000/exulanica-gsplat@sha256:ae7fe94945adb8ba9125b5b9257a5fc580e842076aca7dd2cb779d7dfd4c73df",
+  "localhost:5000/exulanica-scene-worker@sha256:bcf7a2b36ff7b805a12500d54357da564c34e11b29b18cebf1b6df8bed04d279",
+  "localhost:5000/exulanica-gsplat@sha256:200e0f571280eeff51db57f9615acae0065e070322f2a169c41cc37245a86d48",
+  "localhost:5000/exulanica-gsplat@sha256:5dd707be015f12cbd206e71e471a7289aed3f385b5a0e0c3c9c813d34ed86bb0",
+  "localhost:5000/exulanica-scene-worker@sha256:293ccd629306772a6461030642798bbdd0abe25bfc6d6ed378f10970c7bda644",
+  "localhost:5000/exulanica-gsplat@sha256:e684bc3ca3cf0bee8141113f2f9681d489fc2888e511b920955349a88e730eb1",
+  "localhost:5000/exulanica-scene-worker@sha256:93625e5e06aca92943a5710399532d4c62a14153faf2a8309d08a956b5ad1509",
+  "localhost:5000/exulanica-gsplat@sha256:d159f8e90235d819a6bab18877b9432b755d82dc97d4f6b15f19174951240c7b",
+  "localhost:5000/exulanica-scene-worker@sha256:18c34ae7f249342a041dd74b068b95720c724db9705a955469b7235677ebccdd",
+  "localhost:5000/exulanica-gsplat@sha256:f91fb181bd6caba6a0a3971699f319a46ee35d981f303e6ef41539d7c19b14a3",
+  "localhost:5000/exulanica-scene-worker@sha256:86c103f94c3b774c57c2eef2209abaa5b71d4a050c35f77bc3a391c794ee4181",
+  "localhost:5000/exulanica-scene-worker@sha256:bc4e0f5fe63e26f04552cd336f68adba603e1bde093810ef99086c1ef0f8ba2c",
+  "localhost:5000/exulanica-scene-worker@sha256:de68a6ba5c2e5bd9b6bfba5a5d196430c769f044bd04ceac49ffdf07dbb7c132"
+ ],
+ "provider": "NVIDIA Brev, MassedCompute L40S instance type massedcompute_L40S, pre-release option",
+ "instance_name": "exulanica-gsplat",
+ "declared_usd_per_gpu_hour": 1.06,
+ "instance_started_utc": "2026-09-05T17:30:28+00:00",
+ "facts_collected_utc": "2026-09-06T03:34:39+00:00",
+ "prepaid_balance_before_usd": 51.17,
+ "spend_cap_usd": 51.17
+}

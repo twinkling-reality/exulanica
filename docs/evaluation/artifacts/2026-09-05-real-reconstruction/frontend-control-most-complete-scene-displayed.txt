@@ -1,0 +1,30 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/graph-client/test/islands.test.ts (15 tests | 1 failed | 14 skipped) 5ms
+   × what an exact reconstruction set does to regions > displays the most complete scene of a region and leaves the overlapping smaller one recorded 5ms
+     → expected 'group-scene' to be 'exact' // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  15:25:28
+   Duration  317ms (transform 40ms, setup 0ms, collect 46ms, tests 5ms, environment 0ms, prepare 39ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/graph-client/test/islands.test.ts > what an exact reconstruction set does to regions > displays the most complete scene of a region and leaves the overlapping smaller one recorded
+AssertionError: expected 'group-scene' to be 'exact' // Object.is equality
+
+Expected: "exact"
+Received: "group-scene"
+
+ ❯ packages/graph-client/test/islands.test.ts:166:56
+    164|     ] });
+    165|     expect(snapshot.islands).toHaveLength(1);
+    166|     expect(snapshot.islands[0]!.reconstructionSceneId).toBe('exact');
+       |                                                        ^
+    167|     expect(snapshot.reconstructionScenes!.map((item) => [item.sceneId,…
+    168|       .toEqual([['group-scene', 'g1'], ['exact', 'g1']]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

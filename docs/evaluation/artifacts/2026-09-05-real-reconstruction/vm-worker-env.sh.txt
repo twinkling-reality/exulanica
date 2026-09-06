@@ -1,0 +1,27 @@
+# Sourced on the VM. Runs the scene worker inside its digest-pinned image with host networking.
+CODE_REVISION="1297018ae8161512b6e761f0a9981483d3d45d74"
+WORKER_IMAGE=$(docker inspect --format "{{index .RepoDigests 0}}" "localhost:5000/exulanica-scene-worker:${CODE_REVISION:0:7}")
+DATA_DIR="$HOME/exulanica-data"
+WORKSPACES="bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb,79004d44-ca24-4d17-9eef-56786415e233"
+DOCKER_GID=$(stat -c %g /var/run/docker.sock)
+worker_run() {
+  # $@ = command to run inside the worker image (default: the worker itself)
+  mkdir -p "$DATA_DIR" "$HOME/worker-home"
+  docker run --rm --network host --no-healthcheck \
+    --user "$(id -u):$(id -g)" --group-add "$DOCKER_GID" \
+    -e HOME=/tmp/worker-home -v "$HOME/worker-home:/tmp/worker-home" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /usr/bin/docker:/usr/local/bin/docker:ro \
+    -v "$HOME/node:/opt/node:ro" \
+    -v "$HOME/orimera/deploy/gsplat/compressor:/opt/compressor:ro" \
+    -v "$DATA_DIR:$DATA_DIR" \
+    -e PATH="/app/.venv/bin:/opt/compressor/node_modules/.bin:/opt/node/bin:/usr/local/bin:/usr/bin:/bin" \
+    -e EXULANICA_DATABASE_URL=<redacted> \
+    -e PGOPTIONS="-c role=exulanica_app" \
+    -e EXULANICA_DATA_DIR="$DATA_DIR" \
+    -e EXULANICA_WORKSPACE_IDS="${EXULANICA_WORKSPACE_IDS:-$WORKSPACES}" \
+    -e EXULANICA_CODE_REVISION="$CODE_REVISION" \
+    -e EXULANICA_POSE_RUNTIME_IMAGE="$WORKER_IMAGE" \
+    -w "$DATA_DIR" \
+    "$WORKER_IMAGE" "$@"
+}

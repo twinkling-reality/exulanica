@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pull new content-addressed objects from the VM store into the retained local store. Never deletes.
+set -euo pipefail
+cd /Users/glendonchin/dev/Technology/orimera
+before=$(find .exulanica/reference-baseline/runtime/blobs -type f | wc -l | tr -d ' ')
+rsync -a --ignore-existing exulanica-gsplat:~/exulanica-data/blobs/ .exulanica/reference-baseline/runtime/blobs/
+after=$(find .exulanica/reference-baseline/runtime/blobs -type f | wc -l | tr -d ' ')
+echo "blobs before=$before after=$after added=$((after - before))"

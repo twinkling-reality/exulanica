@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ✓ packages/atlas-core/test/display-frame.test.ts (5 tests) 3ms
+ ✓ packages/graph-client/test/islands.test.ts (15 tests) 4ms
+ ✓ packages/app/test/scene.test.ts (14 tests) 6ms
+ ✓ packages/atlas-react/test/source-presentation.test.ts (7 tests) 12ms
+ ✓ packages/app/test/geometry-api.test.ts (26 tests) 40ms
+
+ Test Files  5 passed (5)
+      Tests  67 passed (67)
+   Start at  15:25:38
+   Duration  896ms (transform 435ms, setup 0ms, collect 1.46s, tests 65ms, environment 0ms, prepare 231ms)
+

@@ -1,0 +1,43 @@
+
+ RUN  v2.1.9 /private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/orimera-reconstruction-display-controls-p1ibcj60
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts (7 tests | 1 failed | 6 skipped) 5ms
+   × arrival at a reconstructed region > starts where the first photograph was taken and looks where that camera looked 5ms
+     → expected { x: 23.6, y: 3.258962369251953, …(3) } to deeply equal { x: 20, y: 2.4000000000000004, …(3) }
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  15:25:33
+   Duration  775ms (transform 205ms, setup 0ms, collect 513ms, tests 5ms, environment 0ms, prepare 49ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/atlas-react/test/source-presentation.test.ts > arrival at a reconstructed region > starts where the first photograph was taken and looks where that camera looked
+AssertionError: expected { x: 23.6, y: 3.258962369251953, …(3) } to deeply equal { x: 20, y: 2.4000000000000004, …(3) }
+
+- Expected
++ Received
+
+  Object {
+-   "pitch": -0.24497866312686414,
+-   "x": 20,
+-   "y": 2.4000000000000004,
+-   "yaw": 3.141592653589793,
+-   "z": -9,
++   "pitch": -0.085,
++   "x": 23.6,
++   "y": 3.258962369251953,
++   "yaw": 1.5707963267948966,
++   "z": -6,
+  }
+
+ ❯ packages/atlas-react/test/source-presentation.test.ts:73:19
+     71|     const start = initialAtlasCameraState(scene, world, 'inspection');
+     72|     const expected = recoveredCameraState(reconstructed, reconstructed…
+     73|     expect(start).toEqual(expected);
+       |                   ^
+     74|     expect(initialAtlasCameraState(scene, world, 'world')).toEqual(exp…
+     75|     // Position is the viewpoint under the island placement: yaw pi/2 …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

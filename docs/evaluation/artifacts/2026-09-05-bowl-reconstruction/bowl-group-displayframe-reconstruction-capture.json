@@ -1,0 +1,1137 @@
+{
+  "label": "bowl-group-displayframe",
+  "url": "http://127.0.0.1:5180/?validation=1&validation-seconds=60&validation-warmup=3",
+  "chrome": "headless=new, swiftshader, 1280x720 css px, deviceScaleFactor 1",
+  "atlas_mount_ms": 12070,
+  "total_ms": 138804,
+  "hold_ms_per_view": 6000,
+  "arrival": {
+    "shellPrimary": "world",
+    "statusSummaries": [
+      "Recorded rung 3; showing rung 3 from posed point maps."
+    ],
+    "statusReasons": [
+      [
+        "Rung 1 withheld: no reviewed splat receipt is available.",
+        "Rung 2 withheld: no physically validated scale receipt is available.",
+        "Rung 2 withheld: no measured coverage receipt is available.",
+        "Rung 2 withheld: no measured corridor receipt is available.",
+        "Pose gate: recovered camera translation is below the manifest threshold",
+        "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+        "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+      ]
+    ],
+    "statusWarnings": [
+      "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+    ],
+    "panelVisible": false,
+    "inspectorHidden": true,
+    "inspectorTitle": "Reconstruction views",
+    "inspectorView": null,
+    "inspectorSelected": null,
+    "inspectorState": "",
+    "inspectorViewCount": 0,
+    "loadingVisible": false
+  },
+  "has_inspect_reconstruction": true,
+  "traversal": [
+    {
+      "name": "first-camera",
+      "index": 0,
+      "label": "Source camera 1",
+      "state": "Recovered source camera using the point-map field-of-view estimate.",
+      "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5"
+    },
+    {
+      "name": "midpoint-after-first",
+      "index": 1,
+      "label": "Between cameras 1 and 2",
+      "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+      "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c"
+    },
+    {
+      "name": "central-camera",
+      "index": 38,
+      "label": "Source camera 20",
+      "state": "Recovered source camera using the point-map field-of-view estimate.",
+      "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639"
+    },
+    {
+      "name": "midpoint-after-central",
+      "index": 39,
+      "label": "Between cameras 20 and 21",
+      "state": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+      "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd"
+    },
+    {
+      "name": "last-camera",
+      "index": 74,
+      "label": "Source camera 38",
+      "state": "Recovered source camera using the point-map field-of-view estimate.",
+      "view_id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0"
+    }
+  ],
+  "captures": [
+    {
+      "name": "arrival",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-arrival.jpg",
+      "at_ms": 17377,
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": true,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": null,
+      "inspectorSelected": null,
+      "inspectorState": "",
+      "inspectorViewCount": 0,
+      "loadingVisible": false
+    },
+    {
+      "name": "status-expanded",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-status-expanded.jpg",
+      "at_ms": 17933,
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": true,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": null,
+      "inspectorSelected": null,
+      "inspectorState": "",
+      "inspectorViewCount": 0,
+      "loadingVisible": false
+    },
+    {
+      "name": "first-camera",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-first-camera.jpg",
+      "at_ms": 40775,
+      "option_index": 0,
+      "option_label": "Source camera 1",
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": false,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5",
+      "inspectorSelected": "Source camera 1",
+      "inspectorState": "Recovered source camera using the point-map field-of-view estimate.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    },
+    {
+      "name": "midpoint-after-first",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-midpoint-after-first.jpg",
+      "at_ms": 65343,
+      "option_index": 1,
+      "option_label": "Between cameras 1 and 2",
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": false,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c",
+      "inspectorSelected": "Between cameras 1 and 2",
+      "inspectorState": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    },
+    {
+      "name": "central-camera",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-central-camera.jpg",
+      "at_ms": 84028,
+      "option_index": 38,
+      "option_label": "Source camera 20",
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": false,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639",
+      "inspectorSelected": "Source camera 20",
+      "inspectorState": "Recovered source camera using the point-map field-of-view estimate.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    },
+    {
+      "name": "midpoint-after-central",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-midpoint-after-central.jpg",
+      "at_ms": 105529,
+      "option_index": 39,
+      "option_label": "Between cameras 20 and 21",
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": false,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-77e5-77b8-a265-a203efb50cb3:01a0722b-781b-7a94-a7b1-29fcbf71c8dd",
+      "inspectorSelected": "Between cameras 20 and 21",
+      "inspectorState": "Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    },
+    {
+      "name": "last-camera",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-last-camera.jpg",
+      "at_ms": 129693,
+      "option_index": 74,
+      "option_label": "Source camera 38",
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": false,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0",
+      "inspectorSelected": "Source camera 38",
+      "inspectorState": "Recovered source camera using the point-map field-of-view estimate.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    },
+    {
+      "name": "after-return",
+      "file": "docs/evaluation/artifacts/2026-09-05-bowl-reconstruction/bowl-group-displayframe-after-return.jpg",
+      "at_ms": 138802,
+      "shellPrimary": "world",
+      "statusSummaries": [
+        "Recorded rung 3; showing rung 3 from posed point maps."
+      ],
+      "statusReasons": [
+        [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available.",
+          "Pose gate: recovered camera translation is below the manifest threshold",
+          "Some posed point maps are unavailable; the remaining verified maps are displayed.",
+          "Displayed upright at 0.159× nonmetric exhibit scale, with the recovered cameras at eye height."
+        ]
+      ],
+      "statusWarnings": [
+        "Reconstruction has no region: 11 reconstructions. This photograph has a reconstruction and no region in this world to draw it in."
+      ],
+      "panelVisible": false,
+      "inspectorHidden": true,
+      "inspectorTitle": "Reconstruction views",
+      "inspectorView": "52ec40fd-4b9d-5898-b897-41107e240332:camera:7182b164-9bad-58a1-86b2-e5d5ee3619f0",
+      "inspectorSelected": "Source camera 38",
+      "inspectorState": "Recovered source camera using the point-map field-of-view estimate.",
+      "inspectorViewCount": 75,
+      "loadingVisible": false
+    }
+  ],
+  "console_errors": [],
+  "console_warnings": [],
+  "browser_validation_report": {
+    "profile": "exulanica.browser-reconstruction-validation/v1",
+    "measured_at": "2026-09-05T18:36:31.289Z",
+    "measurement": {
+      "driver": "requestAnimationFrame",
+      "warmup_seconds": 3,
+      "duration_seconds": 60,
+      "first_meaningful_render_ms": 11847.1,
+      "time_to_full_detail_ms": null,
+      "geometry_load_ms": 900.5,
+      "frames": 152,
+      "frameMeanMs": 414.35,
+      "frameP50Ms": 16.7,
+      "frameP95Ms": 3099.9,
+      "frameP99Ms": 3399.8,
+      "framesOver16_7Ms": 105,
+      "frameOver16_7Fraction": 0.690789,
+      "fpsP1Low": 0.29,
+      "hidden_during_run": false,
+      "camera_segments": [
+        {
+          "id": "atlas-navigation",
+          "kind": "atlas-navigation",
+          "position": [
+            183.53785876239348,
+            2.848079525261089,
+            0.32440076018216
+          ],
+          "forward": [
+            0.3575106082529138,
+            -0.804281438757941,
+            -0.47467623940543724
+          ],
+          "up": null,
+          "fovYDeg": 70,
+          "sourceAspect": null,
+          "artifactIds": [],
+          "captureIds": [],
+          "poseReceiptSha256": null,
+          "projection": null,
+          "calibration": null,
+          "frames": 118,
+          "frameMeanMs": 25.56,
+          "frameP50Ms": 16.7,
+          "frameP95Ms": 50,
+          "frameP99Ms": 83.4,
+          "framesOver16_7Ms": 80,
+          "frameOver16_7Fraction": 0.677966,
+          "fpsP1Low": 11.99
+        },
+        {
+          "id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:48e09af1-a2ae-5947-9283-9e638ee81ee5",
+          "kind": "source-camera",
+          "position": [
+            183.53785876239348,
+            1.760192715265104,
+            0.32440076018216
+          ],
+          "forward": [
+            0.3575106082529137,
+            -0.804281438757941,
+            -0.4746762394054372
+          ],
+          "up": [
+            0.20114671502646664,
+            0.5626524051034845,
+            -0.8018492813897921
+          ],
+          "fovYDeg": 58.67972817304736,
+          "sourceAspect": 0.75,
+          "artifactIds": [
+            "48e09af1-a2ae-5947-9283-9e638ee81ee5"
+          ],
+          "captureIds": [
+            "01a0722b-6fe5-7e98-a7f6-27192462c8a5"
+          ],
+          "poseReceiptSha256": null,
+          "projection": "opm-estimate",
+          "calibration": null,
+          "frames": 19,
+          "frameMeanMs": 1202.59,
+          "frameP50Ms": 16.8,
+          "frameP95Ms": 3283.2,
+          "frameP99Ms": 3749.8,
+          "framesOver16_7Ms": 14,
+          "frameOver16_7Fraction": 0.736842,
+          "fpsP1Low": 0.27
+        },
+        {
+          "id": "52ec40fd-4b9d-5898-b897-41107e240332:midpoint:01a0722b-6fe5-7e98-a7f6-27192462c8a5:01a0722b-703d-705c-95c1-20636c25e36c",
+          "kind": "between-cameras",
+          "position": [
+            183.67530227813333,
+            1.7564537120504293,
+            0.34269182138853926
+          ],
+          "forward": [
+            0.1981121047400379,
+            -0.8411346732333614,
+            -0.5032335992758018
+          ],
+          "up": [
+            0.07631779950115536,
+            0.5250881570539264,
+            -0.8476190304618063
+          ],
+          "fovYDeg": 61.29918520241596,
+          "sourceAspect": 0.75,
+          "artifactIds": [
+            "48e09af1-a2ae-5947-9283-9e638ee81ee5",
+            "7d0d7a51-9365-5e88-bb93-9503fec3cf65"
+          ],
+          "captureIds": [
+            "01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+            "01a0722b-703d-705c-95c1-20636c25e36c"
+          ],
+          "poseReceiptSha256": null,
+          "projection": "interpolated",
+          "calibration": null,
+          "frames": 10,
+          "frameMeanMs": 2454.89,
+          "frameP50Ms": 3049.9,
+          "frameP95Ms": 3316.5,
+          "frameP99Ms": 3316.5,
+          "framesOver16_7Ms": 8,
+          "frameOver16_7Fraction": 0.8,
+          "fpsP1Low": 0.3
+        },
+        {
+          "id": "52ec40fd-4b9d-5898-b897-41107e240332:camera:6fa8cdd4-b673-5848-9d28-7181d108d639",
+          "kind": "source-camera",
+          "position": [
+            183.74649576025968,
+            1.453679308215481,
+            -0.7095727698842065
+          ],
+          "forward": [
+            0.07225336934748144,
+            -0.48341755741919484,
+            0.8724029549450161
+          ],
+          "up": [
+            -0.007124136171255761,
+            0.8744166664246882,
+            0.4851234277609658
+          ],
+          "fovYDeg": 60.53606665154778,
+          "sourceAspect": 0.75,
+          "artifactIds": [
+            "6fa8cdd4-b673-5848-9d28-7181d108d639"
+          ],
+          "captureIds": [
+            "01a0722b-77e5-77b8-a265-a203efb50cb3"
+          ],
+          "poseReceiptSha256": null,
+          "projection": "opm-estimate",
+          "calibration": null,
+          "frames": 5,
+          "frameMeanMs": 2513.24,
+          "frameP50Ms": 3049.9,
+          "frameP95Ms": 6083.1,
+          "frameP99Ms": 6083.1,
+          "framesOver16_7Ms": 3,
+          "frameOver16_7Fraction": 0.6,
+          "fpsP1Low": 0.16
+        }
+      ]
+    },
+    "runtime": {
+      "browser_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+      "platform": "MacIntel",
+      "logical_cpu_count": 12,
+      "device_memory_gb": 16,
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "engine": "PlayCanvas 2.21.4",
+      "viewport_css_px": [
+        1280,
+        720
+      ],
+      "canvas_px": [
+        1280,
+        720
+      ],
+      "device_pixel_ratio": 1,
+      "peak_js_heap_mb": 173.16
+    },
+    "scene": {
+      "scene_id": "52ec40fd-4b9d-5898-b897-41107e240332",
+      "member_count": 40,
+      "registered_member_count": 40,
+      "excluded_member_count": 0,
+      "recorded_rung": 3,
+      "displayed_rung": 3,
+      "rendering_substrate": "posed_point_maps",
+      "withholding_reasons": [
+        "Rung 1 withheld: no reviewed splat receipt is available.",
+        "Rung 2 withheld: no physically validated scale receipt is available.",
+        "Rung 2 withheld: no measured coverage receipt is available.",
+        "Rung 2 withheld: no measured corridor receipt is available.",
+        "Pose gate: recovered camera translation is below the manifest threshold",
+        "Some posed point maps are unavailable; the remaining verified maps are displayed."
+      ],
+      "pose_receipt_sha256": "2976a64d54ecb4e8dc8d53533b84e38cb4996176efb7655f96b60ded982cb883",
+      "placement_receipt_sha256": "ccd99741fe41190a453c205e31245335725f061778ceb4014afb83a4c94e3e74"
+    },
+    "geometry": {
+      "placed_point_map_count": 38,
+      "uploaded_point_map_count": 38,
+      "uploaded_point_count": 7418047,
+      "loaded_trained_scene_count": 0,
+      "loaded_gaussian_count": 0,
+      "trained_scene_failures": [],
+      "authenticated_network_bytes": 148411388,
+      "artifact_sizes": [
+        3911528,
+        3912768,
+        3914028,
+        3905988,
+        3910908,
+        3920308,
+        3931608,
+        3916448,
+        3903788,
+        3911788,
+        3915768,
+        3927388,
+        3933472,
+        3903428,
+        3902488,
+        3901988,
+        3900128,
+        3913468,
+        3905828,
+        3901688,
+        3882428,
+        3893588,
+        3904768,
+        3925988,
+        3931208,
+        3926568,
+        3922428,
+        3912568,
+        3909728,
+        3882148,
+        3875168,
+        3882128,
+        3888668,
+        3892788,
+        3889948,
+        3888488,
+        3881328,
+        3876648
+      ],
+      "loads": [
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+          "artifactId": "48e09af1-a2ae-5947-9283-9e638ee81ee5",
+          "expectedBytes": 3911528,
+          "receivedBytes": 3911528,
+          "fetchMs": 30.5,
+          "verifyMs": 3.5999999046325684,
+          "decodeMs": 0.40000009536743164,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-703d-705c-95c1-20636c25e36c",
+          "artifactId": "7d0d7a51-9365-5e88-bb93-9503fec3cf65",
+          "expectedBytes": 3912768,
+          "receivedBytes": 3912768,
+          "fetchMs": 21.700000047683716,
+          "verifyMs": 2.0999999046325684,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-70ab-7653-a573-48abf12190c0",
+          "artifactId": "2888952e-c46a-5c5a-9b10-aa617d7fc8b6",
+          "expectedBytes": 3914028,
+          "receivedBytes": 3914028,
+          "fetchMs": 28.199999809265137,
+          "verifyMs": 2.200000047683716,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-711c-7e57-b17f-f170ce70db67",
+          "artifactId": "87c6852e-b8a6-5cc5-a120-2c2714e569cc",
+          "expectedBytes": 3905988,
+          "receivedBytes": 3905988,
+          "fetchMs": 20.59999990463257,
+          "verifyMs": 2.0999999046325684,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7164-7c8d-91b2-f6cdff7623e8",
+          "artifactId": "bad7242b-c50b-528b-981b-85387b98606e",
+          "expectedBytes": 3910908,
+          "receivedBytes": 3910908,
+          "fetchMs": 21.399999856948853,
+          "verifyMs": 2.1000001430511475,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-71a9-7640-ae0a-c98a74c8cef3",
+          "artifactId": "c9d75e74-c553-5a8c-84af-8bada057b713",
+          "expectedBytes": 3920308,
+          "receivedBytes": 3920308,
+          "fetchMs": 36.5,
+          "verifyMs": 2.200000047683716,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-71f7-7145-9744-0625f6cccb0b",
+          "artifactId": "d2684525-353c-5988-ac00-3deee613a751",
+          "expectedBytes": 3931608,
+          "receivedBytes": 3931608,
+          "fetchMs": 24.59999990463257,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7262-705b-8d4a-6761a4a7c97e",
+          "artifactId": "15374475-46f5-514e-bdf2-8aed199ddec1",
+          "expectedBytes": 3916448,
+          "receivedBytes": 3916448,
+          "fetchMs": 29.800000190734863,
+          "verifyMs": 2,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-72b2-7adf-bf4b-30b0b2d52119",
+          "artifactId": "260f7df0-e912-51bf-ac6d-4bff82eec875",
+          "expectedBytes": 3903788,
+          "receivedBytes": 3903788,
+          "fetchMs": 21.399999856948853,
+          "verifyMs": 1.9000000953674316,
+          "decodeMs": 0.2999999523162842,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7324-77e1-8041-67a23629b114",
+          "artifactId": "df9ef378-9cfe-5ef3-aed5-c6c19af34d46",
+          "expectedBytes": 3911788,
+          "receivedBytes": 3911788,
+          "fetchMs": 21.799999952316284,
+          "verifyMs": 1.9000000953674316,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-73fa-773f-a23a-09126f782ff4",
+          "artifactId": "1e4fb08c-0ed6-502b-8c57-bade917d8c12",
+          "expectedBytes": 3915768,
+          "receivedBytes": 3915768,
+          "fetchMs": 20.799999952316284,
+          "verifyMs": 2,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7437-7038-8b58-c670c2ca9f83",
+          "artifactId": "16e5fb66-7843-5eab-b576-3eb19267579a",
+          "expectedBytes": 3927388,
+          "receivedBytes": 3927388,
+          "fetchMs": 19.700000047683716,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7472-75c0-a577-f0a9df50bd3c",
+          "artifactId": "91c2f9fb-82d7-5aaa-bc8c-33e2a148f11f",
+          "expectedBytes": 3933472,
+          "receivedBytes": 3933472,
+          "fetchMs": 22.300000190734863,
+          "verifyMs": 1.6999998092651367,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-74a8-71e3-99d7-dc8c2cba5423",
+          "artifactId": "844ddc29-49ab-5c49-9e50-7b52a11f9721",
+          "expectedBytes": 3903428,
+          "receivedBytes": 3903428,
+          "fetchMs": 19.300000190734863,
+          "verifyMs": 1.8999998569488525,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7552-73c5-9a78-75c512dbe29f",
+          "artifactId": "9353f171-c46d-5c91-a7b0-6faf698e922d",
+          "expectedBytes": 3902488,
+          "receivedBytes": 3902488,
+          "fetchMs": 20.5,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7585-72d5-8349-ad30f509b716",
+          "artifactId": "615b55f7-26bd-5d98-a843-9347aae1b3da",
+          "expectedBytes": 3901988,
+          "receivedBytes": 3901988,
+          "fetchMs": 22.300000190734863,
+          "verifyMs": 2.299999952316284,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7615-7ca4-88a1-b6feac1d4100",
+          "artifactId": "022b928d-c0e2-526e-a8e5-9c7a277bbcd2",
+          "expectedBytes": 3900128,
+          "receivedBytes": 3900128,
+          "fetchMs": 21.59999990463257,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-76db-7294-bc02-89f8f50a2958",
+          "artifactId": "f196cb53-a19f-508a-b61c-bae95df30eb1",
+          "expectedBytes": 3913468,
+          "receivedBytes": 3913468,
+          "fetchMs": 19.90000009536743,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-77a0-7dee-b4b1-31afd4f9dafb",
+          "artifactId": "3a75d62a-642e-576b-9928-b9fa8161a206",
+          "expectedBytes": 3905828,
+          "receivedBytes": 3905828,
+          "fetchMs": 25.799999952316284,
+          "verifyMs": 2.0999999046325684,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-77e5-77b8-a265-a203efb50cb3",
+          "artifactId": "6fa8cdd4-b673-5848-9d28-7181d108d639",
+          "expectedBytes": 3901688,
+          "receivedBytes": 3901688,
+          "fetchMs": 19.09999990463257,
+          "verifyMs": 2,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-781b-7a94-a7b1-29fcbf71c8dd",
+          "artifactId": "8926a380-5772-5334-8e33-e8a9d81f0c2e",
+          "expectedBytes": 3882428,
+          "receivedBytes": 3882428,
+          "fetchMs": 15.799999952316284,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-784f-767c-86c3-e5093ded07f7",
+          "artifactId": "595fa0d8-289c-52e3-9f14-2ea56a47dc0d",
+          "expectedBytes": 3893588,
+          "receivedBytes": 3893588,
+          "fetchMs": 15.900000095367432,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-787d-7cc4-89a5-dc31943322d4",
+          "artifactId": "56110e4b-d101-5f88-a912-2b50e7f3080e",
+          "expectedBytes": 3904768,
+          "receivedBytes": 3904768,
+          "fetchMs": 15.600000143051147,
+          "verifyMs": 1.5,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-78b4-7099-b6cd-7413c8d49803",
+          "artifactId": "814b43ca-f171-5885-9d1e-2539fd84380a",
+          "expectedBytes": 3925988,
+          "receivedBytes": 3925988,
+          "fetchMs": 16.200000047683716,
+          "verifyMs": 1.8999998569488525,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-78ec-788c-b4a5-ae49886e69f0",
+          "artifactId": "bfbcf775-0bb9-5310-9289-6a05b379b02d",
+          "expectedBytes": 3931208,
+          "receivedBytes": 3931208,
+          "fetchMs": 14,
+          "verifyMs": 2,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7920-70c1-a481-1f54d2d7f850",
+          "artifactId": "b459a116-ef50-5c0c-8cbb-a852b4b06a39",
+          "expectedBytes": 3926568,
+          "receivedBytes": 3926568,
+          "fetchMs": 14.399999856948853,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7952-7a20-9cb9-7e81610e511a",
+          "artifactId": "81368c59-0270-5538-a92e-7cb8f9a88655",
+          "expectedBytes": 3922428,
+          "receivedBytes": 3922428,
+          "fetchMs": 13.799999952316284,
+          "verifyMs": 1.8999998569488525,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7988-750c-be9d-a4cd57bc348d",
+          "artifactId": "de9a73f9-1590-51bb-9cac-1c0645dd68f9",
+          "expectedBytes": 3912568,
+          "receivedBytes": 3912568,
+          "fetchMs": 17,
+          "verifyMs": 1.8999998569488525,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-79bc-7980-8d14-d9d7ee9693a9",
+          "artifactId": "7d4fbdd6-7014-5ab7-af99-3a41a5bee858",
+          "expectedBytes": 3909728,
+          "receivedBytes": 3909728,
+          "fetchMs": 15.599999904632568,
+          "verifyMs": 1.9000000953674316,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-79ed-7f68-98b5-dae5c5667830",
+          "artifactId": "57ba0539-536c-5472-8648-423fbaa491bf",
+          "expectedBytes": 3882148,
+          "receivedBytes": 3882148,
+          "fetchMs": 17.799999952316284,
+          "verifyMs": 2,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7a24-7d6b-b19a-b129fb7b566f",
+          "artifactId": "385d3f26-17dc-5ee7-8910-f41569f07a67",
+          "expectedBytes": 3875168,
+          "receivedBytes": 3875168,
+          "fetchMs": 20.800000190734863,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7a56-7f6a-b583-0ff69cd80e1c",
+          "artifactId": "693ff628-900c-5391-9eba-9c7ced02c6fd",
+          "expectedBytes": 3882128,
+          "receivedBytes": 3882128,
+          "fetchMs": 32.700000047683716,
+          "verifyMs": 2,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7a8c-7232-820f-be018e4b521c",
+          "artifactId": "59dcb370-321f-5070-b88f-cd38ce2ee573",
+          "expectedBytes": 3888668,
+          "receivedBytes": 3888668,
+          "fetchMs": 22,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.09999990463256836,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7abb-79a6-bc84-b73b07b1cdea",
+          "artifactId": "412ea8d4-3de3-5420-827c-36fddf0b8e68",
+          "expectedBytes": 3892788,
+          "receivedBytes": 3892788,
+          "fetchMs": 20.799999952316284,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7ae9-7d5b-9ed6-383fdb18ab6f",
+          "artifactId": "c32dc1ca-7318-5a99-9f93-86bab1961b0f",
+          "expectedBytes": 3889948,
+          "receivedBytes": 3889948,
+          "fetchMs": 21.09999990463257,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7b20-7d3d-9d19-1e46c2218e5c",
+          "artifactId": "224237a1-ca2b-5421-894b-815bfee36c6b",
+          "expectedBytes": 3888488,
+          "receivedBytes": 3888488,
+          "fetchMs": 25.09999990463257,
+          "verifyMs": 1.7999999523162842,
+          "decodeMs": 0.10000014305114746,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7b62-7647-8fcb-84caefa1ee9a",
+          "artifactId": "d2cf8adb-7d57-5f01-8ae3-9c905e98f54a",
+          "expectedBytes": 3881328,
+          "receivedBytes": 3881328,
+          "fetchMs": 25.199999809265137,
+          "verifyMs": 1.9000000953674316,
+          "decodeMs": 0,
+          "reused": false
+        },
+        {
+          "sceneId": "52ec40fd-4b9d-5898-b897-41107e240332",
+          "captureId": "01a0722b-7bae-7417-9477-92ca3dea160b",
+          "artifactId": "7182b164-9bad-58a1-86b2-e5d5ee3619f0",
+          "expectedBytes": 3876648,
+          "receivedBytes": 3876648,
+          "fetchMs": 18.59999990463257,
+          "verifyMs": 1.7000000476837158,
+          "decodeMs": 0,
+          "reused": false
+        }
+      ],
+      "issues": [
+        {
+          "captureId": "01a0722b-70e0-72de-a7c6-9075f43ad5d1",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-72ef-73d8-a9ad-ec2741a7d97d",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-7355-72ca-8975-9c88b6e59e90",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-7389-7b23-8ac0-f66abf251a4c",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-73bc-7468-b5a5-a5b9a31ec01a",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-74d6-7664-b8c0-81dd240c8f2a",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-74fd-7c7a-ba67-ada79207da2b",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-7524-7ef3-903b-53321a0929da",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-770f-78b7-9fdf-147bb4ffc169",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-7741-7e25-a07c-b5033e11f620",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        },
+        {
+          "captureId": "01a0722b-7771-7322-98d5-31547276ecb2",
+          "islandId": null,
+          "state": "no_region",
+          "reason": "This photograph has a reconstruction and no region in this world to draw it in."
+        }
+      ],
+      "placement_max_errors": [
+        0.0000017048401350674376,
+        0.0000016786186622165074,
+        0.0000019597966751653355,
+        0.000002220275831168354,
+        0.000007227684746841837,
+        0.0000018438907045557392,
+        6.552637513542103e-7,
+        0.0000035492355289678075,
+        0.000004009584024018768,
+        9.851650928108559e-7,
+        0.0000052757526261840275,
+        0.000002232157398124869,
+        0.000007006642238690467,
+        0.000002246965394385474,
+        0.0000061006821501528045,
+        0.0000052664988378514335,
+        0.0000037424050033133416,
+        0.0000031337358870577943,
+        0.000004740683625288705,
+        0.000005323361078652284,
+        0.0000010603107868164534,
+        0.000003422454252649174,
+        0.0000050371030312763175,
+        0.0000018413420591346544,
+        0.000004566123943054718,
+        0.0000015635196535345502,
+        0.000004582918007296208,
+        0.000003373120972371103,
+        0.000006673738702118574,
+        0.000002808282901720833,
+        0.000006999840691908939,
+        0.000007324349067465596,
+        0.0000046034368646997345,
+        0.000003464552647166571,
+        0.0000011612966989285735,
+        0.0000064930060377420535,
+        0.000004303576615766181,
+        0.0000057595600606058745
+      ]
+    },
+    "network": {
+      "transfer_bytes": 229718388,
+      "decoded_body_bytes": 229643388,
+      "resource_count": 250
+    },
+    "renderer": {
+      "max_draw_calls": 86,
+      "gpu_error": 0,
+      "draw_submission_valid": true
+    },
+    "limitations": [
+      "This local browser measurement is not representative of the eventual production host.",
+      "Peak JavaScript heap is null when the browser does not expose performance.memory.",
+      "Resource transfer bytes follow the browser Resource Timing accounting convention.",
+      "Uploaded point counts and draw submissions are not evidence of visible pixels or reconstruction quality.",
+      "Time to full detail is unmeasured; the first presented frame may contain authored world geometry only.",
+      "Inspection preserves source vertical field of view; horizontal coverage follows the recorded canvas aspect ratio."
+    ]
+  }
+}

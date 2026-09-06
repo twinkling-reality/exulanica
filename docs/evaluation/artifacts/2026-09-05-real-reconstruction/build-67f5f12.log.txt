@@ -1,0 +1,4 @@
+#18 naming to localhost:5000/exulanica-scene-worker:67f5f12 done
+GSPLAT_DIGEST=localhost:5000/exulanica-gsplat@sha256:ae7fe94945adb8ba9125b5b9257a5fc580e842076aca7dd2cb779d7dfd4c73df
+WORKER_DIGEST=localhost:5000/exulanica-scene-worker@sha256:bfe73e5acbf0f89ef9d602036b2f724ab0d71dcb89581835cf39354a3a65abf6
+BUILD_DONE

@@ -1,0 +1,113 @@
+// Declared reconstruction traversal at 1280x720: arrival, first/central/last source cameras and the
+// midpoints beside them, return, plus the app's own opt-in browser measurement record.
+// Usage: node capture_reconstruction.mjs <label> <url> <outputDirectory> [holdSeconds=10]
+import { spawn } from 'node:child_process';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const [label, baseUrl, outDir, holdArg] = process.argv.slice(2);
+if (!label || !baseUrl || !outDir) throw new Error('usage: <label> <url> <outputDirectory> [holdSeconds]');
+const hold = Number(holdArg ?? 10) * 1000;
+mkdirSync(outDir, { recursive: true });
+const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}validation=1&validation-seconds=60&validation-warmup=3`;
+const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const profile = mkdtempSync(join(tmpdir(), 'orimera-capture-'));
+const gpuArgs = process.env.HEADLESS_GPU === '1' ? ['--use-angle=metal'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+const chrome = spawn(CHROME, [
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--window-size=1280,720', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+  ...gpuArgs, '--force-device-scale-factor=1', 'about:blank',
+], { stdio: ['ignore', 'ignore', 'pipe'] });
+const wsUrl = await new Promise((resolve, reject) => {
+  let buffer = '';
+  chrome.stderr.on('data', (chunk) => { buffer += chunk.toString(); const m = buffer.match(/DevTools listening on (ws:\/\/\S+)/); if (m) resolve(m[1]); });
+  chrome.on('exit', (code) => reject(new Error(`chrome exited ${code}\n${buffer}`)));
+  setTimeout(() => reject(new Error('chrome did not start')), 20000);
+});
+const ws = new WebSocket(wsUrl);
+await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+let nextId = 1; const pending = new Map(); const consoleMessages = []; let sessionId = null;
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.id !== undefined) { const e = pending.get(message.id); pending.delete(message.id); message.error ? e.reject(new Error(JSON.stringify(message.error))) : e.resolve(message.result); return; }
+  if (message.method === 'Runtime.consoleAPICalled') consoleMessages.push({ type: message.params.type, text: message.params.args.map((a) => a.value ?? a.description ?? a.type).join(' ').slice(0, 4000) });
+  else if (message.method === 'Runtime.exceptionThrown') consoleMessages.push({ type: 'exception', text: message.params.exceptionDetails.text + ' ' + (message.params.exceptionDetails.exception?.description ?? '') });
+};
+function send(method, params = {}, withSession = true) { const id = nextId++; const payload = { id, method, params }; if (withSession && sessionId) payload.sessionId = sessionId; ws.send(JSON.stringify(payload)); return new Promise((resolve, reject) => pending.set(id, { resolve, reject })); }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function evaluate(expression) { const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.text + ' ' + JSON.stringify(r.exceptionDetails.exception)); return r.result.value; }
+async function waitFor(expression, timeoutMs, description) { const s = Date.now(); while (Date.now() - s < timeoutMs) { if (await evaluate(expression)) return Date.now() - s; await sleep(250); } throw new Error(`timeout waiting for ${description}`); }
+const STATE = `(() => {
+  const inspector = document.querySelector('.reconstruction-inspector');
+  const shell = document.getElementById('shell');
+  const details = [...document.querySelectorAll('footer.status details.reconstruction-rung')];
+  return {
+    shellPrimary: shell?.getAttribute('data-primary') ?? null,
+    statusSummaries: details.map((d) => d.querySelector('summary')?.textContent ?? ''),
+    statusReasons: details.map((d) => [...d.querySelectorAll('li')].map((li) => li.textContent)),
+    statusWarnings: [...document.querySelectorAll('footer.status .status-warning')].map((s) => s.textContent),
+    panelVisible: (() => { const p = document.querySelector('.reconstruction-availability'); return p !== null && getComputedStyle(p).display !== 'none'; })(),
+    inspectorHidden: inspector?.hidden ?? null,
+    inspectorTitle: inspector?.querySelector('h2')?.textContent ?? null,
+    inspectorView: inspector?.dataset.viewId ?? null,
+    inspectorSelected: inspector?.querySelector('select')?.selectedOptions[0]?.textContent ?? null,
+    inspectorState: inspector?.querySelector('[role=status]')?.textContent ?? null,
+    inspectorViewCount: inspector?.querySelector('select')?.options.length ?? null,
+    loadingVisible: [...document.querySelectorAll('.reconstruction-loading')].some((n) => n.isConnected),
+  };
+})()`;
+const captures = [];
+async function screenshot(name, extra = {}) {
+  const { data } = await send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
+  const file = join(outDir, `${label}-${name}.jpg`);
+  writeFileSync(file, Buffer.from(data, 'base64'));
+  const state = await evaluate(STATE);
+  captures.push({ name, file, at_ms: Date.now() - started, ...extra, ...state });
+  return state;
+}
+let started = Date.now();
+try {
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' }, false);
+  ({ sessionId } = await send('Target.attachToTarget', { targetId, flatten: true }, false));
+  await send('Page.enable'); await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  started = Date.now();
+  await send('Page.navigate', { url });
+  const mountMs = await waitFor(`document.querySelector('canvas')?.dataset.companionRenderer === 'svg'`, 180000, 'Atlas mount');
+  // Give trained geometry or point maps time to finish decoding before judging the arrival frame.
+  await waitFor(`!document.querySelector('.reconstruction-loading')`, 180000, 'geometry loading state to clear');
+  await sleep(5000);
+  const arrival = await screenshot('arrival');
+  const hasInspect = await evaluate(`[...document.querySelectorAll('footer.status details.reconstruction-rung button')].some((b) => b.textContent === 'Inspect reconstruction')`);
+  const views = [];
+  if (hasInspect) {
+    await evaluate(`(() => { const d = [...document.querySelectorAll('footer.status details.reconstruction-rung')].find((d) => [...d.querelectorAll?.('button') ?? d.querySelectorAll('button')].some((b) => b.textContent === 'Inspect reconstruction')); d.open = true; })()`);
+    await sleep(300);
+    await screenshot('status-expanded');
+    await evaluate(`[...document.querySelectorAll('footer.status details.reconstruction-rung button')].find((b) => b.textContent === 'Inspect reconstruction').click()`);
+    await waitFor(`(() => { const i = document.querySelector('.reconstruction-inspector'); return i && !i.hidden && i.querySelector('select')?.options.length > 0; })()`, 30000, 'inspector');
+    const options = await evaluate(`[...document.querySelector('.reconstruction-inspector select').options].map((o) => o.textContent)`);
+    const sourceIdx = options.map((o, i) => [o, i]).filter(([o]) => o.startsWith('Source camera')).map(([, i]) => i);
+    const first = sourceIdx[0], last = sourceIdx.at(-1), central = sourceIdx[Math.floor(sourceIdx.length / 2)];
+    const after = (i) => (i + 1 < options.length && options[i + 1].startsWith('Between') ? i + 1 : null);
+    const plan = [['first-camera', first], ['midpoint-after-first', after(first)], ['central-camera', central], ['midpoint-after-central', after(central)], ['last-camera', last]].filter(([, i]) => i !== null && i !== undefined);
+    for (const [name, index] of plan) {
+      await evaluate(`(() => { const s = document.querySelector('.reconstruction-inspector select'); s.selectedIndex = ${index}; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await sleep(hold);
+      const state = await screenshot(name, { option_index: index, option_label: options[index] });
+      views.push({ name, index, label: options[index], state: state.inspectorState, view_id: state.inspectorView });
+    }
+    await evaluate(`[...document.querySelectorAll('.reconstruction-inspector button')].find((b) => b.textContent === 'Return to Atlas')?.click()`);
+    await sleep(1500);
+    await screenshot('after-return');
+  }
+  const reportMs = await waitFor(`document.getElementById('exulanica-browser-validation-report') !== null`, 120000, 'browser validation report').catch(() => null);
+  const report = reportMs === null ? null : JSON.parse(await evaluate(`document.getElementById('exulanica-browser-validation-report').textContent`));
+  const summary = { label, url, chrome: `headless=new, ${process.env.HEADLESS_GPU === '1' ? 'ANGLE metal' : 'swiftshader'}, 1280x720 css px, deviceScaleFactor 1`, atlas_mount_ms: mountMs, total_ms: Date.now() - started, hold_ms_per_view: hold,
+    arrival, has_inspect_reconstruction: hasInspect, traversal: views, captures,
+    console_errors: consoleMessages.filter((m) => m.type === 'error' || m.type === 'exception'), console_warnings: consoleMessages.filter((m) => m.type === 'warning'),
+    browser_validation_report: report };
+  writeFileSync(join(outDir, `${label}-reconstruction-capture.json`), JSON.stringify(summary, null, 2) + '\n');
+  console.log(JSON.stringify({ mountMs, hasInspect, views: views.map((v) => v.label), statusSummaries: arrival.statusSummaries, reasons: arrival.statusReasons, errors: summary.console_errors.length, report: report === null ? null : { fmr_ms: report.measurement?.first_meaningful_render_ms, p99_ms: report.measurement?.frame_time_p99_ms ?? report.measurement?.p99_ms, gaussians: report.geometry?.loaded_gaussian_count, points: report.geometry?.uploaded_point_count } }, null, 2));
+} finally { ws.close(); chrome.kill('SIGTERM'); await sleep(500); rmSync(profile, { recursive: true, force: true }); }

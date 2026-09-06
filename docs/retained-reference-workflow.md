@@ -1,10 +1,16 @@
 # Retained photographic references — 2026-09-05
 
-**The requested strong reconstructed baseline is not established.** Two real, CC0 photographic
-collections are retained and viewable through ordinary Atlas source/evidence delivery. Their
-reconstruction privacy reviews are unanswered, and this Apple M3 Pro host has no CUDA device.
-No trained real scene, held-out image score, physical-scale result, GPU bill, or reconstructed
-walkthrough is claimed. Source-only browser screenshots are evidence of fallback UX only.
+**A real trained reconstruction is established for one collection and refused for the other.**
+EXECUTED 2026-09-05/06: both retained CC0 collections went through admission with a named human
+screening statement, depth, COLMAP pose, correspondence placement and publication as rung-3
+point-map scenes, and both were trained on a rented NVIDIA L40S. The 51-photograph bowl is a
+delivered Gaussian scene (held-out PSNR 25.28 dB, SSIM 0.896, LPIPS 0.309, coverage 0.983 over 7
+views; 15.3 MB browser asset) traversed at 60 fps in ordinary Atlas with its measured quality on
+screen. The 210-photograph volcanic set trained twice and was refused on measured coverage (0.73
+and 0.63 against 0.75) because the rock was turned over against different backdrops; its
+point-map scene stands. Nothing here claims physical scale; both recorded rungs remain 3. The
+digest-bound outcome is `evaluation/2026-09-05-real-reconstruction.json`; the earlier statement
+that no baseline existed is superseded, and its record remains as history.
 
 ## What is retained
 
@@ -266,6 +272,14 @@ with the existing package commands. The final evaluation record records actual r
 limitations, including any unrelated in-flight failures.
 
 ## Retained verification outcome
+
+The [real reconstruction record](evaluation/2026-09-05-real-reconstruction.json) (2026-09-06)
+supersedes the paragraphs below for reconstruction claims. It binds the four bowl training
+requests and their outcomes, the two volcanic runs and their measured refusals, the GPU-timed
+Atlas captures and walkthrough of the delivered bowl scene, the held-out photograph-beside-render
+comparisons, the seventeen defects the real runs found with their fixing commits and controls, the
+serialized backend and web verification logs, and the spend against the prepaid balance. The
+paragraphs below describe the state before any real reconstruction ran.
 
 The [digest-bound progress record](evaluation/2026-09-05-retained-reference-progress.json)
 binds the frozen inputs, exact code, companion control records, source-state audit and screenshots.

@@ -1,0 +1,52 @@
+// Repeatable camera-register walkthrough: every recovered source camera in member order, plus the
+// midpoint after each, captured at 1280x720 from the live app. Frames feed a retained GIF.
+// Usage: HEADLESS_GPU=1 node capture_walkthrough.mjs <label> <url> <outputDirectory> [holdMs=1200] [maxViews]
+import { spawn } from 'node:child_process';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const [label, url, outDir, holdArg, maxArg] = process.argv.slice(2);
+if (!label || !url || !outDir) throw new Error('usage: <label> <url> <outputDirectory> [holdMs] [maxViews]');
+const hold = Number(holdArg ?? 1200); const maxViews = maxArg ? Number(maxArg) : Infinity;
+mkdirSync(outDir, { recursive: true });
+const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const profile = mkdtempSync(join(tmpdir(), 'orimera-walk-'));
+const gpuArgs = process.env.HEADLESS_GPU === '1' ? ['--use-angle=metal'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=1280,720', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', ...gpuArgs, '--force-device-scale-factor=1', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+const wsUrl = await new Promise((resolve, reject) => { let b = ''; chrome.stderr.on('data', (c) => { b += c.toString(); const m = b.match(/DevTools listening on (ws:\/\/\S+)/); if (m) resolve(m[1]); }); chrome.on('exit', (code) => reject(new Error(`chrome exited ${code}\n${b}`))); setTimeout(() => reject(new Error('chrome did not start')), 20000); });
+const ws = new WebSocket(wsUrl); await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+let nextId = 1; const pending = new Map(); let sessionId = null; const errors = [];
+ws.onmessage = (event) => { const m = JSON.parse(event.data); if (m.id !== undefined) { const e = pending.get(m.id); pending.delete(m.id); m.error ? e.reject(new Error(JSON.stringify(m.error))) : e.resolve(m.result); return; } if (m.method === 'Runtime.exceptionThrown' || (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error')) errors.push(m.method); };
+function send(method, params = {}, withSession = true) { const id = nextId++; const p = { id, method, params }; if (withSession && sessionId) p.sessionId = sessionId; ws.send(JSON.stringify(p)); return new Promise((res, rej) => pending.set(id, { resolve: res, reject: rej })); }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function evaluate(expression) { const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.text); return r.result.value; }
+async function waitFor(expression, timeoutMs, what) { const s = Date.now(); while (Date.now() - s < timeoutMs) { if (await evaluate(expression)) return; await sleep(250); } throw new Error(`timeout waiting for ${what}`); }
+const frames = [];
+async function frame(name, meta) { const { data } = await send('Page.captureScreenshot', { format: 'jpeg', quality: 85 }); const file = join(outDir, `${label}-${String(frames.length).padStart(3, '0')}-${name}.jpg`); writeFileSync(file, Buffer.from(data, 'base64')); frames.push({ file, ...meta }); }
+try {
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' }, false);
+  ({ sessionId } = await send('Target.attachToTarget', { targetId, flatten: true }, false));
+  await send('Page.enable'); await send('Runtime.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await send('Page.navigate', { url });
+  await waitFor(`document.querySelector('canvas')?.dataset.companionRenderer === 'svg'`, 180000, 'Atlas mount');
+  await waitFor(`!document.querySelector('.reconstruction-loading')`, 180000, 'geometry loading');
+  await sleep(4000);
+  await frame('arrival', { label: 'Arrival' });
+  await evaluate(`(() => { const d = [...document.querySelectorAll('footer.status details.reconstruction-rung')].find((d) => [...d.querySelectorAll('button')].some((b) => b.textContent === 'Inspect reconstruction')); if (d) d.open = true; })()`);
+  await evaluate(`[...document.querySelectorAll('footer.status details.reconstruction-rung button')].find((b) => b.textContent === 'Inspect reconstruction')?.click()`);
+  await waitFor(`(() => { const i = document.querySelector('.reconstruction-inspector'); return i && !i.hidden && i.querySelector('select')?.options.length > 0; })()`, 30000, 'inspector');
+  const options = await evaluate(`[...document.querySelector('.reconstruction-inspector select').options].map((o) => o.textContent)`);
+  const count = Math.min(options.length, maxViews);
+  for (let index = 0; index < count; index += 1) {
+    await evaluate(`(() => { const s = document.querySelector('.reconstruction-inspector select'); s.selectedIndex = ${index}; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await sleep(hold);
+    await frame(options[index].toLowerCase().replace(/[^a-z0-9]+/g, '-'), { label: options[index], index });
+  }
+  await evaluate(`[...document.querySelectorAll('.reconstruction-inspector button')].find((b) => b.textContent === 'Return to Atlas')?.click()`);
+  await sleep(1500);
+  await frame('return', { label: 'Return to Atlas' });
+  writeFileSync(join(outDir, `${label}-walkthrough.json`), JSON.stringify({ label, url, views: options.length, captured: frames.length, hold_ms: hold, errors: errors.length, frames }, null, 2) + '\n');
+  console.log(JSON.stringify({ views: options.length, captured: frames.length, errors: errors.length }));
+} finally { ws.close(); chrome.kill('SIGTERM'); await sleep(500); rmSync(profile, { recursive: true, force: true }); }

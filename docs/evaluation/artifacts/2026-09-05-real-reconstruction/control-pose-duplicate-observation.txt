@@ -1,0 +1,11 @@
+== mutation: remove same-image duplicate filtering in exulanica/reconstruction/pose.py (in place, restored via git checkout of commit 58721ee)
+mutated
+E         Use -v to get more diff
+
+tests/test_reconstruction_pose.py:257: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_reconstruction_pose.py::test_pose_receipt_drops_points_one_image_observes_twice
+1 failed, 8 deselected in 0.22s
+mutant exit=
+== restored
+9 passed in 0.04s

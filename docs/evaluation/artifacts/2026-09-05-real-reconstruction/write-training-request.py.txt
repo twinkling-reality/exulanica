@@ -1,0 +1,39 @@
+"""Write a canonical exulanica.scene-splat-request/v1 payload for a frozen reference collection."""
+import argparse, json
+from pathlib import Path
+from exulanica.ingest.scene_splat import SceneSplatRequest
+
+p = argparse.ArgumentParser()
+p.add_argument('--directory', type=Path, required=True)
+p.add_argument('--execution-image', required=True)
+p.add_argument('--requested-gpu', required=True)
+p.add_argument('--usd-per-gpu-hour-millionths', type=int, required=True)
+p.add_argument('--max-iterations', type=int, default=30000)
+p.add_argument('--checkpoint-every', type=int, default=2000)
+p.add_argument('--gaussian-cap', type=int, default=1_000_000)
+p.add_argument('--max-browser-bytes', type=int, default=96 * 1024 * 1024)
+a = p.parse_args()
+manifest = json.loads((a.directory / 'inputs.json').read_bytes())
+heldout = tuple(manifest['record']['evaluation_split']['heldout_sha256'])
+request = SceneSplatRequest(
+    execution_image=a.execution_image,
+    requested_gpu=a.requested_gpu,
+    dependency_inventory=('gsplat', 'torch', 'torchvision', 'torchmetrics', 'pycolmap'),
+    heldout_source_sha256=heldout,
+    max_iterations=a.max_iterations,
+    checkpoint_every=a.checkpoint_every,
+    gaussian_cap=a.gaussian_cap,
+    usd_per_gpu_hour_millionths=a.usd_per_gpu_hour_millionths,
+    # Proposed acceptance rules, frozen before any measurement; real held-out scores decide.
+    min_psnr_millionths=18_000_000,
+    min_ssim_millionths=600_000,
+    max_lpips_millionths=450_000,
+    max_floaters_fraction_millionths=150_000,
+    min_coverage_fraction_millionths=750_000,
+    max_browser_bytes=a.max_browser_bytes,
+)
+payload = request.as_payload()
+assert SceneSplatRequest.from_payload(payload) == request
+out = a.directory / 'training-request.json'
+out.write_text(json.dumps(payload, indent=2) + '\n')
+print(out, len(heldout), 'held-out hashes')
