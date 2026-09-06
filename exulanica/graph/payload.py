@@ -18,6 +18,7 @@ __all__ = [
     "EntityRow",
     "GraphPayload",
     "HistoryRow",
+    "MemberPersonRegionRow",
     "OccurrenceRow",
     "ProposalRow",
     "ReconstructionSceneMemberRow",
@@ -194,6 +195,29 @@ class SceneRecoveredCameraRow(BaseModel):
     projection: Literal["pinhole", "pinhole-approximation"]
 
 
+class MemberPersonRegionRow(BaseModel):
+    """One person in one photograph: their state, their outline, and never their pixels.
+
+    The outline is here and the pixels are not, which is the whole presentation rule in one
+    model. A masked region is drawn as a silhouette; the bytes behind it were replaced with
+    neutral fill before reconstruction ever read them, so there is nothing here for a client bug
+    to reveal.
+
+    ``display_name`` is null unless naming was consented AND somebody has actually been named.
+    Two separate conditions, because a person may consent to being named before anybody names
+    them, and a name that appeared without the first condition would be the exact failure the
+    three-consent split exists to prevent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    region_id: str
+    state: Literal["unknown", "present", "shown", "hidden", "withdrawn"]
+    silhouette_ppm: list[list[int]]
+    display_name: str | None
+    subject_id: uuid.UUID | None
+
+
 class ReconstructionSceneMemberRow(BaseModel):
     """One immutable member and its exact placement or explicit exclusion."""
 
@@ -204,6 +228,11 @@ class ReconstructionSceneMemberRow(BaseModel):
     registered: bool
     placement: ScenePointMapPlacementRow | None
     exclusion_reason: str | None
+    #: Deliberately without a default, following this file's rule. A member row assembled without
+    #: thinking about the people in it would report an unscreened photograph as having nobody in
+    #: it, which is the failure mode this whole feature exists to remove.
+    person_regions: list[MemberPersonRegionRow]
+    person_review_state: Literal["unscreened", "screened", "stale"]
     recovered_camera: SceneRecoveredCameraRow | None = None
 
 
@@ -262,6 +291,10 @@ class ReconstructionSceneRow(BaseModel):
     receipt_state: Literal["available", "missing", "invalid"]
     placement_state: Literal["available", "partial", "bytes_missing", "unavailable", "invalid"]
     rendering_substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"]
+    #: What the status line says out loud. Counted server-side rather than derived in the client,
+    #: so a client that failed to load the regions cannot report zero hidden people.
+    hidden_person_count: int
+    masked_member_count: int
     trained_geometry: SceneTrainedGeometryRow | None = None
     members: list[ReconstructionSceneMemberRow]
 
