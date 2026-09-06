@@ -39,6 +39,15 @@ import {
   type IslandId,
   type SceneDisplayFrame,
 } from '@exulanica/atlas-core';
+// A second atlas-core import, deliberately its own statement. Click-to-evidence's geometry is a
+// self-contained group, and keeping it apart from the block above leaves that block byte-identical
+// to the one the person-consent branch also edits.
+import {
+  canvasToSourcePixel,
+  observationSentence,
+  pickObservedPoint,
+  type PickCamera,
+} from '@exulanica/atlas-core';
 import {
   FACET_KEYS,
   confirmationFor,
@@ -100,6 +109,15 @@ import {
   MAP_ORIENTATION_CAPTION,
   type ReconstructionRungDisclosure,
 } from './ui/status.js';
+// Below the status import rather than beside it: the person-consent branch adds its own imports
+// at the top of this block, and two branches inserting into one sorted list conflict over nothing.
+import { proofLensIslandColors } from './ui/proof-lens.js';
+import {
+  ObservationsClient,
+  ObservationsUnavailable,
+  consentSentence,
+  type ObservationGraph,
+} from './observations-api.js';
 import { readPreferences, writePreferences, type AtlasPreferences } from './preferences.js';
 import {
   WorldStyleClient,
@@ -175,6 +193,20 @@ let notDrawnScenes_: ReadonlySet<string> = new Set();
 let displayFrames_: ReadonlyMap<string, SceneDisplayFrame> = new Map();
 /** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
 let heldPointMaps_: HeldPointMaps | undefined;
+
+/**
+ * Whether the proof lens is switched on, for this session only.
+ *
+ * Not a preference and not persisted. The lens is a way of looking at what is already on screen,
+ * and a stored one would change what a visitor sees on arrival on the strength of something they
+ * did once. It is also the reason this is a plain variable rather than renderer state: switching
+ * it writes one uniform per region and nothing else.
+ */
+let proofLensEnabled = false;
+/** One scene's recorded observation graph, cached for the session. See `observations-api.ts`. */
+let observationGraph_: ObservationGraph | null = null;
+let observationGraphSceneId_: string | null = null;
+let observationLoad_: Promise<void> | null = null;
 
 let worldStyles: WorldStyleClient | null = null;
 let worldStyleConnection: WorldStyleConnection | null = null;
@@ -1192,6 +1224,8 @@ async function mount(): Promise<void> {
     companionStage.setAppearance(companionAppearance());
     shell!.setAttribute('data-vignette', preferences.vignette);
     atlas?.binding.setTheme(theme);
+    // A new theme is a new palette, so a lit lens has to be re-resolved from it. Off stays off.
+    applyProofLens();
     atlas?.binding.setArtProfile(
       profile,
       'settings',
@@ -1214,9 +1248,241 @@ async function mount(): Promise<void> {
     }
   }
 
+  /*
+   * THE PROOF LENS AND CLICK-TO-EVIDENCE.
+   *
+   * Both live here, between the settings block and the inspector, because both need the graph,
+   * the theme and the binding at once and this is the only scope that holds all three. The
+   * person-consent branch edits neither of the two functions above or below, so this whole region
+   * is textually its own.
+   */
+
+  /** Which region draws which scene, as the regions themselves already decided. */
+  const islandOfScene = (sceneId: string): IslandId | undefined => {
+    const region = current.islands.find((island) => island.reconstructionSceneId === sceneId);
+    return region === undefined ? undefined : toIslandId(region.islandId);
+  };
+
+  /**
+   * Push the lens state at the renderer, and push nothing else.
+   *
+   * Every argument is read fresh: the disclosures the status panel is already showing, the region
+   * each scene resolved to, and the current theme. Nothing is stored, no scene is rebuilt, and the
+   * one call this makes writes four floats per region.
+   */
+  const applyProofLens = (): void => {
+    atlas?.binding.setProofLens(
+      proofLensEnabled
+        ? proofLensIslandColors(
+            reconstructionRungs,
+            islandOfScene,
+            themeForPreferences(preferences, systemAppearance.matches),
+          )
+        : null,
+    );
+  };
+
+  /**
+   * How far from the cursor, in screen pixels, a recorded point may be and still count as clicked.
+   *
+   * Expressed in screen pixels and converted to the photograph's own pixels per click, because the
+   * two are not the same scale: the inspector fits a 4080-pixel-tall original into a canvas around
+   * 700 pixels tall, so eight screen pixels is about forty-five source pixels. A tolerance typed
+   * in source pixels would be a different gesture on every display.
+   */
+  const PICK_TOLERANCE_CANVAS_PX = 8;
+  const PICK_OCCLUSION_BAND_CANVAS_PX = 2;
+
+  /** The raw recovered camera for one capture: the frame the observation graph is recorded in. */
+  const pickCameraFor = (sceneId: string, captureId: string): PickCamera | null => {
+    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
+    const camera = record?.members.find((member) => member.captureId === captureId)?.recoveredCamera;
+    if (camera == null) return null;
+    /*
+     * THE RAW TRANSFORM, NOT THE DISPLAYED ONE, and the difference is the whole correctness of
+     * this gesture. `geometry-api.ts` composes each scene's display frame into the cameras it
+     * hands the renderer, so the scene stands upright and at walking scale; the observation
+     * graph's world coordinates are the recovered COLMAP frame and are not composed with
+     * anything. Projecting one through the other would be a silent, plausible-looking error.
+     *
+     * Either pair would in fact agree, because a similarity applied to both a camera and a point
+     * cancels in the projection. Using the recorded pair is still the right choice: it is the one
+     * that stays correct if the display frame ever stops being a similarity, and it is the pair
+     * whose agreement was measured. Against this scene on 2026-09-06, reprojecting every retained
+     * observation of the first photograph through this transform reproduced COLMAP's own recorded
+     * pixel to a median of 2.8 px and a maximum of 9.9 px on a 3060x4080 original, which is the
+     * SIMPLE_RADIAL distortion that `pinhole-approximation` says it is dropping.
+     */
+    return {
+      sceneFromCameraRowMajor: camera.sceneFromCameraRowMajor,
+      calibration: camera.calibration,
+      projection: camera.projection,
+    };
+  };
+
+  /**
+   * Load the scene's recorded observation graph once, when the inspector opens on it.
+   *
+   * Started on open rather than on the first click so the answer is ready when a visitor asks:
+   * the real bowl scene's graph is about 53 MB of JSON. Cached by scene id for the session,
+   * because an accepted pose receipt is immutable and re-reading it could not say anything new.
+   */
+  const loadObservations = (sceneId: string): void => {
+    if (observationGraphSceneId_ === sceneId && (observationGraph_ !== null || observationLoad_ !== null)) return;
+    const where = credentials_;
+    if (where === null) {
+      reconstructionInspector.showEvidence({
+        kind: 'failed', reason: 'This session has no credentials to read the observation graph with.',
+      });
+      return;
+    }
+    observationGraphSceneId_ = sceneId;
+    observationGraph_ = null;
+    reconstructionInspector.showEvidence({ kind: 'loading' });
+    observationLoad_ = new ObservationsClient(where).load(sceneId).then((graph) => {
+      if (observationGraphSceneId_ !== sceneId) return;
+      observationGraph_ = graph;
+      reconstructionInspector.showEvidence({
+        kind: 'ready', pointCount: graph.points.length, retainedPerImage: graph.retainedPerImage,
+      });
+    }).catch((error: unknown) => {
+      if (observationGraphSceneId_ !== sceneId) return;
+      reconstructionInspector.showEvidence({
+        kind: 'failed',
+        reason: error instanceof ObservationsUnavailable
+          ? error.message
+          : 'The recorded observation graph could not be read.',
+      });
+    }).finally(() => {
+      if (observationGraphSceneId_ === sceneId) observationLoad_ = null;
+    });
+  };
+
+  /** What one capture's original looks like in this session, through its own evidence handles. */
+  const sourceForCapture = (captureId: string) =>
+    [...(previewSourceMedia?.values() ?? [])].find((descriptor) =>
+      descriptor.captureIds?.includes(captureId))
+    ?? current.occurrences
+      .filter((occurrence) => occurrence.captureId === captureId)
+      .flatMap((occurrence) => occurrence.evidence)
+      .map((handle) => previewSourceMedia?.get(handle))
+      .find((descriptor) => descriptor !== undefined) ?? null;
+
+  /**
+   * One click in the inspector, resolved to the photographs that observed that piece of the world.
+   *
+   * The answer is recorded provenance and nothing else: the point is one COLMAP actually stored,
+   * and the photographs listed are the ones whose observations of it were retained. Nothing here
+   * reprojects the point into other cameras to ask which of them could have seen it, because that
+   * is a geometric guess about visibility rather than a record of an observation.
+   */
+  const resolveEvidenceAt = (clientX: number, clientY: number): void => {
+    const view = atlas?.binding.inspectionView ?? null;
+    if (view === null) return;
+    const captureId = view.captureIds[0];
+    if (view.kind !== 'source-camera' || view.calibration === null || captureId === undefined) {
+      reconstructionInspector.showEvidence({
+        kind: 'unsupported',
+        reason: view.kind === 'between-cameras'
+          ? 'This is a midpoint between two photographs, not a photograph. No camera stood here, '
+            + 'so there is no calibrated projection to invert. Choose either adjacent source camera.'
+          : 'This view has no accepted calibration, so a click cannot be inverted exactly.',
+      });
+      return;
+    }
+    const graph = observationGraph_;
+    if (graph === null) {
+      if (observationLoad_ === null) loadObservations(view.sceneId);
+      return;
+    }
+    const camera = pickCameraFor(view.sceneId, captureId);
+    if (camera === null) {
+      reconstructionInspector.showEvidence({
+        kind: 'unsupported',
+        reason: 'This session holds no recovered camera for that photograph.',
+      });
+      return;
+    }
+    const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const cursor = canvasToSourcePixel(
+      camera.calibration,
+      { width: rect.width, height: rect.height },
+      { x: clientX - rect.left, y: clientY - rect.top },
+    );
+    const sourcePxPerCanvasPx = camera.calibration.height / rect.height;
+    const tolerancePx = PICK_TOLERANCE_CANVAS_PX * sourcePxPerCanvasPx;
+    const result = pickObservedPoint(camera, graph.points, cursor, {
+      tolerancePx,
+      occlusionBandPx: PICK_OCCLUSION_BAND_CANVAS_PX * sourcePxPerCanvasPx,
+    });
+    if (result === null) {
+      reconstructionInspector.showEvidence({
+        kind: 'miss', toleranceSourcePx: tolerancePx, canvasPx: PICK_TOLERANCE_CANVAS_PX,
+      });
+      return;
+    }
+    const observedBy = graph.observedBy.get(result.point.pointId) ?? [];
+    reconstructionInspector.showEvidence({
+      kind: 'hit',
+      // Verbatim from atlas-core. It is the sentence that must state both the full track length
+      // and the retained count whenever they differ, and rewording it here is how they diverge.
+      sentence: observationSentence(result),
+      pointId: result.point.pointId,
+      pixelDistance: result.pixelDistance,
+      // The POINT's mean residual over its whole track, which is what the receipt records: the
+      // pose stage copies `points3D.txt` field 7 onto every row of a track, so all of these are
+      // the same number and it belongs to the point, not to any one photograph.
+      meanReprojectionErrorPx: observedBy[0]?.reprojectionErrorPx ?? 0,
+      projection: result.projection,
+      photographs: observedBy.map((observation, index) => {
+        const source = sourceForCapture(observation.captureId);
+        return {
+          captureId: observation.captureId,
+          title: source?.title ?? null,
+          label: `Photograph ${String(index + 1)}`,
+          url: source?.url ?? null,
+          alt: source?.alt ?? 'An authorized original photograph.',
+          available: source?.available === true && source.url !== null,
+          x: observation.x,
+          y: observation.y,
+          consentSentence: consentSentence(observation.consent),
+        };
+      }),
+    });
+  };
+
   const reconstructionInspector = buildReconstructionInspector({
     onView: (sceneId, viewId) => atlas?.binding.inspectSceneView(sceneId, viewId) ?? false,
     onReturn: () => atlas?.binding.endSceneInspection(),
+    // The world canvas is aria-hidden, so the click has to have a real button beside it or the
+    // gesture exists only for sighted mouse users.
+    onResolveCentre: () => {
+      const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+      resolveEvidenceAt(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    },
+    onViewShown: (sceneId, view) => {
+      // A new view is a new projection, so the previous pick no longer describes what is on
+      // screen. The panel goes back to saying what a click could resolve rather than keeping an
+      // answer about a camera the visitor has left.
+      if (view.kind !== 'source-camera' || view.projection === 'opm-estimate') {
+        reconstructionInspector.showEvidence({
+          kind: 'unsupported',
+          reason: view.kind === 'between-cameras'
+            ? 'This is a midpoint between two photographs. No camera stood here, so there is no '
+              + 'calibrated projection to invert. Choose either adjacent source camera.'
+            : 'This view has no accepted calibration, so a click cannot be inverted exactly.',
+        });
+        return;
+      }
+      loadObservations(sceneId);
+      const graph = observationGraph_;
+      if (graph !== null && observationGraphSceneId_ === sceneId) {
+        reconstructionInspector.showEvidence({
+          kind: 'ready', pointCount: graph.points.length, retainedPerImage: graph.retainedPerImage,
+        });
+      }
+    },
   });
   const inspectReconstruction = (sceneId: string): void => {
     dispatchShell({ type: 'show-world' });
@@ -1284,6 +1550,18 @@ async function mount(): Promise<void> {
       .filter((island) => !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
       .map((island) => ({ regionId: island.islandId, captureCount: island.captureIds.length })),
     onInspectScene: inspectReconstruction, onInspectSources: inspectSceneSources,
+    // The lens switch, last in the input as it is last in the panel. Toggling it calls
+    // `applyProofLens` and nothing else: no scene is rebuilt and this panel is not re-rendered,
+    // which is what makes "toggling the lens changes no scene, no rung and no receipt" checkable
+    // rather than merely asserted.
+    proofLens: {
+      enabled: proofLensEnabled,
+      theme: themeForPreferences(preferences, systemAppearance.matches),
+      onToggle: (enabled) => {
+        proofLensEnabled = enabled;
+        applyProofLens();
+      },
+    },
     ...(sourcePresentation() === 'inspection' ? {
       reconstructionFocus: {
         collections: current.islands.map((island) => {
@@ -1468,6 +1746,9 @@ async function mount(): Promise<void> {
   const refreshedStatus = renderReconstructionStatus();
   reconstructionStatus.replaceWith(refreshedStatus);
   reconstructionStatus = refreshedStatus;
+  // The lens survives a remount. It is session state, not renderer state, so a world that has just
+  // been rebuilt has to be told what the visitor is currently looking through.
+  applyProofLens();
   (canvas as HTMLCanvasElement).dataset.companionRenderer = 'svg';
   reflectShell();
 
@@ -1569,6 +1850,27 @@ async function mount(): Promise<void> {
 
   mountListeners?.abort();
   mountListeners = new AbortController();
+  /*
+   * CLICK-TO-EVIDENCE, bound here and not beside the function that resolves it.
+   *
+   * The listener is on the shared world canvas, which the inspector does not own, so it has to
+   * hang off `mountListeners` like every other listener outside a mounted element: the inspector
+   * is rebuilt on each mount and the old one is simply discarded, so a listener registered beside
+   * it would survive the mount that created it. This file already records that failure mode.
+   *
+   * Guarded on the inspector being open, so traverse is untouched: while traversing,
+   * `inspectionView` is null and `resolveEvidenceAt` returns before reading anything.
+   * `pointerup` rather than `pointerdown`, so a drag that happens to end over the canvas is not
+   * taken as a click on a surface the visitor never pointed at.
+   */
+  (canvas as HTMLCanvasElement).addEventListener(
+    'pointerup',
+    (event) => {
+      if (event.button !== 0 || reconstructionInspector.root.hidden) return;
+      resolveEvidenceAt(event.clientX, event.clientY);
+    },
+    { signal: mountListeners.signal },
+  );
   (canvas as HTMLCanvasElement).addEventListener(
     'webglcontextlost',
     (event) => {

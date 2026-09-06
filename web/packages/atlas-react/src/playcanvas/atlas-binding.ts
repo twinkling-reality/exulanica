@@ -109,7 +109,7 @@ import type { PointCloud } from './point-cloud.js';
 import { createPointCloud } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
-import { createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
+import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
 import {
   opmPointInScene,
   type PlacedScenePointMap,
@@ -139,7 +139,41 @@ export interface IslandVisual {
   /** Reused so the per-frame uniform write allocates nothing. */
   readonly uIsland: Float32Array;
   readonly uPoint: Float32Array;
+  /**
+   * The proof lens for this island: an already-resolved RGB triple and a tint strength.
+   *
+   * Four zeros is the lens off, which is what every island holds until a caller supplies a value.
+   * NOTHING IN THIS PACKAGE MAY DECIDE WHAT GOES IN HERE. Which tier an island is showing and
+   * which colour that tier wears are both `@exulanica/presentation`'s (`proof-lens.ts`), and the
+   * app resolves them before they cross; the binding's whole job is to get four floats to a
+   * uniform. That is the same split `uPalette` already keeps for provenance colour, and it is
+   * what `pnpm boundaries` and the module header above are protecting.
+   */
+  readonly uLens: Float32Array;
 }
+
+/** One island's proof-lens colour, resolved by the caller: red, green, blue, tint strength. */
+export type ProofLensColor = readonly [number, number, number, number];
+
+/** The lens off. A value rather than an absence, so an unlit island is written, not skipped. */
+const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
+
+/**
+ * Seconds a trained scene's work buffer stays open for after the lens changes.
+ *
+ * MEASURED, and the first two values were both too small. `WORKBUFFER_UPDATE_ONCE` asks for one
+ * refill on the next frame and the tint took several seconds to appear; eight drawn frames, about
+ * a seventh of a second, did not help either. What the wait is actually for is the work-buffer
+ * shader: installing the modifier rebuilds it, the link is deferred until first use, and until it
+ * lands the refills run through the shader that has no lens in it. Nothing asks for another refill
+ * when the new one is ready, so the window has to outlast the compile.
+ *
+ * 2.5 s covers it on the real trained bowl on ANGLE Metal on 2026-09-06, where the tint was absent
+ * at 1.8 s and present at 2.5 s. It is a bounded window per press of a button, and it costs
+ * nothing once closed: getting it wrong is not a visible error but a silent one, a lens that says
+ * nothing while the panel says the tier out loud.
+ */
+const PROOF_LENS_SETTLE_SECONDS = 2.5;
 
 export interface AtlasBindingOptions {
   readonly canvas: HTMLCanvasElement;
@@ -272,6 +306,10 @@ export class AtlasBinding {
   private readonly inspectionTarget = new pc.Vec3();
   private readonly inspectionUp = new pc.Vec3();
   private applicationControlsEnabled = true;
+  /** Trained scenes whose work-buffer modifier is installed. See `setProofLens`. */
+  private readonly proofLensSplatsPrepared = new Set<pc.Entity>();
+  /** When the lens settle window closes, on the binding's own clock. Negative means closed. */
+  private proofLensSettleUntil = -1;
   private styleProposalSequence = 0;
   private readonly skyClearColor = new pc.Color();
   private readonly mapClearColor = new pc.Color();
@@ -622,6 +660,8 @@ export class AtlasBinding {
             900,
             0,
           ]),
+          // Four zeros: the proof lens off. See `setProofLens`.
+          uLens: new Float32Array(4),
         });
       }
     }
@@ -859,6 +899,79 @@ export class AtlasBinding {
 
   setSensitivityMultiplier(multiplier: number): void {
     this.controls.setSensitivityMultiplier(multiplier);
+  }
+
+  /**
+   * The proof lens: colour each region by what produced the surface a visitor is looking at.
+   *
+   * `null` switches it off. Otherwise the map carries one already-resolved RGBA per island, and an
+   * island the map omits is left uncoloured rather than being given a default, because a default
+   * would be this package inventing an answer about provenance.
+   *
+   * THIS METHOD RESOLVES NOTHING AND DECIDES NOTHING. It writes four floats per island into a
+   * uniform. The tier, the palette and the words that name each tier all live in
+   * `@exulanica/presentation`, which is why the legend in the status panel and the colour in the
+   * world cannot drift apart: they are the same four numbers read twice.
+   *
+   * IT ALSO CHANGES NOTHING ELSE. No scene is replaced, no residency plan is recomputed, no tier
+   * or rung is touched, and no receipt is read: the only state this writes is `IslandVisual.uLens`
+   * and the equivalent parameter on a trained scene. Switching the lens on and off is meant to be
+   * exactly as consequential as looking at something differently, and this is where that is true.
+   */
+  setProofLens(colors: ReadonlyMap<IslandId, ProofLensColor> | null): void {
+    for (const visual of this.islands) {
+      const color = colors?.get(visual.island.islandId);
+      visual.uLens.set(color ?? PROOF_LENS_OFF);
+    }
+    for (const visual of this.trainedScenes) {
+      const color = colors?.get(visual.island.islandId) ?? PROOF_LENS_OFF;
+      const gsplat = visual.entity.gsplat;
+      if (gsplat === undefined || gsplat === null) continue;
+      if (!this.proofLensSplatsPrepared.has(visual.entity)) {
+        // Installed on the first use and never removed. Installing it at construction would put a
+        // modified shader on the default path, where a compile failure would cost the trained
+        // scene itself rather than only the lens; installing and removing it per toggle would
+        // rebuild the shader twice for a value that is a uniform.
+        gsplat.setWorkBufferModifier(PROOF_LENS_SPLAT_MODIFIER);
+        this.proofLensSplatsPrepared.add(visual.entity);
+      }
+      gsplat.setParameter('uProofLens', [...color]);
+      /*
+       * THE WORK BUFFER IS HELD OPEN FOR A FEW FRAMES, NOT FOR ONE, AND MEASURED IS WHY.
+       *
+       * `WORKBUFFER_UPDATE_ONCE` asks for exactly one refill on the next frame, which is what this
+       * did first. On the real trained bowl on 2026-09-06 the tint then took several seconds to
+       * appear and sometimes did not appear at all before something else moved: this application
+       * runs with `autoRender` off and draws only the frames `wantsFrame` asks for, so a single
+       * requested refill can land on a frame the host never renders and is simply lost.
+       *
+       * ALWAYS for a bounded settle and then back to AUTO. The cost is a handful of work-buffer
+       * renders per press of a button rather than one per frame for as long as the lens is open,
+       * and the lens is visible in the frame after the press rather than whenever the scene next
+       * happens to move.
+       */
+      gsplat.workBufferUpdate = pc.WORKBUFFER_UPDATE_ALWAYS;
+    }
+    this.proofLensSettleUntil = this.elapsed + PROOF_LENS_SETTLE_SECONDS;
+    this.invalidate();
+  }
+
+  /** Close the settle window opened by `setProofLens`, once the tint is in the work buffer. */
+  private settleProofLens(): void {
+    if (this.proofLensSettleUntil < 0) return;
+    if (this.elapsed < this.proofLensSettleUntil) {
+      // Every settle frame has to be a DRAWN frame, or the window would run out against frames the
+      // host skipped and the work buffer would never be refilled at all.
+      this.invalidate();
+      return;
+    }
+    this.proofLensSettleUntil = -1;
+    for (const visual of this.trainedScenes) {
+      const gsplat = visual.entity.gsplat;
+      if (gsplat === undefined || gsplat === null) continue;
+      gsplat.workBufferUpdate = pc.WORKBUFFER_UPDATE_AUTO;
+    }
+    this.invalidate();
   }
 
   /** Compose application surfaces with Map and travel locks so one cannot re-enable another. */
@@ -1339,7 +1452,12 @@ export class AtlasBinding {
       visual.uPoint[3] = this.elapsed;
       visual.cloud.material.setParameter('uIsland', visual.uIsland);
       visual.cloud.material.setParameter('uPoint', visual.uPoint);
+      // The proof lens rides the same per-frame write, so it costs one more `setParameter` on a
+      // path that already does two and never allocates. Its contents were resolved by the caller
+      // in `setProofLens`; this loop only delivers them.
+      visual.cloud.material.setParameter('uLens', visual.uLens);
     }
+    this.settleProofLens();
 
     // The motes read the same emphasis buffer the manifest writes and the same projection scale
     // the shells use, so a recomposition moves both in one frame rather than in two.

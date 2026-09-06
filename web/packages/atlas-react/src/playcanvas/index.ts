@@ -17,7 +17,7 @@ export type { PlacedScenePointMap } from './scene-point-maps.js';
 export type { SceneInspectionView, RecoveredSceneCamera } from './scene-inspection.js';
 export { sceneInspectionViews, validateRecoveredSceneCamera, calibratedCameraFrustum } from './scene-inspection.js';
 export type { TrainedSceneGeometry } from './scene-splats.js';
-export { validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint } from './scene-splats.js';
+export { PROOF_LENS_SPLAT_MODIFIER, validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint } from './scene-splats.js';
 export {
   opmPointInScene,
   scenePointMapFootprint,
@@ -81,6 +81,7 @@ export type {
   FrameReport,
   IslandVisual,
   PlacementCheck,
+  ProofLensColor,
 } from './atlas-binding.js';
 export { AtlasBinding, mapCameraState, sourceFirstArrivalPose } from './atlas-binding.js';
 

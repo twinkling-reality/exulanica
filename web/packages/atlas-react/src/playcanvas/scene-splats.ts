@@ -128,6 +128,50 @@ export function trainedSceneFootprint(value: TrainedSceneGeometry): number {
   return Math.max(0.1, radius);
 }
 
+/**
+ * The proof lens over trained Gaussian geometry, as a per-component work-buffer modifier.
+ *
+ * WHY THIS AND NOT THE FRAGMENT CHUNK. Unified gsplat rendering draws every splat component
+ * through one shared work buffer, so a fragment uniform cannot differ between two regions in the
+ * same frame: a lens delivered there would colour the whole world by whichever region wrote last.
+ * The work buffer is filled per component (`GSplatUnifiedRenderer.renderSplat` applies that
+ * component's own `parameters` before each splat's quad render), so `modifySplatColor` is the one
+ * hook where a per-region value is genuinely per region. That is the difference between a lens and
+ * a lie about which surface is which.
+ *
+ * THE PRICE IS A RE-RENDER, WHICH IS WHY THE VALUE IS PUSHED AND NOT POLLED. The work buffer is
+ * only refilled when something asks it to, so the binding sets `WORKBUFFER_UPDATE_ONCE` on the
+ * frame the lens value changes and leaves it on AUTO otherwise. A lens that re-rendered the work
+ * buffer every frame would cost the whole scene's splats continuously to display a value that
+ * changes when a visitor presses a button.
+ *
+ * `uProofLens` carries the same four numbers as the point-map shader's `uLens`: a colour resolved
+ * in `@exulanica/presentation` and a tint strength. All zero is off, and off is an exact identity
+ * because `mix(c, anything, 0.0)` is `c`.
+ */
+export const PROOF_LENS_SPLAT_MODIFIER = Object.freeze({
+  glsl: /* glsl */ `
+uniform vec4 uProofLens;
+void modifySplatCenter(inout vec3 center) {}
+void modifySplatRotationScale(vec3 originalCenter, vec3 modifiedCenter, inout vec4 rotation, inout vec3 scale) {}
+void modifySplatColor(vec3 center, inout vec4 color) {
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 hue = uProofLens.rgb / max(dot(uProofLens.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.004);
+    color.rgb = mix(color.rgb, clamp(hue * luma, 0.0, 1.0), uProofLens.a);
+}
+`,
+  wgsl: /* wgsl */ `
+uniform uProofLens : vec4f;
+fn modifySplatCenter(center : ptr<function, vec3f>) {}
+fn modifySplatRotationScale(originalCenter : vec3f, modifiedCenter : vec3f, rotation : ptr<function, vec4f>, scale : ptr<function, vec3f>) {}
+fn modifySplatColor(center : vec3f, color : ptr<function, vec4f>) {
+    let luma : f32 = dot((*color).rgb, vec3f(0.2126, 0.7152, 0.0722));
+    let hue : vec3f = uniform.uProofLens.rgb / max(dot(uniform.uProofLens.rgb, vec3f(0.2126, 0.7152, 0.0722)), 0.004);
+    (*color) = vec4f(mix((*color).rgb, clamp(hue * luma, vec3f(0.0), vec3f(1.0)), uniform.uProofLens.a), (*color).a);
+}
+`,
+});
+
 /** Native SOG decoder, supplied only authenticated, digest-verified, self-contained bytes. */
 export async function createSceneSplatAsset(app: pc.AppBase, value: TrainedSceneGeometry): Promise<pc.Asset> {
   validateTrainedSceneGeometry(value);

@@ -13,9 +13,12 @@ import { el } from './dom.js';
 // person-consent branch adds its own import directly above `rungSentence` and adjacent inserts
 // conflict over nothing.
 import {
+  PROOF_TIERS,
   PROOF_TIER_LABELS,
   PROOF_TIER_SENTENCES,
+  proofLensSwatch,
   proofTierOf,
+  type PresentationTheme,
   type ProofTier,
 } from '@exulanica/presentation';
 
@@ -44,6 +47,23 @@ export interface StatusInput {
   readonly reconstructionFocus?: {
     readonly collections: readonly { readonly sceneId: string; readonly sourceCount: number }[];
   };
+  /**
+   * The proof lens switch and the legend that makes its colours checkable.
+   *
+   * Declared LAST in this interface, and rendered last in `buildStatus`, deliberately. The
+   * person-consent branch inserts its per-member consent line beside the registration paragraph
+   * in the middle of the reconstruction block; a new field and a new section at the two ends stay
+   * textually clear of it, so the two branches merge without an argument about an ordering neither
+   * of them has an opinion about.
+   */
+  readonly proofLens?: ProofLensControl;
+}
+
+/** The lens switch as the status panel sees it: a current state and somewhere to send a change. */
+export interface ProofLensControl {
+  readonly enabled: boolean;
+  readonly theme: PresentationTheme;
+  readonly onToggle: (enabled: boolean) => void;
 }
 
 export interface ReconstructionRungDisclosure {
@@ -225,6 +245,76 @@ export function buildStatus(input: StatusInput): HTMLElement {
       details.append(sources);
     }
     bar.append(details);
+  }
+
+  // THE PROOF LENS SWITCH AND ITS LEGEND, at the very end of the panel.
+  //
+  // Placed here rather than beside the per-scene proof-tier line for two reasons. It belongs to
+  // the whole view rather than to one scene, and the `person-consent-masking` branch appends its
+  // per-member consent line inside the reconstruction block above; keeping this section clear of
+  // that block is what makes the two branches merge textually instead of semantically.
+  //
+  // The legend is not decoration. A colour nobody can name is a claim nobody can check, so every
+  // tier appears here with its swatch, its label and its sentence whether or not any region is
+  // currently at that tier. Reading the three strings straight from `@exulanica/presentation` is
+  // what keeps the words and the colour from drifting: they are the same table the shader's
+  // uniform was resolved from.
+  if (input.proofLens !== undefined) {
+    const lens = input.proofLens;
+    const section = el('section', { class: 'proof-lens', 'aria-label': 'Proof lens' });
+    const toggle = el('button', {
+      type: 'button',
+      class: 'proof-lens-toggle',
+      text: lens.enabled ? 'Proof lens on' : 'Proof lens off',
+    });
+    toggle.setAttribute('aria-pressed', lens.enabled ? 'true' : 'false');
+    let on = lens.enabled;
+    toggle.addEventListener('click', () => {
+      on = !on;
+      // The button restates ITSELF and calls out. It deliberately does not ask the panel to
+      // re-render: the lens changes how the world is coloured and nothing else, and a status
+      // panel that rebuilt on every toggle would make that harder to believe, not easier.
+      toggle.textContent = on ? 'Proof lens on' : 'Proof lens off';
+      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      section.dataset.proofLens = on ? 'on' : 'off';
+      lens.onToggle(on);
+    });
+    section.dataset.proofLens = lens.enabled ? 'on' : 'off';
+    section.append(
+      el('h2', { text: 'Proof lens' }),
+      el('p', {
+        class: 'proof-lens-copy',
+        text: 'Colour every region by what produced the surface you are looking at. It changes '
+          + 'nothing about the scene, its rung or its receipts.',
+      }),
+      toggle,
+    );
+    const legend = el('ul', { class: 'proof-lens-legend' });
+    for (const tier of PROOF_TIERS) {
+      const item = el('li');
+      item.dataset.proofTier = tier;
+      const swatch = el('span', { class: 'proof-lens-swatch', 'aria-hidden': 'true' });
+      // The exact row the renderer is given, so the key and the picture cannot disagree.
+      swatch.style.backgroundColor = proofLensSwatch(lens.theme, tier);
+      item.append(swatch, el('span', {
+        class: 'proof-lens-legend-text',
+        text: `${PROOF_TIER_LABELS[tier]}. ${PROOF_TIER_SENTENCES[tier]}`,
+      }));
+      legend.append(item);
+    }
+    section.append(legend);
+    // WHAT THE LENS DOES NOT REPAINT, said out loud rather than left as a silent gap.
+    //
+    // A region showing an original photograph is showing evidence, and tinting evidence would
+    // alter the thing being offered as evidence. So the lens colours derived geometry and leaves a
+    // photograph alone; `photographed` stays in the legend because a visitor still has to be able
+    // to read what the absence of a tint means.
+    section.append(el('p', {
+      class: 'proof-lens-limit',
+      text: 'The lens colours derived geometry. A region showing an original photograph is left '
+        + 'exactly as it was recorded, because tinting evidence would alter it.',
+    }));
+    bar.append(section);
   }
 
   return bar;

@@ -80,6 +80,60 @@ region shows the one covering the most of them, then trained geometry over point
 stay in the graph and the status list marked "Not drawn". An exact set whose members exceed the
 metadata group joins that group's island rather than splitting into standalone islands.
 
+## The proof lens, and click-to-evidence
+
+MEASURED 2026-09-06 on the retained real trained bowl at 1280x720
+(`docs/evaluation/2026-09-06-phase-10-atlas.json`).
+
+**The proof lens** colours each region by what produced the surface in front of you: photographed,
+reconstructed, generated, or nothing shown. The tier and its colour are both decided in
+`@exulanica/presentation`; what crosses into the renderer is four already-resolved numbers per
+region, a colour and a tint strength, and the binding indexes no palette and knows no tier. Point
+maps take them through a `uLens` uniform written in the existing per-frame island block; trained
+Gaussian geometry takes the same four through a per-component work-buffer modifier, which is the
+only hook that is genuinely per region while unified gsplat rendering draws every splat through one
+shared buffer. The tint replaces hue and keeps the surface's own brightness, so the geometry stays
+readable underneath the answer about where it came from.
+
+The lens changes no scene, no rung and no receipt, and the panel says so beside the switch. The
+legend names all four tiers in words, with the swatch the renderer is actually given rather than a
+near neighbour of it. **A region showing an original photograph is left exactly as recorded**: a
+photograph is the evidence, tinting it would alter what is being offered, and so the `photographed`
+tier is named in the legend and paints nothing.
+
+**Click-to-evidence** lives in the reconstruction inspector and nowhere else. Traverse holds Pointer
+Lock, which freezes cursor coordinates, and the focus solver may never take a screen-space input;
+the inspector has already released the lock and stands on a calibrated recovered camera, so a click
+there has real coordinates and an exact projection to invert. A click resolves to the nearest sparse
+point COLMAP actually recorded, and the answer is the set of photographs whose observations of that
+point the pose receipt holds, each with its consent state. Nothing is reprojected into other cameras
+and presented as observation: that would answer which camera *could* have seen a point, which is a
+guess about visibility rather than a record of a sighting.
+
+Four things the panel is careful to say. The point is the nearest recorded one, **not the surface
+under the pointer**, and the pixel distance is shown. A point whose COLMAP track is longer than the
+bounded sample retained here states **both numbers**, because a viewer told "15 photographs" about a
+point seventeen photographs observed would be misled by omission. A click that reaches nothing is
+shown as the answer it is, with its tolerance in both screen and source pixels; at eight screen
+pixels roughly a third of a grid of clicks over the bowl resolved, and the rest genuinely had no
+recorded observation nearby. A midpoint between two photographs is refused rather than approximated,
+because no camera stood there. Every listed photograph reports `person_consent: unavailable`, and
+the sentence says what a screening receipt does and does not establish: a named human reviewed the
+whole photograph, and no person in it has agreed to be shown.
+
+The pick inverts the **raw** recovered camera from the graph, not the display-frame-composed one the
+renderer draws with, because the observation graph's world coordinates are the recovered COLMAP
+frame and are composed with nothing. Reprojecting every retained observation of the first photograph
+through that transform reproduced COLMAP's own recorded pixel to a median of 2.83 px and a maximum
+of 9.88 px on a 3060x4080 original, which is the SIMPLE_RADIAL distortion the camera declares as a
+pinhole approximation. The world canvas is `aria-hidden`, so the same question is also askable from
+a button inside the inspector, which resolves the centre of the view.
+
+The observation graph is one whole-scene read, about 53 MB of JSON for the bowl, started when the
+inspector opens and cached per scene for the session. It carries no digest of its own, unlike the
+World Read bundle: it is recorded provenance served over an authenticated route, not a receipt a
+recipient can verify offline.
+
 ## Trained artifact delivery
 
 `trained_geometry` describes the exact current published artifact: SOG container,

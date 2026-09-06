@@ -90,6 +90,35 @@ export function proofTierColor(theme: PresentationTheme, tier: ProofTier): strin
 }
 
 /**
+ * How far the lens pushes a tier colour away from its own grey before it reaches the world.
+ *
+ * MEASURED, NOT PICKED. The theme's provenance colours are chips: small, quiet, and read against
+ * type, so `inference` is `#57686d` in Dawn, whose channels sit within 0.09 of its own luminance.
+ * A wash that keeps a surface's brightness and takes only that colour's hue is then almost exactly
+ * grey, and on the real bowl on 2026-09-06 the lens was visible as a slight desaturation and not
+ * as a colour. A lens a visitor cannot see is a legend nobody can check.
+ *
+ * 3.5 is where the four tiers separate as hues in Dawn, which is the darker-on-light case and
+ * therefore the hard one: `photographed` becomes a clear green, `reconstructed` a clear blue,
+ * `generated` an orange and `unavailable` a muted green. It saturates around the colour's own
+ * luminance rather than brightening it, so no tier becomes louder than another by accident, and
+ * the result is clamped per channel, which is why this belongs here rather than in a shader: a
+ * clamp is a decision about what colour to show when the arithmetic leaves the display.
+ */
+const LENS_CHROMA = 3.5;
+
+const LUMA = Object.freeze([0.2126, 0.7152, 0.0722]);
+
+/** One tier's lens colour: the theme's provenance chip, saturated enough to read as a wash. */
+function lensRgb(theme: PresentationTheme, tier: ProofTier): readonly [number, number, number] {
+  const rgb = unitRgb(proofTierColor(theme, tier));
+  const luma = rgb[0] * LUMA[0]! + rgb[1] * LUMA[1]! + rgb[2] * LUMA[2]!;
+  const push = (value: number): number =>
+    Math.min(1, Math.max(0, luma + (value - luma) * LENS_CHROMA));
+  return [push(rgb[0]), push(rgb[1]), push(rgb[2])];
+}
+
+/**
  * The lens palette as the renderer wants it: four RGBA rows, indexed by `PROOF_TIERS`.
  *
  * The fourth channel is emphasis rather than opacity: how strongly the lens tints its tier when
@@ -105,10 +134,23 @@ export function proofLensPalette(theme: PresentationTheme): Float32Array {
   };
   const out = new Float32Array(PROOF_TIERS.length * 4);
   PROOF_TIERS.forEach((tier, index) => {
-    const [r, g, b] = unitRgb(proofTierColor(theme, tier));
+    const [r, g, b] = lensRgb(theme, tier);
     out.set([r, g, b, emphasis[tier]], index * 4);
   });
   return out;
+}
+
+/**
+ * The legend swatch, which must be the colour the world is actually wearing.
+ *
+ * The same row `proofLensPalette` hands the renderer, as CSS. Not `proofTierColor`: that is the
+ * chip colour the lens saturates on its way out, so a legend painted from it would be a key to a
+ * picture drawn in slightly different colours, which is the one thing a key may not be.
+ */
+export function proofLensSwatch(theme: PresentationTheme, tier: ProofTier): string {
+  const byte = (value: number): number => Math.round(value * 255);
+  const [r, g, b] = lensRgb(theme, tier);
+  return `rgb(${String(byte(r))} ${String(byte(g))} ${String(byte(b))})`;
 }
 
 /** Everything the lens needs to know about one region, and nothing it does not. */

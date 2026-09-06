@@ -1,0 +1,188 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.phase-10-atlas-visible/v1",
+    "date": "2026-09-06",
+    "head": "104e415d9ed6c6c074666b0a38e15ee3658223bf",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "collection": "chili-salmon-bowl",
+    "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+    "rendering_substrate": "gaussian_splats",
+    "browser": "Chrome headless=new, ANGLE Metal, 1280x720 css px, deviceScaleFactor 1",
+    "what_this_establishes": "The proof lens colours the real trained reconstruction in the 3D view and restores it exactly when switched off, and a click in the reconstruction inspector resolves a surface to the photographs whose cameras recorded that point, each with its consent state. It establishes nothing about visual quality, physical scale, or per-person consent, none of which this work touched.",
+    "atlas_mount_ms": 28292,
+    "observation_graph_ready_ms": 1,
+    "console_errors": [],
+    "observation_graph": {
+      "route": "GET /world-read/scenes/{scene_id}/observations",
+      "provenance": "recorded",
+      "point_count": 15005,
+      "retained_per_image": 4096,
+      "response_bytes": 53343203,
+      "digest_bound": false,
+      "note": "The response carries no digest of its own, unlike the World Read bundle. It is recorded provenance served over an authenticated route; it is not a receipt a recipient can verify offline."
+    },
+    "projection_check": {
+      "what": "Every retained observation of the first photograph reprojected through the raw recovered camera the pick uses, compared against COLMAP's own recorded pixel.",
+      "observations": 2386,
+      "median_error_px": "2.83",
+      "p95_error_px": "6.73",
+      "max_error_px": "9.88",
+      "image_size_px": "3060x4080",
+      "why_it_is_not_zero": "SIMPLE_RADIAL distortion, which the recovered camera declares as pinhole-approximation and this projection does not apply."
+    },
+    "clicks": [
+      {
+        "canvas_x": 599,
+        "canvas_y": 435,
+        "result": "hit",
+        "sentence": "17 photographs observed this point. 15 photographs of them are retained here, because each photograph keeps a bounded sample of its recorded observations.",
+        "photographs_listed": 15
+      },
+      {
+        "canvas_x": 666,
+        "canvas_y": 216,
+        "result": "hit",
+        "sentence": "5 photographs observed this point.",
+        "photographs_listed": 5
+      },
+      {
+        "canvas_x": 358,
+        "canvas_y": 144,
+        "result": "miss",
+        "sentence": "No recorded observation is within reach of that click.",
+        "photographs_listed": 0
+      }
+    ],
+    "captures": [
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/lens-off.jpg",
+        "byte_size": 213285,
+        "sha256": "cf50164f4f984fca0ca0dc0d0c018e0e6b32a5fc5a17dd8ef7ef9f166a8e29f8",
+        "capture": "lens-off",
+        "shows": "The trained bowl as the world draws it, with the proof lens switched off.",
+        "proof_lens": "off",
+        "evidence_state": null,
+        "evidence_sentence": ""
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/lens-on.jpg",
+        "byte_size": 211686,
+        "sha256": "a0efe3c2997b9a98120936e0e89ae80f1be50f6e5c6168f3e6a09376f58841b7",
+        "capture": "lens-on",
+        "shows": "The same frame with the lens on. The whole trained reconstruction wears the reconstructed tier's hue at its own brightness, so the geometry stays readable under the answer about where it came from.",
+        "proof_lens": "on",
+        "evidence_state": null,
+        "evidence_sentence": ""
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/lens-off-again.jpg",
+        "byte_size": 213285,
+        "sha256": "cf50164f4f984fca0ca0dc0d0c018e0e6b32a5fc5a17dd8ef7ef9f166a8e29f8",
+        "capture": "lens-off-again",
+        "shows": "The lens switched back off. The encoded frame is byte-identical to lens-off, which is the visible half of the claim that toggling changes nothing.",
+        "proof_lens": "off",
+        "evidence_state": null,
+        "evidence_sentence": ""
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/inspector-open.jpg",
+        "byte_size": 265856,
+        "sha256": "a9aa9645e9e710df74035cd2aaa0ce7bc3d362fdc74239b6023d8a197cc1ab9c",
+        "capture": "inspector-open",
+        "shows": "The reconstruction inspector opened on the trained scene, reading its recorded observation graph.",
+        "proof_lens": "on",
+        "evidence_state": "loading",
+        "evidence_sentence": "Reading the recorded observations for this scene."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/inspector-lens-on.jpg",
+        "byte_size": 269976,
+        "sha256": "e8759a45d7c218731c2d6e6817aeb745cc10112234f70bf47d706a9be89e851e",
+        "capture": "inspector-lens-on",
+        "shows": "The lens on, seen from the first photograph's own recovered camera.",
+        "proof_lens": "on",
+        "evidence_state": "ready",
+        "evidence_sentence": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/inspector-lens-off.jpg",
+        "byte_size": 272476,
+        "sha256": "ddeec7e46359bf03131b411bf9b05f2af0264c25eae6425b58c37c852ca18105",
+        "capture": "inspector-lens-off",
+        "shows": "The same recovered camera with the lens off.",
+        "proof_lens": "off",
+        "evidence_state": "ready",
+        "evidence_sentence": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/evidence-ready.jpg",
+        "byte_size": 269976,
+        "sha256": "e8759a45d7c218731c2d6e6817aeb745cc10112234f70bf47d706a9be89e851e",
+        "capture": "evidence-ready",
+        "shows": "The observation graph loaded and nothing clicked yet: 15005 recorded points, at most 4096 retained per photograph.",
+        "proof_lens": "on",
+        "evidence_state": "ready",
+        "evidence_sentence": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/evidence-hit-truncated-track.jpg",
+        "byte_size": 273365,
+        "sha256": "f03c5550b455988d2e0c257d24bba81ea61a57eef9e5bef1f77394b65471d51c",
+        "capture": "evidence-hit-truncated-track",
+        "shows": "A click resolving to sparse point 114, whose COLMAP track is 17 photographs and whose retained sample is 15. Both numbers are stated, because a panel that said 15 would be lying by omission about the one thing the visitor asked.",
+        "proof_lens": "on",
+        "evidence_state": "hit",
+        "evidence_sentence": "17 photographs observed this point. 15 photographs of them are retained here, because each photograph keeps a bounded sample of its recorded observations."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/evidence-hit.jpg",
+        "byte_size": 272676,
+        "sha256": "5206a670fc80300f1082c6e325d00e0255d69a0b20e2727ec1278e470133cb20",
+        "capture": "evidence-hit",
+        "shows": "A click resolving to a point five photographs observed and five retain, where the sentence names one number because there is only one.",
+        "proof_lens": "on",
+        "evidence_state": "hit",
+        "evidence_sentence": "5 photographs observed this point."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/evidence-miss.jpg",
+        "byte_size": 272952,
+        "sha256": "95b0bb15db5054614e77af37f50677be15a01811bc22f2f1fb10020617a772e1",
+        "capture": "evidence-miss",
+        "shows": "A click that reaches no recorded observation, shown as the answer it is rather than swallowed, with the tolerance stated in both screen and source pixels.",
+        "proof_lens": "on",
+        "evidence_state": "miss",
+        "evidence_sentence": "No recorded observation is within reach of that click."
+      },
+      {
+        "path": "artifacts/2026-09-06-phase-10-atlas/evidence-centre-button.jpg",
+        "byte_size": 268552,
+        "sha256": "e68ceeaa70d2185012228ffbf6a77cc692da092de66b837e0cc5404f77b79d9f",
+        "capture": "evidence-centre-button",
+        "shows": "The same question asked from the button in the inspector, because the world canvas is aria-hidden and a gesture that exists only as a click on it exists only for sighted mouse users.",
+        "proof_lens": "on",
+        "evidence_state": "hit",
+        "evidence_sentence": "5 photographs observed this point."
+      }
+    ],
+    "screenshot": {
+      "path": "artifacts/2026-09-06-phase-10-atlas/evidence-hit-truncated-track.jpg",
+      "byte_size": 273365,
+      "sha256": "f03c5550b455988d2e0c257d24bba81ea61a57eef9e5bef1f77394b65471d51c"
+    },
+    "verification": {
+      "backend": "1719 passed, 3 skipped (serialized, 4m21s)",
+      "web": "815 passed; tsc --build clean; depcruise clean over 361 modules"
+    },
+    "limitations": [
+      "The proof lens over a region drawing an original photograph is deliberately absent: a photograph is the evidence, and tinting it would alter what is being offered. The photographed tier is named in the legend and paints nothing.",
+      "No region in either retained workspace draws a generated surface, so the generated tier's colour is exercised only by the legend and by tests, never over real geometry.",
+      "The world-view lens pair had to be captured within about thirteen seconds of arrival. MEASURED and reproduced on the unmodified tree at HEAD 104e415: in this headless browser the representation pressure controller reaches level 3 after six sixty-frame windows, the region's residency is capped at its stub, and the trained scene stops being drawn until something forces it resident again. That is a pre-existing behaviour of the arrival path and nothing here fixed it.",
+      "Click-to-evidence answers only from a recovered source camera. A midpoint between two photographs is refused rather than approximated, because no camera stood there.",
+      "The point a click selects is the nearest recorded sparse point, not the surface under the cursor. On this scene at an eight-screen-pixel tolerance, a grid of clicks over the frame resolved roughly a third of the time; the rest reached no recorded observation and said so.",
+      "Every photograph reports person_consent unavailable, because no per-person consent layer exists in this build. The answer reports that state and filters nothing."
+    ]
+  },
+  "record_sha256": "6d268347d204547c3bce959b7b8fbc0197295cf7dc2ae6a5fa3b05cb249bfdd5"
+}

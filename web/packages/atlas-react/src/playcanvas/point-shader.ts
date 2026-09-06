@@ -37,6 +37,7 @@
  *   uFog          vec4  x start, y end, z density, w enabled
  *   uFogColor     vec3
  *   uPalette[4]   vec4  one per provenance class: capture, inference, user, external
+ *   uLens         vec4  xyz proof-tier colour, w tint strength; all zero is the lens switched off
  *   uExposure     float display gain, never per point
  */
 
@@ -154,6 +155,19 @@ uniform vec4 uPalette[4];
 uniform vec3 uFogColor;
 uniform vec4 uPoint;
 /**
+ * The proof lens, as a RESOLVED colour and nothing else.
+ *
+ * xyz is the colour of the tier this island is currently showing, and w is how strongly to tint.
+ * Which tier that is, and which colour a tier gets, are both decided in @exulanica/presentation
+ * (proof-lens.ts) and delivered here already resolved: the shader cannot see a tier, cannot index
+ * a palette, and therefore cannot disagree with the legend the status panel prints.
+ *
+ * All zero is the lens switched off, and off must be indistinguishable from a build that has no
+ * lens. That is why this is a mix at the end rather than a branch: mix(rgb, anything, 0.0) is
+ * exactly rgb, so the off state costs one instruction and changes no pixel.
+ */
+uniform vec4 uLens;
+/**
  * Exposure. A point map carries albedo with no lighting model, so unlit albedo alone renders
  * dark. This is a single display gain and it is NOT a per-point value: it must never be able to
  * make one point look more certain than another.
@@ -202,6 +216,23 @@ void main(void) {
     // receding under both themes, and that is the whole claim being made.
     rgb = mix(rgb, uFogColor, (1.0 - vColor.a) * 0.55);
     rgb *= uExposure;
+
+    // THE PROOF LENS, APPLIED LAST: THE TIER'S HUE AT THIS PIXEL'S OWN BRIGHTNESS.
+    //
+    // The tier is a property of the whole island, so tinting flat would erase the surface and
+    // leave a coloured silhouette: a visitor could then read the tier but not check it against
+    // what is being drawn, which is the opposite of the point. Keeping the luminance and replacing
+    // only the hue leaves the geometry legible underneath the answer about where it came from.
+    //
+    // The delivered colour is DIVIDED BY ITS OWN LUMINANCE before it is applied. Multiplying by it
+    // instead was the first version, and on this palette it read as desaturation rather than as a
+    // colour: the tier colours are dark by design, so colour times luma lands near the ground for
+    // every bright pixel and the picture merely goes grey. Normalising keeps the hue the legend
+    // names at the brightness the surface actually has. This rescales a colour; it does not choose
+    // one, exactly as the provenance uPalette tint above it does not.
+    float lensLuma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 lensHue = uLens.rgb / max(dot(uLens.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.004);
+    rgb = mix(rgb, clamp(lensHue * lensLuma, 0.0, 1.0), uLens.a);
 
     // Coverage is the sprite footprint and the emphasis, and nothing else.
     float coverage = soft * (0.35 + 0.65 * emphasis) * (1.0 - vSemantic.z * 0.45);
@@ -328,6 +359,8 @@ export const POINT_FRAGMENT_WGSL = /* wgsl */ `
 uniform uPalette : array<vec4f, 4>;
 uniform uFogColor : vec3f;
 uniform uPoint : vec4f;
+/** The proof lens: a resolved tier colour in xyz and its tint strength in w. See the GLSL source. */
+uniform uLens : vec4f;
 uniform uExposure : f32;
 
 varying vColor : vec4f;
@@ -357,6 +390,11 @@ fn fragmentMain(input : FragmentInput) -> FragmentOutput {
     // thinned the cloud by confidence; charging it again would delete uncertain surfaces twice.
     // Fades toward the ground rather than toward black. See the GLSL source for why.
     rgb = mix(rgb, uniform.uFogColor, (1.0 - input.vColor.a) * 0.55) * uniform.uExposure;
+
+    // The proof lens: the tier's hue at this pixel's own brightness, exactly as in the GLSL path.
+    let lensLuma : f32 = dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
+    let lensHue : vec3f = uniform.uLens.rgb / max(dot(uniform.uLens.rgb, vec3f(0.2126, 0.7152, 0.0722)), 0.004);
+    rgb = mix(rgb, clamp(lensHue * lensLuma, vec3f(0.0), vec3f(1.0)), uniform.uLens.a);
 
     let coverage : f32 = (0.35 + 0.65 * emphasis) * (1.0 - input.vSemantic.z * 0.45);
     if (coverage < 0.2) {

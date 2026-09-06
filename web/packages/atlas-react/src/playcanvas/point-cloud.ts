@@ -235,6 +235,10 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     footprint * (1 - DISSOLVE_BAND_FRACTION),
     1,
   ]);
+  // The proof lens, off. Bound here rather than only when the lens is switched on, because an
+  // unbound uniform is read as whatever the device scope last held for that name, which on a
+  // second cloud would be the previous cloud's tier. The off state has to be a value.
+  material.setParameter('uLens', [0, 0, 0, 0]);
   material.update();
 
   if (semantics.some((s) => s.id >= MAX_SEGMENTS)) {

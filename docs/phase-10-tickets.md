@@ -292,29 +292,57 @@ person able to check it without reading JSON.
 **Exit.**
 
 - [x] Colour is decided in `@exulanica/presentation`, not inside `atlas-react`. `pnpm boundaries`
-      passes, which is what enforces this. Nothing delivers it to the renderer yet; see the open
-      criterion below.
+      passes, which is what enforces this. What crosses is `AtlasBinding.setProofLens`, taking one
+      already-resolved RGBA per region; the binding indexes no palette and knows no tier.
 - [x] The lens has a legend naming each tier in words, because a colour without a legend is a claim
       nobody can check. The status panel prints the tier label and its sentence per scene
-      (`proofTierDisclosure`), which is also what a screen reader and a screenshot get.
-- [ ] **The 3D view is not yet coloured.** The tier decision, its palette and its words exist and
-      are tested; nothing writes the palette into the renderer's per-frame island uniform. Until
-      that lands the lens is a sentence in the panel, not a colour in the world, and this ticket is
-      open. The wiring point is the existing `visual.uIsland` write in `atlas-binding.ts`, and it
-      cannot be covered by a test in this workspace: no test imports the engine, by the rule
-      `atlas-react/test/opm.test.ts` states, so it needs the bake-off page or a real scene on
-      screen.
+      (`proofTierDisclosure`), and the lens section prints all four tiers with the swatch the
+      renderer is actually given (`proofLensSwatch` reads the same palette row), which is also what
+      a screen reader and a screenshot get.
+- [x] **The 3D view is coloured.** EXECUTED 2026-09-06 against the retained real trained bowl in a
+      headless browser at 1280x720
+      (`docs/evaluation/2026-09-06-phase-10-atlas.json`, captures `lens-off`, `lens-on`,
+      `lens-off-again`). Two delivery paths, because the flagship scene needed the second: the
+      point-map shader takes a `uLens` vec4 written in the existing per-frame `uIsland` block, and
+      trained Gaussian geometry takes the same four numbers through a per-component work-buffer
+      modifier (`PROOF_LENS_SPLAT_MODIFIER`), which is the only hook that is genuinely per region
+      under unified gsplat rendering. A lens wired to the point clouds alone would have shown
+      nothing at all on the bowl, because `atlas-binding.ts` disables an island's point cloud for
+      any scene whose trained geometry loaded.
 - [x] A region whose scene is not drawn keeps its existing "Not drawn" disclosure under the lens
-      rather than being coloured as though it were showing something.
-- [ ] Toggling the lens changes no scene, no rung and no receipt. Untestable and unticked: there is
-      no toggle. The tier line is always shown in the status panel, and `proofTierOf` is a pure
-      function that writes no state at all, so there is nothing for such a test to assert on until
-      a toggle exists.
+      rather than being coloured as though it were showing something. The retained run has exactly
+      this case: the 40-photograph bowl scene is passed over for the 51-photograph trained one, and
+      it reports `unavailable` while the drawn scene reports `reconstructed`.
+- [x] Toggling the lens changes no scene, no rung and no receipt. There is a toggle now, so this is
+      testable and tested: `web/packages/app/test/proof-lens-toggle.test.ts` toggles three times and
+      asserts the scene records are unchanged by value, every rung disclosure's rendered markup is
+      identical, and the switch's only outward effect is the callback. The visible half is in the
+      retained captures: `lens-off-again` is a byte-identical encoded frame to `lens-off`.
+- [x] The lens leaves a photograph alone, and says so. A region showing an original photograph is
+      showing evidence, and tinting evidence would alter what is being offered as evidence, so the
+      `photographed` tier is named in the legend and paints nothing. The legend states that in
+      words rather than leaving the absence to be discovered.
 
-**Files.** New: a lens module in `web/packages/presentation/src/`, tests under
-`web/packages/presentation/test/` and `web/packages/app/test/`. Edit:
-`web/packages/atlas-react/src/playcanvas/atlas-binding.ts` (the existing per-frame `uIsland`
-uniform write), `web/packages/app/src/ui/status.ts`.
+**Files.** `web/packages/presentation/src/proof-lens.ts`, `web/packages/app/src/ui/proof-lens.ts`,
+tests under `web/packages/presentation/test/` and `web/packages/app/test/`. Edited:
+`web/packages/atlas-react/src/playcanvas/atlas-binding.ts` (the per-frame `uIsland` block, plus
+`setProofLens`), `point-shader.ts`, `point-cloud.ts`, `scene-splats.ts`,
+`web/packages/app/src/ui/status.ts`, `web/packages/app/src/main.ts`.
+
+**Two findings the run produced that are not this ticket's to fix.**
+
+- The work buffer behind trained Gaussian geometry has to be held open for about two and a half
+  seconds after a lens change, not for one frame. `WORKBUFFER_UPDATE_ONCE` asks for a single refill
+  and the tint took several seconds to appear or did not appear at all: this application runs with
+  `autoRender` off, and installing the modifier rebuilds a shader whose link is deferred, so a
+  single requested refill can run through the shader that has no lens in it and nothing asks again.
+  `PROOF_LENS_SETTLE_SECONDS` is that window and it closes itself.
+- MEASURED and reproduced on the unmodified tree at HEAD `104e415`: in a headless browser the
+  representation pressure controller reaches level 3 about thirteen seconds after arrival, which
+  caps the region's residency at its stub, and the trained scene stops being drawn until something
+  forces it resident again. Opening the inspector does force it, which is why the retained captures
+  include a second lens pair taken from a recovered camera. This is a pre-existing behaviour of the
+  arrival path; nothing here fixed it and nothing here caused it.
 
 ### P10-A-b Click-to-evidence
 
@@ -341,9 +369,12 @@ product's whole epistemic claim made physical.
       `track_length` beside the number of observations actually held, and says the held set is a
       bounded sample. A UI that showed "3 photographs" for a point with a track length of 40 would
       be lying by omission.
-- [ ] Clicking trained (SOG) geometry, which carries no per-splat provenance, either resolves
-      through the same sparse points or says it cannot. It never reprojects into cameras and
-      presents the result as though it were recorded observation.
+- [x] Clicking trained (SOG) geometry, which carries no per-splat provenance, resolves through the
+      same sparse points and says that is what it did: the panel states that the point is the
+      nearest one COLMAP recorded and not the surface under the pointer, and gives the pixel
+      distance. It never reprojects into cameras and presents the result as though it were
+      recorded observation; the photographs listed are the ones whose observations of that point
+      the receipt holds. EXECUTED 2026-09-06 over the trained bowl.
 - [x] Each listed observation carries the photograph's consent state, from the same seam the World
       Read bundle uses (`consent_for_captures`).
 - [ ] A photograph whose person state forbids it is not offered. Open, and it is P10-5's to close:
@@ -353,14 +384,29 @@ product's whole epistemic claim made physical.
       `tombstone_blocks_scene` (not `tombstone_blocks_capture`, which is the wrong reduction for a
       fact about N photographs) and `person_withdrawal_blocks_artifact`.
 
-- [ ] **The inspector does not yet listen for a click.** `pickObservedPoint` and
-      `canvasToSourcePixel` are built and tested against a known camera, and
-      `GET /world-read/scenes/{id}/observations` serves the recorded graph, but nothing in
-      `reconstruction-inspector.ts` binds a pointer event to them or draws the result. Until that
-      lands a visitor cannot click anything, and this ticket is open.
+- [x] **The inspector listens for a click.** EXECUTED 2026-09-06 against the retained real trained
+      bowl: a click at (599, 435) on a 1280x720 canvas resolved to sparse point 114 and listed the
+      fifteen photographs the receipt holds for it, each with its consent state
+      (`docs/evaluation/2026-09-06-phase-10-atlas.json`). The gesture is bound to the world canvas
+      under the mount's own `AbortController` and guarded on the inspector being open, so traverse
+      is untouched.
+- [x] The pick is inverted through the RAW recovered camera from the graph snapshot, not the
+      display-frame-composed one the renderer is given, because the observation graph's world
+      coordinates are the recovered COLMAP frame and are composed with nothing. MEASURED
+      2026-09-06: reprojecting every retained observation of the first photograph through that
+      transform reproduces COLMAP's own recorded pixel to a median of 2.83 px and a maximum of
+      9.88 px on a 3060x4080 original, which is the SIMPLE_RADIAL distortion the camera declares
+      as `pinhole-approximation` and this projection does not apply.
+- [x] A null pick is shown as an answer rather than swallowed, with the tolerance stated in both
+      screen and source pixels. It is a common answer and not an edge case: at an eight-screen-pixel
+      tolerance a grid of clicks over the retained scene resolved roughly a third of the time.
+- [x] The gesture has a keyboard-reachable equivalent inside the inspector, because the world
+      canvas carries `aria-hidden="true"` by deliberate decision and a gesture that exists only as
+      a click on it exists only for sighted mouse users.
 
 **Files.** New: `exulanica/graph/observations.py`, `exulanica/api/routes/world_read.py` (second
-route), `web/packages/atlas-core/src/observation-pick.ts`, tests in both workspaces. Still to edit:
+route), `web/packages/atlas-core/src/observation-pick.ts`,
+`web/packages/app/src/observations-api.ts`, tests in both workspaces. Edited:
 `web/packages/app/src/ui/reconstruction-inspector.ts`, `web/packages/app/src/main.ts`.
 
 ---

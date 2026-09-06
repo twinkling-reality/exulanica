@@ -823,6 +823,81 @@ button.ghost {
 .reconstruction-inspector img { display: block; width: 100%; height: auto; margin-top: 0.6rem; }
 .reconstruction-inspector > button { margin-top: 0.8rem; }
 
+/* ---------------------------------------------------------------- the proof lens and evidence */
+
+/*
+ * The lens switch and its legend stand apart from the status line rather than inside it. The
+ * status bar is one flex row of small faint sentences along the bottom; a four-row legend with
+ * swatches inside it would wrap into the world. This is the same treatment the availability panel
+ * already gets, at a lower stacking order so the inspector and the loading line still sit above it.
+ */
+.proof-lens {
+  position: fixed;
+  left: var(--gap);
+  bottom: 3.2rem;
+  width: min(24rem, calc(100vw - 2 * var(--gap)));
+  padding: 0.9rem 1.1rem;
+  display: grid;
+  gap: 0.55rem;
+  background: var(--raised);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  font: 400 0.8rem/1.5 var(--ui-font-body);
+  text-shadow: none;
+  pointer-events: auto;
+  z-index: 55;
+}
+.proof-lens h2 {
+  margin: 0;
+  font: 500 0.72rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.proof-lens .proof-lens-copy { color: var(--ink-faint); }
+.proof-lens-toggle { justify-self: start; }
+.proof-lens-legend { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.proof-lens-legend li { display: grid; grid-template-columns: 0.7rem 1fr; gap: 0.6rem; align-items: start; }
+.proof-lens-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.35em;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.proof-lens-legend-text { color: var(--ink-faint); }
+.proof-lens-limit { color: var(--ink-faint); }
+/* The lens belongs to the world. It says nothing about the Index or the Map, so it leaves them. */
+#shell:not([data-primary='world']) .proof-lens,
+#shell[data-camera='map'] .proof-lens { display: none; }
+
+.reconstruction-evidence {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent);
+  display: grid;
+  gap: 0.5rem;
+}
+.reconstruction-evidence h3 {
+  margin: 0;
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.reconstruction-evidence p { margin: 0; }
+.reconstruction-evidence-how, .reconstruction-evidence-detail { color: var(--ink-faint); font-size: 0.78rem; }
+.reconstruction-evidence-resolve { justify-self: start; }
+.reconstruction-evidence-state { font-weight: 500; }
+.reconstruction-evidence-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.7rem; }
+.reconstruction-evidence-photograph { font-size: 0.78rem; }
+.reconstruction-evidence-photograph p { margin: 0.15rem 0 0; }
+.reconstruction-evidence-title { font-weight: 500; }
+.reconstruction-evidence-where,
+.reconstruction-evidence-consent,
+.reconstruction-evidence-unavailable { color: var(--ink-faint); }
+.reconstruction-evidence[data-evidence='miss'] .reconstruction-evidence-state { color: var(--warning); }
+
 /* ------------------------------------------------------------------ Atlas system surfaces */
 
 .atlas-commands {
