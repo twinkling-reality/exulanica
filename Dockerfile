@@ -48,15 +48,17 @@ FROM python:3.11-slim-trixie AS runtime
 LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exulanica"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-# Three apt packages, and only these: psycopg[binary] ships its own libpq and Pillow ships its
-# own image libraries, so the runtime needs nothing else from Debian. libvulkan1 is the Vulkan
-# loader the SOG compressor's WebGPU backend opens when the scene worker runs on a GPU host with
-# the NVIDIA runtime's graphics capability; the NVIDIA Vulkan ICD it then loads is
-# libGLX_nvidia.so.0, which links libX11 and libXext even with no display (MEASURED 2026-09-06:
-# the loader reported "libX11.so.6: cannot open shared object file" and found no driver). Without
-# a GPU all three are inert. Every package added here is a package somebody has to patch.
+# The only apt packages, and each one is here for the SOG compressor's GPU path: psycopg[binary]
+# ships its own libpq and Pillow its own image libraries, so nothing else is needed from Debian.
+# libvulkan1 is the Vulkan loader the compressor's WebGPU backend opens when the scene worker runs
+# on a GPU host with the NVIDIA runtime's graphics capability. The NVIDIA Vulkan ICD it loads is
+# libGLX_nvidia.so.0, which links libX11 and libXext even with no display, and its glcore library
+# resolves the ErrorF symbol from libglvnd's GLX dispatch (MEASURED 2026-09-06: without them the
+# loader reported "libX11.so.6: cannot open shared object file", then "undefined symbol: ErrorF",
+# and found no driver). Without a GPU every one of these is inert. Every package added here is a
+# package somebody has to patch.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libvulkan1 libx11-6 libxext6 \
+ && apt-get install -y --no-install-recommends libvulkan1 libx11-6 libxext6 libglvnd0 libglx0 libgl1 libegl1 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 exulanica \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home exulanica \
