@@ -134,3 +134,35 @@ def test_the_only_new_person_tables_are_the_three_declared_ones():
         if line.startswith("create table ")
     }
     assert created == {"person_subject", "person_region", "person_presentation_consent"}
+
+
+def test_the_privacy_policy_version_moved_so_old_receipts_are_provably_old():
+    """The digest of these parameters is in every receipt; bumping it forces a re-screening.
+
+    Deliberately not free. The two retained collections were screened under version 1, whose only
+    eligible answer about a photograph with somebody in it was that there was nobody in it, and
+    carrying those receipts forward unchanged would carry that answer forward with them.
+    """
+    from exulanica.ingest.privacy import PRIVACY_POLICY_PARAMS, PRIVACY_POLICY_VERSION
+
+    assert PRIVACY_POLICY_VERSION == "exulanica.reconstruction-privacy/v2"
+    assert PRIVACY_POLICY_PARAMS["masking"] != "not-implemented"
+    assert PRIVACY_POLICY_PARAMS["default_state"].startswith("hidden-until")
+    assert PRIVACY_POLICY_PARAMS["biometric_templates"] == "never"
+
+
+def test_the_policy_names_three_separate_consents():
+    from exulanica.ingest.privacy import PRIVACY_POLICY_PARAMS
+
+    consents = PRIVACY_POLICY_PARAMS["consents"]
+    for scope in ("presence", "naming", "likeness"):
+        assert scope in consents
+
+
+def test_the_receipt_vocabulary_is_the_one_the_resolver_uses():
+    """Two spellings of the five states is how one of them quietly grows a sixth."""
+    from exulanica.consent.states import MASKED_STATES
+    from exulanica.ingest.privacy import _REGION_STATES
+
+    assert MASKED_STATES <= _REGION_STATES
+    assert {"unknown", "present", "shown", "hidden", "withdrawn"} == _REGION_STATES
