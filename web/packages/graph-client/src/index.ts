@@ -25,8 +25,6 @@
 
 export type { GraphPayload } from './wire.js';
 
-export type { GeneratedGeometryRecord } from './read-model.js';
-
 export type { IslandOf } from './islands.js';
 
 export type { GraphLoadState, GraphSource, TerminalGraphLoadState } from './source.js';
@@ -95,3 +93,8 @@ export {
   occurrencesOf,
   openQuestionCount,
 } from './read-model.js';
+
+// Appended at the end of this barrel rather than beside the other read-model exports, because the
+// person-consent branch inserts its own block at exactly that point and the two would conflict
+// over an insertion order neither of them cares about.
+export type { GeneratedGeometryRecord } from './read-model.js';

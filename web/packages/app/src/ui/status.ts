@@ -7,13 +7,17 @@ import type {
   TrainingQualityRecord,
 } from '@exulanica/graph-client';
 import { rungSentence } from '@exulanica/formation';
+import { el } from './dom.js';
+
+// Imported below the local import rather than beside the other package imports, because the
+// person-consent branch adds its own import directly above `rungSentence` and adjacent inserts
+// conflict over nothing.
 import {
   PROOF_TIER_LABELS,
   PROOF_TIER_SENTENCES,
   proofTierOf,
   type ProofTier,
 } from '@exulanica/presentation';
-import { el } from './dom.js';
 
 /** Fixed by interaction-model.md 6.2 and shown with Atlas Map, where layout can be misread. */
 export const MAP_ORIENTATION_CAPTION =
@@ -176,13 +180,6 @@ export function buildStatus(input: StatusInput): HTMLElement {
         text: `${scene.registeredMemberCount} of ${scene.memberCount} photographs registered.`,
       }),
     );
-    const proof = proofTierDisclosure(scene);
-    const proofLine = el('p', {
-      class: 'reconstruction-proof-tier',
-      text: `${proof.label}. ${proof.sentence}`,
-    });
-    proofLine.dataset.proofTier = proof.tier;
-    details.append(proofLine);
     if (scene.reasons.length > 0) {
       const reasons = el('ul', { class: 'reconstruction-rung-reasons' });
       for (const reason of scene.reasons) reasons.append(el('li', { text: reason }));
@@ -193,6 +190,16 @@ export function buildStatus(input: StatusInput): HTMLElement {
         details.append(el('p', { class: 'reconstruction-rung-quality', text: sentence }));
       }
     }
+    // Last of the sentences and before the buttons, so it reads as the summary of everything above
+    // it. Also deliberately far from the registration paragraph, which is where the person-consent
+    // branch appends its own line.
+    const proof = proofTierDisclosure(scene);
+    const proofLine = el('p', {
+      class: 'reconstruction-proof-tier',
+      text: `${proof.label}. ${proof.sentence}`,
+    });
+    proofLine.dataset.proofTier = proof.tier;
+    details.append(proofLine);
     if (scene.renderingSubstrate !== 'source_photographs' && input.onInspectScene !== undefined) {
       const inspect = el('button', { type: 'button', text: 'Inspect reconstruction' });
       inspect.addEventListener('click', () => input.onInspectScene?.(scene.sceneId));
