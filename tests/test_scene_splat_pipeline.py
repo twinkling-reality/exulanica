@@ -423,6 +423,19 @@ def _evaluation_fixture(tmp_path):
     return rendered, metrics
 
 
+def test_evaluation_bundle_budget_is_the_stage_parameter_and_holds_a_210_photograph_capture():
+    """MEASURED 2026-09-06: 27 held-out 12 MP views overflowed the 256 MiB budget of version 1."""
+    from exulanica.ingest.scene_splat import EVALUATION_MAX_BYTES
+    from exulanica.ingest.stages import STAGES
+
+    spec = STAGES["scene_splat_evaluation"]
+    assert spec.version == 2
+    assert spec.params["max_bytes"] == 1_073_741_824
+    assert spec.params["max_bytes"] == EVALUATION_MAX_BYTES
+    # 27 renders of about 9 MB and 27 rectified references of about 6 MB, with headroom.
+    assert EVALUATION_MAX_BYTES > 27 * (9 + 6) * 1024 * 1024 * 2
+
+
 def test_private_evaluation_bundle_retains_verified_pixels_and_excludes_scratch(tmp_path):
     rendered, metrics = _evaluation_fixture(tmp_path)
     first = evaluation_bundle(tmp_path)

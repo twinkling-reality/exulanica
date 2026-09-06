@@ -411,13 +411,18 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "scene_splat_evaluation": StageSpec(
         key="scene_splat_evaluation",
-        version=1,
+        # Version 2 raises only the retained-byte budget. MEASURED 2026-09-05/06: the 210-photograph
+        # volcanic set holds out 27 views at 12 MP; its first bundle (PNG renders plus rectified
+        # references) was 266.9 MB and passed the 256 MiB budget by 1.5 MB, its second exceeded it
+        # and the completed run lost its receipt and bundle. 1 GiB keeps every held-out view of a
+        # capture that size at full resolution; the bundle format is unchanged.
+        version=2,
         output_kind="scene_splat_evaluation_bundle",
         deterministic=True,
         params={
             "profile": "exulanica.scene-splat-evaluation/v1",
             "container": "zip-stored/1",
-            "max_bytes": 268_435_456,
+            "max_bytes": 1_073_741_824,
             "files": ["metrics", "runtime", "split", "preparation", "attempts", "heldout-pixels"],
             "delivery": "private-operational-artifact-no-browser-route",
         },

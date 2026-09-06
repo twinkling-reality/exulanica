@@ -21,6 +21,7 @@ from typing import Any
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import TombstonedError
+from exulanica.ingest.stages import STAGES
 from exulanica.reconstruction.gsplat_protocol import GSPLAT_REVISION
 from exulanica.reconstruction.pose import CommandResult, PoseBuildManifest
 from exulanica.reconstruction.splat import SplatBuildManifest
@@ -30,7 +31,9 @@ class ContainerCleanupUnconfirmed(RuntimeError):
     """The owned external worker may still hold source mounts; scratch must be retained."""
 
 
-EVALUATION_MAX_BYTES = 256 * 1024 * 1024
+#: The stage parameter is the single source of the budget, so the value that enters stage
+#: identity is the value the packager enforces.
+EVALUATION_MAX_BYTES = int(STAGES["scene_splat_evaluation"].params["max_bytes"])
 
 
 def evaluation_bundle(output: Path) -> bytes:

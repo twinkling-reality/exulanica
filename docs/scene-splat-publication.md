@@ -48,8 +48,10 @@ evaluation ZIP is keyed by its actual retained content.
 
 `scene_splat_training` and `scene_splat_delivery` are nondeterministic stages. The separate
 `scene_splat_evaluation` stage deterministically packages fixed generated output bytes as a ZIP
-with stable ordering and timestamps. Its 256 MiB budget and allowed file classes enter stage
-identity. It retains metrics, runtime/package inventory, required runtime-bound split and preprocessing receipts,
+with stable ordering and timestamps. Its retained-byte budget and allowed file classes enter stage
+identity; version 2 raised the budget from 256 MiB to 1 GiB after the 27 held-out 12 MP views of
+the volcanic set produced a 266.9 MB bundle once and an over-budget one the next run, which lost
+that completed run's receipt. It retains metrics, runtime/package inventory, required runtime-bound split and preprocessing receipts,
 attempt accounting, every declared held-out PNG, and rectified held-out reference pixels when they
 differ from retained originals. Companion files must reproduce the runtime's digest bindings;
 pixel files must reproduce their metric digests. Checkpoints and
