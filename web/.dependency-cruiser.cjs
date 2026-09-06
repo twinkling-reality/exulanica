@@ -195,11 +195,14 @@ module.exports = {
       name: 'engine-specific-code-stays-behind-the-binding',
       severity: 'error',
       comment:
-        'Only the binding layer and the bake-off harness may name an engine. If ADR-0003 flips ' +
-        'to PlayCanvas, this rule is what guarantees the blast radius is two packages.',
+        'Only the binding layer and the two harnesses may name an engine. If ADR-0003 flips ' +
+        'to PlayCanvas, this rule is what guarantees the blast radius stays small. ' +
+        'companion-forms is on the list because the roadmap requires a world-rendered Companion ' +
+        'prototype before a depth contract can be approved, and a prototype that could not name ' +
+        'a renderer would be prototyping something else.',
       from: {
         path: String.raw`^packages/`,
-        pathNot: String.raw`^packages/(atlas-three|atlas-react|bakeoff)/`,
+        pathNot: String.raw`^packages/(atlas-three|atlas-react|bakeoff|companion-forms)/`,
       },
       to: { path: `${RENDERER}|${pkgRef('atlas-three')}` },
     },
@@ -214,6 +217,18 @@ module.exports = {
         'It also may not import scene-synth: the fixture crosses as bytes over HTTP.',
       from: { path: pkg('bakeoff') },
       to: { path: notPkgRef('bakeoff', 'atlas-core', 'atlas-three') },
+    },
+
+    // ---- companion-forms: the Companion depth prototypes -------------------------------------
+    {
+      name: 'companion-forms-imports-presentation-only',
+      severity: 'error',
+      comment:
+        'The bench compares presentations of one identity, so it reads the versioned appearance ' +
+        'contract and nothing else. It may not reach the app, the binding, graph-client or ' +
+        'companion-runtime: a prototype that could see a graph would be prototyping a product.',
+      from: { path: pkg('companion-forms') },
+      to: { path: notPkgRef('companion-forms', 'presentation') },
     },
 
     // ---- formation: the contract two surfaces share ------------------------------------------

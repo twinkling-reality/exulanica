@@ -17,7 +17,9 @@
     "app:build": "pnpm --filter @exulanica/app build",
     "landing": "pnpm --filter @exulanica/landing dev",
     "landing:build": "pnpm --filter @exulanica/landing build",
-    "bakeoff:build": "pnpm --filter @exulanica/bakeoff build"
+    "bakeoff:build": "pnpm --filter @exulanica/bakeoff build",
+    "forms": "pnpm --filter @exulanica/companion-forms dev",
+    "forms:build": "pnpm --filter @exulanica/companion-forms build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

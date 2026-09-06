@@ -1,17 +1,44 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/graph-client" },
-    { "path": "./packages/formation" },
-    { "path": "./packages/atlas-core" },
-    { "path": "./packages/presentation" },
-    { "path": "./packages/companion-runtime" },
-    { "path": "./packages/world-index" },
-    { "path": "./packages/atlas-react" },
-    { "path": "./packages/scene-synth" },
-    { "path": "./packages/atlas-three" },
-    { "path": "./packages/bakeoff" },
-    { "path": "./packages/landing" },
-    { "path": "./packages/app" }
+    {
+      "path": "./packages/graph-client"
+    },
+    {
+      "path": "./packages/formation"
+    },
+    {
+      "path": "./packages/atlas-core"
+    },
+    {
+      "path": "./packages/presentation"
+    },
+    {
+      "path": "./packages/companion-runtime"
+    },
+    {
+      "path": "./packages/world-index"
+    },
+    {
+      "path": "./packages/atlas-react"
+    },
+    {
+      "path": "./packages/scene-synth"
+    },
+    {
+      "path": "./packages/atlas-three"
+    },
+    {
+      "path": "./packages/bakeoff"
+    },
+    {
+      "path": "./packages/companion-forms"
+    },
+    {
+      "path": "./packages/landing"
+    },
+    {
+      "path": "./packages/app"
+    }
   ]
 }

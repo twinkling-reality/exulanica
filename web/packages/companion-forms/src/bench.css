@@ -1,0 +1,155 @@
+/*
+ * Bench chrome, deliberately plain.
+ *
+ * The three candidates sit on the same neutral ground at the same size, because a bench that
+ * flatters one of them is not a bench. Nothing here is product styling and none of it should be
+ * copied into one: the world profile owns how the Companion's surroundings look.
+ */
+
+:root {
+  color-scheme: light;
+  --bench-ground: #f7f9f7;
+  --bench-ink: #121715;
+  --bench-ink-soft: #45514b;
+  --bench-rule: #dfe4e0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: clamp(1.5rem, 3vw, 3rem);
+  background: var(--bench-ground);
+  color: var(--bench-ink);
+  font: 400 15px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.bench-header h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.bench-header p {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--bench-ink-soft);
+}
+
+.bench-controls,
+.bench-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-top: 1.5rem;
+}
+
+.bench-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bench-ink-soft);
+}
+
+.bench-control select,
+.bench-actions button {
+  font: inherit;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--bench-ink);
+  padding: 0.4rem 0.6rem;
+  background: #fff;
+  border: 1px solid var(--bench-rule);
+  border-radius: 4px;
+}
+
+.bench-actions button { cursor: pointer; }
+
+.bench-status {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--bench-ink-soft);
+}
+
+.bench-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.bench-tile {
+  border: 1px solid var(--bench-rule);
+  border-radius: 8px;
+  padding: 1.1rem;
+  background: #fff;
+}
+
+.bench-tile h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.bench-summary {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  color: var(--bench-ink-soft);
+}
+
+/* Every candidate gets exactly the same box. */
+.form-canvas {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 15rem;
+  margin: 0 auto;
+  display: block;
+}
+
+.form-canvas svg,
+.form-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bench-readout {
+  margin: 0.9rem 0 0;
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.74rem;
+  color: var(--bench-ink-soft);
+}
+
+.bench-dossier {
+  margin: 0.9rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--bench-rule);
+  font-size: 0.78rem;
+}
+
+.bench-dossier dt {
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: var(--bench-ink-soft);
+}
+
+.bench-dossier dd {
+  margin: 0.2rem 0 0.7rem;
+  color: var(--bench-ink);
+}
+
+.bench-solo {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}

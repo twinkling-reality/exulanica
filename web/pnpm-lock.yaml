@@ -117,6 +117,19 @@ importers:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(tsx@4.23.12)
 
+  packages/companion-forms:
+    dependencies:
+      '@exulanica/presentation':
+        specifier: workspace:*
+        version: link:../presentation
+    devDependencies:
+      playcanvas:
+        specifier: 2.21.4
+        version: 2.21.4
+      vite:
+        specifier: ^6
+        version: 6.4.3(@types/node@22.20.1)(lightningcss@1.33.0)(tsx@4.23.12)
+
   packages/companion-runtime:
     dependencies:
       '@exulanica/atlas-core':

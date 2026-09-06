@@ -1,0 +1,19 @@
+{
+  "name": "@exulanica/companion-forms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@exulanica/presentation": "workspace:*"
+  },
+  "devDependencies": {
+    "playcanvas": "2.21.4",
+    "vite": "^6"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --build"
+  }
+}
