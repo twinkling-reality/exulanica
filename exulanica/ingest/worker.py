@@ -53,6 +53,7 @@ from typing import Final
 
 import psycopg
 
+from exulanica.consent.regions import PersonDetector
 from exulanica.db.session import Database
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
@@ -230,6 +231,7 @@ class DerivativeWorker:
         *,
         vision: VisionModel | None = None,
         depth: DepthModel | None = None,
+        detector: PersonDetector | None = None,
         name: str = "derivatives",
         poll_seconds: float = _POLL_SECONDS,
         lease_seconds: float = MINIMUM_LEASE_SECONDS,
@@ -253,6 +255,7 @@ class DerivativeWorker:
         self._workspaces = workspaces
         self._vision = vision
         self._depth = depth
+        self._detector = detector
         self._name = name
         self._poll_seconds = poll_seconds
         self._lease_seconds = lease_seconds
@@ -585,7 +588,11 @@ class DerivativeWorker:
         keeper: _LeaseKeeper,
     ) -> None:
         pipeline = PhotoIngestPipeline(
-            repository, self._store, vision=self._vision, depth=self._depth
+            repository,
+            self._store,
+            vision=self._vision,
+            depth=self._depth,
+            detector=self._detector,
         )
         total = len(claimed.capture_ids)
         for capture_id in claimed.capture_ids:
@@ -743,9 +750,7 @@ class DerivativeWorker:
         return min(60.0, float(2 ** max(0, attempt - 1)))
 
     @staticmethod
-    def _close_batch(
-        repository: IngestRepository, batch_id: uuid.UUID | None, status: str
-    ) -> None:
+    def _close_batch(repository: IngestRepository, batch_id: uuid.UUID | None, status: str) -> None:
         """Close the watched intake with what happened, which is what ends the stream.
 
         The caller computes the status rather than handing over counts, because two of the three

@@ -24,6 +24,7 @@ exists to prevent, so they become a whole-frame region instead.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import uuid
 from collections.abc import Sequence
@@ -31,11 +32,12 @@ from typing import Any
 
 from PIL import Image
 
+from exulanica.canonical import sha256_digest
 from exulanica.consent.regions import DetectedPerson, region_key
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import DisplayGeometry
 from exulanica.ingest.ledger import Ledger
-from exulanica.ingest.person_receipts import person_region_list
+from exulanica.ingest.person_receipts import person_region_list, region_edit_receipt
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
@@ -91,15 +93,18 @@ def run(
     blob_id: BlobId,
     upright: Image.Image,
     capture_id: uuid.UUID,
+    intake: StageResult,
     vision: StageResult | None,
     ledger: Ledger,
     outcome: IngestOutcome,
 ) -> StageResult | None:
     """Propose regions for one photograph, or record honestly that nothing looked."""
     spec = stage("person_regions")
-    if detector is None or vision is None:
+    if detector is None or (detector.requires_observation and vision is None):
         # "Nothing looked" and "looked and found nobody" are different facts and must stay
         # different rows: the first blocks geometry under default deny and the second does not.
+        # A detector that needs the vision observation and has none has not looked, whatever an
+        # empty result from it would suggest.
         outcome.stages_skipped.append(spec.key)
         outcome.stages_unavailable.append(spec.key)
         ledger.unavailable(
@@ -112,14 +117,12 @@ def run(
             input_blob=blob_id,
         )
         return None
-    pinned = str(spec.params["detector"])
-    if detector.model_id != pinned:
-        raise ValueError(
-            f"stage version {spec.version} pins detector {pinned!r} and was handed "
-            f"{detector.model_id!r}. Swapping a detector without editing the stage parameters "
-            "would leave the corpus keyed as though nothing had changed."
-        )
-    input_digest = input_digest_of([vision.content_sha256])
+    # The observation when there is one, the source bytes otherwise, and always the identity of
+    # the detector that will be asked. Its identity is an input to this region list in the plainest
+    # sense: change the detector and the regions are a different answer, so the key must move and
+    # the old artifact must not be reused.
+    upstream = [intake.content_sha256] if vision is None else [vision.content_sha256]
+    input_digest = input_digest_of([*upstream, sha256_digest(detector.model_id.encode("utf-8"))])
     key = idempotency_key(blob_id, spec, input_digest)
     existing = writes.repository.find_artifact(key)
     if existing is not None and existing.content_sha256 is not None:
@@ -131,14 +134,16 @@ def run(
             idempotency_key=key,
             reused=True,
         )
-    document = json.loads(writes.store.get(BlobId(vision.content_sha256)))
-    context = {
-        "person_boxes": located_people(document),
-        "unlocated_people": unlocated_people(document),
-    }
-    with ledger.stage(
-        spec, input_artifact_ids=[vision.artifact_id], input_blob=blob_id
-    ) as recorder:
+    if vision is None:
+        context: dict[str, Any] = {"person_boxes": [], "unlocated_people": 0}
+    else:
+        document = json.loads(writes.store.get(BlobId(vision.content_sha256)))
+        context = {
+            "person_boxes": located_people(document),
+            "unlocated_people": unlocated_people(document),
+        }
+    inputs = [intake.artifact_id] if vision is None else [vision.artifact_id]
+    with ledger.stage(spec, input_artifact_ids=inputs, input_blob=blob_id) as recorder:
         display = DisplayGeometry(w=upright.width, h=upright.height)
         detections = detector.detect(upright, context)
         payload = encode_region_list(
@@ -151,7 +156,7 @@ def run(
             unlocated=int(context["unlocated_people"]),
         )
         with writes.committed_writes() as pending:
-            return writes.persist_artifact(
+            result = writes.persist_artifact(
                 spec=spec,
                 blob_id=blob_id,
                 key=key,
@@ -162,6 +167,16 @@ def run(
                 pending=pending,
                 produced_by_event=recorder.stage_started_event,
             )
+            _record_regions(
+                writes,
+                blob_id=blob_id,
+                capture_id=capture_id,
+                detections=detections,
+                display=display,
+                detector_id=detector.model_id,
+                unlocated=int(context["unlocated_people"]),
+            )
+        return result
 
 
 def encode_region_list(
@@ -187,3 +202,72 @@ def encode_region_list(
             unlocated_people=unlocated,
         )
     )
+
+
+def _record_regions(
+    writes: StageWrites,
+    *,
+    blob_id: BlobId,
+    capture_id: uuid.UUID,
+    detections: Sequence[DetectedPerson],
+    display: DisplayGeometry,
+    detector_id: str,
+    unlocated: int,
+) -> None:
+    """Write one ``detected`` edit per proposed region, in the transaction that stores the artifact.
+
+    **This is what arms default deny.** A detected row carries no subject, and
+    ``person_region_is_masked`` in migration 0037 returns true for a null subject, so from the
+    moment these rows exist the photograph requires masking and the geometry trigger will refuse a
+    point map over the original bytes. Writing the artifact without these rows, which is what this
+    stage did before, left the whole database guard inert: `capture_requires_masking` was false for
+    every capture in every workspace because nothing had ever written to the table it reads.
+
+    Recorded inside ``committed_writes`` so the rows and the artifact commit together. A region
+    list that survived without its rows would claim a screening that arms nothing.
+    """
+    if not detections and not unlocated:
+        return
+    repository = writes.repository
+    recorded_at = dt.datetime.now(dt.UTC)
+    for found in detections:
+        key = region_key(blob_id, found.silhouette, display)
+        sequence = repository.next_person_region_sequence(capture_id=capture_id, region_key=key)
+        if sequence:
+            # Somebody has already edited this region, and a re-run of a detector must not
+            # overwrite a human's decision. The bucketed key exists precisely so that the second
+            # run lands here rather than proposing the same body again.
+            continue
+        edit_id, record, canonical, digest = region_edit_receipt(
+            workspace_id=repository.workspace_id,
+            capture_id=capture_id,
+            source_sha256=blob_id.hex,
+            region_key=key,
+            sequence=0,
+            action="detected",
+            shape=found.shape,
+            silhouette=found.silhouette,
+            subject_id=None,
+            actor=None,
+            detector_id=detector_id,
+            confidence=found.confidence,
+            recorded_at=recorded_at,
+        )
+        repository.insert_person_region_edit(
+            region_edit_id=edit_id,
+            capture_id=capture_id,
+            source_sha256=blob_id,
+            region_key=key,
+            sequence=0,
+            action="detected",
+            shape=found.shape,
+            silhouette=found.silhouette.as_digest_input(),
+            subject_id=None,
+            detector_id=detector_id,
+            confidence=found.confidence,
+            confirmed_by=None,
+            recorded_at=recorded_at,
+            region_record=record,
+            region_canonical=canonical,
+            region_digest=digest,
+        )

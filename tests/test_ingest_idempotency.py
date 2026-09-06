@@ -284,18 +284,22 @@ def test_ingest_without_a_vision_model_records_capture_facts_and_says_vision_did
     report = PhotoIngestPipeline(repository, store, vision=None).ingest_directory(photo_dir)
 
     outcome = report.outcomes[0]
-    # Depth joins vision here: neither model is configured, and a stage that never ran is
-    # reported as skipped rather than as failed. The capture is complete for
-    # capture-supported facts and incomplete for inference, which is two different things.
-    assert outcome.stages_skipped == ["vision", "depth"]
-    assert outcome.stages_unavailable == ["vision", "depth"]
+    # Depth and person_regions join vision here: no model and no detector are configured, and a
+    # stage that never ran is reported as skipped rather than as failed. The capture is complete
+    # for capture-supported facts and incomplete for inference, which is two different things.
+    #
+    # person_regions being UNAVAILABLE rather than absent is the point. "Nobody looked for people"
+    # and "somebody looked and found none" are different facts, and only the second one may let a
+    # photograph through; a stage that vanished silently from this list would collapse them.
+    assert outcome.stages_skipped == ["vision", "person_regions", "depth"]
+    assert outcome.stages_unavailable == ["vision", "person_regions", "depth"]
     assert outcome.model_calls == 0
     unavailable = repository.connection.execute(
         "select stage_key, duration_ms, cost, error_class from pipeline_event "
         "where run_id = %s and type = 'stage_unavailable' order by seq",
         (outcome.run_id,),
     ).fetchall()
-    assert [row["stage_key"] for row in unavailable] == ["vision", "depth"]
+    assert [row["stage_key"] for row in unavailable] == ["vision", "person_regions", "depth"]
     assert all(row["duration_ms"] is None and row["cost"] is None for row in unavailable)
     assert all(row["error_class"] == "unavailable" for row in unavailable)
     kinds = [

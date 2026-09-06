@@ -27,12 +27,20 @@ from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role
 from exulanica.store.local import LocalContentAddressedStore
 
-__all__ = ["DATA_DIR_ENV", "DEPTH_MODEL_ENV", "WORKSPACES_ENV", "main", "parse_workspaces"]
+__all__ = [
+    "DATA_DIR_ENV",
+    "DEPTH_MODEL_ENV",
+    "PERSON_DETECTOR_ENV",
+    "WORKSPACES_ENV",
+    "main",
+    "parse_workspaces",
+]
 
 WORKSPACES_ENV: Final = env_name("WORKSPACE_IDS")
 DATA_DIR_ENV: Final = env_name("DATA_DIR")
 MODEL_KEY_ENV: Final = "NEBIUS_API_KEY"
 DEPTH_MODEL_ENV: Final = env_name("DEPTH_MODEL")
+PERSON_DETECTOR_ENV: Final = env_name("PERSON_DETECTOR")
 DEPTH_MODEL_ID_ENV: Final = env_name("DEPTH_MODEL_ID")
 DEPTH_MODEL_REVISION_ENV: Final = env_name("DEPTH_MODEL_REVISION")
 DEPTH_DEVICE_ENV: Final = env_name("DEPTH_DEVICE")
@@ -82,6 +90,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
     client = ModelClient(max_attempts=1) if environ.get(MODEL_KEY_ENV) else None
     vision = NebiusVisionModel(client) if client is not None else None
     depth = _build_depth(environ)
+    detector = _build_detector(environ)
     lease_seconds = lease_seconds_for(
         client.worst_case_seconds(Role.VISION) if client is not None else None
     )
@@ -92,6 +101,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         parse_workspaces(args.workspace, environ),
         vision=vision,
         depth=depth,
+        detector=detector,
         name=_worker_name(args.name),
         poll_seconds=args.poll_seconds,
         lease_seconds=lease_seconds,
@@ -210,3 +220,23 @@ def main(
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+
+
+def _build_detector(environ: Mapping[str, str]) -> Any:
+    """Resolve the person detector, defaulting to none configured.
+
+    Defaulting to ``unavailable`` rather than to the recorded-observation adapter is deliberate.
+    A worker that quietly started proposing person regions would start refusing point maps over
+    every photograph it found somebody in, which is the correct behaviour and a bad surprise; an
+    operator turns it on, and the stage says plainly that nothing looked until they do.
+    """
+    mode = (env_get("PERSON_DETECTOR", environ) or "unavailable").strip().lower()
+    if mode == "unavailable":
+        return None
+    if mode != "recorded-observation":
+        raise ValueError(
+            f"{PERSON_DETECTOR_ENV} must be 'recorded-observation' or 'unavailable', not {mode!r}"
+        )
+    from exulanica.ingest.person_detectors import RecordedObservationDetector
+
+    return RecordedObservationDetector()

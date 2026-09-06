@@ -149,6 +149,23 @@ class Silhouette:
     def as_digest_input(self) -> dict[str, Any]:
         return {"kind": "polygon", "points": [[x, y] for x, y in self.points]}
 
+    @classmethod
+    def from_digest_input(cls, value: Mapping[str, Any]) -> Silhouette:
+        """Rebuild an outline from what :meth:`as_digest_input` wrote.
+
+        Needed because the outline is stored as ``jsonb`` and read back as a plain dictionary,
+        and the validation in ``__post_init__`` is the only thing standing between a corrupted
+        row and a mask that covers nothing. Rebuilding through the constructor rather than
+        trusting the stored shape is what makes a bad row raise instead of silently hiding
+        nobody.
+        """
+        if value.get("kind") != "polygon":
+            raise ValueError(f"unsupported outline kind {value.get('kind')!r}")
+        points = value.get("points")
+        if not isinstance(points, list):
+            raise ValueError("an outline needs a list of points")
+        return cls(tuple((int(x), int(y)) for x, y in points))
+
 
 def region_key(blob_id: BlobId, silhouette: Silhouette, display: DisplayGeometry) -> bytes:
     """The 32 byte identity of a person region, stable across detector versions.
@@ -195,6 +212,17 @@ class PersonDetector(Protocol):
 
     @property
     def model_id(self) -> str: ...
+
+    @property
+    def requires_observation(self) -> bool:
+        """Whether this detector cannot look without a recorded vision observation.
+
+        Declared rather than inferred, because the alternative is to hand an adapter an empty
+        context and read the nothing it returns as "found nobody". Those are different facts and
+        conflating them is how a photograph nobody screened is treated as a photograph with
+        nobody in it.
+        """
+        ...
 
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         """Propose every region that might be a person. Over-proposing is the safe direction.

@@ -47,6 +47,7 @@ from typing import Final
 from PIL import Image
 
 from exulanica.canonical import sha256_digest
+from exulanica.consent.regions import PersonDetector
 from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence import EvidenceAddress
 from exulanica.evidence.blob import BlobId
@@ -55,6 +56,9 @@ from exulanica.ingest.committed_store import committed_writes as flush_committed
 from exulanica.ingest.decode import UNREADABLE, open_upright
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger, StageRecorder
+from exulanica.ingest.masking import mask_image
+from exulanica.ingest.person_receipts import consent_state_digest, region_set_digest
+from exulanica.ingest.person_state import region_state_for_capture
 from exulanica.ingest.report import IngestOutcome, IngestReport
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages import (
@@ -65,6 +69,8 @@ from exulanica.ingest.stages import (
 )
 from exulanica.ingest.stages import depth as depth_stage
 from exulanica.ingest.stages import intake as intake_stage
+from exulanica.ingest.stages import masked_source as masked_source_stage
+from exulanica.ingest.stages import person_regions as person_regions_stage
 from exulanica.ingest.stages import rendition as rendition_stage
 from exulanica.ingest.stages import vision as vision_stage
 from exulanica.ingest.stages.writes import StageResult
@@ -117,11 +123,16 @@ class PhotoIngestPipeline:
         *,
         vision: VisionModel | None = None,
         depth: DepthModel | None = None,
+        detector: PersonDetector | None = None,
     ) -> None:
         self._repository = repository
         self._store = store
         self._vision = vision
         self._depth = depth
+        # Not a binding. `person_regions` declares no model_role, so `_require_binding`
+        # refuses a run-time binding for it; the detector it was given is pinned in the
+        # stage parameters instead and the stage refuses one that does not match.
+        self._detector = detector
         # The run-time half of every stage's identity, resolved once. For the vision stage that
         # is the identifier the model role points at right now: it is not in the registry
         # because it does not live in the source, and it is in the key because swapping it
@@ -192,6 +203,7 @@ class PhotoIngestPipeline:
         pending: list[bytes],
         produced_by_event: uuid.UUID | None = None,
         privacy_screening_id: uuid.UUID | None = None,
+        read_source_sha256: bytes | None = None,
     ) -> StageResult:
         """Queue bytes, insert the artifact row, and report reuse honestly.
 
@@ -252,6 +264,10 @@ class PhotoIngestPipeline:
             byte_size=len(payload),
             produced_by_event=produced_by_event,
             privacy_screening_id=privacy_screening_id,
+            # The exact bytes this stage read, which is not always the capture's own bytes. A
+            # point map over a photograph containing somebody who has not consented must name the
+            # masked derivative here, and migration 0037's trigger refuses the row if it does not.
+            read_source_sha256=read_source_sha256,
         )
         recorder.record_output(artifact_id)
         outcome.stages_run.append(spec.key)
@@ -302,9 +318,7 @@ class PhotoIngestPipeline:
 
     # -- one photograph, in one piece or in two -------------------------------------------
 
-    def ingest_file(
-        self, path: str | Path, *, batch_id: uuid.UUID | None = None
-    ) -> IngestOutcome:
+    def ingest_file(self, path: str | Path, *, batch_id: uuid.UUID | None = None) -> IngestOutcome:
         """Ingest one photograph, every stage, in this thread. Never raises for a bad file."""
         source = Path(path)
         outcome = IngestOutcome(path=source)
@@ -412,9 +426,7 @@ class PhotoIngestPipeline:
                 _Prepared(
                     blob_id=blob_id,
                     capture_id=capture_id,
-                    image_span_id=self._repository.upsert_span(
-                        EvidenceAddress.photograph(blob_id)
-                    ),
+                    image_span_id=self._repository.upsert_span(EvidenceAddress.photograph(blob_id)),
                     intake=StageResult(
                         artifact_id=intake.artifact_id,
                         content_sha256=intake.content_sha256,
@@ -509,7 +521,7 @@ class PhotoIngestPipeline:
         rendition = rendition_stage.run(
             self, prepared.blob_id, prepared.upright, prepared.intake, ledger, outcome
         )
-        vision_stage.run(
+        vision = vision_stage.run(
             self,
             self._vision,
             self._binding_for(STAGES["vision"]),
@@ -521,6 +533,24 @@ class PhotoIngestPipeline:
             ledger,
             outcome,
         )
+        # Between vision and depth, and in this order for a reason. The region stage reads the
+        # observation vision stored and writes one `detected` row per proposed person, which is
+        # what arms the database guard: until a region row exists, `capture_requires_masking` is
+        # false for that photograph and the trigger below has nothing to refuse. The masking stage
+        # then fills every region whose person has not consented to their likeness, and depth
+        # reads the result. Ordering these after depth would produce the mask a frame too late.
+        person_regions_stage.run(
+            self,
+            self._detector,
+            prepared.blob_id,
+            prepared.upright,
+            prepared.capture_id,
+            prepared.intake,
+            vision,
+            ledger,
+            outcome,
+        )
+        masked, masked_image, consent_digests = self._masked_source(prepared, ledger, outcome)
         # After vision, and from the UPRIGHT source rather than from the rendition. The rendition
         # is 768px and exists so a model can look at something small; depth is the geometry the
         # photograph will be walked through and is worth the full frame the size parameter allows.
@@ -536,7 +566,57 @@ class PhotoIngestPipeline:
             ledger,
             outcome,
             privacy_screening_id,
+            masked=masked,
+            masked_image=masked_image,
+            consent_digests=consent_digests,
         )
+
+    def _masked_source(
+        self, prepared: _Prepared, ledger: Ledger, outcome: IngestOutcome
+    ) -> tuple[StageResult | None, Image.Image | None, tuple[bytes, ...]]:
+        """Produce the masked derivative for one photograph, or nothing when nobody is hidden.
+
+        Returns the digests as well as the image, because they are what puts the consent state
+        into the depth stage's key. A photograph where everybody has consented produces no
+        derivative and no digests, so it keys and reconstructs exactly as it did before any of
+        this existed.
+        """
+        state = region_state_for_capture(self._repository, prepared.capture_id)
+        if not state.outlines:
+            return None, None, ()
+        digests = (
+            region_set_digest(
+                capture_id=prepared.capture_id,
+                source_sha256=prepared.blob_id.hex,
+                regions=state.outlines,
+            ),
+            consent_state_digest(
+                capture_id=prepared.capture_id,
+                source_sha256=prepared.blob_id.hex,
+                resolved=state.resolved,
+            ),
+        )
+        masked = masked_source_stage.run(
+            self,
+            prepared.blob_id,
+            prepared.upright,
+            prepared.capture_id,
+            state.outlines,
+            state.resolved,
+            state.subjects,
+            prepared.intake,
+            ledger,
+            outcome,
+        )
+        if masked is None:
+            return None, None, digests
+        hidden = masked_source_stage.hidden_outlines(state.outlines, state.resolved)
+        image = mask_image(
+            prepared.upright,
+            hidden,
+            dilation_millionths=int(STAGES["masked_source"].params["dilation_millionths"]),
+        )
+        return masked, image, digests
 
 
 def _decode(data: bytes) -> tuple[Image.Image, ExifFacts]:

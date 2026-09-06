@@ -523,6 +523,7 @@ class IngestRepository:
         byte_size: int,
         produced_by_event: uuid.UUID | None,
         privacy_screening_id: uuid.UUID | None = None,
+        read_source_sha256: bytes | None = None,
     ) -> bool:
         """Insert a derivative. Returns False when another worker already produced it."""
         return artifacts.insert(
@@ -540,6 +541,7 @@ class IngestRepository:
             byte_size=byte_size,
             produced_by_event=produced_by_event,
             privacy_screening_id=privacy_screening_id,
+            read_source_sha256=read_source_sha256,
         )
 
     def insert_scene_artifact(

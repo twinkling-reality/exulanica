@@ -123,12 +123,29 @@ def test_outlines_are_ordered_by_region_key_not_by_dictionary_order():
     assert hidden_outlines(regions, {}) == (OUTLINE_A, OUTLINE_B)
 
 
-def test_the_region_stage_pins_its_detector_in_its_parameters():
-    """A detector swapped without editing this would leave the corpus keyed as before."""
+def test_the_region_stage_declares_a_detector_contract_rather_than_one_detector():
+    """A single pinned name refused every detector but one, including this suite's own doubles.
+
+    The property that matters is that swapping a detector regenerates rather than silently reusing
+    the previous regions, and that lives in the stage's input digest, per photograph. See
+    ``test_a_different_detector_produces_a_different_key``.
+    """
     spec = stage("person_regions")
-    assert spec.params["detector"] == "recorded-vision-observation/v1"
+    assert spec.params["detector_contract"] == "exulanica.person-detector/v1"
+    assert "detector" not in spec.params
     assert spec.model_role is None
     assert spec.deterministic is True
+
+
+def test_a_different_detector_produces_a_different_key():
+    """Swapping a detector must not reuse the regions the previous one proposed."""
+    from exulanica.canonical import sha256_digest
+    from exulanica.ingest.stages import input_digest_of
+
+    upstream = b"\x01" * 32
+    first = input_digest_of([upstream, sha256_digest(b"recorded-vision-observation/v1")])
+    second = input_digest_of([upstream, sha256_digest(b"a-future-segmenter/v1")])
+    assert first != second
 
 
 def test_the_region_stage_declares_that_it_stores_no_template():

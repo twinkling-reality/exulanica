@@ -53,7 +53,13 @@ def run(
     facts: ExifFacts,
     ledger: Ledger,
     outcome: IngestOutcome,
-) -> None:
+) -> StageResult | None:
+    """Observe one photograph, or report honestly that nothing looked.
+
+    Returns its ``StageResult`` so a later stage can read the observation it stored. ``None`` means
+    no observation exists, which is not the same fact as an observation that found nobody: the
+    person-region stage treats a missing observation as unscreened rather than as empty.
+    """
     spec = stage("vision")
     if model is None:
         # Checked before the key rather than after it. The key names the model that will
@@ -67,7 +73,7 @@ def run(
             reason="no vision model is configured for this worker",
             input_blob=blob_id,
         )
-        return
+        return None
     input_digest = input_digest_of([rendition.content_sha256])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
@@ -79,7 +85,17 @@ def run(
         # binding.
         outcome.stages_reused.append(spec.key)
         ledger.reused(spec, existing.artifact_id, input_blob=blob_id)
-        return
+        if existing.content_sha256 is None:
+            # A row with no content hash names an output that was never stored, so there is
+            # nothing a later stage could read back. Reported as reused, because that is what the
+            # ledger records, but not handed on as though an observation existed.
+            return None
+        return StageResult(
+            artifact_id=existing.artifact_id,
+            content_sha256=existing.content_sha256,
+            idempotency_key=key,
+            reused=True,
+        )
 
     image_bytes = writes.store.get(BlobId(rendition.content_sha256))
     with ledger.stage(
@@ -124,7 +140,7 @@ def run(
             "person_labels": result.observation.person_labels,
         }
         with writes.committed_writes() as pending:
-            writes.persist_artifact(
+            produced = writes.persist_artifact(
                 spec=spec,
                 blob_id=blob_id,
                 key=key,
@@ -146,6 +162,7 @@ def run(
                 ledger=ledger,
             )
         ledger.emitted("assertion", emitted, spec)
+    return produced
 
 
 def _observation_rows(

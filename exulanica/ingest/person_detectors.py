@@ -69,6 +69,10 @@ class RecordedObservationDetector:
     def model_id(self) -> str:
         return "recorded-vision-observation/v1"
 
+    @property
+    def requires_observation(self) -> bool:
+        return True
+
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         del image  # The observation was made against these bytes; re-reading them adds nothing.
         found: list[DetectedPerson] = []
@@ -108,6 +112,10 @@ class StubRegionDetector:
     def model_id(self) -> str:
         return "fixed-region-double"
 
+    @property
+    def requires_observation(self) -> bool:
+        return False
+
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         del image, context
         return self._regions
@@ -125,6 +133,10 @@ class NoRegionDetector:
     def model_id(self) -> str:
         return "no-region-double"
 
+    @property
+    def requires_observation(self) -> bool:
+        return False
+
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         del image, context
         return ()
@@ -141,6 +153,10 @@ class PathologicalRegionDetector:
     @property
     def model_id(self) -> str:
         return "pathological-region-double"
+
+    @property
+    def requires_observation(self) -> bool:
+        return False
 
     def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
         del image, context

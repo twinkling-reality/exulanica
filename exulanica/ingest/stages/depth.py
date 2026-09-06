@@ -54,6 +54,9 @@ def run(
     ledger: Ledger,
     outcome: IngestOutcome,
     privacy_screening_id: uuid.UUID | None,
+    masked: StageResult | None = None,
+    masked_image: Image.Image | None = None,
+    consent_digests: tuple[bytes, ...] = (),
 ) -> None:
     spec = stage("depth")
     if model is None:
@@ -72,11 +75,15 @@ def run(
         raise PrivacyAdmissionError(
             "point-map inference requires an exact eligible privacy screening receipt"
         )
-    screening = require_privacy_screening(
-        writes.repository, capture_id, privacy_screening_id
-    )
+    screening = require_privacy_screening(writes.repository, capture_id, privacy_screening_id)
 
-    input_digest = input_digest_of([intake.content_sha256, screening.receipt_digest])
+    # The confirmed regions and the consent states in force are part of what this point map was
+    # computed from, so they belong in its key. Without them a revoked likeness would find the
+    # existing point map by key and reuse it, and the person who withdrew would stay in the
+    # geometry while every receipt said they had gone.
+    input_digest = input_digest_of(
+        [intake.content_sha256, screening.receipt_digest, *consent_digests]
+    )
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
     if existing is not None:
@@ -87,10 +94,15 @@ def run(
     with ledger.stage(
         spec, input_artifact_ids=[intake.artifact_id], input_blob=blob_id
     ) as recorder:
-        prediction = model.predict(upright)
+        # The masked derivative when anybody in this photograph is hidden, the original otherwise.
+        # This is the line that makes "mask before, not only after" true: a person who never
+        # consented is neutral fill before the depth model sees a pixel, so they cannot become a
+        # point map, and therefore cannot become Gaussians further down.
+        source = masked_image if masked_image is not None else upright
+        prediction = model.predict(source)
         points = build_point_map(
             prediction,
-            upright,
+            source,
             max_depth_step=int(spec.params["max_depth_step_milli"]) / 1000,
         )
         decision = decide_rung(
@@ -117,9 +129,9 @@ def run(
                 # vertical field of view beside it comes from the model because it is what the
                 # model recovered, and a resize preserves it; the aspect does not come from the
                 # model because a rounded working grid is an implementation detail of inference.
-                aspect=upright.width / max(1, upright.height),
+                aspect=source.width / max(1, source.height),
             ),
-            source_size=upright.size,
+            source_size=source.size,
             # The grid the points were unprojected from, which OPM/2 states beside the
             # photograph rather than leaving to be inferred from a point count (ADR-0010 D6).
             # The two differ by the model's own rounding and both are facts the renderer needs:
@@ -150,10 +162,12 @@ def run(
                 outcome=outcome,
                 pending=pending,
                 privacy_screening_id=screening.screening_id,
+                # Names the exact bytes the model read. Migration 0037's trigger refuses this row
+                # when the capture requires masking and this is null or names anything but a real
+                # masked derivative of it.
+                read_source_sha256=(None if masked is None else masked.content_sha256),
             )
-            _record_rung(
-                writes, capture_id, image_span_id, decision, result, prediction, ledger
-            )
+            _record_rung(writes, capture_id, image_span_id, decision, result, prediction, ledger)
     # `persist_artifact` already recorded the stage as run. Appending it here as well is what
     # printed "depth+depth" in the command line's per-file summary.
 

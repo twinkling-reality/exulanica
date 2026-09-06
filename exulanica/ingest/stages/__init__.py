@@ -459,9 +459,13 @@ STAGES: Final[dict[str, StageSpec]] = {
         deterministic=True,
         params={
             "profile": "exulanica.person-region-list/v1",
-            # The exact detector this stage version means. `run` compares it to the detector it
-            # was handed and refuses a mismatch.
-            "detector": "recorded-vision-observation/v1",
+            # The contract a detector must satisfy, not one detector's name. The resolved
+            # detector's identity goes into this stage's INPUT digest instead, per photograph,
+            # which gets the property the design note wanted -- swapping a detector regenerates
+            # rather than silently reusing the old regions -- while still allowing a test double
+            # and a future real segmenter to run through the same stage. Pinning a single literal
+            # here made the stage refuse every detector but one, including its own test doubles.
+            "detector_contract": "exulanica.person-detector/v1",
             # Bodies, not faces. Clothing, tattoos, hands and posture identify people, so a region
             # covers the whole silhouette and a face-only detector does not satisfy this stage.
             "scope": "whole-silhouette-not-face",
