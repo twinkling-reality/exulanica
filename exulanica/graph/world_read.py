@@ -375,11 +375,7 @@ def world_read_bundle(
     ``None`` covers both "no such scene" and "a scene in another workspace", because the route
     above turns both into the same 404: the surface is not an existence oracle.
     """
-    scenes = [
-        row
-        for row in reconstruction_scene_rows(connection, workspace, store)
-        if row.scene_id == scene_id
-    ]
+    scenes = reconstruction_scene_rows(connection, workspace, store, scene_id=scene_id)
     if not scenes:
         return None
     scene = scenes[0]

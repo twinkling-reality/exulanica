@@ -44,6 +44,7 @@ __all__ = [
 #: per-person receipts, is a new value rather than a silent change of meaning under the same name.
 CONSENT_BASIS: Final = "human-screening-receipt"
 
+
 def _person_consent_layer_is_present() -> bool:
     """Whether the per-person presentation-consent layer exists in this tree.
 

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.read_consent import CONSENT_BASIS, PERSON_CONSENT_AVAILABLE
+from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.graph.world_read import (
     NUMBER_DECIMALS,
     WORLD_READ_PROFILE,
@@ -338,3 +339,30 @@ def test_a_recipient_reproduces_the_recorded_digest_from_the_keys_the_bundle_nam
         "recorded_keys",
         "recorded_sha256",
     } == set(received)
+
+
+def test_the_scene_filter_is_applied_in_the_query(published, repository):
+    """One scene per request must mean one scene's receipts, not the whole workspace's.
+
+    A read API a world model calls per place cannot read and validate every pose, placement and
+    gate receipt in the store to answer for one of them. What is asserted here is that the filter
+    selects exactly the asked-for scene and refuses an absent one. That the OTHER scenes' bytes are
+    never fetched follows from the filter being a `where` clause rather than a comprehension over
+    the result, which is visible in `exulanica/graph/reconstruction_scenes.py` and is not something
+    a test with one scene in the workspace can demonstrate.
+    """
+    store, _captures, scene_id = published
+
+    narrowed = reconstruction_scene_rows(
+        repository.connection, repository.workspace_id, store, scene_id=scene_id
+    )
+    assert [row.scene_id for row in narrowed] == [scene_id]
+
+    absent = reconstruction_scene_rows(
+        repository.connection, repository.workspace_id, store, scene_id=uuid.uuid4()
+    )
+    assert absent == []
+
+    # And narrowing changes the answer for that scene not at all.
+    whole = reconstruction_scene_rows(repository.connection, repository.workspace_id, store)
+    assert narrowed[0] == next(row for row in whole if row.scene_id == scene_id)

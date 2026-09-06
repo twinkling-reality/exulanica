@@ -77,9 +77,7 @@ def scene_group_rows(connection: psycopg.Connection, workspace: uuid.UUID) -> li
     return groups
 
 
-def rung_by_capture(
-    connection: psycopg.Connection, workspace: uuid.UUID
-) -> dict[uuid.UUID, int]:
+def rung_by_capture(connection: psycopg.Connection, workspace: uuid.UUID) -> dict[uuid.UUID, int]:
     """The rung each capture earned, from the claim that records it.
 
     Read from ``assertion`` rather than from a column, because the rung is not a property of the

@@ -98,6 +98,7 @@ select distinct on (s.scene_id)
    and gate.kind = 'scene_gate_receipt'
    and gate.purged_at is null
  where s.workspace_id = %s
+   and (%s::uuid is null or s.scene_id = %s::uuid)
    and not tombstone_blocks_scene(s.workspace_id, s.scene_id)
  order by s.scene_id, a.asserted_at desc, a.assertion_id desc,
           j.completed_at desc nulls last, j.job_id desc
@@ -108,9 +109,20 @@ def reconstruction_scene_rows(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
     store: ContentAddressedStore | None,
+    *,
+    scene_id: uuid.UUID | None = None,
 ) -> list[ReconstructionSceneRow]:
-    """Return live scene claims, exposing placements only when their receipt chain verifies."""
-    rows = connection.execute(_SCENES, (RECONSTRUCTION_SCENE_RUNG_PREDICATE, workspace)).fetchall()
+    """Return live scene claims, exposing placements only when their receipt chain verifies.
+
+    ``scene_id`` narrows the read to one scene. It exists because the World Read API serves one
+    scene per request, and building every scene in the workspace to answer for one means reading
+    and validating every pose, placement and gate receipt in the store each time. The filter is in
+    the query rather than applied to the result so the receipts of the other scenes are never
+    fetched. Passing None keeps the whole-workspace read the graph snapshot needs.
+    """
+    rows = connection.execute(
+        _SCENES, (RECONSTRUCTION_SCENE_RUNG_PREDICATE, workspace, scene_id, scene_id)
+    ).fetchall()
     return [_scene_row(connection, workspace, row, store) for row in rows]
 
 
