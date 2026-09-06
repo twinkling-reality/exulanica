@@ -9,6 +9,31 @@
   --landing-wordmark-start: #303638;
   --landing-wordmark-middle: #535d62;
   --landing-wordmark-end: #7a858d;
+  /*
+   * The travelling band in the wordmark. Cool and deeper than the ramp it passes through, not
+   * lighter: on a near-white canvas a paler band would both wash out and drop the name under the
+   * 3:1 large-text floor, since the lightest stop already sits at 3.57:1. This one measures
+   * 6.6:1 against the canvas, so the sweep never reduces legibility below the resting state.
+   */
+  --landing-wordmark-sheen: #3f5d74;
 
   --landing-focus: #235c43;
+
+  /*
+   * One accent per station.
+   *
+   * The Companion stays ink. companion-appearance.ts records why: against a field made of light
+   * the saturated variants read as a sticker stuck on it, and colour there is a device preference
+   * a person sets in Customize, not something a menu may assign. So the colour belongs to the
+   * place, not to the character. Each destination lights its own mark and its own rule, and the
+   * Companion picks that light up in its wake, the way anything standing somewhere does.
+   *
+   * Hues are the artwork palette and the wordmark ramp taken down to ink weight, so a filled
+   * 0.34rem mark stays legible on the near-white canvas instead of glowing off it.
+   */
+  --landing-station-home: #3f5d74;
+  --landing-station-enter: #235c43;
+  --landing-station-purpose: #4f6b23;
+  --landing-station-capabilities: #8a6410;
+  --landing-station-resources: #4a4570;
 }

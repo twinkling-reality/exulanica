@@ -17,6 +17,29 @@ describe('gradient form geometry and reusable instances', () => {
     expect(art.querySelector('[id$="-rim"]')).toBeNull();
   });
 
+  /*
+   * The home artwork paints once and is never invalidated again.
+   *
+   * It is drawn at 120vw and the informational surfaces scale it by 2.5, which on a 1728 by 996
+   * retina viewport is about 93 megapixels of device pixels carrying a clip path, an alpha mask
+   * and a soft-light grain. A per-field drift was built here and removed after it made the page
+   * flicker on the Purpose surface: nothing inside a form may animate. The color cross-fade is
+   * the one sanctioned motion because it changes an opacity on a layer that is already
+   * rasterized. This test states that so the next attempt starts from the measurement.
+   */
+  it('gives the home artwork no per-element animation hook to invalidate it with', () => {
+    const art = createGradientForms(HOME_FORMS).element;
+    expect(art.querySelectorAll('.gradient-forms-field')).toHaveLength(0);
+    for (const node of art.querySelectorAll('[style]')) {
+      expect(node.getAttribute('style'), `${node.tagName} carries a styling hook`).toBe(
+        'mask-type:alpha',
+      );
+    }
+    expect(
+      new Set(Array.from(art.querySelectorAll('[class]'), (node) => node.getAttribute('class'))),
+    ).toEqual(new Set(['gradient-forms-base', 'gradient-forms-grain']));
+  });
+
   it('places attached rims at their exact requested gap and never intersects other forms', () => {
     const { forms } = layoutForms(HOME_FORMS.forms);
     expect(forms).toHaveLength(2);

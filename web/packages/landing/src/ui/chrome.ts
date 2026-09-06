@@ -5,8 +5,59 @@
  * documentation and source code do not become extra primary destinations.
  */
 
+import {
+  companionAppearanceConfiguration,
+  DEFAULT_COMPANION,
+  type CompanionColorVariant,
+  type CompanionFaceVariant,
+} from '@exulanica/presentation';
+
 import { el } from './dom.js';
 import { createCompanionMenuMarker } from './companion-menu-marker.js';
+
+/**
+ * What the Companion is doing with its eyes at each station.
+ *
+ * The menu is five entries a visitor sweeps in a second, and a character that wears one face at
+ * all of them is furniture. These are the appearance contract's own variants, assigned to say
+ * something true about each destination rather than to be different for its own sake: alert at
+ * the way in, curious at the question, pleased at what the product does, and relaxed at the
+ * utility drawer, which is the one entry that is not about the product.
+ */
+const STATION_FACE: Readonly<Record<string, CompanionFaceVariant>> = Object.freeze({
+  'path-home': 'neutral',
+  'path-enter': 'attentive',
+  'path-purpose': 'curious',
+  'path-capabilities': 'happy',
+  'path-resources': 'sleepy',
+});
+
+/**
+ * EXPERIMENT: the Companion's own colour, per station.
+ *
+ * companion-appearance.ts argues against this. It records that the saturated variants read as a
+ * sticker on the field and that ink is the default for that reason, and that colour there is a
+ * device preference a person sets in Customize rather than something a menu assigns. This is here
+ * to see the argument rather than take it on faith. Deleting this map and the two custom
+ * properties it sets returns the Companion to one ink identity; nothing else depends on it.
+ */
+export const STATION_COLOR: Readonly<Record<string, CompanionColorVariant>> = Object.freeze({
+  'path-home': 'ink',
+  'path-enter': 'mint',
+  'path-purpose': 'periwinkle',
+  'path-capabilities': 'orange',
+  'path-resources': 'rose',
+});
+
+/** The contract owns the colours; this only picks which one a station asks for. */
+const stationInk = (station: string): { body: string; eye: string } => {
+  const configuration = companionAppearanceConfiguration({
+    body: DEFAULT_COMPANION.bodyVariant,
+    color: STATION_COLOR[station] ?? DEFAULT_COMPANION.colorVariant,
+    face: DEFAULT_COMPANION.faceVariant,
+  });
+  return { body: configuration.bodyColor, eye: configuration.eyeColor };
+};
 
 export const REPOSITORY_URL = 'https://github.com/twinkling-reality/exulanica';
 /** The documents this page is built from, which are the same ones it is checked against. */
@@ -107,6 +158,26 @@ export function buildChrome(options: ChromeOptions): Chrome {
   const github = destination('GitHub', 'resource-github', () => {}, REPOSITORY_URL);
   resourceLinks.append(resourceBack, documentation, github);
 
+  /*
+   * The order attention travels down the column, used to stagger an entry's arrival.
+   *
+   * Return and Enter Exulanica never appear at the same time, so they share the first position.
+   * The stylesheet reads this as a delay multiplier; nothing else depends on it, and an entry
+   * without one simply arrives first.
+   */
+  for (const [node, order] of [
+    [home, 0],
+    [atlas, 0],
+    [purpose, 1],
+    [capabilities, 2],
+    [resources, 3],
+    [resourceBack, 0],
+    [documentation, 1],
+    [github, 2],
+  ] as const) {
+    node.style.setProperty('--enter-index', String(order));
+  }
+
   const left = el('div', { class: 'destinations' });
   const marker = createCompanionMenuMarker();
   left.append(
@@ -125,6 +196,7 @@ export function buildChrome(options: ChromeOptions): Chrome {
   let hovered: HTMLElement | null = null;
   let focused: HTMLElement | null = null;
   let previousTarget = atlas;
+  let occupied: HTMLElement | null = null;
   let motionPhase = false;
   let outsideListener: ((event: PointerEvent) => void) | null = null;
   let escapeListener: ((event: KeyboardEvent) => void) | null = null;
@@ -139,6 +211,20 @@ export function buildChrome(options: ChromeOptions): Chrome {
     const target = focused ?? hovered ?? defaultTarget();
     marker.dataset['state'] = focused !== null || hovered !== null ? 'attending' : 'resting';
     marker.dataset['target'] = target.id;
+    marker.dataset['face'] = STATION_FACE[target.id] ?? 'neutral';
+    const ink = stationInk(target.id);
+    marker.style.setProperty('--companion-body', ink.body);
+    marker.style.setProperty('--companion-eye', ink.eye);
+    /*
+     * The Companion and the station mark are two indicators of one thing, and they share a column,
+     * so the mark yields where the character is standing. Before the marks were filled this
+     * overlapped invisibly; a filled mark sits on the Companion's face.
+     */
+    if (occupied !== target) {
+      if (occupied) delete occupied.dataset['companion'];
+      target.dataset['companion'] = 'here';
+      occupied = target;
+    }
     if (target !== previousTarget) {
       const previousIndex = targets.indexOf(previousTarget);
       const nextIndex = targets.indexOf(target);
@@ -147,6 +233,9 @@ export function buildChrome(options: ChromeOptions): Chrome {
       marker.style.setProperty('--companion-travel-ms', `${Math.min(400, 280 + (distance - 1) * 60)}ms`);
       motionPhase = !motionPhase;
       marker.dataset['motion'] = `${direction}-${motionPhase ? 'a' : 'b'}`;
+      // Arriving somewhere new is what a blink is for here: it covers the change of expression,
+      // so the eyes are shut at the moment the new pose is revealed rather than morphing.
+      marker.dataset['arrive'] = motionPhase ? 'a' : 'b';
       previousTarget = target;
     }
     requestAnimationFrame(() => {

@@ -133,6 +133,18 @@ body {
 }
 
 /*
+ * Each entry owns an accent, and the disclosure inherits the one belonging to the station that
+ * opened it. Everything tinted here is a decorative mark: label colour stays ink, so no accent
+ * can move a contrast ratio that matters.
+ */
+#path-home { --station-accent: var(--landing-station-home); }
+#path-enter { --station-accent: var(--landing-station-enter); }
+#path-purpose { --station-accent: var(--landing-station-purpose); }
+#path-capabilities { --station-accent: var(--landing-station-capabilities); }
+#path-resources,
+.resource-disclosure { --station-accent: var(--landing-station-resources); }
+
+/*
  * The title menu borrows the hierarchy of a game title screen without borrowing its furniture.
  * One micro-Companion is the sole primary-navigation marker on every surface.
  */
@@ -153,7 +165,9 @@ body {
   cursor: pointer;
   display: block;
   text-align: left;
-  transition: color 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    letter-spacing 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .destination-primary,
@@ -162,14 +176,66 @@ body {
   color: var(--ink);
 }
 
-.destination-label {
-  display: inline-block;
-  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+/*
+ * Tracking opens under attention.
+ *
+ * A menu of five uppercase words at 0.76rem has almost no room to move without becoming
+ * decoration. Letter-spacing is the one property that reads at that size from across a desk, and
+ * because each item is a full-width block in a fixed-width column, opening it moves nothing else
+ * on the page. A disabled entry is excluded: it must not answer a pointer it cannot serve.
+ */
+.destinations > .destination:not(:disabled):hover,
+.destinations > .destination:not(:disabled):focus-visible,
+.resource-disclosure .destination:hover,
+.resource-disclosure .destination:focus-visible {
+  letter-spacing: 0.185em;
 }
 
-.destination:hover .destination-label,
-.destination:focus-visible .destination-label {
-  transform: translateX(0.1rem);
+.destination-label {
+  display: inline-block;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.destination:not(:disabled):hover .destination-label,
+.destination:not(:disabled):focus-visible .destination-label {
+  transform: translateX(0.3rem);
+}
+
+/*
+ * The light under an attended entry.
+ *
+ * It wipes rightward from the Companion's side of the column and fades out before the end of the
+ * word, so it reads as light arriving with the marker rather than as an underline. It is one
+ * composited scale on a pseudo-element; nothing reflows.
+ */
+.destination::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.3rem;
+  height: 1px;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--station-accent, var(--ink)) 62%, transparent) 0%,
+    color-mix(in srgb, var(--station-accent, var(--ink)) 20%, transparent) 46%,
+    transparent 82%
+  );
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+  transition:
+    opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.destination:not(:disabled):hover::before,
+.destination:not(:disabled):focus-visible::before,
+.destinations > .destination[aria-current='page']::before,
+.destinations > .destination[aria-expanded='true']::before {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .destinations > .destination::after,
@@ -184,8 +250,23 @@ body {
   border-radius: 50%;
   background: transparent;
   pointer-events: none;
-  transform: translate(-50%, -50%);
-  transition: border-color 180ms ease;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    border-color 180ms ease,
+    background-color 220ms ease,
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/*
+ * The mark yields where the Companion is standing.
+ *
+ * They share a column and they indicate the same thing, so only one of them should be there. This
+ * did not matter while the marks were hollow hairlines, which the character simply covered. A
+ * filled mark sits on its face.
+ */
+.destinations > .destination[data-companion='here']::after {
+  opacity: 0;
 }
 
 .destinations > .destination-primary::after,
@@ -197,7 +278,62 @@ body {
   border-color: color-mix(in srgb, var(--ink) 42%, transparent);
 }
 
+/*
+ * The station mark fills when the entry is the one being attended or the one you are on. The
+ * overshoot in its easing is the only springy motion on the page, and it is confined to a
+ * 0.34rem dot, which is small enough to register as a click landing rather than as bounce.
+ */
+.destinations > .destination:not(:disabled):hover::after,
+.destinations > .destination:not(:disabled):focus-visible::after,
+.destinations > .destination[aria-current='page']::after,
+.destinations > .destination[aria-expanded='true']::after,
+.resource-disclosure .destination:hover::after,
+.resource-disclosure .destination:focus-visible::after {
+  background-color: var(--station-accent, color-mix(in srgb, var(--ink) 42%, transparent));
+  border-color: var(--station-accent, color-mix(in srgb, var(--ink) 42%, transparent));
+  transform: translate(-50%, -50%) scale(1.22);
+}
+
+.companion-menu-marker[data-target='path-home'] {
+  --station-accent: var(--landing-station-home);
+  --companion-tilt: -4deg;
+  --companion-gaze-x: 10px;
+  --companion-gaze-y: 0px;
+}
+.companion-menu-marker[data-target='path-enter'] {
+  --station-accent: var(--landing-station-enter);
+  --companion-tilt: 0deg;
+  --companion-gaze-x: 13px;
+  --companion-gaze-y: -1px;
+}
+.companion-menu-marker[data-target='path-purpose'] {
+  --station-accent: var(--landing-station-purpose);
+  --companion-tilt: -9deg;
+  --companion-gaze-x: 11px;
+  --companion-gaze-y: -3px;
+}
+.companion-menu-marker[data-target='path-capabilities'] {
+  --station-accent: var(--landing-station-capabilities);
+  --companion-tilt: 5deg;
+  --companion-gaze-x: 12px;
+  --companion-gaze-y: 1px;
+}
+.companion-menu-marker[data-target='path-resources'] {
+  --station-accent: var(--landing-station-resources);
+  --companion-tilt: 10deg;
+  --companion-gaze-x: 8px;
+  --companion-gaze-y: 3px;
+}
+
 .companion-menu-marker {
+  /*
+   * The wake keeps its own spread of light and is shifted toward the station rather than replaced
+   * by it, so the Companion reads as one character standing in different places and not as five
+   * differently coloured markers.
+   */
+  --companion-wake-near: color-mix(in srgb, var(--station-accent, #235c43) 42%, #d9ff73);
+  --companion-wake-mid: color-mix(in srgb, var(--station-accent, #235c43) 42%, #cfe4ff);
+  --companion-wake-far: color-mix(in srgb, var(--station-accent, #235c43) 42%, #ddd7ff);
   --companion-marker-y: 1rem;
   --companion-travel-ms: 330ms;
   --companion-settle-transform: scale(1);
@@ -210,6 +346,8 @@ body {
   overflow: visible;
   pointer-events: none;
   color: var(--ink);
+  /* The character passes in front of the marks it travels past, never behind them. */
+  z-index: 1;
   transform: translate3d(0, calc(var(--companion-marker-y) - 50%), 0);
 }
 
@@ -224,10 +362,38 @@ body {
 
 .companion-menu-wake,
 .companion-menu-orb,
+.companion-menu-pose,
 .companion-menu-gaze {
   transform-box: fill-box;
   transform-origin: center;
   transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * The Companion looks at the menu, and holds itself differently at each stop.
+ *
+ * The marker stands to the left of every label, so a character gazing straight ahead is looking
+ * past the thing it is marking. Gaze is a translation of the eye group inside the body and tilt
+ * is a rotation of the body inside the wake. Both are presentation over the shared blueprint, not
+ * a second set of eyes: eye geometry is EYE_POSES in @exulanica/presentation, and Atlas renders
+ * the same table, so this file may not redraw it.
+ *
+ * The scale is optical sizing. Those poses are authored for a Companion rendered large. At the
+ * 1.5rem this marker occupies, ten viewBox units is about one device pixel and the shortest pose
+ * stands under a pixel tall, which is why two of them read as the same squint. A small
+ * enlargement lets a pose register at reading size without becoming a different pose.
+ */
+.companion-menu-pose {
+  transform: rotate(var(--companion-tilt, 0deg));
+}
+
+.companion-menu-gaze {
+  transform:
+    translate(
+      var(--companion-gaze-x, 11px),
+      calc(var(--companion-gaze-y, 0px) + var(--companion-gaze-lift, 0px))
+    )
+    scale(var(--companion-gaze-scale, 1.12));
 }
 
 .companion-menu-wake {
@@ -253,11 +419,12 @@ body {
 }
 
 .companion-menu-marker[data-state='attending'] .companion-menu-gaze {
-  transform: translateY(-4px) scaleY(1.04);
+  --companion-gaze-lift: -4px;
+  --companion-gaze-scale: 1.2;
 }
 
 .companion-menu-marker[data-state='attending'] {
-  --companion-wake-opacity: 0.14;
+  --companion-wake-opacity: 0.2;
 }
 
 .companion-menu-marker[data-state='attending'] .companion-menu-wake {
@@ -306,11 +473,168 @@ body {
   100% { opacity: var(--companion-wake-opacity); transform: scale(1); }
 }
 
+/*
+ * Idle life.
+ *
+ * The marker used to be inert between moves, which made it read as a bullet that happened to
+ * slide rather than as the Companion. Two loops fix that without adding a second idea: the
+ * character breathes, and it blinks. Both are the same two behaviours the Atlas Companion has, so
+ * the landing is not inventing a separate personality for the same identity.
+ *
+ * A spin was considered and rejected. This form has eyes and a gaze direction, so rotating it
+ * reads as a loading spinner, and frontier-roadmap.md's parallel frontend track already commits
+ * to an original Exulanica Companion rather than a borrowed one. Breath and blink are the motions
+ * a face has; a spin is the motion a widget has.
+ *
+ * Units are viewBox units. The blueprint is 240 wide and the marker is rendered at 1.5rem, so ten
+ * units is about one device pixel.
+ */
+.companion-menu-life {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-breathe var(--motion-idle-cycle, 5200ms) ease-in-out infinite;
+}
+
+/* Attention quickens the breath. Nothing else about the idle changes, so it stays one character. */
+.companion-menu-marker[data-state='attending'] .companion-menu-life {
+  animation-duration: 2600ms;
+}
+
+/*
+ * The blink is a repertoire, not a tick.
+ *
+ * One evenly spaced blink is a cursor. This is a twenty-three second track carrying six blinks at
+ * irregular places, two of them doubles, which never lines up with the 5.2 second breath and so
+ * does not visibly repeat while anyone is looking at it. The right lid runs a fraction behind the
+ * left, which is what real lids do and what stops the pair reading as one machined part.
+ */
+.companion-menu-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-blink-track 23s linear infinite;
+}
+
+.companion-menu-blink[data-eye='right'] {
+  animation-delay: -45ms;
+}
+
+/*
+ * Every expression is rendered; the stylesheet shows one.
+ *
+ * The reveal is held back 120ms so it lands inside the shut frame of the arrival blink below.
+ * The Companion closes its eyes on the way to a station and opens them wearing that station's
+ * face, rather than morphing one pose into another in the open.
+ */
+.companion-menu-face {
+  transform-box: fill-box;
+  transform-origin: center;
+  visibility: hidden;
+  transition: visibility 0s 120ms;
+}
+
+.companion-menu-marker[data-face='neutral'] .companion-menu-face[data-face='neutral'],
+.companion-menu-marker[data-face='attentive'] .companion-menu-face[data-face='attentive'],
+.companion-menu-marker[data-face='curious'] .companion-menu-face[data-face='curious'],
+.companion-menu-marker[data-face='happy'] .companion-menu-face[data-face='happy'],
+.companion-menu-marker[data-face='sleepy'] .companion-menu-face[data-face='sleepy'] {
+  visibility: visible;
+}
+
+/*
+ * The arrival blink. Two names for one motion, alternated by chrome.ts, because restarting a CSS
+ * animation needs the name to change; the same trick the travel keyframes use.
+ *
+ * It sits on the face rather than the lid so it composes with the idle track above instead of
+ * replacing it, and its shut window spans 100ms to 200ms of 300ms, which is where the reveal is
+ * parked.
+ */
+.companion-menu-marker[data-arrive='a'] .companion-menu-face {
+  animation: companion-arrive-a 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.companion-menu-marker[data-arrive='b'] .companion-menu-face {
+  animation: companion-arrive-b 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes companion-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-9px) scale(1.048); }
+}
+
+/*
+ * Six blinks in twenty-three seconds: single, double, single, single, double. The gaps are uneven
+ * on purpose, because a creature that blinks on a schedule is a light on a circuit board.
+ */
+@keyframes companion-blink-track {
+  0%, 13.4%, 14.6%, 28.6%, 29.8%, 30.8%, 32%, 52%, 53.2%, 70.2%, 71.4%,
+  85.4%, 86.6%, 87.6%, 88.8%, 100% { transform: scaleY(1); }
+  14%, 29.2%, 31.4%, 52.6%, 70.8%, 86%, 88.2% { transform: scaleY(0.06); }
+}
+
+@keyframes companion-arrive-a {
+  0%, 100% { transform: scaleY(1); }
+  34%, 66% { transform: scaleY(0.05); }
+}
+
+@keyframes companion-arrive-b {
+  0%, 100% { transform: scaleY(1); }
+  34%, 66% { transform: scaleY(0.05); }
+}
+
+/*
+ * Opening Resources used to be invisible.
+ *
+ * The station replaces the primary list rather than pushing it down, which is the right shape for
+ * one Companion station, but it was doing it as an instant swap: four entries left and three
+ * arrived inside a single frame, with nothing to say that a place had been entered. What was
+ * missing is not decoration, it is the event.
+ *
+ * Entries that appear now arrive in sequence from the Companion's side of the column. `hidden`
+ * still flips synchronously, which keeps the semantics and the keyboard order exactly as they
+ * were; the animation is carried entirely by the fact that an element revealed from `display:
+ * none` restarts its animations. Nothing schedules, nothing waits, and no state is held in the
+ * stylesheet that the markup does not already carry.
+ */
+.destinations > .destination,
+.resource-disclosure .destination {
+  animation: menu-enter 460ms cubic-bezier(0.22, 1, 0.36, 1)
+    calc(var(--enter-index, 0) * 58ms) backwards;
+}
+
+@keyframes menu-enter {
+  from { opacity: 0; transform: translateX(-0.55rem); }
+  to { opacity: 1; transform: none; }
+}
+
 .resource-disclosure {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.08rem;
+}
+
+/*
+ * The disclosure sits in from the primary column instead of being tied to it by a drawn line.
+ *
+ * A rule down the left through three hollow marks reads as a stepper, which is a progress
+ * component, and these are not steps. It also breaks the page's own habit: atlas-visual-language.md
+ * bans dividers and ornament standing in for hierarchy, and the landing has no reason to be looser
+ * about that than the world is. What says these belong to Resources is that they arrive in
+ * sequence from that entry, and that the entry stays lit while they are the menu. The indent is
+ * the only structural mark, and indentation is not ornament.
+ */
+.resource-disclosure .destination {
+  padding-left: 0.62rem;
+}
+
+.resource-disclosure .destination::after {
+  left: -1.06rem;
+}
+
+/* The entry that opened the station stays lit while its links are the menu. */
+.destinations > .destination[aria-expanded='true'] {
+  color: var(--ink);
 }
 
 .resource-disclosure .destination {
@@ -385,17 +709,45 @@ body {
   animation: wordmark-in 1450ms cubic-bezier(0.22, 1, 0.36, 1) 220ms forwards;
 }
 
+/*
+ * The wordmark carries the same light the artwork does.
+ *
+ * The gradient is painted at twice the name's width and then travelled, so a brighter band passes
+ * through the letterforms rather than sitting on them. It is one composited background-position
+ * animation on one element: no second copy of the text, no clip-path pass, no filter.
+ *
+ * The cycle begins and ends at 0% 50%, which is the resting composition. That is what lets the
+ * reduced-motion collapse below land on the intended artwork instead of on a frozen mid-sweep.
+ */
 @supports ((background-clip: text) or (-webkit-background-clip: text)) {
   .wordmark {
     background-image: linear-gradient(110deg,
       var(--landing-wordmark-start) 0%,
-      var(--landing-wordmark-middle) 56%,
+      var(--landing-wordmark-middle) 30%,
+      var(--landing-wordmark-sheen) 44%,
+      var(--landing-wordmark-middle) 58%,
       var(--landing-wordmark-end) 100%);
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+    background-repeat: no-repeat;
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
     -webkit-text-fill-color: transparent;
+    animation:
+      wordmark-in 1450ms cubic-bezier(0.22, 1, 0.36, 1) 220ms forwards,
+      wordmark-sheen 11s cubic-bezier(0.5, 0, 0.5, 1) 2100ms infinite;
   }
+}
+
+/*
+ * Out and back rather than a loop. A one-way sweep would have to jump home at the cycle boundary,
+ * and on a name held this large the jump is the only thing anyone would see.
+ */
+@keyframes wordmark-sheen {
+  0%, 6% { background-position: 0% 50%; }
+  44%, 56% { background-position: 100% 50%; }
+  94%, 100% { background-position: 0% 50%; }
 }
 
 .proposition {
@@ -604,6 +956,41 @@ body {
     opacity: 0 !important;
   }
 
+  /*
+   * The idle loops, the wordmark sweep, the artwork drift and the menu entrances all stop dead,
+   * and every one of them was written so that its resting frame is the composition the page is
+   * meant to hold. Stopping them removes motion without removing design.
+   */
+  .companion-menu-life,
+  .companion-menu-blink,
+  .companion-menu-face,
+  .wordmark,
+  .pane-title[data-entered='true'] .wordmark,
+  .destinations > .destination,
+  .resource-disclosure .destination {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .wordmark,
+  .pane-title[data-entered='true'] .wordmark {
+    opacity: 1;
+    background-position: 0% 50%;
+  }
+
+  .destinations > .destination,
+  .resource-disclosure .destination {
+    opacity: 1;
+  }
+
+  .destination::before {
+    transition: none !important;
+  }
+
+  /* No blink is coming to hide the change, so the expression simply is the station's. */
+  .companion-menu-face {
+    transition: none !important;
+  }
 }
 
 @media (forced-colors: active) {
@@ -636,4 +1023,13 @@ body {
   animation: none;
   opacity: 1;
   transform: none;
+}
+
+/*
+ * The arrival plays once; the light does not stop living. Returning to the title from Purpose or
+ * Capabilities must not replay the entrance, so the rule above clears it, and this one puts the
+ * sweep back without the letter-spacing settle that only belongs to a first arrival.
+ */
+.pane-title[data-entered='true'] .wordmark {
+  animation: wordmark-sheen 11s cubic-bezier(0.5, 0, 0.5, 1) 600ms infinite;
 }

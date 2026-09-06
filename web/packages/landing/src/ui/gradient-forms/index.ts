@@ -28,6 +28,18 @@ export interface GradientFormsOptions {
   readonly seed?: number;
   /** Seconds for one full color cycle. Geometry never moves or intersects. */
   readonly duration?: number;
+  /**
+   * How the artwork lives.
+   *
+   * `still` renders one palette and never moves. `color` cross-fades a second palette over the
+   * same geometry, which is an opacity change on an already-rasterized layer.
+   *
+   * Motion that moves anything inside a form was tried and removed. This artwork is painted at
+   * 120vw and the informational surfaces scale it by 2.5, so the composition reaches about 93
+   * megapixels of device pixels; invalidating that region every frame, through a clip path, an
+   * alpha mask and a soft-light grain, is not something a browser can keep up with. The artwork
+   * is a poster. Motion on this page belongs on the small elements.
+   */
   readonly motion?: 'still' | 'color';
 }
 export interface GradientForms {
