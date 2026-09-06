@@ -10,6 +10,13 @@ Claims resolve to captured bytes, never to derived geometry. **Reconstruction qu
 never participates in the truth guarantee.** A region rendered from thin coverage tells the truth
 exactly as reliably as a photoreal one, because neither of them is what the answer cites.
 
+Against the generative world models of 2026, which imagine a plausible world for a session and
+forget it, Exulanica is the memory they lack: a persistent world of one person's life (or one
+place, family or institution) built from real captures, where every part is traceable to its
+original, every pictured person's consent is enforced, and the whole thing is a signed package the
+owner keeps. A generative model that renders your kitchen should read it from here and be unable to
+deviate from what is real without saying so.
+
 Originally built for the Nebius x NVIDIA Global AI Hackathon.
 
 ## Project status
@@ -331,7 +338,7 @@ tests. The boundary rules have each been probed with a deliberate violation, so 
 fire rather than assumed to.
 
 ```bash
-pnpm landing                 # the public title and Method surfaces
+pnpm landing                 # the public title, Purpose and Capabilities surfaces
 pnpm app                     # the canonical Atlas application
 pnpm synth --out ./fixtures  # generates the renderer bake-off ladder, about ten seconds
 pnpm bakeoff                 # serves the bake-off harness over those fixtures

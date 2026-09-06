@@ -21,7 +21,7 @@ pnpm run test         # vitest
 | `@exulanica/atlas-three` | the three.js r185 + Spark 2.1.0 renderer binding, ADR-0003 option A | React, and every workspace package except atlas-core |
 | `@exulanica/scene-synth` | the synthetic scene generator for the ADR-0003 bake-off | everything except atlas-core; offline only |
 | `@exulanica/bakeoff` | the ADR-0003 X-R1 harness page | everything except atlas-core and atlas-three |
-| `@exulanica/landing` | the public title and Method surfaces; a configured link opens the real application | every renderer, and every workspace package except presentation |
+| `@exulanica/landing` | the public title, Purpose, and Capabilities surfaces; a configured link opens the real application | every renderer, and every workspace package except presentation |
 
 From `docs/architecture-overview.md` section 1.1, plus four packages that are not among the
 five shipped modules: `presentation` owns visual policy without owning a surface, `scene-synth` is a build-time tool, `bakeoff` is a harness,
@@ -59,7 +59,7 @@ Two further guards worth knowing about:
 
 ## Fixtures
 
-`pnpm landing` serves the public title and Method surfaces; see
+`pnpm landing` serves the public title, Purpose, and Capabilities surfaces; see
 `packages/landing/README.md`. It links to the local app preview on port 5173 by default. If the app
 is running elsewhere, start it with an explicit destination, for example
 `VITE_ATLAS_URL='http://127.0.0.1:5175/?preview=1' pnpm landing`.
