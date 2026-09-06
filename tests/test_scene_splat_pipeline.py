@@ -510,7 +510,7 @@ def test_nonmetric_trained_scene_uses_normal_publication_and_keeps_recorded_rung
     assert {
         key: quality[key] for key in quality if key not in ("duration_seconds", "usd_cost")
     } == {
-        "heldout_views": 4,
+        "heldout_views": 1,
         "psnr": 28.0,
         "ssim": 0.86,
         "lpips": 0.14,

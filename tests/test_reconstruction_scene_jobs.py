@@ -29,9 +29,9 @@ from exulanica.store.local import LocalContentAddressedStore
 from conftest import write_point_map
 
 
-def _captures(repository, count: int = 3) -> list[uuid.UUID]:
+def _captures(repository, count: int = 3, *, start: int = 0) -> list[uuid.UUID]:
     capture_ids: list[uuid.UUID] = []
-    for index in range(count):
+    for index in range(start, start + count):
         blob = BlobId.of_bytes(f"scene input {index}".encode())
         repository.upsert_blob(
             blob,
@@ -221,10 +221,7 @@ def test_operator_exact_set_does_not_queue_incomplete_privacy_safe_inputs(reposi
 def test_a_job_scoped_claim_takes_only_the_named_job_and_leaves_the_rest_queued(ingest_spine):
     repository, reopen = ingest_spine
     older_job, _ = _enqueue(repository, _captures(repository, 3))
-    newer_captures = [
-        capture for capture in _captures(repository, 6) if capture not in {older_job}
-    ][3:]
-    newer_job, inserted = _enqueue(repository, newer_captures)
+    newer_job, inserted = _enqueue(repository, _captures(repository, 3, start=3))
     assert inserted is True and newer_job != older_job
 
     scoped = reopen().claim_reconstruction_scene(

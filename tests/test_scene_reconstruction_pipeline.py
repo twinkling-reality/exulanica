@@ -357,6 +357,7 @@ def test_stale_stage_bindings_are_refused_before_any_pose_work_runs(repository, 
     import hashlib
 
     from exulanica.canonical import canonical_json
+    from exulanica.ingest.operations import reconstruction_scene_job
 
     store, _captures, _point_artifacts, job_id = _queued_scene(repository, tmp_path)
     claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
@@ -380,8 +381,8 @@ def test_stale_stage_bindings_are_refused_before_any_pose_work_runs(repository, 
     assert outcome.status == "failed"
     assert "stage bindings are no longer current" in (outcome.message or "")
     assert executor.calls == [], "no COLMAP stage may run for a job the current rules refuse"
-    job = repository.reconstruction_scene_job(job_id)
-    assert job is not None and job.status == "failed"
+    job = reconstruction_scene_job(repository.connection, repository.workspace_id, job_id)
+    assert job is not None and job["status"] == "failed"
 
 
 def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_history(
