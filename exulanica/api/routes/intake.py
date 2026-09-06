@@ -213,9 +213,7 @@ def intake(
 def _read_and_check(upload: UploadFile, name: str) -> bytes | RefusedPart:
     """Checks 3 to 7, in order, returning either the bytes or the check that stopped them."""
     if PurePosixPath(name).suffix.lower() not in SUPPORTED_SUFFIXES:
-        return _refusal(
-            name, "unsupported_type", f"one of {', '.join(sorted(SUPPORTED_SUFFIXES))}"
-        )
+        return _refusal(name, "unsupported_type", f"one of {', '.join(sorted(SUPPORTED_SUFFIXES))}")
     # One byte past the bound, and no more. This is the check rather than a comparison against
     # the size the parser reports, deliberately: the reported size is the parser's own
     # bookkeeping, this bound is what keeps an over-large part out of memory and out of the

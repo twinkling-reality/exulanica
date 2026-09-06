@@ -12,15 +12,55 @@ export type CompanionOperationalState =
   | 'working'
   | 'settled';
 
-export type CompanionBodyVariant =
-  | 'circle'
-  | 'pebble'
-  | 'squircle'
-  | 'capsule'
-  | 'cloud'
-  | 'droplet';
-export type CompanionColorVariant = 'ink' | 'rose' | 'orange' | 'periwinkle' | 'mint';
-export type CompanionFaceVariant = 'neutral' | 'attentive' | 'curious' | 'happy' | 'sleepy';
+/*
+ * The catalogs are the single source of truth for what a person may choose.
+ *
+ * The variant types are derived from these arrays rather than written beside them, and the
+ * geometry and colour tables below are total records over those types. Adding an entry here is
+ * therefore a compile error until it has a silhouette, an eye pose or a colour pair, and the app's
+ * option lists and preference validator read these same arrays. Before this, the three axes were
+ * declared in three places that derived from nothing, so a variant could validate in one and
+ * silently reset in another.
+ *
+ * Order is presentation order. It is what Customize lists, so it is part of the contract.
+ */
+export const COMPANION_BODY_VARIANTS = Object.freeze([
+  'circle',
+  'pebble',
+  'squircle',
+  'capsule',
+  'cloud',
+  'droplet',
+  'arch',
+  'bead',
+  'lozenge',
+] as const);
+
+export const COMPANION_COLOR_VARIANTS = Object.freeze([
+  'ink',
+  'rose',
+  'orange',
+  'periwinkle',
+  'mint',
+  'ember',
+  'iris',
+  'slate',
+] as const);
+
+export const COMPANION_FACE_VARIANTS = Object.freeze([
+  'neutral',
+  'attentive',
+  'curious',
+  'happy',
+  'sleepy',
+  'wide',
+  'wink',
+  'focused',
+] as const);
+
+export type CompanionBodyVariant = (typeof COMPANION_BODY_VARIANTS)[number];
+export type CompanionColorVariant = (typeof COMPANION_COLOR_VARIANTS)[number];
+export type CompanionFaceVariant = (typeof COMPANION_FACE_VARIANTS)[number];
 
 export interface CompanionAppearanceConfigurationV3 {
   readonly companionModelVersion: 3;
@@ -35,21 +75,18 @@ export interface CompanionAppearanceConfigurationV3 {
 
 export type CompanionAppearanceConfiguration = CompanionAppearanceConfigurationV3;
 
-const BODY = new Set<CompanionBodyVariant>([
-  'circle', 'pebble', 'squircle', 'capsule', 'cloud', 'droplet',
-]);
-const COLOR = new Set<CompanionColorVariant>([
-  'ink', 'rose', 'orange', 'periwinkle', 'mint',
-]);
-const FACE = new Set<CompanionFaceVariant>([
-  'neutral', 'attentive', 'curious', 'happy', 'sleepy',
-]);
+const BODY = new Set<CompanionBodyVariant>(COMPANION_BODY_VARIANTS);
+const COLOR = new Set<CompanionColorVariant>(COMPANION_COLOR_VARIANTS);
+const FACE = new Set<CompanionFaceVariant>(COMPANION_FACE_VARIANTS);
 const COLORS: Readonly<Record<CompanionColorVariant, readonly [string, string]>> = Object.freeze({
   ink: ['#0a0a0c', '#f7f5ef'],
   rose: ['#f13f8e', '#28101b'],
   orange: ['#ff8a35', '#2b1405'],
   periwinkle: ['#637ff2', '#0c1747'],
   mint: ['#43caa9', '#062a25'],
+  ember: ['#e2483a', '#2c0c08'],
+  iris: ['#8b5cf0', '#180b33'],
+  slate: ['#5b6e7a', '#eef3f5'],
 });
 
 export interface CompanionAppearanceSelection {

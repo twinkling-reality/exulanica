@@ -14,6 +14,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.evidence.blob import BlobId
 from exulanica.graph.read_consent import CONSENT_BASIS, PERSON_CONSENT_AVAILABLE
 from exulanica.graph.world_read import (
     NUMBER_DECIMALS,
@@ -163,13 +164,30 @@ def test_no_geometry_entry_is_offered_as_evidence(published, repository):
     assert "Nothing in this bundle is evidence" in envelope["bundle"]["epistemics"]["evidence"]
 
 
-def test_recorded_and_displayed_rungs_stay_separate(published, repository):
-    store, _captures, scene_id = published
+def test_recorded_and_displayed_rungs_stay_separate(partly_registered, repository):
+    """Collapsing the two is how a system claims a rung it did not earn, so they must differ.
+
+    Asserting only that both keys exist proved nothing: they would still both exist if one were
+    assigned from the other. The fixture here has receipts on disk but no accepted pose, so the
+    scene has a durable recorded rung and cannot draw it, and the two numbers genuinely diverge.
+    """
+    store, _captures, scene_id = partly_registered
     envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
     assert envelope is not None
     rungs = envelope["bundle"]["rungs"]
     assert set(rungs) == {"recorded", "recorded_reasons", "displayed", "display_reasons", "ladder"}
-    assert rungs["displayed"] in (1, 2, 3, 4)
+
+    # Now take the bytes away. The recorded claim is durable and must not move; the displayed rung
+    # is what can actually be drawn and must fall to 4.
+    for entry in envelope["bundle"]["geometry"]:
+        digest = BlobId.from_hex(entry["content_sha256"])
+        (store.root / store.key_for(digest)).unlink(missing_ok=True)
+    degraded = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert degraded is not None
+    assert degraded["bundle"]["rungs"]["recorded"] == rungs["recorded"]
+    assert degraded["bundle"]["rungs"]["displayed"] == 4
+    assert degraded["bundle"]["rungs"]["displayed"] != degraded["bundle"]["rungs"]["recorded"]
+    assert degraded["bundle"]["geometry"] == []
 
 
 def test_the_bundle_names_the_scene_addressing_limitation(published, repository):

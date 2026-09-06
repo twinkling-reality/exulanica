@@ -25,6 +25,8 @@
 
 export type { GraphPayload } from './wire.js';
 
+export type { GeneratedGeometryRecord } from './read-model.js';
+
 export type { IslandOf } from './islands.js';
 
 export type { GraphLoadState, GraphSource, TerminalGraphLoadState } from './source.js';

@@ -535,12 +535,17 @@ function reconstructionRungsFor(
       // letting the panel infer it from the substrate is the point: a scene can have trained
       // geometry and still be showing the visitor nothing, because its region draws another one.
       drawn: !notDrawn.has(scene.sceneId),
-      // A generation only counts as in view when it verified. An `invalid` entry is a generation
-      // whose receipt did not check out, and it is never drawn, so it must not colour the region
-      // as though a model surface were on screen.
-      showingGenerated:
-        !notDrawn.has(scene.sceneId)
-        && scene.generatedGeometry.some((entry) => entry.state === 'available'),
+      // FALSE UNTIL SOMETHING DRAWS A GENERATION, and this is not a placeholder.
+      //
+      // The first version set this whenever a verified generation existed for the scene, which
+      // made the panel tell a visitor "A model produced this. No camera observed it" about a
+      // region drawing recorded point maps. Nothing in this renderer draws generated geometry at
+      // all, so the honest answer to "is a model surface on screen" is no. Filing a generation
+      // must not change what the world says it is showing.
+      //
+      // When a loader draws one, this becomes a fact about that region's drawn content, not about
+      // the existence of a row.
+      showingGenerated: false,
       ...(scene.trainedGeometry?.quality === undefined ? {} : { trainingQuality: scene.trainedGeometry.quality }),
     });
   }));

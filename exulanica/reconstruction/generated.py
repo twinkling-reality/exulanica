@@ -17,10 +17,16 @@ and amending a retained record so a new field fits is the wrong direction of cau
 **The prompt digest.** The prompt is not stored. Its digest is, so a later reader can prove two
 generations shared a prompt, or did not, without the prompt itself entering the corpus.
 
-**The conditioning digests.** Exactly what the model was shown: the World Read bundle's
-``bundle_sha256`` and the content digest of every artifact that bundle referenced. This is what
-makes the tier falsifiable rather than decorative. Without it, "the model was conditioned on the
-real scene" is a sentence; with it, a recipient can recompute the bundle and check.
+**The conditioning digests.** What the model was shown. Exactly one entry is required and checked:
+the World Read bundle's ``recorded_sha256``, the digest over the observed world alone, which
+``exulanica.ingest.generated_scene`` verifies against the scene's current value before storing
+anything. That is what makes the tier falsifiable rather than decorative: "the model was
+conditioned on the real scene" becomes something a recipient recomputes rather than reads.
+
+Further entries may name individual artifacts the model was given, and nothing requires them or
+checks them. A caller listing every point map it passed is recording more than the minimum; a
+caller listing none has still bound itself to the bundle, which references those artifacts by
+digest anyway.
 
 **The seam.** One sentence naming, in words, where the record stops and the imagination starts.
 Atlas draws it, and a receipt without it is refused, because a generated surface a viewer cannot
@@ -184,12 +190,12 @@ class GeneratedSceneReceipt:
         return next(item.sha256 for item in self.conditioning if item.role == "world-read-bundle")
 
     def identity(self) -> dict[str, Any]:
-        """The part of the receipt that decides whether this is the same generation.
+        """The provenance of this generation: what produced it and what it was shown.
 
-        Model, prompt and conditioning, and nothing about the output. Two runs of one model on one
-        prompt and one bundle are the same generation attempt even though sampling makes their
-        bytes differ, which is precisely why this stage is not deterministic and why its output is
-        removed rather than regenerated on deletion (ADR-0017).
+        Model, prompt and conditioning, and nothing about the output. This says whether two
+        generations share an origin. It is deliberately NOT the artifact key: see
+        :func:`generation_input_digest`, whose docstring records why using this as the key was
+        wrong.
         """
         return {
             "profile": GENERATED_SCENE_PROFILE,
@@ -229,12 +235,22 @@ class GeneratedSceneReceipt:
 
 
 def generation_input_digest(receipt: GeneratedSceneReceipt) -> bytes:
-    """The artifact ``input_digest`` for one generation.
+    """The artifact ``input_digest`` for one generation: the whole receipt, not just its origin.
 
-    Folds model identity, prompt digest and every conditioning digest, so changing any of them
-    produces a different ``artifact_id``. This is the scene-subject equivalent of the blob-subject
-    ``binding_digest``, whose docstring records why it exists: without it, swapping the model
-    behind a stage would leave every artifact keyed as though nothing had changed and the corpus
-    would never reprocess.
+    This is the scene-subject equivalent of the blob-subject ``binding_digest``, whose docstring
+    records why it exists: without it, swapping the model behind a stage would leave every artifact
+    keyed as though nothing had changed and the corpus would never reprocess.
+
+    **It covers the entire receipt document, and the first version's narrower key was a real
+    defect.** That version hashed :meth:`identity` alone, on the reasoning that two runs of one
+    model on one prompt and one bundle are the same generation attempt even though sampling makes
+    their bytes differ. The reasoning is backwards. ADR-0017's whole point is that a sampled
+    generation is not reproducible, so two runs are two artifacts, not one artifact seen twice.
+    Under the narrow key the second run collided with the first, ``insert ... on conflict do
+    nothing`` discarded it, its bytes were never written to the store, and the caller was handed a
+    ``receipt_sha256`` naming bytes that do not exist anywhere.
+
+    Hashing the document keeps idempotency where it belongs, on filing the identical receipt twice,
+    and gives every distinct generation its own artifact.
     """
-    return sha256_of_canonical(receipt.identity())
+    return sha256_of_canonical(receipt.document())

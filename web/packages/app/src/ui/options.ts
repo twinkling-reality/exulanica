@@ -10,13 +10,60 @@ import {
   type VignettePreference,
 } from '../preferences.js';
 import {
+  COMPANION_BODY_VARIANTS,
+  COMPANION_COLOR_VARIANTS,
+  COMPANION_FACE_VARIANTS,
+  companionAppearanceConfiguration,
   resolveWorldStyleParameters,
   worldArtProfile,
   worldStyleControls,
 } from '@exulanica/presentation';
 import type { WorldStyleParameterDefinition, WorldStyleParameterValue } from '@exulanica/atlas-core';
 import { commandAction, el } from './dom.js';
+import { createCompanionAvatar } from './companion-avatar.js';
 import { createModalFocus } from './modal-focus.js';
+
+/*
+ * What each variant is called on screen.
+ *
+ * These are total records over the contract's catalogs, so a silhouette, colour or expression
+ * added in @exulanica/presentation cannot reach a person unnamed: the build fails until it has a
+ * word. Colour labels stay plain colour words rather than the internal variant names, which is
+ * what the first five already did.
+ */
+const BODY_LABEL: Readonly<Record<CompanionBodyPreference, string>> = Object.freeze({
+  circle: 'Circle',
+  pebble: 'Pebble',
+  squircle: 'Squircle',
+  capsule: 'Capsule',
+  cloud: 'Cloud',
+  droplet: 'Droplet',
+  arch: 'Arch',
+  bead: 'Bead',
+  lozenge: 'Lozenge',
+});
+
+const COLOR_LABEL: Readonly<Record<CompanionColorPreference, string>> = Object.freeze({
+  ink: 'Ink',
+  rose: 'Pink',
+  orange: 'Orange',
+  periwinkle: 'Blue',
+  mint: 'Green',
+  ember: 'Red',
+  iris: 'Violet',
+  slate: 'Slate',
+});
+
+const FACE_LABEL: Readonly<Record<CompanionFacePreference, string>> = Object.freeze({
+  neutral: 'Neutral',
+  attentive: 'Attentive',
+  curious: 'Curious',
+  happy: 'Happy',
+  sleepy: 'Sleepy',
+  wide: 'Wide',
+  wink: 'Wink',
+  focused: 'Focused',
+});
 
 /**
  * The parts of Customize a caller can ask for by name.
@@ -141,28 +188,24 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     option('subtle', 'Subtle'),
     option('strong', 'Strong'),
   ]);
-  const companionBody = el('select', { 'aria-label': 'Companion shape' }, [
-    option('circle', 'Circle'),
-    option('pebble', 'Pebble'),
-    option('squircle', 'Squircle'),
-    option('capsule', 'Capsule'),
-    option('cloud', 'Cloud'),
-    option('droplet', 'Droplet'),
-  ]);
-  const companionColor = el('select', { 'aria-label': 'Companion color' }, [
-    option('ink', 'Ink'),
-    option('rose', 'Pink'),
-    option('orange', 'Orange'),
-    option('periwinkle', 'Blue'),
-    option('mint', 'Green'),
-  ]);
-  const companionFace = el('select', { 'aria-label': 'Companion expression' }, [
-    option('neutral', 'Neutral'),
-    option('attentive', 'Attentive'),
-    option('curious', 'Curious'),
-    option('happy', 'Happy'),
-    option('sleepy', 'Sleepy'),
-  ]);
+  const companionBody = el('select', { 'aria-label': 'Companion shape' },
+    COMPANION_BODY_VARIANTS.map((variant) => option(variant, BODY_LABEL[variant])));
+  const companionColor = el('select', { 'aria-label': 'Companion color' },
+    COMPANION_COLOR_VARIANTS.map((variant) => option(variant, COLOR_LABEL[variant])));
+  const companionFace = el('select', { 'aria-label': 'Companion expression' },
+    COMPANION_FACE_VARIANTS.map((variant) => option(variant, FACE_LABEL[variant])));
+
+  /*
+   * The preview.
+   *
+   * Choosing an appearance from three dropdowns of words meant reading "Lozenge" and hoping. The
+   * real avatar renderer draws it here, so the choice is visible where it is made rather than
+   * behind the surface that is covering the Companion. It is decorative: the selects remain the
+   * controls, and atlas-interface-architecture.md asks for exactly this.
+   */
+  const companionPreview = createCompanionAvatar();
+  const companionPreviewFrame = el('div', { class: 'companion-preview', 'aria-hidden': 'true' });
+  companionPreviewFrame.append(companionPreview.root);
 
   const activeStyle = worldArtProfile(
     callbacks.preferences.worldArtProfile,
@@ -325,6 +368,11 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     companionBody.value = current.companionBody;
     companionColor.value = current.companionColor;
     companionFace.value = current.companionFace;
+    companionPreview.setAppearance(companionAppearanceConfiguration({
+      body: current.companionBody,
+      color: current.companionColor,
+      face: current.companionFace,
+    }));
     const liveStyle = worldArtProfile(
       current.worldArtProfile,
       current.worldArtProfileVersion,
@@ -533,6 +581,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     ]),
     el('div', { class: 'option-group companion-options' }, [
       el('h2', { text: 'Companion' }),
+      companionPreviewFrame,
       field('Shape', companionBody, 'Changes the silhouette without changing what the Companion may do.'),
       field('Color', companionColor),
       field('Expression', companionFace, 'Two slit eyes are the complete face; expression is visual only.'),

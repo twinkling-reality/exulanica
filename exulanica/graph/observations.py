@@ -23,8 +23,11 @@ together. ``exulanica/graph/geometry.py`` records why the per-capture reduction 
 scene-wide facts: its liveness predicate is an OR over captures sharing a blob, and one live
 capture would keep serving a fact about a set from which another was withdrawn.
 
-Consent rides along per photograph, through the same seam the World Read bundle uses, so a
-photograph a person has not consented to appear in is never offered as the answer to a click.
+Consent rides along per photograph, through the same seam the World Read bundle uses. Note what
+that does and does not do today: it **reports** each photograph's screening state, and it filters
+nothing, because no per-person consent state exists to filter on. Every observation currently
+carries ``person_consent: unavailable``. Filtering is Phase 10 capability 5's to add, on the
+privacy branch, and until it lands a caller has a state to display and no decision to enforce.
 """
 
 from __future__ import annotations

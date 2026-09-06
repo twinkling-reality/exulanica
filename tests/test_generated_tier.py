@@ -187,13 +187,16 @@ def test_the_stored_receipt_is_its_own_canonical_bytes(repository, generated):
     assert hashlib.sha256(payload).hexdigest() == record.receipt_sha256
     document = json.loads(payload)
     assert document["tier"] == "generated"
-    assert document["epistemics"] == {
-        "citable": False,
-        "promotes_rung": False,
-        "is_evidence": False,
-        "statement": document["epistemics"]["statement"],
-    }
     assert document["seam"] == receipt.seam
+    # Spelled out rather than read back from the document, which is what the first version did and
+    # which made the assertion true of any statement at all, including an empty one.
+    assert document["epistemics"]["citable"] is False
+    assert document["epistemics"]["promotes_rung"] is False
+    assert document["epistemics"]["is_evidence"] is False
+    statement = document["epistemics"]["statement"]
+    assert "produced by a model" in statement
+    assert "supports no claim" in statement
+    assert "carries no rung" in statement
 
 
 # -- the four things it can never do ------------------------------------------------------
@@ -417,3 +420,52 @@ def test_filing_a_generation_leaves_the_recorded_digest_untouched(repository, tm
     assert after is not None
     assert after["bundle"]["recorded_sha256"] == recorded
     assert after["bundle_sha256"] != before["bundle_sha256"]
+
+
+def test_two_generations_for_one_scene_are_both_visible(repository, tmp_path):
+    """Two runs of one model are two artifacts, and the graph must show both.
+
+    Two defects met here, and neither test in the first version could see either. The artifact key
+    hashed only the generation's provenance, so a second run of the same model on the same prompt
+    and bundle collided with the first, was silently discarded, and the caller was handed a digest
+    naming bytes nobody stored. And the read went through ``artifact_current``, whose distinct-on
+    key every generation for one scene shares, so even two genuinely distinct artifacts would have
+    come back as one row.
+    """
+    store, _captures, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    recorded = envelope["bundle"]["recorded_sha256"]
+
+    first = record_generated_scene(
+        repository,
+        store,
+        scene_id=scene_id,
+        receipt=_receipt(recorded, seam=_SEAM),
+        expected_recorded_sha256=recorded,
+    )
+    # Same model, same prompt, same bundle, different sampled output. Under ADR-0017 these are two
+    # artifacts, because re-running a sampled generation does not reproduce its bytes.
+    second = record_generated_scene(
+        repository,
+        store,
+        scene_id=scene_id,
+        receipt=_receipt(recorded, content_sha256=_sha("a different sampling")),
+        expected_recorded_sha256=recorded,
+    )
+    assert first.inserted and second.inserted
+    assert first.artifact_id != second.artifact_id
+    assert first.receipt_sha256 != second.receipt_sha256
+
+    # Both sets of bytes are actually in the store, which is what the discarded-write defect broke.
+    from exulanica.evidence.blob import BlobId
+
+    for record in (first, second):
+        stored = store.get(BlobId.from_hex(record.receipt_sha256))
+        assert hashlib.sha256(stored).hexdigest() == record.receipt_sha256
+
+    snapshot = read_snapshot(repository.connection, repository.workspace_id, store)
+    scene = next(s for s in snapshot.reconstruction_scenes if s.scene_id == scene_id)
+    visible = {str(entry.artifact_id) for entry in scene.generated_geometry}
+    assert visible == {str(first.artifact_id), str(second.artifact_id)}
+    assert all(entry.state == "available" for entry in scene.generated_geometry)

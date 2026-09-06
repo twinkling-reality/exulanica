@@ -135,13 +135,12 @@ def by_uri(
         raise HTTPException(status_code=404, detail="no such evidence")
     if row["withdrawn"]:
         raise HTTPException(
-            status_code=410, detail="evidence was withdrawn",
+            status_code=410,
+            detail="evidence was withdrawn",
             headers={"Cache-Control": "private, no-store"},
         )
     data = resolve_original_bytes(address, get_services(request).store)
-    return _ranged(
-        data, row["media_type"], range_header, _evidence_headers(str(address.modality))
-    )
+    return _ranged(data, row["media_type"], range_header, _evidence_headers(str(address.modality)))
 
 
 def _address(
@@ -169,7 +168,8 @@ def _address(
         raise HTTPException(status_code=404, detail="no such evidence")
     if row["withdrawn"]:
         raise HTTPException(
-            status_code=410, detail="evidence was withdrawn",
+            status_code=410,
+            detail="evidence was withdrawn",
             headers={"Cache-Control": "private, no-store"},
         )
     # No `except` here, and the absence is the point. `address_from_span_row` raises

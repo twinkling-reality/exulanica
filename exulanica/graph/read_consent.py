@@ -44,11 +44,28 @@ __all__ = [
 #: per-person receipts, is a new value rather than a silent change of meaning under the same name.
 CONSENT_BASIS: Final = "human-screening-receipt"
 
-#: Whether a per-person consent layer is present in this tree. Kept as a module constant so the
-#: branch that adds the layer flips one symbol, and so a test can pin today's value: when the
-#: privacy branch merges, that test fails and forces the release rule to be reconsidered rather
-#: than inherited.
-PERSON_CONSENT_AVAILABLE: Final = False
+def _person_consent_layer_is_present() -> bool:
+    """Whether the per-person presentation-consent layer exists in this tree.
+
+    **Detected, not declared, and the first version's hand-set ``False`` was an inert tripwire.**
+    That constant lived only on this branch, so the branch actually building the consent layer had
+    no reason to touch it: the layer could merge in full and this module would go on reporting that
+    it was absent, and the test pinning the value would go on passing. A tripwire nobody has to
+    disarm is not a tripwire.
+
+    Importing the module is the detection because ``exulanica.graph.person_regions`` is that
+    layer's own read seam. Its arrival is the event this needs to notice, and it cannot arrive
+    without arriving here.
+    """
+    try:
+        import exulanica.graph.person_regions  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+#: Whether a per-person consent layer is present, resolved once at import.
+PERSON_CONSENT_AVAILABLE: Final = _person_consent_layer_is_present()
 
 _SCREENINGS: Final = """
 select distinct on (s.capture_id)

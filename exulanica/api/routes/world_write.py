@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
-from exulanica.errors import EpistemicViolation
+from exulanica.errors import CanonicalisationError, EpistemicViolation
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.ingest.generated_scene import record_generated_scene
 from exulanica.ingest.repository import IngestRepository
@@ -106,7 +106,12 @@ def record_generation(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
-    envelope = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+    try:
+        envelope = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+    except CanonicalisationError as error:
+        # No generation may be filed against a scene whose own conditioning digest cannot be
+        # computed: the receipt would name a bundle nobody can reproduce.
+        return _problem(424, "unreadable_scene", str(error))
     if envelope is None:
         # The same 404 the read route gives, for the same reason: a caller who cannot read a scene
         # must not learn from a write attempt that it exists.

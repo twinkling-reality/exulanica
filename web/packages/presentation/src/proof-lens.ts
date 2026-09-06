@@ -49,7 +49,8 @@ export const PROOF_TIERS: readonly ProofTier[] = Object.freeze([
  * The legend, and it is not optional.
  *
  * A colour without a name is a claim a visitor cannot check, which would make the lens decorative
- * rather than evidential. `buildProofLensLegend` in the app renders these strings verbatim.
+ * rather than evidential. `proofTierDisclosure` in the app's status panel renders these strings
+ * verbatim rather than rewording them, so the colour and the words cannot drift apart.
  */
 export const PROOF_TIER_LABELS: Readonly<Record<ProofTier, string>> = Object.freeze({
   photographed: 'Photographed',

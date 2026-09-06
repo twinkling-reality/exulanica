@@ -91,10 +91,14 @@ cannot record what it was conditioned on, and the tier is unfalsifiable.
 - [x] A clean client recomputes `bundle_sha256` from the returned canonical bytes offline, with no
       database and no repository code, asserted by a test that reimplements the hash in the test
       file rather than calling the production function.
-- [x] `exulanica.canonical.canonical_json` accepts the bundle, which means every measured number in
-      it is an integer. Focal lengths, principal points and transforms are quantised on the way in
-      by an explicitly named unit (the existing convention is `_micro`/`_milli` suffixes), and the
-      quantisation is stated in the bundle, not assumed.
+- [x] `exulanica.canonical.canonical_json` accepts the bundle, which means no float reaches the
+      digest input. Focal lengths, principal points and transforms are encoded as fixed-precision
+      decimal strings (`exulanica/graph/wire_numbers.py`, following the existing precedent in
+      `exulanica/evaluation/synthetic_multiview.py`) rather than as quantised integers with a
+      `_micro`/`_milli` suffix, which is what this criterion first said. Decimal strings were
+      chosen because a transform has no natural unit to name; the precision is stated in the
+      bundle's own `number_encoding`, and a value the grid cannot represent is refused rather than
+      encoded.
 - [x] Mutating one byte of any referenced artifact digest changes `bundle_sha256`.
 - [x] The bundle names its own profile, `exulanica.world-read-bundle/v1`.
 - [x] Nothing derived is presented as evidence: the bundle's geometry entries carry the rung that
@@ -175,9 +179,13 @@ output has nowhere to go but into the record.
       that set from the registry and asserts the document matches. A generated artifact is
       **removed, not regenerated** on deletion, per ADR-0017.
 - [x] The model identity, model version, prompt digest and conditioning digests are bound into the
-      artifact's `input_digest`, so swapping the model produces a different `artifact_id` rather
-      than silently reusing the old one. Asserted by a test that changes only the model version and
-      observes a different id.
+      artifact's `input_digest`, so swapping the model produces a different artifact rather than
+      silently reusing the old one. `generation_input_digest` covers the whole receipt document,
+      not only its provenance: the narrower first version made two runs of one model collide, and
+      the second run's bytes were discarded while its caller was handed a digest naming bytes
+      nobody had stored (`tests/test_generated_tier.py::test_two_generations_for_one_scene_are_both_visible`).
+      Asserted at the digest level by `test_a_model_swap_produces_a_different_artifact_identity`
+      and at the artifact-id level by the two-generation test.
 - [x] `model_role` is **not** set. `model_role` names a role the platform routes through its own
       reviewed model manifest, and a third-party world model supplied per request is not that.
       Setting it would also change `sorted(key for key, spec in STAGES.items() if spec.model_role)`,
@@ -225,8 +233,11 @@ rung, cannot be cited, and cannot enter a receipt chain.
 - [x] `SceneReceipt.kind` remains `pose|placement|scale|coverage|corridor|splat`, so a generated
       artifact is structurally unable to enter `decide_scene_rung`. A test constructs a generated
       artifact and asserts the scene's rung is unchanged.
-- [x] A generated artifact cannot become an assertion's support span. A test attempts it and gets
-      the existing epistemic refusal.
+- [x] A generated artifact cannot become an assertion's support span, and the reason is structural
+      rather than enforced: `evidence_span` references `blob`, and a generated artifact has no
+      source blob at all, so there is no span that could name it.
+      `test_a_generation_cannot_become_an_assertion_support_span` asserts that absence. It does not
+      attempt the write, because there is nothing to attempt.
 - [ ] An executed mutation control per invariant, in `scripts/verify_world_read_controls.py`
       following the shape of `scripts/verify_gsplat_controls.py`: the mutant must be killed by a
       named test selector, the unmutated baseline must pass first, and the record is written
@@ -251,8 +262,9 @@ person able to check it without reading JSON.
 
 **Exit.**
 
-- [x] Colour is decided in `@exulanica/presentation` and delivered to the renderer as a uniform,
-      not chosen inside `atlas-react`. `pnpm boundaries` passes, which is what enforces this.
+- [x] Colour is decided in `@exulanica/presentation`, not inside `atlas-react`. `pnpm boundaries`
+      passes, which is what enforces this. Nothing delivers it to the renderer yet; see the open
+      criterion below.
 - [x] The lens has a legend naming each tier in words, because a colour without a legend is a claim
       nobody can check. The status panel prints the tier label and its sentence per scene
       (`proofTierDisclosure`), which is also what a screen reader and a screenshot get.
@@ -265,8 +277,10 @@ person able to check it without reading JSON.
       screen.
 - [x] A region whose scene is not drawn keeps its existing "Not drawn" disclosure under the lens
       rather than being coloured as though it were showing something.
-- [x] Toggling the lens changes no scene, no rung and no receipt, asserted by a test on the state it
-      writes.
+- [ ] Toggling the lens changes no scene, no rung and no receipt. Untestable and unticked: there is
+      no toggle. The tier line is always shown in the status panel, and `proofTierOf` is a pure
+      function that writes no state at all, so there is nothing for such a test to assert on until
+      a toggle exists.
 
 **Files.** New: a lens module in `web/packages/presentation/src/`, tests under
 `web/packages/presentation/test/` and `web/packages/app/test/`. Edit:
@@ -343,7 +357,9 @@ place captured once. So this week delivers the design and the fixture, and the e
       frame within a stated tolerance, and the world shows both versions in place. Not achievable
       this week and not claimed.
 
-**Files.** New: `docs/place-identity.md`, `tests/fixtures/` additions.
+**Files.** New: `docs/place-identity.md`, `exulanica/reconstruction/place_alignment.py`,
+`tests/test_place_alignment.py`. No `tests/fixtures/` additions: the fixture is generated in the
+test module (one camera ring, transformed by a known similarity), not committed as data.
 
 ---
 

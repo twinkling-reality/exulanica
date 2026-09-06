@@ -39,6 +39,7 @@ OBSERVATIONS = "exulanica/graph/observations.py"
 
 TEST_FILES = (
     "conftest.py",
+    "test_wire_numbers.py",
     "pg_harness.py",
     "model_fakes.py",
     "test_world_read_bundle.py",
@@ -54,16 +55,30 @@ CONTROLS = [
     (
         "the_recorded_digest_excludes_generated_content",
         WORLD_READ,
-        'recorded = {key: value for key, value in bundle.items() if key != "generated"}',
-        "recorded = bundle",
+        'bundle["recorded_keys"] = sorted(key for key in bundle if key != "generated")',
+        'bundle["recorded_keys"] = sorted(bundle)',
         "test_filing_a_generation_leaves_the_recorded_digest_untouched",
     ),
     (
-        "measured_numbers_never_reach_a_digest_as_floats",
+        "a_non_finite_measurement_is_refused_rather_than_encoded",
         NUMBERS,
-        '    quantised = Decimal(value).quantize(Decimal(1).scaleb(-NUMBER_DECIMALS))\n    return f"{quantised:f}"',
-        "    return value  # mutant: a float in a digest input",
-        "test_every_number_in_the_bundle_survives_canonical_json",
+        "    if not math.isfinite(value):",
+        "    if False:  # mutant: a non-finite value is encoded rather than refused",
+        "test_a_non_finite_measurement_is_refused_rather_than_encoded",
+    ),
+    (
+        "an_unencodable_magnitude_is_refused_rather_than_crashing",
+        NUMBERS,
+        "    if abs(value) >= _LIMIT:",
+        "    if False:  # mutant: an oversized coordinate reaches the decimal context",
+        "test_a_coordinate_too_large_to_encode_is_refused_rather_than_crashing",
+    ),
+    (
+        "the_two_zeros_encode_to_one_string",
+        NUMBERS,
+        "    if quantised.is_zero():\n",
+        "    if False:\n",
+        "test_the_two_zeros_encode_to_the_same_string",
     ),
     (
         "the_release_state_is_internal_only_without_person_consent",
@@ -96,7 +111,7 @@ CONTROLS = [
     (
         "model_identity_enters_the_generated_artifact_key",
         GENERATED,
-        "    return sha256_of_canonical(receipt.identity())",
+        "    return sha256_of_canonical(receipt.document())",
         '    return sha256_of_canonical({"constant": "mutant"})',
         "test_a_model_swap_produces_a_different_artifact_identity",
     ),
@@ -113,6 +128,13 @@ CONTROLS = [
         '        if kind not in ("pose", "placement", "scale", "coverage", "corridor", "splat"):',
         "        if False:  # mutant: any receipt kind is a gate receipt",
         "test_a_generation_cannot_satisfy_any_reconstruction_gate",
+    ),
+    (
+        "every_generation_for_a_scene_stays_visible",
+        "exulanica/graph/generated_geometry.py",
+        "   and a.superseded_by is null",
+        "   and a.artifact_id is not null  -- mutant: no supersession filter",
+        "test_two_generations_for_one_scene_are_both_visible",
     ),
     (
         "the_observation_graph_is_guarded_scene_wide",

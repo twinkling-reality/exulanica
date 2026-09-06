@@ -187,6 +187,26 @@ body {
   width: 100%;
 }
 
+/*
+ * The preview sits above its own controls, at the size the Companion is actually read at in the
+ * world rather than as a chip. It is the real renderer, not a picture of one, so a silhouette or
+ * expression added to the contract needs no second drawing to appear here.
+ */
+.companion-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+  margin-bottom: var(--gap);
+  padding: var(--gap) 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.companion-preview .companion-avatar {
+  width: 6.5rem;
+  height: 6.5rem;
+}
+
 .options-view .overlay-actions {
   margin-top: 0.2rem;
 }

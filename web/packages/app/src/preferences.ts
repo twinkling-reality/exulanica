@@ -1,8 +1,14 @@
 /** Versioned device preferences. The authored Atlas landscape is not a theme picker. */
 
 import {
+  COMPANION_BODY_VARIANTS,
+  COMPANION_COLOR_VARIANTS,
+  COMPANION_FACE_VARIANTS,
   productWorldStyleReferences,
   resolveWorldStyleParameters,
+  type CompanionBodyVariant,
+  type CompanionColorVariant,
+  type CompanionFaceVariant,
   type WorldArtProfileId,
   type WorldStyleParameters,
 } from '@exulanica/presentation';
@@ -16,15 +22,13 @@ export type VignettePreference = 'off' | 'subtle' | 'strong';
 export type TurnPreference = 'smooth' | 'snap';
 export type TransitionPreference = 'system' | 'motion' | 'fade';
 export type CompanionInitiativePreference = 'normal' | 'minimal' | 'off';
-export type CompanionBodyPreference =
-  | 'circle'
-  | 'pebble'
-  | 'squircle'
-  | 'capsule'
-  | 'cloud'
-  | 'droplet';
-export type CompanionColorPreference = 'ink' | 'rose' | 'orange' | 'periwinkle' | 'mint';
-export type CompanionFacePreference = 'neutral' | 'attentive' | 'curious' | 'happy' | 'sleepy';
+/*
+ * Companion appearance is the versioned V3 family, so these names are the contract's, not a second
+ * copy of it. A copy is how a variant comes to validate in presentation and reset here.
+ */
+export type CompanionBodyPreference = CompanionBodyVariant;
+export type CompanionColorPreference = CompanionColorVariant;
+export type CompanionFacePreference = CompanionFaceVariant;
 
 export interface AtlasPreferences {
   readonly version: 1;
@@ -97,15 +101,9 @@ const VIGNETTE = new Set<VignettePreference>(['off', 'subtle', 'strong']);
 const TURN = new Set<TurnPreference>(['smooth', 'snap']);
 const TRANSITION = new Set<TransitionPreference>(['system', 'motion', 'fade']);
 const INITIATIVE = new Set<CompanionInitiativePreference>(['normal', 'minimal', 'off']);
-const COMPANION_BODY = new Set<CompanionBodyPreference>([
-  'circle', 'pebble', 'squircle', 'capsule', 'cloud', 'droplet',
-]);
-const COMPANION_COLOR = new Set<CompanionColorPreference>([
-  'ink', 'rose', 'orange', 'periwinkle', 'mint',
-]);
-const COMPANION_FACE = new Set<CompanionFacePreference>([
-  'neutral', 'attentive', 'curious', 'happy', 'sleepy',
-]);
+const COMPANION_BODY = new Set<CompanionBodyPreference>(COMPANION_BODY_VARIANTS);
+const COMPANION_COLOR = new Set<CompanionColorPreference>(COMPANION_COLOR_VARIANTS);
+const COMPANION_FACE = new Set<CompanionFacePreference>(COMPANION_FACE_VARIANTS);
 
 const finiteIn = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;

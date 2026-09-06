@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
+from exulanica.errors import CanonicalisationError
 from exulanica.graph.observations import scene_observations
 from exulanica.graph.world_read import world_read_bundle
 
@@ -68,7 +69,13 @@ def scene_bundle(
 ) -> JSONResponse:
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
-        bundle = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+        try:
+            bundle = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+        except CanonicalisationError as error:
+            # A coordinate this reader cannot encode is a degenerate receipt, not a missing scene.
+            # 424 rather than 500, and rather than 404, so the caller learns the scene is theirs
+            # and unreadable instead of being told it does not exist.
+            return _problem(424, "unreadable_scene", str(error))
         if bundle is None:
             if _withdrawn(connection, session.workspace_id, scene_id):
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
@@ -94,7 +101,10 @@ def scene_observation_graph(
     """
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
-        records = scene_observations(connection, session.workspace_id, scene_id, services.store)
+        try:
+            records = scene_observations(connection, session.workspace_id, scene_id, services.store)
+        except CanonicalisationError as error:
+            return _problem(424, "unreadable_scene", str(error))
         if records is None:
             if _withdrawn(connection, session.workspace_id, scene_id):
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")

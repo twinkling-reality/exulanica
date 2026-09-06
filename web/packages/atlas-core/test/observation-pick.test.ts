@@ -123,11 +123,30 @@ describe('picking a recorded point', () => {
   it('prefers the nearer point when two lie on the same ray', () => {
     // A background point a fraction of a pixel closer to the cursor must not beat the foreground
     // surface occluding it.
-    const near = point(1, [0, 0, -5]);
+    //
+    // The near point carries the HIGHER id and the far point is nearer to the cursor in pixels,
+    // so neither the id tie-break nor the pixel-distance sort can produce this answer. Only the
+    // depth comparison can. The first version of this test gave the near point the lower id and
+    // passed under a tie-break that ignored depth entirely.
+    const near = point(9, [0.002, 0, -5]);
     const far = point(2, [0, 0, -50]);
+    const nearPixels = projectToSourcePixel(AT_ORIGIN, near.world)!;
+    const farPixels = projectToSourcePixel(AT_ORIGIN, far.world)!;
+    expect(farPixels.u).toBeCloseTo(320, 9);
+    expect(nearPixels.u).toBeGreaterThan(farPixels.u);
+
     const picked = pickObservedPoint(AT_ORIGIN, [far, near], { u: 320, v: 240 });
-    expect(picked?.point.pointId).toBe(1);
+    expect(picked?.point.pointId).toBe(9);
     expect(picked?.depth).toBeCloseTo(5, 9);
+  });
+
+  it('does not let the occlusion band swallow a genuinely distant point', () => {
+    // The band exists to resolve one ray, not to prefer depth over the cursor. A near point well
+    // away from the cursor must lose to a far point under it.
+    const near = point(1, [0.06, 0, -5]);
+    const far = point(2, [0, 0, -50]);
+    const picked = pickObservedPoint(AT_ORIGIN, [near, far], { u: 320, v: 240 });
+    expect(picked?.point.pointId).toBe(2);
   });
 
   it('ignores points behind the camera entirely', () => {

@@ -10,7 +10,12 @@ Three guards, all inherited rather than reinvented:
 
 * ``person_withdrawal_blocks_artifact``, so a generation that depended on a withdrawn person's
   photographs stops being served the moment the withdrawal commits;
-* the ``artifact_current`` view, so a superseded generation is not offered beside its replacement;
+* ``superseded_by is null``, so a superseded generation is not offered beside its replacement.
+  Deliberately NOT the ``artifact_current`` view, and this was a real defect: that view is
+  ``distinct on (workspace_id, kind, stage_key, stage_version, source_blob_sha256, scene_id)``,
+  which is exactly right for a stage that produces one artifact per subject and exactly wrong here.
+  Every generation for one scene shares all six columns, so the view returned one row and every
+  other generation filed against that scene was invisible;
 * the receipt's own digest, checked against the bytes, so a corrupted receipt reports ``invalid``
   rather than being parsed into fields nobody verified.
 
@@ -41,11 +46,12 @@ __all__ = ["generated_geometry_rows"]
 
 _GENERATIONS: Final = """
 select a.artifact_id, a.content_sha256, a.created_at
-  from artifact_current a
+  from artifact a
  where a.workspace_id = %s
    and a.scene_id = %s
    and a.kind = %s
    and a.purged_at is null
+   and a.superseded_by is null
    and not person_withdrawal_blocks_artifact(a.workspace_id, a.artifact_id)
  order by a.created_at, a.artifact_id
 """

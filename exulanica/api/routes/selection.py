@@ -196,8 +196,7 @@ def packet(
             for item in built.items
         ],
         "values": [
-            {"key": value.key, "text": value.text, "label": value.label}
-            for value in built.values
+            {"key": value.key, "text": value.text, "label": value.label} for value in built.values
         ],
     }
 

@@ -248,9 +248,7 @@ def split(body: SplitRequest, identity: Identity) -> EventView:
 @router.post("/undo", summary="Reverse one identity decision, from what its event recorded.")
 def undo_decision(body: UndoRequest, identity: Identity) -> EventView:
     return EventView(
-        event_id=undo(
-            identity.repository, event_id=body.event_id, actor=identity.session.actor
-        )
+        event_id=undo(identity.repository, event_id=body.event_id, actor=identity.session.actor)
     )
 
 

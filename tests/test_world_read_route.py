@@ -14,7 +14,6 @@ import uuid
 
 from exulanica.graph.world_read import WORLD_READ_PROFILE
 from exulanica.ingest.scene_reconstruction import SceneReconstructionProcessor
-from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import write_photo, write_point_map
 from test_api import deployment as deployment
@@ -153,12 +152,37 @@ def test_the_route_holds_a_read_only_connection(deployment, repository, tmp_path
     assert readonly_connection in dependencies
 
 
-def test_the_store_is_reopened_per_request_without_changing_the_digest(
+def test_two_requests_for_an_unchanged_scene_return_the_same_digest(
     deployment, repository, tmp_path
 ):
+    """Determinism across requests, which is what makes the digest worth quoting to anybody.
+
+    The first version of this test constructed a second store object and asserted its root, which
+    is a fact about the constructor and not about the route. This asks the route twice.
+    """
     scene_id = _scene_in(deployment, repository, tmp_path)
     first = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
-    reopened = LocalContentAddressedStore(deployment.store.root)
-    assert reopened.root == deployment.store.root
     second = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
     assert first["bundle_sha256"] == second["bundle_sha256"]
+    assert first == second
+
+
+def test_a_scene_whose_geometry_bytes_vanish_returns_a_different_digest(
+    deployment, repository, tmp_path
+):
+    """And the digest must move when the world does, or determinism is just a constant."""
+    from exulanica.evidence.blob import BlobId
+
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    before = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
+    entries = before["bundle"]["geometry"]
+    assert entries, "the fixture publishes geometry; without it this test cannot fire"
+    for entry in entries:
+        path = deployment.store.root / deployment.store.key_for(
+            BlobId.from_hex(entry["content_sha256"])
+        )
+        path.unlink(missing_ok=True)
+
+    after = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
+    assert after["bundle_sha256"] != before["bundle_sha256"]
+    assert after["bundle"]["scene"]["placement_state"] != "available"
