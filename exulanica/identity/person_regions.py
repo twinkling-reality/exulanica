@@ -29,8 +29,11 @@ human and has not been made. Locating a body does not make that decision.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final, Literal, Protocol
+
+from PIL import Image
 
 from exulanica.evidence.address import EvidenceAddress
 from exulanica.evidence.blob import BlobId
@@ -184,17 +187,20 @@ class PersonDetector(Protocol):
     descriptor that could be compared with one from another photograph. An implementation that
     wanted to do any of those would have nowhere to put the result.
 
-    ``identity`` and ``version`` land in the stage parameters, so swapping a detector or changing
-    its settings changes the stage digest and regenerates rather than silently reinterpreting an
-    existing region list.
+    ``model_id`` is read before the call and enters the stage's idempotency key as a run-time
+    binding, so swapping a detector regenerates rather than leaving the corpus keyed as though
+    nothing had changed. That is why this stage names a model role at all: a detector chosen at
+    run time cannot be described by a compile-time parameter.
     """
 
     @property
-    def identity(self) -> str: ...
+    def model_id(self) -> str: ...
 
-    @property
-    def version(self) -> int: ...
+    def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
+        """Propose every region that might be a person. Over-proposing is the safe direction.
 
-    def detect(self, image_width: int, image_height: int, context: Any) -> list[DetectedPerson]:
-        """Propose every region that might be a person. Over-proposing is the safe direction."""
+        ``context`` carries whatever the pipeline already knows about this photograph, so an
+        adapter over an observation another stage recorded needs no second look at the pixels.
+        An adapter is free to ignore it.
+        """
         ...
