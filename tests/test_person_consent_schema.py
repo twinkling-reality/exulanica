@@ -166,3 +166,19 @@ def test_the_receipt_vocabulary_is_the_one_the_resolver_uses():
 
     assert MASKED_STATES <= _REGION_STATES
     assert {"unknown", "present", "shown", "hidden", "withdrawn"} == _REGION_STATES
+
+
+def test_an_undecided_person_never_produces_an_eligible_screening():
+    """The regression this file exists to stop coming back.
+
+    Migration 0029 blocked any photograph whose screening named a person at all. 0037 removes that
+    rule so a confirmed region list can be recorded, and for a while the replacement accepted a
+    region in state ``unknown`` -- which means somebody was seen and nobody decided -- as eligible.
+    That is the exact case default deny exists for, and it made this branch strictly less safe than
+    the version it replaced. Until masking is wired into the pipeline, a masked region blocks.
+    """
+    from exulanica.consent.states import MASKED_STATES
+    from exulanica.ingest.privacy import _REGION_STATES
+
+    assert "unknown" in MASKED_STATES
+    assert MASKED_STATES < _REGION_STATES, "a masked state must still be a recordable state"

@@ -25,7 +25,7 @@ import uuid
 from typing import Any, Final, get_args
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
-from exulanica.consent.states import PersonState
+from exulanica.consent.states import MASKED_STATES, PersonState
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.scene import scene_id_for, scene_member_digest
@@ -378,6 +378,21 @@ def record_human_screening(
         for region in sensitive_regions
         if not isinstance(region, dict) or region.get("state") not in _REGION_STATES
     ]
+    # A region in a masked state blocks, and it blocks for a reason worth stating plainly: the
+    # masking stages are not yet wired into the pipeline, so nothing anywhere would actually
+    # hide this person before depth read them. Marking such a screening eligible would be
+    # strictly worse than the version 1 rule it replaced, which blocked any photograph naming a
+    # person at all. `unknown` is the important member of this set: it means somebody was seen
+    # and nobody decided, and "nobody decided" is the case default deny exists for.
+    #
+    # When masking is wired end to end this becomes "eligible if every masked region has a
+    # current masked_source derivative", which is the whole point of the design. Until then the
+    # honest rule is the conservative one, and this comment is the record of why.
+    masked = [
+        region
+        for region in sensitive_regions
+        if isinstance(region, dict) and region.get("state") in MASKED_STATES
+    ]
     if failure_reason:
         state = "failed"
         reasons = [failure_reason]
@@ -385,6 +400,12 @@ def record_human_screening(
         state = "blocked"
         reasons = [
             f"{len(unresolved)} confirmed person region(s) carry no resolved presentation state"
+        ]
+    elif masked:
+        state = "blocked"
+        reasons = [
+            f"{len(masked)} person region(s) are not consented to likeness and no masked source "
+            "derivative is produced yet, so geometry over these bytes is refused"
         ]
     else:
         state = "eligible"
