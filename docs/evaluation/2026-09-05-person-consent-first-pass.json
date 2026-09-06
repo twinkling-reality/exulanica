@@ -1,17 +1,15 @@
 {
   "profile": "exulanica.digest-bound-record/v1",
   "record": {
-    "base_revision": "e5bb108",
     "branch": "person-consent-masking",
-    "claim": "A first pass of person regions, masked source derivatives and presentation consent, covered by unit tests over synthetic images. No database was touched, migration 0037 was never applied, and no reconstruction, training or real photograph was processed.",
+    "claim": "A first pass of person regions, masked source derivatives and presentation consent. Migration 0037 was applied to the permitted test database and the complete suite passed, so the database-backed paths are executed rather than merely written. No reconstruction, no Gaussian training and no real photograph was processed.",
     "design_note": "docs/person-presentation-consent.md",
     "executed": {
-      "backend_tests": {
-        "command": "uv run pytest -m 'not postgres'",
-        "deselected_postgres": 751,
-        "note": "The 751 deselected are every test reaching PostgreSQL, auto-marked by tests/conftest.py from the spine_schema, ingest_spine, repository and cli_database fixtures. They were deliberately not run.",
-        "passed": 994,
-        "skipped": 3
+      "database": {
+        "allow_database_creation": "unset throughout",
+        "migration_0037_applied": true,
+        "note": "Applied through the ordinary migration test against a disposable schema in the one permitted database. No other database was contacted.",
+        "url": "postgresql://localhost:5433/exulanica_spine_test"
       },
       "detector_availability": {
         "absent": [
@@ -34,10 +32,39 @@
           "PIL"
         ]
       },
+      "full_suite": {
+        "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest",
+        "duration_seconds": 198,
+        "exit_code": 0,
+        "failed": 0,
+        "passed": 1747,
+        "skipped": 3
+      },
       "import_contracts": {
         "command": "uv run lint-imports",
-        "note": "Includes the new consent layer added to the exhaustive layers contract.",
         "result": "4 kept, 0 broken"
+      },
+      "pre_existing_failure_determination": {
+        "method": "Three tests failed on the pre-rebase branch. A clean detached worktree was made at the base commit e5bb108 with none of this change present, and the same three tests were run there.",
+        "result": "All three reproduced identically at e5bb108, so none was caused by this work. They were the other session's in-flight tests, fixed by their commit 30d53b8 'Fix the three database-backed tests written while the database was reserved'. After rebasing onto 164b20f the suite is green.",
+        "tests": [
+          "test_a_job_scoped_claim_takes_only_the_named_job_and_leaves_the_rest_queued",
+          "test_stale_stage_bindings_are_refused_before_any_pose_work_runs",
+          "test_nonmetric_trained_scene_uses_normal_publication_and_keeps_recorded_rung"
+        ]
+      },
+      "rebase": {
+        "commits": 13,
+        "conflicts": 0,
+        "footprint_on_files_the_other_session_changed": {
+          "exulanica/ingest/scene_reconstruction.py": "6 inserted lines, 0 modified",
+          "exulanica/ingest/scene_splat.py": "untouched",
+          "exulanica/ingest/stages/__init__.py": "90 inserted lines, 0 modified",
+          "exulanica/reconstruction/splat.py": "untouched",
+          "web/packages/app/src/geometry-api.ts": "untouched",
+          "web/packages/app/src/main.ts": "untouched"
+        },
+        "onto": "164b20f"
       },
       "ruff_check": {
         "command": "uv run ruff check .",
@@ -49,6 +76,15 @@
         "test_files": 98,
         "tests_passed": 756,
         "typecheck": "clean"
+      },
+      "workspace_isolation": {
+        "added_by_this_change": [
+          "person_subject",
+          "person_region",
+          "person_presentation_consent"
+        ],
+        "note": "The count is asserted against the live schema by test_the_prose_count_of_workspace_isolated_tables_matches_the_schema, which is the gate that caught the three prose statements needing 59 changed to 62.",
+        "tables_forced_and_workspace_keyed": 62
       }
     },
     "files": {
@@ -56,6 +92,7 @@
       "exulanica/consent/__init__.py": "5561e061f5cb896ec8f3c875cd9661d22796331c09bb6acba55ba69006a7481d",
       "exulanica/consent/regions.py": "025602984682787ce6f78b1f4c39c4fa4f27c7dd09a7a8a465a587772b665333",
       "exulanica/consent/states.py": "fe684ee60fb43fd6835c8216a5d619be34f7f14977ec6f7dec4b82b91e6eaa16",
+      "exulanica/db/session.py": "2462c39de19561a33dbb67f2d06298af7b34bec8c88a2892c3d59ba104566e85",
       "exulanica/graph/payload.py": "cbf16418dcf3f8c82f768cbdca286edc933bc69f0084724d61038c15c5302e7a",
       "exulanica/graph/person_regions.py": "139ebbffae7aea7ffc81d1262708512297f9d1b745f2bfe83403716fa0d919da",
       "exulanica/graph/reconstruction_scenes.py": "294d07e0abd5522db015a622b78e13483c6cabf043eb27a5c00b2b28f42891bc",
@@ -65,13 +102,15 @@
       "exulanica/ingest/person_detectors.py": "f58444b1da6a5ebc03cc81cc2c242e5938015436bd44e195c39958a574dd72d2",
       "exulanica/ingest/person_receipts.py": "406e942ddb9fccd73005afa17d44b23d8e1f2dd1edd3c6b236d16cce956268de",
       "exulanica/ingest/privacy.py": "de319450f26a9c1a4833a8667b1ced04f965bec5587cbb078822361286cc957f",
-      "exulanica/ingest/scene_reconstruction.py": "95e351fb74095fd787967496e4800e9f8283f4d49b4e409e89aa736c9986394d",
+      "exulanica/ingest/scene_reconstruction.py": "823174f2c8964ff78d8b6c891d5b50e22e23efb89e7895d0bbf1b7b16e58f987",
       "exulanica/ingest/scene_selection.py": "d41b7f92a70f89bcd3ff61a764f1471e1d83ddacc116fbccab4f2349284a872a",
+      "exulanica/ingest/spine/__init__.py": "df4ec3b6293f33f814fb4ff7882a137aef21e9f417d6f8316759dbfc8f3f86da",
       "exulanica/ingest/stages/__init__.py": "5b54610b585487e14392674660e11eeb46e01a6500eae8318660f597690347f7",
       "exulanica/ingest/stages/masked_source.py": "d62505478867170ae9b83d625bc060f5d0501f6627ea3d5f6c913e53ce43104d",
       "exulanica/ingest/stages/person_regions.py": "c2859b8eabb9c0f6d6ee8747c94f065b5931f0e54b8bc876a3805eeab2603664",
       "exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql": "c542d26215644278003f7069b2fd40b3f8f78d68b7d943e915b210045319134e",
       "pyproject.toml": "e6eba250f90d1b2ba91637fb94361dcd60ed391ec19942ee81c00b9d763fa4ed",
+      "tests/test_ingest_persistence.py": "5acab08029f98afaecd81a740d484d9cae4a5ce87c301f28943c4e354c8fe2e0",
       "tests/test_masked_geometry.py": "1f6c5f025929216139621e273ecda0bf63bd21c67ebd21bf41f55d14b9feee75",
       "tests/test_masked_scene_inputs.py": "b6e170c08cd969206a29d581a15ff8151b4a1ecb323ac64e014ca3f97da275fe",
       "tests/test_migration.py": "8053be27fab47fff5088e315f6ac316976e62c545394e06a980aadc4fa012fe8",
@@ -85,18 +124,19 @@
       "web/packages/graph-client/src/wire.ts": "49bb24f8dcef6d37081710f958bd34946366b24d9e22a928e47c928d68fb0e39",
       "web/packages/graph-client/test/person-presentation.test.ts": "c34e2633cc8a47a5b47a97ba04781a3294cc46e9bf7938a53f86521303fb4045"
     },
+    "head_revision": "2d9fc53",
     "limitations": [
-      "Unit tests over synthetic images establish the rules this code follows, not that a corpus behaves this way.",
+      "A green suite establishes that the schema and the code agree, not that a corpus behaves this way. No person region has been confirmed by a human on a real photograph.",
       "A box from a recorded vision observation is not a measured whole-person silhouette, and the region records shape 'box' so nothing downstream claims otherwise.",
-      "Splat training on a masked scene is refused rather than supported.",
-      "Source photograph delivery still serves original bytes, so the no-pixels rule holds for reconstructed geometry and not yet for the source fallback."
+      "Source photograph delivery still serves original bytes, so the no-pixels rule holds for reconstructed geometry and not yet for the source fallback.",
+      "The API on port 8000 was left running during the run, against the runbook's advice to stop it; tests use isolated disposable schemas and none failed, but the run was not performed under the runbook's exact preconditions."
     ],
     "not_executed": [
-      "Migration 0037 was never applied. Its SQL is unverified against PostgreSQL.",
-      "Every database-backed path: stage persistence, the graph resolver queries, and the geometry trigger.",
-      "No reconstruction, pose, placement or Gaussian training run.",
+      "No reconstruction, pose, placement or Gaussian training run was performed.",
       "No real photograph was processed and neither retained collection was touched.",
-      "The masked-geometry check has never seen a trained scene; its tests build PLY bytes vertex by vertex."
+      "The masked-geometry check has never seen a trained scene; its tests build PLY bytes vertex by vertex.",
+      "Splat training on a masked scene is refused rather than supported, so no masked training path was exercised.",
+      "No reviewer edit screen and no subject-facing consent route exist to exercise."
     ],
     "policy_change": {
       "effect": "The policy parameter digest is embedded in every screening and admission receipt, so every receipt written under version 1 is now provably old-policy. The two retained collections must be re-screened before their geometry is admitted again.",
@@ -104,7 +144,8 @@
       "to": "exulanica.reconstruction-privacy/v2"
     },
     "profile": "exulanica.person-consent-implementation/v1",
+    "rebased_onto": "164b20f",
     "recorded_date": "2026-09-05"
   },
-  "record_sha256": "f02d7a20b43dca32c5befe90eafe94119f1d00ea01c28a2360d0d144fbb3c694"
+  "record_sha256": "ef39dd61106d0e172af5c29a4a12f319f87a42af6c85956eb9929dac5f2df626"
 }

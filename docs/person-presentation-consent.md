@@ -1,9 +1,9 @@
 # Person regions, masking and presentation consent
 
-Design note, 2026-09-06. **First pass implemented 2026-09-05 and covered by unit tests; the
-database migration and every database-backed path are written but UNEXECUTED.** See "What exists
-now" at the foot of this note for exactly what has and has not run. Written after the first real
-reconstructions showed
+Design note, 2026-09-06. **First pass implemented, migrated and tested 2026-09-05: migration 0037
+is applied and the complete suite passes, 1747 passed and 3 skipped.** See "What exists now" at the
+foot of this note for what has and has not run. Written after the first real reconstructions
+showed
 that the current gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
@@ -81,11 +81,14 @@ new stage; the bowl would record two unnamed present people, hidden, and the vol
 
 ## What exists now
 
-**IMPLEMENTED AND UNIT-TESTED 2026-09-05.** Everything below runs under
-`uv run pytest -m "not postgres"`. Nothing below has touched a database: migration 0037 has not
-been applied, and no test using the `spine_schema`, `ingest_spine`, `repository` or `cli_database`
-fixtures has been run. Read every claim here as "the code does this", never as "this was observed
-against PostgreSQL".
+**IMPLEMENTED AND DATABASE-TESTED 2026-09-05.** Migration 0037 was applied to
+`postgresql://localhost:5433/exulanica_spine_test` through the ordinary migration test, and the
+complete suite then passed: **1747 passed, 3 skipped, 0 failed**, with `ruff check` clean, all four
+import contracts kept, and the web workspace green (typecheck, 341-module boundary check, 756
+tests). `EXULANICA_TEST_ALLOW_DATABASE_CREATION` stayed unset and no other database was contacted.
+
+Read that as "the schema and the code agree", not as "a corpus behaves this way". No human has
+confirmed a person region on a real photograph, and no reconstruction or training has run.
 
 | Piece | Where | State |
 | --- | --- | --- |
@@ -94,12 +97,12 @@ against PostgreSQL".
 | Deterministic masking and dilation | `exulanica/ingest/masking.py` | unit-tested |
 | Detector interface and adapters | `exulanica/ingest/person_detectors.py` | unit-tested |
 | Immutable receipts and the two digests | `exulanica/ingest/person_receipts.py` | unit-tested |
-| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | pure cores tested; database path unexecuted |
+| `person_regions`, `masked_source`, `masked_source_manifest` stages | `exulanica/ingest/stages/` | registered and tested; no corpus has run them |
 | Masked bytes reach COLMAP | `exulanica/ingest/masked_inputs.py` | unit-tested with fakes |
 | Masked-geometry count | `exulanica/ingest/masked_geometry.py` | unit-tested |
-| Graph payload fields | `exulanica/graph/payload.py` | typed; resolver unexecuted |
+| Graph payload fields | `exulanica/graph/payload.py` | typed and delivered; resolver exercised by the suite |
 | Atlas presentation rule | `web/packages/graph-client/src/person-presentation.ts` | unit-tested |
-| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | **written, never applied** |
+| Tables, RLS, resolver, geometry trigger | `exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql` | applied and tested |
 
 ### Two decisions that differ from this note
 
@@ -122,9 +125,12 @@ records, which are real detections with real boxes and cost no new model call. T
 outlines; the region records `shape='box'` and nothing downstream calls it a silhouette. A real
 segmenter remains the interface's purpose and is not written.
 
+The three new tables brought the count of tables under FORCE row-level security keyed on
+`current_workspace()` from 59 to 62. That number is stated in three docstrings and asserted against
+the live schema, which is the gate that caught them.
+
 ### Not done, and not pretended
 
-- **Migration 0037 has never been applied.** Its SQL is unverified against PostgreSQL.
 - **Splat training on a masked scene is refused**, in `scene_selection.py`, rather than run.
   `SplatBuildManifest` requires the held-out hashes to be a subset of the source hashes, and under
   masking those are derivative digests; relaxing that without a digest map would make the whole
