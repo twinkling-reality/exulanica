@@ -334,9 +334,8 @@ every masked region has a current `masked_source` derivative".
 the foot of this note for what replaced it and the three cases that are executed against a real
 database.
 
-**3. The reviewer screen and every client-side drawing predicate are dead code.**
-`web/packages/app/src/ui/person-review.ts` is imported by nothing but
-`web/packages/app/test/person-review.test.ts`. `drawsPixels`, `drawsSilhouette`,
+**3. The reviewer screen was dead code, and is wired as of 2026-09-07. The drawing predicates are
+still dead.** `web/packages/app/src/ui/person-review.ts` was imported by nothing but its own test. `drawsPixels`, `drawsSilhouette`,
 `mayDrawPhotograph` and `hiddenRegions` are exported from `graph-client` and used by no application
 source. The only symbol that reaches the app is `personPresenceSentence`, in
 `web/packages/app/src/ui/status.ts`. **The browser-side "presentation rule" is a status sentence
@@ -483,3 +482,45 @@ it is admitted, ingested (which proposes regions and builds masks), and then re-
 two retained collections this is the whole path back to eligibility, and it still needs a detector
 or a human to put regions there in the first place, which is point 1 of the section above and is
 still open.
+
+## The review screen, wired 2026-09-07
+
+The panel now reaches a reviewer. It lives in the reconstruction inspector, under click-to-evidence,
+because that is the one surface in the app already standing on a single named photograph, and a
+review is about a photograph rather than a scene. `web/packages/app/src/person-review-api.ts` is
+the only thing between the panel and `exulanica/api/routes/person_consent.py`.
+
+**Recording a consent is three requests, and that is the shape of the data.** A consent is
+addressed to a subject, meaning a person; the panel is looking at a region, meaning an outline in
+one photograph. A region a detector proposed has no subject, because nobody has said the outline is
+a person, let alone which person. So the first consent against such a region creates somebody for
+it to be about, binds them to the outline with an ordinary `confirm` edit, and only then records
+what they agreed to. There is no server-side writer that does the three in one, and adding one
+would be the only change that moves this out of the client.
+
+**Two defects were found by wiring it**, which is the usual result of connecting something that was
+only ever unit-tested:
+
+- **The route reported that nobody had looked at a photograph a reviewer had just finished.**
+  `review_state` was derived from whether the live region list was empty, and `review_list` excludes
+  deleted regions, so a reviewer who threw out every false positive left the photograph reporting
+  `unscreened`. It also disagreed with the graph payload, which asks the raw table and answered
+  `screened` for the same photograph. Both now ask whether any region has ever been recorded there.
+- **One branch of the panel was unreachable.** "Screened, and nobody was found in this photograph"
+  could not be produced, because the only way to get `screened` was to have regions. Fixing the
+  route made it reachable, and a test now renders both it and the `unscreened` branch and asserts
+  they differ.
+
+**What is verified and what is not.** The client's mapping, its three-request consent path, its
+refusal of an unknown review state, and the panel rendered from the real mapped wire shape are all
+executed in `web/packages/app/test/person-review-api.test.ts`. The route change is executed against
+PostgreSQL. **Nobody has seen this panel in a running browser.** `main.ts`'s plumbing, which loads
+the review on a view change and clears it on a view that stands on no photograph, has no test and
+was not run: the local `.env` still uses the withdrawn `ORIMERA_` variable names, so the API would
+start unconfigured, and the launch configuration exports the whole file including a hosted-model
+key. Neither is this note's to fix. There is also nothing to see yet: both retained collections
+hold zero person regions, so every photograph in them would render the `unscreened` branch.
+
+**The detector is still off**, so wiring the screen has not by itself made a region exist. A
+reviewer can now add one by hand, which is the route this note called for from the beginning, and
+it is the first path to a region on real data that does not require a model.
