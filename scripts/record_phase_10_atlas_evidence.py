@@ -78,7 +78,17 @@ def digest_of(path: Path) -> dict[str, object]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", required=True, help="the capture driver's run.json")
-    parser.add_argument("--head", required=True, help="the commit the captures were taken at")
+    parser.add_argument(
+        "--head",
+        required=True,
+        help=(
+            "the commit whose tree the captures were taken from. This is the commit this record "
+            "is retained IN, not its parent: the working tree was the retained code before it was "
+            "committed. Passing `git rev-parse HEAD` before committing records the parent and is "
+            "wrong, which is how the first version of this record came to name a commit that does "
+            "not contain the code it describes."
+        ),
+    )
     parser.add_argument("--backend", required=True, help="the backend suite result, as one line")
     parser.add_argument("--web", required=True, help="the web suite result, as one line")
     args = parser.parse_args()
@@ -120,6 +130,13 @@ def main() -> int:
         "profile": "exulanica.phase-10-atlas-visible/v1",
         "date": "2026-09-06",
         "head": args.head,
+        "head_note": (
+            "The commit whose tree the captures were taken from, which is also the commit that "
+            "first retained this record. The captures were taken from that tree before it was "
+            "committed. The first version of this record named its PARENT, because the head was "
+            "read before the commit existed, so it pointed at a tree that did not contain the "
+            "code the record describes."
+        ),
         "database": "postgresql://localhost:5433/exulanica_spine_test",
         "collection": "chili-salmon-bowl",
         "scene_id": run["inspectorSceneId"],

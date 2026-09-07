@@ -3,7 +3,8 @@
   "record": {
     "profile": "exulanica.phase-10-atlas-visible/v1",
     "date": "2026-09-06",
-    "head": "104e415d9ed6c6c074666b0a38e15ee3658223bf",
+    "head": "104e210308961ba070af7377401027620ad9c664",
+    "head_note": "The commit whose tree the captures were taken from, which is also the commit that first retained this record. The captures were taken from that tree before it was committed. The first version of this record named its PARENT, because the head was read before the commit existed, so it pointed at a tree that did not contain the code the record describes.",
     "database": "postgresql://localhost:5433/exulanica_spine_test",
     "collection": "chili-salmon-bowl",
     "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
@@ -184,5 +185,5 @@
       "Every photograph reports person_consent unavailable, because no per-person consent layer exists in this build. The answer reports that state and filters nothing."
     ]
   },
-  "record_sha256": "6d268347d204547c3bce959b7b8fbc0197295cf7dc2ae6a5fa3b05cb249bfdd5"
+  "record_sha256": "49f030df334ba792f6ac33100311bbabe727ead183cbe286b72da4f2362ed8fd"
 }

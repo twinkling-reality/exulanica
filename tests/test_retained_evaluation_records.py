@@ -43,16 +43,53 @@ def test_depth_image_forward_record_does_not_claim_normal_worker_or_host_perform
     assert any("do not represent a production host" in item for item in record["limitations"])
 
 
+def _bound_images(record: dict) -> list[dict]:
+    """Every image a record binds, whether it binds one or a gallery.
+
+    ``screenshot`` was the whole vocabulary while every record retained a single image. The Phase
+    10 Atlas record binds eleven under ``captures``, and the first version of this test checked
+    only ``screenshot``: ten of those eleven could have been replaced with any other bytes and the
+    suite would have stayed green, which makes a digest-bound gallery no better than a folder of
+    pictures. Both shapes are collected here so a record cannot escape the check by binding more.
+    """
+    bound = []
+    screenshot = record.get("screenshot")
+    if screenshot is not None:
+        bound.append(screenshot)
+    for capture in record.get("captures", []):
+        if isinstance(capture, dict) and {"path", "byte_size", "sha256"} <= set(capture):
+            bound.append(capture)
+    return bound
+
+
+def _bound_artifact(record_path: Path, relative: str) -> Path:
+    """Resolve a bound path under either convention the retained records actually use.
+
+    ``screenshot`` paths are relative to ``docs/evaluation`` and the 2026-09-05 reconstruction
+    record's ``captures`` paths are relative to the repository root. Both are in the tree and
+    neither is going to be rewritten, because rewriting one would change a digest that is bound
+    into a record about a run that already happened. So this resolves either rather than declaring
+    one of them wrong after the fact.
+    """
+    for candidate in (record_path.parent / relative, _ROOT / relative):
+        if candidate.is_file():
+            return candidate
+    raise AssertionError(f"{record_path.name} binds {relative}, which is in neither location")
+
+
 def test_retained_screenshots_match_the_artifact_bound_into_their_record():
+    checked = 0
     for path in _records():
         record = json.loads(path.read_bytes())["record"]
-        screenshot = record.get("screenshot")
-        if screenshot is None:
-            continue
-        image = path.parent / screenshot["path"]
-        data = image.read_bytes()
-        assert len(data) == screenshot["byte_size"], image
-        assert hashlib.sha256(data).hexdigest() == screenshot["sha256"], image
+        for image_ref in _bound_images(record):
+            image = _bound_artifact(path, image_ref["path"])
+            data = image.read_bytes()
+            assert len(data) == image_ref["byte_size"], image
+            assert hashlib.sha256(data).hexdigest() == image_ref["sha256"], image
+            checked += 1
+    # A binding nobody checks is a claim nobody can check. If this ever falls to zero, the rule
+    # above has stopped applying to anything rather than having nothing to apply to.
+    assert checked > 0, "no retained record binds an image"
 
 
 _READINESS = "2026-09-04-readiness-and-architecture-audit.json"

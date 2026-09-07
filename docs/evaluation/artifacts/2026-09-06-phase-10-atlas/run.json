@@ -1,0 +1,631 @@
+{
+  "url": "http://127.0.0.1:5180/",
+  "viewport": "1280x720 css px, deviceScaleFactor 1",
+  "mountMs": 28292,
+  "observationGraphReadyMs": 1,
+  "totalMs": 57831,
+  "inspectorSceneId": "851ca35b-31c3-560c-84f9-4e142962755b",
+  "canvasRect": {
+    "x": 0,
+    "y": 0,
+    "w": 1280,
+    "h": 720
+  },
+  "attempts": [
+    {
+      "index": 0,
+      "fractionX": 0.468,
+      "fractionY": 0.6042,
+      "clientX": 599,
+      "clientY": 435,
+      "kind": "hit",
+      "state": "17 photographs observed this point. 15 photographs of them are retained here, because each photograph keeps a bounded sample of its recorded observations.",
+      "photographs": 15
+    },
+    {
+      "index": 1,
+      "fractionX": 0.52,
+      "fractionY": 0.3,
+      "clientX": 666,
+      "clientY": 216,
+      "kind": "hit",
+      "state": "5 photographs observed this point.",
+      "photographs": 5
+    },
+    {
+      "index": 2,
+      "fractionX": 0.28,
+      "fractionY": 0.2,
+      "clientX": 358,
+      "clientY": 144,
+      "kind": "miss",
+      "state": "No recorded observation is within reach of that click.",
+      "photographs": 0
+    }
+  ],
+  "consoleErrors": [],
+  "captures": [
+    {
+      "name": "lens-off",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/lens-off.jpg",
+      "note": "The bowl as it is drawn with the proof lens switched off.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "off",
+        "lensToggleLabel": "Proof lens off",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": true,
+        "inspectorViewId": null,
+        "inspectorViewLabel": null,
+        "inspectorState": "",
+        "evidenceKind": null,
+        "evidenceState": "",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "lens-on",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/lens-on.jpg",
+      "note": "The same view with the proof lens on: the trained reconstruction wears the reconstructed tier.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": true,
+        "inspectorViewId": null,
+        "inspectorViewLabel": null,
+        "inspectorState": "",
+        "evidenceKind": null,
+        "evidenceState": "",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "lens-off-again",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/lens-off-again.jpg",
+      "note": "The lens switched back off, restoring what it found.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "off",
+        "lensToggleLabel": "Proof lens off",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": true,
+        "inspectorViewId": null,
+        "inspectorViewLabel": null,
+        "inspectorState": "",
+        "evidenceKind": null,
+        "evidenceState": "",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "inspector-open",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/inspector-open.jpg",
+      "note": "Inspector open on 851ca35b-31c3-560c-84f9-4e142962755b, observation graph loading.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "loading",
+        "evidenceState": "Reading the recorded observations for this scene.",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "inspector-lens-on",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/inspector-lens-on.jpg",
+      "note": "The lens on, from the first photograph's own recovered camera.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "ready",
+        "evidenceState": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph.",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "inspector-lens-off",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/inspector-lens-off.jpg",
+      "note": "The same recovered camera with the lens off.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "off",
+        "lensToggleLabel": "Proof lens off",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "ready",
+        "evidenceState": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph.",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "evidence-ready",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/evidence-ready.jpg",
+      "note": "The observation graph loaded; nothing clicked yet.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "ready",
+        "evidenceState": "Click the view to see which photographs observed a point. 15,005 recorded points are held for this scene, at most 4,096 per photograph.",
+        "evidenceDetail": "",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "evidence-hit-truncated-track",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/evidence-hit-truncated-track.jpg",
+      "note": "A click at (599, 435): hit.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "hit",
+        "evidenceState": "17 photographs observed this point. 15 photographs of them are retained here, because each photograph keeps a bounded sample of its recorded observations.",
+        "evidenceDetail": "Recorded sparse point 114, 3 source pixels from the cursor, mean reprojection error 1.26 px over its whole track. This is the nearest point COLMAP actually recorded, not the surface under the pointer, and the photographs below are the ones that observed it. The original lens had a distortion model this projection approximates as a pinhole.",
+        "evidencePhotographs": [
+          {
+            "captureId": "01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+            "title": "Photograph 1",
+            "where": "Recorded at 1295, 2463 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-703d-705c-95c1-20636c25e36c",
+            "title": "Photograph 2",
+            "where": "Recorded at 937, 2205 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-70ab-7653-a573-48abf12190c0",
+            "title": "Photograph 3",
+            "where": "Recorded at 867, 1349 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-70e0-72de-a7c6-9075f43ad5d1",
+            "title": "Photograph 4",
+            "where": "Recorded at 1543, 2222 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7324-77e1-8041-67a23629b114",
+            "title": "Photograph 5",
+            "where": "Recorded at 1066, 2189 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7355-72ca-8975-9c88b6e59e90",
+            "title": "Photograph 6",
+            "where": "Recorded at 1182, 2432 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7389-7b23-8ac0-f66abf251a4c",
+            "title": "Photograph 7",
+            "where": "Recorded at 1350, 2230 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-74a8-71e3-99d7-dc8c2cba5423",
+            "title": "Photograph 8",
+            "where": "Recorded at 958, 1770 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-74d6-7664-b8c0-81dd240c8f2a",
+            "title": "Photograph 9",
+            "where": "Recorded at 1237, 1665 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7552-73c5-9a78-75c512dbe29f",
+            "title": "Photograph 10",
+            "where": "Recorded at 1527, 1539 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7585-72d5-8349-ad30f509b716",
+            "title": "Photograph 11",
+            "where": "Recorded at 1060, 1554 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7615-7ca4-88a1-b6feac1d4100",
+            "title": "Photograph 12",
+            "where": "Recorded at 976, 1580 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7658-78ef-a8c0-19cc470dfc73",
+            "title": "Photograph 13",
+            "where": "Recorded at 2139, 2396 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-768f-7a2f-9188-5cfa0b1fe280",
+            "title": "Photograph 14",
+            "where": "Recorded at 1104, 2377 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-76db-7294-bc02-89f8f50a2958",
+            "title": "Photograph 15",
+            "where": "Recorded at 346, 2163 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          }
+        ],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "evidence-hit",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/evidence-hit.jpg",
+      "note": "A click at (666, 216): hit.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "hit",
+        "evidenceState": "5 photographs observed this point.",
+        "evidenceDetail": "Recorded sparse point 11278, 28 source pixels from the cursor, mean reprojection error 1.53 px over its whole track. This is the nearest point COLMAP actually recorded, not the surface under the pointer, and the photographs below are the ones that observed it. The original lens had a distortion model this projection approximates as a pinhole.",
+        "evidencePhotographs": [
+          {
+            "captureId": "01a0722b-7164-7c8d-91b2-f6cdff7623e8",
+            "title": "Photograph 1",
+            "where": "Recorded at 159, 1642 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-71f7-7145-9744-0625f6cccb0b",
+            "title": "Photograph 2",
+            "where": "Recorded at 127, 1732 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7437-7038-8b58-c670c2ca9f83",
+            "title": "Photograph 3",
+            "where": "Recorded at 192, 1637 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7472-75c0-a577-f0a9df50bd3c",
+            "title": "Photograph 4",
+            "where": "Recorded at 184, 1538 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7952-7a20-9cb9-7e81610e511a",
+            "title": "Photograph 5",
+            "where": "Recorded at 2075, 3470 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          }
+        ],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "evidence-miss",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/evidence-miss.jpg",
+      "note": "A click at (358, 144): miss.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "miss",
+        "evidenceState": "No recorded observation is within reach of that click.",
+        "evidenceDetail": "Nothing COLMAP recorded lies within 8 screen pixels (45 pixels of the original photograph) of where you clicked. The sparse points are the recorded evidence; the surface drawn between them is not itself observed.",
+        "evidencePhotographs": [],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    },
+    {
+      "name": "evidence-centre-button",
+      "file": "docs/evaluation/artifacts/2026-09-06-phase-10-atlas/evidence-centre-button.jpg",
+      "note": "The same question asked from the button, for anyone not using a pointer.",
+      "state": {
+        "statusSummaries": [
+          "Recorded rung 3; showing rung 4 from source photographs.",
+          "Recorded rung 3; showing rung 3 from trained Gaussian reconstruction."
+        ],
+        "proofTiers": [
+          "unavailable | Not shown. Nothing about the world is being drawn here.",
+          "reconstructed | Reconstructed from photographs. Derived from photographs by a reviewed stage. It visualises what was observed and is not itself evidence."
+        ],
+        "lensPresent": true,
+        "lensState": "on",
+        "lensToggleLabel": "Proof lens on",
+        "lensLegend": [
+          "photographed",
+          "reconstructed",
+          "generated",
+          "unavailable"
+        ],
+        "lensLimit": "The lens colours derived geometry. A region showing an original photograph is left exactly as it was recorded, because tinting evidence would alter it.",
+        "inspectorHidden": false,
+        "inspectorViewId": "851ca35b-31c3-560c-84f9-4e142962755b:camera:01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "inspectorViewLabel": "Source camera 1",
+        "inspectorState": "Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.",
+        "evidenceKind": "hit",
+        "evidenceState": "5 photographs observed this point.",
+        "evidenceDetail": "Recorded sparse point 5345, 7 source pixels from the cursor, mean reprojection error 1.05 px over its whole track. This is the nearest point COLMAP actually recorded, not the surface under the pointer, and the photographs below are the ones that observed it. The original lens had a distortion model this projection approximates as a pinhole.",
+        "evidencePhotographs": [
+          {
+            "captureId": "01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+            "title": "Photograph 1",
+            "where": "Recorded at 1537, 2037 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-703d-705c-95c1-20636c25e36c",
+            "title": "Photograph 2",
+            "where": "Recorded at 1336, 1856 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-72b2-7adf-bf4b-30b0b2d52119",
+            "title": "Photograph 3",
+            "where": "Recorded at 1446, 1238 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-72ef-73d8-a9ad-ec2741a7d97d",
+            "title": "Photograph 4",
+            "where": "Recorded at 1260, 1637 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          },
+          {
+            "captureId": "01a0722b-7324-77e1-8041-67a23629b114",
+            "title": "Photograph 5",
+            "where": "Recorded at 1352, 1840 in this photograph.",
+            "consent": "Screened by a named human reviewer: screened, eligible. No per-person presentation consent is recorded, so no person in it has agreed to be shown; the screening receipt is a review of the whole photograph, not a decision about anyone in it."
+          }
+        ],
+        "canvasRect": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 720
+        }
+      }
+    }
+  ]
+}
