@@ -565,6 +565,30 @@ def _project_components(
                 "authorized to export them."
             ),
         },
+        # This stays "excluded" on purpose, and the sentence is accurate rather than cautious.
+        # Migration 0037 gives every person presentation decision a receipt, and
+        # exulanica.consent.states.resolve_presentation folds receipts with no database, so
+        # carrying them here looks like a small addition. It is not, for three MEASURED reasons.
+        #
+        # 1. It is a profile version bump, not a new file. REQUIRED_PAYLOAD_PATHS is checked at
+        #    package.py:311, before the Ed25519 verify at package.py:352, so adding a required
+        #    path retroactively breaks every already-signed exulanica-wmp-1.0 package while its
+        #    bytes and signature are still sound. An OPTIONAL path rides along untouched.
+        #    Both halves are held by tests/test_world_package_verifier.py.
+        # 2. A bump cannot reach this function without migration 0038. Migration 0028 puts
+        #    `check (profile_version = 'exulanica-wmp-1.0')` on world_package_export and the
+        #    insert above writes PROFILE_VERSION into that column, so emitting 1.1 raises a check
+        #    constraint violation. A 1.1 profile document beside profile/exulanica-wmp-1.0.json is
+        #    needed too, since package.profile_bytes reads that file by name.
+        # 3. The blocking one. resolve_presentation is not yet a faithful offline copy of the
+        #    database's person_consent_is_granted. MEASURED 2026-09-07 on identical receipts:
+        #    an expired temporary_hide (SQL shows the person, the fold hides them, the fold has no
+        #    valid_until); a region-scoped grant against a later subject-wide revoke (SQL grants,
+        #    the fold resolves unknown); and two receipts at the same instant (SQL takes the
+        #    higher sequence and revokes, the fold has no sequence at all and breaks the tie on
+        #    receipt_digest, which can resolve `shown` and draw somebody the source system says
+        #    revoked their likeness consent). Projecting receipts before that is fixed would sign,
+        #    and distribute unrecallable, a claim the source system contradicts.
         "consent": {
             "records": "excluded",
             "state": "must be enforced by the source system before projection",
