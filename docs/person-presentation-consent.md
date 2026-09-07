@@ -301,6 +301,8 @@ actor who authorized the detection, so the row never reads as a review that did 
 
 ## Three things true of the code and false of a running deployment
 
+**Point 2 below was closed on 2026-09-07.** Points 1 and 3 stand.
+
 VERIFIED 2026-09-07 on the merged tree, after `person-consent-masking` landed on
 `semantic-answers-and-memory-lifecycle`. Everything above this heading describes code that exists
 and is tested. None of it describes a deployment where a person is actually protected, and the
@@ -323,15 +325,14 @@ receipt's region list has no production writer, and the only way to reach the ma
 for the screening's region list and the `person_region` table to disagree, which is exactly what
 `tests/test_person_masking_end_to_end.py`'s synthetic exemption arranges.
 
-That block was written for a stated reason, and the reason has expired. Its own comment says: "the
+That block was written for a stated reason, and the reason expired. Its own comment said: "the
 masking stages are not yet wired into the pipeline, so nothing anywhere would actually hide this
 person before depth read them", and "when masking is wired end to end this becomes eligible if
-every masked region has a current `masked_source` derivative". **Masking is now wired end to end.**
-So the rule the comment describes as the destination is now the correct one, and the conservative
-rule it describes as temporary is now the thing making the feature unreachable. Changing it is a
-decision with real safety weight rather than a cleanup, and it must be made before the review
-screen is wired, or the reviewer will be built for a path nobody can reach honestly. It is not
-made here.
+every masked region has a current `masked_source` derivative".
+
+**DECIDED 2026-09-07: masking is wired end to end, so that is now the rule.** See the section at
+the foot of this note for what replaced it and the three cases that are executed against a real
+database.
 
 **3. The reviewer screen and every client-side drawing predicate are dead code.**
 `web/packages/app/src/ui/person-review.ts` is imported by nothing but
@@ -433,3 +434,52 @@ policy in force. Only the policy term is reported, not the whole predicate: its 
 a digest nobody could quote. One consequence is worth stating rather than discovering: a migration
 that bumps `current_privacy_policy()` moves the recorded digest of every bundle. That is a write
 and not a tick, so the rule holds, but it is a new way for the digest to move.
+
+## The screening rule, decided 2026-09-07
+
+A screening naming somebody in a masked state used to be blocked outright. That rule had stopped
+protecting anybody and started making the feature unreachable: a photograph containing a person who
+had not consented could obtain no eligible screening at all, so the only screening production could
+write was an empty region list, which is the statement "there is nobody here" this layer exists to
+retire. The masking path was reachable only when the screening's list and the `person_region` table
+disagreed.
+
+**What replaced it is not the absence of a rule.** A masked region is eligible only when both of
+these hold, and each is checked against the database rather than taken from the caller:
+
+1. **Every person the screening names as masked is one the pipeline is already hiding.** The named
+   region keys must be present in `person_region` and resolve to a masked state. A region entry
+   with no `region_key` cannot be matched to anything that was hidden, and blocks.
+2. **The mask is current, not merely present.** `masked_source_key` folds the source bytes, the
+   confirmed region set and the resolved consent states, so a derivative built before somebody
+   added a region or changed their mind produces a different key and stops being an answer.
+
+Two things behind this are not the screening's to enforce and are enforced anyway. Migration
+0037's `tg_geometry_reads_the_masked_derivative` refuses a point map that does not name a real
+masked derivative of those exact bytes, so an eligible screening cannot by itself put an
+unconsented body into geometry. And because the consent states are inside the derivative's key, a
+revocation produces a new build rather than mutating an accepted one.
+
+**Executed against PostgreSQL, a real migration and a real on-disk store**, in
+`tests/test_person_masking_end_to_end.py`:
+
+| Case | Answer |
+| --- | --- |
+| A detected person, masked, derivative built, named in the screening | eligible |
+| A person the reviewer names whom no detector proposed and no mask covers | blocked |
+| A reviewer adds a region after the derivative was built | blocked, the mask is stale |
+
+Each of the three fails under a different wrong rule, which is why there are three. The first
+fails under the old blanket refusal. The second fails under a rule that asks only whether the
+capture's own mask is current, and that is not hypothetical: it was the first version of this
+change and the test caught it returning `eligible` for a photograph whose reviewer had named
+somebody the detector never saw. The third fails under a rule that asks only whether a
+`masked_source` artifact exists for the capture.
+
+**One sequencing consequence, worth knowing before planning a re-screening.** The derivative is
+produced during ingest, and `admit_reviewed_benchmark` records its screening before derivatives
+run. So a photograph containing people cannot be admitted and screened as eligible in one pass:
+it is admitted, ingested (which proposes regions and builds masks), and then re-screened. For the
+two retained collections this is the whole path back to eligibility, and it still needs a detector
+or a human to put regions there in the first place, which is point 1 of the section above and is
+still open.
