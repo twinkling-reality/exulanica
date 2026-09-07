@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import warnings
 from pathlib import Path
 
 from exulanica.canonical import canonical_json
@@ -21,9 +22,10 @@ def test_every_retained_evaluation_record_reproduces_its_canonical_digest():
     for path in paths:
         document = json.loads(path.read_bytes())
         assert document["profile"] == "exulanica.digest-bound-record/v1", path
-        assert document["record_sha256"] == hashlib.sha256(
-            canonical_json(document["record"])
-        ).hexdigest(), path
+        assert (
+            document["record_sha256"]
+            == hashlib.sha256(canonical_json(document["record"])).hexdigest()
+        ), path
 
 
 def test_retained_evaluation_records_contain_no_personal_path_or_credential_material():
@@ -92,6 +94,113 @@ def test_retained_screenshots_match_the_artifact_bound_into_their_record():
     assert checked > 0, "no retained record binds an image"
 
 
+def _declared_predecessors(record: dict) -> list[tuple[str, dict]]:
+    """Every predecessor a record declares, whether it declares one or several.
+
+    Two shapes are in the tree and both are load bearing (MEASURED 2026-09-07: 12 records declare
+    the singular ``predecessor_record``, 2 declare the plural ``predecessor_records``, and the two
+    plural ones are the records that followed two goals rather than one:
+    2026-09-05-real-reconstruction follows retained-reference-progress and
+    source-presentation-correction, 2026-09-05-scene-publication follows placement-alignment and
+    gsplat-trainer-verification). Reading only the singular key would check 12 of the 16 declared
+    bindings while calling itself universal, which is worse than checking two by name, because a
+    rule that names its own scope wrongly stops anyone looking again.
+
+    Only the top level of the record is read. ``counts`` carries a prose field whose NAME contains
+    "predecessor_record"; a key search rather than these two exact keys would pick up a sentence
+    and try to resolve it as a path.
+    """
+    declared: list[tuple[str, dict]] = []
+    single = record.get("predecessor_record")
+    if single is not None:
+        declared.append(("predecessor_record", single))
+    for entry in record.get("predecessor_records", []):
+        declared.append(("predecessor_records", entry))
+    return declared
+
+
+def test_every_declared_predecessor_binding_resolves_and_matches():
+    """The chain arithmetic, once, over every record that declares a link.
+
+    This replaced two by-name checks over two records. A record's predecessor binding is the only
+    thing that fixes what it was measured against: without it a report can silently be re-parented
+    onto a more flattering starting point, and the digest is what stops the predecessor itself
+    being edited after the fact.
+
+    Resolution is strict repository-root relative, unlike ``_bound_artifact`` above, which has to
+    tolerate two conventions for images. MEASURED 2026-09-07: all 16 declared predecessor paths
+    begin with ``docs/evaluation/`` and are root relative, so a second convention here would be a
+    new mistake rather than history.
+    """
+    checked = 0
+    for path in _records():
+        record = json.loads(path.read_bytes())["record"]
+        for key, declared in _declared_predecessors(record):
+            predecessor = _ROOT / declared["path"]
+            assert predecessor.is_file(), (
+                f"{path.name} {key} names {declared['path']}, which is not in the tree"
+            )
+            digest = hashlib.sha256(
+                canonical_json(json.loads(predecessor.read_bytes())["record"])
+            ).hexdigest()
+            assert declared["record_sha256"] == digest, (
+                f"{path.name} {key} binds {declared['path']} at {declared['record_sha256']}, "
+                f"but that record now canonicalises to {digest}"
+            )
+            checked += 1
+    # A floor rather than "> 0", in the same spirit as the migration prefix check further down.
+    # These records are immutable retained evidence and are only ever added to, so a later record
+    # may raise this number; a drop to below 16 means a declaration that existed on 2026-09-07 was
+    # removed, which shortens the chain and is exactly the silent re-parenting this test exists to
+    # catch. Raise the floor when the chain grows, never lower it.
+    assert checked >= 16, f"only {checked} predecessor bindings found, expected at least 16"
+
+
+def test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent():
+    """A missing predecessor is reported, not failed.
+
+    19 of the 33 records predate the convention (MEASURED 2026-09-07). Failing on them would make
+    this file red on a tree nobody intends to change, and a permanently red test gets deleted
+    rather than fixed, taking the universal rule above with it. So the gap is emitted as a warning
+    the pytest summary always shows, which is a thing a reader can act on.
+
+    ``warnings.warn`` rather than ``print`` on purpose: pytest runs with ``-q`` here, which
+    captures stdout and shows it only for failures, so a print would say nothing on the green run
+    that is the only run this ever has. Nothing configures ``filterwarnings``, so this can neither
+    be hidden nor promoted into an error.
+
+    Rejected: freezing today's 19 into an allowlist so any NEW record without a predecessor fails.
+    The three 2026-09-06 records are the most recent family in the tree and declare nothing, so
+    that gate would fire on the legitimate first record of every new family, and the cheapest way
+    past it would be to add a binding that says nothing true.
+    """
+    bindings = 0
+    declaring: list[str] = []
+    silent: list[str] = []
+    for path in _records():
+        record = json.loads(path.read_bytes())["record"]
+        declared = _declared_predecessors(record)
+        if declared:
+            declaring.append(path.name)
+            bindings += len(declared)
+        else:
+            silent.append(path.name)
+    # `declaring` is what carries the guard, and the partition count above it does NOT: every
+    # path is appended to exactly one of the two lists, so their sum equals the total by
+    # construction and can never fail. It was written here as if it caught a blind extractor and
+    # it does not, which in a file whose comments are the reasoning is worse than no comment. The
+    # blind-extractor case is caught twice over, and neither time is here: the universal rule
+    # above fails on its own floor of verified bindings, and this line fails on an empty list.
+    total = len(_records())
+    assert declaring, "no record declares a predecessor, so the binding rule checks nothing"
+    warnings.warn(
+        f"predecessor chain: {bindings} bindings verified across {len(declaring)} of {total} "
+        f"retained records. {len(silent)} declare no predecessor and are not required to: "
+        + ", ".join(sorted(silent)),
+        stacklevel=1,
+    )
+
+
 _READINESS = "2026-09-04-readiness-and-architecture-audit.json"
 
 
@@ -100,13 +209,16 @@ def _readiness() -> dict:
 
 
 def test_the_readiness_audit_is_bound_to_the_campaign_it_followed():
-    """A readiness report that floated free of its predecessor could claim any starting point."""
-    record = _readiness()
-    predecessor = record["predecessor_record"]
-    campaign = json.loads((_ROOT / predecessor["path"]).read_bytes())
-    assert predecessor["record_sha256"] == hashlib.sha256(
-        canonical_json(campaign["record"])
-    ).hexdigest()
+    """WHICH record the audit follows, which is the half no universal rule can know.
+
+    This asserted only the sha256 arithmetic until 2026-09-07, so despite its name it would have
+    stayed green with the audit re-parented onto any other well-formed record in the folder. The
+    arithmetic now runs once for every record above; what is left here is the identity claim the
+    name always made: a readiness report that says it starts from the validation campaign has to
+    start from the validation campaign, not from something more flattering.
+    """
+    predecessor = _readiness()["predecessor_record"]
+    assert predecessor["path"].endswith("2026-09-04-reconstruction-validation-campaign.json")
 
 
 def test_the_readiness_audit_closes_the_eight_decisions_it_was_asked_to_close():
@@ -114,8 +226,15 @@ def test_the_readiness_audit_closes_the_eight_decisions_it_was_asked_to_close():
     numbers = [decision["number"] for decision in record["decisions_closed"]]
     assert numbers == list(range(1, 9)), numbers
     for decision in record["decisions_closed"]:
-        for field in ("name", "invariant", "rationale", "compatibility_impact",
-                      "failure_behaviour", "affected_surfaces", "tests"):
+        for field in (
+            "name",
+            "invariant",
+            "rationale",
+            "compatibility_impact",
+            "failure_behaviour",
+            "affected_surfaces",
+            "tests",
+        ):
             assert decision.get(field), (decision["number"], field)
 
 
@@ -157,7 +276,7 @@ def test_every_subsequent_goal_has_both_gates():
     record = _readiness()
     goals = {entry["goal"] for entry in record["dependency_order"]}
     gated = {entry["goal"] for entry in record["subsequent_goal_gates"]}
-    assert goals == gated, (goals ^ gated)
+    assert goals == gated, goals ^ gated
     for entry in record["subsequent_goal_gates"]:
         assert entry["entry_gates"], entry["goal"]
         assert entry["exit_gates"], entry["goal"]
@@ -171,14 +290,12 @@ def _answers() -> dict:
 
 
 def test_the_answer_record_is_bound_to_the_audit_that_set_its_gates():
-    """A record that floated free of its predecessor could claim any starting point."""
-    record = _answers()
-    predecessor = record["predecessor_record"]
-    assert predecessor["path"].endswith(_READINESS)
-    audit = json.loads((_ROOT / predecessor["path"]).read_bytes())
-    assert predecessor["record_sha256"] == hashlib.sha256(
-        canonical_json(audit["record"])
-    ).hexdigest()
+    """The gates this goal was measured against came from the audit, so it must follow the audit.
+
+    Identity only; the digest arithmetic that used to be duplicated here is now checked once for
+    every declared binding in the folder.
+    """
+    assert _answers()["predecessor_record"]["path"].endswith(_READINESS)
 
 
 def test_the_answer_record_names_its_corpus_and_publishes_no_accuracy():
@@ -223,7 +340,7 @@ def _numeric_fields(node, path=""):
 
 
 def test_the_answer_record_publishes_no_number_against_a_blocked_metric():
-    """"No retrieval or accuracy number may be published against an OPEN evaluation item."
+    """ "No retrieval or accuracy number may be published against an OPEN evaluation item."
 
     Enforced against ``metrics.py`` rather than against a copied list, so a component that
     becomes runnable later does not leave this test asserting a stale set.
@@ -336,14 +453,25 @@ def test_the_answer_record_numbers_its_decisions_contiguously_and_states_all_fiv
     assert numbers == list(range(1, len(numbers) + 1)), numbers
     for decision in record["decisions"]:
         for field in (
-            "name", "invariant", "rationale", "canonical_representation",
-            "compatibility_impact", "failure_behaviour", "negative_control",
+            "name",
+            "invariant",
+            "rationale",
+            "canonical_representation",
+            "compatibility_impact",
+            "failure_behaviour",
+            "negative_control",
         ):
             assert decision.get(field), f"decision {decision['number']} has no {field}"
         assert decision["tests"], decision["number"]
         assert set(decision["affected_surfaces"]) == {
-            "schema", "migrations", "workers", "evidence", "apis", "exports",
-            "deletion_paths", "browser_consumers",
+            "schema",
+            "migrations",
+            "workers",
+            "evidence",
+            "apis",
+            "exports",
+            "deletion_paths",
+            "browser_consumers",
         }, decision["number"]
 
 
