@@ -14,6 +14,7 @@ the operator's shell happened to hold, and the unmutated baseline must pass befo
 result counts.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -81,18 +82,36 @@ CONTROLS = [
         "test_the_two_zeros_encode_to_the_same_string",
     ),
     (
+        # The invariant survived the person-consent merge; the reason for it changed. The bundle
+        # carries no per-person state, so no recipient can check a more permissive claim, and the
+        # test this kills now pins that absence rather than the absence of the layer.
         "the_release_state_is_internal_only_without_person_consent",
         CONSENT,
         '        "state": "internal_only",',
-        '        "state": "public",',
-        "test_the_release_state_is_internal_only_until_person_consent_lands",
+        '        "state": "releasable",',
+        "test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bundle",
     ),
     (
-        "absence_of_a_person_layer_is_never_reported_as_absence_of_people",
+        # Renamed with the fact it protects. The old mutation flipped a hardcoded "unavailable" to
+        # "none", which stopped existing when the layer merged and the field started describing
+        # the photograph rather than the build. The mutation that carries the same meaning now is
+        # the default: a photograph nobody screened must never be reported as one whose people
+        # have decisions on file.
+        "an_unscreened_photograph_is_never_reported_as_one_with_decisions",
         CONSENT,
-        '            "person_consent": "unavailable",\n            "person_consent_reason": (',
-        '            "person_consent": "none",\n            "person_consent_reason": (',
+        '            "recorded" if reviewed.get(key) == "screened" else "unscreened"',
+        '            "recorded"',
         "test_consent_reports_the_screening_basis_and_refuses_to_infer_people",
+    ),
+    (
+        # The scene-level fold, which is where the pre-merge bundle contradicted itself: a scene
+        # said one thing about people and every capture in it said another. A permissive fold
+        # would restore exactly that.
+        "one_unscreened_photograph_makes_the_whole_scene_unscreened",
+        CONSENT,
+        '    if all(record["person_consent"] == "recorded" for record in consent.values()):',
+        '    if any(record["person_consent"] == "recorded" for record in consent.values()):',
+        "test_the_scene_consent_answer_is_the_weakest_of_its_photographs",
     ),
     (
         "a_generation_is_labelled_generated_in_the_read_bundle",
@@ -168,7 +187,13 @@ def _environment(work: Path) -> dict[str, str]:
     return env
 
 
-def _run(work: Path, env: dict[str, str], selector: str | None) -> subprocess.CompletedProcess[str]:
+def _run(
+    work: Path,
+    env: dict[str, str],
+    selector: str | None,
+    *,
+    collect_only: bool = False,
+) -> subprocess.CompletedProcess[str]:
     command = [
         str(PYTHON),
         "-m",
@@ -178,6 +203,10 @@ def _run(work: Path, env: dict[str, str], selector: str | None) -> subprocess.Co
         "addopts=",
         "--confcutdir=" + str(work / "tests"),
     ]
+    if collect_only:
+        # Collection alone answers "does this selector name a test", and it answers it without a
+        # database, so the check costs a fraction of a run rather than a run.
+        command.append("--collect-only")
     if selector is None:
         command.extend(
             str(work / "tests" / name)
@@ -200,6 +229,20 @@ def _run(work: Path, env: dict[str, str], selector: str | None) -> subprocess.Co
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    # A record is a dated observation of a tree. Re-running against a changed tree writes a new
+    # record bound to the one it follows, rather than overwriting a true statement about a tree
+    # that can no longer be checked out.
+    parser.add_argument(
+        "--date", required=True, help="ISO date this run was executed, e.g. 2026-09-07"
+    )
+    parser.add_argument(
+        "--predecessor",
+        default=None,
+        help="path, relative to the repository root, of the record this one follows",
+    )
+    arguments = parser.parse_args()
+
     work = Path(tempfile.mkdtemp(prefix="exulanica-world-read-mutants-"))
     shutil.copytree(
         ROOT / "exulanica", work / "exulanica", ignore=shutil.ignore_patterns("__pycache__")
@@ -224,15 +267,37 @@ def main() -> int:
             raise ValueError(
                 f"mutation {name} needs exactly one target in {file}, found {original.count(old)}"
             )
+        # The selector must select something on the UNMUTATED tree first. Without this a renamed
+        # or misspelled `-k` expression deselects everything, pytest exits 5, and the run below
+        # records SURVIVED: a control that never executed reads as an invariant that failed to
+        # hold, and the two need opposite responses. Checked before the mutation so a failure here
+        # is unambiguously about the selector and not about the edit.
+        collected = _run(work, env, selector, collect_only=True)
+        if collected.returncode != 0 or " no tests ran" in collected.stdout:
+            raise ValueError(
+                f"mutation {name} has a selector that matches no test: -k {selector!r}"
+            )
         try:
             path.write_text(original.replace(old, new, 1))
             result = _run(work, env, selector)
         finally:
             path.write_text(original)
         output = result.stdout + result.stderr
-        # A kill is the named test failing, not any non-zero exit. A collection error or an
-        # import failure exits non-zero too and would prove nothing about the invariant.
-        killed = result.returncode == 1 and "FAILED" in output and "ERROR tests/" not in output
+        # A kill is THE NAMED TEST failing, and the predicate says so literally rather than
+        # inferring it from a path prefix.
+        #
+        # MEASURED 2026-09-07, and this is why the shape is what it is. The predicate was first
+        # `"FAILED" in output`, which a passing bare word in a traceback could satisfy. Tightening
+        # it to `"FAILED tests/"` to match verify_reference_controls.py reported all fifteen
+        # mutants SURVIVED: this script passes absolute test paths, so pytest renders node ids
+        # from the rootdir it derives, and the prefix is not reliably `tests/`. A predicate that
+        # depends on how pytest chose to spell a path is a predicate that will silently invert
+        # again. Requiring the selector's own name on a FAILED line is stronger than either form
+        # and depends on nothing but the test's identity.
+        failed_the_named_test = any(
+            line.startswith("FAILED") and selector in line for line in output.splitlines()
+        )
+        killed = result.returncode == 1 and failed_the_named_test and "ERROR tests/" not in output
         records.append(
             {
                 "mutation": name,
@@ -256,9 +321,9 @@ def main() -> int:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout.strip()
-    record = {
+    record: dict[str, object] = {
         "profile": "exulanica.world-read-negative-controls/v1",
-        "date": "2026-09-06",
+        "date": arguments.date,
         "head": head,
         "database": DATABASE,
         "isolated_source_copy": True,
@@ -266,7 +331,13 @@ def main() -> int:
         "restored_suite_passed": restored.returncode == 0,
         "records": records,
     }
-    output_path = ROOT / "docs/evaluation/2026-09-06-world-read-negative-controls.json"
+    if arguments.predecessor:
+        predecessor = json.loads((ROOT / arguments.predecessor).read_bytes())
+        record["predecessor_record"] = {
+            "path": arguments.predecessor,
+            "record_sha256": hashlib.sha256(canonical_json(predecessor["record"])).hexdigest(),
+        }
+    output_path = ROOT / f"docs/evaluation/{arguments.date}-world-read-negative-controls.json"
     output_path.write_text(
         json.dumps(
             {
