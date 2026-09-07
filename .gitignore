@@ -1,6 +1,11 @@
 # Internal working area: raw agent reports, scratch research, experiments, private media
 .orimera/
-.exulanica/
+# Slashless on purpose. In the sibling worktree orimera-person-consent, .exulanica is a symlink
+# into this checkout's blob store, so git records it as a blob and a directory-only rule misses
+# it (MEASURED 2026-09-07: git status there reported '?? .exulanica', and committing it would
+# have stored a machine-specific absolute path). Slashless still matches the real directory
+# here, so one rule covers both the directory and the symlink.
+.exulanica
 
 # Secrets and environment
 .env
