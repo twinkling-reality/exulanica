@@ -511,15 +511,37 @@ only ever unit-tested:
   route made it reachable, and a test now renders both it and the `unscreened` branch and asserts
   they differ.
 
-**What is verified and what is not.** The client's mapping, its three-request consent path, its
-refusal of an unknown review state, and the panel rendered from the real mapped wire shape are all
-executed in `web/packages/app/test/person-review-api.test.ts`. The route change is executed against
-PostgreSQL. **Nobody has seen this panel in a running browser.** `main.ts`'s plumbing, which loads
-the review on a view change and clears it on a view that stands on no photograph, has no test and
-was not run: the local `.env` still uses the withdrawn `ORIMERA_` variable names, so the API would
-start unconfigured, and the launch configuration exports the whole file including a hosted-model
-key. Neither is this note's to fix. There is also nothing to see yet: both retained collections
-hold zero person regions, so every photograph in them would render the `unscreened` branch.
+**Seen working, 2026-09-07.** The reference instance was run against the permitted database
+(`scripts/reference_instance.py api` and `web`), the Atlas opened on the retained bowl collection,
+and the reconstruction inspector showed the panel under Observed by. Three behaviours were observed
+rather than reasoned about:
+
+| Action | Observed |
+| --- | --- |
+| Open Source camera 1 | `GET /api/person-regions/01a0722b-6fe5-...` answered 200, panel rendered |
+| Step to Between cameras 1 and 2 | panel cleared; a midpoint stands on no photograph |
+| Step to Source camera 2 | `GET /api/person-regions/01a0722b-703d-...`, a DIFFERENT capture, 200 |
+
+The middle row is the one worth having seen. It is the guard against offering buttons that write
+receipts against a photograph the visitor has already left, and it is the part of the wiring that
+has no unit test.
+
+Every photograph rendered "Nobody has looked at this photograph for people yet, so it is not shown
+anywhere. That is different from a photograph somebody checked and found empty." That is the
+correct answer for this corpus, which holds zero person regions, and it is the sentence the old
+gate could not say.
+
+The rest is executed in `web/packages/app/test/person-review-api.test.ts`: the client's mapping,
+its three-request consent path, its refusal of an unknown review state, and the panel rendered from
+the real mapped wire shape. The route change is executed against PostgreSQL.
+
+**What running it needed, and what that says about the tooling.** The local `.env` still used the
+withdrawn `ORIMERA_` names that ADR-0011 retired with no fallback, and its database URL pointed at
+`orimera`, a pre-rename database 22 migrations behind. Both were corrected. `.claude/launch.json`
+named `orimera.api.app`, which has not existed since the rename, and sourced the whole `.env`
+including a hosted-model key into the API process; it now unsets that key and carries entries for
+the reference instance, which strips it by design. That file is gitignored, so those repairs are
+machine-local.
 
 **The detector is still off**, so wiring the screen has not by itself made a region exist. A
 reviewer can now add one by hand, which is the route this note called for from the beginning, and
