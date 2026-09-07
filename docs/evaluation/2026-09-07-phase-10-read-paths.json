@@ -3,7 +3,7 @@
   "record": {
     "profile": "exulanica.phase-10-read-paths/v1",
     "date": "2026-09-07",
-    "head": "5cfa50fa563082ddcd460583d00ce694ed2f80fb",
+    "head": "ffb7476189046c231a8ce02efe7ab1b14a363f07",
     "database": "postgresql://localhost:5433/exulanica_spine_test",
     "store": ".exulanica/reference-baseline/runtime/blobs",
     "read_only": true,
@@ -16,9 +16,9 @@
           {
             "scene_id": "52ec40fd-4b9d-5898-b897-41107e240332",
             "readable": true,
-            "bundle_sha256": "f7e7dfe347b3e77d62849f80d3c7a7334807a064170d758340cd45e50c571b15",
-            "recorded_sha256": "8683a48415f46771ebad55a964611d582effca2509718bcdd48857002543a592",
-            "bundle_byte_size": 84775,
+            "bundle_sha256": "bdfeb2ab0cdb2ae971f8e40376d6ac048e0ff3a78970073b07eb944c6e62a9ca",
+            "recorded_sha256": "fd7a93a9da6ea7cd718de255a21eecdfecfc11b70ee2e19ae4eddeef0fc4db9c",
+            "bundle_byte_size": 140411,
             "bundle_digest_reproduces_offline": true,
             "recorded_digest_reproduces_offline": true,
             "recorded_keys": [
@@ -47,6 +47,7 @@
             "release_state": "internal_only",
             "person_consent": "unscreened",
             "captures_with_a_screening_receipt": 40,
+            "captures_whose_receipt_is_under_the_policy_in_force": 2,
             "captures_screened_by_a_named_human": 40,
             "no_geometry_entry_names_evidence": true,
             "observation_graph": {
@@ -57,9 +58,9 @@
           {
             "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
             "readable": true,
-            "bundle_sha256": "e5028aacf1a7cefc62f2493cbd5f24400c16278eaa0dbd7f29c5d1620464e0ee",
-            "recorded_sha256": "dbf9f0f97923b31f835f4f9fd43cd38a11ad9eab3c5655da4b4bc51cb242adb6",
-            "bundle_byte_size": 139688,
+            "bundle_sha256": "2a2ba63d9b8e16afda7f623ac22f888a1dfe4e049c9524d59f07cdf1b90b1c18",
+            "recorded_sha256": "528d2805cd4c325808a65acd3f327223311462c103406696afa3bcef5503a99d",
+            "bundle_byte_size": 210834,
             "bundle_digest_reproduces_offline": true,
             "recorded_digest_reproduces_offline": true,
             "recorded_keys": [
@@ -88,6 +89,7 @@
             "release_state": "internal_only",
             "person_consent": "unscreened",
             "captures_with_a_screening_receipt": 51,
+            "captures_whose_receipt_is_under_the_policy_in_force": 2,
             "captures_screened_by_a_named_human": 51,
             "no_geometry_entry_names_evidence": true,
             "observation_graph": {
@@ -110,9 +112,9 @@
           {
             "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
             "readable": true,
-            "bundle_sha256": "8d4a66504722183353fe3134c7badabc01d43b2fde90dfa3e74b8fbeb6af5d8c",
-            "recorded_sha256": "c392b2f1f8e4b372d57f937c2e4a68bd6061e2e6510d787fc01b0e5128c21966",
-            "bundle_byte_size": 559689,
+            "bundle_sha256": "7ae23dbd6bd469929d37ead2690e097c77c2d92fa6ae1be7a7b4f6ec0bfdada1",
+            "recorded_sha256": "400c6b95410eeeaf157b3253b7719df7760b912040b45b1afde0ee32cfb6b20e",
+            "bundle_byte_size": 855789,
             "bundle_digest_reproduces_offline": true,
             "recorded_digest_reproduces_offline": true,
             "recorded_keys": [
@@ -141,6 +143,7 @@
             "release_state": "internal_only",
             "person_consent": "unscreened",
             "captures_with_a_screening_receipt": 210,
+            "captures_whose_receipt_is_under_the_policy_in_force": 0,
             "captures_screened_by_a_named_human": 210,
             "no_geometry_entry_names_evidence": true,
             "observation_graph": {
@@ -158,12 +161,13 @@
       }
     ],
     "verification": {
-      "backend": "1899 passed, 3 skipped",
+      "backend": "1917 passed, 3 skipped, 1 xfailed",
       "web": "844 passed"
     },
     "limitations": [
       "The per-person consent layer is present, and every retained photograph is still unscreened for people: person_region, person_subject and person_presentation_consent all hold zero rows for both collections. So every bundle reports person_consent unscreened, which says nobody has looked, and never that there is nobody there.",
       "release internal_only is a decision, not a default. The bundle carries no state for any individual person, so a recipient holding it cannot check a more permissive claim; release.not_yet_earnable states what each higher state would require.",
+      "MEASURED 2026-09-07 over the whole public schema, by newest receipt per capture: 283 captures, of which 281 say eligible under the superseded v1 policy (273 human_review, 8 synthetic_exemption) and 2 are under the v2 policy in force and say blocked (person_detection_only). So no capture in this corpus is both eligible and current, and captures_whose_receipt_is_under_the_policy_in_force counts currency alone, not eligibility: the two bowl scenes report 2 because those receipts are current AND refused, which is the distinction the field exists to keep. Re-screening under v2 is what restores the other 281.",
       "The masking chain has never run against these photographs. It is proven against PostgreSQL on synthetic data (tests/test_person_masking_end_to_end.py); nobody has seen it act on the bowl or the volcanic collection.",
       "No structural snapshot is committed in either retained workspace, so every bundle reports its region graph unavailable.",
       "No generation has been recorded against a real scene; the generated tier is exercised only by tests.",
@@ -174,5 +178,5 @@
       "record_sha256": "31dbba03a172309929f98fd46f880a2bb0c8971358d2e347c0308cbec906a867"
     }
   },
-  "record_sha256": "835b92b2de95e21eb4e39ab52c86f79f2ad4cf241de45525eb1a320ff269e07a"
+  "record_sha256": "2caaa3624211eab84f76493184ac9008bc7d168d541a103daff673be10924512"
 }

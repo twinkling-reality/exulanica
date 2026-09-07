@@ -96,6 +96,17 @@ def _scene_record(
             for item in bundle["consent"]["per_capture"].values()
             if item["screening"]["state"] == "screened"
         ),
+        # Retained as a measurement rather than left in a comment, because it is the number that
+        # says how much of the corpus the bundle used to describe wrongly: a receipt written under
+        # a superseded policy was published as screened and eligible while the database refused
+        # geometry over those exact bytes. The two counts are kept apart on purpose. A receipt
+        # saying "eligible" and a receipt the policy in force still accepts are different facts,
+        # and collapsing them is the coarse statement this whole layer exists to retire.
+        "captures_whose_receipt_is_under_the_policy_in_force": sum(
+            1
+            for item in bundle["consent"]["per_capture"].values()
+            if item["screening"]["under_current_policy"]
+        ),
         "captures_screened_by_a_named_human": sum(
             1
             for item in bundle["consent"]["per_capture"].values()
@@ -210,6 +221,14 @@ def main() -> int:
             "release internal_only is a decision, not a default. The bundle carries no state for "
             "any individual person, so a recipient holding it cannot check a more permissive "
             "claim; release.not_yet_earnable states what each higher state would require.",
+            "MEASURED 2026-09-07 over the whole public schema, by newest receipt per capture: "
+            "283 captures, of which 281 say eligible under the superseded v1 policy (273 "
+            "human_review, 8 synthetic_exemption) and 2 are under the v2 policy in force and say "
+            "blocked (person_detection_only). So no capture in this corpus is both eligible and "
+            "current, and captures_whose_receipt_is_under_the_policy_in_force counts currency "
+            "alone, not eligibility: the two bowl scenes report 2 because those receipts are "
+            "current AND refused, which is the distinction the field exists to keep. Re-screening "
+            "under v2 is what restores the other 281.",
             "The masking chain has never run against these photographs. It is proven against "
             "PostgreSQL on synthetic data (tests/test_person_masking_end_to_end.py); nobody has "
             "seen it act on the bowl or the volcanic collection.",
