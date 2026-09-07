@@ -41,7 +41,7 @@ from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
 
-__all__ = ["hidden_outlines", "run"]
+__all__ = ["hidden_outlines", "masked_source_input_digest", "masked_source_key", "run"]
 
 
 def hidden_outlines(
@@ -55,6 +55,64 @@ def hidden_outlines(
     """
     return tuple(
         regions[key] for key in sorted(regions) if key not in resolved or resolved[key].masked
+    )
+
+
+def masked_source_input_digest(
+    *,
+    intake_sha256: bytes,
+    capture_id: uuid.UUID,
+    blob_id: BlobId,
+    regions: Mapping[bytes, Silhouette],
+    resolved: Mapping[bytes, ResolvedPresentation],
+) -> bytes:
+    """The three inputs that decide whether a derivative is still the right one, folded.
+
+    Separate from :func:`masked_source_key` only because :func:`run` records this digest on the
+    ledger row beside the key. Everything that decides currency is in here.
+    """
+    return input_digest_of(
+        [
+            intake_sha256,
+            region_set_digest(capture_id=capture_id, source_sha256=blob_id.hex, regions=regions),
+            consent_state_digest(
+                capture_id=capture_id, source_sha256=blob_id.hex, resolved=resolved
+            ),
+        ]
+    )
+
+
+def masked_source_key(
+    *,
+    intake_sha256: bytes,
+    capture_id: uuid.UUID,
+    blob_id: BlobId,
+    regions: Mapping[bytes, Silhouette],
+    resolved: Mapping[bytes, ResolvedPresentation],
+) -> bytes:
+    """The key the derivative for this photograph must carry to be the CURRENT one.
+
+    Exported so that "is this photograph's mask up to date" has one derivation and two callers
+    rather than a second implementation growing beside the first. :func:`run` writes the artifact
+    under this key and ``exulanica.ingest.masked_inputs`` asks whether one exists under it. A
+    screening rule that answered that question with its own arithmetic would drift, and the
+    direction it would drift is a photograph admitted against a mask built before somebody changed
+    their mind.
+
+    All three inputs are load bearing, and the module docstring says why the third is: the
+    resolved consent states are inside the key, so a revoked consent produces a different key and
+    the old derivative stops being current rather than being quietly reused.
+    """
+    return idempotency_key(
+        blob_id,
+        stage("masked_source"),
+        masked_source_input_digest(
+            intake_sha256=intake_sha256,
+            capture_id=capture_id,
+            blob_id=blob_id,
+            regions=regions,
+            resolved=resolved,
+        ),
     )
 
 
@@ -75,14 +133,12 @@ def run(
     outlines = hidden_outlines(regions, resolved)
     if not outlines:
         return None
-    input_digest = input_digest_of(
-        [
-            intake.content_sha256,
-            region_set_digest(capture_id=capture_id, source_sha256=blob_id.hex, regions=regions),
-            consent_state_digest(
-                capture_id=capture_id, source_sha256=blob_id.hex, resolved=resolved
-            ),
-        ]
+    input_digest = masked_source_input_digest(
+        intake_sha256=intake.content_sha256,
+        capture_id=capture_id,
+        blob_id=blob_id,
+        regions=regions,
+        resolved=resolved,
     )
     key = idempotency_key(blob_id, spec, input_digest)
     existing = writes.repository.find_artifact(key)

@@ -20,6 +20,7 @@ receipt said otherwise:
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 
 import pytest
@@ -347,3 +348,130 @@ def test_a_consent_receipt_is_always_recorded_as_the_owner(repository, photo_dir
     rows = repository.person_consent_transitions(subject_id=subject_id)
     assert [row.actor_role for row in rows] == ["owner"]
     assert [row.actor_id for row in rows] == [ACTOR]
+
+
+def _screening_reasons(repository, screening):
+    """The stated reasons on the stored receipt, which is where they live rather than on the row."""
+    row = repository.connection.execute(
+        "select blocking_reasons from reconstruction_privacy_screening "
+        "where workspace_id = %s and screening_id = %s",
+        (repository.workspace_id, screening.screening_id),
+    ).fetchone()
+    return " ".join(row["blocking_reasons"] or [])
+
+
+def _human_screening(repository, capture_id, regions):
+    """A named human's screening over these exact bytes, naming the people they saw."""
+    from exulanica.ingest.privacy import authorize_benchmark_capture, record_human_screening
+
+    authorization = authorize_benchmark_capture(
+        repository,
+        capture_id=capture_id,
+        actor=ACTOR,
+        official_source_url="https://example.invalid/fixture",
+        retrieval_date="2026-09-07",
+        license_document_sha256="0" * 64,
+        permitted_use="test fixture",
+        authorization_scope={"purpose": "screening rule test"},
+        purpose="screening rule test",
+        authorized_at=dt.datetime(2026, 9, 7, tzinfo=dt.UTC),
+    )
+    return record_human_screening(
+        repository,
+        authorization_id=authorization.authorization_id,
+        reviewed_by=ACTOR,
+        sensitive_regions=regions,
+        screened_at=dt.datetime(2026, 9, 7, tzinfo=dt.UTC),
+    )
+
+
+def test_a_reviewer_may_name_an_unconsented_person_once_the_mask_exists(
+    repository, photo_dir, tmp_path
+):
+    """The rule that made this feature reachable, and the one that keeps it honest.
+
+    Until 2026-09-07 a screening naming anybody in a masked state was blocked outright, so a
+    photograph containing somebody who had not consented could obtain no eligible screening at
+    all. The only screening production could write was an empty region list, which is the
+    statement "there is nobody here" that this layer exists to retire, and the masking path was
+    reachable only when the screening's list and the person_region table disagreed.
+
+    What replaced it is not the absence of a rule. A masked region is eligible only when this
+    photograph has a masked_source derivative under the key today's regions and consents produce,
+    which is what the old comment said the rule should become once masking was wired. Both halves
+    are executed here against a real PostgreSQL, a real migration and a real on-disk store.
+    """
+    capture_id, _ = _ingest(repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)))
+    assert _artifacts(repository, "masked_source"), "the fixture must have produced a derivative"
+    listed = _review(repository).review_list(repository, capture_id)
+    assert listed[0]["state"] == "unknown", "nobody consented, so this person is masked"
+
+    screening = _human_screening(
+        repository, capture_id, [{"state": "unknown", "region_key": listed[0]["region_key"]}]
+    )
+    assert screening.eligibility_state == "eligible", (
+        "a person who is actually masked must not block the screening that names them"
+    )
+
+
+def test_naming_a_person_the_pipeline_has_not_masked_still_blocks(repository, photo_dir, tmp_path):
+    """The half that must not relax, and the failure it catches is the whole feature inverted.
+
+    A reviewer sees somebody the detector missed and says so BEFORE any mask exists for them. If
+    that screening were eligible, the photograph would be admitted on the strength of a mask
+    nobody had built, which is worse than the version 1 rule this replaced: version 1 at least
+    refused the photograph. So the region list disagreeing with the derivative blocks, and the
+    reason says what would end it.
+    """
+    capture_id, _ = _ingest(repository, photo_dir, tmp_path, NoRegionDetector())
+    assert not _artifacts(repository, "masked_source"), "nobody was detected, so nothing is masked"
+
+    screening = _human_screening(repository, capture_id, [{"state": "unknown"}])
+    assert screening.eligibility_state == "blocked"
+    assert "no current masked source derivative" in _screening_reasons(repository, screening)
+
+
+def test_a_mask_built_before_the_reviewer_added_a_region_is_not_current(
+    repository, photo_dir, tmp_path
+):
+    """Present is not current, and this is the case where the difference bites.
+
+    The derivative's key folds the confirmed region set and the resolved consent states, so a
+    reviewer adding somebody the detector missed moves the key and the mask on disk stops being an
+    answer. A check that asked only "does a masked_source artifact exist for this capture" would
+    say yes here and admit a photograph whose newest person is not masked at all.
+    """
+    from exulanica.consent.regions import region_key as key_of
+    from exulanica.evidence.region import DisplayGeometry
+
+    review = _review(repository)
+    capture_id, _ = _ingest(repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)))
+    assert _artifacts(repository, "masked_source"), "the detected person produced a derivative"
+
+    outline = Silhouette.from_rect(Rect.from_normalised(0.75, 0.05, 0.15, 0.4))
+    capture = repository.capture(capture_id)
+    review.record_region_edits(
+        repository,
+        capture_id=capture_id,
+        actor=ACTOR,
+        edits=[
+            {
+                "region_key": key_of(capture.blob_id, outline, DisplayGeometry(w=160, h=100)).hex(),
+                "action": "add",
+                "shape": "polygon",
+                "silhouette": outline.as_digest_input(),
+            }
+        ],
+    )
+    # Both regions are named and both are genuinely masked in the table, so this cannot block for
+    # the unkeyed reason the test above covers. What is stale is the derivative.
+    named = [
+        {"state": row["state"], "region_key": row["region_key"]}
+        for row in review.review_list(repository, capture_id)
+    ]
+    assert len(named) == 2 and all(row["state"] == "unknown" for row in named)
+    screening = _human_screening(repository, capture_id, named)
+    assert screening.eligibility_state == "blocked", (
+        "the derivative on disk predates this region, so it does not hide the new person"
+    )
+    assert "no current masked source derivative" in _screening_reasons(repository, screening)

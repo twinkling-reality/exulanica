@@ -29,6 +29,8 @@ from exulanica.consent.states import MASKED_STATES, PersonState
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.scene import scene_id_for, scene_member_digest
+from exulanica.ingest.masked_inputs import capture_mask_is_current
+from exulanica.ingest.person_state import region_state_for_capture
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.spine.privacy import (
     PrivacyAdmissionRow,
@@ -349,6 +351,38 @@ def record_synthetic_exemption(
     )
 
 
+def _every_named_person_is_already_hidden(
+    repository: IngestRepository, capture_id: uuid.UUID, masked: list[dict[str, Any]]
+) -> bool:
+    """Whether the people this screening names as masked are ones the pipeline is already hiding.
+
+    This is the reconciliation the old blanket refusal made unnecessary, and it is the half that
+    must not relax. A reviewer naming somebody is a statement about the photograph; a masked
+    derivative is a fact about the bytes reconstruction will read. The two are written by
+    different actors at different times and they can disagree, and the direction that matters is
+    the reviewer seeing an arm at the edge of the frame that no detector proposed and no mask
+    covers. Crediting that screening would admit the photograph on the strength of a mask nobody
+    built, which is worse than the version 1 rule this replaced: version 1 at least refused it.
+
+    MEASURED 2026-09-07: the first version of this rule asked only whether the capture's own mask
+    was current, and a photograph where the detector found nobody answered "nothing to hide, so
+    nothing is out of date" and went eligible while the reviewer's screening named a person. The
+    test named for that is in ``tests/test_person_masking_end_to_end.py``.
+
+    **A region the screening cannot key blocks.** An entry with no ``region_key`` cannot be
+    matched to anything the pipeline hid, and the permissive reading of an unmatched region is the
+    one that ships somebody's body. There is no default here for the same reason
+    ``exulanica.consent.states`` has none.
+    """
+    state = region_state_for_capture(repository, capture_id)
+    hidden = {key.hex() for key, resolved in state.resolved.items() if resolved.masked}
+    for region in masked:
+        key = region.get("region_key")
+        if not isinstance(key, str) or key not in hidden:
+            return False
+    return capture_mask_is_current(repository, capture_id)
+
+
 def record_human_screening(
     repository: IngestRepository,
     *,
@@ -380,21 +414,38 @@ def record_human_screening(
         for region in sensitive_regions
         if not isinstance(region, dict) or region.get("state") not in _REGION_STATES
     ]
-    # A region in a masked state blocks, and it blocks for a reason worth stating plainly: the
-    # masking stages are not yet wired into the pipeline, so nothing anywhere would actually
-    # hide this person before depth read them. Marking such a screening eligible would be
-    # strictly worse than the version 1 rule it replaced, which blocked any photograph naming a
-    # person at all. `unknown` is the important member of this set: it means somebody was seen
-    # and nobody decided, and "nobody decided" is the case default deny exists for.
+    # A region in a masked state used to block outright, and the comment here recorded why and
+    # what would end it: "the masking stages are not yet wired into the pipeline, so nothing
+    # anywhere would actually hide this person before depth read them", and "when masking is wired
+    # end to end this becomes eligible if every masked region has a current masked_source
+    # derivative, which is the whole point of the design".
     #
-    # When masking is wired end to end this becomes "eligible if every masked region has a
-    # current masked_source derivative", which is the whole point of the design. Until then the
-    # honest rule is the conservative one, and this comment is the record of why.
+    # DECIDED 2026-09-07: masking is wired end to end, so this is that rule. The conservative
+    # version had stopped protecting anybody and started making the feature unreachable: a
+    # photograph containing somebody who has not consented could obtain no eligible screening at
+    # all, so the only screenings production could write were empty region lists, which is the
+    # statement "there is nobody here" that this whole layer exists to retire.
+    #
+    # What replaces it is not weaker, it is checkable. A masked region blocks unless this
+    # photograph has a masked_source derivative under the key TODAY's regions and consents
+    # produce, so a mask built before somebody changed their mind does not count. `unknown` still
+    # masks and is still the important member of the set: somebody was seen and nobody decided,
+    # and "nobody decided" is the case default deny exists for. It now means "mask them", not
+    # "refuse the photograph".
+    #
+    # Two things behind this that are not this function's to enforce, and are enforced anyway.
+    # Migration 0037's tg_geometry_reads_the_masked_derivative refuses a point map that does not
+    # name a real masked derivative of those exact bytes, so an eligible screening cannot by
+    # itself put an unconsented body into geometry. And the derivative's key carries the consent
+    # states, so a revocation produces a new build rather than mutating an accepted one.
     masked = [
         region
         for region in sensitive_regions
         if isinstance(region, dict) and region.get("state") in MASKED_STATES
     ]
+    masked_and_unprotected = bool(masked) and not _every_named_person_is_already_hidden(
+        repository, authorization.capture_id, masked
+    )
     if failure_reason:
         state = "failed"
         reasons = [failure_reason]
@@ -403,11 +454,12 @@ def record_human_screening(
         reasons = [
             f"{len(unresolved)} confirmed person region(s) carry no resolved presentation state"
         ]
-    elif masked:
+    elif masked_and_unprotected:
         state = "blocked"
         reasons = [
-            f"{len(masked)} person region(s) are not consented to likeness and no masked source "
-            "derivative is produced yet, so geometry over these bytes is refused"
+            f"{len(masked)} person region(s) are not consented to likeness and this photograph "
+            "has no current masked source derivative, so geometry over these bytes is refused "
+            "until one is built from the regions and consents that hold now"
         ]
     else:
         state = "eligible"

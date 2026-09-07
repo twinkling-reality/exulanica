@@ -27,13 +27,17 @@ from typing import Any
 
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
+from exulanica.ingest.person_state import region_state_for_capture
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
 from exulanica.ingest.stages import stage
+from exulanica.ingest.stages.intake import key_for as intake_key_for
+from exulanica.ingest.stages.masked_source import masked_source_key
 
 __all__ = [
     "MASKED_SOURCE_KIND",
     "apply_masked_sources",
+    "capture_mask_is_current",
     "masked_source_declarations",
     "verify_masked_sources",
 ]
@@ -142,3 +146,41 @@ def apply_masked_sources(repository: IngestRepository, claimed: ClaimedSceneJob)
         for member in claimed.members
     )
     return dataclasses.replace(claimed, members=members)
+
+
+def capture_mask_is_current(repository: IngestRepository, capture_id: uuid.UUID) -> bool:
+    """Whether every person this photograph must hide is hidden by a derivative that exists NOW.
+
+    True in two different situations and the difference matters to nobody downstream: a photograph
+    with nobody to hide has nothing to be out of date, and a photograph with somebody to hide has a
+    ``masked_source`` artifact under the key today's regions and consents produce. False when a
+    mask is needed and the current one is missing, or was built before somebody changed their mind.
+
+    **The key is asked for rather than compared field by field.** ``masked_source_key`` folds the
+    source bytes, the confirmed region set and the resolved consent states, so "is this derivative
+    current" is one lookup rather than three comparisons that could each be got wrong. A revoked
+    consent moves the key, so the artifact under the old key stops being an answer instead of
+    quietly remaining one.
+
+    This does NOT assert that the derivative's bytes are in the store. The store check belongs to
+    the stage that reads them and to the database trigger that refuses a point map naming a
+    derivative that does not exist; repeating it here would be a second place to keep in step.
+    """
+    state = region_state_for_capture(repository, capture_id)
+    if not state.any_masked:
+        return True
+    capture = repository.capture(capture_id)
+    if capture is None:
+        return False
+    intake = repository.find_artifact(intake_key_for(capture.blob_id))
+    if intake is None or intake.content_sha256 is None:
+        return False
+    key = masked_source_key(
+        intake_sha256=intake.content_sha256,
+        capture_id=capture_id,
+        blob_id=capture.blob_id,
+        regions=state.outlines,
+        resolved=state.resolved,
+    )
+    current = repository.find_artifact(key)
+    return current is not None and current.content_sha256 is not None
