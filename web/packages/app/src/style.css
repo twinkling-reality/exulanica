@@ -2853,3 +2853,63 @@ button.command-action:focus-visible {
 
 .reconstruction-inspector-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
 .reconstruction-inspector-header h2 { margin: 0; }
+
+/* The person review, under the evidence panel in the reconstruction inspector.
+ *
+ * The outline is drawn on a neutral field and the photograph is never behind it. That is not a
+ * styling preference: `ui/person-review.ts` refuses to render the pixels because a screen that
+ * showed them would display the very body the feature exists to hide, in the tool built to hide
+ * it. So `--ink-faint` on `--raised` is the whole picture a reviewer gets, and the outline has to
+ * carry on its own. Masked outlines are filled; a shown person's is left open, so the two are
+ * distinguishable without colour. */
+.reconstruction-review:empty { display: none; }
+.reconstruction-review {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent);
+}
+.person-review { display: grid; gap: 0.6rem; }
+.person-review h3 {
+  margin: 0;
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.person-review p { margin: 0; }
+.person-review-unscreened,
+.person-review-empty,
+.person-review-authority { color: var(--ink-faint); font-size: 0.78rem; }
+.person-review-region {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: 0.2rem 0.7rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 30%, transparent);
+}
+/* The outline spans the rows beside it rather than sitting in the flow, so a tall silhouette does
+ * not push the sentences about it out of alignment with the next region. */
+.person-review-outline {
+  grid-row: 1 / -1;
+  width: 100%;
+  height: auto;
+  background: color-mix(in srgb, var(--ink-faint) 12%, transparent);
+  border-radius: 2px;
+}
+.person-review-part { font-weight: 500; font-size: 0.8rem; }
+.person-review-state, .person-review-provenance { color: var(--ink-faint); font-size: 0.76rem; }
+.person-review-controls { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
+.person-review-action {
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.2rem 0.5rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--ink-faint) 60%, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.person-review-action:hover { background: color-mix(in srgb, var(--ink-faint) 12%, transparent); }
+.person-review-action:disabled { opacity: 0.45; cursor: default; }
+.person-review-failed { color: var(--ink-faint); font-size: 0.78rem; margin: 0; }

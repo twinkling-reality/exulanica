@@ -7,6 +7,14 @@ export interface ReconstructionInspectionOption {
   readonly label: string;
   readonly projection?: 'pinhole' | 'pinhole-approximation' | 'opm-estimate' | 'interpolated';
   readonly source: SourceMediaDescriptor | null;
+  /**
+   * Which photograph this view stands on, when it stands on one.
+   *
+   * Carried because the person review below is about a photograph and not about a scene, and the
+   * caller already resolves the member to build `source`. Null for a midpoint between cameras,
+   * where there is no single photograph a review could be of.
+   */
+  readonly captureId?: string | null;
 }
 
 /** One photograph that recorded the selected point, as the panel needs to show it. */
@@ -108,6 +116,14 @@ export function buildReconstructionInspector(options: {
   const evidence = el('section', {
     class: 'reconstruction-evidence', 'aria-label': 'Observed by',
   });
+  // The person review sits below the evidence panel, in the inspector, for the same reason
+  // click-to-evidence does: this is the one surface that already stands on a single named
+  // photograph, and a review is about a photograph. It is a slot rather than a renderer because
+  // `ui/person-review.ts` owns what a review looks like and owns the argument that it must never
+  // draw the pixels; duplicating any of that here would be a second place for it to be wrong.
+  const review = el('section', {
+    class: 'reconstruction-review', 'aria-label': 'People in this photograph',
+  });
   const evidenceState = el('p', { class: 'reconstruction-evidence-state', role: 'status', 'aria-live': 'polite' });
   const evidenceDetail = el('p', { class: 'reconstruction-evidence-detail' });
   const evidenceList = el('ol', { class: 'reconstruction-evidence-list' });
@@ -129,7 +145,7 @@ export function buildReconstructionInspector(options: {
   }
   evidence.append(evidenceState, evidenceDetail, evidenceList);
   root.append(el('header', { class: 'reconstruction-inspector-header' }, [title, back]),
-    disclosure, select, el('nav', {}, [previous, next]), state, source, evidence);
+    disclosure, select, el('nav', {}, [previous, next]), state, source, evidence, review);
   let sceneId = '';
   let views: readonly ReconstructionInspectionOption[] = [];
   let restoreFocus: HTMLElement | null = null;
@@ -256,6 +272,7 @@ export function buildReconstructionInspector(options: {
     root.hidden = true;
     source.open = false;
     replace(sourceBody, []);
+    replace(review, []);
     // A closed inspector holds no answer. Leaving the last pick on screen would let a later
     // session read it as being about whatever is open then.
     showEvidence({ kind: 'unsupported', reason: 'Open a reconstruction view to resolve a surface to its photographs.' });
@@ -273,8 +290,20 @@ export function buildReconstructionInspector(options: {
   select.addEventListener('change', () => showView(select.selectedIndex));
   previous.addEventListener('click', () => showView(select.selectedIndex - 1));
   next.addEventListener('click', () => showView(select.selectedIndex + 1));
+  /**
+   * Put a review panel under the evidence, or clear it.
+   *
+   * Null clears, and every path that changes which photograph is showing must call it with null
+   * before it has an answer for the new one. A stale panel here would attribute one photograph's
+   * people to another, which is the same failure `showEvidence` guards against and is worse: the
+   * buttons in it write receipts.
+   */
+  function showReview(panel: HTMLElement | null): void {
+    replace(review, panel === null ? [] : [panel]);
+  }
+
   return {
-    root, hide, showEvidence,
+    root, hide, showEvidence, showReview,
     /** The view a click would be inverted through, so the caller can refuse an uncalibrated one. */
     get selected(): ReconstructionInspectionOption | null {
       return root.hidden ? null : (views[select.selectedIndex] ?? null);

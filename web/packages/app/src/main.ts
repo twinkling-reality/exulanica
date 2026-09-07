@@ -97,6 +97,7 @@ import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
+import { buildPersonReview } from './ui/person-review.js';
 import { buildReconstructionInspector } from './ui/reconstruction-inspector.js';
 import { buildStartupState } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
@@ -118,6 +119,7 @@ import {
   consentSentence,
   type ObservationGraph,
 } from './observations-api.js';
+import { PersonReviewApi, ReviewUnavailable } from './person-review-api.js';
 import { readPreferences, writePreferences, type AtlasPreferences } from './preferences.js';
 import {
   WorldStyleClient,
@@ -203,6 +205,15 @@ let heldPointMaps_: HeldPointMaps | undefined;
  * it writes one uniform per region and nothing else.
  */
 let proofLensEnabled = false;
+/**
+ * Which photograph the review panel is currently about, so a late answer cannot land on another.
+ *
+ * Not cached, unlike the observation graph below. An accepted pose receipt is immutable and
+ * re-reading it says nothing new; a review is the opposite, since every button in it writes a
+ * receipt that changes what the next read returns.
+ */
+let reviewCaptureId_: string | null = null;
+
 /** One scene's recorded observation graph, cached for the session. See `observations-api.ts`. */
 let observationGraph_: ObservationGraph | null = null;
 let observationGraphSceneId_: string | null = null;
@@ -1359,6 +1370,74 @@ async function mount(): Promise<void> {
   };
 
   /** What one capture's original looks like in this session, through its own evidence handles. */
+  /**
+   * Load who is in the photograph this view stands on, and let a reviewer answer.
+   *
+   * Called on every view change, including with null, because the panel is about ONE photograph
+   * and leaving the previous one on screen would offer buttons that write receipts against a
+   * capture the visitor has already left. `reviewCaptureId_` is the guard: a slow answer for the
+   * previous photograph is dropped rather than rendered.
+   *
+   * Every action refetches instead of patching the panel in place. One receipt can move more than
+   * the row it was written against, because a subject can be bound to several regions and the
+   * resolved state is a fold over all of that subject's receipts; a client that edited one row
+   * would be a second implementation of a rule the server already owns.
+   */
+  const loadPersonReview = (captureId: string | null): void => {
+    reviewCaptureId_ = captureId;
+    if (captureId === null) {
+      reconstructionInspector.showReview(null);
+      return;
+    }
+    const where = credentials_;
+    if (where === null) {
+      reconstructionInspector.showReview(
+        el('p', { text: 'This session has no credentials to read who is in this photograph.' }),
+      );
+      return;
+    }
+    const api = new PersonReviewApi(where);
+    const act = (run: () => Promise<unknown>): void => {
+      void run()
+        .then(() => { if (reviewCaptureId_ === captureId) loadPersonReview(captureId); })
+        .catch((error: unknown) => {
+          if (reviewCaptureId_ !== captureId) return;
+          reconstructionInspector.showReview(el('p', {
+            class: 'person-review-failed',
+            text: error instanceof ReviewUnavailable
+              ? error.message
+              : 'That review edit was not recorded.',
+          }));
+        });
+    };
+    void api.load(captureId).then((review) => {
+      // Dropped rather than drawn: the visitor has moved to another photograph since this asked.
+      if (reviewCaptureId_ !== captureId) return;
+      reconstructionInspector.showReview(buildPersonReview({
+        captureId: review.captureId,
+        reviewState: review.reviewState,
+        regions: review.regions,
+        onConfirm: (regionKey) => act(() =>
+          api.edit(captureId, { region_key: regionKey, action: 'confirm' })),
+        onDelete: (regionKey) => act(() =>
+          api.edit(captureId, { region_key: regionKey, action: 'delete' })),
+        onConsent: (regionKey, scope, decision) => {
+          const region = review.regions.find((item) => item.regionKey === regionKey);
+          if (region === undefined) return;
+          act(() => api.consent(captureId, region, scope, decision));
+        },
+      }));
+    }).catch((error: unknown) => {
+      if (reviewCaptureId_ !== captureId) return;
+      reconstructionInspector.showReview(el('p', {
+        class: 'person-review-failed',
+        text: error instanceof ReviewUnavailable
+          ? error.message
+          : 'Who is in this photograph could not be read.',
+      }));
+    });
+  };
+
   const sourceForCapture = (captureId: string) =>
     [...(previewSourceMedia?.values() ?? [])].find((descriptor) =>
       descriptor.captureIds?.includes(captureId))
@@ -1465,6 +1544,11 @@ async function mount(): Promise<void> {
       // A new view is a new projection, so the previous pick no longer describes what is on
       // screen. The panel goes back to saying what a click could resolve rather than keeping an
       // answer about a camera the visitor has left.
+      // The review is about a photograph, so it follows the view that stands on one and is
+      // cleared by every view that does not. Called before the early return below for exactly
+      // that reason: a midpoint between two cameras must not keep the previous photograph's
+      // people on screen with buttons that write receipts against it.
+      loadPersonReview(view.captureId ?? null);
       if (view.kind !== 'source-camera' || view.projection === 'opm-estimate') {
         reconstructionInspector.showEvidence({
           kind: 'unsupported',
@@ -1510,6 +1594,10 @@ async function mount(): Promise<void> {
         label: view.kind === 'source-camera'
           ? `Source camera ${cameraNumber}` : `Between cameras ${cameraNumber} and ${cameraNumber + 1}`,
         source,
+        // Taken from the member already resolved above rather than from `view.captureIds`, which
+        // names topology slots on a source-only view. Null for a midpoint, where no single
+        // photograph is being looked at and so no review is about anything.
+        captureId: member?.captureId ?? null,
       };
     });
     if (!reconstructionInspector.open(sceneId, choices)) {
