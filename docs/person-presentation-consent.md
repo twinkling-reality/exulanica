@@ -373,3 +373,63 @@ So `release.state` is `internal_only` for every scene, and the bundle says so wi
 reason rather than as a constant. Resolving that tension, most likely by binding the release answer
 to an explicit as-of time carried in the bundle, is what the next person to add per-person state to
 a view has to do. A test is armed for exactly that moment.
+
+## Two defects found and closed on 2026-09-07, and how they were found
+
+Both were found by an adversarial pass over work that had already been written, tested and
+reported as done, and neither would have been caught by the suite. Recording the shape of them
+because it is the shape that recurs: **a fix verified on the surface it was written for, declared
+complete for the leak as a whole.**
+
+**A withdrawn person's name reached the browser, and blanking one field did not stop it.**
+`person_consent_is_granted` answers whether one scope's receipt is held right now and carries no
+withdrawal term. Migration 0037 composes it for masking (`p_subject is null OR
+person_subject_is_withdrawn(...) OR NOT person_consent_is_granted(..., 'likeness')`); naming never
+got that composition. So a subject who was named and then withdrew resolved to `state: withdrawn`
+carrying their name.
+
+The first fix corrected `exulanica/graph/person_regions.py`, which is where the region's
+`display_name` is decided, and was reported as closing the leak. It did not. The same
+`GraphPayload` carries `entities`, and `exulanica/graph/entities.py` set `display_name` on every
+live entity with no consent filter at all. MEASURED 2026-09-07 with the first fix in place: the
+region row came back with `display_name: None` and the entity row beside it came back `'Julie'`.
+Two further surfaces carried it as well, the naming assertion's `object_value` and the rename
+event's own payload, and `web/packages/graph-client/src/snapshot.ts` maps all of them into the
+client model.
+
+All four are now closed at one boundary in `entities.py`, resolved once per snapshot rather than
+per row. The entity keeps its row and loses its name, the naming assertion keeps its row and loses
+its value, and the rename event keeps its actor and its time and loses the name key. A withdrawal
+stays visible as a withdrawal; what goes is the name. The test asserts the whole rule as well as
+the four fields, by serialising the entity and requiring the name to be absent from it, so a fifth
+surface added later fails there rather than shipping.
+
+**An unlocated person's whole-frame mask was swallowed by a centred located one.** Both keyed to
+grid cell (8,8) of the 16 by 16 `REGION_GRID`, and three separate mechanisms then collapsed them
+to one row. An unlocated person is now keyed off the photograph with no region at all, which is a
+key no grid cell can produce, and the grid itself was not touched: it is shared with the vision
+stage's person occurrences and with identity and naming memory, and changing it would silently
+re-key every occurrence, rejection and naming decision in the corpus.
+
+**That fix is inert on the shipping detector.** `RecordedObservationDetector` still builds an
+unlocated person with the located default, so every key this system actually mints is unchanged.
+One line closes it, and a strict `xfail` in
+`tests/test_person_detection_finds_partial_bodies.py` is armed to turn green-to-red the moment
+somebody adds the line without removing the marker.
+
+## What the bundle now says about a screening receipt
+
+`privacy_screening_allows_capture` requires `s.policy_version = current_privacy_policy()`, and the
+World Read bundle never checked it: it published the newest receipt's `eligibility_state` verbatim.
+MEASURED 2026-09-07 over the whole `public` schema, by newest receipt per capture: 283 captures, of
+which **281 say `eligible` under the superseded v1 policy** (273 human_review, 8
+synthetic_exemption) and 2 are under v2 and say `blocked`. So the bundle was reporting most of the
+corpus as screened and eligible while the database refused geometry over those exact bytes.
+
+The receipt's own word is still published unchanged, because a read path does not get to edit what
+a named reviewer wrote. Beside it the bundle now reports whether that receipt is still under the
+policy in force. Only the policy term is reported, not the whole predicate: its neighbours are
+`valid_until > clock_timestamp()`, and a bundle whose digest moved when a receipt expired would be
+a digest nobody could quote. One consequence is worth stating rather than discovering: a migration
+that bumps `current_privacy_policy()` moves the recorded digest of every bundle. That is a write
+and not a tick, so the rule holds, but it is a new way for the digest to move.
