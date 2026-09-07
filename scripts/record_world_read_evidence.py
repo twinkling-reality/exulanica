@@ -144,6 +144,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend-tests", default=None, help="e.g. '1698 passed'")
     parser.add_argument("--web-tests", default=None, help="e.g. '784 passed'")
+    # A record is a dated observation of a tree, not a file that tracks the tree. Re-running this
+    # against a changed tree writes a NEW record and binds it to the one it follows; overwriting
+    # the old one would destroy exactly the chain `predecessor_record` exists to build, and would
+    # leave a record whose stated limitations describe a tree nobody can check out any more.
+    parser.add_argument(
+        "--date", required=True, help="ISO date this run was executed, e.g. 2026-09-07"
+    )
+    parser.add_argument(
+        "--predecessor",
+        default=None,
+        help="path, relative to the repository root, of the record this one follows",
+    )
     arguments = parser.parse_args()
 
     head = subprocess.run(
@@ -172,9 +184,9 @@ def main() -> int:
                 }
             )
 
-    record = {
+    record: dict[str, object] = {
         "profile": "exulanica.phase-10-read-paths/v1",
-        "date": "2026-09-06",
+        "date": arguments.date,
         "head": head,
         "database": DATABASE,
         "store": str(STORE_PATH.relative_to(ROOT)),
@@ -191,21 +203,31 @@ def main() -> int:
             "web": arguments.web_tests,
         },
         "limitations": [
-            "No per-person consent layer exists in this tree, so every bundle reports "
-            "person_consent unavailable and release internal_only. That is the honest state, not "
-            "a passing result.",
+            "The per-person consent layer is present, and every retained photograph is still "
+            "unscreened for people: person_region, person_subject and person_presentation_consent "
+            "all hold zero rows for both collections. So every bundle reports person_consent "
+            "unscreened, which says nobody has looked, and never that there is nobody there.",
+            "release internal_only is a decision, not a default. The bundle carries no state for "
+            "any individual person, so a recipient holding it cannot check a more permissive "
+            "claim; release.not_yet_earnable states what each higher state would require.",
+            "The masking chain has never run against these photographs. It is proven against "
+            "PostgreSQL on synthetic data (tests/test_person_masking_end_to_end.py); nobody has "
+            "seen it act on the bowl or the volcanic collection.",
             "No structural snapshot is committed in either retained workspace, so every bundle "
             "reports its region graph unavailable.",
             "No generation has been recorded against a real scene; the generated tier is "
             "exercised only by tests.",
-            "The proof lens is a sentence in the status panel. Nothing colours the 3D view.",
-            "Click-to-evidence has its recorded data, its route and its pick geometry; no click "
-            "in the inspector is bound to them.",
             "Place alignment is measured against numeric fixtures only. No two real captures of "
             "one place exist.",
         ],
     }
-    output = ROOT / "docs/evaluation/2026-09-06-phase-10-read-paths.json"
+    if arguments.predecessor:
+        predecessor = json.loads((ROOT / arguments.predecessor).read_bytes())
+        record["predecessor_record"] = {
+            "path": arguments.predecessor,
+            "record_sha256": hashlib.sha256(canonical_json(predecessor["record"])).hexdigest(),
+        }
+    output = ROOT / f"docs/evaluation/{arguments.date}-phase-10-read-paths.json"
     output.write_text(
         json.dumps(
             {

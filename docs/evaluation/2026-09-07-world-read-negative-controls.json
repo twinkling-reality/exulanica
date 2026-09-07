@@ -1,0 +1,184 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.world-read-negative-controls/v1",
+    "date": "2026-09-07",
+    "head": "5cfa50fa563082ddcd460583d00ce694ed2f80fb",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "isolated_source_copy": true,
+    "baseline_passed": true,
+    "restored_suite_passed": true,
+    "records": [
+      {
+        "mutation": "the_recorded_digest_excludes_generated_content",
+        "production_file": "exulanica/graph/world_read.py",
+        "replace": "bundle[\"recorded_keys\"] = sorted(key for key in bundle if key != \"generated\")",
+        "with": "bundle[\"recorded_keys\"] = sorted(bundle)",
+        "test": "test_filing_a_generation_leaves_the_recorded_digest_untouched",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "070b9608a9fd32e55c380095f5b077c477d938fe0f84d375a0300ecca4c832e0",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_non_finite_measurement_is_refused_rather_than_encoded",
+        "production_file": "exulanica/graph/wire_numbers.py",
+        "replace": "    if not math.isfinite(value):",
+        "with": "    if False:  # mutant: a non-finite value is encoded rather than refused",
+        "test": "test_a_non_finite_measurement_is_refused_rather_than_encoded",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "44a84c7a886543c6feb88345519a5d316b4b7f7c1566b91feb86571ed2209047",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "an_unencodable_magnitude_is_refused_rather_than_crashing",
+        "production_file": "exulanica/graph/wire_numbers.py",
+        "replace": "    if abs(value) >= _LIMIT:",
+        "with": "    if False:  # mutant: an oversized coordinate reaches the decimal context",
+        "test": "test_a_coordinate_too_large_to_encode_is_refused_rather_than_crashing",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "f637ac8c2c9a4df95eb237036e51570c3795978cc6dd0e7b2c50022c340b9c31",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "the_two_zeros_encode_to_one_string",
+        "production_file": "exulanica/graph/wire_numbers.py",
+        "replace": "    if quantised.is_zero():\n",
+        "with": "    if False:\n",
+        "test": "test_the_two_zeros_encode_to_the_same_string",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "e48d911922fc6efadaeed7fa9755cfef25f0c4f2363b1be49a9bbef0fbb2b207",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "the_release_state_is_internal_only_without_person_consent",
+        "production_file": "exulanica/graph/read_consent.py",
+        "replace": "        \"state\": \"internal_only\",",
+        "with": "        \"state\": \"releasable\",",
+        "test": "test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bundle",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "610187c93f24a741649cbe3cb66cad54aa3b9e69d29726cfe663fd7f0aedac05",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "an_unscreened_photograph_is_never_reported_as_one_with_decisions",
+        "production_file": "exulanica/graph/read_consent.py",
+        "replace": "            \"recorded\" if reviewed.get(key) == \"screened\" else \"unscreened\"",
+        "with": "            \"recorded\"",
+        "test": "test_consent_reports_the_screening_basis_and_refuses_to_infer_people",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "6c3dd204de7ca392eda85eb4ffa1e565b27e08bea2fed723135dd4918a52c7f0",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "one_unscreened_photograph_makes_the_whole_scene_unscreened",
+        "production_file": "exulanica/graph/read_consent.py",
+        "replace": "    if all(record[\"person_consent\"] == \"recorded\" for record in consent.values()):",
+        "with": "    if any(record[\"person_consent\"] == \"recorded\" for record in consent.values()):",
+        "test": "test_the_scene_consent_answer_is_the_weakest_of_its_photographs",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "5d5af06f3094cf036b1beef36a0ccdd3bb4a97e999db166bc7135f98c6e5bf25",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_generation_is_labelled_generated_in_the_read_bundle",
+        "production_file": "exulanica/graph/world_read.py",
+        "replace": "            \"tier\": \"generated\",\n            \"artifact_id\": str(row.artifact_id),",
+        "with": "            \"tier\": \"recorded\",\n            \"artifact_id\": str(row.artifact_id),",
+        "test": "test_the_read_bundle_keeps_generated_out_of_the_recorded_geometry_list",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "cf26e6c20f45c1559c2849083545d66845b82b522fa1611f65227af9d68438ff",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_generation_must_name_the_bundle_it_actually_read",
+        "production_file": "exulanica/ingest/generated_scene.py",
+        "replace": "    if receipt.bundle_sha256 != expected_recorded_sha256:",
+        "with": "    if False:  # mutant: any conditioning digest is accepted",
+        "test": "test_a_generation_naming_the_wrong_bundle_is_refused",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "213c2ec2b3b2fddf062c7bc739ca0d71859ea69772d463e056769c2f43635a94",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "model_identity_enters_the_generated_artifact_key",
+        "production_file": "exulanica/reconstruction/generated.py",
+        "replace": "    return sha256_of_canonical(receipt.document())",
+        "with": "    return sha256_of_canonical({\"constant\": \"mutant\"})",
+        "test": "test_a_model_swap_produces_a_different_artifact_identity",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "08cfeeeaf7dbe92efc8afebf6e6b063e112f73f22d2547577d37806647b03a28",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_generation_without_a_seam_is_refused",
+        "production_file": "exulanica/reconstruction/generated.py",
+        "replace": "_MIN_SEAM_CHARACTERS: Final = 24",
+        "with": "_MIN_SEAM_CHARACTERS: Final = 1",
+        "test": "test_a_generation_without_a_seam_is_refused",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "a59caeeb8b04ab9be43fbc9ba9b8c4861aeb3a7488143f7821288d92eba80cb0",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_generated_receipt_kind_cannot_enter_a_gate",
+        "production_file": "exulanica/reconstruction/scene_gate.py",
+        "replace": "        if kind not in (\"pose\", \"placement\", \"scale\", \"coverage\", \"corridor\", \"splat\"):",
+        "with": "        if False:  # mutant: any receipt kind is a gate receipt",
+        "test": "test_a_generation_cannot_satisfy_any_reconstruction_gate",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "641f46f62d3e3afe78d920087449e65cd885a4f1493ee8f54e54ec32a1e1efc7",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "every_generation_for_a_scene_stays_visible",
+        "production_file": "exulanica/graph/generated_geometry.py",
+        "replace": "  from artifact a\n",
+        "with": "  from artifact_current a\n",
+        "test": "test_two_generations_for_one_scene_are_both_visible",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "7b52c90eb8601ebe8e224194cf2d86d9ab997e5ea29a4bb75105f55cac24dc14",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_superseded_generation_is_not_offered_beside_its_replacement",
+        "production_file": "exulanica/graph/generated_geometry.py",
+        "replace": "   and a.superseded_by is null",
+        "with": "   and a.artifact_id is not null  -- mutant: no supersession filter",
+        "test": "test_a_superseded_generation_is_withdrawn_from_the_graph",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "0b833962a6b875fc543189e0678f88008edb1bbe0d01cd4d3b0eb3005d35a5bd",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "the_observation_graph_is_guarded_scene_wide",
+        "production_file": "exulanica/graph/observations.py",
+        "replace": "   and not tombstone_blocks_scene(s.workspace_id, s.scene_id)",
+        "with": "   and not tombstone_blocks_capture(s.workspace_id, s.scene_id)",
+        "test": "test_withdrawing_a_member_withdraws_the_whole_observation_graph",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "b4d28d0fb5a3fc92424f827430e81184d7610dcfdbbb46b34a9e1f6bd01d855a",
+        "observed_outcome": "the named test failed under the production mutation"
+      }
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-06-world-read-negative-controls.json",
+      "record_sha256": "893a23fa8338fdb28f239cac19ceae818c0997ee2ebe9457dbbf014d71c2abae"
+    }
+  },
+  "record_sha256": "0fa641ac5bcb42241c387145c3f1f0d312237bf8131a9f9f5ff670df2705b1f5"
+}
