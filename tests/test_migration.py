@@ -25,6 +25,7 @@ from __future__ import annotations
 import pathlib
 import re
 
+import exulanica.migrations
 import pytest
 from exulanica.migrations import Migration, migrations, verify_applied
 
@@ -82,10 +83,44 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 
 def test_the_migrations_are_numbered_and_ordered():
     files = list(migrations())
-    assert [m.version for m in files] == [
-        f"{number:04d}" for number in range(1, len(files) + 1)
-    ], [m.version for m in files]
+    assert [m.version for m in files] == [f"{number:04d}" for number in range(1, len(files) + 1)], [
+        m.version for m in files
+    ]
     assert len(files) >= 8, "a migration went missing from the directory"
+
+
+def test_a_duplicate_migration_number_surviving_a_merge_refuses_to_enumerate(tmp_path, monkeypatch):
+    """Two branches each adding an 0038 produce a clean merge and a forked schema.
+
+    Numbers are handed out centrally and git checks none of them: neither branch touched the
+    other's file, so there is nothing to conflict on. What follows is not a naming quibble.
+    ``apply_pending`` finds both files pending and executes both SQL bodies, then records only
+    the first, because it writes with "on conflict (version) do nothing". The next boot compares
+    that single recorded checksum against the other file and refuses to start citing checksum
+    drift, on a schema where both migrations have in fact already run.
+
+    The test above does fail on a duplicate, structurally: an extra file raises the count without
+    raising the maximum version, so the 0001..N equality cannot hold. But it fails by printing a
+    list diff that reads as a missing file, and it is a test, so it protects nothing that runs
+    outside pytest. This is the refusal in the library, checked here at the point of enumeration.
+    """
+    (tmp_path / "0001_spine.sql").write_text("begin;\ncommit;\n", encoding="utf-8")
+    (tmp_path / "0002_alpha_change.sql").write_text("begin;\ncommit;\n", encoding="utf-8")
+    (tmp_path / "0002_beta_change.sql").write_text("begin;\ncommit;\n", encoding="utf-8")
+    monkeypatch.setattr(exulanica.migrations, "migration_directory", lambda: tmp_path)
+
+    # next() rather than list(), deliberately. Pulling one item is exactly what a lazy generator
+    # lets through, and two tests further down this file do precisely that, so this assertion is
+    # what pins the enumerator to being eager.
+    with pytest.raises(ValueError, match="0002") as refusal:
+        next(iter(migrations()))
+    message = str(refusal.value)
+    for named in ("0002_alpha_change.sql", "0002_beta_change.sql"):
+        assert named in message, message
+
+    # And it is not simply raising on whatever it is shown.
+    (tmp_path / "0002_beta_change.sql").unlink()
+    assert [migration.version for migration in migrations()] == ["0001", "0002"]
 
 
 def test_historical_migrations_0001_through_0035_are_byte_identical():
@@ -295,9 +330,9 @@ def test_allows_kind_is_enforced_rather_than_merely_declared():
 
 def test_the_epistemic_guard_covers_updates_as_well_as_inserts():
     """Otherwise insert-then-update is an unguarded route to the row the guard refuses."""
-    assert (
-        "before insert or update of kind, predicate_id on assertion" in SQL
-    ), "the epistemic guard must fire on UPDATE too"
+    assert "before insert or update of kind, predicate_id on assertion" in SQL, (
+        "the epistemic guard must fire on UPDATE too"
+    )
 
 
 def test_the_vocabulary_cannot_be_edited_into_letting_a_model_name_someone():
@@ -534,8 +569,7 @@ def test_the_prose_count_of_workspace_isolated_tables_matches_the_schema():
             "nothing checks the number it used to carry."
         )
         assert {int(number) for number in stated} == {len(workspace_keyed)}, (
-            f"{relative} says {stated} and the schema has {len(workspace_keyed)}: "
-            f"{workspace_keyed}"
+            f"{relative} says {stated} and the schema has {len(workspace_keyed)}: {workspace_keyed}"
         )
 
 
@@ -690,8 +724,7 @@ def test_the_migration_actually_applies():
         ).fetchone()
         assert tables is not None and tables[0] >= 30
         triggers = conn.execute(
-            "select trigger_name from information_schema.triggers "
-            "where trigger_schema = %s",
+            "select trigger_name from information_schema.triggers where trigger_schema = %s",
             (scratch,),
         ).fetchall()
         names = {row[0] for row in triggers}
