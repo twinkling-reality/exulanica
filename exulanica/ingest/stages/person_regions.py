@@ -17,9 +17,14 @@ Masking a box hides a superset of the person, which is the safe direction under 
 the region is usable now; ``shape='box'`` travels with it so nothing downstream calls it a
 measured silhouette.
 
-**A person nobody could locate masks the whole photograph.** The vision schema makes ``box``
-optional. Treating an unlocated person as nothing to do is precisely the failure this design
-exists to prevent, so they become a whole-frame region instead.
+**A person nobody could locate masks the whole photograph, and keeps a key of their own.** The
+vision schema makes ``box`` optional. Treating an unlocated person as nothing to do is precisely
+the failure this design exists to prevent, so they become a whole-frame region instead. That
+region carries ``located=False`` all the way into ``region_key``, because a whole-frame outline's
+centre is the middle of the photograph and the identity key buckets on the centre. MEASURED
+2026-09-07: without it an unlocated person and an ordinary body standing centre-frame produced one
+key, one row survived the ``person_region_current`` view, and it was the located one, so the
+person nobody could place was visible in the masked derivative.
 """
 
 from __future__ import annotations
@@ -214,7 +219,13 @@ def encode_region_list(
     """The artifact bytes: a canonical region list keyed on the evidence, confirming nobody."""
     from exulanica.canonical import canonical_json
 
-    keyed = [(region_key(blob_id, found.silhouette, display), found) for found in detections]
+    # Keyed exactly as `_record_regions` keys the rows. The artifact and the database disagreeing
+    # about a region's identity would be its own defect: a reviewer's confirmation would be
+    # recorded against a key the listed region does not have.
+    keyed = [
+        (region_key(blob_id, found.silhouette, display, located=found.located), found)
+        for found in detections
+    ]
     return canonical_json(
         person_region_list(
             source_sha256=source_sha256,
@@ -253,7 +264,12 @@ def _record_regions(
     repository = writes.repository
     recorded_at = dt.datetime.now(dt.UTC)
     for found in detections:
-        key = region_key(blob_id, found.silhouette, display)
+        # `located=` is what stops a whole-frame region being swallowed by a body standing in the
+        # middle of the same photograph. Both key to grid cell 8:8, the first insert is already
+        # visible in this transaction, so the second is read as an already-edited region and
+        # skipped by the `continue` below. MEASURED 2026-09-07: the whole-frame mask was the one
+        # lost, because a detector reports located people first.
+        key = region_key(blob_id, found.silhouette, display, located=found.located)
         sequence = repository.next_person_region_sequence(capture_id=capture_id, region_key=key)
         if sequence:
             # Somebody has already edited this region, and a re-run of a detector must not

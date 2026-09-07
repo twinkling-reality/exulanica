@@ -20,6 +20,24 @@ deleted and a confirmed person stays confirmed, because neither is keyed on a ro
 means a confirmed region and the ``person`` occurrence the vision stage wrote for the same body
 share one key, so the existing rejection and naming memory applies to it unchanged.
 
+**The grid is right for a person somebody located and meaningless for one nobody could.**
+``region_bucket`` buckets on the centre, and the centre of "everywhere" is the middle of the
+frame, so an unlocated person's whole-frame outline used to key to cell 8:8 and collide with any
+ordinary body standing in the middle of the photograph. MEASURED 2026-09-07: those two produced
+identical 32 byte keys, the second insert was skipped as an already-edited region, and the
+whole-frame mask was the one thrown away, because a detector reports located people first. A
+person who should have been hidden was visible in the masked derivative. So ``located=False``
+keys off a region-less photograph address instead: ``region_bucket(None)`` returns ``'null'``,
+which none of the 256 cells can produce (verified over all of them), and the vision stage already
+addresses a ``place`` occurrence exactly this way. The shared-key promise above is untouched,
+because the vision stage writes no ``person`` occurrence at all for an unlocated person, for this
+same reason: every unlocated person in one photograph would share one identity key.
+
+That collapse is deliberate here too. N unlocated people in one photograph become ONE whole-frame
+region: they mask identically and no observation distinguishes them, and minting N distinct keys
+would fabricate identities for people nobody could tell apart. The count is not lost, it is the
+region list artifact's ``unlocated_people`` field.
+
 **No template, ever.** A region is a location. This module derives nothing from the pixels it
 names, persists no descriptor, and offers no comparison of two regions in two photographs.
 :mod:`exulanica.identity.keys` records the standing reason: ``face`` is absent from
@@ -167,18 +185,26 @@ class Silhouette:
         return cls(tuple((int(x), int(y)) for x, y in points))
 
 
-def region_key(blob_id: BlobId, silhouette: Silhouette, display: DisplayGeometry) -> bytes:
+def region_key(
+    blob_id: BlobId, silhouette: Silhouette, display: DisplayGeometry, *, located: bool = True
+) -> bytes:
     """The 32 byte identity of a person region, stable across detector versions.
 
     Deliberately the same function the vision stage keys its ``person`` occurrences with, over
     the same bounding box. Two detectors that find the same body in the same photograph agree
     here even when their outlines differ, which is what a human's confirmation is recorded
     against.
+
+    ``located=False`` drops the region from the address entirely rather than bucketing the
+    outline it stands in for. It is not a smaller region, it is the absence of one, and the
+    module docstring records what keying it as a region cost. Keyword-only and defaulting to
+    True so no existing caller changes meaning by omission; a caller that means "nobody could
+    say where" has to say so.
     """
-    address = EvidenceAddress.photograph(
-        blob_id, region=Region(rect=silhouette.bounding_rect(), display=display)
+    region = None if not located else Region(rect=silhouette.bounding_rect(), display=display)
+    return occurrence_identity_key(
+        EvidenceAddress.photograph(blob_id, region=region), PERSON_OCCURRENCE_CLASS
     )
-    return occurrence_identity_key(address, PERSON_OCCURRENCE_CLASS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +224,12 @@ class DetectedPerson:
     #: neutral field cannot otherwise tell a hand at the frame edge from a coat on a chair, and
     #: the partial traces are exactly the ones the old whitelist missed.
     part: str | None = None
+    #: Whether the detector could say WHERE this person is. A detector that knows somebody is
+    #: present but not where reports the whole frame, and that outline's centre is the middle of
+    #: the photograph, which is a real body's grid cell. Saying so here is what keeps the two
+    #: apart; inferring it back from the geometry cannot work, because a polygon of somebody
+    #: lying corner to corner has a whole-frame bounding box while covering almost none of it.
+    located: bool = True
 
 
 class PersonDetector(Protocol):

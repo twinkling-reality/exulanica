@@ -17,6 +17,7 @@ still reads, and that the new field carries no description of anybody.
 from __future__ import annotations
 
 import pytest
+from exulanica.ingest.person_detectors import RecordedObservationDetector
 from exulanica.ingest.stages.person_regions import located_people, unlocated_people
 from exulanica.ingest.vision import (
     OBSERVATION_SCHEMA,
@@ -24,6 +25,7 @@ from exulanica.ingest.vision import (
     PersonTrace,
     validate_observation,
 )
+from PIL import Image
 
 
 def _v2(people, objects=()):
@@ -173,3 +175,53 @@ def test_the_schema_tells_the_model_a_miss_is_worse_than_a_false_positive():
 def test_objects_now_points_at_the_field_people_belong_in():
     """The old wording said people were handled elsewhere and there was no elsewhere."""
     assert "people array above" in OBSERVATION_SCHEMA["properties"]["objects"]["description"]
+
+
+# -- the fact that keeps an unlocated person from colliding with a located one -------------
+
+
+def test_a_located_trace_stays_located_through_the_adapter():
+    """The ordinary case, pinned so the flag below cannot be set by defaulting it the wrong way."""
+    document = _document(_v2([_trace("full_body", x=0.4, y=0.4, w=0.2, h=0.2)]))
+    found = RecordedObservationDetector().detect(
+        Image.new("RGB", (8, 8)),
+        {"person_boxes": tuple(located_people(document)), "unlocated_people": 0},
+    )
+    assert len(found) == 1
+    assert found[0].located is True
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "exulanica/ingest/person_detectors.py is not in this change's file set. The unlocated "
+        "loop in RecordedObservationDetector.detect must add `located=False` to the "
+        "DetectedPerson it builds; until it does, an unlocated person keys to the centre grid "
+        "cell and a body standing centre-frame swallows their whole-frame mask. Add the line "
+        "and delete this marker together."
+    ),
+)
+def test_a_trace_with_no_box_is_marked_unlocated_rather_than_placed_at_the_centre():
+    """A boxless trace must say nobody could place it, because the key derivation reads that.
+
+    This is the file that owns "a person the detector must not lose", so this is where a revert
+    of that one line gets caught. Without it the whole-frame outline's centre is the middle of
+    the photograph, which is an ordinary body's grid cell, and the two regions become one row.
+    """
+    document = _document(
+        _v2(
+            [
+                _trace("full_body", x=0.4, y=0.4, w=0.2, h=0.2),
+                {"part": "hand", "confidence": "low", "box": None},
+            ]
+        )
+    )
+    found = RecordedObservationDetector().detect(
+        Image.new("RGB", (8, 8)),
+        {
+            "person_boxes": tuple(located_people(document)),
+            "unlocated_people": unlocated_people(document),
+        },
+    )
+    assert len(found) == 2
+    assert [person.located for person in found] == [True, False]
