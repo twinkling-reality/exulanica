@@ -21,17 +21,17 @@ Originally built for the Nebius x NVIDIA Global AI Hackathon.
 
 ## Project status
 
-Checked on 2026-08-29 by running the commands in [Setup and running](#setup-and-running).
+Checked on 2026-09-07 by running the commands in [Setup and running](#setup-and-running).
 
 **Working, and verified by execution.** The evidence spine, the content-addressed store, the
 photograph ingest pipeline and the Nebius Token Factory model client are implemented and covered by
-912 backend tests, all passing. 426 of those apply the schema migration to a live PostgreSQL 18
+1902 backend tests, all passing. 849 of those apply the schema migration to a live PostgreSQL 18
 server with pgvector, the only executable proof that a model cannot write a person's name into
 canonical state. Ingest runs end to end over a directory of photographs and is idempotent: a second
 pass recomputes nothing and issues no model calls. The HTTP API serves health, graph, selection,
 identity, evidence and intake routes, and an upload's intake stage runs in the request while its
 model stages are queued by capture id. The browser packages pass `pnpm check`: a typecheck of every
-package, an import-boundary contract, and 371 tests. The renderer was chosen on measurement, against the
+package, an import-boundary contract, and 844 tests. The renderer was chosen on measurement, against the
 earlier lean (PlayCanvas Engine 2.21.4,
 [docs/adr/0003-renderer-selection.md](docs/adr/0003-renderer-selection.md)). Real calls to NVIDIA
 Nemotron and to Tavily were made and archived on 2026-08-27.
@@ -195,7 +195,7 @@ credits: the model client is exercised through a scripted HTTP transport, and te
 generated rather than committed, so the content of every test image is known exactly.
 
 ```bash
-uv run pytest                       # 1447 tests; 677 skip without a database
+uv run pytest                       # 1902 tests; 849 skip without a database
 uv run ruff check .                 # lints backend, tests and scripts
 uv run lint-imports                 # the backend layering contract, four rules
 uv run exulanica-preflight            # checks every manifest id against the live catalog
@@ -208,7 +208,7 @@ uv run scripts/verify_platform.py      # the runtime verification harness, needs
 
 ### The tests that need a database
 
-**PostgreSQL is the only data layer.** 426 of the 912 backend tests need a real server, and they
+**PostgreSQL is the only data layer.** 849 of the 1902 backend tests need a real server, and they
 are the executable proof of everything the database carries: that a model cannot write a name into
 canonical state, that one workspace cannot read another's rows, that a tombstoned address refuses
 the write, and that the whole ingest path works. A default run prints a reminder naming the files
@@ -235,8 +235,12 @@ Three things to know about that harness:
   `halfvec(4096)` so the suite could run on PostgreSQL 14. Everything passed and the vector path
   had never executed once, which hid a test that wrote raw bytes into a vector column.
 - Set `EXULANICA_REQUIRE_POSTGRES=1` to turn the skip into a failure, which is how continuous
-  integration should run it. The suite is safe to run in parallel against one database: verified
-  with five concurrent runs.
+  integration should run it. The suite is safe to run in parallel against one database. MEASURED
+  2026-09-07 on the merged tree: two concurrent full runs each produced a failure set byte
+  identical to the serial baseline, and three concurrent runs of `tests/test_ingest_cli.py`, the
+  file a 2026-09-05 note blamed for six failures under concurrency, all passed. That note does not
+  reproduce. Isolation is by throwaway schema (`exulanica_test_<12 hex>`), not by database, so the
+  test schemas and `public` share one database and only the schema name separates them.
 
 ### Running the API
 
@@ -333,7 +337,7 @@ pnpm check                   # typecheck, then the import-boundary contract, the
 ```
 
 `pnpm check` runs three gates that catch different failure modes: `tsc --build` across every
-package, a dependency-cruiser contract over the forbidden cross-package imports, and 371 vitest
+package, a dependency-cruiser contract over the forbidden cross-package imports, and 844 vitest
 tests. The boundary rules have each been probed with a deliberate violation, so they are known to
 fire rather than assumed to.
 
