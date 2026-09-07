@@ -191,16 +191,6 @@ def test_a_located_trace_stays_located_through_the_adapter():
     assert found[0].located is True
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "exulanica/ingest/person_detectors.py is not in this change's file set. The unlocated "
-        "loop in RecordedObservationDetector.detect must add `located=False` to the "
-        "DetectedPerson it builds; until it does, an unlocated person keys to the centre grid "
-        "cell and a body standing centre-frame swallows their whole-frame mask. Add the line "
-        "and delete this marker together."
-    ),
-)
 def test_a_trace_with_no_box_is_marked_unlocated_rather_than_placed_at_the_centre():
     """A boxless trace must say nobody could place it, because the key derivation reads that.
 

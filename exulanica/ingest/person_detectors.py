@@ -98,6 +98,13 @@ class RecordedObservationDetector:
                     # Somebody the observation named without saying where. The whole frame is
                     # masked because no smaller answer is honest.
                     part="partial_body",
+                    # And the key is derived from the photograph rather than from a grid cell,
+                    # because a whole-frame outline's centre IS the centre cell, which is where an
+                    # ordinary body standing in the middle of the shot also lands. MEASURED
+                    # 2026-09-07: both keyed to 698e29417c4b8625 and the two regions collapsed to
+                    # one row, so a centred person swallowed the mask of somebody nobody could
+                    # place. `located` carries that distinction into `region_key`.
+                    located=False,
                 )
             )
         return tuple(found)
