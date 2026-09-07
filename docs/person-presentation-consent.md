@@ -298,3 +298,78 @@ actor who authorized the detection, so the row never reads as a review that did 
 - **Consistency across views, reflections and screens, and generative fill** remain as this note
   left them.
 
+
+## Three things true of the code and false of a running deployment
+
+VERIFIED 2026-09-07 on the merged tree, after `person-consent-masking` landed on
+`semantic-answers-and-memory-lifecycle`. Everything above this heading describes code that exists
+and is tested. None of it describes a deployment where a person is actually protected, and the
+difference is three separate gaps. They are recorded here because "it is proven" and "it has run
+here" are different claims, and this note previously made only the first.
+
+**1. The detector defaults to none, so a default deployment writes no region at all.**
+`_build_detector` in `exulanica/ingest/worker_command.py` resolves to `unavailable` unless
+`EXULANICA_PERSON_DETECTOR` is set to `recorded-observation`. With no detector, no `person_region`
+row is ever written, `capture_requires_masking` is false for every capture, and migration 0037's
+`tg_geometry_reads_the_masked_derivative` never has anything to refuse. The database guard is
+correct and inert. The default is deliberate and this note does not argue with it; what was missing
+was saying out loud that the guard protects nothing until an operator opts in.
+
+**2. A photograph with an unconsented person cannot obtain an eligible screening at all, so the
+masking path has no honest route through production.** `record_human_screening` blocks any
+screening listing a region in a `MASKED_STATES` state, and its only production caller,
+`exulanica/ingest/reference_admission.py`, passes `sensitive_regions=[]`. So the screening
+receipt's region list has no production writer, and the only way to reach the masking path today is
+for the screening's region list and the `person_region` table to disagree, which is exactly what
+`tests/test_person_masking_end_to_end.py`'s synthetic exemption arranges.
+
+That block was written for a stated reason, and the reason has expired. Its own comment says: "the
+masking stages are not yet wired into the pipeline, so nothing anywhere would actually hide this
+person before depth read them", and "when masking is wired end to end this becomes eligible if
+every masked region has a current `masked_source` derivative". **Masking is now wired end to end.**
+So the rule the comment describes as the destination is now the correct one, and the conservative
+rule it describes as temporary is now the thing making the feature unreachable. Changing it is a
+decision with real safety weight rather than a cleanup, and it must be made before the review
+screen is wired, or the reviewer will be built for a path nobody can reach honestly. It is not
+made here.
+
+**3. The reviewer screen and every client-side drawing predicate are dead code.**
+`web/packages/app/src/ui/person-review.ts` is imported by nothing but
+`web/packages/app/test/person-review.test.ts`. `drawsPixels`, `drawsSilhouette`,
+`mayDrawPhotograph` and `hiddenRegions` are exported from `graph-client` and used by no application
+source. The only symbol that reaches the app is `personPresenceSentence`, in
+`web/packages/app/src/ui/status.ts`. **The browser-side "presentation rule" is a status sentence
+and a server-side href swap, not a draw gate.** What actually protects a person in the browser is
+that the bytes were masked before anything read them and that `/world/source-media` withholds an
+unmasked derivative; the client-side predicates are a second line that is not connected.
+
+## What the privacy feature has and has not touched
+
+VERIFIED 2026-09-07: `public.person_region`, `public.person_subject` and
+`public.person_presentation_consent` all hold **zero rows**. Migration 0037's masking trigger has
+never fired against a real photograph. The two retained collections, the bowl `bdba4f95` and the
+volcanic `79004d44`, are `unscreened` for people in every World Read bundle, which is why the
+2026-09-07 read-paths record reports `person_consent: unscreened` and `release.state:
+internal_only` for all three scenes.
+
+The end-to-end test proves the mechanism against PostgreSQL, a real migration and a real on-disk
+store, using synthetic data in a throwaway schema. Nobody has yet seen it work on a real
+photograph.
+
+## What the World Read bundle now says about people, and what it deliberately does not
+
+DECIDED 2026-09-07, and the reasoning is in `docs/phase-10-tickets.md` under P10-1-c-2.
+
+The bundle reports, per photograph, whether anybody has looked at it for people (`unscreened` or
+`recorded`) and how many live regions it carries. It reports neither the state of any individual
+person nor their outline. That is not an oversight, and the reason is the interaction between two
+things this note and the migration each established separately: `person_consent_is_granted` filters
+on `clock_timestamp()`, so a person's resolved state changes when a `temporary_hide` expires with
+no write in between, and the World Read bundle is digest bound with `release` inside its recorded
+keys. Putting a resolved state in the bundle would make the recorded digest move on a timer, and a
+digest that moves when nobody wrote anything is a digest nobody can quote.
+
+So `release.state` is `internal_only` for every scene, and the bundle says so with a per-scene
+reason rather than as a constant. Resolving that tension, most likely by binding the release answer
+to an explicit as-of time carried in the bundle, is what the next person to add per-person state to
+a view has to do. A test is armed for exactly that moment.
