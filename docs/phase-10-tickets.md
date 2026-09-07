@@ -174,8 +174,99 @@ exists to prevent.
       establish.
 - [x] A test asserts `internal_only` is what the current tree produces, so the day the privacy
       branch lands, that test fails and forces the value to be reconsidered rather than inherited.
+      **It fired on 2026-09-07** when `person-consent-masking` merged, along with 36 other
+      failures from one `NotImplementedError`. The decision it forced is below.
 
 **Files.** `exulanica/graph/world_read.py`, `tests/test_world_read_bundle.py`.
+
+### P10-1-c-2 The release state, decided against the per-person receipts
+
+**Decided 2026-09-07, on the merged tree.** `release.state` stays `internal_only` for every scene.
+That is a decision and not the old default, and the reason is a new one.
+
+**Why not a more permissive state.** The bundle carries no state for any individual person.
+`_view()` returns the camera, the exclusion reason and the capture's screening record, and nothing
+per person; the member rows behind it carry `person_regions` and `person_review_state`, and the
+bundle drops both. A recipient holding these bytes therefore cannot check a claim that the people
+in these photographs agreed to anything. A release state whose own recipient cannot verify it is
+the failure this bundle exists to prevent, and it does not become acceptable because the facts
+exist somewhere else in the system.
+
+**Why the answer is nevertheless computed.** `release_state()` now takes the per-capture consent
+records the bundle publishes, and folds them. It reports how many photographs have been screened
+for people, how many people are recorded across them, and which of the three consents from
+`exulanica/consent/states.py` is unestablished and why. A scene nobody has screened and a scene
+fully screened whose people the bundle cannot describe are different distances from a release, and
+the single constant collapsed them.
+
+**Why it does not read the clock, which was the trap.** `person_consent_is_granted` (migration
+0037) filters on `clock_timestamp()` against `effective_at` and `valid_until`, so a person's
+resolved state changes between two reads with no write in between. `release` is inside
+`recorded_keys` and therefore inside both digests. **The recorded digest may not depend on the
+clock**, so nothing in the release answer reads a resolved state: the two facts it does read,
+whether a photograph has been screened and how many live regions it carries, are existence queries
+with no time predicate. Note that
+`test_two_reads_of_an_unchanged_scene_produce_the_same_digest` would NOT have caught a violation:
+it compares two back-to-back in-process calls, and a consent expiring between them is not
+something a test can arrange. The rule is kept by construction, not by that test.
+
+**Why the answer is folded from the per-capture records and not from the scene row.** On the four
+paths where `reconstruction_scenes._fallback` is reached, a member's `person_review_state` is
+hard-set to `unscreened` whatever the database holds. A release answer folded over the members
+would then contradict the `consent.per_capture` records printed beside it in the same bundle.
+Folding the published records instead also means a recipient can recompute every count in
+`release.people` from the bytes they hold, which is asserted by
+`test_the_release_counts_are_recomputable_from_the_bundles_own_per_capture_records`.
+
+**What was rejected, and why.**
+
+- **A per-scene gradient with `releasable_masked`.** Blocked, and the block is now stated in the
+  bundle under `release.not_yet_earnable` rather than in this document. The geometry entries carry
+  the digest of the artifact produced, not of the source derivative read to produce it, so nothing
+  in the bundle proves the geometry offered descends from the masked images.
+- **A distinct `undecidable` state** for a scene with an unscreened member. Rejected as vocabulary
+  inflation: it permits exactly what `internal_only` permits, and a state that changes no
+  permission is one every consumer must learn for nothing. The decidability fact is carried in
+  `release.scopes[*].reason` and `release.people` instead, where it does not have to be branched on.
+- **Keeping `internal_only` unconditionally and deleting the raise.** Rejected: it would have left
+  the value inherited rather than decided, and would not have removed the contradiction below.
+
+**The second decision, made in the same change.** `person_consent_state()` answered a different
+question from the per-capture records under one word. It said whether the *build* contained a
+person layer; each capture said whether that *photograph* had a decision. On the merged tree the
+first returned `available` while every capture under it said `unavailable`, so the bundle
+contradicted itself. Both now describe photographs, in one vocabulary: `unscreened` (nobody has
+looked) or `recorded` (people are located and carry receipts). Neither is ever "there is nobody
+here", which is the statement the 2026-09-05 bowl screening made falsely and this layer exists to
+retire. The scene-level answer is the weakest of its members.
+
+**Exit.**
+
+- [x] `release.state` is `internal_only` for every scene and says, per scene, which consent is
+      unestablished and why, asserted by
+      `tests/test_world_read_bundle.py::test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bundle`.
+- [x] The release counts are recomputable by a stranger from `consent.per_capture` in the same
+      bundle, asserted by
+      `test_the_release_counts_are_recomputable_from_the_bundles_own_per_capture_records`.
+- [x] The scene-level and per-capture person answers speak one vocabulary and the scene fold is
+      the restrictive one, asserted by
+      `test_the_scene_consent_answer_is_the_weakest_of_its_photographs`. Its first version was
+      killed by a surviving `all`-to-`any` mutant and strengthened with a mixed-state case.
+- [x] Three executed negative controls, all killed:
+      `the_release_state_is_internal_only_without_person_consent`,
+      `an_unscreened_photograph_is_never_reported_as_one_with_decisions`, and
+      `one_unscreened_photograph_makes_the_whole_scene_unscreened`
+      (`docs/evaluation/2026-09-07-world-read-negative-controls.json`, 15 of 15 killed).
+- [x] Re-recorded against the three retained real scenes:
+      `docs/evaluation/2026-09-07-phase-10-read-paths.json`, bound by `predecessor_record` to the
+      2026-09-06 record it follows.
+- [x] The tripwire was moved forward rather than deleted. It now pins the ABSENCE of per-person
+      state in the views, so the day somebody adds it, they must decide the gradient with the
+      clock problem in front of them.
+
+**Files.** `exulanica/graph/read_consent.py`, `exulanica/graph/world_read.py`,
+`tests/test_world_read_bundle.py`, `tests/test_scene_observations.py`,
+`scripts/verify_world_read_controls.py`, `scripts/record_world_read_evidence.py`.
 
 ---
 
