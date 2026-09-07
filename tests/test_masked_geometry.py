@@ -98,12 +98,69 @@ def test_a_gaussian_outside_the_frame_is_not_projected():
 
 
 def test_a_faint_gaussian_below_the_opacity_floor_is_not_counted():
+    """Stored -6.0, which is opacity 0.0025 as a logit and not a probability at all.
+
+    It used to store 0.01, which is faint only under the face-value reading that was removed:
+    read as the logit this repository's exporter actually writes, 0.01 is opacity 0.5025 and
+    belongs above a half floor. Keeping that fixture would have made the test's name a lie about
+    what it stores, so the fixture moved rather than the assertion.
+    """
     report = count_masked_gaussians(
-        ply=_ply([(-0.2, 0.0, 1.0, 0.01)]),
+        ply=_ply([(-0.2, 0.0, 1.0, -6.0)]),
         views=[_view(masked=(LEFT_HALF,))],
         min_opacity_millionths=500_000,
     )
     assert report["gaussians_over_masked_region"] == 0
+
+
+def test_a_half_opaque_gaussian_stored_as_logit_zero_is_not_dropped_by_a_half_floor():
+    """A body at half opacity reported as clean, which is the module's own forbidden direction.
+
+    MEASURED 2026-09-07 against the code before this fix: this exact call returned
+    ``gaussians_over_masked_region == 0`` and ``masked_geometry_is_clean(report) is True``. The
+    stored 0.0 is a gsplat logit meaning half opaque, and the ambiguous-range branch read it at
+    face value as fully transparent. Latent only because the default floor is 0 and nothing calls
+    the module; reachable the instant a caller sets a floor, which is the first thing wiring the
+    count into anything would do.
+    """
+    report = count_masked_gaussians(
+        ply=_ply([(-0.2, 0.0, 1.0, 0.0)]),
+        views=[_view(masked=(LEFT_HALF,))],
+        min_opacity_millionths=500_000,
+    )
+    assert report["gaussians_over_masked_region"] == 1
+    assert masked_geometry_is_clean(report) is False
+    assert report["opacity_reading"] == "logit or probability, whichever is higher"
+
+
+def test_a_corrupt_opacity_saturates_rather_than_crashing_the_check():
+    """-1e10 used to raise OverflowError out of math.exp, from a ValueError-only module.
+
+    A corrupt scene is the scene that most needs the check to run, and a traceback is not a
+    number. The value is finite, so refusing it as nonfinite is not available; it saturates.
+    """
+    report = count_masked_gaussians(
+        ply=_ply([(-0.2, 0.0, 1.0, -1e10)]),
+        views=[_view(masked=(LEFT_HALF,))],
+        min_opacity_millionths=1,
+    )
+    assert report["gaussians_over_masked_region"] == 0
+    at_no_floor = count_masked_gaussians(
+        ply=_ply([(-0.2, 0.0, 1.0, 1e10)]), views=[_view(masked=(LEFT_HALF,))]
+    )
+    assert at_no_floor["gaussians_over_masked_region"] == 1
+
+
+def test_a_nonfinite_opacity_is_refused_rather_than_read_as_transparent():
+    """A NaN opacity must not resolve to "barely there" once the sigmoid exponent is clamped.
+
+    NaN loses every comparison, so ``min(60.0, nan)`` is 60.0 and the clamp would hand the
+    transparent end of the curve to a Gaussian whose opacity the file never stated: the exact
+    under-report the module exists to prevent. The header walk checked x, y and z for
+    finiteness and never the opacity column.
+    """
+    with pytest.raises(ValueError, match="nonfinite opacity"):
+        read_gaussian_centres(_ply([(-0.2, 0.0, 1.0, float("nan"))]))
 
 
 def test_an_opaque_gaussian_above_the_floor_is_counted():
@@ -117,13 +174,24 @@ def test_an_opaque_gaussian_above_the_floor_is_counted():
 
 def test_a_logit_opacity_is_read_as_a_logit():
     """gsplat stores a logit; a raw 4.0 read as a probability would still pass, but 0.0 must not
-    be read as fully transparent when it means one half."""
+    be read as fully transparent when it means one half.
+
+    The second half of that sentence used to have no assertion under it: only 4.0 was exercised,
+    so the docstring described behaviour the test did not hold. Both cases are now here, and 0.0
+    is checked at the floor its sigmoid clears rather than at 4.0's.
+    """
     report = count_masked_gaussians(
         ply=_ply([(-0.2, 0.0, 1.0, 4.0)]),
         views=[_view(masked=(LEFT_HALF,))],
         min_opacity_millionths=900_000,
     )
     assert report["gaussians_over_masked_region"] == 1
+    half = count_masked_gaussians(
+        ply=_ply([(-0.2, 0.0, 1.0, 0.0)]),
+        views=[_view(masked=(LEFT_HALF,))],
+        min_opacity_millionths=400_000,
+    )
+    assert half["gaussians_over_masked_region"] == 1, "logit 0.0 is opacity 0.5, not opacity 0.0"
 
 
 def test_a_scene_without_opacity_says_so_rather_than_assuming_faint():

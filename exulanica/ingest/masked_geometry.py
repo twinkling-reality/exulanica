@@ -6,12 +6,22 @@ the trained scene itself, how many Gaussians of meaningful opacity project into 
 supposed to be masked in the view they are seen from. The honest number is zero, and a number is
 what goes in the evaluation record rather than an assurance.
 
-**It errs toward reporting more, never less.** Three choices all lean the same way. A Gaussian is
+**It errs toward reporting more, never less.** Four choices all lean the same way. A Gaussian is
 counted at its centre against a region grown by a stated margin. A camera whose model is not a
 plain pinhole is projected as a pinhole approximation and the margin is widened, rather than the
-view being skipped. And a scene whose Gaussians carry no opacity property reports opacity as
-unavailable instead of assuming the Gaussians are faint. Over-reporting costs somebody a look at a
-number; under-reporting is how a body stays in the world while a receipt says it does not.
+view being skipped. A scene whose Gaussians carry no opacity property reports opacity as
+unavailable instead of assuming the Gaussians are faint. And a stored opacity that could be a
+logit or a probability is read as whichever of the two is higher, so no exporter convention can
+make the check miss a Gaussian. Over-reporting costs somebody a look at a number; under-reporting
+is how a body stays in the world while a receipt says it does not.
+
+A fifth choice does not lean that way and is listed separately for that reason: a nonfinite
+opacity is REFUSED rather than read, so the file produces no count at all. That is not
+over-reporting, it is declining to report, and it is the right answer for the one input where
+leaning either way would be a guess. A NaN compares False against every threshold, so reading it
+would have resolved silently to the transparent end and dropped the Gaussian under any floor a
+caller set: the direction the other four choices exist to avoid, arrived at by arithmetic rather
+than by decision.
 
 **It counts confirmed regions whether or not they are masked.** So it produces a real measurement
 on a scene trained before any of this existed, which is what makes the check testable now rather
@@ -102,7 +112,15 @@ def read_gaussian_centres(
             raise ValueError("Gaussian PLY contains nonfinite geometry")
         centres.append(values)
         if opacity_index is not None:
-            opacities.append(vertex[opacity_index])
+            opacity = vertex[opacity_index]
+            if not math.isfinite(opacity):
+                # Refused rather than read, and the refusal is load-bearing since `_probability`
+                # started clamping its exponent. A NaN survives every comparison as False, so
+                # `min(60.0, nan)` is 60.0 and the clamp would silently resolve a NaN opacity to
+                # the TRANSPARENT end, dropping the Gaussian under any floor a caller sets. A
+                # file that cannot say how opaque a Gaussian is does not get to answer "barely".
+                raise ValueError("Gaussian PLY contains a nonfinite opacity")
+            opacities.append(opacity)
     return centres, (opacities if opacity_index is not None else None)
 
 
@@ -187,10 +205,15 @@ def count_masked_gaussians(
                 "projection": view.projection,
             }
         )
+    # Which reading produced the count, because the PLY does not say. A reader who assumed the
+    # number was computed against probabilities would otherwise misread a scene whose exporter
+    # wrote logits, and this repository's exporter writes logits.
+    reading = None if opacities is None else "logit or probability, whichever is higher"
     return {
         "profile": "exulanica.masked-geometry-check/v1",
         "gaussians": len(centres),
         "opacity": "unavailable" if opacities is None else "present",
+        "opacity_reading": reading,
         "min_opacity_millionths": min_opacity_millionths,
         "margin_ppm": margin_ppm,
         "gaussians_over_masked_region": over_masked,
@@ -199,16 +222,45 @@ def count_masked_gaussians(
     }
 
 
-def _probability(value: float) -> float:
-    """Read an opacity that may have been written as a logit.
+def _sigmoid(value: float) -> float:
+    """Logistic, with the exponent clamped so a corrupt finite opacity saturates instead of raising.
 
-    gsplat stores opacity as a logit and some exporters apply the sigmoid first. A value outside
-    ``[0, 1]`` can only be a logit; a value inside it is ambiguous and is taken at face value,
-    which is the reading that counts MORE Gaussians and is therefore the safe one.
+    MEASURED 2026-09-07: an opacity of ``-1e10`` in an otherwise well-formed PLY raised
+    ``OverflowError`` out of ``math.exp``, from a module whose entire error vocabulary is
+    ``ValueError``. That crashes the check rather than answering it, and a check that crashes on a
+    corrupt scene is a check nobody can run on the scene that most needs it.
+
+    The clamp costs no precision that any caller can observe. MEASURED 2026-09-07 in float64:
+    ``sigmoid(60)`` is exactly ``1.0`` and ``sigmoid(-60)`` is ``8.76e-27``, while the floor is
+    expressed in millionths, so its smallest nonzero value is ``1e-6``. Past ``|60|`` the answer
+    had already saturated to the far side of every threshold a caller can name.
+    """
+    return 1.0 / (1.0 + math.exp(max(-60.0, min(60.0, -value))))
+
+
+def _probability(value: float) -> float:
+    """Read an opacity whose convention the file does not state, in the direction that over-counts.
+
+    MEASURED 2026-09-07: the exporter pinned by this repository writes LOGITS, so for a PLY this
+    repository produced there is no ambiguity at all. ``splats["opacities"]`` is the raw
+    parameter; every use of it in ``exulanica/reconstruction/gsplat_runner.py`` applies
+    ``.sigmoid()`` at the point of use (``:571`` rasterization, ``:641`` floater weighting,
+    ``:828`` the opacity regulariser), and ``:850`` then hands that same untransformed tensor to
+    the exporter. The ambiguity this function exists for is a foreign file's.
+
+    A value outside ``[0, 1]`` can only be a logit. A value inside it could be either, and this
+    used to take it at face value while claiming that was "the reading that counts MORE Gaussians
+    and is therefore the safe one". CORRECTED 2026-09-07: that claim was false over
+    ``[0, 0.6591)``, which is precisely where the sigmoid exceeds the identity. A Gaussian stored
+    as ``0.0``, which under this repository's own exporter means HALF OPAQUE, read as fully
+    transparent and was dropped by any opacity floor above zero. Under-reporting is how a body
+    stays in the world while a receipt says it does not, so the ambiguous range now returns
+    whichever of the two readings is larger. ``0.99`` stays ``0.99`` as a probability, ``0.0``
+    becomes ``0.5`` as a logit, and neither convention can make the check miss a Gaussian.
     """
     if 0.0 <= value <= 1.0:
-        return value
-    return 1.0 / (1.0 + math.exp(-value))
+        return max(value, _sigmoid(value))
+    return _sigmoid(value)
 
 
 def masked_geometry_is_clean(report: Mapping[str, Any]) -> bool:
