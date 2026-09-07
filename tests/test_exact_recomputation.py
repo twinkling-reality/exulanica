@@ -81,12 +81,12 @@ def test_a_model_stage_that_produces_different_bytes_is_not_reported_as_a_fault(
     from exulanica.ingest.pipeline import PhotoIngestPipeline
     from exulanica.store.local import LocalContentAddressedStore
 
-    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
     path = write_photo(photo_dir, "a.jpg")
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
-    first = pipeline.ingest_file(path)
+    first = ingest_observed(pipeline, repository, path)
     assert first.error is None
 
     stored = repository.connection.execute(
@@ -107,7 +107,7 @@ def test_a_model_stage_that_produces_different_bytes_is_not_reported_as_a_fault(
         PurgeAuthorization(tombstone_id="t", actor="test", reason="force a recompute"),
     ).purge(BlobId(original))
 
-    second = second_pipeline.ingest_file(path)
+    second = ingest_observed(second_pipeline, repository, path)
     assert second.error is None
 
     events = repository.connection.execute(

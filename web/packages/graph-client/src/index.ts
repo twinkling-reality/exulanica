@@ -25,6 +25,23 @@
 
 export type { GraphPayload } from './wire.js';
 
+// The presentation rule for people in a photograph. Exported because three separate draw sites
+// need it -- world veils, the reconstruction inspector, and the citation image in the detail
+// pane -- and a rule copied into three call sites is a rule that gets corrected in two of them.
+export type {
+  PersonRegionView,
+  PersonReviewState,
+  PersonState,
+} from './person-presentation.js';
+export {
+  drawsName,
+  drawsPixels,
+  drawsSilhouette,
+  hiddenRegions,
+  mayDrawPhotograph,
+  personPresenceSentence,
+} from './person-presentation.js';
+
 export type { IslandOf } from './islands.js';
 
 export type { GraphLoadState, GraphSource, TerminalGraphLoadState } from './source.js';

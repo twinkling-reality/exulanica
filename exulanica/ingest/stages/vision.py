@@ -23,6 +23,7 @@ from exulanica.evidence.region import DisplayGeometry, Rect, Region
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.privacy import require_observation_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
@@ -53,7 +54,26 @@ def run(
     facts: ExifFacts,
     ledger: Ledger,
     outcome: IngestOutcome,
-) -> None:
+    privacy_screening_id: uuid.UUID | None = None,
+) -> StageResult | None:
+    """Observe one photograph, or report honestly that nothing looked.
+
+    Returns its ``StageResult`` so a later stage can read the observation it stored. ``None`` means
+    no observation exists, which is not the same fact as an observation that found nobody: the
+    person-region stage treats a missing observation as unscreened rather than as empty.
+
+    **This stage sends the photograph to a model, so it is gated like the one that reconstructs
+    it.** Until 2026-09-06 it was not: depth required an eligible screening receipt and vision
+    required nothing, which meant the first thing to touch a photograph after intake handed it to
+    a hosted service with no authorization recorded anywhere. That is the wrong way round. Vision
+    is also the stage that now enumerates every visible trace of a person, so running it ungated
+    would locate people in order to protect them by first sending them somewhere else.
+
+    The screening's digest is deliberately NOT in the input digest, unlike depth's. Re-recording a
+    screening does not change what is in the photograph, and keying on it would re-bill a model
+    call every time a receipt was superseded. The receipt id is recorded on the artifact instead,
+    so the provenance is kept without paying for it twice.
+    """
     spec = stage("vision")
     if model is None:
         # Checked before the key rather than after it. The key names the model that will
@@ -67,7 +87,32 @@ def run(
             reason="no vision model is configured for this worker",
             input_blob=blob_id,
         )
-        return
+        return None
+    if privacy_screening_id is None:
+        # Unavailable, not failed, and the distinction is the same one the no-model branch above
+        # draws. Nothing went wrong: nobody has authorized sending this photograph to a model, so
+        # it was not sent. Raising instead would make the one-shot ingest path impossible rather
+        # than merely quiet, because a screening is keyed to a capture that does not exist until
+        # intake has run; and an ingest that errors on every unscreened photograph is an ingest
+        # somebody switches off. The ledger records the reason either way, and the important
+        # property holds: no bytes left this machine.
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(
+            spec,
+            reason="no privacy screening receipt authorizes sending these bytes to a model",
+            input_blob=blob_id,
+        )
+        return None
+    # The OBSERVATION question, not the geometry one. An eligible receipt permits both, and a
+    # `person_detection_only` receipt permits only this: somebody authorized looking for the
+    # people in this photograph so they can be hidden, which is what lets a collection be screened
+    # at all. It buys no point map; `require_privacy_screening` is a different function and the
+    # database enforces the split.
+    #
+    # An expired, withdrawn or superseded receipt still raises. Having looked and been refused is
+    # not the same as never having asked.
+    screening = require_observation_screening(writes.repository, capture_id, privacy_screening_id)
     input_digest = input_digest_of([rendition.content_sha256])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
@@ -79,7 +124,17 @@ def run(
         # binding.
         outcome.stages_reused.append(spec.key)
         ledger.reused(spec, existing.artifact_id, input_blob=blob_id)
-        return
+        if existing.content_sha256 is None:
+            # A row with no content hash names an output that was never stored, so there is
+            # nothing a later stage could read back. Reported as reused, because that is what the
+            # ledger records, but not handed on as though an observation existed.
+            return None
+        return StageResult(
+            artifact_id=existing.artifact_id,
+            content_sha256=existing.content_sha256,
+            idempotency_key=key,
+            reused=True,
+        )
 
     image_bytes = writes.store.get(BlobId(rendition.content_sha256))
     with ledger.stage(
@@ -124,7 +179,7 @@ def run(
             "person_labels": result.observation.person_labels,
         }
         with writes.committed_writes() as pending:
-            writes.persist_artifact(
+            produced = writes.persist_artifact(
                 spec=spec,
                 blob_id=blob_id,
                 key=key,
@@ -134,6 +189,7 @@ def run(
                 outcome=outcome,
                 pending=pending,
                 produced_by_event=recorder.stage_started_event,
+                privacy_screening_id=screening.screening_id,
             )
             emitted = _observation_rows(
                 writes,
@@ -146,6 +202,7 @@ def run(
                 ledger=ledger,
             )
         ledger.emitted("assertion", emitted, spec)
+    return produced
 
 
 def _observation_rows(
@@ -189,7 +246,7 @@ def _observation_rows(
     )
 
     # People first, so their emit-key ordinals are stable as the object list changes.
-    for index, person in enumerate(observation.person_objects):
+    for index, person in enumerate(observation.person_traces):
         span_id, address = _region_span(writes, blob_id, person.box, display, image_span_id)
         emit(
             predicate_key="person_present",
@@ -214,12 +271,12 @@ def _observation_rows(
             emit_key=f"{key}:p:{index}",
             quality={
                 "confidence_band": person.confidence,
-                "salience": person.salience,
-                # The detector's own word for what it saw, kept because it is evidence
-                # about the detection. It is NOT a name and there is no column for one:
-                # `occurrence` has no display_name, and `entity.display_name` is enforced
-                # by trigger to require an active user assertion.
-                "label": person.label,
+                # Which visible trace this is, from a closed vocabulary. Schema version 1 stored
+                # the model's free-text label here instead, and a label is a description of
+                # somebody: "woman in a red coat" is exactly the sentence a person who has not
+                # consented to being described should not have written about them. A part is
+                # where they are, which is all this needs in order to hide them.
+                "part": person.part,
                 "trust_tier": "T2",
             },
         )

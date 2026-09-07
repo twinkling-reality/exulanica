@@ -52,6 +52,7 @@ __all__ = [
     "PROMPT_VERSION",
     "SCHEMA_VERSION",
     "NebiusVisionModel",
+    "PersonTrace",
     "VisionModel",
     "VisionObservation",
     "VisionResult",
@@ -60,12 +61,16 @@ __all__ = [
     "validate_observation",
 ]
 
-SCHEMA_VERSION: Final = 1
-PROMPT_VERSION: Final = 1
-OBSERVATION_SCHEMA_NAME: Final = "exulanica_photo_observation_v1"
+SCHEMA_VERSION: Final = 2
+PROMPT_VERSION: Final = 2
+OBSERVATION_SCHEMA_NAME: Final = "exulanica_photo_observation_v2"
 
-#: Labels that denote a human being. A located one becomes a person occurrence; none of them
-#: ever becomes an entity, a name, or an embedding.
+#: Labels that denote a human being, used ONLY to read observations written under schema
+#: version 1 and to catch a model that ignores the instruction not to put people in ``objects``.
+#: It is an exact-match whitelist of singular nouns, which is exactly why it could not be the
+#: detector: "arms", "hands" and "diners" match none of it, and those are the traces that the
+#: retained bowl photographs actually contain. Schema version 2 asks for people in their own
+#: field instead.
 _PERSON_LABELS: Final = frozenset(
     {
         "person",
@@ -115,6 +120,31 @@ _BOX_SCHEMA: Final[dict[str, Any]] = {
     "additionalProperties": False,
 }
 
+#: What visible trace of a person an entry is. A closed vocabulary rather than free text, and the
+#: entries deliberately include the partial ones: a hand or an arm at the edge of a frame is the
+#: case that the old label whitelist missed and that this whole feature exists for.
+_PERSON_PART: Final[dict[str, Any]] = {
+    "type": "string",
+    "enum": [
+        "full_body",
+        "partial_body",
+        "head",
+        "torso",
+        "arm",
+        "hand",
+        "leg",
+        "foot",
+        "reflection",
+        "on_screen",
+    ],
+    "description": (
+        "Which visible trace of a person this is. Use partial_body, arm, hand, leg or foot when "
+        "only part of somebody is in the frame, which is common at an edge. Use reflection for "
+        "somebody visible in a mirror, window or other surface, and on_screen for somebody "
+        "shown on a display inside the photograph."
+    ),
+}
+
 _CONFIDENCE: Final[dict[str, Any]] = {
     "type": "string",
     "enum": ["low", "medium", "high"],
@@ -133,11 +163,34 @@ OBSERVATION_SCHEMA: Final[dict[str, Any]] = {
                 "something visible in the image says so."
             ),
         },
+        "people": {
+            "type": "array",
+            "description": (
+                "Every visible trace of a human being, including partial ones. A hand at the "
+                "edge of the frame, an arm, a leg, a shoulder, clothing on a body, somebody "
+                "reflected in a window, somebody on a screen inside the photograph: each is one "
+                "entry. Report only where it is and which part it is. Do not describe anybody, "
+                "do not name anybody, and say nothing about appearance, age, sex, or expression. "
+                "If you are unsure whether something is part of a person, include it with low "
+                "confidence: a person you miss is a worse error than a box that turns out to be "
+                "a coat on a chair."
+            ),
+            "items": {
+                "type": "object",
+                "properties": {
+                    "part": _PERSON_PART,
+                    "confidence": _CONFIDENCE,
+                    "box": _BOX_SCHEMA,
+                },
+                "required": ["part", "confidence", "box"],
+                "additionalProperties": False,
+            },
+        },
         "objects": {
             "type": "array",
             "description": (
-                "Distinct things visible in the image. Do not list people here; people are "
-                "handled elsewhere and are not part of this record."
+                "Distinct things visible in the image. Do not list people here; report every "
+                "person in the people array above instead."
             ),
             "items": {
                 "type": "object",
@@ -194,7 +247,7 @@ OBSERVATION_SCHEMA: Final[dict[str, Any]] = {
             "additionalProperties": False,
         },
     },
-    "required": ["scene_description", "objects", "legible_text", "proposed_place"],
+    "required": ["scene_description", "people", "objects", "legible_text", "proposed_place"],
     "additionalProperties": False,
 }
 
@@ -236,6 +289,33 @@ class Box(BaseModel):
         return self.w <= 0 or self.h <= 0
 
 
+class PersonTrace(BaseModel):
+    """One visible trace of a person: where it is and which part, and nothing else.
+
+    Deliberately carries no label and no salience, unlike :class:`DetectedObject`. Routing people
+    through the object list meant the model wrote free text about them, and "woman in a red coat"
+    is a description of somebody who has not consented to being described. A part from a closed
+    vocabulary and a box is the least this can record and still hide them.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    part: Literal[
+        "full_body",
+        "partial_body",
+        "head",
+        "torso",
+        "arm",
+        "hand",
+        "leg",
+        "foot",
+        "reflection",
+        "on_screen",
+    ]
+    confidence: Literal["low", "medium", "high"]
+    box: Box | None = None
+
+
 class DetectedObject(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -269,9 +349,32 @@ class VisionObservation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scene_description: str = Field(min_length=1, max_length=4000)
+    #: Defaulted rather than required, because an observation stored under schema version 1 has no
+    #: such field and must still parse: those artifacts are what the corpus already holds.
+    #: ``person_traces`` is what callers read, and it falls back for exactly that case.
+    people: list[PersonTrace] = Field(default_factory=list, max_length=64)
     objects: list[DetectedObject] = Field(default_factory=list, max_length=64)
     legible_text: list[LegibleText] = Field(default_factory=list, max_length=64)
     proposed_place: ProposedPlace | None = None
+
+    @property
+    def person_traces(self) -> list[PersonTrace]:
+        """Every trace of a person this observation reports, whichever way it reported them.
+
+        Version 2 asks for them in ``people``. Version 1 had no such field, and a version 1
+        artifact's people are whatever the model put in ``objects`` despite being told not to; the
+        fallback reads those so an existing corpus does not silently become a corpus with nobody
+        in it. A version 2 observation that genuinely found nobody returns an empty list from the
+        first branch, because the model was told to use ``people`` and the fallback would find
+        nothing in ``objects`` anyway.
+        """
+        if self.people:
+            return list(self.people)
+        return [
+            PersonTrace(part="full_body", confidence=item.confidence, box=item.box)
+            for item in self.objects
+            if item.label.strip().lower() in _PERSON_LABELS
+        ]
 
     @property
     def person_labels(self) -> list[str]:
@@ -322,6 +425,10 @@ transcribe it and carry on.
 
 Rules:
 - Never write a person's name, and never propose who someone is. Not even a famous person.
+- Report every visible trace of a person in `people`, including partial ones: a hand, an arm, a \
+leg or a shoulder at the edge of the frame, somebody reflected in a window, somebody on a screen \
+in the photograph. Give the location and the part only, never a description. When you are unsure \
+whether something is part of a person, include it with low confidence.
 - Never state a date, a time, or a location as fact. Propose a place only when signage or a \
 distinctive landmark in the image supports it, and say what supports it.
 - Describe only what is in the frame. Do not fill gaps with what is usually true.
@@ -457,9 +564,7 @@ class NebiusVisionModel:
             prompt_version=f"{_PROMPT_CACHE_VERSION}-{prompt_digest()[:12]}",
             max_tokens=self._max_tokens,
             temperature=0.0,
-            response_format=response_format_for_schema(
-                OBSERVATION_SCHEMA, OBSERVATION_SCHEMA_NAME
-            ),
+            response_format=response_format_for_schema(OBSERVATION_SCHEMA, OBSERVATION_SCHEMA_NAME),
             image_prompt_tokens=_IMAGE_TOKEN_ESTIMATE,
             # The system message carries a per-request nonce, so no two requests for the same
             # photograph digest the same and the response cache structurally cannot hit. Asking

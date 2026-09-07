@@ -57,7 +57,7 @@ from exulanica.identity.keys import USER_STATEMENT_BASIS
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
 #: What the trigger guards raise. `raise exception ... using errcode =
 #: 'integrity_constraint_violation'` is SQLSTATE 23000 exactly, and psycopg maps that to this
@@ -90,7 +90,7 @@ def library(tmp_path, photo_dir, repository):
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
     captures = (("morning.jpg", "2026:08:27 10:00:00"), ("evening.jpg", "2026:08:27 19:30:00"))
     for name, when in captures:
-        outcome = pipeline.ingest_file(write_photo(photo_dir, name, when=when))
+        outcome = ingest_observed(pipeline, repository, write_photo(photo_dir, name, when=when))
         assert outcome.error is None, outcome.error
 
     identity = IdentityRepository(repository.connection, repository.workspace_id)

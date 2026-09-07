@@ -261,6 +261,10 @@ function sceneRecord(
   const member = (captureId: string, ordinal: number, artifactId: string, digest: string) => ({
     captureId,
     ordinal,
+    // These fixtures are synthetic geometry with nobody in the frame: screened, and empty. That
+    // is deliberately not the same as leaving them out, which would mean nobody had looked.
+    personRegions: [],
+    personReviewState: 'screened' as const,
     registered: true,
     exclusionReason: null,
     placement: {
@@ -301,6 +305,8 @@ function sceneRecord(
     receiptState: 'available',
     placementState: 'available',
     renderingSubstrate: 'posed_point_maps',
+    hiddenPersonCount: 0,
+    maskedMemberCount: 0,
     members: [
       member(CAPTURE_A, 0, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', contentSha256),
       member(CAPTURE_B, 1, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', secondDigest),

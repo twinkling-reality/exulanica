@@ -62,8 +62,6 @@ def upright_pixels(width: int = 160, height: int = 100) -> Image.Image:
     return image
 
 
-
-
 def bomb_png(width: int, height: int) -> bytes:
     """A PNG whose header declares an enormous frame and whose body is a few bytes.
 
@@ -538,4 +536,43 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     terminalreporter.write_line(
         "Run them with:  "
         "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest"
+    )
+
+
+def ingest_observed(pipeline, repository, path, *, batch_id=None):
+    """Ingest one photograph with an authorization that permits observing it.
+
+    The vision stage sends a photograph to a hosted model, so from 2026-09-06 it requires an
+    eligible privacy screening for those exact bytes, the same receipt the depth stage has always
+    required. Without one it reports itself unavailable and nothing is sent.
+
+    Every fixture in this suite works on the synthetic corpus, and ``record_synthetic_exemption``
+    is the mechanism this codebase already has for exactly that: it exempts bytes whose durable
+    authorization is itself synthetic, and the database enforces that it cannot be applied to
+    benchmark or personal media. So this helper is not a way around the gate, it is the gate being
+    satisfied honestly by media that has nobody in it.
+
+    Two calls rather than ``ingest_file``, because a screening is keyed to a capture that does not
+    exist until intake has committed. That ordering is the point: somebody authorizes these exact
+    bytes, and only then is anything sent anywhere.
+    """
+    from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+
+    intake = pipeline.ingest_intake(path.read_bytes(), filename=path.name, batch_id=batch_id)
+    assert intake.capture_id is not None, intake.error
+    authorization = authorize_synthetic_capture(
+        repository,
+        capture_id=intake.capture_id,
+        actor=uuid.UUID("a244f9d0-9bd9-5f55-a133-2712cd05d720"),
+        generator_manifest={
+            "profile": "exulanica.synthetic-test-corpus/v1",
+            "notice": "SYNTHETIC TEST FIXTURE",
+        },
+        authorization_scope={"purpose": "test suite"},
+    )
+    screening = record_synthetic_exemption(
+        repository, authorization_id=authorization.authorization_id
+    )
+    return pipeline.ingest_derivatives(
+        intake.capture_id, batch_id=batch_id, privacy_screening_id=screening.screening_id
     )

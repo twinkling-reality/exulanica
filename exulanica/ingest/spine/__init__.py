@@ -39,13 +39,16 @@ The modules, and the question each one answers:
                       advance it?
 :mod:`privacy`        Which exact source authorization and screening permitted geometry,
                       and did the exact ordered scene set pass the current policy?
+:mod:`person_consent` Who is in this photograph, where, and what did each of them agree
+                      to, with no column anywhere for anything that could recognise
+                      them somewhere else?
 :mod:`counts`         How many rows are in one of the thirteen tables this corpus may
                       be counted by, and in which scope is that number true?
 ===================== ============================================================
 
 **Every public function here takes a** :class:`~exulanica.ingest.spine.scope.WorkspaceScope`
 **as its first parameter**, and there is deliberately no way to build one without declaring a
-workspace on the connection it wraps. 59 tables are under FORCE row-level security keyed on
+workspace on the connection it wraps. 62 tables are under FORCE row-level security keyed on
 ``current_workspace()``, and the tombstone and epistemic guards do not merely read that setting,
 they ``assert_workspace_context()`` and raise when it is absent. A module reachable with a bare
 ``psycopg.Connection`` would be a module reachable with an undeclared one. There is no type

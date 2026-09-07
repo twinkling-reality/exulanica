@@ -28,7 +28,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.vision import Box
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
 REFUSED = psycopg.errors.CheckViolation
 
@@ -86,9 +86,10 @@ def _ingest(tmp_path, photo_dir, repository, legible):
     payload["legible_text"] = legible
     path = write_photo(photo_dir, "sign.jpg")
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    outcome = PhotoIngestPipeline(
+    pipeline = PhotoIngestPipeline(
         repository, store, vision=CountingVisionModel(payload=payload)
-    ).ingest_file(path)
+    )
+    outcome = ingest_observed(pipeline, repository, path)
     assert outcome.error is None
     return repository.connection.execute(
         "select s.track_key, s.modality, s.region, a.object_value "

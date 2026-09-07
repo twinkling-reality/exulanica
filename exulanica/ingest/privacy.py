@@ -1,18 +1,31 @@
 """Versioned privacy admission policy for reconstruction geometry.
 
-The first production policy is deliberately strict. Synthetic sources may use an exemption only
-when their durable authorization is itself synthetic. Benchmark and personal sources require a
-named human to inspect the exact bytes, and any detected or unresolved person blocks geometry.
-No mask is claimed because this policy does not implement one.
+Synthetic sources may use an exemption only when their durable authorization is itself synthetic.
+Benchmark and personal sources require a named human to inspect the exact bytes.
+
+**What version 2 changed, and why version 1 had to go.** Version 1 blocked geometry for any
+detected or unresolved person and implemented no mask, so the only eligible answer a reviewer could
+give about a photograph with somebody in it was that there was nobody in it. That is not a
+hypothetical: the retained bowl collection was reviewed on 2026-09-05 as having "no visible people
+or sensitive person regions" over 51 frames containing the arms, hands and clothing of diners at
+the edge, because the alternative was to lose the collection. Version 2 takes a confirmed region
+list with a consent state per person, and the people who did not consent are hidden by
+:mod:`exulanica.ingest.stages.masked_source` before any geometry reads a pixel.
+
+A region list does not make a photograph eligible on its own. Eligibility says a named human
+looked and resolved every region; that reconstruction actually read the masked bytes is enforced
+separately, by ``tg_geometry_reads_the_masked_derivative`` in migration 0037, because a rule that
+lives only here is a rule a future caller can route around.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Any, Final
+from typing import Any, Final, get_args
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.consent.states import MASKED_STATES, PersonState
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.scene import scene_id_for, scene_member_digest
@@ -31,14 +44,29 @@ __all__ = [
     "authorize_personal_capture",
     "authorize_synthetic_capture",
     "record_human_screening",
+    "record_person_detection_screening",
     "record_synthetic_exemption",
+    "require_observation_screening",
     "require_privacy_screening",
 ]
 
-PRIVACY_POLICY_VERSION: Final = "exulanica.reconstruction-privacy/v1"
+PRIVACY_POLICY_VERSION: Final = "exulanica.reconstruction-privacy/v2"
+#: Version 2 replaces "is anybody visible?" with "who is here, and what did each of them agree
+#: to?". Version 1 could only block a photograph containing a person, so a reviewer looking at one
+#: had two options: refuse the photograph, or say nobody was there. MEASURED 2026-09-05, the
+#: retained bowl review took the second over 51 frames containing diners' arms and hands, which is
+#: what this version exists to make unnecessary.
+#:
+#: The digest of these parameters is embedded in every screening and admission receipt, so bumping
+#: them makes every receipt written under version 1 provably old-policy rather than silently
+#: carried forward. That is the mechanism by which the two retained collections must be
+#: re-screened, and it is deliberate that it costs a re-screening rather than being free.
 PRIVACY_POLICY_PARAMS: Final[dict[str, Any]] = {
-    "person_policy": "block-any-detected-or-unresolved-person",
-    "masking": "not-implemented",
+    "person_policy": "confirmed-region-list-with-per-person-consent-state",
+    "masking": "masked-source-derivative-read-before-any-geometry",
+    "default_state": "hidden-until-a-consent-receipt-says-otherwise",
+    "consents": "presence-naming-likeness-separately-plus-reversible-temporary-hide",
+    "biometric_templates": "never",
     "synthetic_exemption": "requires-durable-synthetic-generator-manifest",
     "real_media_review": "named-human-over-exact-source-bytes",
 }
@@ -46,6 +74,11 @@ _POLICY_DIGEST: Final = sha256_of_canonical(PRIVACY_POLICY_PARAMS)
 _AUTHORIZATION_NAMESPACE: Final = uuid.UUID("c43ad553-9510-5de2-876c-7359e58520e1")
 _SCREENING_NAMESPACE: Final = uuid.UUID("f4f2600b-aa92-59d4-a75c-0914ad9d88c4")
 _ADMISSION_NAMESPACE: Final = uuid.UUID("345e1307-d5b9-52e2-8ca2-8f8db00a378d")
+
+#: The five states a confirmed region may carry, spelled here so a receipt cannot record a
+#: sixth. Imported rather than restated: a vocabulary duplicated in two files is a vocabulary
+#: that will be extended in one of them.
+_REGION_STATES: Final = frozenset(get_args(PersonState))
 
 
 def _utc(value: dt.datetime | None = None) -> dt.datetime:
@@ -326,16 +359,56 @@ def record_human_screening(
     screened_at: dt.datetime | None = None,
     valid_until: dt.datetime | None = None,
 ) -> PrivacyScreeningRow:
-    """Record strict exact-byte review. Any region or review failure blocks geometry."""
+    """Record exact-byte review as a confirmed region list with a state per person.
+
+    Under version 1 a non-empty region list blocked the photograph outright, and the effect was
+    the opposite of the intent: it made "there is nobody here" the only answer that kept a
+    collection usable. Under version 2 a listed person is fine, because a person who has not
+    consented to their likeness is filled with neutral grey before any geometry reads them. What
+    blocks now is a region nobody resolved -- one with no state, or a state outside the closed
+    vocabulary -- because that is a person the reviewer saw and did not decide about, and deciding
+    nothing is not consent.
+
+    A caller passing ``[]`` still records an eligible screening, so an inventory a human really did
+    find empty behaves exactly as before.
+    """
     authorization = repository.reconstruction_authorization(authorization_id)
     if authorization is None:
         raise PrivacyAdmissionError("the reconstruction authorization does not exist")
+    unresolved = [
+        region
+        for region in sensitive_regions
+        if not isinstance(region, dict) or region.get("state") not in _REGION_STATES
+    ]
+    # A region in a masked state blocks, and it blocks for a reason worth stating plainly: the
+    # masking stages are not yet wired into the pipeline, so nothing anywhere would actually
+    # hide this person before depth read them. Marking such a screening eligible would be
+    # strictly worse than the version 1 rule it replaced, which blocked any photograph naming a
+    # person at all. `unknown` is the important member of this set: it means somebody was seen
+    # and nobody decided, and "nobody decided" is the case default deny exists for.
+    #
+    # When masking is wired end to end this becomes "eligible if every masked region has a
+    # current masked_source derivative", which is the whole point of the design. Until then the
+    # honest rule is the conservative one, and this comment is the record of why.
+    masked = [
+        region
+        for region in sensitive_regions
+        if isinstance(region, dict) and region.get("state") in MASKED_STATES
+    ]
     if failure_reason:
         state = "failed"
         reasons = [failure_reason]
-    elif sensitive_regions:
+    elif unresolved:
         state = "blocked"
-        reasons = ["one or more sensitive person regions remain unmasked"]
+        reasons = [
+            f"{len(unresolved)} confirmed person region(s) carry no resolved presentation state"
+        ]
+    elif masked:
+        state = "blocked"
+        reasons = [
+            f"{len(masked)} person region(s) are not consented to likeness and no masked source "
+            "derivative is produced yet, so geometry over these bytes is refused"
+        ]
     else:
         state = "eligible"
         reasons = []
@@ -350,6 +423,77 @@ def record_human_screening(
         screened_at=screened_at,
         valid_until=valid_until,
     )
+
+
+def record_person_detection_screening(
+    repository: IngestRepository,
+    *,
+    authorization_id: uuid.UUID,
+    authorized_by: uuid.UUID,
+    purpose: str,
+    screened_at: dt.datetime | None = None,
+    valid_until: dt.datetime | None = None,
+) -> PrivacyScreeningRow:
+    """Permit showing these exact bytes to a detector, and permit nothing else.
+
+    **What this is for.** Finding the people in a photograph means showing it to something that
+    can find them, and the detector here is a hosted model. But the confirmed region list that
+    makes a screening eligible is the *output* of that looking, so a photograph containing
+    somebody who has not consented had no way to be looked at at all: an empty region list asserts
+    nobody is there, and a list naming them is blocked. This receipt is the narrow way out.
+
+    **What it does not do.** It records ``blocked``, because blocked is what it is for geometry,
+    and the blocking reason says so in words. ``privacy_screening_allows_capture`` does not admit
+    it, so no point map, pose, placement or trained scene can be produced on its strength; only
+    ``privacy_screening_allows_observation`` does. A caller who wanted geometry and reached for
+    this would find it refused by the database rather than by a code review.
+
+    **It is not consent, and the wording matters.** Nobody in the photograph has agreed to
+    anything here. An account holder has authorized a search for them so that they can be hidden,
+    which is a different act with a different actor, and ``purpose`` is recorded so the receipt
+    says which act it was.
+    """
+    authorization = repository.reconstruction_authorization(authorization_id)
+    if authorization is None:
+        raise PrivacyAdmissionError("the reconstruction authorization does not exist")
+    if not purpose.strip():
+        raise PrivacyAdmissionError(
+            "a detection authorization records why the photograph is being looked at"
+        )
+    return _record_screening(
+        repository,
+        authorization=authorization,
+        method="person_detection_only",
+        reviewed_by=authorized_by,
+        sensitive_regions=[],
+        eligibility_state="blocked",
+        blocking_reasons=[
+            "authorized for person detection only; geometry needs a confirmed region list "
+            f"with a consent state per person. Purpose: {purpose.strip()}"
+        ],
+        screened_at=screened_at,
+        valid_until=valid_until,
+    )
+
+
+def require_observation_screening(
+    repository: IngestRepository,
+    capture_id: uuid.UUID,
+    screening_id: uuid.UUID,
+) -> PrivacyScreeningRow:
+    """Resolve one receipt that permits showing these bytes to a detector, or stop.
+
+    Separate from :func:`require_privacy_screening` on purpose. The two questions are "may this be
+    looked at" and "may this become geometry", and a single function with a flag would eventually
+    be called with the wrong flag; the failure mode there is a photograph reconstructed on the
+    strength of a receipt that only ever permitted looking at it.
+    """
+    screening = repository.privacy_screening(screening_id)
+    if screening is None or screening.capture_id != capture_id:
+        raise PrivacyAdmissionError("privacy screening is missing for the exact capture")
+    if not repository.privacy_screening_allows_observation(capture_id, screening_id):
+        raise PrivacyAdmissionError("no current receipt permits showing these bytes to a detector")
+    return screening
 
 
 def require_privacy_screening(
@@ -393,9 +537,13 @@ def admit_reconstruction_scene(
             blockers.append(f"member {ordinal} has no screening for its exact source")
         elif not repository.privacy_screening_allows(capture_id, receipt.screening_id):
             blockers.append(f"member {ordinal} screening is failed, blocked, stale, or withdrawn")
-    at = _utc(admitted_at) if admitted_at else max(
-        (receipt.screened_at for receipt in screenings if receipt is not None),
-        default=dt.datetime.now(dt.UTC),
+    at = (
+        _utc(admitted_at)
+        if admitted_at
+        else max(
+            (receipt.screened_at for receipt in screenings if receipt is not None),
+            default=dt.datetime.now(dt.UTC),
+        )
     )
     classes = {receipt.corpus_class for receipt in screenings if receipt is not None}
     scopes = {

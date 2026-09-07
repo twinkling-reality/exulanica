@@ -16,7 +16,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import CountingVisionModel, write_photo
+from conftest import CountingVisionModel, ingest_observed, write_photo
 
 
 def test_execution_snapshot_carries_actual_runs_cost_timing_attempts_and_reuse(
@@ -31,12 +31,18 @@ def test_execution_snapshot_carries_actual_runs_cost_timing_attempts_and_reuse(
         LocalContentAddressedStore(tmp_path / "blobs"),
         vision=model,
     )
-    pipeline.ingest_directory(photo_dir)
-    pipeline.ingest_directory(photo_dir)
+    # Twice over the same two photographs, because the second pass is what produces the reuse
+    # events asserted below. One call per photograph rather than ingest_directory, because the
+    # vision stage now needs a screening receipt keyed to a capture that does not exist until
+    # intake has committed, and this test reads what the model call recorded.
+    for _ in range(2):
+        for path in (first, second):
+            ingest_observed(pipeline, repository, path)
 
     snapshot = execution_snapshot(repository.connection, workspace_id, sources)
     assert snapshot["source_coverage"]["complete"] is True
-    assert snapshot["summary"]["runs"] == 4
+    # Two passes over two photographs, each recorded as an intake run and a derivatives run.
+    assert snapshot["summary"]["runs"] == 8
     assert snapshot["summary"]["reuse_events"] == 4
     assert snapshot["summary"]["duration_ms"]["observations"] >= 6
     assert snapshot["summary"]["cost"]["totals"]["input_tokens"] == "1544"

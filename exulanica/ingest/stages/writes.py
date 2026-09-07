@@ -67,4 +67,5 @@ class StageWrites(Protocol):
         pending: list[bytes],
         produced_by_event: uuid.UUID | None = None,
         privacy_screening_id: uuid.UUID | None = None,
+        read_source_sha256: bytes | None = None,
     ) -> StageResult: ...

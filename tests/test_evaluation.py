@@ -507,7 +507,7 @@ def timed_corpus(tmp_path, photo_dir, repository):
     from exulanica.ingest.pipeline import PhotoIngestPipeline
     from exulanica.store.local import LocalContentAddressedStore
 
-    from conftest import CountingVisionModel, write_photo
+    from conftest import CountingVisionModel, ingest_observed, write_photo
 
     store = LocalContentAddressedStore(tmp_path / "blobs")
     plates = [
@@ -521,7 +521,7 @@ def timed_corpus(tmp_path, photo_dir, repository):
             photo_dir, name, when=f"2026:03:04 {hour:02d}:{minute:02d}:00", offset="+00:00"
         )
         pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
-        outcome = pipeline.ingest_file(path)
+        outcome = ingest_observed(pipeline, repository, path)
         assert outcome.error is None, outcome.error
         frames.append(
             Frame(

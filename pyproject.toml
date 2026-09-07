@@ -323,6 +323,13 @@ layers = [
   # module the layering says nothing about. It sits one step under the API, which is where an
   # upward import is easiest to write and hardest to notice.
   "graph | selection | ingest",
+  # Whether a person may be shown. It sits here, between the three top-level workflows and the
+  # identity tables, because both `ingest` (which masks a photograph before anything reads it)
+  # and `graph` (which decides what the browser may draw) must resolve the same state, and those
+  # two are siblings that may not import each other. It is above `identity` because a person
+  # region borrows the occurrence identity key, and below `ingest` so nothing in it can reach a
+  # pipeline. Pure: the offline package verifier resolves consent through it with no database.
+  "consent",
   "world | identity",
   "epistemics",
   # Erasure sits under everything that writes, because everything that writes may have to ask

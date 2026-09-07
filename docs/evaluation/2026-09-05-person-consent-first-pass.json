@@ -1,0 +1,254 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "audit_2026_09_06": {
+      "candidates": 83,
+      "confirmed": 46,
+      "confirmed_critical": 13,
+      "detector_error": "exulanica/ingest/vision.py:139 instructs the model not to list people in `objects`, and `objects` is the only place RecordedObservationDetector looks. The adapter reads a field specified to be empty, so it detects nobody. The earlier claim in this record that it reads real recorded detections was wrong.",
+      "method": "Eight independent adversarial lenses hunted for ways an unconsented person still becomes visible or reconstructed; each candidate was then given to a separate skeptic instructed to refute it, defaulting to refuted when the exposure could not be demonstrated.",
+      "structural_breaks": [
+        "exulanica/ingest/pipeline.py:501 never invokes person_regions or masked_source.",
+        "exulanica/ingest/pipeline.py:532 hands depth the original upright image.",
+        "No code path writes person_region, person_subject or person_presentation_consent, so capture_requires_masking is always false and the 0037 trigger has never fired.",
+        "web/packages/graph-client/src/snapshot.ts:205 drops person_regions and person_review_state when parsing the payload.",
+        "No draw site calls the presentation predicates; four byte paths are ungated."
+      ]
+    },
+    "branch": "person-consent-masking",
+    "claim": "Person regions, masked source derivatives and presentation consent, wired end to end and exercised against the permitted test database. A detected or human-added person leaves a row; the row forces a masked derivative; depth reads that derivative and records which bytes it read; the database refuses a point map over the original; the world withholds or masks the photograph; and a reviewer can confirm who is present and record three separate consents.",
+    "design_note": "docs/person-presentation-consent.md",
+    "executed": {
+      "behavioural_guarantees": {
+        "asserted": [
+          "a detected person leaves a person_region row and capture_requires_masking becomes true",
+          "the point map's read_source_sha256 equals the masked derivative's content digest",
+          "the database itself refuses a point map over the original bytes (CheckViolation)",
+          "a photograph with nobody in it produces no derivative and reads the original",
+          "no detector reports person_regions unavailable rather than empty",
+          "confirming a person keeps them masked; consenting to likeness unmasks them",
+          "presence and naming do not unmask; revoking likeness masks again",
+          "a deleted false positive stops requiring a mask",
+          "a reviewer can add a region the detector missed",
+          "every consent receipt records actor_role owner, never subject"
+        ],
+        "file": "tests/test_person_masking_end_to_end.py",
+        "note": "Runs the real pipeline against PostgreSQL. Before this file existed a stub that hid nobody would have passed the whole suite; it now fails four of these."
+      },
+      "database": {
+        "allow_database_creation": "unset throughout",
+        "migration_0037_applied": true,
+        "note": "Applied through the ordinary migration test against a disposable schema in the one permitted database. No other database was contacted.",
+        "url": "postgresql://localhost:5433/exulanica_spine_test"
+      },
+      "detector_availability": {
+        "absent": [
+          "torchvision",
+          "transformers",
+          "ultralytics",
+          "mediapipe",
+          "onnxruntime",
+          "rembg",
+          "segment_anything"
+        ],
+        "conclusion": "No local person detector exists in either extra. No detector was written and no detection was fabricated; the shipped adapter reads person boxes the vision stage had already recorded.",
+        "method": "Imported each candidate in the project environment and read uv.lock.",
+        "opencv_note": "cv2.HOGDescriptor does not exist in 5.0.0 and cv2.data.haarcascades contains no cascade XML, so the classical fallbacks are gone too.",
+        "present": [
+          "torch 2.14.0",
+          "opencv-python-headless 5.0.0",
+          "numpy",
+          "scipy",
+          "PIL"
+        ]
+      },
+      "detector_corrected": {
+        "fix": "Observation schema version 2 gives people their own array and asks for partial traces by name, with a closed part vocabulary carried through to the review screen. The vision stage moved to version 3, so every photograph is re-observed.",
+        "not_measured": "Recall on real photographs. Nothing has run the vision stage over the retained collections, so what this actually finds on the bowl frames is unknown.",
+        "privacy_effect": "A person entry carries no free-text label. Occurrence quality keys went from {confidence_band, salience, label, trust_tier} to {confidence_band, part, trust_tier}, and both biometric-boundary tests were tightened to assert `label` is absent.",
+        "what_was_wrong": "The shipped adapter read `person_objects`, and the observation schema instructs the model not to list people in `objects`. Its label set is an exact-match whitelist of 16 singular nouns matching none of 'arms', 'hands', 'diners', 'elbow' or 'shoulder', which are the traces the retained bowl photographs contain."
+      },
+      "environment": {
+        "disk_full_incident": "The host filled to 100 percent (3.0 GiB free of 460 GiB) during this work, which caused psycopg DiskFull and 23-minute suite runs. Cleared by the operator; the suite returned to 4m33s. Sixteen leaked exulanica_test_* schemas from interrupted runs, totalling 64.5 MiB, were dropped with the operator's authorization."
+      },
+      "full_suite": {
+        "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest",
+        "duration_seconds": 285,
+        "exit_code": 0,
+        "failed": 0,
+        "passed": 1800,
+        "skipped": 3
+      },
+      "import_contracts": {
+        "command": "uv run lint-imports",
+        "result": "4 kept, 0 broken"
+      },
+      "performance_regression_found_and_fixed": {
+        "fix": "an indexed existence check answers the common case before the view is touched",
+        "measured": {
+          "after_fix_seconds": 9,
+          "after_wiring_seconds": 208,
+          "before_wiring_seconds": 44,
+          "control_query_disabled_seconds": 48,
+          "file": "tests/test_ingest_persistence.py"
+        },
+        "what": "region_state_for_capture ran per photograph against person_region_current, a distinct-on view with no supporting index."
+      },
+      "pre_existing_failure_determination": {
+        "method": "Three tests failed on the pre-rebase branch. A clean detached worktree was made at the base commit e5bb108 with none of this change present, and the same three tests were run there.",
+        "result": "All three reproduced identically at e5bb108, so none was caused by this work. They were the other session's in-flight tests, fixed by their commit 30d53b8 'Fix the three database-backed tests written while the database was reserved'. After rebasing onto 164b20f the suite is green.",
+        "tests": [
+          "test_a_job_scoped_claim_takes_only_the_named_job_and_leaves_the_rest_queued",
+          "test_stale_stage_bindings_are_refused_before_any_pose_work_runs",
+          "test_nonmetric_trained_scene_uses_normal_publication_and_keeps_recorded_rung"
+        ]
+      },
+      "rebase": {
+        "commits": 13,
+        "conflicts": 0,
+        "footprint_on_files_the_other_session_changed": {
+          "exulanica/ingest/scene_reconstruction.py": "6 inserted lines, 0 modified",
+          "exulanica/ingest/scene_splat.py": "untouched",
+          "exulanica/ingest/stages/__init__.py": "90 inserted lines, 0 modified",
+          "exulanica/reconstruction/splat.py": "untouched",
+          "web/packages/app/src/geometry-api.ts": "untouched",
+          "web/packages/app/src/main.ts": "untouched"
+        },
+        "onto": "164b20f"
+      },
+      "ruff_check": {
+        "command": "uv run ruff check .",
+        "result": "All checks passed"
+      },
+      "web": {
+        "boundaries_dependencies": 1104,
+        "boundaries_modules": 343,
+        "test_files": 99,
+        "tests_passed": 768,
+        "typecheck": "clean"
+      },
+      "workspace_isolation": {
+        "added_by_this_change": [
+          "person_subject",
+          "person_region",
+          "person_presentation_consent"
+        ],
+        "note": "The count is asserted against the live schema by test_the_prose_count_of_workspace_isolated_tables_matches_the_schema, which is the gate that caught the three prose statements needing 59 changed to 62.",
+        "tables_forced_and_workspace_keyed": 62
+      }
+    },
+    "files": {
+      "docs/person-presentation-consent.md": "952e7b9244c507d1ccb7831d4bb631e5840ec1e65298d197bea2b26c02267479",
+      "exulanica/api/app.py": "a36be73e3b6d92507e5b7e036355ebd7c9485a3c114fd825c54efc205e63bfcc",
+      "exulanica/api/routes/evidence.py": "c39ce18b73c88f9c1f4dc174b7042cba0418cd3dbfd8b7f253a86cf6e8eaef14",
+      "exulanica/api/routes/person_consent.py": "e7547a15584dde57daf5a4f4fe9b1390a5bd3de2e8e377b22fba7c209a386a87",
+      "exulanica/consent/__init__.py": "5561e061f5cb896ec8f3c875cd9661d22796331c09bb6acba55ba69006a7481d",
+      "exulanica/consent/regions.py": "0f6acabbb91d80d203123422c3ad8235377bcaf925a62ea2953ac5d1394a8f81",
+      "exulanica/consent/states.py": "fe684ee60fb43fd6835c8216a5d619be34f7f14977ec6f7dec4b82b91e6eaa16",
+      "exulanica/db/session.py": "2462c39de19561a33dbb67f2d06298af7b34bec8c88a2892c3d59ba104566e85",
+      "exulanica/graph/payload.py": "cbf16418dcf3f8c82f768cbdca286edc933bc69f0084724d61038c15c5302e7a",
+      "exulanica/graph/person_regions.py": "139ebbffae7aea7ffc81d1262708512297f9d1b745f2bfe83403716fa0d919da",
+      "exulanica/graph/reconstruction_scenes.py": "294d07e0abd5522db015a622b78e13483c6cabf043eb27a5c00b2b28f42891bc",
+      "exulanica/ingest/masked_geometry.py": "cd4ecc4ec739b642241f0da6bff53bc1fb6c8016ba7a5e7a101934f1c9ba2b2f",
+      "exulanica/ingest/masked_inputs.py": "bd3bfcae23df0bdf18be145363cd325732d25c4d697bad0fc86a7290fba19ab3",
+      "exulanica/ingest/masking.py": "2d6e7552fd6ef2f3b9e773ecef95bed5e086f433a2de22c91ed296c3ee484c51",
+      "exulanica/ingest/person_detectors.py": "a0a7ebeaecc05dc878048fa30f284d5dfd00cce7747aeccb047ba0539ffbf977",
+      "exulanica/ingest/person_receipts.py": "fd171cb9e63a4fdf6e48946ddb61b3c14e1cb4877ccf24831801775dc74f5eb0",
+      "exulanica/ingest/person_review.py": "cc580dcccad080c2de0d65761ef8ba22442f84eed742849c03478d87b30ebd11",
+      "exulanica/ingest/person_state.py": "4613c7fa2ee7ba8404117c37732c5018dea625cba25eb7ccbe084d2d5054fe54",
+      "exulanica/ingest/pipeline.py": "43071ed31d2eb96f0d85fadc830bd7a0ab52ccf8d4f3a5dae1114942aa0ff96f",
+      "exulanica/ingest/privacy.py": "36dac1368519ba5bebf2ccfa8b34fbd916ce3a3d29a458b43745280f6d0789bf",
+      "exulanica/ingest/repository.py": "12ed1c1d4a06809198c46a095e625dd1682a20b41ae74333d92824662dd6d8c5",
+      "exulanica/ingest/scene_reconstruction.py": "823174f2c8964ff78d8b6c891d5b50e22e23efb89e7895d0bbf1b7b16e58f987",
+      "exulanica/ingest/scene_selection.py": "d41b7f92a70f89bcd3ff61a764f1471e1d83ddacc116fbccab4f2349284a872a",
+      "exulanica/ingest/spine/__init__.py": "eb90c8dce2680816f17c5b935ff62bc23e72dd9b3de49bef8e198f9efb18bab0",
+      "exulanica/ingest/spine/artifacts.py": "f281b22d72891971b9cce9cd779b30514fe30f44573d2ae984414739b034a274",
+      "exulanica/ingest/spine/person_consent.py": "e38339702c00f5a0a4c09c72726cd07e9ef0707076f0530f20b036bef4e638c4",
+      "exulanica/ingest/stages/__init__.py": "445ee12cdc160222673d688d86961292eb47bf871c47bc414ac4e2fa5a29011f",
+      "exulanica/ingest/stages/depth.py": "edbc96af13ef917a8937343bc9e0e81c82c25963ba0742a7819f52aac26ce7c0",
+      "exulanica/ingest/stages/masked_source.py": "d62505478867170ae9b83d625bc060f5d0501f6627ea3d5f6c913e53ce43104d",
+      "exulanica/ingest/stages/person_regions.py": "943018446060f8c105d8a9bbd227882582e315cb9caa10b9f0537cd12c1399d4",
+      "exulanica/ingest/stages/vision.py": "40ea0474f836321f91f363b12197ef88ebfd807c28cda660b287295fc8d99d1b",
+      "exulanica/ingest/stages/writes.py": "bdb2beb81251f7954964fe0d651b2c01eedb653c77aa9b048fcc840ae1bc7cb7",
+      "exulanica/ingest/vision.py": "4b10f6a07cf02fe853e10a16cb8a1dddd233a0f2ff011c9f1e998e499406c023",
+      "exulanica/ingest/worker.py": "e1dfd8188715649520efdd52f8cb2c2f091f91c13517a82b593add97096ce3c8",
+      "exulanica/ingest/worker_command.py": "f28e90303c87abf8f75ae11c58976e3952a9dabd4371fed0ba43137da802904d",
+      "exulanica/migrations/0037_a_person_is_hidden_until_they_consent.sql": "220b74ebdbc2d89a1c9727595708c857262a375eb8cd37318622bbf0f8719120",
+      "exulanica/orchestration/demonstration.py": "889170c45b98274551d7741bfd91fe92a4e17eb4e60d64340b8b4fab678f1834",
+      "exulanica/world/repository.py": "c73310b53846be78d4a7d651056c3612418d4cb230612adc98f446b8fcc7382c",
+      "pyproject.toml": "e6eba250f90d1b2ba91637fb94361dcd60ed391ec19942ee81c00b9d763fa4ed",
+      "tests/conftest.py": "e76fbdd30f8670bb5508a4915764ee0b5ef7cc6442eacff42a650505ecdeda22",
+      "tests/test_api.py": "e941905202e4c95b5d4239d4824a483ceaed513faa470f62b76adf4f6417f9e2",
+      "tests/test_evaluation.py": "0472103a551afc4d171011f9573cec2f5908512c169f8ed98f4b6c95981d5d64",
+      "tests/test_evaluation_execution.py": "e47d35dd8bb1bad7c68e96e6a5da22c7c4b51bc69262876290083bc864819b7e",
+      "tests/test_exact_recomputation.py": "c287dc7b8b050cbc6589ce94a9f22022e26c5f6a5e0e8a648205ca41ca49cd48",
+      "tests/test_formation_stream.py": "e0c2425d3b1ce82b753176c235e8f16a767ae0a8360f60912fa06e372b2d51cb",
+      "tests/test_identity.py": "8d4da7b10e19b462c12d6f376cf6da0db540f1224c22a6ce0efb79286696fe74",
+      "tests/test_ingest_idempotency.py": "86db3fd5f87c5a4b84f998dd696cf0359dd5ca4f4341c12f4593f9001e631369",
+      "tests/test_ingest_persistence.py": "758db28d1d99ae486b87e51246447905b0d5b526b39dff38e31fa311a056c027",
+      "tests/test_ingest_preconditions.py": "75b60122683b170606e6b17b10f69b406b07a5cd749d68c77832d014e6bcf466",
+      "tests/test_intake_upload.py": "7beab5057a958eabc64d3b80a39cdc487c4a5af116b1ecdaed33763403782bbf",
+      "tests/test_masked_geometry.py": "1f6c5f025929216139621e273ecda0bf63bd21c67ebd21bf41f55d14b9feee75",
+      "tests/test_masked_scene_inputs.py": "b6e170c08cd969206a29d581a15ff8151b4a1ecb323ac64e014ca3f97da275fe",
+      "tests/test_memory_lifecycle.py": "a07a63fadb02808d73e8da0dce46e4f8d0cbd40567fb6bd016935f2954409f58",
+      "tests/test_migration.py": "8053be27fab47fff5088e315f6ac316976e62c545394e06a980aadc4fa012fe8",
+      "tests/test_ocr_span_modality.py": "e281bb5a4bd803d4f3556ddcbc461e406002294eb6824d45f132afa90cd44d21",
+      "tests/test_person_consent_schema.py": "0c227007ce605a8c01531aa66c39e651d17553d492109e2e88738b026ca79ef0",
+      "tests/test_person_detection_finds_partial_bodies.py": "60c1d85d1ce344e42addab411f1fa27606a39ed0015f6353a081c62156fe36f3",
+      "tests/test_person_masking.py": "f881de0a94c47384c26d7bea88d631753a15b96917159c3c7e74f683e3228785",
+      "tests/test_person_masking_end_to_end.py": "00a1b459788cd32dfa46ec4dff59ec98110246c1ae84a1844ad70327564fe642",
+      "tests/test_person_presentation_consent.py": "05dba639ae7d6dc6b374731d453b01eec71f0a926fb6861be9af3c85a12f8a99",
+      "tests/test_person_receipts.py": "d8d7303c999af55ae78fd414c504a7a4c1dcb6bae5cc8c1c9acd78ab958def61",
+      "tests/test_person_region_stages.py": "913a7d55f4b155869b417b11f7c45268a07de288cc6e0db3173c5488ffba685d",
+      "tests/test_purge.py": "d5a7b433150a4d97a0584f2f3f759c13cd1bbe9c7b3c4b3cdc42bd188af6275c",
+      "tests/test_recomputation_closure.py": "e1a80a90873d04c737eaff00fc529e1aea999ba94a419366a1f45c433f97ce8a",
+      "tests/test_rename.py": "d92a11ef935ea2dea7086f3fec0f0d7b94ec6466564aac991e180ffc1281e901",
+      "tests/test_scene_grouping.py": "145de122d713d80f7606307f926e00cdce952bf57432ad04c388c719a7eff040",
+      "tests/test_selection.py": "9a07d4961a5582ce32ac88304471cb22954d441ba687ba6fe353d16e98956346",
+      "tests/test_selection_answer.py": "19d3846959762d0149750a1964f8adefa2fea00a86aae2845a80a9f04714da9b",
+      "tests/test_vision_contract.py": "71c49077702a3779d87b6a5f93afdab7605d689621ab7a48180bc2d055ef23e2",
+      "web/packages/app/src/ui/person-review.ts": "9fbcbd9fedd9a3edb884b464ba79e11876d7bbbe7a6582f953a424cd1a82d786",
+      "web/packages/app/src/ui/status.ts": "e412c60f7176207fef92203388ce44d38ca277ebd7c8e1b0c03f86221d893384",
+      "web/packages/app/test/geometry-api.test.ts": "185db30df4f7ff5c0165b1d9baa497c11034edc6ecf9ceeda282ba8e0d41c4a3",
+      "web/packages/app/test/person-review.test.ts": "d51534edcc832eef36b38b45ab4d7989154c1ca29f3041f85eefa03e544d1229",
+      "web/packages/graph-client/src/client.ts": "d608b948f1eb45f3fdde768a7d62e1de8b222eff2bd5b853432ece754cfbf67b",
+      "web/packages/graph-client/src/index.ts": "070376038d693c37304d17c2cdc1a9119e8b91baca8248b2f7acef075e501efe",
+      "web/packages/graph-client/src/person-presentation.ts": "c703fccd69f3aad18a7b7ff1811f5c47cf3e22274f078bb40e22b9411e706143",
+      "web/packages/graph-client/src/read-model.ts": "392b7eda57520f5f8fc7e50367241421afbf4b54c3f22aca697c6c42240c1fd9",
+      "web/packages/graph-client/src/snapshot.ts": "fd533c49e8a60e499a05b9d2c39c199ba13480e2df09072f3ec163268ac35e78",
+      "web/packages/graph-client/src/wire.ts": "49bb24f8dcef6d37081710f958bd34946366b24d9e22a928e47c928d68fb0e39",
+      "web/packages/graph-client/test/person-presentation.test.ts": "c34e2633cc8a47a5b47a97ba04781a3294cc46e9bf7938a53f86521303fb4045"
+    },
+    "head_revision": "2d9fc53",
+    "limitations": [
+      "The detector is a hosted multimodal model doing open-vocabulary detection, not a segmenter. Regions are boxes and are recorded as shape='box'. Its recall on real photographs is unmeasured, and enumeration happens off this machine.",
+      "Every consent recorded is the account holder's, as actor_role owner. The photographed person still has no way to answer for themselves.",
+      "A revoked consent produces a new build; it does not purge geometry from an earlier build.",
+      "A green suite establishes that the code and schema agree and that the guards fire, not that a corpus behaves this way. No human has confirmed a region on a real photograph.",
+      "The API on port 8000 was left running throughout, against the runbook's advice to stop it."
+    ],
+    "not_executed": [
+      "No reconstruction, pose, placement or Gaussian training run was performed.",
+      "No real photograph was processed and neither retained collection was touched.",
+      "The masked-geometry check has never seen a trained scene.",
+      "Splat training on a masked scene is refused rather than supported.",
+      "No subject-facing consent route exists to exercise.",
+      "The vision stage has never been run over the retained bowl photographs. No honest version 2 screening makes them eligible, and no NEBIUS_API_KEY was present. Nothing was sent anywhere."
+    ],
+    "policy_change": {
+      "correction": "An earlier version of this record claimed the bump alone forced a re-screening. It did not. The resolver never compared policy_version, so all 51 bowl receipts still returned allowed = true when checked against the live workspace on 2026-09-06. The comparison was added the same day, with a test binding the SQL function to PRIVACY_POLICY_VERSION. Recorded because a digest that nothing compares is the same as not having one.",
+      "effect": "The resolver privacy_screening_allows_capture now compares policy_version against current_privacy_policy(), so a receipt written under version 1 no longer permits geometry. The two retained collections must be re-screened before they can be used.",
+      "from": "exulanica.reconstruction-privacy/v1",
+      "to": "exulanica.reconstruction-privacy/v2"
+    },
+    "profile": "exulanica.person-consent-implementation/v1",
+    "rebased_onto": "164b20f",
+    "recorded_date": "2026-09-06",
+    "regression_introduced_and_fixed": {
+      "effect": "For several commits this branch admitted geometry over an undecided person that the pre-existing rule would have blocked, so the change was a net privacy regression.",
+      "fixed": "2026-09-06. A region in any masked state (unknown, present, withdrawn) or with no state now blocks. Only 'shown' and 'hidden', both of which have consented to likeness, pass.",
+      "what": "Migration 0029 blocked any screening naming a person. 0037 removed that rule, and the first replacement in record_human_screening accepted a region in state 'unknown', meaning somebody was seen and nobody decided, as eligible."
+    }
+  },
+  "record_sha256": "83dc8108e394fb0e4d7ff9bcaaed0c6c3f221f019b6d9c128415da82296de7a5"
+}

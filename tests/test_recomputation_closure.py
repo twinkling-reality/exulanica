@@ -24,7 +24,7 @@ from exulanica.ingest.scenes import run_scene_grouping
 from exulanica.store.base import PurgeAuthorization, privileged_purger
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import CountingVisionModel
+from conftest import CountingVisionModel, ingest_observed
 
 
 def _canonical(value):
@@ -71,7 +71,7 @@ def test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes
         path.write_bytes(data)
         paths.append(path)
         source_digests.append(hashlib.sha256(data).hexdigest())
-        outcome = pipeline.ingest_file(path)
+        outcome = ingest_observed(pipeline, repository, path)
         assert outcome.error is None, outcome.error
         captures.append(outcome.capture_id)
         occurrence = repository.connection.execute(
@@ -132,8 +132,12 @@ def test_deleted_exemplar_reproduces_remaining_canonical_context_and_image_bytes
         blob = BlobId.from_hex(digest)
         assert purger.purge(blob)
         assert not store.exists(blob), "recomputation must not read a cached artifact"
+    # Screened again rather than re-ingested bare, because "the model was not called" has to be
+    # earned by the reuse branch and not by the gate. An unscreened re-ingest reports vision
+    # unavailable before it ever looks for a cached artifact, which would make the call count
+    # below true for a reason this test is not measuring.
     for path in paths[:2]:
-        outcome = pipeline.ingest_file(path)
+        outcome = ingest_observed(pipeline, repository, path)
         assert outcome.error is None, outcome.error
     for digest, expected in baseline_bytes.items():
         assert store.get(BlobId.from_hex(digest)) == expected

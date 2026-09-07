@@ -1100,6 +1100,16 @@ class WorldStyleRepository:
             ",array(select c.capture_id from capture c where c.workspace_id=ws.workspace_id "
             "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null "
             "order by c.capture_id) as capture_ids "
+            # Whether anybody in this photograph has not consented to their likeness, and whether
+            # the masked derivative that hides them exists. Asked here rather than in the client
+            # because this is the row that decides which bytes a viewer is handed: a photograph
+            # that needs a mask and has none must not resolve to its original.
+            ",exists(select 1 from capture c where c.workspace_id=ws.workspace_id "
+            "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null "
+            "and capture_requires_masking(c.workspace_id,c.capture_id)) as needs_mask "
+            ",exists(select 1 from artifact ma where ma.workspace_id=ws.workspace_id "
+            "and ma.kind='masked_source' and ma.source_blob_sha256=s.blob_sha256 "
+            "and ma.purged_at is null and ma.content_sha256 is not null) as has_mask "
             "from world_topology_source ws "
             "left join evidence_span s on s.workspace_id=ws.workspace_id "
             "and s.span_id=ws.evidence_span_id "
@@ -1132,7 +1142,15 @@ class WorldStyleRepository:
         elif row["blob_sha256"] is None or not store.exists(BlobId(bytes(row["blob_sha256"]))):
             state = SourceMediaState.UNAVAILABLE_ASSET
             reason = "source bytes are missing from storage"
+        elif row.get("needs_mask") and not row.get("has_mask"):
+            # Somebody in this photograph has not consented to their likeness and nothing has
+            # produced the derivative that hides them. Withheld rather than served: falling back
+            # to the original here would show exactly the person the whole feature exists to hide,
+            # and it would do it on the path a viewer actually looks at.
+            state = SourceMediaState.UNAVAILABLE_ASSET
+            reason = "source contains a person who has not consented and is not yet masked"
         available = state is SourceMediaState.AVAILABLE
+        masked = bool(row.get("needs_mask"))
         return WorldSourceMedia(
             source_id=row["source_id"],
             slot_key=row["slot_key"],
@@ -1140,7 +1158,13 @@ class WorldStyleRepository:
             state=state,
             reason=reason,
             evidence_span_id=row["evidence_span_id"],
-            evidence_path=(f"/evidence/{row['evidence_span_id']}" if available else None),
+            evidence_path=(
+                None
+                if not available
+                else f"/evidence/{row['evidence_span_id']}/masked"
+                if masked
+                else f"/evidence/{row['evidence_span_id']}"
+            ),
             modality=row["modality"],
             media_type=row["media_type"],
             byte_size=row["byte_size"],

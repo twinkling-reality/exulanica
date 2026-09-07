@@ -27,6 +27,11 @@ from exulanica.graph.payload import (
     ScenePointMapPlacementRow,
     SceneRecoveredCameraRow,
 )
+from exulanica.graph.person_regions import (
+    hidden_people,
+    person_regions_for_captures,
+    review_states_for_captures,
+)
 from exulanica.graph.scene_geometry import trained_geometry_row
 from exulanica.reconstruction.placement import (
     PointMapInput,
@@ -135,6 +140,10 @@ def _scene_row(
     scene_id = row["scene_id"]
     members = _members(connection, workspace, scene_id, row["job_id"])
     claim = _claim(row["object_value"], members)
+    capture_ids = [member.capture_id for member in members]
+    people = person_regions_for_captures(connection, workspace, capture_ids)
+    review_state = review_states_for_captures(connection, workspace, capture_ids)
+    hidden_count, masked_members = hidden_people(people)
     pose_digest = _hex(row["pose_sha256"])
     placement_digest = _hex(row["placement_sha256"])
 
@@ -231,6 +240,8 @@ def _scene_row(
                     registered=member.registered,
                     placement=None,
                     exclusion_reason=excluded[capture_ref],
+                    person_regions=people.get(capture_ref, []),
+                    person_review_state=review_state.get(capture_ref, "unscreened"),
                     recovered_camera=recovered_camera,
                 )
             )
@@ -265,6 +276,8 @@ def _scene_row(
                     ),
                 ),
                 exclusion_reason=None,
+                person_regions=people.get(capture_ref, []),
+                person_review_state=review_state.get(capture_ref, "unscreened"),
                 recovered_camera=recovered_camera,
             )
         )
@@ -317,6 +330,8 @@ def _scene_row(
         receipt_state="available",
         placement_state=placement_state,
         rendering_substrate=substrate,
+        hidden_person_count=hidden_count,
+        masked_member_count=masked_members,
         trained_geometry=trained,
         members=output_members,
         generated_geometry=generated_geometry_rows(connection, workspace, scene_id, store),
@@ -465,6 +480,11 @@ def _fallback(
         receipt_state=receipt_state,
         placement_state=placement_state,
         rendering_substrate="source_photographs",
+        # The fallback cannot resolve regions: it is reached when the receipts are unreadable, and
+        # a count of zero would read as "nobody is hidden here". Zero is honest only beside the
+        # member rows' "unscreened", which is what stops the client drawing anybody.
+        hidden_person_count=0,
+        masked_member_count=0,
         members=[
             ReconstructionSceneMemberRow(
                 capture_id=member.capture_id,
@@ -474,6 +494,12 @@ def _fallback(
                 exclusion_reason=(
                     "pose-not-registered" if not member.registered else "placement-unavailable"
                 ),
+                # A scene that collapsed to the fallback for some unrelated reason -- a bad gate,
+                # a missing placement -- must not thereby report that it contains nobody. Until
+                # the regions are resolved here too, the honest answer is that nothing screened
+                # this photograph, which draws silhouettes rather than pixels.
+                person_regions=[],
+                person_review_state="unscreened",
             )
             for member in members
         ],

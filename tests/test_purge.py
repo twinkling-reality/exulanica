@@ -37,7 +37,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import CountingVisionModel, write_photo
+from conftest import CountingVisionModel, ingest_observed, write_photo
 
 #: Suffixed, because **a role is a CLUSTER object** and the harness's "the database name must
 #: contain test" guard does not reach one. Provisioning the deployment's own role names here
@@ -124,7 +124,7 @@ def purged(tmp_path, photo_dir, repository, spine_schema):
     psycopg_module, scratch = spine_schema
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
-    outcome = pipeline.ingest_file(write_photo(photo_dir, "a.jpg"))
+    outcome = ingest_observed(pipeline, repository, write_photo(photo_dir, "a.jpg"))
     assert outcome.error is None, outcome.error
 
     import urllib.parse

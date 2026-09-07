@@ -43,7 +43,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.scenes import SCENE_GROUP_KIND, run_scene_grouping
 from exulanica.store.local import LocalContentAddressedStore
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
 #: Two photographs five minutes apart at one position, so grouping produces one scene rather
 #: than two. The place label comes from the vision payload and is what makes the group's
@@ -106,8 +106,8 @@ def lifecycle(tmp_path, photo_dir, repository):
         repository, store, vision=CountingVisionModel(payload=_payload_with_a_person())
     )
     for name, when in (("a.jpg", "2026:08:27 10:00:00"), ("b.jpg", "2026:08:27 10:05:00")):
-        outcome = pipeline.ingest_file(
-            write_photo(photo_dir, name, when=when, gps=GULLFOSS)
+        outcome = ingest_observed(
+            pipeline, repository, write_photo(photo_dir, name, when=when, gps=GULLFOSS)
         )
         assert outcome.error is None, outcome.error
     return Lifecycle(repository, store, photo_dir)

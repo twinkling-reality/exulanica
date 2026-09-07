@@ -19,6 +19,8 @@
  * seam costs nothing in the direction data actually flows (graph -> presentation).
  */
 
+import type { PersonReviewState, PersonState } from './person-presentation.js';
+
 export type EntityIdRef = string;
 export type OccurrenceIdRef = string;
 export type IslandIdRef = string;
@@ -377,6 +379,15 @@ export interface RecoveredCameraRecord {
   readonly projection: 'pinhole' | 'pinhole-approximation';
 }
 
+/** One person in one photograph: an outline and a state, never pixels. */
+export interface PersonRegionRecord {
+  readonly regionId: string;
+  readonly state: PersonState;
+  readonly silhouettePpm: readonly (readonly number[])[];
+  readonly displayName: string | null;
+  readonly subjectId: string | null;
+}
+
 export interface ReconstructionSceneMemberRecord {
   readonly captureId: string;
   readonly ordinal: number;
@@ -384,6 +395,15 @@ export interface ReconstructionSceneMemberRecord {
   readonly recoveredCamera?: RecoveredCameraRecord | null;
   readonly placement: ReconstructionPointMapRecord | null;
   readonly exclusionReason: string | null;
+  readonly personRegions: readonly PersonRegionRecord[];
+  /**
+   * Whether anybody has screened this photograph for people.
+   *
+   * Not the same fact as an empty `personRegions`. An absent or unrecognised value must be read
+   * as `unscreened`, which draws no pixels: the two look identical in an empty array and are
+   * opposite answers.
+   */
+  readonly personReviewState: PersonReviewState;
 }
 
 /** One receipt-backed reconstruction scene, distinct from a presentation island or scene group. */
@@ -404,6 +424,9 @@ export interface ReconstructionSceneRecord {
   readonly receiptState: 'available' | 'missing' | 'invalid';
   readonly placementState: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
   readonly renderingSubstrate: RenderingSubstrate;
+  /** Counted by the server, so a client that failed to load regions cannot report zero. */
+  readonly hiddenPersonCount: number;
+  readonly maskedMemberCount: number;
   readonly members: readonly ReconstructionSceneMemberRecord[];
   readonly trainedGeometry?: TrainedGeometryRecord | null;
   /**

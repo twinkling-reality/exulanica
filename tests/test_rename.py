@@ -31,7 +31,7 @@ def named(repository, photo_dir, tmp_path):
     from exulanica.ingest.pipeline import PhotoIngestPipeline
     from exulanica.store.local import LocalContentAddressedStore
 
-    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, write_photo
+    from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 
     payload = copy.deepcopy(DEFAULT_PAYLOAD)
     payload["objects"] = [
@@ -44,7 +44,8 @@ def named(repository, photo_dir, tmp_path):
     ]
     store = LocalContentAddressedStore(tmp_path / "blobs")
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel(payload=payload))
-    assert pipeline.ingest_file(write_photo(photo_dir, "a.jpg")).error is None
+    outcome = ingest_observed(pipeline, repository, write_photo(photo_dir, "a.jpg"))
+    assert outcome.error is None
 
     identity = IdentityRepository(repository.connection, repository.workspace_id)
     writer = AssertionWriter(repository.connection, repository.workspace_id)

@@ -47,7 +47,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
 from psycopg.types.json import Jsonb
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, bomb_png, write_photo
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, bomb_png, ingest_observed, write_photo
 
 # No module-level postgres marker. tests/conftest.py marks each test by the fixtures it
 # actually requests, so the handful here that need no server stay runnable without one.
@@ -71,7 +71,7 @@ def ingested(tmp_path, photo_dir, repository):
     store = LocalContentAddressedStore(tmp_path / "blobs")
     vision = CountingVisionModel()
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    outcome = pipeline.ingest_file(path)
+    outcome = ingest_observed(pipeline, repository, path)
     assert outcome.error is None
     return repository, store, pipeline, path, outcome
 
@@ -88,7 +88,7 @@ def ingested_with_a_person(tmp_path, photo_dir, repository):
     store = LocalContentAddressedStore(tmp_path / "blobs")
     vision = CountingVisionModel(payload=payload)
     pipeline = PhotoIngestPipeline(repository, store, vision=vision)
-    outcome = pipeline.ingest_file(path)
+    outcome = ingest_observed(pipeline, repository, path)
     assert outcome.error is None
     return repository, store, pipeline, path, outcome
 
@@ -237,7 +237,11 @@ def test_a_located_person_becomes_an_occurrence_and_never_anything_more(ingested
 
     person = people[0]
     assert len(bytes(person["identity_key"])) == 32
-    assert person["quality"]["label"] == "person"
+    # `part`, not `label`. Schema version 2 stopped routing people through the object list, so
+    # the model no longer writes free text about somebody: a part from a closed vocabulary says
+    # where they are without saying anything about who they are.
+    assert person["quality"]["part"] == "full_body"
+    assert "label" not in person["quality"]
     assert person["quality"]["trust_tier"] == "T2"
 
     # The occurrence points at a REGION of the photograph, not at the whole frame. Without that
@@ -434,9 +438,7 @@ def _pil_image_open_calls(tree: ast.Module) -> list[ast.Call]:
         called = _dotted_name(node.func)
         if called is None:
             continue
-        if called in direct or (
-            called.endswith(".open") and called[: -len(".open")] in modules
-        ):
+        if called in direct or (called.endswith(".open") and called[: -len(".open")] in modules):
             calls.append(node)
     return calls
 
@@ -576,10 +578,36 @@ def _events(repository, run_id):
     ]
 
 
+def _runs_for_capture(repository, capture_id):
+    """Every run recorded against one capture, in the order they were opened.
+
+    One photograph is two runs, since the vision stage began requiring a privacy screening
+    receipt for the exact bytes it sends. A receipt is keyed to a capture, and the capture does
+    not exist until intake has committed, so intake is one run and the derivative stages are
+    another. Both attach the capture, which is what keeps the pair recoverable from the ledger
+    alone rather than from whatever the caller happened to hold on to.
+    """
+    return [
+        row["run_id"]
+        for row in repository.connection.execute(
+            "select run_id from pipeline_run where capture_id = %s order by run_id", (capture_id,)
+        ).fetchall()
+    ]
+
+
 def test_the_ledger_records_every_stage_with_timing_and_its_inputs(ingested):
     repository, _store, _pipeline, _path, outcome = ingested
-    events = _events(repository, outcome.run_id)
-    assert [e["seq"] for e in events] == list(range(1, len(events) + 1)), "seq must be gapless"
+    # Read across both runs of the one photograph. ``seq`` is checked per run because that is
+    # what the column promises: gapless within a run, not across the pair.
+    runs = _runs_for_capture(repository, outcome.capture_id)
+    assert len(runs) == 2, runs
+    events = []
+    for run_id in runs:
+        recorded = _events(repository, run_id)
+        assert [e["seq"] for e in recorded] == list(range(1, len(recorded) + 1)), (
+            "seq must be gapless"
+        )
+        events.extend(recorded)
 
     started = {e["stage_key"]: e for e in events if e["type"] == "stage_started"}
     assert set(started) == {"intake", "rendition", "vision"}
@@ -639,9 +667,7 @@ def test_the_ledger_records_the_prompt_and_schema_version_in_the_artifact_it_poi
     assert header["prompt_sha256"] == prompt_digest()
 
 
-def test_a_failed_stage_is_recorded_as_failed_with_its_error_class(
-    tmp_path, photo_dir, repository
-):
+def test_a_failed_stage_is_recorded_as_failed_with_its_error_class(tmp_path, photo_dir, repository):
     class Exploding:
         model_id = "MiniMaxAI/MiniMax-M3"
 
@@ -650,7 +676,11 @@ def test_a_failed_stage_is_recorded_as_failed_with_its_error_class(
 
     path = write_photo(photo_dir, "a.jpg")
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    outcome = PhotoIngestPipeline(repository, store, vision=Exploding()).ingest_file(path)
+    pipeline = PhotoIngestPipeline(repository, store, vision=Exploding())
+    # Screened, because a vision stage with no screening receipt never reaches the model at all:
+    # it reports itself unavailable and there is no failure to record. The stage has to be
+    # allowed to look before "it looked and the endpoint said no" is a thing that can happen.
+    outcome = ingest_observed(pipeline, repository, path)
 
     assert outcome.error is not None
     events = _events(repository, outcome.run_id)
@@ -754,9 +784,7 @@ def test_an_explicit_hash_blocklist_refuses_the_write_and_cancels_the_run(ingest
     not have failed however the pipeline behaved. It was a test of nothing.
     """
     repository, store, pipeline, path, first = ingested
-    _capture, tombstone_id = _delete_capture(
-        repository, reason="never again", blocklist_hash=True
-    )
+    _capture, tombstone_id = _delete_capture(repository, reason="never again", blocklist_hash=True)
     _purge_every_blob(store, tombstone_id)
     assert not store.exists(first.blob_id), "the fixture must start from genuinely erased bytes"
     assert list(store.iter_blob_ids()) == []
@@ -794,6 +822,7 @@ _SPINE_MODULES = (
     "derived.py",
     "inferences.py",
     "occurrences.py",
+    "person_consent.py",
     "privacy.py",
     "reconstruction_jobs.py",
     "reconstruction_scenes.py",
@@ -836,9 +865,7 @@ def _ingest_package_modules() -> list[pathlib.Path]:
     reaches the stage modules and the upload route by name, so the sweep cannot go quiet again
     by code moving away from it.
     """
-    return sorted(
-        path for package in _swept_packages() for path in package.rglob("*.py")
-    )
+    return sorted(path for package in _swept_packages() for path in package.rglob("*.py"))
 
 
 def _store_write_call_sites() -> list[str]:
@@ -1026,7 +1053,7 @@ def _annotations_naming_a_connection() -> list[str]:
 def test_every_spine_function_takes_a_workspace_scope():
     """Nothing in the spine package is reachable by a session that named no workspace.
 
-    59 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
+    62 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
     those policies compare against, and the tombstone and epistemic guards go further: they call
     ``assert_workspace_context()`` and raise when it is unset, because a guard that silently sees
     no tombstones is worse than no guard. So no path into the spine package may begin with a
@@ -1095,7 +1122,14 @@ def _commit_a_workspace_tombstone_from_another_connection(ingest_spine) -> None:
 
 
 def _race_a_tombstone(
-    ingest_spine, tmp_path, photo_dir, monkeypatch, *, intercept: str, on_call: int = 1
+    ingest_spine,
+    tmp_path,
+    photo_dir,
+    monkeypatch,
+    *,
+    intercept: str,
+    on_call: int = 1,
+    observed: bool = False,
 ):
     """Run one ingest with a real tombstone committed just before ``intercept`` writes.
 
@@ -1104,6 +1138,13 @@ def _race_a_tombstone(
     and arrives as an SQLSTATE. That distinction is the point: a trigger can only raise an
     SQLSTATE, an SQLSTATE reaches ``ingest_file`` through its generic handler, and the generic
     handler records the run as **failed**, which is the state a worker retries.
+
+    ``observed`` splits the ingest into the two halves a screened one takes, and only the race
+    that has to reach the vision stage asks for it: that stage will not send a photograph
+    anywhere without a privacy screening receipt for its exact bytes, and a receipt cannot exist
+    until intake has committed. The races against intake and against the rendition stage's
+    artifact write are reached by a one-shot ``ingest_file`` and are left on it, because a
+    screening they never needed would move what call number three is.
     """
     repository, _open_another = ingest_spine
     path = write_photo(photo_dir, "a.jpg")
@@ -1126,7 +1167,10 @@ def _race_a_tombstone(
         return real(*args, **kwargs)
 
     monkeypatch.setattr(repository, intercept, interception)
-    outcome = pipeline.ingest_file(path)
+    if observed:
+        outcome = ingest_observed(pipeline, repository, path)
+    else:
+        outcome = pipeline.ingest_file(path)
 
     assert fired, f"the interception on {intercept} never ran, so nothing was raced"
     assert outcome.error is not None and "tombstoned" in outcome.error, outcome.error
@@ -1173,7 +1217,7 @@ def test_a_tombstone_racing_the_vision_stage_cancels_the_run_and_writes_no_occur
     ``test_no_derivative_is_written_for_tombstoned_bytes``.
     """
     repository, _store = _race_a_tombstone(
-        ingest_spine, tmp_path, photo_dir, monkeypatch, intercept="insert_occurrence"
+        ingest_spine, tmp_path, photo_dir, monkeypatch, intercept="insert_occurrence", observed=True
     )
     assert repository.rows_in_schema("occurrence") == 0
     assert repository.rows_in_schema("capture") == 1, (
@@ -1301,8 +1345,9 @@ def test_no_derivative_is_written_for_tombstoned_bytes(
     purge queue, and it is still unimplemented.
     """
     # The THIRD call, which is the rendition stage's artifact WRITE. The measured sequence over
-    # one ingest_file is intake-persist, rendition-lookup, rendition-persist, vision-lookup,
-    # vision-persist, so racing call 3 commits the tombstone in the window between the rendition
+    # one unscreened ingest_file is intake-persist, rendition-lookup, rendition-persist: vision
+    # requires a screening receipt this call does not supply, so it returns before its own two
+    # look-ups. Racing call 3 commits the tombstone in the window between the rendition
     # stage deciding it has no artifact yet and inserting the one it just made, which is the
     # write migration 0011 refuses. Racing call 1 would abort intake instead and leave this
     # assertion true for the wrong reason: no rendition, because no intake.
@@ -1323,13 +1368,20 @@ def test_the_race_harness_intercepts_the_rendition_stages_artifact_write(
 ):
     """``on_call=3`` above is a positional count, so what sits in position three is an invariant.
 
-    Measured over one ``ingest_file``: five calls to ``find_artifact`` through the facade, in the
-    order intake-persist, rendition-lookup, rendition-persist, vision-lookup, vision-persist.
-    Nothing else pins that. A single extra look-up added anywhere before the rendition stage
-    would slide the whole sequence along, ``test_no_derivative_is_written_for_tombstoned_bytes``
-    would race a different guard, and it would go on passing while proving something else. That
-    is the failure this exists to make loud rather than silent, so the observed sequence is
-    printed on failure.
+    Measured over one ``ingest_file``: three calls to ``find_artifact`` through the facade, in the
+    order intake-persist, rendition-lookup, rendition-persist. Nothing else pins that. A single
+    extra look-up added anywhere before the rendition stage would slide the whole sequence along,
+    ``test_no_derivative_is_written_for_tombstoned_bytes`` would race a different guard, and it
+    would go on passing while proving something else. That is the failure this exists to make
+    loud rather than silent, so the observed sequence is printed on failure.
+
+    **RE-MEASURED 2026-09-06, and the number that matters did not move.** It was five calls,
+    ending vision-lookup, vision-persist. The vision stage now requires a privacy screening
+    receipt because it sends the photograph to a hosted model, and this ``ingest_file`` supplies
+    none, so vision reports itself unavailable and returns before either of its look-ups. Position
+    three is still the rendition persist, which is the whole reason the sibling races call 3, so
+    the guarantee is unchanged and only the tail is shorter. Recorded rather than quietly edited,
+    because a measured sequence that changes for a reason is worth the sentence.
 
     Attributed by the caller's own frame rather than by a stack search, so a call that stopped
     going through the facade would not be counted here at all, which is the other thing worth
@@ -1353,8 +1405,6 @@ def test_the_race_harness_intercepts_the_rendition_stages_artifact_write(
     assert observed == [
         "pipeline.py:persist_artifact",
         "rendition.py:run",
-        "pipeline.py:persist_artifact",
-        "vision.py:run",
         "pipeline.py:persist_artifact",
     ], (
         "the find_artifact sequence changed, so on_call=3 in "
@@ -1420,11 +1470,7 @@ def test_the_object_lock_is_taken_before_the_first_content_write(
     # And say which zero this is. The statements that DO precede the lock are named, so this
     # test cannot be satisfied one day by an insert nobody noticed moving ahead of it.
     ahead = sorted(
-        {
-            s.lower().split()[2]
-            for s in statements[:lock_at]
-            if s.lower().startswith("insert into ")
-        }
+        {s.lower().split()[2] for s in statements[:lock_at] if s.lower().startswith("insert into ")}
     )
     assert ahead == ["pipeline_event", "pipeline_run"], (
         f"{ahead} are written before the object lock. Only the ledger may be, because a ledger "

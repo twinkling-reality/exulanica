@@ -48,6 +48,7 @@ from fastapi import APIRouter, Header, HTTPException, Path, Request, Response
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.evidence import EvidenceAddress, parse_uri
+from exulanica.evidence.blob import BlobId
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
@@ -72,6 +73,66 @@ def original(
     address, media_type, clock = _address(connection, session, span_id)
     data = resolve_original_bytes(address, get_services(request).store)
     return _ranged(data, media_type, range_header, clock)
+
+
+@router.get(
+    "/{span_id}/masked",
+    summary="The photograph with every unconsented person filled neutral.",
+)
+def masked(
+    span_id: Annotated[uuid.UUID, Path()],
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    range_header: Annotated[str | None, Header(alias="range")] = None,
+) -> Response:
+    """The derivative a viewer may see, never the original bytes behind it.
+
+    A sibling of the route above rather than a change to it, and the distinction is not cosmetic.
+    ``GET /evidence/{span_id}`` resolves the exact bytes a citation names, and those bytes are
+    inside the span digest: serving something else there would break every archived citation that
+    verifies against it. So the original endpoint keeps its meaning and this one exists for the
+    world, which shows photographs to people rather than resolving citations.
+
+    **Refuses rather than falling back.** When the photograph contains somebody who has not
+    consented and no masked derivative exists, this returns 409 and no bytes. Serving the original
+    would show exactly the person the derivative exists to hide, on the one path a viewer actually
+    looks at, and it would do it precisely when something upstream had already gone wrong.
+    """
+    address, media_type, clock = _address(connection, session, span_id)
+    row = connection.execute(
+        "select c.capture_id, capture_requires_masking(c.workspace_id, c.capture_id) as needed, "
+        "(select a.content_sha256 from artifact a where a.workspace_id = c.workspace_id "
+        " and a.kind = 'masked_source' and a.source_blob_sha256 = c.blob_sha256 "
+        " and a.purged_at is null and a.content_sha256 is not null "
+        " order by a.stage_version desc, a.created_at desc limit 1) as masked_sha256 "
+        "from capture c where c.workspace_id = %s and c.blob_sha256 = %s "
+        "and c.deleted_at is null limit 1",
+        (session.workspace_id, address.blob_id.digest),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="no live capture holds these bytes")
+    if not row["needed"]:
+        # Nobody in this photograph is hidden, so the masked view and the original are the same
+        # picture. Served rather than refused, so a caller does not have to ask twice.
+        return _ranged(
+            resolve_original_bytes(address, get_services(request).store),
+            media_type,
+            range_header,
+            clock,
+        )
+    if row["masked_sha256"] is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "this photograph contains a person who has not consented to their likeness and "
+                "no masked derivative exists yet"
+            ),
+        )
+    store = get_services(request).store
+    return _ranged(
+        store.get(BlobId(bytes(row["masked_sha256"]))), "image/jpeg", range_header, clock
+    )
 
 
 @router.get("/{span_id}/region", summary="The region of the original this span names, as PNG.")

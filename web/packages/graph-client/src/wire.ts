@@ -48,6 +48,14 @@ export interface ReconstructionScenePayload {
   readonly receipt_state: 'available' | 'missing' | 'invalid';
   readonly placement_state: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
   readonly rendering_substrate: 'posed_point_maps' | 'gaussian_splats' | 'source_photographs';
+  /**
+   * How many people in this scene are not being drawn, counted by the server.
+   *
+   * Server-side on purpose: a client that failed to load the region rows would otherwise compute
+   * zero and tell the viewer that nobody is hidden.
+   */
+  readonly hidden_person_count: number;
+  readonly masked_member_count: number;
   readonly trained_geometry?: {
     readonly artifact_id: string;
     readonly content_sha256: string;
@@ -79,6 +87,27 @@ export interface ReconstructionScenePayload {
     readonly capture_id: string;
     readonly ordinal: number;
     readonly registered: boolean;
+    /**
+     * The people in this photograph: an outline and a state, never pixels.
+     *
+     * A masked region's bytes were replaced with neutral fill before reconstruction read them,
+     * so there is nothing here a rendering bug could turn back into somebody's face.
+     */
+    readonly person_regions: readonly {
+      readonly region_id: string;
+      readonly state: 'unknown' | 'present' | 'shown' | 'hidden' | 'withdrawn';
+      readonly silhouette_ppm: readonly (readonly number[])[];
+      readonly display_name: string | null;
+      readonly subject_id: string | null;
+    }[];
+    /**
+     * Whether anybody has screened this photograph for people at all.
+     *
+     * `unscreened` is not the same fact as an empty `person_regions`, and the difference is the
+     * whole point: one means there is nobody to hide, the other means nobody has looked. Treat an
+     * absent or unrecognised value as `unscreened` and draw no pixels.
+     */
+    readonly person_review_state: 'unscreened' | 'screened' | 'stale';
     readonly recovered_camera?: {
       readonly scene_from_camera_row_major: readonly number[];
       readonly calibration: {

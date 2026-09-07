@@ -224,6 +224,8 @@ export function adaptSnapshot(
         receiptState: row.receipt_state,
         placementState: row.placement_state,
         renderingSubstrate: row.rendering_substrate,
+        hiddenPersonCount: row.hidden_person_count ?? 0,
+        maskedMemberCount: row.masked_member_count ?? 0,
         members: row.members.map((member) => ({
           captureId: member.capture_id,
           ordinal: member.ordinal,
@@ -234,6 +236,20 @@ export function adaptSnapshot(
             projection: member.recovered_camera.projection,
           },
           exclusionReason: member.exclusion_reason,
+          // Carried, not dropped. This mapping is the only path between what the server sends
+          // and what a draw site can see, and for a while it silently discarded both of these:
+          // the fields were declared on the wire, resolved by the server and thrown away here,
+          // so every consent decision stopped at the parser.
+          personRegions: (member.person_regions ?? []).map((person) => ({
+            regionId: person.region_id,
+            state: person.state,
+            silhouettePpm: person.silhouette_ppm,
+            displayName: person.display_name,
+            subjectId: person.subject_id,
+          })),
+          // Absent reads as unscreened, which draws nothing. An older server that does not send
+          // this field must not thereby be treated as having screened the photograph.
+          personReviewState: member.person_review_state ?? 'unscreened',
           placement: member.placement === null
             ? null
             : {

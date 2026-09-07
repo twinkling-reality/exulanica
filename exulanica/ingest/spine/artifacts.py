@@ -165,6 +165,7 @@ def insert(
     byte_size: int,
     produced_by_event: uuid.UUID | None,
     privacy_screening_id: uuid.UUID | None = None,
+    read_source_sha256: bytes | None = None,
 ) -> bool:
     """Insert a derivative. Returns False when another worker already produced it.
 
@@ -179,8 +180,9 @@ def insert(
         cursor = scope.connection.execute(
             "insert into artifact (artifact_id, workspace_id, kind, source_blob_sha256, "
             "stage_key, stage_version, params_digest, input_digest, idempotency_key, "
-            "content_sha256, storage_key, byte_size, produced_by_event,privacy_screening_id) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "content_sha256, storage_key, byte_size, produced_by_event, privacy_screening_id, "
+            "read_source_sha256) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             "on conflict (workspace_id, idempotency_key) do nothing",
             (
                 artifact_id,
@@ -197,6 +199,7 @@ def insert(
                 byte_size,
                 produced_by_event,
                 privacy_screening_id,
+                read_source_sha256,
             ),
         )
     return cursor.rowcount > 0
