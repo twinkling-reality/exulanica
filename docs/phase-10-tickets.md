@@ -468,9 +468,14 @@ product's whole epistemic claim made physical.
       the receipt holds. EXECUTED 2026-09-06 over the trained bowl.
 - [x] Each listed observation carries the photograph's consent state, from the same seam the World
       Read bundle uses (`consent_for_captures`).
-- [ ] A photograph whose person state forbids it is not offered. Open, and it is P10-5's to close:
-      no per-person state exists yet, so today every observation reports `person_consent:
-      unavailable` and the caller has nothing to filter on.
+- [ ] A photograph whose person state forbids it is not offered. **Still open on 2026-09-07, and
+      the reason changed.** The vocabulary now exists: an observation reports `person_consent`
+      as `unscreened` or `recorded` rather than the flat `unavailable` it reported before the
+      person layer merged, so a caller can tell a photograph nobody examined from one whose people
+      are on file. What it still cannot do is filter, because no state for an individual person
+      reaches an observation, and putting one there means putting a clock-dependent value inside a
+      digest-bound answer. That is the same blocker P10-1-c-2 records, and it is one decision
+      rather than two.
 - [x] A new authenticated route serving pose-receipt observations, guarded by
       `tombstone_blocks_scene` (not `tombstone_blocks_capture`, which is the wrong reduction for a
       fact about N photographs) and `person_withdrawal_blocks_artifact`.
@@ -608,3 +613,32 @@ The roadmap names these; they are cut to make room and are not silently dropped:
 
 P10-5's seam is written inside P10-1-a rather than after it, because a read API that has to be
 retrofitted with a consent check is a read API that shipped without one.
+
+---
+
+## Phase 2, executed 2026-09-07 on the merged tree
+
+Nine items, each scoped to a disjoint file set, each scoped and implemented and then checked by an
+adversarial pass that was told to default to rejecting. Two were rejected and reworked; the
+rejections are the useful part of this record and are written up where the work lives rather than
+summarised away here.
+
+| Item | Outcome |
+| --- | --- |
+| A withdrawn person's name reaches the browser | **Closed**, after the first fix closed one of four surfaces and was reported as complete. `docs/person-presentation-consent.md` |
+| An unlocated person's mask is swallowed at cell (8,8) | **Closed in the pipeline, inert on the shipping detector.** One line in `person_detectors.py` remains, with a strict `xfail` armed for it |
+| The bundle publishes a superseded receipt as eligible | **Closed.** 281 of 283 retained captures were affected |
+| Migration numbers are first-come and unchecked | **Closed.** Enumeration refuses a duplicate version rather than forking the schema silently |
+| The predecessor chain is enforced for two records by name | **Closed.** Every declared binding is checked, and the records that declare none are reported rather than failed |
+| `verify_reference_controls.py` cannot run from a fresh clone | **Closed.** Its own 15-mutation run has NOT been re-executed since |
+| The masked-geometry count is called by nothing | **Not wired.** Correctly refused: it needs a trained scene, and no test here runs real CUDA training. A nonfinite opacity is now refused rather than silently read as transparent |
+| Consent receipts in the World Memory Package | **Not projected.** The regression guard for `exulanica-wmp-1.0` landed; the profile bump did not. A tripwire holds the blocker |
+| Widen the `.exulanica` ignore rule | **Closed in both checkouts.** A working-tree edit in the main checkout cannot reach a linked worktree, which has its own file on its own branch |
+
+**What this phase did not touch, and why.** `record_human_screening` still blocks any screening
+naming a person in a masked state, and its only production caller passes an empty region list, so
+the masking path has no honest route through production. Its own comment says the rule should
+become "eligible if every masked region has a current `masked_source` derivative" once masking is
+wired, and masking is now wired. Changing it is a safety decision with a real failure direction,
+it gates wiring the review screen, and it is not an implementation task. It is stated in
+`docs/person-presentation-consent.md` and left for a decision.
