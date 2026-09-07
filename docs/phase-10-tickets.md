@@ -635,10 +635,17 @@ summarised away here.
 | Consent receipts in the World Memory Package | **Not projected.** The regression guard for `exulanica-wmp-1.0` landed; the profile bump did not. A tripwire holds the blocker |
 | Widen the `.exulanica` ignore rule | **Closed in both checkouts.** A working-tree edit in the main checkout cannot reach a linked worktree, which has its own file on its own branch |
 
-**What this phase did not touch, and why.** `record_human_screening` still blocks any screening
-naming a person in a masked state, and its only production caller passes an empty region list, so
-the masking path has no honest route through production. Its own comment says the rule should
-become "eligible if every masked region has a current `masked_source` derivative" once masking is
-wired, and masking is now wired. Changing it is a safety decision with a real failure direction,
-it gates wiring the review screen, and it is not an implementation task. It is stated in
-`docs/person-presentation-consent.md` and left for a decision.
+**The decision this phase surfaced, taken the same day.** `record_human_screening` blocked any
+screening naming a person in a masked state, which left the masking path with no honest route
+through production. It now admits such a screening when every named masked region is one the
+pipeline is already hiding AND the derivative is current under the key today's regions and
+consents produce. Three cases are executed against a real database and each fails under a
+different wrong rule, including the one this change first shipped; the reasoning and the table are
+in `docs/person-presentation-consent.md`.
+
+**What is still open after it.** Nothing puts person regions on the retained collections. The
+production worker defaults its detector to `unavailable`, and the reviewer screen is imported by
+nothing but its own test, so the two ways a region could arrive are both switched off. Until one
+of them is wired, the screening rule change moves nothing on real data: it removes the blocker
+rather than producing the regions. That is the next thing worth doing, and it is a wiring task
+rather than a decision.
