@@ -99,6 +99,13 @@ CONTROLS = [
 def main() -> int:
     env = {k: v for k, v in os.environ.items() if not k.startswith("EXULANICA_")}
     env.update(EXULANICA_TEST_DATABASE_URL=DATABASE, PYTHONDONTWRITEBYTECODE="1")
+    # Created before the baseline subprocess, not merely before the write. .exulanica is gitignored
+    # and no tracked file recreates it, so a fresh clone has no such directory, and the baseline log
+    # is only written after the isolated suite has run: a mkdir any later would discard minutes of
+    # pytest work to a FileNotFoundError. (MEASURED 2026-09-07: the unguarded write raised
+    # FileNotFoundError on a fresh-clone-shaped ROOT and left no baseline log at all.)
+    output_root = ROOT / ".exulanica/reference-baseline"
+    output_root.mkdir(parents=True, exist_ok=True)
     records = []
     with tempfile.TemporaryDirectory(prefix="exulanica-reference-controls-") as temporary:
         work = Path(temporary)
@@ -121,7 +128,7 @@ def main() -> int:
             command, cwd=work, env=env, capture_output=True, text=True, check=False
         )
         baseline_output = baseline.stdout + baseline.stderr
-        (ROOT / ".exulanica/reference-baseline/control-baseline.log").write_text(baseline_output)
+        (output_root / "control-baseline.log").write_text(baseline_output)
         if baseline.returncode:
             raise RuntimeError("unmodified isolated baseline failed; no mutant result is valid")
         for name, filename, old, new, selector in CONTROLS:
@@ -142,7 +149,7 @@ def main() -> int:
             finally:
                 path.write_text(original)
             output = result.stdout + result.stderr
-            (ROOT / ".exulanica/reference-baseline" / f"control-{name}.log").write_text(output)
+            (output_root / f"control-{name}.log").write_text(output)
             records.append(
                 {
                     "mutation": name,
