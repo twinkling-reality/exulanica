@@ -8,6 +8,7 @@ with the code under test proves that the code agrees with itself.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 import uuid
@@ -475,3 +476,189 @@ def test_the_scene_filter_is_applied_in_the_query(published, repository):
     # And narrowing changes the answer for that scene not at all.
     whole = reconstruction_scene_rows(repository.connection, repository.workspace_id, store)
     assert narrowed[0] == next(row for row in whole if row.scene_id == scene_id)
+
+
+_SUPERSEDED_POLICY = "exulanica.reconstruction-privacy/v1"
+
+
+def _screen_again_under_the_superseded_policy(repository, capture_id: uuid.UUID) -> uuid.UUID:
+    """Write a newer screening receipt for this photograph under the policy version 2 replaced.
+
+    An insert rather than an update, and not for convenience: migration 0029 puts
+    ``tg_reconstruction_privacy_screening_append_only`` on this table, so a receipt's
+    ``policy_version`` cannot be edited after the fact. That is also the shape of the real case
+    this stands in for, where the receipt was written under version 1 and the policy moved
+    afterwards.
+
+    The receipt is built the way ``exulanica.ingest.privacy._record_screening`` builds one, because
+    the table checks that ``digest(receipt_canonical,'sha256')`` is ``receipt_digest`` and that the
+    canonical bytes parse back to ``receipt_record``. It cannot be produced by calling that
+    function, which hardcodes the current ``PRIVACY_POLICY_VERSION``.
+    """
+    authorization = repository.connection.execute(
+        "select authorization_id from capture_reconstruction_authorization "
+        "where workspace_id=%s and capture_id=%s",
+        (repository.workspace_id, capture_id),
+    ).fetchone()
+    assert authorization is not None, "the fixture must authorize its captures"
+    row = repository.reconstruction_authorization(authorization["authorization_id"])
+    assert row is not None
+
+    params_digest = hashlib.sha256(b"exulanica.reconstruction-privacy/v1 params").digest()
+    # Later than the 2026-09-04 the fixture screens at, so `distinct on ... screened_at desc`
+    # selects this one. A test whose superseding receipt lost the ordering would pass for the
+    # wrong reason.
+    screened_at = dt.datetime(2026, 9, 5, tzinfo=dt.UTC)
+    record = {
+        "profile": "exulanica.reconstruction-privacy-screening-receipt/v1",
+        "authorization": {
+            "authorization_id": str(row.authorization_id),
+            "evidence_sha256": row.evidence_digest.hex(),
+            "scope": row.authorization_scope,
+        },
+        "capture_id": str(capture_id),
+        "source_sha256": row.source_sha256.hex(),
+        "screening_method": "synthetic_exemption",
+        "model": None,
+        "human_review": {"required": False, "reviewed_by": None},
+        "sensitive_regions": [],
+        "mask_artifacts": [],
+        "eligibility_state": "eligible",
+        "blocking_reasons": [],
+        "policy": {"version": _SUPERSEDED_POLICY, "params_sha256": params_digest.hex()},
+        "screened_at": "2026-09-05T00:00:00+00:00",
+        "valid_until": None,
+    }
+    canonical = _canonical(record)
+    digest = hashlib.sha256(canonical).digest()
+    screening_id = uuid.uuid4()
+    repository.insert_privacy_screening(
+        screening_id=screening_id,
+        authorization_id=row.authorization_id,
+        capture_id=capture_id,
+        source_sha256=BlobId(row.source_sha256),
+        screening_method="synthetic_exemption",
+        human_review_required=False,
+        reviewed_by=None,
+        sensitive_regions=[],
+        eligibility_state="eligible",
+        blocking_reasons=[],
+        policy_version=_SUPERSEDED_POLICY,
+        policy_params_digest=params_digest,
+        authorization_scope=row.authorization_scope,
+        screened_at=screened_at,
+        valid_until=None,
+        receipt_record=record,
+        receipt_canonical=canonical,
+        receipt_digest=digest,
+    )
+    return screening_id
+
+
+def test_a_receipt_the_database_refuses_is_not_reported_as_simply_eligible(published, repository):
+    """A receipt written under a superseded policy must not be published as screened and eligible.
+
+    This is the bundle contradicting its own database. ``privacy_screening_allows_capture``
+    (migration 0037) requires ``s.policy_version = current_privacy_policy()``, and version 2
+    replaced "is anybody visible?" with a region list carrying a consent state per person, so a
+    version 1 receipt does not carry forward. The bundle applied no such check: it selected the
+    newest receipt per capture and published its ``eligibility_state`` verbatim.
+
+    MEASURED 2026-09-07 against the retained ``public`` schema: 281 of the 283 captures whose
+    newest receipt is retained say ``eligible`` while the database refuses geometry for them on
+    the policy version alone, and none is both eligible and current. So this is not a hypothetical
+    shape, it is the whole of the retained corpus.
+
+    What is asserted is the DISTINCTION, not a rewrite. The receipt still says ``eligible``,
+    because that is what the named reviewer wrote and no read path gets to edit it. What is added
+    is whether the policy in force still accepts it.
+    """
+    store, captures, scene_id = published
+    refused_capture = captures[0]
+    superseded_id = _screen_again_under_the_superseded_policy(repository, refused_capture)
+
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    per_capture = envelope["bundle"]["consent"]["per_capture"]
+    refused = per_capture[str(refused_capture)]
+
+    # The receipt is untouched: it says screened, and it says eligible, because it does.
+    assert refused["screening"]["state"] == "screened"
+    assert refused["screening"]["eligibility"] == "eligible"
+    assert refused["screening"]["policy_version"] == _SUPERSEDED_POLICY
+    # And the new fact, which is the one the database actually gates on.
+    assert refused["screening"]["policy_in_force"] == "exulanica.reconstruction-privacy/v2"
+    assert refused["screening"]["under_current_policy"] is False
+    assert "screened again" in refused["screening"]["policy_reason"]
+    # The reason must not overstate what was checked. Being current is one term of the predicate.
+    assert "not sufficient" in refused["screening"]["policy_reason"]
+
+    # The database agrees, which is what makes this a test about the contradiction rather than
+    # about a string the bundle builder chose.
+    assert repository.privacy_screening_allows(refused_capture, superseded_id) is False
+
+    # The discriminating control, in the same scene and the same bundle. An all-superseded fixture
+    # would be passed by a hardcoded False. MEASURED 2026-09-07: the sibling fold test in this file
+    # records a mutant that survived exactly that mistake.
+    others = [str(capture) for capture in captures[1:]]
+    assert others, "a mixed scene is the point; a one-member fixture proves nothing here"
+    for key in others:
+        current = per_capture[key]
+        assert current["screening"]["under_current_policy"] is True
+        assert current["screening"]["policy_version"] == "exulanica.reconstruction-privacy/v2"
+        newest = repository.connection.execute(
+            "select screening_id from reconstruction_privacy_screening "
+            "where workspace_id=%s and capture_id=%s order by screened_at desc limit 1",
+            (repository.workspace_id, uuid.UUID(key)),
+        ).fetchone()
+        assert newest is not None
+        assert repository.privacy_screening_allows(uuid.UUID(key), newest["screening_id"]) is True
+
+
+def test_the_policy_currency_field_cannot_move_the_recorded_digest_on_a_timer(
+    published, repository
+):
+    """The policy half of the gate may go in the digest; the expiry half beside it may not.
+
+    ``privacy_screening_allows_capture`` is a conjunction of terms that do not behave alike.
+    ``s.policy_version = current_privacy_policy()`` compares against an ``immutable`` function
+    returning a literal, so it moves only when a migration writes a new version. Its neighbours
+    ``s.valid_until > clock_timestamp()`` and ``a.valid_until > clock_timestamp()`` move with no
+    write at all, which is why the bundle reports the first and not the whole predicate.
+
+    This is armed for the migration that redefines ``current_privacy_policy()`` as anything but a
+    literal. That would put a timer inside ``recorded_keys`` and make the recorded digest of every
+    bundle unquotable, and it would do it silently.
+    """
+    store, _captures, scene_id = published
+    # Every visible definition, not the first one. MEASURED 2026-09-07: during a suite run two
+    # rows come back, `public`'s and the throwaway schema's, and `public` sorts first, so an
+    # unscoped fetchone() was reading the retained schema's function rather than the one this
+    # test's own migration just created. A tripwire armed against the wrong schema is not armed:
+    # a migration that made this function volatile would change it in the scratch schema while
+    # `public` kept its 'i', and this would have passed.
+    volatility = repository.connection.execute(
+        "select n.nspname, p.provolatile from pg_proc p "
+        "join pg_namespace n on n.oid = p.pronamespace "
+        "where p.proname = 'current_privacy_policy'"
+    ).fetchall()
+    assert volatility, "the policy predicate must exist to be reported"
+    assert all(row["provolatile"] == "i" for row in volatility), (
+        "current_privacy_policy() stopped being immutable in "
+        f"{[row['nspname'] for row in volatility if row['provolatile'] != 'i']}, so the policy "
+        "currency this bundle reports can now change with no write, and it is inside recorded_keys"
+    )
+
+    first = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    second = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert first is not None and second is not None
+    assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]
+    assert first["bundle_sha256"] == second["bundle_sha256"]
+    # The field is genuinely inside the recorded recipe, so the equality above is a claim about
+    # this field and not about some unrelated subset of the bundle.
+    recorded = {key: first["bundle"][key] for key in first["bundle"]["recorded_keys"]}
+    assert "consent" in recorded
+    assert all(
+        "under_current_policy" in record["screening"]
+        for record in recorded["consent"]["per_capture"].values()
+    )

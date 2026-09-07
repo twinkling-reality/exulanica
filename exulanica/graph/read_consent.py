@@ -30,6 +30,19 @@ whether a photograph has been screened and how many live regions it carries, are
 queries with no time predicate. The rule is short enough to state: **the recorded digest may not
 depend on the clock**, and keeping the resolved states out of the bundle is how that is kept.
 
+**Why the policy version is the one part of the database's own predicate that may be reported.**
+``privacy_screening_allows_capture`` in migration 0037 is a conjunction, and its terms do not all
+behave the same way under the rule above. ``s.policy_version = current_privacy_policy()`` compares
+against a function declared ``immutable`` that returns a literal, verified in the migration text
+and live (``pg_proc.provolatile = 'i'``), so it can only change when a migration writes a new
+version. Its neighbours ``s.valid_until > clock_timestamp()`` and ``a.valid_until >
+clock_timestamp()`` are exactly the shape the rule forbids. So ``screening`` reports whether the
+receipt was written under the policy in force and does not claim the database accepts it, because
+half of that predicate cannot be put inside a digest. One consequence is worth stating rather than
+discovering: a migration that bumps ``current_privacy_policy()`` moves the recorded digest of
+every bundle. That is a write and not a tick, so the rule holds, but it is a new way for the
+digest to move.
+
 **The basis is per photograph, not a module constant.** ``CONSENT_BASIS``'s first version carried
 a comment demanding that a later basis be a new value rather than a silent change of meaning under
 the same name. It is now two values, and which one applies depends on whether that photograph has
@@ -89,6 +102,14 @@ select distinct on (s.capture_id)
  order by s.capture_id, s.screened_at desc, s.screening_id desc
 """
 
+#: The policy a receipt has to have been written under to still count, asked of the database rather
+#: than imported from :data:`exulanica.ingest.privacy.PRIVACY_POLICY_VERSION`. The question this
+#: record answers is what the DATABASE demands of a receipt, and if the Python constant ever drifts
+#: from the SQL function, a bundle that read the constant would report the drift as agreement.
+#: Migration 0037 made this a function rather than a literal inside the resolver for exactly that
+#: reason: one place to move it, one place to compare against.
+_POLICY_IN_FORCE: Final = "select current_privacy_policy() as policy"
+
 
 def consent_for_captures(
     connection: psycopg.Connection,
@@ -110,11 +131,28 @@ def consent_for_captures(
     one; duplicating it here would be the second implementation of the presentation rule that
     ``person_regions`` warns against, and the direction two implementations drift is a person shown
     who should not have been.
+
+    The screening half reports two facts that used to be one. ``eligibility`` is what the receipt
+    says, unchanged and never rewritten here. ``under_current_policy`` is whether that receipt was
+    written under the policy the database now demands, which is a term of
+    ``privacy_screening_allows_capture`` and, before this, the one the bundle silently assumed.
+    MEASURED 2026-09-07 against the retained ``public`` schema, by the query in the test named
+    for this: of the 283 captures whose newest receipt is retained, 281 say ``eligible`` while the
+    database refuses geometry for them on the policy version alone, and NONE is both eligible and
+    current. Every one of those 281 was published here as screened and eligible, which is a bundle
+    contradicting its own database.
     """
     rows: dict[uuid.UUID, dict[str, Any]] = {}
+    policy_in_force: str | None = None
     if capture_ids:
         for row in connection.execute(_SCREENINGS, (workspace, capture_ids)).fetchall():
             rows[row["capture_id"]] = row
+        # No try/except and no default. If `current_privacy_policy()` is missing this must raise,
+        # because every fallback available here is the permissive one: a bundle that guessed the
+        # policy would report a superseded receipt as current on the strength of the guess.
+        in_force = connection.execute(_POLICY_IN_FORCE).fetchone()
+        assert in_force is not None
+        policy_in_force = in_force["policy"]
 
     # One query for the whole member set, matching the shape of the screening query above rather
     # than asking once per capture.
@@ -133,16 +171,31 @@ def consent_for_captures(
                 "sensitive_region_count": None,
                 "policy_version": None,
                 "receipt_digest": None,
+                "policy_in_force": policy_in_force,
+                # No receipt is not a current receipt. The restrictive value is the default here
+                # for the same reason every requested capture appears in this mapping at all.
+                "under_current_policy": False,
+                "policy_reason": (
+                    "no screening receipt exists for this photograph, so there is nothing for "
+                    "the policy in force to accept"
+                ),
             }
         else:
+            current = row["policy_version"] == policy_in_force
             screening = {
                 "state": "screened",
                 "method": row["screening_method"],
+                # Never rewritten from the policy check beside it. What the receipt says and
+                # whether the receipt is still accepted are two facts, and a reader that collapsed
+                # them would be making the same coarse statement this layer exists to retire.
                 "eligibility": row["eligibility_state"],
                 "named_human_reviewer": bool(row["reviewed_by_a_named_actor"]),
                 "sensitive_region_count": int(row["sensitive_region_count"]),
                 "policy_version": row["policy_version"],
                 "receipt_digest": row["receipt_digest"],
+                "policy_in_force": policy_in_force,
+                "under_current_policy": current,
+                "policy_reason": _policy_reason(row["policy_version"], policy_in_force, current),
             }
         key = str(capture_id)
         person_state: PersonConsentState = (
@@ -169,6 +222,38 @@ def consent_for_captures(
             ),
         }
     return result
+
+
+#: Said in both branches of :func:`_policy_reason`, because a reader who saw it only on the
+#: superseded branch would read ``under_current_policy: true`` as "the database allows this", which
+#: is the permissive misreading. The three terms named here are real terms of
+#: ``privacy_screening_allows_capture`` and none of them is reported.
+_NOT_THE_WHOLE_PREDICATE: Final = (
+    "Being current under the policy is necessary and not sufficient: the receipt's validity "
+    "window, its authorization's window and any tombstone are also terms of "
+    "privacy_screening_allows_capture, and they are deliberately not reported here because they "
+    "move with the clock and this record is inside the bundle digest."
+)
+
+
+def _policy_reason(written_under: str, in_force: str | None, current: bool) -> str:
+    """Whether the policy in force still accepts a receipt written under ``written_under``.
+
+    Named for the half of the database's predicate it actually checks. The other half is stated as
+    absent rather than left out, because a field called something like ``allowed`` would be read as
+    the whole predicate and would be wrong for any receipt whose authorization had expired.
+    """
+    if current:
+        return (
+            f"this receipt was written under {written_under}, which is the policy in force. "
+            f"{_NOT_THE_WHOLE_PREDICATE}"
+        )
+    return (
+        f"this receipt says what it said and nothing here rewrites it, but it was written under "
+        f"{written_under} while the policy in force is {in_force}, so "
+        f"privacy_screening_allows_capture refuses geometry on it until this photograph is "
+        f"screened again. {_NOT_THE_WHOLE_PREDICATE}"
+    )
 
 
 def _live_region_counts(
