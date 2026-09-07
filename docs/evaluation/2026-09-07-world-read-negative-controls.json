@@ -3,7 +3,7 @@
   "record": {
     "profile": "exulanica.world-read-negative-controls/v1",
     "date": "2026-09-07",
-    "head": "ffb7476189046c231a8ce02efe7ab1b14a363f07",
+    "head": "0ebdb6a6c8c04d8032129d6b8e88a4c1772c057c",
     "database": "postgresql://localhost:5433/exulanica_spine_test",
     "isolated_source_copy": true,
     "baseline_passed": true,
@@ -17,7 +17,7 @@
         "test": "test_filing_a_generation_leaves_the_recorded_digest_untouched",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "f2d61ae90793a05a78974d282739129845d0f6c3c2a03803ca9dabfe5412b326",
+        "observed_output_sha256": "77ff1511987f8f34468902a85ffd100c1d03c7c1fa1fdf4bd5a6956b239e72fd",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -28,7 +28,7 @@
         "test": "test_a_non_finite_measurement_is_refused_rather_than_encoded",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "52e436609332d8f6a83be5af9d3452b730ee9a83a311b40c2286035c728c9afc",
+        "observed_output_sha256": "0c2edd38868727e9217c24773c476ac508f5df676287bb6bb123d185b0b772d0",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -39,7 +39,7 @@
         "test": "test_a_coordinate_too_large_to_encode_is_refused_rather_than_crashing",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "9f8465d48fbdfda711edcda35d871c27dc5303e3bcb682866dce4d1b477fc3fb",
+        "observed_output_sha256": "6ff797f41228a064d525c2606fa603e5303b6e8e589f59c615729c2a67339db5",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -50,7 +50,7 @@
         "test": "test_the_two_zeros_encode_to_the_same_string",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "044e116dbf0e540be1dac053a61c85cf420c1e683c7ebe466ff4a609b3da214f",
+        "observed_output_sha256": "8a0e36493d8a5389226b674285b6b252a43abd2e65e92859f28d6a2276f88063",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -61,7 +61,7 @@
         "test": "test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bundle",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "73725ca779121b35cb593c49fc06e214040d8d8a56f04fe00f5113983023062f",
+        "observed_output_sha256": "df6084114f9d92bac2991abeba435e9b3677d0e4d79abe4474abc9b7e526a12a",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -72,7 +72,7 @@
         "test": "test_consent_reports_the_screening_basis_and_refuses_to_infer_people",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "20bf8d69a065cf3fa9d8e3da5e2e424d0e632dd753eed5f6decc0cb720002976",
+        "observed_output_sha256": "5ea5b1e2fb639353a0afe58b080fc2df73cd7b1d8cb13ba00cf48f0b83fc5d2c",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -83,7 +83,7 @@
         "test": "test_the_scene_consent_answer_is_the_weakest_of_its_photographs",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "4012f46aec987bc0935c6ed548399b131348df95c1b2a76fea8d959f3d79297a",
+        "observed_output_sha256": "a7129ac90943d15b8ee0df1a44c2b587a9b5dba205a56bcd4c39be3583faf0ba",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -94,7 +94,7 @@
         "test": "test_the_read_bundle_keeps_generated_out_of_the_recorded_geometry_list",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "bbe186fa50d7113b7d6fba83a7e23b4a146d5709708c1a74ffa5ffb72b367e05",
+        "observed_output_sha256": "d3cf4f8c47d3d503ec9054711524f6fa14bb352ee990e6cce8354f8d13276286",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -105,7 +105,7 @@
         "test": "test_a_generation_naming_the_wrong_bundle_is_refused",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "e20dab4bb663e5146774d6adb968b4a2ed3391a775b2fcf9ee308794b975a94d",
+        "observed_output_sha256": "38ee004717d34957ff1fd0417f38ad5a62a0c408d56ed16d7ce7215da2561106",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -116,7 +116,7 @@
         "test": "test_a_model_swap_produces_a_different_artifact_identity",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "c837bf643d0a4fea558e1a57a7556a47eabc80f3ad9cf54031d6d4b350dd8ae9",
+        "observed_output_sha256": "c523a44687a76d0f14cb181cc340613ea998b868c2228e154ea41b6e76c4768d",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -127,7 +127,7 @@
         "test": "test_a_generation_without_a_seam_is_refused",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "f3b93a76265aff16230a320e8e4d29dbf3c1297225ab5c9a5242b49b90ee05fe",
+        "observed_output_sha256": "e5a12060a5975a4aca76c105931eb93f1cf6de9642e71f3d5db8f490ea681023",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -138,7 +138,7 @@
         "test": "test_a_generation_cannot_satisfy_any_reconstruction_gate",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "37da39b15be2fa3c443a9fa8de1ce2e680a873abd51b479fc8e18a68b8d4c2ce",
+        "observed_output_sha256": "01541cfe6ee62c1ce4ebc6e48058b0f0641c122c8cdf6b01735a64371b37bac3",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -149,7 +149,7 @@
         "test": "test_two_generations_for_one_scene_are_both_visible",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "6401148bdaec8628c355bfd8cbb5392be2a1834f28490d82f7e2d355f8e60209",
+        "observed_output_sha256": "62bfce5191b4d43ed9bb138a02d242d43cea3b22867c218a24d4df04fe318db2",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -160,7 +160,7 @@
         "test": "test_a_superseded_generation_is_withdrawn_from_the_graph",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "af7b3accb04643e75f642b576e9e725f1f5e56e68c9dfa1a9427ff58272a1d85",
+        "observed_output_sha256": "4659e0d327aea9f15fd21911b26547bf38ca0e615ece3ea737f839fd0c0936c9",
         "observed_outcome": "the named test failed under the production mutation"
       },
       {
@@ -171,7 +171,7 @@
         "test": "test_withdrawing_a_member_withdraws_the_whole_observation_graph",
         "returncode": 1,
         "killed": true,
-        "observed_output_sha256": "cc3a2a1825056d2fc44eacfe33a2da0d994f11e422618d315b9b43b134d8566c",
+        "observed_output_sha256": "7174c53c1c68547cbbfe93845fd986b583b808519339f8d51cb756bc4d5bb7dc",
         "observed_outcome": "the named test failed under the production mutation"
       }
     ],
@@ -180,5 +180,5 @@
       "record_sha256": "893a23fa8338fdb28f239cac19ceae818c0997ee2ebe9457dbbf014d71c2abae"
     }
   },
-  "record_sha256": "f9363d65c5bc8256e2002b8bcdcc9c2dd2326ad4f5a3c208c89fcdfbac5875a7"
+  "record_sha256": "3beb2e49f862873dff52e13597487c472421d20f270d5b860abd06212eea348f"
 }
