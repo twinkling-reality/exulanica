@@ -148,15 +148,29 @@ def test_no_float_reaches_the_wire(repository, tmp_path):
 
 
 def test_every_observation_carries_its_photograph_consent_state(repository, tmp_path):
-    """A photograph a person has not consented to appear in is never the answer to a click."""
+    """A photograph a person has not consented to appear in is never the answer to a click.
+
+    The fixture writes no person regions, so every photograph here is ``unscreened``: nobody has
+    looked at it for people. That is the restrictive answer and it is deliberately not the same
+    fact as "there is nobody in it", which is what the pre-2026-09-07 vocabulary's ``unavailable``
+    would have collapsed to now that the layer it referred to has merged.
+
+    What this route still cannot do is filter, and P10-A-b's last open box is exactly that: the
+    caller can now tell a screened photograph from an unscreened one, but no per-person state
+    reaches an observation, so "not offered because that person forbids it" has nothing to read.
+    """
     store, _captures, scene_id = _scene(repository, tmp_path)
     records = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
     assert records is not None
+    seen = 0
     for point in records["points"]:
         for item in point["observations"]:
             consent = item["consent"]
             assert consent["basis"] == "human-screening-receipt"
-            assert consent["person_consent"] == "unavailable"
+            assert consent["person_consent"] == "unscreened"
+            assert consent["recorded_person_count"] == 0
+            seen += 1
+    assert seen, "a consent assertion over an empty observation set proves nothing"
 
 
 def test_a_scene_without_an_accepted_pose_has_no_observation_graph(repository, tmp_path):

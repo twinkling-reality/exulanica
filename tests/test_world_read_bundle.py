@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 from exulanica.evidence.blob import BlobId
-from exulanica.graph.read_consent import CONSENT_BASIS, PERSON_CONSENT_AVAILABLE
+from exulanica.graph.read_consent import SCREENING_BASIS, person_consent_state, release_state
 from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.graph.world_read import (
     NUMBER_DECIMALS,
@@ -241,36 +241,145 @@ def test_an_unknown_scene_is_not_readable(published, repository):
 
 
 def test_consent_reports_the_screening_basis_and_refuses_to_infer_people(published, repository):
+    """An unscreened photograph says nobody looked, and never says nobody is there."""
     store, _captures, scene_id = published
     envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
     assert envelope is not None
     consent = envelope["bundle"]["consent"]
-    assert consent["basis"] == CONSENT_BASIS
-    assert consent["person_consent"] == "unavailable"
+    # This fixture writes no person regions, so every photograph in it is unscreened and the scene
+    # rests on the screening receipt alone. The basis is per photograph now: it becomes the
+    # per-person one only where regions exist, so a capture nobody screened is not credited with
+    # receipts it does not have.
+    assert consent["basis"] == SCREENING_BASIS
+    assert consent["person_consent"] == "unscreened"
     assert len(consent["per_capture"]) == envelope["bundle"]["scene"]["member_count"]
     for record in consent["per_capture"].values():
-        # Never an empty list of people. Absence of a person layer is not absence of people.
-        assert record["person_consent"] == "unavailable"
+        # Never an empty list of people, and never "nobody is here" either. The two answers this
+        # field can give are "nobody looked" and "people are located"; absence is neither.
+        assert record["person_consent"] == "unscreened"
+        assert record["recorded_person_count"] == 0
+        assert "not a statement that there is nobody in it" in record["person_consent_reason"]
         assert record["screening"]["state"] in {"screened", "unscreened"}
 
 
-def test_the_release_state_is_internal_only_until_person_consent_lands(published, repository):
-    """This test is a tripwire, and it is meant to fail when the privacy branch merges.
+def test_the_scene_consent_answer_is_the_weakest_of_its_photographs(published, repository):
+    """One unexamined photograph must not hide behind the examined ones beside it.
 
-    ``PERSON_CONSENT_AVAILABLE`` flips on that branch. When it does, this assertion fails and the
-    release rule has to be decided from the per-person receipts rather than quietly inherited from
-    the coarse screening receipt. A release state that upgraded itself silently would be the exact
-    failure Phase 10 capability 5 exists to prevent.
+    The scene-level field and the per-capture records used to speak different vocabularies under
+    one word: the scene said whether the *build* had a person layer while each capture said
+    whether that *photograph* had a decision, so a merged tree produced a bundle reporting
+    ``available`` over a list of captures every one of which said ``unavailable``. Both now
+    describe photographs, and this asserts the fold is the restrictive one.
     """
-    assert PERSON_CONSENT_AVAILABLE is False
     store, _captures, scene_id = published
     envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
     assert envelope is not None
-    release = envelope["bundle"]["release"]
+    consent = envelope["bundle"]["consent"]
+    per_capture = consent["per_capture"]
+    assert per_capture, "the fixture must publish at least one member for this to mean anything"
+    recorded = {"person_consent": "recorded", "recorded_person_count": 1}
+    unscreened = {"person_consent": "unscreened", "recorded_person_count": 0}
+    assert consent["person_consent"] == person_consent_state(per_capture)
+    # The discriminating case, and the only one that is: a scene with BOTH kinds of photograph.
+    # An all-unscreened or all-recorded scene answers the same under a restrictive fold and a
+    # permissive one, so a test built only from those proves nothing. MEASURED 2026-09-07: the
+    # first version of this test asserted exactly those two and the negative control's `all` to
+    # `any` mutant survived it.
+    assert person_consent_state({"a": recorded, "b": unscreened}) == "unscreened"
+    assert person_consent_state({"a": recorded, "b": recorded}) == "recorded"
+    assert person_consent_state({"a": unscreened}) == "unscreened"
+    # No members at all is the restrictive answer too, and not by accident: an empty fold over
+    # `all` is vacuously true, so this is the one case the natural spelling gets backwards.
+    assert person_consent_state({}) == "unscreened"
+
+
+def test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bundle(
+    published, repository
+):
+    """This test is a tripwire, and it is armed for the thing that is missing NOW.
+
+    Its predecessor was armed for the person-consent layer arriving, and it fired when that layer
+    merged on 2026-09-07. The release rule was then decided rather than inherited, and the decision
+    was that ``internal_only`` still holds, for a reason that is not the old one: the bundle
+    carries no state for any individual person, so a recipient holding it cannot check a claim
+    that the people in these photographs agreed. A permissive state nobody can check from the
+    bytes they were handed is the failure Phase 10 capability 5 exists to prevent, and it does not
+    become acceptable because the facts now exist somewhere else in the system.
+
+    So this pins the ABSENCE, not the value. The day a per-person state is added to a view, this
+    fails, and whoever added it has to decide the release gradient with the clock problem in front
+    of them: a presentation consent expires against ``clock_timestamp()``, ``release`` is inside
+    ``recorded_keys``, and a digest that moves when nobody wrote anything is a digest nobody can
+    quote. Deleting this assertion instead of answering that is how the bundle starts lying.
+    """
+    store, _captures, scene_id = published
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    bundle = envelope["bundle"]
+    release = bundle["release"]
     assert release["state"] == "internal_only"
-    assert release["basis"] == CONSENT_BASIS
+    assert release["basis"] == SCREENING_BASIS
     assert any("third party" in claim for claim in release["does_not_establish"])
     assert any("train" in claim for claim in release["does_not_establish"])
+    # The three consents stay apart, and none of them is established by anything in this bundle.
+    assert set(release["scopes"]) == {"presence", "naming", "likeness"}
+    assert not any(scope["established"] for scope in release["scopes"].values())
+    # The tripwire itself: no view carries a per-person fact, so the claim above is the only one
+    # this bundle can support.
+    for view in bundle["views"]:
+        assert "person_regions" not in view
+        assert "person_review_state" not in view
+        assert "state" not in view["consent"]
+    assert release["not_yet_earnable"]["releasable"].startswith("no per-person state")
+
+
+def test_the_release_counts_are_recomputable_from_the_bundles_own_per_capture_records(
+    published, repository
+):
+    """A release claim a recipient cannot recompute is a release claim they have to trust.
+
+    The counts in ``release.people`` are a fold over ``consent.per_capture``, which travels in the
+    same bundle, so this reproduces them from the wire form alone. It is the same discipline as
+    the recorded-digest recipe: the bundle states its arithmetic and a stranger checks it.
+    """
+    store, _captures, scene_id = published
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    received = json.loads(json.dumps(envelope))["bundle"]
+    per_capture = received["consent"]["per_capture"]
+    people = received["release"]["people"]
+    assert people["photographs"] == len(per_capture)
+    assert people["screened_for_people"] == sum(
+        1 for record in per_capture.values() if record["person_consent"] == "recorded"
+    )
+    assert people["recorded_people"] == sum(
+        record["recorded_person_count"] for record in per_capture.values()
+    )
+
+
+def test_the_release_state_does_not_move_when_a_consent_expires(published, repository):
+    """The recorded digest may not depend on the clock, and this is the rule stated as a test.
+
+    ``person_consent_is_granted`` (migration 0037) filters on ``clock_timestamp()`` against
+    ``effective_at`` and ``valid_until``, so a temporary hide expiring changes a person's resolved
+    state with no write in between. ``release`` is inside ``recorded_keys``, so a release answer
+    that read a resolved state would move both digests on a timer. This asserts the release block
+    is a function of facts with no time predicate behind them: given the same per-capture records,
+    it returns the same answer, and it never consults a resolver to produce it.
+    """
+    unscreened = {"person_consent": "unscreened", "recorded_person_count": 0}
+    recorded = {"person_consent": "recorded", "recorded_person_count": 3}
+    assert release_state({"a": recorded}) == release_state({"a": dict(recorded)})
+    # And the answer does vary with the facts, so the equality above is not the equality of a
+    # constant. The state does not move; the reason and the counts do.
+    mixed = release_state({"a": recorded, "b": unscreened})
+    assert mixed["state"] == release_state({"a": recorded})["state"] == "internal_only"
+    assert mixed["people"]["screened_for_people"] == 1
+    assert (
+        mixed["scopes"]["likeness"]["reason"]
+        != (release_state({"a": recorded})["scopes"]["likeness"]["reason"])
+    )
+    assert "have not been screened" in mixed["scopes"]["likeness"]["reason"]
 
 
 def test_the_region_graph_says_unavailable_rather_than_empty(published, repository):

@@ -1,72 +1,77 @@
 """The one place the World Read API asks whether a photograph may be shown.
 
-This module exists to be replaced. The person-region and presentation-consent layer
-(``docs/person-presentation-consent.md``) is being built on its own branch; when it merges, the
-body of :func:`consent_for_captures` delegates to it and nothing else in the read path changes.
-Isolating that single call is the whole point: a read API that has to be retrofitted with a consent
-check is a read API that shipped without one.
+This module used to be a constants module that stood in for a layer being built elsewhere. That
+layer has merged, and the shape of the answer changed with it: a single sentence about a whole
+photograph became a list of people, each with three separate decisions and a withdrawal that
+reaches forward. What follows is the policy that reads those facts, and the reasoning is here
+rather than at the call site because there is exactly one call site and there must stay one.
 
-What can honestly be said today is narrow. The only durable per-photograph privacy fact in this
-tree is the screening receipt from migration 0029: a named human, or a synthetic exemption, stating
-that a capture carries no visible people or sensitive regions, with an eligibility verdict and a
-policy digest. That is a real receipt and this module reports it. It is also, as
-``docs/person-presentation-consent.md`` records, too coarse to be a consent state: the reviewer of
-the retained bowl collection stated no visible people, and the frames contain the arms, hands and
-clothing of diners at the edges. One statement about a whole photograph cannot carry three separate
-decisions about each person in it.
+**What is now known, and it is more than before.** ``exulanica.graph.person_regions`` resolves,
+per photograph, the live person regions and the state each of them is in, and
+``review_states_for_captures`` says whether anybody has looked at that photograph for people at
+all. Those are different facts and the second is the one default deny turns on: a photograph with
+no person-region row is ``unscreened``, which means nobody looked, not that nobody is there.
 
-So the answer this module gives has two parts that must not be collapsed into one. ``screening``
-is what the receipt says. ``person_consent`` is ``"unavailable"``, meaning no per-person decision
-exists to report, which is a different fact from "there is nobody here". Reporting an empty list of
-people would be exactly the confusion that made the 2026-09-05 screening statement too coarse, and
-a consumer that read absence as permission would be reading a fact the system never established.
+**What is still not known, and it is why the release state did not move.** The World Read bundle
+carries no per-person fact. A recipient holding the bundle can see how many photographs were
+screened and how many people are recorded in them; they cannot see any individual person's state,
+so they cannot check a claim that every pictured person consented. A release state more permissive
+than ``internal_only`` would be a claim its own recipient could not verify from the bytes they
+hold, which is the failure this bundle exists to prevent. ``internal_only`` is therefore still the
+answer, but it is now computed from the scene rather than asserted, and it says which of the three
+consents is unestablished and why.
 
-Default deny follows from that: while ``person_consent`` is ``"unavailable"``, no bundle built on
-this module may be released to a third party, and :func:`release_state` says so rather than leaving
-the caller to infer it.
+**Why none of this reads the clock.** ``person_consent_is_granted`` in migration 0037 filters on
+``clock_timestamp()`` against ``effective_at`` and ``valid_until``, so a person's resolved state
+can change between two reads with no write in between. ``release`` is inside ``recorded_keys`` and
+therefore inside both digests. A digest that moved because a consent expired would be a digest
+nobody could quote, so nothing here reads a resolved person state. The two facts it does read,
+whether a photograph has been screened and how many live regions it carries, are existence
+queries with no time predicate. The rule is short enough to state: **the recorded digest may not
+depend on the clock**, and keeping the resolved states out of the bundle is how that is kept.
+
+**The basis is per photograph, not a module constant.** ``CONSENT_BASIS``'s first version carried
+a comment demanding that a later basis be a new value rather than a silent change of meaning under
+the same name. It is now two values, and which one applies depends on whether that photograph has
+person regions at all. A capture nobody screened rests on the screening receipt alone, exactly as
+before, and saying otherwise would be the same overstatement in a new place.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Any, Final, Literal
 
 import psycopg
 
+from exulanica.graph.person_regions import review_states_for_captures
+
 __all__ = [
-    "CONSENT_BASIS",
-    "PERSON_CONSENT_AVAILABLE",
+    "PERSON_RECEIPT_BASIS",
+    "SCREENING_BASIS",
     "consent_for_captures",
+    "person_consent_state",
     "release_state",
+    "scene_consent_basis",
 ]
 
-#: What the current answer rests on. A string rather than a boolean so a later basis, such as the
-#: per-person receipts, is a new value rather than a silent change of meaning under the same name.
-CONSENT_BASIS: Final = "human-screening-receipt"
+#: What a photograph with no located people rests on: one named human's statement about the whole
+#: frame. Unchanged in meaning and in spelling, so a record written before the person layer landed
+#: still says what it said.
+SCREENING_BASIS: Final = "human-screening-receipt"
 
+#: What a photograph with located people rests on: that same statement AND the per-person receipts.
+#: A new value rather than a redefinition of the one above, which is what the original comment on
+#: the single constant asked for. It is deliberately additive: the screening receipt does not stop
+#: being the gate when regions appear, it stops being the whole of it.
+PERSON_RECEIPT_BASIS: Final = "human-screening-receipt+person-presentation-receipts"
 
-def _person_consent_layer_is_present() -> bool:
-    """Whether the per-person presentation-consent layer exists in this tree.
-
-    **Detected, not declared, and the first version's hand-set ``False`` was an inert tripwire.**
-    That constant lived only on this branch, so the branch actually building the consent layer had
-    no reason to touch it: the layer could merge in full and this module would go on reporting that
-    it was absent, and the test pinning the value would go on passing. A tripwire nobody has to
-    disarm is not a tripwire.
-
-    Importing the module is the detection because ``exulanica.graph.person_regions`` is that
-    layer's own read seam. Its arrival is the event this needs to notice, and it cannot arrive
-    without arriving here.
-    """
-    try:
-        import exulanica.graph.person_regions  # noqa: F401
-    except ImportError:
-        return False
-    return True
-
-
-#: Whether a per-person consent layer is present, resolved once at import.
-PERSON_CONSENT_AVAILABLE: Final = _person_consent_layer_is_present()
+#: What a photograph's per-person record can say, and none of these is a consent. ``unscreened``
+#: means nobody has looked for people in it. ``recorded`` means people are located and each has
+#: decisions on file, whose resolved states are evaluated at read time and are deliberately not
+#: carried here; see the module docstring on the clock.
+PersonConsentState = Literal["unscreened", "recorded"]
 
 _SCREENINGS: Final = """
 select distinct on (s.capture_id)
@@ -96,11 +101,25 @@ def consent_for_captures(
     capture appears in the result, because a caller that had to distinguish "absent from the
     mapping" from "screened and eligible" would eventually get it wrong in the permissive
     direction.
+
+    The person half is an existence query, not a resolution: it says whether anybody has looked at
+    this photograph for people, and how many live regions that looking left. It deliberately does
+    not say what any of them agreed to. Two reasons, and both are load bearing. The resolved state
+    is clock-dependent and this record is inside a digest (see the module docstring). And a state
+    per person belongs beside that person's outline, which is the graph payload's job and not this
+    one; duplicating it here would be the second implementation of the presentation rule that
+    ``person_regions`` warns against, and the direction two implementations drift is a person shown
+    who should not have been.
     """
     rows: dict[uuid.UUID, dict[str, Any]] = {}
     if capture_ids:
         for row in connection.execute(_SCREENINGS, (workspace, capture_ids)).fetchall():
             rows[row["capture_id"]] = row
+
+    # One query for the whole member set, matching the shape of the screening query above rather
+    # than asking once per capture.
+    reviewed = review_states_for_captures(connection, workspace, capture_ids)
+    people = _live_region_counts(connection, workspace, capture_ids)
 
     result: dict[str, dict[str, Any]] = {}
     for capture_id in capture_ids:
@@ -125,36 +144,166 @@ def consent_for_captures(
                 "policy_version": row["policy_version"],
                 "receipt_digest": row["receipt_digest"],
             }
-        result[str(capture_id)] = {
-            "basis": CONSENT_BASIS,
+        key = str(capture_id)
+        person_state: PersonConsentState = (
+            "recorded" if reviewed.get(key) == "screened" else "unscreened"
+        )
+        result[key] = {
+            "basis": PERSON_RECEIPT_BASIS if person_state == "recorded" else SCREENING_BASIS,
             "screening": screening,
-            # Deliberately not an empty list. No per-person decision exists to report, and an
-            # empty list of people would read as "nobody is in this photograph".
-            "person_consent": "unavailable",
+            # Still never an empty list of people, and now for a sharper reason than before: the
+            # two answers are "nobody has looked" and "people are located", and neither of them is
+            # "there is nobody here". A count of zero under `recorded` means every proposed region
+            # was reviewed away as a false positive, which is a reviewed statement; absence of a
+            # row is not.
+            "person_consent": person_state,
+            "recorded_person_count": people.get(key, 0),
             "person_consent_reason": (
-                "No per-person presentation consent layer is present in this build. A screening "
-                "receipt states that a whole photograph was reviewed; it does not record a "
-                "decision about any individual person in it."
+                "People are located in this photograph and each carries presentation receipts. "
+                "Their resolved states are evaluated at read time and are not carried here, "
+                "because this record is inside the bundle digest and a resolved state expires "
+                "with the clock."
+                if person_state == "recorded"
+                else "Nobody has screened this photograph for people. That is not a statement "
+                "that there is nobody in it."
             ),
         }
     return result
 
 
-def release_state() -> dict[str, Any]:
-    """What the consent basis permits, stated rather than left to the reader.
+def _live_region_counts(
+    connection: psycopg.Connection, workspace: uuid.UUID, capture_ids: list[uuid.UUID]
+) -> dict[str, int]:
+    """How many live person regions each photograph carries.
 
-    ``internal_only`` is not a placeholder for a value that will be filled in later by the same
-    code. It is the correct answer while no per-person consent exists, and Phase 10 capability 5
-    states the rule it enforces: no third party sees an export before that layer lands.
+    A count rather than the regions themselves, and no consent predicate anywhere in it, so the
+    answer is a function of the rows alone and not of the moment it was asked.
     """
-    if PERSON_CONSENT_AVAILABLE:  # pragma: no cover - flipped by the person-consent branch
-        raise NotImplementedError(
-            "the per-person consent layer is present; release_state must be decided from the "
-            "per-person receipts rather than from the screening receipt alone"
+    if not capture_ids:
+        return {}
+    rows = connection.execute(
+        "select capture_id, count(*) as live from person_region_current "
+        "where workspace_id = %s and capture_id = any(%s) and action <> 'deleted' "
+        "group by capture_id",
+        (workspace, list(capture_ids)),
+    ).fetchall()
+    return {str(row["capture_id"]): int(row["live"]) for row in rows}
+
+
+#: The per-capture records this module produced, keyed by capture id string. Every scene-level
+#: answer below is a fold over exactly these, and that is a deliberate constraint rather than a
+#: convenience: it is the same mapping the bundle publishes under ``consent.per_capture``, so a
+#: recipient can recompute every count in the release block from the bytes they were handed. An
+#: answer derived from anything the bundle does not carry would be one they had to take on trust.
+#:
+#: It also removes a contradiction that a scene-row-derived answer would have created. On the four
+#: paths where ``reconstruction_scenes._fallback`` is reached, a member's ``person_review_state`` is
+#: hard-set to ``unscreened`` whatever the database says, so folding over the members would let a
+#: bundle report no people while its own per-capture records reported some.
+CaptureConsent = Mapping[str, dict[str, Any]]
+
+
+def person_consent_state(consent: CaptureConsent) -> PersonConsentState:
+    """The one symbol a caller should branch on, for a whole scene.
+
+    It used to answer a different question under this name: whether the build contained a person
+    layer at all. That question stopped being interesting the day the layer merged, and leaving it
+    would have been worse than uninteresting, because the value it returned was drawn from a
+    different vocabulary than the per-capture records beside it. A bundle whose scene-level field
+    said ``available`` while every capture in it said ``unavailable`` contradicted itself under one
+    word. Both now describe photographs, and the scene is the weakest of its members: one
+    photograph nobody screened is enough to make the scene unscreened.
+    """
+    if not consent:
+        return "unscreened"
+    if all(record["person_consent"] == "recorded" for record in consent.values()):
+        return "recorded"
+    return "unscreened"
+
+
+def scene_consent_basis(consent: CaptureConsent) -> str:
+    """What the scene's consent answer rests on, which is the weakest of its members' bases."""
+    return PERSON_RECEIPT_BASIS if person_consent_state(consent) == "recorded" else SCREENING_BASIS
+
+
+#: The release ladder, least to most revealed. Only the first is reachable today and the block on
+#: each of the others is stated in the bundle rather than left in a design note, because a
+#: vocabulary whose unreachable half is undocumented gets reinvented by the next caller who needs
+#: it. ``undecidable`` is deliberately NOT in this list: a scene nobody screened permits exactly
+#: what ``internal_only`` permits, and a state that changes no permission is vocabulary a consumer
+#: has to learn for nothing. What varies per scene is the reason, and the reason has its own keys.
+ReleaseState = Literal["internal_only", "releasable_masked", "releasable"]
+
+
+def release_state(consent: CaptureConsent) -> dict[str, Any]:
+    """What the consent basis permits for this scene, stated rather than left to the reader.
+
+    Computed from the members rather than returned as a constant, and computed from the ones
+    already in the caller's hand rather than from a second read. That matters beyond cost: the
+    scene row's person fields and this answer must come from the same read of the same rows, or a
+    bundle could report people its own release state had not counted.
+
+    ``internal_only`` is still the answer for every scene, and the reason it is not a placeholder
+    is that it is now derived from two facts that vary. What changed is that the bundle says which
+    of the three consents is unestablished and why, so the next person to look can tell a scene
+    nobody has screened from a scene fully screened whose people this bundle cannot describe.
+    Those are different distances from a release and the old constant collapsed them.
+
+    **Why not a per-scene gradient yet.** ``releasable_masked`` would have to prove that the
+    geometry *this bundle offers* descends from the masked derivatives. Nothing in the bundle
+    records which source derivative a point map or a SOG was built from; the geometry entries carry
+    the digest of the artifact produced, not of the bytes read to produce it. Until they do, a
+    scene could satisfy every consent and the claim would still be uncheckable by its recipient.
+    That is recorded in ``not_yet_earnable`` rather than in a comment, because it is the recipient
+    who needs to know it.
+    """
+    total = len(consent)
+    screened = sum(1 for record in consent.values() if record["person_consent"] == "recorded")
+    recorded_people = sum(int(record["recorded_person_count"]) for record in consent.values())
+    unscreened = total - screened
+
+    if unscreened:
+        # Default deny, and it reaches the whole scene rather than the photograph it came from: a
+        # release is a statement about the material handed over, and one unexamined photograph in
+        # it is enough to make that statement unsupported.
+        why = (
+            f"{unscreened} of {total} photographs in this scene have not been screened for "
+            "people, so no decision about anybody in them exists to report"
         )
+    else:
+        why = (
+            f"all {total} photographs have been screened and {recorded_people} people are "
+            "recorded, but this bundle carries no per-person state, so a recipient holding it "
+            "cannot check that any of them agreed"
+        )
+
     return {
         "state": "internal_only",
-        "basis": CONSENT_BASIS,
+        "basis": scene_consent_basis(consent),
+        # The three consents from `exulanica.consent.states`, kept apart here for the same reason
+        # they are kept apart there: granting one grants nothing else, and a single boolean over
+        # all three is the yes-or-no gate this layer exists to replace.
+        "scopes": {
+            "presence": {"established": False, "reason": why},
+            "naming": {"established": False, "reason": why},
+            "likeness": {"established": False, "reason": why},
+        },
+        # Not a fourth consent, and it is here so a recipient cannot read the three above as the
+        # whole of the rule. A withdrawal reaches forward and no later receipt undoes it.
+        "withdrawal": {
+            "honoured": True,
+            "meaning": (
+                "a withdrawn person is masked and their derived artifacts are purged through the "
+                "existing withdrawal path; a consent recorded afterwards does not restore them"
+            ),
+        },
+        # Counted, so the two sentences above are checkable against the bundle rather than taken
+        # on trust. Every one of these is an existence count with no time predicate behind it.
+        "people": {
+            "photographs": total,
+            "screened_for_people": screened,
+            "recorded_people": recorded_people,
+        },
         "permits": [
             "reading inside the owning workspace by an authenticated session",
         ],
@@ -164,13 +313,22 @@ def release_state() -> dict[str, Any]:
             "that this material may be released to a third party",
             "that this material may be used to train a model",
         ],
+        "not_yet_earnable": {
+            "releasable_masked": (
+                "the geometry entries record the digest of the artifact produced, not of the "
+                "source derivative read to produce it, so a recipient cannot check that what "
+                "they were handed descends from the masked images"
+            ),
+            "releasable": (
+                "no per-person state is carried in this bundle. Adding it means putting a "
+                "clock-dependent value inside recorded_keys, because a presentation consent "
+                "expires against clock_timestamp(), and the recorded digest may not depend on "
+                "the clock"
+            ),
+        },
         "blocked_until": (
-            "the person-region and presentation-consent layer records a state per person "
-            "(docs/person-presentation-consent.md)"
+            "the bundle carries a state per person that a recipient can check, and the geometry "
+            "entries name the source derivative they were built from "
+            "(docs/person-presentation-consent.md, docs/phase-10-tickets.md P10-5)"
         ),
     }
-
-
-def person_consent_state() -> Literal["unavailable", "available"]:
-    """The one symbol a caller should branch on, so the branch appears in exactly one place."""
-    return "available" if PERSON_CONSENT_AVAILABLE else "unavailable"

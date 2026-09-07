@@ -62,7 +62,12 @@ from exulanica.graph.payload import (
     ReconstructionSceneRow,
     SceneGeometryReferenceRow,
 )
-from exulanica.graph.read_consent import consent_for_captures, person_consent_state, release_state
+from exulanica.graph.read_consent import (
+    consent_for_captures,
+    person_consent_state,
+    release_state,
+    scene_consent_basis,
+)
 from exulanica.graph.reconstruction_scenes import reconstruction_scene_rows
 from exulanica.graph.wire_numbers import (
     NUMBER_DECIMALS,
@@ -407,11 +412,18 @@ def world_read_bundle(
             world_id=world_id,
         ),
         "consent": {
-            "basis": "human-screening-receipt",
-            "person_consent": person_consent_state(),
+            # Both of these describe the photographs rather than the build. The scene-level answer
+            # is the weakest of its members, so a scene is `recorded` only when every photograph in
+            # it has been screened; anything else would let one unexamined frame hide behind five
+            # examined ones.
+            "basis": scene_consent_basis(consent),
+            "person_consent": person_consent_state(consent),
             "per_capture": consent,
         },
-        "release": release_state(),
+        # Folded from the per-capture records directly above rather than from the scene row or a
+        # second query. A recipient can recompute every count in this block from `per_capture`,
+        # which is the difference between a release claim they can check and one they must trust.
+        "release": release_state(consent),
         "epistemics": {
             "evidence": (
                 "original capture bytes, reached through /evidence/{span_id}. Nothing in this "
