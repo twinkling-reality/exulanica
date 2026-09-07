@@ -19,11 +19,15 @@
  * A per-point route would be smaller and does not exist; when one does, this is the file that
  * changes.
  *
- * **Nothing here filters.** Every observation carries its photograph's consent state and today
- * every one of them says `person_consent: unavailable`, because no per-person consent layer exists
- * in this build. Reporting that state is this file's job; deciding what to withhold on the
- * strength of it is Phase 10 capability 5's, on the privacy branch. A filter written here against
- * a state that is always the same value would be a filter nobody has ever seen work.
+ * **Nothing here filters.** Every observation carries its photograph's consent state. CORRECTED
+ * 2026-09-07: that state used to be `unavailable` on every observation, meaning no per-person
+ * consent layer existed in this build. The layer has merged, so the value now describes the
+ * PHOTOGRAPH: `unscreened` when nobody has looked at it for people, `recorded` when people are
+ * located in it and carry receipts. Neither is a per-person state, and a filter still has nothing
+ * to read: withholding a photograph because one person in it forbids it needs that person's state
+ * to reach an observation, which it does not, because the resolved state expires against
+ * `clock_timestamp()` and this answer is digest-bound. That is P10-A-b's last open box and the
+ * blocker is stated in `docs/phase-10-tickets.md` under P10-1-c-2.
  */
 
 import type { SparseObservedPoint } from '@exulanica/atlas-core';
