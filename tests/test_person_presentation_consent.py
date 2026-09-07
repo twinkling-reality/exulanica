@@ -19,6 +19,8 @@ clothing of diners at the edge. Four failures follow from that, and each has a t
 from __future__ import annotations
 
 import datetime as dt
+import json
+import uuid
 
 import pytest
 from exulanica.consent.regions import Silhouette, region_key
@@ -170,3 +172,159 @@ def test_a_box_outline_says_it_is_a_box():
     assert outline.as_digest_input()["kind"] == "polygon"
     assert len(outline.points) == 4
     assert outline.bounding_rect() == rect
+
+
+# ---------------------------------------------------------------------------------------------
+# Through the database, because the rule has two implementations and only one of them is Python.
+
+
+def test_a_withdrawn_persons_name_does_not_travel_to_the_browser(repository, photo_dir, tmp_path):
+    """A withdrawal outranks a naming receipt, and nothing downstream would have caught it.
+
+    Every other test in this file resolves the rule in Python. The graph payload does not: it
+    asks migration 0037 directly, and ``person_consent_is_granted`` answers only "is this one
+    scope's receipt held right now". It has no withdrawal check. The database composes that
+    predicate rather than widening it, and ``person_region_is_masked`` is the composition
+    (``person_subject_is_withdrawn`` OR no likeness); naming never got one. So this row resolved
+    to ``withdrawn`` and shipped the name in the same payload. MEASURED 2026-09-07 against
+    PostgreSQL, before the fix: ``state == "withdrawn"`` and ``display_name == "Julie"``.
+
+    No layer below catches it. ``drawsName`` in ``web/packages/graph-client`` gates on the name
+    having arrived rather than on the state, on the stated grounds that the server sends a name
+    only when naming was consented. ``drawsSilhouette`` excludes ``withdrawn``, so the name would
+    have been the one remaining trace of a person the world otherwise omits. Nor does the name go
+    stale on its own: a presentation withdrawal writes a consent receipt and never touches the
+    naming assertion, so migration 0002's cache trigger does not blank ``entity.display_name``.
+    """
+    from exulanica.epistemics.assertions import AssertionWriter
+    from exulanica.graph.entities import NAME_PREDICATE, entity_rows
+    from exulanica.graph.person_regions import person_regions_for_captures
+    from exulanica.identity import IdentityRepository, rename_entity
+    from exulanica.ingest import person_review
+    from exulanica.ingest.pipeline import PhotoIngestPipeline
+    from exulanica.store.local import LocalContentAddressedStore
+
+    from conftest import iso, write_photo
+
+    actor = uuid.uuid4()
+    write_photo(photo_dir, "a.jpg", when=iso(10))
+    pipeline = PhotoIngestPipeline(
+        repository, LocalContentAddressedStore(tmp_path / "blobs"), detector=None
+    )
+    # Intake only. No derivatives, so no depth model and no privacy screening are involved: the
+    # capture exists to satisfy the person_region foreign key and nothing else.
+    intake = pipeline.ingest_intake((photo_dir / "a.jpg").read_bytes(), filename="a.jpg")
+    assert intake.capture_id is not None, intake.error
+    blob_id = repository.capture(intake.capture_id).blob_id
+
+    identity = IdentityRepository(repository.connection, repository.workspace_id)
+    entity_id = identity.entities.create(entity_class="person")
+    # Through the naming assertion, because a raw insert of display_name is refused by migration
+    # 0002's tg_entity_name_is_user_stated and would prove nothing about the real path.
+    rename_entity(
+        identity,
+        AssertionWriter(repository.connection, repository.workspace_id),
+        entity_id=entity_id,
+        display_name="Julie",
+        actor=actor,
+    )
+
+    subject_id = person_review.create_subject(repository, actor=actor, entity_id=entity_id)
+    outline = Silhouette.from_rect(Rect.from_normalised(0.2, 0.2, 0.3, 0.5))
+    display = DisplayGeometry(w=160, h=100)
+    key = region_key(blob_id, outline, display)
+    person_review.record_region_edits(
+        repository,
+        capture_id=intake.capture_id,
+        actor=actor,
+        edits=[
+            {
+                "region_key": key.hex(),
+                "action": "add",
+                "silhouette": outline.as_digest_input(),
+                "subject_id": str(subject_id),
+            }
+        ],
+    )
+    person_review.record_consent(
+        repository,
+        subject_id=subject_id,
+        actor=actor,
+        consent_scope="naming",
+        decision="granted",
+    )
+
+    def payload_row():
+        found = person_regions_for_captures(
+            repository.connection, repository.workspace_id, [intake.capture_id]
+        )
+        rows = found[str(intake.capture_id)]
+        assert len(rows) == 1
+        return rows[0]
+
+    # The control, so the assertion below cannot pass by the name never having travelled at all.
+    # Named on a silhouette is a real state and the name is supposed to reach the browser in it.
+    before = payload_row()
+    assert before.state == "unknown"
+    assert before.display_name == "Julie"
+
+    person_review.record_consent(
+        repository,
+        subject_id=subject_id,
+        actor=actor,
+        consent_scope="likeness",
+        decision="withdrawn",
+    )
+
+    after = payload_row()
+    assert after.state == "withdrawn"
+    assert after.display_name is None, "a withdrawn person's name reached the browser"
+    # The invariant behind the bug: the two implementations of the presentation rule agree.
+    assert person_review.review_list(repository, intake.capture_id)[0]["name_permitted"] is False
+
+    # The SECOND surface, and clearing the region row alone does not clear it. The same
+    # GraphPayload carries `entities`, and an entity row's display_name had no consent filter of
+    # any kind, so the withdrawn person's name shipped beside their blanked region in one
+    # response. MEASURED 2026-09-07: region display_name None, entities display_name "Julie".
+    # `web/packages/graph-client/src/snapshot.ts` maps that field into the client entity model, so
+    # it is drawn rather than merely present.
+    named = [
+        row
+        for row in entity_rows(repository.connection, repository.workspace_id)
+        if row.entity_id == entity_id
+    ]
+    assert len(named) == 1, "the entity must still be in the payload; it is the name that goes"
+    entity = named[0]
+    assert entity.display_name is None, (
+        "a withdrawn person's name reached the browser through the entity list"
+    )
+    # The third surface, and the one that survives blanking the other two. The naming assertion
+    # keeps its row so the ledger still shows somebody was named, and loses its value.
+    naming = [row for row in entity.assertions if row.predicate_key == NAME_PREDICATE]
+    assert naming, "the naming assertion must survive; a withdrawal is not an erasure of the event"
+    assert all(row.object_value is None for row in naming), (
+        "a withdrawn person's name reached the browser through the naming assertion"
+    )
+    # And the fourth, inside the rename event's own payload.
+    assert entity.history, "the rename event must still be in the ledger"
+    assert not any("Julie" in json.dumps(row.payload) for row in entity.history), (
+        "a withdrawn person's name reached the browser inside an identity event payload"
+    )
+    # The whole rule in one assertion, so a fifth surface added later fails here rather than
+    # shipping. Serialised exactly as the route serialises it.
+    assert "Julie" not in entity.model_dump_json(), (
+        "a withdrawn person's name is somewhere in their entity row"
+    )
+
+
+def test_the_graph_reads_the_same_naming_predicate_the_writer_writes():
+    """Two spellings of one predicate would silently stop redacting a withdrawn person's name.
+
+    ``exulanica.graph.entities`` cannot import the writer's private constant, so it carries its
+    own copy and this binds them. Without it, renaming the predicate in one place leaves the
+    redaction looking for a key nothing writes, and the failure is silent and revealing.
+    """
+    from exulanica.graph.entities import NAME_PREDICATE as read_side
+    from exulanica.identity.naming import _NAME_PREDICATE as write_side
+
+    assert read_side == write_side

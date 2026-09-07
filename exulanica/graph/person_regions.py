@@ -7,9 +7,11 @@ Three rules, and every one of them is chosen so that a failure reveals nobody.
     is nobody to hide and the other means nobody has looked. The client draws no pixels for the
     second, so a corpus ingested before this feature existed degrades to silhouettes and a stated
     reason rather than to a photograph of somebody who never agreed to be shown.
-*   **Only a ``shown`` person's name travels, and only if somebody named them.** Naming and
-    likeness are separate consents, so the name is gated on the naming receipt alone, while the
-    pixels are gated on likeness; a person may be named on a silhouette.
+*   **A name travels on a naming receipt, and never once a withdrawal stands.** Naming and
+    likeness are separate consents, so the name is gated on the naming receipt while the pixels
+    are gated on likeness, and a person may be named on a silhouette. A withdrawal outranks every
+    receipt, and it has to be applied here: the client draws a name whenever one arrives rather
+    than reading the state, so a name that leaves this function is a name on the screen.
 *   **The outline travels and the pixels do not.** There is nothing here a client bug could turn
     back into a face: the bytes for a masked region were replaced with neutral fill before
     reconstruction read them, and this row carries a polygon and a state.
@@ -66,13 +68,12 @@ def person_regions_for_captures(
     ).fetchall()
     found: dict[str, list[MemberPersonRegionRow]] = {}
     for row in rows:
-        naming = bool(row["naming"])
         found.setdefault(str(row["capture_id"]), []).append(
             MemberPersonRegionRow(
                 region_id=row["region_key"],
                 state=_state(row),
                 silhouette_ppm=_points(row["silhouette"]),
-                display_name=row["display_name"] if naming else None,
+                display_name=_name(row),
                 subject_id=row["subject_id"],
             )
         )
@@ -86,6 +87,28 @@ def _state(row: dict[str, Any]) -> str:
     if row["masked"]:
         return "present" if row["presence"] else "unknown"
     return "hidden" if row["temporarily_hidden"] else "shown"
+
+
+def _name(row: dict[str, Any]) -> str | None:
+    """The name, and a withdrawal takes it back whatever the naming receipt still says.
+
+    ``person_consent_is_granted`` answers a narrower question than its name suggests: whether one
+    scope's receipt is held at this instant. It has no withdrawal check, and that is right for
+    what it is, because migration 0037 composes it rather than widening it. The masking rule at
+    0037:189-195 is a disjunction of three reasons to hide somebody, `p_subject is null OR
+    person_subject_is_withdrawn(...) OR NOT person_consent_is_granted(..., 'likeness')`, so a
+    withdrawal masks whatever the likeness receipt says. Naming needed the same composition with
+    the withdrawal term and did not have it, so this is that composition rather than a second
+    implementation of the rule.
+
+    MEASURED 2026-09-07 against PostgreSQL, by the test named for it: a subject holding a granted
+    naming receipt, given a withdrawal, came back as ``state='withdrawn'`` carrying
+    ``display_name='Julie'``. Only ``_state`` read ``withdrawn``, and the name was decided from a
+    different fact.
+    """
+    if row["withdrawn"] or not row["naming"]:
+        return None
+    return row["display_name"]
 
 
 def _points(silhouette: Any) -> list[list[int]]:

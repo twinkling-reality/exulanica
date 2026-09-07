@@ -205,10 +205,13 @@ class MemberPersonRegionRow(BaseModel):
     neutral fill before reconstruction ever read them, so there is nothing here for a client bug
     to reveal.
 
-    ``display_name`` is null unless naming was consented AND somebody has actually been named.
-    Two separate conditions, because a person may consent to being named before anybody names
-    them, and a name that appeared without the first condition would be the exact failure the
-    three-consent split exists to prevent.
+    ``display_name`` is null unless naming was consented, somebody has actually been named, and
+    that person has not withdrawn. Three separate conditions. The first two are separate because a
+    person may consent to being named before anybody names them, and a name that appeared without
+    the first would be the exact failure the three-consent split exists to prevent. The third is
+    separate because a withdrawal is not a fourth consent and cannot be expressed by revoking one:
+    ``person_consent_is_granted`` has no withdrawal term, so a subject who withdrew still holds
+    their old naming receipt and the name has to be taken back above it.
     """
 
     model_config = ConfigDict(extra="forbid")
