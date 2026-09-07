@@ -475,3 +475,38 @@ def test_a_mask_built_before_the_reviewer_added_a_region_is_not_current(
         "the derivative on disk predates this region, so it does not hide the new person"
     )
     assert "no current masked source derivative" in _screening_reasons(repository, screening)
+
+
+def test_a_reviewer_who_deleted_every_false_positive_has_still_looked(
+    repository, photo_dir, tmp_path
+):
+    """The review screen must not tell the next reviewer that nobody has looked at this one.
+
+    ``review_list`` excludes deleted regions, so a photograph whose every proposal a reviewer threw
+    out comes back with an empty list. The route derived ``review_state`` from that emptiness,
+    which made "nobody has looked" and "somebody looked and found nobody" the same answer: exactly
+    the collapse this layer exists to undo, reappearing in the screen built to undo it.
+
+    It also disagreed with the graph payload about the same photograph.
+    ``review_states_for_captures`` asks the raw table and answers ``screened``, so the browser's
+    own status line and its review panel would have contradicted each other.
+    """
+    from exulanica.graph.person_regions import review_states_for_captures
+
+    review = _review(repository)
+    capture_id, _ = _ingest(repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)))
+    key = repository.current_person_regions(capture_ids=[capture_id])[capture_id][0].region_key
+    review.record_region_edits(
+        repository,
+        capture_id=capture_id,
+        actor=ACTOR,
+        edits=[{"region_key": key.hex(), "action": "delete"}],
+    )
+
+    assert review.review_list(repository, capture_id) == [], "the false positive is gone"
+    # What the route now answers, and what the graph payload has always answered. They must be the
+    # same fact asked of the same rows.
+    assert repository.capture_has_person_regions(capture_id=capture_id) is True
+    assert review_states_for_captures(
+        repository.connection, repository.workspace_id, [capture_id]
+    ) == {str(capture_id): "screened"}

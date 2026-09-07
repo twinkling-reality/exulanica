@@ -77,8 +77,9 @@ def regions(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> dict[str, Any]:
+    repository = IngestRepository(connection, session.workspace_id)
     try:
-        found = review_list(IngestRepository(connection, session.workspace_id), capture_id)
+        found = review_list(repository, capture_id)
     except PrivacyAdmissionError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {
@@ -86,7 +87,20 @@ def regions(
         # Said explicitly rather than left to be inferred from an empty list. "Nobody has looked"
         # and "somebody looked and found nobody" are different answers and only the second one may
         # let a photograph through.
-        "review_state": "screened" if found else "unscreened",
+        #
+        # CORRECTED 2026-09-07: this was `"screened" if found else "unscreened"`, which made the
+        # two answers the same one. `review_list` excludes deleted regions, so a reviewer who
+        # examined a photograph and deleted every false positive left it reporting that nobody had
+        # looked, and the review screen would have told the next reviewer exactly that about work
+        # somebody had just finished. It also disagreed with the graph payload, which asks
+        # `review_states_for_captures` over the raw table and answered `screened` for the same
+        # photograph. Both now ask the same question of the same rows: has anybody ever been
+        # proposed or recorded here.
+        "review_state": (
+            "screened"
+            if repository.capture_has_person_regions(capture_id=capture_id)
+            else "unscreened"
+        ),
         "regions": found,
     }
 
