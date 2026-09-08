@@ -1,8 +1,10 @@
 # Deliver exact posed image bytes through World Read
 
 Status: dispatched by the operator to task 01a0820f-2d29-7722-af7d-f7415e504b1a.
-This task exclusively owns the Exulanica isolated database/full-suite slot until explicit
-handoff or release. The preceding consent-timestamp task released its slot; recovery readiness
+Handoff received at 67f5811; the owner explicitly released the database/full-suite slot after
+all processes finished. Integration review is pending; no merge or push is authorized.
+The reservation below is retained as history. This task exclusively owned the Exulanica
+isolated database/full-suite slot until this release. The preceding consent-timestamp task released its slot; recovery readiness
 is documentation-only. This reservation permits only owned isolated schemas and the gates below,
 not retained-public mutation. Original implementation scope is unchanged.
 Repository: /Users/glendonchin/dev/Technology/orimera.
