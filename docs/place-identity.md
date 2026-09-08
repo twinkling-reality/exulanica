@@ -152,9 +152,17 @@ So there are two real things, and they get two planes rather than one plane and 
 
 **Neither creates the other, and that is the invariant worth testing.** Naming a place occurrence
 must not bring a `place` row into being, because a label is not a measurement. Accepting an
-alignment must not mint an entity, because geometry is not a name. `place.named_entity_id` is a
-nullable column pointing at the entity that names this place when a user has supplied one, and it is
-an annotation carried alongside the place rather than any part of its identity.
+alignment must not mint an entity, because geometry is not a name. It is asserted both ways by
+`tests/test_place_plane.py::test_naming_a_place_a_person_saw_creates_no_place_row` and
+`::test_admitting_a_place_version_creates_no_entity`, the first driving the real `name_occurrence`
+path rather than a raw insert.
+
+An earlier draft of this note proposed a nullable `place.named_entity_id` linking the two planes,
+and 0038 does not carry it. The link is not needed to keep them separate, which is what the tests
+above establish, and a column would have been a second place to look for a place's name. When
+naming a place is wanted, it belongs where every other user statement in this system belongs: an
+assertion whose `subject_ref` names the place, under the guard 0002 already applies to names. That
+is not built, and this note does not claim it is.
 
 The ambiguity that remains is a reader's, not a query's, and the identifier closes it: `place_id`
 names the geometric plane and nothing else, while the identity plane uses `entity_id` everywhere and
@@ -168,24 +176,39 @@ three existing meanings of "region" is reused.
 
 ### The three tables
 
-`place`. One row per durable place: `place_id`, `workspace_id`, an optional `named_entity_id`
-pointing at the class-`'place'` entity that names it when a user has named one, an
-`anchor_scene_id`, and the usual `created_at` and `deleted_at`. There is no `display_name` column:
-naming is the identity plane's job and it already has a guard, and a second name here would be a
-second answer to the same question.
-
-The anchor is the part worth arguing about. **A place's shared frame is its anchor scene's own
-recovered frame**, not a new frame of its own. A joint reconstruction produces a third frame, and
-adopting that as the place frame would mean every version's geometry is expressed in a frame no
-retained artifact was measured in, and that nothing else in the system addresses. Anchoring on a
-real scene keeps the place frame a frame that already exists, makes the anchor's own transform
-exactly identity, and makes "the world does not move under the visitor's feet when they change time"
-a property of the anchor rather than of a build.
+`place`. One row per durable place: `place_id`, `workspace_id`, `created_at`. That is all of it,
+and the emptiness is the decision. There is no `display_name`, because naming is the identity
+plane's job and it already has a guard; no `deleted_at`, because the table is append-only and a
+place's liveness is derived from its anchor's; and no position, for the reasons in "Where a place
+is" below. The id is allocated once and never derived, the same choice `entity` makes for the same
+reason: a place's identity has to survive its member set growing, which is exactly what
+`scene_id_for` cannot do.
 
 `place_version`. One row per scene in the place: `place_id`, `scene_id`, an `ordinal` by capture
-time, the `ordered_by_utc` it was ordered on with the `ordered_by_basis` that produced it, the
-`place_from_scene` similarity as a row-major 4x4 with its scale carried separately the way
-`PlaceAlignmentResult` already does, the alignment receipt that admitted it, and `frame_hops`.
+time, the `ordered_by_utc` it was ordered on with the `ordered_by_basis` that produced it,
+`frame_hops`, the `admitted_by_alignment_id` that admitted it, and `created_at`.
+
+**No transform column.** The similarity between a scene's own recovered frame and its place's frame
+is a measured number with held-out residuals behind it, and this repository keeps measured numbers
+in digest-bound artifacts rather than in columns nothing recomputes, exactly as
+`point_map_placement` already does. A version names the receipt that measured it and the read seam
+reads the transform from there, which is also what lets a receipt whose bytes are gone be reported
+as `unavailable` rather than silently substituted with identity.
+
+**The anchor is a row, not a column.** A place's shared frame is its anchor scene's own recovered
+frame, so the anchor is simply the version with `frame_hops` 0 and no admitting alignment, and a
+partial unique index enforces exactly one per place. Putting an `anchor_scene_id` on `place` as
+well would state the same fact twice and let the two disagree.
+
+`frame_hops` is the honesty column. It is 0 for the anchor, 1 for a scene whose transform to the
+anchor was measured by a single joint run, and n for one composed through a chain of them. A place
+with three scenes has two accepted alignment receipts, and the third scene's frame may have been
+measured against the second rather than against the anchor. Without this column that composition is
+invisible and a reader would take a composed transform for a measured one.
+
+`unique (workspace_id, scene_id)` enforces the rule this note already states: a scene belongs to at
+most one place, because two places claiming one scene would be two coordinate frames claiming one
+set of photographs.
 
 The capture time needs its own sentence, because **a scene has no capture-time column**. The only
 time available is `capture.started_at` across the scene's members, which 0001 itself calls a best
@@ -194,24 +217,16 @@ presentation ordering rather than a fact. Ordering versions by a live join on it
 place's history rearrange itself when a capture's metadata is corrected, and would have no answer at
 all when it is null. So the time is **recorded at bind time**, with the basis that produced it, and
 the ordinal is fixed then. A version whose time could not be established is admitted with a null
-time and an ordinal after every dated one, which is a visible state rather than a silent guess.
-
-`frame_hops` is the honesty field. It is 0 for the anchor, 1 for a scene whose transform to the
-anchor was measured by a single joint run, and n for one composed through a chain of them. A place
-with three scenes has two accepted alignment receipts, and the third scene's frame may have been
-measured against the second rather than against the anchor. Without this field that composition is
-invisible and a reader would take a composed transform for a measured one. With it, "measured
-directly" is a machine-readable property rather than a footnote somebody has to find.
-
-`unique (workspace_id, scene_id)` enforces the rule this note already states: a scene belongs to at
-most one place, because two places claiming one scene would be two coordinate frames claiming one
-set of photographs.
+time and the `unavailable` basis, which is a visible state rather than a silent guess.
 
 `place_alignment`. The receipt of one joint reconstruction: the two scenes, the member digest of the
-union, the versioned policy from `PLACE_ALIGNMENT_POLICY`, the digest of the joint model, whether it
-was accepted, the refusal reason when it was not, and the held-out residuals and correspondence
-counts as integers. A refused alignment is a row like any other, because a measured refusal recorded
-as a fact is a result.
+union, the versioned policy digest from `PLACE_ALIGNMENT_POLICY`, the digest of the joint model,
+whether it was accepted, the refusal reason when it was not, and the artifact holding the numbers. A
+refused alignment is a row like any other, because a measured refusal recorded as a fact is a
+result. The three reasons are a check constraint rather than free text, so a refusal nobody
+anticipated fails loudly. **No threshold appears in any constraint**: those numbers are versioned
+engineering choices measured against a synthetic fixture, and a threshold frozen into the schema
+would have to be right before anybody could measure it.
 
 ### An artifact may now name a place
 
