@@ -1,5 +1,14 @@
 # Asset-read currency
 
+Final acceptance at source head `03501cea376cf530c185e3b12a5fb0d8d8d7acdf` passed 2118 backend
+tests (3 skipped), Ruff, all 4 import contracts, web typecheck and boundaries, and 876 web tests.
+The locked pose/reconstruction environment was installed. Six negative controls failed at their
+own exact selectors. The [executed record](evaluation/2026-09-08-executed-asset-read-currency.json)
+binds the route-to-byte evidence; the [verification record](evaluation/2026-09-08-verification-asset-read-currency.json)
+records digest checks and the second unsuccessful recorder attempt without changing accepted records.
+No executable changes followed the tested head. Migration 0041 was exercised only in disposable
+test schemas; retained database activation, merge and push remain unperformed.
+
 Migration 0041 implements the scope approved at `6270115`, with the single existing viewer-URL
 assertion update approved at `6d12621`. Original/crop/by-URI image delivery now refuses current
 mask requirements, withdrawal and missing capture identity. Permitted originals retain exact
