@@ -1650,11 +1650,13 @@ async function mount(): Promise<void> {
       showTravelStatus('No authorized source photographs are available in this session.', 'failure');
     }
   };
+  const renderedPreviewRegions = new Set<string>();
   const renderReconstructionStatus = (): HTMLElement => buildStatus({
     omittedRegionCount: built.omitted.length, undrawable: built.undrawable,
     notices: [...sourceMediaNotices, ...geometryNotices], reconstructionScenes: reconstructionRungs,
     sourceRegions: current.islands
-      .filter((island) => !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
+      .filter((island) => !renderedPreviewRegions.has(island.islandId)
+        && !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
       .map((island) => ({ regionId: island.islandId, captureCount: island.captureIds.length })),
     onInspectScene: inspectReconstruction, onInspectSources: inspectSceneSources,
     // The lens switch, last in the input as it is last in the panel. Toggling it calls
@@ -1844,6 +1846,12 @@ async function mount(): Promise<void> {
     });
     });
   } finally { rendererLoading.remove(); shell!.removeAttribute('aria-busy'); }
+  // Only renderer-accepted legacy preview maps suppress the source-only region notice.
+  if (preview) {
+    for (const visual of atlas.binding.islands) {
+      if (pointMaps_?.has(visual.island.islandId)) renderedPreviewRegions.add(visual.island.islandId);
+    }
+  }
   const actualRendering = new Map<string, RenderingSubstrate>();
   for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');

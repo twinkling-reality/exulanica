@@ -111,6 +111,25 @@ The separate `ui/status.ts:137` sourceOnly branch in inspection presentation als
 legacy maps and can still say no reconstruction is loaded. That file remains unmodified;
 this distinct limitation was reported rather than silently included in the patch.
 
+## Independent integration acceptance
+
+The orchestrator applied the owner-authored patch in a separate integration worktree. The first
+typecheck rejected Set<IslandId> against the snapshot's string IDs. Owner correction 158a3b2
+uses Set<string> for exact cross-projection comparison; the corrected integration typecheck
+passed. All 41 focused preview, OPM and status tests passed, along with dependency boundaries.
+No full backend run or database operation was performed.
+
+The browser at port 5182 independently showed Index > Mara > first Open the source displaying
+the courtyard photograph. With the renderer-accepted courtyard map, only three grouped regions
+remain labelled reconstruction unavailable. Temporarily withholding the fixture in the isolated
+integration checkout and reloading produced four unavailable rows; restoring the exact tracked
+file and reloading returned to three. The fixture was restored before commit. This verifies
+the actual boot/status refresh and failure fallback, not just a mocked status input.
+
+The corrected grouped-preview mode does not repair the separate inspection-presentation branch,
+implement intake/review in the preview, or establish useful reconstructed-world quality. The
+operator's objection to the floating-image presentation remains a product-design issue.
+
 ### Integration type correction
 
 The orchestrator applied the initial patch in its separate integration worktree and reported
