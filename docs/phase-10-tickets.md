@@ -610,6 +610,40 @@ place.
 
 ---
 
+### P10-3-e Where a place is
+
+**What.** A derived position block on the place read, from the `gps_position_is` claims the intake
+stage already writes per capture. No column, no receipt, and no amendment to migration 0038.
+
+**Why now.** The decision had a closing window: 0038 was written and `public` was still at 0037, so
+a column was an amendment today and a migration tomorrow. The decision is recorded in
+`docs/place-identity.md`, "Where a place is": derive, do not store, because `place` is append-only
+and a stored position could not follow a withdrawal or a superseded claim. **The window did not
+need to be used.**
+
+**Exit.**
+
+- [x] The decision written down with what it rejected and why.
+- [x] The signal verified rather than assumed. MEASURED 2026-09-07: `exulanica/ingest/exif.py:157`
+      defines `GpsFix` in integer ten-millionths, `exulanica/ingest/stages/intake.py:151` writes
+      the claim, `exulanica/migrations/0006_functional_predicates.sql:14` makes the predicate
+      functional, and the permitted instance holds zero `gps_position_is` assertions because both
+      retained collections are published datasets with EXIF stripped.
+- [ ] The position block implemented in `exulanica/graph/places.py`: member captures, captures with
+      a fix, bounding box and median in integer ten-millionths, `basis` `exif-capture-fixes/v1`.
+- [ ] A place with no fix reports `unavailable` with a reason, asserted by a test named for the
+      failure it catches, because absence is the ordinary case in the only corpus that exists and
+      must never read as an error.
+- [ ] A withdrawn capture stops contributing its fix, asserted by a test. This is the invariant the
+      whole decision rests on and the one a stored column would have broken.
+- [ ] The block states in its own text that a fix says where a photographer stood, not where the
+      place is, how large it is, or which way it faces. The recovered frame stays ungeoreferenced.
+
+**Files.** Edited: `exulanica/graph/places.py`, `docs/place-identity.md`, `docs/phase-10-tickets.md`,
+tests. No migration.
+
+---
+
 ### P10-3-c The joint reconstruction build
 
 **What.** One new stage whose subject is a pair of scenes, its artifact kind, its receipt, its

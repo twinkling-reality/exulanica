@@ -225,6 +225,75 @@ scene side. So 0038 adds a nullable `place_id` to `artifact` and generalises the
 exactly-one-of-three. The invariant is unchanged and every existing row still satisfies it; what
 changes is that a place is now a subject a build may be about.
 
+### Where a place is, decided 2026-09-07
+
+**A place derives its position from its photographs and stores none. Migration 0038 needs no
+amendment for this.**
+
+Every capture ingested with EXIF GPS already writes a durable `gps_position_is` claim.
+`exulanica/ingest/exif.py:157-167` defines `GpsFix` as latitude and longitude in integer
+ten-millionths of a degree, deliberately never a float, and `exulanica/ingest/stages/intake.py:151`
+writes it for every capture that has one. MEASURED 2026-09-07 on the permitted instance: the
+retained corpus holds **zero** such claims, because the bowl and volcanic sets are published
+datasets with EXIF stripped. The signal is real, it is already recorded, and nothing has exercised
+it.
+
+#### Why not a column on `place`
+
+This is refused on deletion, and decisively. `place` is append-only, so a stored `lat_e7` and
+`lon_e7` could never be corrected. When a member capture is withdrawn, the tombstone guards
+already take its geometry and its observations out of every read; a stored position derived from
+that photograph's EXIF would survive as two integers with no lineage, still saying where a
+withdrawn photograph was taken. That is a retained inference over withdrawn evidence, which is what
+the withdrawal machinery exists to prevent, and it would be invisible: an integer pair on a row
+looks like configuration, not like a derived fact somebody has a right to remove.
+
+`gps_position_is` is also **functional** (`exulanica/migrations/0006_functional_predicates.sql:14`),
+so its claim can be superseded or retracted. A column cannot follow that; a read can.
+
+#### Why not its own receipt
+
+A receipt pins an answer to a moment, which is the staleness problem again wearing a digest. It is
+also unearned: this reduction is one join and a median over at most a few hundred integers, not a
+build, and a receipt for arithmetic that a reader can redo is ceremony.
+
+#### What the derivation says, and what it refuses to say
+
+A place's position block reports the member captures, how many of them carry a fix, a **bounding
+box** in integer ten-millionths, and a **median** latitude and longitude in the same units, under a
+versioned `basis` of `exif-capture-fixes/v1` so a changed reduction changes the name rather than
+silently reinterpreting an old answer.
+
+Median rather than centroid, for two reasons. A centroid of integers is a rational and needs a
+rounding policy, which is a float in disguise, and `canonical_json` refuses floats at any depth. And
+one bad handheld fix, which is the ordinary case indoors, moves a centroid and does not move a
+median. The bounding box is what says whether the median means anything at all, in the same way
+`track_length` sits beside `observations_held` in the observation graph: a single number with no
+spread beside it invites a confidence nobody measured.
+
+**Absence is ordinary.** A place no member of which carries a fix reports `state: "unavailable"`
+with a reason. That is the only state the corpus that exists today can produce, and it is not a
+degraded place, not an error, and not a gap to be filled by inference.
+
+**What this must never be read as.** A GPS fix says where a photographer stood. It does not say
+where the place is, how large it is, or which way it faces, and the position block says so in its
+own text rather than leaving a reader to infer it. **The recovered frame stays ungeoreferenced.**
+Georeferencing a frame needs metric scale, which needs the independent physical reference
+`docs/retained-reference-workflow.md` names as an unmet dependency, and a place that quietly
+attached a real-world coordinate to a scale-free COLMAP frame would be making exactly the unearned
+claim the rung ladder exists to prevent.
+
+#### The trade, stated
+
+A derived position cannot be indexed, so "which places are near here" is a sequential scan over
+assertions. That is the cost, and it is accepted for now on three grounds: nobody has asked for
+that query, the roadmap explicitly defers Earth and map views to a later bridge view, and the
+corpus holds zero fixes to scan. When it is wanted, the right answer is a materialized position
+carrying an explicit invalidation edge, following the pattern `world_structure_invalidation`
+already implements, and it will properly be a migration then, because it will need that edge. This
+decision does not give it one, which is the point: a materialized column without invalidation is
+the version that is wrong, and it is the version an amendment today would have shipped.
+
 ### The build, and why it needs its own queue
 
 The joint reconstruction is a new stage, `place_alignment`, producing one artifact kind. It has to
