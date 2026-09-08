@@ -12,6 +12,7 @@ import hashlib
 import json
 import uuid
 
+import pytest
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.observations import OBSERVATIONS_PROFILE, scene_observations
 from exulanica.ingest.repository import IngestRepository
@@ -217,3 +218,123 @@ def test_the_method_sentence_refuses_to_claim_reprojection_is_provenance(reposit
     records = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
     assert records is not None
     assert "not visibility inferred" in records["method"]
+
+
+def test_the_unbounded_answer_holds_every_point_and_now_says_so(repository, tmp_path):
+    """The default did not change, and a complete answer has to state that it is complete.
+
+    Both halves matter. A caller already reading this route asked for the whole graph and still
+    gets it, so no default quietly started answering a smaller question. And "complete" is now a
+    field rather than an inference from the absence of a cursor, because an inference is what a
+    client gets wrong.
+    """
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    records = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    assert records is not None
+    bounds = records["bounds"]
+    assert bounds["state"] == "complete"
+    assert bounds["limit"] is None
+    assert bounds["after_point_id"] is None
+    assert bounds["next_point_id"] is None
+    assert bounds["point_count_not_returned"] == 0
+    assert bounds["point_count_total"] == bounds["point_count_returned"] == records["point_count"]
+    assert bounds["observations_total"] == bounds["observations_returned"]
+    assert bounds["observations_total"] == sum(
+        point["observations_retained"] for point in records["points"]
+    )
+
+
+def test_a_page_says_it_is_a_page_and_names_the_points_it_left_behind(repository, tmp_path):
+    """A truncated answer that reads as complete is the failure this route can produce.
+
+    It is the sampling rule one level up. A point that holds 3 of 40 observations says so through
+    ``track_length``; an answer that holds 1 of 15005 points has to say so the same way, or a
+    client counting what it received understates the world and has no way to know it did.
+    """
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    assert whole is not None
+    total = whole["point_count"]
+    assert total > 1, "a one-point scene cannot demonstrate a page"
+
+    page = scene_observations(
+        repository.connection, repository.workspace_id, scene_id, store, limit=1
+    )
+    assert page is not None
+    bounds = page["bounds"]
+    assert bounds["state"] == "page"
+    assert bounds["limit"] == 1
+    assert bounds["point_count_returned"] == page["point_count"] == len(page["points"]) == 1
+    assert bounds["point_count_total"] == total
+    assert bounds["point_count_not_returned"] == total - 1
+    assert bounds["next_point_id"] == page["points"][0]["point_id"]
+    assert f"1 of the {total} points" in bounds["note"]
+    # `point_count` keeps meaning "points in this answer", which is what it has always meant. The
+    # scene's own total lives in `bounds`, and the two are never the same field: one field that
+    # changed meaning between a complete answer and a page is a field a client reads wrongly.
+    assert page["point_count"] != bounds["point_count_total"]
+
+
+def test_a_page_is_smaller_on_the_wire_than_the_whole_graph(repository, tmp_path):
+    """The size claim, measured rather than asserted, and measured twice.
+
+    MEASURED 2026-09-07, read-only against the retained reference instance
+    (``postgresql://localhost:5433/exulanica_spine_test``, store
+    ``.exulanica/reference-baseline/runtime/blobs``): the bowl scene
+    ``851ca35b-31c3-560c-84f9-4e142962755b`` serialises to 97,633,587 canonical bytes over 15005
+    points, and a 500-point page of it to 4,973,392, which is 5.1%. The volcanic scene
+    ``45ad50b7`` serialises to 1,179,240,157 bytes over 111694 points, and a 500-point page to
+    8,173,297, which is 0.7%. This fixture is three photographs and cannot reproduce those
+    numbers; what it can do, and does here, is fail if a page ever stops being smaller than the
+    graph it came from, which is what those measurements would stop meaning.
+    """
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    page = scene_observations(
+        repository.connection, repository.workspace_id, scene_id, store, limit=1
+    )
+    assert whole is not None and page is not None
+    whole_bytes = len(_canonical(whole))
+    page_bytes = len(_canonical(page))
+    assert page_bytes < whole_bytes, (whole_bytes, page_bytes)
+    assert whole["point_count"] > page["point_count"]
+
+
+def test_a_cursor_walks_every_point_exactly_once(repository, tmp_path):
+    """A cursor that skipped or repeated a point would assemble a graph nobody observed.
+
+    The order is COLMAP's global point id and the pose receipt holding it is immutable, so the
+    walk is asserted against the complete answer rather than against itself: paging must be a way
+    of receiving the same graph, not a different graph that happens to be the same length.
+    """
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    assert whole is not None
+
+    walked: list[dict] = []
+    cursor = None
+    while True:
+        page = scene_observations(
+            repository.connection,
+            repository.workspace_id,
+            scene_id,
+            store,
+            limit=2,
+            after_point_id=cursor,
+        )
+        assert page is not None
+        walked.extend(page["points"])
+        cursor = page["bounds"]["next_point_id"]
+        if cursor is None:
+            break
+    assert walked == whole["points"]
+    assert len(walked) == whole["point_count"]
+
+
+def test_a_limit_of_zero_is_refused_rather_than_answering_with_no_points(repository, tmp_path):
+    """An empty point list reads as "this scene observed nothing", which is the one sentence this
+    module refuses to write. A caller asking for zero points has made a mistake, and a page of
+    none is not the answer to it."""
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    with pytest.raises(ValueError, match="at least one point"):
+        scene_observations(repository.connection, repository.workspace_id, scene_id, store, limit=0)

@@ -17,6 +17,27 @@ Every point therefore carries COLMAP's full ``track_length`` beside the number o
 actually held. A viewer shown three photographs for a point forty photographs observed would be
 misled by omission.
 
+**A page says it is a page, by the same rule.** The whole graph is large, and the size was
+measured rather than estimated. MEASURED 2026-09-07, read-only against the retained reference
+instance (``postgresql://localhost:5433/exulanica_spine_test``, store
+``.exulanica/reference-baseline/runtime/blobs``): the bowl scene
+``851ca35b-31c3-560c-84f9-4e142962755b`` holds 15005 points and 71214 observations and serialises
+to **97,633,587** canonical bytes; the volcanic scene ``45ad50b7`` holds 111694 points and
+serialises to **1,179,240,157**. A 500-point page of the same two scenes is **4,973,392** and
+**8,173,297** bytes, 5.1% and 0.7% of the whole. A place spans several captures, so this is the
+read that fails first once a place is addressable, and ``limit`` is what bounds it.
+
+What a bounded answer must never do is look like a complete one. Every response carries a
+``bounds`` block naming the state, how many points the scene has, how many this answer holds and
+the cursor for the rest. The unbounded call is unchanged and stays the default, so a client
+already reading the whole graph keeps getting it and is now told that it did. This is the sampling
+rule one level up and it is the same argument: a viewer shown 500 points of 15005 and not told
+would be misled by omission.
+
+The bound is on the answer, not on the work. The pose receipt is one object and it is read and
+grouped in full before any page is cut, so paging saves the wire and the client's memory and saves
+nothing on the server. Saying otherwise would be a performance claim nobody measured.
+
 **The guard is scene-scoped, and that is not an implementation detail.** ``tombstone_blocks_scene``
 rather than ``tombstone_blocks_capture``, because these rows are a fact about N photographs
 together. ``exulanica/graph/geometry.py`` records why the per-capture reduction is wrong for
@@ -26,7 +47,8 @@ capture would keep serving a fact about a set from which another was withdrawn.
 Consent rides along per photograph, through the same seam the World Read bundle uses. Note what
 that does and does not do today: it **reports** each photograph's screening state, and it filters
 nothing, because no per-person consent state exists to filter on. Every observation currently
-carries ``person_consent: unavailable``. Filtering is Phase 10 capability 5's to add, on the
+carries ``person_consent: unscreened``, which says nobody has looked at that photograph for people
+and never that there is nobody in it. Filtering is Phase 10 capability 5's to add, on the
 privacy branch, and until it lands a caller has a state to display and no decision to enforce.
 """
 
@@ -80,12 +102,29 @@ def scene_observations(
     workspace: uuid.UUID,
     scene_id: uuid.UUID,
     store: ContentAddressedStore | None,
+    *,
+    limit: int | None = None,
+    after_point_id: int | None = None,
 ) -> dict[str, Any] | None:
     """The scene's retained sparse observation graph, or ``None`` when it is not readable.
 
     ``None`` covers a missing scene, a foreign one, a withdrawn one and a scene with no accepted
     pose alike, so the route above cannot turn any of them into an existence oracle.
+
+    ``limit`` and ``after_point_id`` cut a page out of the graph, in point-id order. Both default
+    to None, which returns the whole graph exactly as this function always has, because a client
+    already reading it asked for the whole thing and a default that quietly stopped answering that
+    question would be the failure this module's own sampling rule exists to prevent. What every
+    answer gains is a ``bounds`` block: a complete one says it is complete, and a page says how
+    many points it left behind and where to continue.
+
+    A page is stable across requests without a snapshot: the pose receipt is immutable and its
+    points are ordered by COLMAP's global point id, so a cursor over that order cannot skip or
+    repeat a point. What a cursor cannot promise is that the scene is still readable between
+    pages, and it is not asked to: a withdrawal between two pages makes the next one ``None``.
     """
+    if limit is not None and limit < 1:
+        raise ValueError("a page of the observation graph holds at least one point")
     if store is None:
         return None
     row = connection.execute(_POSE, (workspace, scene_id)).fetchone()
@@ -139,6 +178,16 @@ def scene_observations(
             }
         )
 
+    window = [
+        point for point in points if after_point_id is None or point["point_id"] > after_point_id
+    ]
+    page = window if limit is None else window[:limit]
+    # A cursor is offered only when there is somewhere to go. `next_point_id` on an exhausted page
+    # would invite one more request whose answer is empty, and an empty page of an observation
+    # graph reads like a scene that observed nothing, which is the sentence this module opens by
+    # refusing to write.
+    next_point_id = page[-1]["point_id"] if page and len(page) < len(window) else None
+
     return {
         "profile": OBSERVATIONS_PROFILE,
         "scene_id": str(scene_id),
@@ -155,6 +204,50 @@ def scene_observations(
             "observations_retained is how many of them this answer holds."
         ),
         "number_encoding": NUMBER_ENCODING,
-        "point_count": len(points),
-        "points": points,
+        "bounds": _bounds(points, page, limit, after_point_id, next_point_id),
+        # How many points THIS ANSWER holds, which is what it has always meant. The scene's own
+        # total is in `bounds`, kept apart on purpose: one field that meant "the scene's points"
+        # on a complete answer and "this page's points" on a bounded one is a field no client can
+        # read correctly, and the reading it would get wrong is the one that undercounts a world.
+        "point_count": len(page),
+        "points": page,
+    }
+
+
+def _bounds(
+    points: list[dict[str, Any]],
+    page: list[dict[str, Any]],
+    limit: int | None,
+    after_point_id: int | None,
+    next_point_id: int | None,
+) -> dict[str, Any]:
+    """What this answer holds and what it does not, in the shape a client has to read first."""
+    held = sum(len(point["observations"]) for point in points)
+    returned = sum(len(point["observations"]) for point in page)
+    complete = len(page) == len(points)
+    return {
+        "state": "complete" if complete else "page",
+        "limit": limit,
+        "after_point_id": after_point_id,
+        "next_point_id": next_point_id,
+        "point_count_total": len(points),
+        "point_count_returned": len(page),
+        "point_count_not_returned": len(points) - len(page),
+        "observations_total": held,
+        "observations_returned": returned,
+        "order": (
+            "points ascend by COLMAP's global point id, the order the pose receipt retains. The "
+            "receipt is immutable, so a cursor over this order can neither skip nor repeat a point"
+        ),
+        "note": (
+            "this answer holds every point retained for this scene"
+            if complete
+            else (
+                f"this answer holds {len(page)} of the {len(points)} points retained for this "
+                "scene. It is a page of the observation graph and not the graph: counting these "
+                "points understates what the scene observed, the same way counting a point's "
+                "held observations understates its track length. Ask again with after_point_id "
+                "set to next_point_id for the rest"
+            )
+        ),
     }
