@@ -1,8 +1,8 @@
 # Start recipient-checkable World Read evidence work
 
-Queue this brief behind the shared screening-currency follow-up in
-`docs/briefs/2026-09-08-stale-screening-policy.md`. The admission/review tasks have now landed;
-see `docs/integration-personal-review-2026-09-08.md` for executed results and the remaining blocker.
+Queue this brief behind `docs/briefs/2026-09-08-asset-read-currency.md`. Shared screening currency
+has landed; see `docs/integration-screening-currency-2026-09-08.md` for executed results and the
+remaining asset-read activation dependency.
 Repository: `/Users/glendonchin/dev/Technology/orimera`; product/package: Exulanica.
 Read applicable AGENTS.md, `docs/integration-2026-09-08.md`, `docs/phase-10-tickets.md` P10-1/P10-5,
 `exulanica/graph/world_read.py`, `read_consent.py`, and the landed training export implementation.

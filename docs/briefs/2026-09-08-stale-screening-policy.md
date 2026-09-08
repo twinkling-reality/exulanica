@@ -1,5 +1,9 @@
 # Close shared stale-screening admission before personal-data activation
 
+Status: completed and integrated at `53039d4`; see
+`docs/integration-screening-currency-2026-09-08.md`. The original dispatch scope and approvals
+below are preserved. Asset-read currency remains separate and is queued next.
+
 This is the next serialized brief after manual review and personal admission have both landed.
 It takes priority over the queued World Read evidence brief because an executed admission
 rehearsal exposed a shared policy gap. Do not start from either unintegrated implementation tip.

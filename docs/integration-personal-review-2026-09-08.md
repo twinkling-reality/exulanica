@@ -1,5 +1,9 @@
 # Personal admission and manual review integration, 2026-09-08
 
+Follow-up: the shared admission-policy gap described here was subsequently addressed in
+`integration-screening-currency-2026-09-08.md`. Asset-read currency remains open. This report
+retains the state and limitations of its own verified integration.
+
 Both feature branches are integrated. This report distinguishes executed generated-fixture paths
 from retained personal-data operation. No public migration or paid compute was performed.
 
