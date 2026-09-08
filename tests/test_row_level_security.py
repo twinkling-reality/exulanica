@@ -120,6 +120,9 @@ def isolated():
             "pipeline_version, dims, v) values (%s, 'text_chunk', 'span', %s, 'm', 1, 4096, %s)",
             (workspace_a, span, WIDE_VECTOR),
         )
+        # A place is the durable plane 0038 added, and it is the newest workspace-keyed table, so
+        # it is the one whose isolation is least likely to be covered by habit.
+        admin.execute("insert into place (workspace_id) values (%s)", (workspace_a,))
         admin.commit()
         yield Isolated(scratch, workspace_a, workspace_b)
 
@@ -212,7 +215,7 @@ def test_delivery_replay_cannot_name_a_job_from_another_workspace(scoped):
             )
 
 
-@pytest.mark.parametrize("table", ["capture", "evidence_span", "embedding"])
+@pytest.mark.parametrize("table", ["capture", "evidence_span", "embedding", "place"])
 def test_a_workspace_reads_its_own_rows_and_no_other_workspace_sees_them(scoped, table):
     """A policy that refused everything would pass the isolation half of this on its own."""
     mine = scoped.connect(_APP_ROLE, scoped.workspace_a)

@@ -1053,13 +1053,14 @@ def _annotations_naming_a_connection() -> list[str]:
 def test_every_spine_function_takes_a_workspace_scope():
     """Nothing in the spine package is reachable by a session that named no workspace.
 
-    62 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
+    65 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
     those policies compare against, and the tombstone and epistemic guards go further: they call
     ``assert_workspace_context()`` and raise when it is unset, because a guard that silently sees
     no tombstones is worse than no guard. So no path into the spine package may begin with a
     connection that has not declared one, and ``WorkspaceScope`` has no constructor that skips
     the declaration. ``test_the_prose_count_of_workspace_isolated_tables_matches_the_schema``
-    is what keeps that 32 a measurement rather than a memory.
+    is what keeps that number a measurement rather than a memory, and it is why the sentence
+    above says a number at all: nothing else checks it.
 
     This is checked structurally because there is nothing else to check it with. There is no
     ``[tool.mypy]`` and no pyright configuration in ``pyproject.toml``, so the parameter type is

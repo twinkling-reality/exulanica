@@ -228,6 +228,9 @@ def test_every_migration_is_a_single_transaction_with_no_down_path(migration):
         "person_subject",
         "person_region",
         "person_presentation_consent",
+        "place",
+        "place_version",
+        "place_alignment",
     ],
 )
 def test_every_required_table_exists(table):
