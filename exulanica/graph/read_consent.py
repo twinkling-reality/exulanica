@@ -358,8 +358,8 @@ def release_state(consent: CaptureConsent) -> dict[str, Any]:
     else:
         why = (
             f"all {total} photographs have been screened and {recorded_people} people are "
-            "recorded, but this bundle carries no per-person state, so a recipient holding it "
-            "cannot check that any of them agreed"
+            "recorded; recorded receipts alone do not establish current permission or "
+            "redistribution authority"
         )
 
     return {
@@ -400,20 +400,16 @@ def release_state(consent: CaptureConsent) -> dict[str, Any]:
         ],
         "not_yet_earnable": {
             "releasable_masked": (
-                "the geometry entries record the digest of the artifact produced, not of the "
-                "source derivative read to produce it, so a recipient cannot check that what "
-                "they were handed descends from the masked images"
+                "recorded lineage is not permission to redistribute; missing lineage and "
+                "derivative currency must be evaluated explicitly"
             ),
             "releasable": (
-                "no per-person state is carried in this bundle. Adding it means putting a "
-                "clock-dependent value inside recorded_keys, because a presentation consent "
-                "expires against clock_timestamp(), and the recorded digest may not depend on "
-                "the clock"
+                "recorded person receipts require evaluation at an explicit time and do not "
+                "authenticate the subject or the account holder's redistribution authority"
             ),
         },
         "blocked_until": (
-            "the bundle carries a state per person that a recipient can check, and the geometry "
-            "entries name the source derivative they were built from "
-            "(docs/person-presentation-consent.md, docs/phase-10-tickets.md P10-5)"
+            "separately authorized redistribution with authenticated authority and complete "
+            "source-specific permission; this owning-workspace evidence contract does not grant it"
         ),
     }

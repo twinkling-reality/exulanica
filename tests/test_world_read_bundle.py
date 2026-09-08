@@ -350,7 +350,8 @@ def test_the_release_state_is_internal_only_while_no_person_state_reaches_the_bu
         assert "person_regions" not in view
         assert "person_review_state" not in view
         assert "state" not in view["consent"]
-    assert release["not_yet_earnable"]["releasable"].startswith("no per-person state")
+    assert "authenticate" in release["not_yet_earnable"]["releasable"]
+    assert "recipient_evidence" in bundle
 
 
 def test_the_release_counts_are_recomputable_from_the_bundles_own_per_capture_records(
@@ -465,6 +466,10 @@ def test_a_recipient_reproduces_the_recorded_digest_from_the_keys_the_bundle_nam
     assert "recorded_keys" not in received["recorded_keys"]
     assert set(received["recorded_keys"]) | {
         "generated",
+        "scene",
+        "views",
+        "geometry",
+        "rungs",
         "recorded_keys",
         "recorded_sha256",
     } == set(received)

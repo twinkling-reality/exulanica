@@ -32,9 +32,8 @@ place and its receipts are bound to inputs no place can be part of. What is stil
 an **entity**: nothing routes from a person or an object to a bundle, and the ``addressing`` block
 says that rather than leaving a reader to find it out.
 
-**Consent is asked once, through one function.** See :mod:`exulanica.graph.read_consent`. While no
-per-person layer exists, the bundle is ``internal_only`` and says what that basis does not
-establish.
+**Consent is asked once, through one function.** See :mod:`exulanica.graph.read_consent`. The bundle remains ``internal_only``: recorded presentation receipts and source lineage do
+not authenticate redistribution authority.
 
 **Two digests, not one.** ``recorded_sha256`` covers the observed world alone; ``bundle_sha256``
 covers the whole response including anything a model has since generated. A generation cites the
@@ -93,6 +92,7 @@ from exulanica.graph.wire_numbers import (
 from exulanica.graph.wire_numbers import (
     decimal_strings as _decimals,
 )
+from exulanica.graph.world_read_evidence import recorded_evidence
 from exulanica.store import ContentAddressedStore
 from exulanica.world import DEFAULT_WORLD_ID, WorldStructureRepository
 
@@ -736,6 +736,9 @@ def _assemble(
         "number_encoding": NUMBER_ENCODING,
         "addressing": addressing,
         "scene": _scene_block(scene),
+        "recipient_evidence": recorded_evidence(
+            connection, workspace, scene.scene_id, capture_ids, store
+        ),
         "rungs": _rungs(scene),
         "views": [_view(member, consent[str(member.capture_id)]) for member in scene.members],
         "geometry": _geometry(scene),
@@ -775,6 +778,16 @@ def _assemble(
             ),
         },
     }
+    point_ids = {
+        item["artifact_id"] for item in bundle["recipient_evidence"]["record"]["point_maps"]
+    }
+    for geometry in bundle["geometry"]:
+        if geometry["kind"] == "point_map":
+            geometry["source_lineage"] = (
+                {"state": "available", "record_artifact_id": geometry["artifact_id"]}
+                if geometry["artifact_id"] in point_ids
+                else {"state": "unavailable", "reason": "frozen_point_binding_missing"}
+            )
     if place is not None:
         # A place-addressed bundle carries the place it resolved through; a scene-addressed one
         # does not. The difference is visible in `recorded_keys` rather than hidden, and it is a
@@ -802,7 +815,11 @@ def _seal(bundle: dict[str, Any]) -> dict[str, Any]:
     # `recorded_sha256` itself, which was not an input to its own hash. A self-referential digest
     # whose input a recipient has to infer is a digest they cannot check. Naming the keys makes the
     # recipe exact and makes adding a key to the recorded world a deliberate edit here.
-    bundle["recorded_keys"] = sorted(key for key in bundle if key != "generated")
+    bundle["recorded_digest_profile"] = "exulanica.world-read-recorded/v2"
+    # Delivery fields can change at expiry without writes. Exact response integrity remains
+    # covered by bundle_sha256; retained cameras and outputs live in recipient_evidence.
+    delivery_keys = {"generated", "scene", "views", "geometry", "rungs"}
+    bundle["recorded_keys"] = sorted(key for key in bundle if key not in delivery_keys)
     bundle["recorded_sha256"] = sha256_of_canonical(
         {key: bundle[key] for key in bundle["recorded_keys"]}
     ).hex()
