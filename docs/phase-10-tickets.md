@@ -1,6 +1,6 @@
 # Phase 10 tickets: the memory layer for world models
 
-Status: **PLAN AND PROGRESS, 2026-09-06**. This turns [`frontier-roadmap.md`](frontier-roadmap.md)
+Status: **PLAN AND PROGRESS, reconciled 2026-09-08**. This turns [`frontier-roadmap.md`](frontier-roadmap.md)
 Phase 10 into tickets in the first-week order that phase states. It is a plan, not a claim: a
 ticket is done when its exit criteria have been executed and the evidence retained, and until then
 its checkbox is empty no matter how much code exists.
@@ -26,7 +26,25 @@ A ticket with no executed exit is open. A ticket whose exit is executed against 
 says so in its exit line, because the difference between a passing fixture and a real capture is
 where every defect in the 2026-09-05 reconstruction runs was found.
 
-## Ownership
+## Integration ownership, 2026-09-08
+
+The assignments below supersede the historical branch split. Integration is serialized B, C,
+then A, with full gates after each rebase. No implementation task owns
+`web/packages/app/src/main.ts`.
+
+| Owner | Branch | File boundary | Migration |
+| --- | --- | --- | --- |
+| B | `phase-7b-training-consent` | Training consent and World Memory Package; three shared RLS prose counts only | 0039 |
+| C | `frontier-run-and-read-bounds` | Orchestration, observation reads and client, demonstration docs | None |
+| A | `gpu-and-real-geometry` | Reconstruction, masked geometry, evaluation, deployment scripts and GPU docs | None; 0040 unused |
+
+The retained `public` schema was independently read at 0038 on 2026-09-08: 284 captures,
+880 artifacts, 5 scenes and zero person regions. Migration 0039 has been exercised in isolated
+test schemas only. The frontier preflight now refuses a live demonstration until the operator
+applies it. A dated record made before this integration remains an observation of its recorded
+tree and schema; it is not rewritten to describe the combined tree.
+
+## Historical ownership, 2026-09-06
 
 Three owners, and the split is by file, not by intent.
 
@@ -610,7 +628,7 @@ place.
 
 ---
 
-### P10-3-f Apply 0038 to the reference instance, which nobody has done
+### P10-3-f Apply 0038 to the reference instance
 
 **What.** Migration `0038` applied to the retained reference instance's `public` schema.
 
@@ -637,8 +655,8 @@ and it is the operator's call.
 
 **Exit.**
 
-- [ ] `0038` applied to the reference instance, by whatever path the previous 37 took.
-- [ ] `uv run python scripts/record_world_read_evidence.py --date <today> --label place-read-paths
+- [x] `0038` applied to the reference instance, by whatever path the previous 37 took.
+- [x] `uv run python scripts/record_world_read_evidence.py --date <today> --label place-read-paths
       --predecessor docs/evaluation/2026-09-07-phase-10-read-paths.json` executed, producing a new
       dated record bound to the one it follows rather than replacing it.
 - [x] `uv run python scripts/verify_world_read_controls.py --date <today> --label place-world-read
@@ -657,6 +675,14 @@ commit, not a complete description of the then-uncommitted source. Use the lates
 the result from a checkout.
 
 **Files.** No source change. Two records under `docs/evaluation/`.
+
+**Superseding result, 2026-09-08.** The pending statements above describe the earlier preflight.
+The authorized application subsequently completed, and integration independently read version
+0038 from `public.schema_migrations` with 284 captures, 880 artifacts and 5 scenes. The new
+`docs/evaluation/2026-09-08-place-read-paths.json` records served retained scene bundles, and
+`docs/evaluation/2026-09-08-place-reference-world-read-negative-controls.json` records all fifteen
+named controls killed. Both envelopes and predecessor bindings were independently verified.
+This closes the 0038 application and re-record criteria; it does not apply migration 0039.
 
 ---
 
@@ -721,17 +747,25 @@ new records existed. No web source was changed. Capability 3's real-capture exit
 refusal path, and its own queue table, giving `exulanica/reconstruction/place_alignment.py` a
 production caller.
 
-**Why now.** `place_alignment.py` is measured against a synthetic fixture and called by nothing.
+**Original motivation.** `place_alignment.py` is measured against a synthetic fixture and called by nothing.
 Until something calls it, the fitter is a module and not a capability.
+
+**Current implementation, checked 2026-09-08.** That original gap is closed by
+`exulanica/ingest/place_alignment.py`, which calls the fitter and records an accepted alignment
+or a refusal. The full integration suites execute `tests/test_place_alignment_build.py` against
+scripted joint reconstruction, including all three refusal reasons. The stage is registered and
+the frontier readiness record carries the current pipeline digest. The queue remains explicitly
+deferred in `place-identity.md`; the original queue requirement below is not a shipped queue.
+No real cross-capture joint reconstruction has been demonstrated.
 
 **Exit.**
 
-- [ ] A `place_alignment` stage in `STAGES`, with the resulting `pipeline_digest()` movement
+- [x] A `place_alignment` stage in `STAGES`, with the resulting `pipeline_digest()` movement
       re-recorded rather than absorbed silently.
-- [ ] The stage's correspondences are built from the two scenes' retained `pose_receipt` artifacts
+- [x] The stage's correspondences are built from the two scenes' retained `pose_receipt` artifacts
       for `scene_xyz` and from the joint run for `joint_xyz`, never from a read-time join over
       receipts, which `docs/place-identity.md` establishes cannot work.
-- [ ] Each of the three refusal reasons reachable and recorded as an outcome, asserted by tests
+- [x] Each of the three refusal reasons reachable and recorded as an outcome, asserted by tests
       named for the refusal they catch.
 - [ ] The joint sparse model is not promoted to citable geometry; its digest is in the receipt.
 - [ ] **Open until real data.** No real COLMAP joint run has happened. MEASURED 2026-09-07:
@@ -749,15 +783,22 @@ Edited: `exulanica/ingest/stages/__init__.py`.
 **What.** A graph read seam for places following `exulanica/graph/reconstruction_scenes.py`, and a
 World Read bundle that addresses a place and a time.
 
-**Why now.** The bundle currently carries a string telling every recipient that place addressing
+**Original motivation.** The bundle currently carries a string telling every recipient that place addressing
 does not exist. Deleting that string is the visible half of this capability.
+
+**Current implementation, checked 2026-09-08.** `exulanica/graph/places.py` and the widened bundle
+already provide place/time addressing, version transforms and frame-hop counts. The twenty
+`tests/test_place_read_bundle.py` cases execute in the integration suite, including time
+selection, scene-address compatibility and withdrawal. Their place versions are fixtures.
+The retained real-scene re-record is `docs/evaluation/2026-09-08-place-read-paths.json`; it does
+not establish a real place with two captures or a browser surface for switching their time.
 
 **Exit.**
 
-- [ ] `exulanica/graph/places.py` returns a place, its versions in capture order, and each
+- [x] `exulanica/graph/places.py` returns a place, its versions in capture order, and each
       version's transform with the receipt that measured it and how many alignments it was composed
       through.
-- [ ] The bundle's `addressing` block accepts a place and a time, resolves to one version, and the
+- [x] The bundle's `addressing` block accepts a place and a time, resolves to one version, and the
       scene address stays valid, because a scene is still a real thing after it joins a place.
 - [ ] The `limitation` string is deleted, and every retained record whose digest covered it is
       re-recorded as a new dated record bound by `predecessor_record` to the one it follows.
@@ -876,9 +917,10 @@ consents produce. Three cases are executed against a real database and each fail
 different wrong rule, including the one this change first shipped; the reasoning and the table are
 in `docs/person-presentation-consent.md`.
 
-**What is still open after it.** Nothing puts person regions on the retained collections. The
-production worker defaults its detector to `unavailable`, and the reviewer screen is imported by
-nothing but its own test, so the two ways a region could arrive are both switched off. Until one
-of them is wired, the screening rule change moves nothing on real data: it removes the blocker
-rather than producing the regions. That is the next thing worth doing, and it is a wiring task
-rather than a decision.
+**What is still open, checked 2026-09-08.** The retained collections still have zero person
+regions. The earlier claim that the review screen was imported only by its test is stale:
+`main.ts` imports `buildPersonReview` and `PersonReviewApi`, and `loadPersonReview` mounts the
+panel in the reconstruction inspector. Code wiring does not establish a completed real-person
+review. The detector remains unavailable by default, and neither that wiring nor the retrospective
+empty-region geometry count proves that anyone in the retained photographs has been located or
+masked. Real region review and consent evidence remain prerequisites for re-screening the corpus.

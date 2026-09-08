@@ -443,11 +443,14 @@ which already failed to yield a consistent up direction and would be a poor seco
 one existed. So the exit stays open, and this note claims a design and a numeric fixture, nothing
 else.
 
-What is buildable now, and is:
+What is implemented and exercised with fixtures:
 
 - the fitter and its refusals, measured against synthetic captures with a known ground-truth
   transform, so the geometry and the thresholds are exercised before a card is rented;
 - the refusal paths, which are the ones a real capture pair is most likely to take.
+- the callable joint-build path, place/version/alignment persistence and the place/time World
+  Read bundle. Integration executes their database tests with scripted joint reconstruction;
+  neither a leased alignment queue nor a browser time-switching surface is implemented.
 
 What needs real data:
 
@@ -461,7 +464,8 @@ What needs real data:
 
 ## Relationship to the rest of Phase 10
 
-The World Read API addresses a scene, and says so in its own `addressing` block: a place that
-persists across captures does not exist yet. When it does, the bundle gains place addressing and
-time, and the scene address stays valid, because a scene is still a real thing after it joins a
-place.
+The World Read API now addresses either a scene or a place and time. Its place plane and read
+contract exist; `tests/test_place_read_bundle.py` exercises version selection and preserves the
+scene address after a scene joins a place. The retained-scene read record dated 2026-09-08 serves
+the widened bundle after migration 0038. None of those results is the missing real-capture exit:
+two consented captures weeks apart, a measured joint frame, and both versions shown in the world.
