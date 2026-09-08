@@ -36,12 +36,116 @@ def binding(path: Path) -> dict[str, object]:
     }
 
 
+def retained_arg(value: str) -> str:
+    """Keep command provenance while removing this checkout's personal prefix."""
+    return value.replace(str(ROOT), "<worktree>")
+
+
+def write_envelope(path: Path, document: dict) -> None:
+    document["record_sha256"] = hashlib.sha256(canonical(document["record"])).hexdigest()
+    path.write_bytes(canonical(document) + b"\n")
+
+
+def repair_candidates(artifacts: Path) -> None:
+    """Repair only the two unpublished candidates authorized by main 520a192."""
+    paths = [
+        ROOT / "docs/evaluation" / f"2026-09-08-{kind}-asset-read-currency.json"
+        for kind in ("executed", "verification")
+    ]
+    expected = [
+        "582004804995515f8635f666d65bb82a879c8ad620190773867c3bfb5174876b",
+        "9d502d1fee24ae76c0ef646d247096709086396987b089e4243ca85a2649e597",
+    ]
+    documents = [json.loads(path.read_bytes()) for path in paths]
+    for document, digest in zip(documents, expected, strict=True):
+        assert document["record_sha256"] == digest
+        assert hashlib.sha256(canonical(document["record"])).hexdigest() == digest
+    artifacts.mkdir(parents=True, exist_ok=False)
+    failure = Path("/tmp/exulanica-asset-read-integration-d4cffba/backend.log")
+    log = retained_arg(failure.read_text())
+    assert "FAILED tests/test_retained_evaluation_records.py::" in log
+    (artifacts / "independent-backend-failure.log").write_text(log)
+    repair = {
+        "approval_commit": "520a192",
+        "reason": "Unpublished candidate retained checkout paths in argv; gates preceded generation.",
+        "replaced_record_sha256": expected,
+        "original_candidate_tip": "d4cffbacf886094a6a84e43c05426f54ff31d863",
+        "corrected_recorder_head": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
+        "recorder": binding(Path(__file__).resolve()),
+        "independent_failure": binding(artifacts / "independent-backend-failure.log"),
+    }
+    for command in documents[0]["record"]["commands"]:
+        command["argv"] = [retained_arg(arg) for arg in command["argv"]]
+    documents[0]["record"]["evidence_repair"] = repair
+    write_envelope(paths[0], documents[0])
+    verification = documents[1]["record"]
+    verification["evidence_repair"] = repair
+    verification["acceptance_record"] = {
+        **binding(paths[0]),
+        "record_sha256": documents[0]["record_sha256"],
+    }
+    verification["verification"]["record_sha256"] = documents[0]["record_sha256"]
+    write_envelope(paths[1], documents[1])
+    env = dict(os.environ, EXULANICA_TEST_DATABASE_URL=URL)
+    commands = []
+    for name, argv in [
+        (
+            "post-generation",
+            ["uv", "run", "pytest", "tests/test_retained_evaluation_records.py", "-q"],
+        ),
+        ("environment", ["uv", "sync", "--locked", "--extra", "pose", "--extra", "reconstruction"]),
+        ("backend", ["uv", "run", "pytest"]),
+        ("ruff", ["uv", "run", "ruff", "check", "."]),
+        ("imports", ["uv", "run", "lint-imports"]),
+        ("typecheck", ["pnpm", "--dir", "web", "run", "typecheck"]),
+        ("boundaries", ["pnpm", "--dir", "web", "run", "boundaries"]),
+        ("web", ["pnpm", "--dir", "web", "run", "test"]),
+    ]:
+        print(name, flush=True)
+        result = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True)
+        path = artifacts / f"{name}.log"
+        path.write_text(retained_arg(result.stdout + result.stderr))
+        commands.append(
+            {
+                "argv": [retained_arg(a) for a in argv],
+                "exit_code": result.returncode,
+                "log": binding(path),
+            }
+        )
+        if result.returncode:
+            raise RuntimeError(f"{name} failed; inspect retained log")
+    verification["repair_gates"] = commands
+    write_envelope(paths[1], documents[1])
+    # The final check follows the last envelope write; no self-referential log binding.
+    result = subprocess.run(
+        ["uv", "run", "pytest", "tests/test_retained_evaluation_records.py", "-q"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    (artifacts / "final-candidate-records.log").write_text(
+        retained_arg(result.stdout + result.stderr)
+    )
+    if result.returncode:
+        raise RuntimeError("final candidate retained-record checks failed")
+    print("Final candidate retained-record checks passed", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--repair-unpublished-candidates", action="store_true")
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--full-gates", action="store_true")
     args = parser.parse_args()
+    if args.repair_unpublished_candidates:
+        repair_candidates((ROOT / args.artifacts).resolve())
+        return
+    if args.output is None:
+        parser.error("--output is required for new evidence")
     output = (ROOT / args.output).resolve()
     artifacts = (ROOT / args.artifacts).resolve()
     output.relative_to(ROOT / "docs/evaluation")
@@ -74,7 +178,7 @@ def main() -> None:
         commands.append(
             {
                 "name": name,
-                "argv": argv,
+                "argv": [retained_arg(arg) for arg in argv],
                 "exit_code": result.returncode,
                 "expected_exit_code": expected,
             }
@@ -288,6 +392,10 @@ raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
     }
     with output.open("xb") as stream:
         stream.write(canonical(envelope) + b"\n")
+    run(
+        "post-generation-records",
+        [sys.executable, "-m", "pytest", "tests/test_retained_evaluation_records.py", "-q"],
+    )
     print(output.relative_to(ROOT), flush=True)
 
 
