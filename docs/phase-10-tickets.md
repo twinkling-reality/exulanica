@@ -610,6 +610,45 @@ place.
 
 ---
 
+### P10-3-f Apply 0038 to the reference instance, which nobody has done
+
+**What.** Migration `0038` applied to the retained reference instance's `public` schema.
+
+**Why now.** It blocks the re-record, and it is the one step in this work that needs an operator
+rather than an agent.
+
+MEASURED 2026-09-07: `select max(version) from public.schema_migrations` returns `0037`, and
+`public` holds no `place`, `place_version` or `place_alignment`. The widened World Read bundle asks
+`scene_place_membership` whether a scene belongs to a place, so **the scene address now fails on a
+pre-0038 schema** with `UndefinedTable: relation "place_version" does not exist`. That is not a
+defect in the widening; it is the migration not having reached the database the retained
+collections live in. Every test passes because the test harness applies every migration to its own
+throwaway schema.
+
+The consequence: `scripts/record_world_read_evidence.py` cannot run, so
+`docs/evaluation/2026-09-07-phase-10-read-paths.json` cannot be re-recorded against the changed
+bundle, and the retained record still describes a bundle whose `addressing` block no longer
+exists in the tree.
+
+**This was deliberately not done by the agent that found it.** `public` holds 284 real captures,
+285 screening receipts and both retained collections, migrations here have no down path, and the
+brief names that schema as the one thing not to touch. Applying it is a one-line operator action
+and it is the operator's call.
+
+**Exit.**
+
+- [ ] `0038` applied to the reference instance, by whatever path the previous 37 took.
+- [ ] `uv run python scripts/record_world_read_evidence.py --date <today> --label place-read-paths
+      --predecessor docs/evaluation/2026-09-07-phase-10-read-paths.json` executed, producing a new
+      dated record bound to the one it follows rather than replacing it.
+- [ ] `uv run python scripts/verify_world_read_controls.py --date <today> --label place-world-read
+      --predecessor docs/evaluation/2026-09-07-world-read-negative-controls.json` re-executed,
+      because the fifteen world-read controls were measured against the narrower bundle.
+
+**Files.** No source change. Two records under `docs/evaluation/`.
+
+---
+
 ### P10-3-e Where a place is
 
 **What.** A derived position block on the place read, from the `gps_position_is` claims the intake
