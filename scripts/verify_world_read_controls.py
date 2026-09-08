@@ -241,6 +241,14 @@ def main() -> int:
         default=None,
         help="path, relative to the repository root, of the record this one follows",
     )
+    # Two runs on one date against two different trees are two observations, and the second must
+    # not overwrite the first. The date alone cannot separate them, so a label can.
+    parser.add_argument(
+        "--label",
+        default="world-read",
+        help="filename stem after the date, so a same-day re-run against a changed tree writes a "
+        "new record rather than replacing a true statement about a tree nobody can check out",
+    )
     arguments = parser.parse_args()
 
     work = Path(tempfile.mkdtemp(prefix="exulanica-world-read-mutants-"))
@@ -337,7 +345,9 @@ def main() -> int:
             "path": arguments.predecessor,
             "record_sha256": hashlib.sha256(canonical_json(predecessor["record"])).hexdigest(),
         }
-    output_path = ROOT / f"docs/evaluation/{arguments.date}-world-read-negative-controls.json"
+    output_path = (
+        ROOT / f"docs/evaluation/{arguments.date}-{arguments.label}-negative-controls.json"
+    )
     output_path.write_text(
         json.dumps(
             {
