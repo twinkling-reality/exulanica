@@ -43,6 +43,10 @@ Writable file set:
   `tests/test_personal_admission_flow.py`, `tests/test_person_detection_screening.py`,
   `tests/test_frontier_preflight.py`, `tests/test_frontier_demonstration.py`, and
   `tests/test_masked_scene_inputs.py`.
+- Approved fixture adaptations only: `_ingest` in `tests/test_person_masking_end_to_end.py`,
+  `_ingest_two_people` in `tests/test_person_region_stages.py`, `_person` in
+  `tests/test_training_export_postgres.py`, their necessary imports, and the migration-count
+  assertion in `tests/test_personal_admission_command.py`'s isolated-fallback test.
 - New `docs/screening-currency.md`, `scripts/record_screening_currency_evidence.py`, generated
   `docs/evaluation/*-screening-currency.json`, and their uniquely named artifact directories.
 
@@ -68,6 +72,14 @@ and naming state needed to reject stale claimed review inputs. The permitted cal
 passes those obtained rows through without substituting a fresh snapshot for what was reviewed.
 Execute the command's review/rescreen path and stale/missing-input refusals. A stored eligibility
 field is not evidence of standing SQL permission. No other admission behavior is added to scope.
+
+Fixture extensions approved after the intermediate `9e9d8a8` gate: old person fixtures carry a
+synthetic exemption past a newly discovered region, and the training helper edits privacy inputs
+while retaining the earlier exemption. Adapt setup to detection-only, actual review/re-screening
+and then geometry as appropriate. Preserve all masking, collision, no-person, export-consent and
+withdrawal assertions. The original-byte refusal test must reach that mask check with otherwise
+current permission. Derive the fallback test's migration count from the migration inventory.
+No training production changes or assertion weakening are approved by these fixture extensions.
 
 First document which exact recorded inputs establish currency, how a mask proves it used those
 inputs, how relevant consent expiry is evaluated without a write, and what is an immutable
