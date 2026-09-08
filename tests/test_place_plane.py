@@ -20,6 +20,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
+from exulanica.epistemics import AssertionWriter
+from exulanica.identity import IdentityRepository, name_occurrence
 
 from pg_harness import migrated_schema
 
@@ -102,6 +104,50 @@ class Plane:
             ),
         )
         return alignment_id
+
+    def count(self, table: str) -> int:
+        """A row count that survives the row factory changing under us.
+
+        ``IdentityRepository`` and ``AssertionWriter`` both set ``row_factory = dict_row`` on the
+        connection they are handed, and this fixture is module-scoped, so one test that names an
+        occurrence changes how every later test's rows are shaped.
+        """
+        row = self.conn.execute(f"select count(*) as n from {table}").fetchone()
+        return row["n"] if isinstance(row, dict) else row[0]
+
+    def place_occurrence(self) -> uuid.UUID:
+        """One place the vision stage would have proposed: a whole-image label over a photograph."""
+        capture_id = self.conn.execute(
+            "select capture_id from reconstruction_scene_member "
+            " where workspace_id = %s and scene_id = %s",
+            (self.workspace, self.scene_a),
+        ).fetchone()[0]
+        span_id = self.conn.execute(
+            "insert into evidence_span (workspace_id, blob_sha256, track_key, t_start_ns, "
+            "t_end_ns, modality, span_digest) values (%s, %s, 'img', 0, 1, 'still_image', %s) "
+            "returning span_id",
+            (self.workspace, self.blob, uuid.uuid4().bytes + uuid.uuid4().bytes),
+        ).fetchone()[0]
+        run_id = self.conn.execute(
+            "insert into pipeline_run (workspace_id, trigger) values (%s, 'ingest') "
+            "returning run_id",
+            (self.workspace,),
+        ).fetchone()[0]
+        return self.conn.execute(
+            "insert into occurrence (workspace_id, capture_id, class, primary_span_id, span_ids, "
+            "presence, produced_by_run, detector_version, identity_key, emit_key) "
+            "values (%s, %s, 'place', %s, %s, '{[0,1)}', %s, 'v1', %s, %s) "
+            "returning occurrence_id",
+            (
+                self.workspace,
+                capture_id,
+                span_id,
+                [span_id],
+                run_id,
+                uuid.uuid4().bytes + uuid.uuid4().bytes,
+                f"place-occurrence:{uuid.uuid4()}",
+            ),
+        ).fetchone()[0]
 
     def anchor(self, place_id: uuid.UUID, scene_id: uuid.UUID | None = None) -> None:
         self.conn.execute(
@@ -486,3 +532,66 @@ def test_all_three_place_tables_are_forced_and_workspace_keyed(plane):
     )
     for table, qual in rows.items():
         assert "current_workspace()" in qual, f"{table} is forced against something else: {qual}"
+
+
+def test_naming_a_place_a_person_saw_creates_no_place_row(plane):
+    """A label is not a measurement, and this is the checkable form of that sentence.
+
+    ``occurrence_class`` has carried `'place'` since 0001 and means a place observed in one
+    photograph. The vision stage still emits those, ``name_occurrence`` turns one into an entity
+    whose class is copied from it, and ``tests/test_selection.py:163`` has said so for as long as
+    it has existed: "Places are entities too, and the same mechanism names them." That path is
+    correct and 0038 does not touch it.
+
+    What must never happen is the convenience a future implementer would reach for: naming a place
+    also creating the durable place, so that a user who typed "kitchen" gets a coordinate frame
+    they never photographed twice. There is no code doing that today, which is exactly why this
+    test exists: it is the guard against a helpful trigger nobody would think to argue with.
+    """
+    occurrence_id = plane.place_occurrence()
+    before = plane.count("place")
+    # Both of these set row_factory to dict_row on the connection they are handed, and this
+    # fixture is module-scoped, so the change would outlive this test and reshape every later
+    # one's rows. Restored rather than worked around, because a fixture whose row shape depends on
+    # test order is a fixture that fails somewhere other than where it broke.
+    original_factory = plane.conn.row_factory
+    try:
+        named = name_occurrence(
+            IdentityRepository(plane.conn, plane.workspace),
+            AssertionWriter(plane.conn, plane.workspace),
+            occurrence_id=occurrence_id,
+            display_name="Gullfoss",
+            actor=uuid.uuid4(),
+        )
+        entity_class = plane.conn.execute(
+            "select class as c from entity where entity_id = %s", (named.entity_id,)
+        ).fetchone()["c"]
+    finally:
+        plane.conn.row_factory = original_factory
+    assert entity_class == "place", "the naming path stopped producing a place entity"
+    after = plane.count("place")
+    assert after == before, (
+        "naming a place occurrence created a row on the geometric plane. A place is admitted by a "
+        "joint reconstruction and never by a label, and this is the write that would break that."
+    )
+
+
+def test_admitting_a_place_version_creates_no_entity(plane):
+    """The other direction: geometry is not a name.
+
+    An accepted alignment must not mint an entity, because an entity is the plane where a user
+    assertion carries a name, and nothing here said anything. A place with no name is the ordinary
+    case and stays the ordinary case.
+    """
+    before = plane.count("entity")
+    place_id = plane.place()
+    plane.anchor(place_id)
+    alignment_id = plane.alignment(place_id)
+    plane.conn.execute(
+        "insert into place_version (workspace_id, place_id, scene_id, ordinal, ordered_by_utc, "
+        "ordered_by_basis, frame_hops, admitted_by_alignment_id) "
+        "values (%s, %s, %s, 1, now(), 'capture_exif', 1, %s)",
+        (plane.workspace, place_id, plane.scene_b, alignment_id),
+    )
+    after = plane.count("entity")
+    assert after == before, "admitting a place version wrote to the identity plane"
