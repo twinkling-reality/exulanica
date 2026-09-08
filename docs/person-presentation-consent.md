@@ -546,3 +546,43 @@ machine-local.
 **The detector is still off**, so wiring the screen has not by itself made a region exist. A
 reviewer can now add one by hand, which is the route this note called for from the beginning, and
 it is the first path to a region on real data that does not require a model.
+
+## Training use is a separate consent plane
+
+Training use is optional, default off, and scoped to one package, one licensee, a set of model
+classes and an explicit term. It does not grant presence, naming or likeness, and none of those
+presentation decisions grants training use. The existing four presentation scope tokens and five
+presentation states remain unchanged. A training receipt records an immutable decision by a named
+actor; recording an owner's decision does not claim that the pictured subject authenticated it.
+
+We reject adding `training_use` to `CONSENT_SCOPES`: that vocabulary describes presentation per
+person and region, whereas a training licence describes a package and a counterparty. We also
+reject reusing `person_consent_is_granted`: it deliberately composes withdrawal at its callers,
+and is not a complete training authorization rule. Training receipts have their own exact-term
+resolver. No receipts means denied, an expired or future term means denied, and a withdrawal
+cannot be undone by a later grant in the same package and licensee relationship. Person withdrawal
+also overrides training grants. Revocation and withdrawal remain visible against earlier exports;
+an offline package establishes its recorded decision at export time, not perpetual current rights.
+
+The existing append-only `world_package_export` remains the export ledger. A dataset profile adds
+explicit licensing metadata there without inventing a second history of signed package roots.
+Training consent itself has a separate workspace-isolated append-only receipt table. Receipt
+canonical bytes and their digest bind the exact terms and actor to the stored decision. Export
+requires explicit opt-in and must exclude an unconsented person's material unless masking is
+proven for every exported representation, including geometry and source pixels.
+
+The package owner's opt-in is an explicit receipt for the reserved `package-owner` subject, in
+addition to the export command's explicit opt-in flag. It is required even when the package has no
+pictured people. A person grant names its person subject and never satisfies the owner's gate.
+A revocation applies to its exact terms and may be followed by a new grant; a withdrawal applies
+across terms for that subject, package and licensee and cannot be followed by an effective grant.
+Future-dated decisions do not affect an earlier export. Concurrent receipt insertion and export
+share a workspace/package transaction lock, so the export cannot publish across a committed
+withdrawal that it did not read.
+
+Source authority has a second lock: exports share a workspace lock through publication, while
+changes to capture withdrawal, person regions and decisions, screening, artifacts, scenes and job
+membership take it exclusively. Exports can run together; source mutations wait only for exports
+in their own workspace. This closes the gap where a presentation withdrawal could arrive after
+the export read its masks but before the signed bytes became visible. The lock also covers both
+workspaces if an update moves a source row between them.
