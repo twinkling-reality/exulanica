@@ -2918,7 +2918,7 @@ button.command-action:focus-visible {
 .person-region-editor { border-top: 1px solid currentColor; margin-top: 1rem; padding-top: .75rem; }
 .person-region-editor-stage { position: relative; width: 100%; height: 240px; touch-action: none; }
 .person-region-editor-stage img { width: 100%; height: 100%; object-fit: contain; user-select: none; }
-.person-region-editor-box { position: absolute; border: 2px solid #eacb79; outline: 1px solid #222; pointer-events: none; }
+.person-region-editor-box { position: absolute; border: 2px solid var(--ink); outline: 1px solid var(--ground); pointer-events: none; }
 .person-region-editor form { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
 .person-region-editor label { display: grid; gap: .25rem; }
 .person-region-editor input { min-width: 0; width: 100%; box-sizing: border-box; }

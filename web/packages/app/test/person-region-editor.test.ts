@@ -11,6 +11,7 @@ function mounted(onAdd: Parameters<typeof buildPersonRegionEditor>[0]['onAdd'], 
   const root = buildPersonReview({ captureId: capture, reviewState: 'unscreened', regions: [], editor });
   document.body.append(root);
   const photo = root.querySelector('img')!;
+  expect(photo, 'manual-region-authoring requires the mounted add editor').not.toBeNull();
   Object.defineProperties(photo, { naturalWidth: { value: 800 }, naturalHeight: { value: 400 } });
   photo.dispatchEvent(new Event('load'));
   const stage = root.querySelector('.person-region-editor-stage')!;
@@ -38,6 +39,31 @@ describe('manual person authoring', () => {
       silhouette: { kind: 'polygon', points: [[100000, 100000], [500000, 100000], [500000, 700000], [100000, 700000]] } }]);
     expect(root.textContent).toContain('Region saved');
     submit(); expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('uses the resized image layout in the submitted payload', async () => {
+    const fetch = vi.fn(async () => new Response('{}', { status: 201 }));
+    const api = new PersonReviewApi({ baseUrl: 'https://test.invalid/api', token: 't', fetch });
+    const { stage, draw, submit } = mounted(region => api.add(capture, region));
+    vi.mocked(stage.getBoundingClientRect).mockReturnValue({ left: 0, top: 0, width: 800, height: 400 } as DOMRect);
+    draw(); submit(); await settle();
+    const init = (fetch.mock.calls[0] as unknown as [unknown, RequestInit])[1];
+    expect(JSON.parse(String(init.body)).edits[0].silhouette.points).toEqual([
+      [50000, 300000], [250000, 300000], [250000, 600000], [50000, 600000],
+    ]);
+  });
+  it('releases detached panels without clearing a newer panel callback', async () => {
+    const drafts = new PersonRegionDrafts();
+    const first = mounted(async () => {}, drafts);
+    const previous = drafts.entries.get(capture)!.refresh;
+    expect(previous).toBeTypeOf('function');
+    first.root.remove();
+    const second = mounted(async () => {}, drafts);
+    const replacement = drafts.entries.get(capture)!.refresh;
+    expect(replacement).not.toBe(previous);
+    await settle();
+    expect(drafts.entries.get(capture)!.refresh).toBe(replacement);
+    second.root.remove(); await settle();
+    expect(drafts.entries.get(capture)!.refresh).toBeUndefined();
   });
   it('maps resized photographs and rejects letterbox gestures', () => {
     expect(imagePoint(20, 60, { left: 0, top: 0, width: 200, height: 200 }, 800, 400)).toEqual([100000, 100000]);

@@ -76,3 +76,11 @@
      // The world canvas is aria-hidden, so the click has to have a real button beside it or the
      // gesture exists only for sighted mouse users.
      onResolveCentre: () => {
+@@ -1626,6 +1644,7 @@
+     const choices = sources.map((source, index) => ({
+       id: `source:${source.evidenceRef}`, kind: 'source-only' as const,
+       label: `Photograph ${index + 1}`, source,
++      captureId: source.captureIds?.length === 1 ? source.captureIds[0] ?? null : null,
+     }));
+     if (!reconstructionInspector.open(sceneId, choices)) {
+       showTravelStatus('No authorized source photographs are available in this session.', 'failure');

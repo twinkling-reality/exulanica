@@ -157,7 +157,10 @@ export function buildPersonRegionEditor(input: PersonRegionEditorInput): HTMLEle
   const observer = new ResizeObserver(() => draw());
   observer.observe(stage);
   const removal = new MutationObserver(() => {
-    if (!root.isConnected) { observer.disconnect(); removal.disconnect(); }
+    if (!root.isConnected) {
+      observer.disconnect(); removal.disconnect();
+      if (state.refresh === render) delete state.refresh;
+    }
   });
   removal.observe(document.body, { childList: true, subtree: true });
   form.append(submit, cancel);
