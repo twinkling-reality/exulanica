@@ -11,15 +11,39 @@ export interface PreviewApiResponse {
 }
 
 export function previewApiResponse(method: string, requestUrl: string): PreviewApiResponse {
-  const path = new URL(requestUrl, 'http://atlas-preview.local').pathname;
+  if (method !== 'GET') {
+    return {
+      statusCode: 403,
+      body: { code: 'preview_read_only', detail: 'The Atlas preview cannot write data.' },
+    };
+  }
+  const missing: PreviewApiResponse = {
+    statusCode: 404,
+    body: { code: 'preview_route_not_found', detail: 'That resource is not part of the Atlas preview.' },
+  };
+  let path: string;
+  try {
+    path = new URL(requestUrl, 'http://atlas-preview.local').pathname;
+  } catch {
+    return missing;
+  }
   if (method === 'GET' && path === '/graph') {
     return { statusCode: 200, body: PREVIEW_GRAPH };
   }
   if (method === 'GET' && path === '/formation') {
     return { statusCode: 200, body: [] };
   }
-  if (method === 'GET' && path.startsWith('/evidence/')) {
-    const evidenceRef = decodeURIComponent(path.slice('/evidence/'.length));
+  const evidence = /^\/evidence\/([^/]+)(?:\/masked)?$/.exec(path);
+  if (evidence !== null) {
+    let evidenceRef: string;
+    try {
+      evidenceRef = decodeURIComponent(evidence[1]!);
+    } catch {
+      return missing;
+    }
+    if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(evidenceRef)) return missing;
+    // Both exact-original and current-view routes use this same synthetic photograph.
+    // This preview has no consent resolver or masked derivative and asserts no live permission.
     const source = previewSource(evidenceRef);
     if (source?.available === true && source.assetPath !== null) {
       return {
@@ -37,20 +61,5 @@ export function previewApiResponse(method: string, requestUrl: string): PreviewA
       },
     };
   }
-  if (method !== 'GET') {
-    return {
-      statusCode: 403,
-      body: {
-        code: 'preview_read_only',
-        detail: 'The Atlas preview cannot write data.',
-      },
-    };
-  }
-  return {
-    statusCode: 404,
-    body: {
-      code: 'preview_route_not_found',
-      detail: 'That resource is not part of the Atlas preview.',
-    },
-  };
+  return missing;
 }

@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest';
-import { adaptSnapshot, type OccurrenceRecord } from '@exulanica/graph-client';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { decodeOpm } from '@exulanica/atlas-react/playcanvas';
+import { adaptSnapshot, ExulanicaClient, type OccurrenceRecord } from '@exulanica/graph-client';
 
 import {
   applicationTitle,
@@ -135,5 +138,77 @@ describe('Atlas development preview', () => {
     expect(note).toContain('synthetic');
     expect(note).toContain('unavailable');
     expect(note).not.toContain('opens the photograph');
+  });
+});
+
+
+describe('Current client and retained preview bytes', () => {
+  it('uses the real client masked route for available and deliberately unavailable sources', async () => {
+    const calls: string[] = [];
+    const client = new ExulanicaClient({
+      baseUrl: 'http://atlas-preview.local', token: 'atlas-preview-read-only',
+      fetch: async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        calls.push(path);
+        const decision = previewApiResponse(init?.method ?? 'GET', path);
+        const bytes = decision.assetPath === undefined
+          ? JSON.stringify(decision.body)
+          : Uint8Array.from(readFileSync(`packages/app/public/${decision.assetPath}`));
+        return new Response(bytes, {
+          status: decision.statusCode,
+          headers: { 'content-type': decision.contentType ?? 'application/json' },
+        });
+      },
+    });
+    const available = [...PREVIEW_SOURCE_MEDIA.values()].find((source) => source.available)!;
+    const unavailable = [...PREVIEW_SOURCE_MEDIA.values()].find((source) => !source.available)!;
+    const image = await client.evidenceBytes(available.evidenceRef);
+    const expected = readFileSync('packages/app/public/fixtures/memory/glasshouse-courtyard.jpg');
+    expect(new Uint8Array(await image.arrayBuffer())).toEqual(Uint8Array.from(expected));
+    expect(image.type).toBe('image/jpeg');
+    await expect(client.evidenceBytes(unavailable.evidenceRef)).rejects.toMatchObject({
+      status: 404, code: 'preview_evidence_unavailable',
+    });
+    expect(calls).toEqual([
+      `/evidence/${available.evidenceRef}/masked`, `/evidence/${unavailable.evidenceRef}/masked`,
+    ]);
+    expect(previewApiResponse('GET', `/evidence/${available.evidenceRef}`)).toEqual(
+      previewApiResponse('GET', `/evidence/${available.evidenceRef}/masked`),
+    );
+  });
+
+  it('refuses malformed and unknown routes without throwing or enabling writes', () => {
+    const available = [...PREVIEW_SOURCE_MEDIA.values()].find((source) => source.available)!;
+    for (const path of ['/evidence/%', '/evidence/%2F', '/evidence/unknown/masked',
+      `/evidence/${available.evidenceRef}/masked/extra`, `/evidence/${available.evidenceRef}/region`,
+      `/evidence/${available.evidenceRef}/masked/`, 'http://[']) {
+      expect(previewApiResponse('GET', path).statusCode).toBe(404);
+      for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+        expect(previewApiResponse(method, path).statusCode).toBe(403);
+      }
+    }
+  });
+
+  it('decodes the migrated checked-in OPM with unchanged metadata and payload', () => {
+    const bytes = Uint8Array.from(readFileSync('packages/app/public/fixtures/memory/glasshouse-courtyard.opm'));
+    const decoded = decodeOpm(bytes.buffer);
+    expect(decoded.header.pointCount).toBe(190570);
+    expect(decoded.header.sourceImage).toEqual({ width: 1280, height: 960 });
+    expect(decoded.header.modelImage).toEqual({ width: 512, height: 384 });
+    expect(decoded.header.colorAlpha).toBe('support');
+    expect(decoded.planarContiguous).toBe(true);
+    expect(decoded.packedByteOffset).toBe(1296);
+    const headerLength = new DataView(bytes.buffer).getUint32(4, true);
+    const raw = new TextDecoder().decode(bytes.subarray(8, 8 + headerLength));
+    const legacyHeader = new TextEncoder().encode(raw.replace('"format":"exulanica-point-map"', '"format":"orimera-point-map"'));
+    const restored = bytes.slice();
+    new DataView(restored.buffer).setUint32(4, legacyHeader.length, true);
+    restored.fill(32, 8, 1296);
+    restored.set(legacyHeader, 8);
+    // Reconstructing the exact reviewed old hash proves every other field and payload byte stayed.
+    expect(createHash('sha256').update(restored).digest('hex')).toBe(
+      '3d6712872eb05bd8b012b3f1e1ddf90cce17fe669fcd8b4360354d1909d096e2',
+    );
+    expect(() => decodeOpm(restored.buffer)).toThrow('unexpected .opm format field');
   });
 });
