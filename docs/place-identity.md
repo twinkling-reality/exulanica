@@ -134,8 +134,10 @@ whose class is copied from it (`exulanica/identity/decisions.py:107`), and 0002'
 already requires an active user assertion before any entity may carry a name
 (`exulanica/migrations/0002_naming_and_admission.sql:246`). So an `entity` of class `'place'` is a
 live product path: it is a place **a person named**, admitted by the same guard that admits every
-other name. Refusing it would have deleted a working capability to solve a vocabulary problem, which
-is the wrong trade, and it would have been made on a false premise.
+other name. `tests/test_selection.py:163` has said so in a comment since long before this note
+existed: "Places are entities too, and the same mechanism names them." Refusing it would have
+deleted a working capability to solve a vocabulary problem, which is the wrong trade, and it would
+have been made on a false premise.
 
 So there are two real things, and they get two planes rather than one plane and a prohibition.
 
