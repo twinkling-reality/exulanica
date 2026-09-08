@@ -1,6 +1,10 @@
 # Use one effective instant for each presentation receipt
 
-Queued for dispatch after World Read recipient evidence integration; no task started.
+Dispatched to task `01a081ec-cb27-70b2-8fa1-db4481364b91` after World Read recipient integration.
+The task exclusively owns the Exulanica isolated database/full-suite slot from this reservation
+on 2026-09-08 until explicit handoff or release. Other known implementation tasks are idle;
+the orchestrator will not run competing gates. This reservation authorizes only the isolated
+schema work and checks already specified below, not retained-public mutation or activation.
 Repository: `/Users/glendonchin/dev/Technology/orimera`; product/package: Exulanica.
 Read applicable AGENTS.md, `docs/integration-world-read-recipient-2026-09-08.md`,
 `docs/world-read-recipient-evidence.md`, person_review.record_consent, its actual receipt and SQL
