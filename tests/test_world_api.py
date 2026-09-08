@@ -10,9 +10,12 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
 from fastapi.testclient import TestClient
+
+from conftest import write_photo
 
 pytestmark = pytest.mark.postgres
 
@@ -411,3 +414,51 @@ def test_the_request_cannot_choose_the_audit_actor(world_api):
     body = world_api.preview_body(actor=str(uuid.uuid4()))
     response = world_api.post("/world/styles/previews", body)
     assert response.status_code == 422
+
+
+def test_pending_mask_keeps_review_identity_without_a_byte_reference(
+    world_api, repository, tmp_path, photo_dir
+):
+    store = LocalContentAddressedStore(tmp_path / "blobs")
+    outcome = PhotoIngestPipeline(repository, store, vision=None).ingest_file(
+        write_photo(photo_dir, "generated-review.jpg")
+    )
+    assert outcome.error is None
+    capture_id = outcome.capture_id
+    span_id = repository.connection.execute(
+        "select span_id from evidence_span where workspace_id=%s and region is null "
+        "and modality='still_image' order by created_at limit 1",
+        (repository.workspace_id,),
+    ).fetchone()["span_id"]
+    source_id = uuid.uuid4()
+    WorldStyleRepository(repository.connection, repository.workspace_id).register_topology(
+        TopologyContract("manual-review-mask-pending", ("region-a",), (
+            TopologySourceSlot(source_id, "generated-review", "region-a", span_id, None),
+        ))
+    )
+    added = world_api.post(f"/person-regions/{capture_id}/edits", {"edits": [{
+        "region_key": "ab" * 32, "action": "add", "shape": "box",
+        "silhouette": {"kind": "polygon", "points": [
+            [100000, 100000], [400000, 100000], [400000, 800000], [100000, 800000],
+        ]},
+    }]})
+    assert added.status_code == 201, added.text
+    [pending] = world_api.get("/world/source-media").json()
+    assert pending["capture_ids"] == [str(capture_id)]
+    assert pending["state"] == "unavailable_asset"
+    assert pending["evidence_path"] is None
+    assert pending["asset_reference"] is None
+    assert world_api.get(f"/world/source-media/{source_id}").status_code == 424
+    assert world_api.get(f"/evidence/{span_id}/masked").status_code == 409
+    assert world_api.get(f"/person-regions/{capture_id}").json()["regions"][0]["masked"]
+    assert world_api.stranger_get("/world/source-media").json() == []
+    assert world_api.stranger_get(f"/world/source-media/{source_id}").status_code == 404
+    assert world_api.stranger_get(f"/person-regions/{capture_id}").status_code == 404
+    repository.insert_tombstone(
+        scope="capture", capture_id=capture_id, requested_by=world_api.actor,
+        reason="remove generated review fixture",
+    )
+    [deleted] = world_api.get("/world/source-media").json()
+    assert deleted["capture_ids"] == []
+    assert deleted["evidence_path"] is None
+    assert deleted["asset_reference"] is None

@@ -1127,6 +1127,7 @@ class WorldStyleRepository:
     def _source_from_row(row: Mapping[str, Any], store: ContentAddressedStore) -> WorldSourceMedia:
         state = SourceMediaState.AVAILABLE
         reason: str | None = None
+        pending_mask = False
         if row["evidence_span_id"] is None:
             state = SourceMediaState.MISSING_EVIDENCE
             reason = row["missing_reason"]
@@ -1149,6 +1150,10 @@ class WorldStyleRepository:
             # and it would do it on the path a viewer actually looks at.
             state = SourceMediaState.UNAVAILABLE_ASSET
             reason = "source contains a person who has not consented and is not yet masked"
+            # Identity lets the authenticated reviewer reopen the saved review after reload.
+            # This branch is reached only for a live, otherwise-resolvable source; it grants
+            # neither a media reference nor pixels, and never covers deleted or missing data.
+            pending_mask = True
         available = state is SourceMediaState.AVAILABLE
         masked = bool(row.get("needs_mask"))
         return WorldSourceMedia(
@@ -1172,7 +1177,7 @@ class WorldStyleRepository:
             height=row["disp_h"] or row["coded_h"],
             captured_at=row["utc_instant"],
             captured_at_uncertainty_ms=row["uncertainty_ms"],
-            capture_ids=tuple(row["capture_ids"]) if available else (),
+            capture_ids=tuple(row["capture_ids"]) if available or pending_mask else (),
         )
 
 

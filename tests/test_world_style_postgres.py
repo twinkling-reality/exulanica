@@ -6,6 +6,7 @@ import uuid
 
 import psycopg
 import pytest
+from exulanica.ingest.person_review import record_region_edits
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import (
@@ -341,6 +342,7 @@ def test_missing_source_evidence_is_a_state_and_requiring_it_is_an_asset_error(
 
     [metadata] = styles.source_media(store)
     assert metadata.state is SourceMediaState.MISSING_EVIDENCE
+    assert metadata.capture_ids == ()
     assert metadata.evidence_path is None
     with pytest.raises(UnavailableAsset):
         styles.require_source_media(source_id, store)
@@ -381,6 +383,19 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
         (repository.workspace_id,),
     ).fetchone()["capture_id"]
     assert metadata.capture_ids == (capture_id,)
+    record_region_edits(
+        repository, capture_id=capture_id, actor=uuid.uuid4(),
+        edits=[{"region_key": "aa" * 32, "action": "add", "shape": "box",
+                "silhouette": {"kind": "polygon", "points": [
+                    [100000, 100000], [400000, 100000], [400000, 800000], [100000, 800000],
+                ]}}],
+    )
+    [pending] = styles.source_media(store)
+    assert pending.state is SourceMediaState.UNAVAILABLE_ASSET
+    assert pending.capture_ids == (capture_id,)
+    assert pending.evidence_path is None
+    with pytest.raises(UnavailableAsset):
+        styles.require_source_media(source_id, store)
     repository.insert_tombstone(
         scope="capture",
         capture_id=capture_id,
