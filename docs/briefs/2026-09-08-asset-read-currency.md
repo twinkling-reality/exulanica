@@ -1,14 +1,14 @@
 # Check current permission at asset reads
 
-Queued; not dispatched. Repository: `/Users/glendonchin/dev/Technology/orimera`.
+Dispatched to `codex/asset-read-currency`; checkpoint approved below.
+Repository: `/Users/glendonchin/dev/Technology/orimera`.
 Product/package: Exulanica. This brief precedes recipient-checkable World Read evidence.
 Read applicable AGENTS.md, `docs/integration-screening-currency-2026-09-08.md`,
 `docs/screening-currency.md`, and migrations 0037 through 0040, including their actual callees.
 
 Proposed worktree: `/Users/glendonchin/dev/Technology/exulanica-asset-read-currency`.
 Proposed branch: `codex/asset-read-currency`, from main containing `53039d4` and this brief.
-Migration: NONE initially. A required SQL policy extension needs a concrete checkpoint and a
-new migration number from the orchestrator; do not edit 0040 or allocate 0041 silently.
+Migration: 0041, assigned at checkpoint `a6ff18b` below. Do not edit old migrations.
 
 Goal: prevent viewer asset paths from serving obsolete privacy derivatives or geometry whose
 persisted source lineage cannot support current permission. Admission is already guarded;
@@ -65,3 +65,76 @@ import-linter, and web typecheck/boundaries/tests. Reserve the serialized suite 
 No retained-public migration, real personal media, hosted models, credentials, GPU spend, merge
 or push. Stage explicit paths; one-line imperative commits without trailers, authorship notices
 or em dash characters. Report tip, scope, executed criteria and remaining activation limits.
+
+## Scope checkpoint approved on 2026-09-08
+
+The orchestrator inspected `a6ff18b`'s contract against original/crop/by-URI routes, source URL
+selection, graph/World Read transactions, 0039/0040 locks and the masked-splat refusal. These are
+real integration dependencies; the checkpoint's role probe is not executed delivery acceptance.
+This approval supersedes the narrower pending restrictions above only as specified here.
+
+Additional writable files:
+- New `exulanica/migrations/0041_guard_asset_reads_with_current_permission.sql`: read predicates,
+  explicit-time evaluation, lock helpers and dependency mutation triggers on existing tables.
+  Replacement function/trigger definitions belong here; keep 0039/0040 bytes unchanged. No new
+  workspace table, RLS-count change, table-write grant or BYPASSRLS authority is approved.
+- All three original/crop/by-URI authorization seams in `exulanica/api/routes/evidence.py`.
+- `exulanica/api/routes/graph.py` and `exulanica/api/routes/world_read.py`, transaction/policy
+  composition only. Preserve snapshot consistency, routes, wire schemas and release scope.
+- New `exulanica/graph/asset_read_policy.py` if a shared delivery helper is necessary within
+  existing architecture boundaries. No graph-to-ingest import or new spine module.
+- Relevant regression cases in `tests/test_world_read_route.py`, `tests/test_world_read_bundle.py`
+  and `tests/test_training_export_postgres.py` for snapshot compatibility and lock interaction.
+
+Policy decision: existing sessions do not distinguish privileged original review from viewing.
+Do not invent a privilege through a query parameter, route name, header or workspace ownership.
+For capture-backed person images, original, crop and by-URI delivery must refuse when current
+person-presentation policy requires masking or withdrawal/deletion blocks the source. Crops do
+not bypass that check on the assumption that a person lies outside the crop. Originals still
+return the exact cited bytes when permitted, otherwise refuse; never return a mask under the
+original digest. Route all future viewer image references through /masked, including no-person
+images. Verify old saved original URLs are refused after permission changes. This does not grant
+new training or reconstruction permission and must not apply a geometry-purpose prerequisite to
+ordinary citation media. Preserve existing non-person/non-image evidence semantics. Ambiguous
+capture mappings must not let one permissive duplicate override a restrictive current mapping.
+Document missing legacy identity explicitly and refuse where required authorization cannot be
+established. Keep manual review reachable without a new unmasked reviewer bypass.
+
+Transaction decision: preserve REPEATABLE READ READ ONLY graph/World Read snapshots. Introduce
+snapshot-compatible explicit-time read predicates rather than invoking 0040's READ COMMITTED
+lock inside them or downgrading every query globally. Metadata describes its consistent snapshot
+and is not a permission token for later byte delivery. Do not claim freshness after a lock wait
+that retains an old snapshot. Byte-serving requests need a fresh final permission evaluation at
+one database instant after the policy lock, using the artifact's actual input lineage and a
+locally buffered, digest-verified payload. Release locks before network delivery. Each range
+request reauthorizes. Writers ordered before that check must be visible; later changes or expiry
+affect later requests and do not promise retraction. If any World Read path embeds source bytes,
+it also needs this byte-delivery rule; a snapshot label cannot exempt embedded bytes. Do not add
+wall-clock values to immutable provenance, relabel receipts or claim offline withdrawal knowledge.
+
+Lock decision: 0041 may coordinate the exact dependency writers within SQL, including the
+occurrence/entity/dependency/assertion and stage-registry dependencies found in the checkpoint.
+Retain a written table/event dependency inventory and audit old/new workspace moves, cascades,
+direct SQL, purge and publication. Establish and test one order across privacy, training, read
+and purge locks, including cross-workspace and global stage mutations. Merely naming a trigger
+to sort first does not prove transaction-wide ordering when writers already hold another lock.
+Do not weaken existing admission/training serialization. If a production Python caller must
+change to establish ordering, report that exact file/call site with the failing interleaving;
+that is the remaining extension checkpoint, not a reason to pause the already authorized SQL
+and read work. Runtime checks must execute as the actual SELECT-only non-owner/non-BYPASSRLS
+role, without fallback to the writer connection or SECURITY DEFINER privilege escalation.
+
+Geometry decision: omit policy-refused point-map descriptors using the existing wire contract;
+do not label present-but-forbidden bytes as bytes_missing. No geometry API state literal or
+frontend schema extension is needed. Test metadata omission and direct-ID byte refusal together.
+Masked splat production stays outside this task. Validate real persisted lineage where available;
+refuse unsupported or missing lineage. Constructed fixtures cannot prove successful masked
+training. A rebuilt mask must never revive geometry built from obsolete original inputs.
+
+Serialized suite reservation: this task exclusively owns Exulanica's isolated database/full-gate
+slot from this approval until handoff or explicit release. Other implementation tasks were idle
+when assigned. The orchestrator will not run a competing full suite; request handoff before its
+independent integration gates. Use only the approved test URL and isolated schemas, clean them
+up, and retain intermediate failures. No retained-public migration or runtime activation is
+authorized. Record the approval as a successor to the immutable checkpoint evidence; do not
+rewrite that record to make the earlier investigation look like executed acceptance.
