@@ -1,0 +1,58 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_default_time_sql_receipt_uses_one_instant ________________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x109563010>
+
+    def test_default_time_sql_receipt_uses_one_instant(repository):
+        subject = create_subject(repository, actor=ACTOR)
+        clock = AdvancingClock()
+        with _clock(clock):
+            consent = record_consent(
+                repository,
+                subject_id=subject,
+                actor=ACTOR,
+                consent_scope="likeness",
+                decision="granted",
+            )
+        row = _row(repository, consent)
+        _save(
+            "sql-observation.json",
+            {
+                "receipt_time": row["consent_record"]["effective_at"],
+                "column_time": row["effective_at"].isoformat(),
+                "clock_calls": clock.calls,
+                "columns_match": _consent_columns_match(row),
+            },
+        )
+>       _assert_receipt(row)
+
+tests/test_consent_timestamp_consistency.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+row = {'consent_id': UUID('d4bcb75c-a4f7-5305-b550-e34684051d4b'), 'workspace_id': UUID('eadf4c36-ea77-4ae0-b2ed-b84477905de5'), 'subject_id': UUID('606d626e-bfc6-4be2-84d8-cbf8754e5ec4'), 'region_key': None, ...}
+
+    def _assert_receipt(row):
+        raw = bytes(row["consent_canonical"])
+        parsed = json.loads(raw)
+        assert parsed == row["consent_record"]
+        assert canonical_json(parsed) == raw
+        assert hashlib.sha256(raw).digest() == bytes(row["consent_digest"])
+>       assert dt.datetime.fromisoformat(parsed["effective_at"]) == row["effective_at"], (
+            "two-clock effective_at mismatch"
+        )
+E       AssertionError: two-clock effective_at mismatch
+E       assert datetime.datetime(2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc) == datetime.datetime(2020, 1, 1, 0, 0, 0, 1, tzinfo=datetime.timezone.utc)
+E        +  where datetime.datetime(2020, 1, 1, 0, 0, tzinfo=datetime.timezone.utc) = <built-in method fromisoformat of type object at 0x105328980>('2020-01-01T00:00:00Z')
+E        +    where <built-in method fromisoformat of type object at 0x105328980> = <class 'datetime.datetime'>.fromisoformat
+E        +      where <class 'datetime.datetime'> = dt.datetime
+
+tests/test_consent_timestamp_consistency.py:68: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_consent_timestamp_consistency.py::test_default_time_sql_receipt_uses_one_instant

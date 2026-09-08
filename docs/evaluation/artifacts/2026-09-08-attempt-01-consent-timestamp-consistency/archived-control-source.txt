@@ -1,0 +1,1 @@
+mutant_two_clocks.py was executed in attempt 01. Its exact bytes are retained as mutant_two_clocks.py.txt after Ruff rejected its annotations and formatting. Runtime defect restoration succeeded; no accepted envelope was written for attempt 01.

@@ -1,0 +1,1 @@
+[{"argv":["<worktree>/.venv/bin/python","-m","pytest","-q","tests/test_consent_timestamp_consistency.py::test_default_time_sql_receipt_uses_one_instant"],"exit_code":1,"label":"baseline"}]
