@@ -91,14 +91,19 @@ def main():
     plugin = artifacts / "mutant_two_clocks.py"
     plugin.write_text(
         '"""Restore exactly the baseline record_consent writer in this child process."""\n'
-        "def pytest_sessionstart(session):\n"
+        "def pytest_sessionstart(session: object) -> None:\n"
         "    import ast\n"
         "    import subprocess\n"
-        "    from exulanica.ingest import person_review\n"
-        f"    source = subprocess.check_output(['git', 'show', '{BASE}:exulanica/ingest/person_review.py'], text=True)\n"
+        "\n    from exulanica.ingest import person_review\n\n"
+        f"    revision = '{BASE}:exulanica/ingest/person_review.py'\n"
+        "    source = subprocess.check_output(['git', 'show', revision], text=True)\n"
         "    tree = ast.parse(source)\n"
-        "    function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'record_consent')\n"
-        "    exec(compile(ast.Module(body=[function], type_ignores=[]), '<baseline-writer>', 'exec'), person_review.__dict__)\n"
+        "    function = next(\n"
+        "        n for n in tree.body\n"
+        "        if isinstance(n, ast.FunctionDef) and n.name == 'record_consent'\n"
+        "    )\n"
+        "    module = ast.Module(body=[function], type_ignores=[])\n"
+        "    exec(compile(module, '<baseline-writer>', 'exec'), person_review.__dict__)\n"
     )
     status, output = run(
         "negative-control",
@@ -108,7 +113,7 @@ def main():
     assert status == 1 and "FAILED " + SELECTOR in output
     assert "two-clock effective_at mismatch" in output
     for label, argv in [
-        ("backend", [sys.executable, "-m", "pytest", "-q"]),
+        ("backend", [sys.executable, "-m", "pytest", "-q", "-o", "addopts=--strict-markers --strict-config"]),
         ("ruff", [sys.executable, "-m", "ruff", "check", "."]),
         ("imports", [str(Path(sys.executable).parent / "lint-imports"), "--no-cache"]),
         ("web-typecheck", ["pnpm", "--dir", "web", "run", "typecheck"]),
