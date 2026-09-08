@@ -1,6 +1,9 @@
 # Start recipient-checkable World Read evidence work
 
-Ready for dispatch after the asset-read integration; no task for this brief has been started.
+Status: dispatched as `codex/world-read-evidence`. Candidate `1328935` is under independent
+review; the unsupported-receipt repair checkpoint below must be completed before integration.
+
+This task follows the completed asset-read integration.
 See `docs/integration-asset-read-currency-2026-09-08.md` for verified read behavior and remaining
 deployment, producer and real-data limits. This brief adds recipient evidence, not activation.
 Repository: `/Users/glendonchin/dev/Technology/orimera`; product/package: Exulanica.
@@ -63,3 +66,29 @@ and web typecheck/boundaries/tests. Coordinate suite timing. No public migration
 hosted calls or GPU spend. Use coherent one-line imperative commits, no trailers, authorship
 notices or em dash characters; stage explicit paths. Report commit tip, contract, executed
 recipient path, evidence and unresolved release/real-data limits. Do not merge or push.
+
+## Unsupported-receipt repair checkpoint, 2026-09-08
+
+Independent review of `1328935` found that world_read_evidence._receipt accepts any valid JSON
+value and labels it available. recorded_evidence then calls .get on each masked manifest candidate.
+A digest-valid array or null therefore raises AttributeError; an irrelevant malformed candidate
+can prevent use of a separate valid matching manifest. LocalContentAddressedStore.get verifies
+hashes, not JSON shape. The owner confirmed the producer reuse path does not establish a shape
+invariant and the authenticated route does not catch this error. The orchestrator's in-memory
+diagnostic is not a database-route acceptance test.
+
+Within the existing writable set, validate supported receipt object shape/profile before field
+access, preserve specific unavailable reasons and do not expose unsupported payloads as supported
+evidence. A malformed irrelevant candidate must not break selection of an exact valid manifest.
+When no supported exact lineage exists, report unavailable rather than inventing or substituting
+lineage. Cover the actual authenticated route with persisted digest-valid array/null/unsupported
+object cases, including a malformed candidate alongside a valid matching one. Keep recipient
+verification errors controlled and named for unsupported receipt shapes where applicable. Do not
+silently loosen trusted digest, consent, lineage or privacy checks. This extends no file set or
+migration scope: use the owned producer projection/verifier and tests/test_world_read_evidence.py.
+
+Retain the first campaign and valid candidate evidence. Generate successor evidence with fresh
+paths and explicit predecessor bindings, not edited old envelopes. Run full gates on the corrected
+executable head and retained-record checks after the final envelope write. Coordinate the suite
+slot: the orchestrator's initial independent run must finish before the owner resumes database
+mutations or gates. No merge, push, retained-public migration or activation is authorized.
