@@ -36,7 +36,10 @@ from exulanica.ingest.spine.privacy import (
     PrivacyAdmissionRow,
     PrivacyScreeningRow,
     ReconstructionAuthorizationRow,
+    current_inputs,
+    screening_masks,
 )
+from exulanica.ingest.spine.scope import WorkspaceScope
 
 __all__ = [
     "PRIVACY_POLICY_PARAMS",
@@ -269,8 +272,12 @@ def _record_screening(
 ) -> PrivacyScreeningRow:
     at = _utc(screened_at)
     until = _utc(valid_until) if valid_until else None
+    scope = WorkspaceScope(repository.connection, repository.workspace_id)
+    inputs = current_inputs(scope, authorization.capture_id)
+    masks = screening_masks(scope, authorization.capture_id, inputs)
     record = {
         "profile": "exulanica.reconstruction-privacy-screening-receipt/v1",
+        "privacy_inputs": inputs,
         "authorization": {
             "authorization_id": str(authorization.authorization_id),
             "evidence_sha256": authorization.evidence_digest.hex(),
@@ -285,7 +292,7 @@ def _record_screening(
             "reviewed_by": str(reviewed_by) if reviewed_by else None,
         },
         "sensitive_regions": sensitive_regions,
-        "mask_artifacts": [],
+        "mask_artifacts": masks,
         "eligibility_state": eligibility_state,
         "blocking_reasons": blocking_reasons,
         "policy": {

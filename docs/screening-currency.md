@@ -1,123 +1,139 @@
-# Screening currency: contract review and scope blocker
+# Shared screening currency
 
-Status: design review only. Shared admission remains unfixed and personal-data activation
-remains blocked. Base: integrated `38625d2`, following the accepted personal review integration
-record. Migration 0040 is reserved, not written or applied. Historical evidence is unchanged.
+Migration 0040 separates a historical review from permission for a new geometry operation.
+It does not rewrite dated screenings or apply to retained public. Personal-data activation still
+requires the separate asset-read work described below.
 
-## Recorded inputs and the missing producer alignment
+## Approved scope and exact inputs
 
-The current mask producer already records meaningful lineage. In
-`ingest/stages/masked_source.py`, its input digest hashes the sorted three hashes of:
+This work starts from integrated `38625d2`, after manual review and personal admission. The
+orchestrator approved adding only `ingest/person_state.py` (its current-state reader and necessary
+imports/docstring) to the original writable set. The existing reader ignored consent expiry and
+future effective times and folded overlapping scopes differently from SQL. The producer now reads
+one database-resolved snapshot through `ingest/spine/privacy.py`. `CaptureRegionState` and the
+existing mask digest formats remain unchanged. The offline fold, pipeline, stage registry and
+other producer files are unchanged.
 
-1. The exact upright intake artifact content.
-2. `person-region-set/v1`: capture ID, original source hash, and sorted live region keys and
-   silhouettes.
-3. `person-consent-state/v1`: capture ID, source hash, and sorted per-region presentation state,
-   masked flag and naming permission.
+`current_privacy_inputs` takes the workspace privacy lock, then evaluates at one database clock
+instant. Its snapshot names the workspace, capture, exact original bytes, latest edit digest for
+**every** region key (including deleted regions), and each live region's key, silhouette, subject,
+resolved state, naming permission and applicable consent digests. Edit identities distinguish a
+new review input even if its pixels are identical; keeping deleted edit identities prevents an
+old empty-inventory review from reviving after add/delete. Capture absence is not an empty review.
 
-The artifact also records source hash, stage version, parameters digest, input digest, identity
-key and output content hash. Its identity key frames and hashes these stage inputs. The producer
-uses the supplied silhouettes and resolved states to paint the image. These hashes can support
-an exact comparison; newest timestamp or any masked artifact cannot substitute for it. The
-separate mask manifest identifies masked regions, subjects and states but omits silhouettes and
-receipt identities. Its bytes are in the content store, not a SQL-readable current-input record.
+Consent evaluation preserves SQL's region-specific-over-subject-wide precedence, then sequence,
+with receipt digest as a deterministic tie breaker. Future decisions are excluded. Expired
+receipts no longer hold; an older still-valid applicable receipt may hold under this established
+resolver. Withdrawals remain terminal even if another grant follows. All scopes use the same
+instant. A future effective time or expiry can change the snapshot without a database write.
+No evaluation timestamp is included in the binding, so unchanged effective inputs remain reusable.
 
-There is a concrete semantic mismatch before persistence. `pipeline._masked_source` obtains
-inputs from `person_state.region_state_for_capture`. That function reads all consent transitions
-from `spine/person_consent.py`, then drops `valid_until` and folds them by effective time and
-receipt digest. It does not exclude future-effective transitions. SQL's
-`person_consent_is_granted` filters effective and expiry times and gives region-scoped receipts
-precedence over subject-wide receipts, then orders by sequence. These are different decisions.
+## How a mask proves its recorded inputs
 
-A local in-memory probe of the actual state reader, using one generated polygon and a likeness
-grant effective January 1, 2000 and expired January 2, 2000, returned
-`Expired likeness grant: state=shown, masked=False`. This is a focused diagnostic, not a database
-rehearsal, retained acceptance envelope, mutant kill, or demonstration of disclosed bytes.
+The mask stage already paints the supplied outlines using supplied resolved states and records
+an input digest over the sorted hashes of:
 
-Consequently a SQL implementation matching the producer would inherit its expiry defect; one
-matching time-aware SQL would refuse a mask that the unchanged producer cannot correctly rebuild.
-For a photograph whose only region has expired likeness consent, the producer emits no mask at
-all. A trigger stamping current inputs onto an artifact at INSERT would additionally mislabel
-work performed using earlier inputs. Neither approach meets this brief.
+1. The intake artifact's content (the canonical EXIF/probe record, not the source pixels).
+2. `person-region-set/v1`: capture ID, original source hash and sorted live keys/silhouettes.
+3. `person-consent-state/v1`: capture ID, source hash and sorted region state/masked/naming values.
 
-## Smallest requested extension
+0040 recomputes these existing digests from the shared snapshot, with canonical integral JSON,
+and matches the artifact's recorded `input_digest`, exact source, current stage version and
+parameters. The intake artifact must also match its current stage definition. The mask must be
+complete, unpurged and not marked for repair. An UPDATE cannot relabel an existing mask's lineage
+or replace its non-null content hash. Purge can still clear bytes.
 
-Add **`exulanica/ingest/person_state.py`** to the writable set. Make this existing producer input
-reader consume the shared database-resolved current states at an explicit evaluation instant,
-using helpers in the already permitted `ingest/spine/privacy.py`. The pipeline and mask stage
-already consume this reader, so no pipeline, stage registry, new spine module or new table is
-requested. Preserve the existing mask digest formats and compare their exact recorded inputs.
+This is recorded producer lineage, not a cryptographic proof of rasterization against a malicious
+database writer who can fabricate an entirely new artifact row. The executed rehearsal uses the
+real producer and store. No insertion trigger stamps current inputs onto work computed earlier.
+SQL checks database records; store readers remain responsible for existence and digest checks of
+actual bytes. Neither newest creation time nor the existence of any mask establishes currency.
 
-This extension addresses the demonstrated producer mismatch. Do not implement a second fold in
-the admission layer. If implementation shows that an additional producer interface is needed,
-report that extension before changing it. No production changes have been made at this checkpoint.
+New screening canonical records include the exact input snapshot and, when masking is required,
+the exact existing mask ID/content hash. The SQL predicate compares both bindings with current
+inputs and artifact lineage. A review recorded without its mask cannot activate when a mask later
+appears. Rebuild alone cannot revive a review for changed inputs: explicitly re-screen. A same-input
+retry reuses the existing mask and review; a same-pixel new edit can reuse the mask but needs a new
+review. Mask and review currency are intentionally different comparisons.
 
-## Proposed shared contract after extension
+Legacy records lacking the new binding remain historical facts but do not authorize new geometry.
+There is no policy version bump invalidating detection receipts: detection-only remains a separate
+observation purpose. Human screening must cover exactly the current region keys and states; a
+no-person review binds an empty inventory. Synthetic exemption requires no live person regions.
+Withdrawal, capture tombstones and authorization/screening expiry still refuse geometry.
 
-Resolve workspace, exact capture/source bytes, live region inventory including subject links and
-edit receipt identities, and applicable consent receipt identities/scopes/decisions at a single
-database evaluation instant. Preserve both the review input binding and the mask input binding:
-an unrelated naming change need not force different pixels, but a changed review input must not
-silently retain an earlier review's standing permission. Specify the relevant input set explicitly
-in 0040 rather than treating every historical receipt as invalid.
+## SQL consumers and operation boundaries
 
-Recompute effective consent on every new permission check. Expiry and future effective times
-can change the answer without any database write. Check authority and screening expiry too.
-Withdrawal remains a terminal refusal through existing tombstone/withdrawal policy. Detection-only
-permission stays separate from permission for geometry. A no-person review binds the empty
-inventory, so adding a region makes that review obsolete.
+The shared predicate reaches frontier preflight and demonstration selection, scene admission,
+admission-member/scene policy triggers from 0029, point-map selection/exact resolution in
+`ingest/spine/artifacts.py`, and training input selection in `world_package/training_inputs.py`.
+No frontier caller change was needed. The Python guard delegates mask currency to the same SQL
+contract. Scene mask declaration and exact resolution also check current lineage and refuse a
+missing declaration when a member now requires masking.
 
-Bind new screenings immutably to their observed inputs and any exact required mask. Compare
-the bound inputs with the current inputs in `privacy_screening_allows_capture`, and compare the
-named mask's persisted digest with the expected producer digest. Reject missing legacy bindings
-for new geometry operations without rewriting dated receipts. Rebuild alone must not revive an
-old review; re-screening establishes the new binding. Unchanged-input retries may reuse it.
+The point-map trigger checks both the screening and the named masked source. It also checks a
+named mask when current inputs no longer require masking, and covers relevant artifact UPDATEs
+as well as INSERTs. Clearing historical content during purge is not a new geometry operation and
+remains possible. Point-map acceptance tests use placeholder geometry content and exercise the
+actual SQL write boundary; they perform no depth inference.
 
-Before implementation, specify and test a database locking contract shared by region/consent
-writes, screening insertion, scene admission and geometry insertion. Capture-only locks are
-insufficient for subject-wide consent affecting multiple captures. A conservative workspace lock
-is a possible tradeoff, with subject/capture lookup repeated after acquiring it. Account for
-READ COMMITTED fresh snapshots, reject unsupported stale transaction snapshots, and re-evaluate
-time-dependent permission after waiting. Do not hold a transaction lock across model inference:
-an artifact can record old inputs, but a new operation must reject that obsolete binding.
+## Concurrency contract and tradeoffs
 
-## Consumers and separate read activation dependency
+Person-region writes, consent writes, screening insertion and permission checks take the same
+transaction advisory lock per workspace. Subject-wide consent therefore cannot bypass a
+capture-only lock. The predicate takes a fresh snapshot after acquiring the lock. READ COMMITTED
+is required; repeatable-read/serializable transaction snapshots are refused with serialization
+failure so the caller can retry in a supported transaction. Time-dependent consent is evaluated
+**after** waiting for the lock. The linearization point is the permission check, not eventual
+commit or later asset delivery; a permission does not promise that consent will never expire.
 
-Direct SQL policy consumers include frontier `preflight.py` and `demonstration.py`,
-`ingest/spine/privacy.py` selection/checking, `world_package/training_inputs.py`, and migration
-0029's admission-member, artifact and scene policy paths. `admit_reconstruction_scene` must be
-tested through its real entry point. Migration 0037's point-map trigger currently checks only
-that the named masked bytes belong to an existing unpurged derivative of the source. The new
-write check must validate currency even when a write explicitly names masked bytes and current
-state no longer requires masking; cover relevant UPDATE paths as well as INSERT.
+The producer's read lock need not span image computation. Its artifact records the inputs actually
+used, and subsequent admission/write checks reject it if those inputs became obsolete. The
+workspace lock is deliberately coarse and can serialize otherwise independent captures. This
+cost buys one checkable policy within the approved scope. Tombstone/purge and asset-delivery
+transactions retain their existing contracts; no global read-versus-deletion lock guarantee is made.
 
-`ingest/spine/artifacts.py` applies the SQL screening predicate to point-map selection and exact
-resolution. Its masked-source queries do not apply that predicate. `masked_inputs.py` currently
-selects available masks and verifies declared IDs/content, without establishing current inputs
-for every exact declared mask. Those permitted seams need explicit currency checks.
+## Executed evidence and remaining verification
 
-Serving old assets is a **separate remaining activation dependency**. In particular,
-`api/routes/evidence.py` selects masked-source bytes by stage version and creation time without
-matching current mask inputs. `graph/geometry.py` reads point-map bytes with live-source, purge
-and withdrawal checks; `graph/scene_geometry.py` reads trained scene assets with scene/job/gate,
-purge and withdrawal checks. Admission checks do not establish a universal current-consent read
-guarantee for these paths. Original evidence access also has its own exact-byte semantics.
-Read-time currency and read-versus-withdrawal races require a separately scoped fix and tests.
+The recorder executes generated labelled media through real PostgreSQL and the real mask stage.
+The end-to-end sequence covers authority, empty review, region addition, masking/review, outline
+edit and blocked review, direct SQL refusal, actual frontier preflight, demonstration selection,
+scene admission and point-map refusal, followed by rebuild/re-screen/retry success. It verifies
+that the old receipt digest is unchanged. Full frontier preflight supplies no signing key; its
+screening check passes or fails as expected while signing remains unavailable.
 
-The predecessor personal-admission records demonstrate a stale SQL admission answer and a killed
-command-local guard mutant. They demonstrate neither a stale depth write nor disclosure. This
-review preserves that distinction.
+Additional cases cover expired and future grants, region-specific precedence, unknown subject,
+consent changes, expiry without writes, withdrawal, region deletion, cross-workspace requests,
+legacy receipts, premature unbound reviews, immutable mask lineage, geometry UPDATE, missing/stale
+worker declarations, unchanged inputs and exact evaluation boundaries. Two-connection tests
+exercise region commit and expiry while a predicate waits; stale transaction snapshots refuse.
 
-## Verification still required
+Executed negative controls remove review-input binding, mask-input digest comparison and consent
+expiry filtering in subprocess memory. Every killed claim requires its exact selector's `FAILED`
+line. These are shared SQL policy mutants. The earlier personal-admission baseline is still an
+observed SQL defect, and its earlier command-local mutant proved only that local caller's guard.
+Neither earlier record demonstrated a stale depth write or disclosure.
 
-After scope extension, execute generated-media database/mask rehearsals in isolated schemas at
-the permitted test database, including direct SQL, actual frontier preflight, scene admission,
-point-map writes, expiry, withdrawal, region add/edit/delete, consent precedence, cross-workspace,
-legacy, detection-only, no-person and unchanged retry cases. Execute rebuild/re-screen success
-and appropriate concurrent interleavings. Require exact selector FAILED lines for mutant kills.
-Generate new digest-bound evidence with an explicit predecessor and no personal paths or floats.
+Generate fresh evidence without replacing accepted records:
 
-Full backend and web gates have not been run for this documentation checkpoint; no suite slot
-was taken. Coordinate that slot with the orchestrator when implementation can proceed. The full
-acceptance brief remains pending. No public migration, personal media, hosted calls, credentials,
-GPU work, merge or push occurred.
+```sh
+uv run python scripts/record_screening_currency_evidence.py \
+  --output docs/evaluation/NEW-screening-currency.json \
+  --artifacts docs/evaluation/artifacts/NEW-screening-currency \
+  --predecessor docs/evaluation/2026-09-08-command-personal-admission-flow.json
+```
+
+Records have exactly `profile`, `record`, `record_sha256`, a canonical SHA-256, no floats, explicit
+predecessor and digest/size-bound artifact paths. The test harness removes isolated schemas.
+Full backend/Ruff/import/web gates must be bound to a frozen commit in the final gate record.
+
+## Separate remaining activation dependency: asset-read currency
+
+`api/routes/evidence.py` still chooses masked-source bytes by stage version and creation time,
+without matching current mask inputs. Original evidence access has separate exact-byte semantics.
+`graph/geometry.py` reads point-map bytes with live-source/purge/withdrawal checks, and
+`graph/scene_geometry.py` checks scene/job/gate/purge/withdrawal state when serving trained assets.
+Those are not a universal current-screening/currency contract for already-produced assets.
+Read-time mask and geometry currency, and read-versus-withdrawal races, require separately scoped
+implementation and tests before activation. This brief does not implement all media delivery or
+World Read release policy, and admission-only evidence is not a global disclosure guarantee.

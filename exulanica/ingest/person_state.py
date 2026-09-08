@@ -1,16 +1,7 @@
-"""Read the recorded regions and receipts for one photograph, and fold them into a decision.
+"""Read one database-resolved privacy snapshot for both mask production and admission.
 
-One place, so the masking stage and anything else that must know are reading the same answer. The
-fold itself is :func:`exulanica.consent.states.resolve_presentation`, which is pure and is the
-same function an offline verifier runs over a World Memory Package; this module is only the part
-that fetches rows. Keeping those separate is what stops a second implementation of the rule
-appearing next to the database.
-
-**A region whose subject is unknown resolves to ``unknown``, which masks.** That is not a special
-case handled here, it is what the pure fold returns for an empty receipt chain, and this module
-takes care not to paper over it: a detected region nobody has confirmed has no subject, so it has
-no receipts, so it is hidden. The whole of default deny survives the trip through the database
-because nothing here supplies a default.
+Consent precedence and expiry belong to the shared SQL policy. The offline receipt fold is
+unchanged; it is not used to decide permission for a new operation against this database.
 """
 
 from __future__ import annotations
@@ -18,8 +9,10 @@ from __future__ import annotations
 import uuid
 
 from exulanica.consent.regions import Silhouette
-from exulanica.consent.states import ConsentTransition, ResolvedPresentation, resolve_presentation
+from exulanica.consent.states import ResolvedPresentation
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.spine.privacy import current_inputs
+from exulanica.ingest.spine.scope import WorkspaceScope
 
 __all__ = ["CaptureRegionState", "region_state_for_capture"]
 
@@ -48,46 +41,18 @@ class CaptureRegionState:
 def region_state_for_capture(
     repository: IngestRepository, capture_id: uuid.UUID
 ) -> CaptureRegionState:
-    """Every live region on one photograph, with the state that holds for each right now.
-
-    Each subject's chain is read once and folded once per region, because a region-scoped receipt
-    and a subject-wide one apply to different regions and must not be merged by the query. A
-    region with no subject is folded from an empty chain, which resolves to ``unknown``.
-    """
-    if not repository.capture_has_person_regions(capture_id=capture_id):
-        # The overwhelmingly common case, answered from an index rather than from a `distinct on`
-        # over the whole table. See `has_regions` for the measurement that put this here.
-        return CaptureRegionState({}, {}, {})
-    rows = repository.current_person_regions(capture_ids=[capture_id]).get(capture_id, [])
-    outlines: dict[bytes, Silhouette] = {}
-    resolved: dict[bytes, ResolvedPresentation] = {}
-    subjects: dict[bytes, uuid.UUID | None] = {}
-    chains: dict[uuid.UUID, list] = {}
-    for row in rows:
-        outlines[row.region_key] = Silhouette.from_digest_input(row.silhouette)
-        subjects[row.region_key] = row.subject_id
-        if row.subject_id is None:
-            resolved[row.region_key] = resolve_presentation(())
-            continue
-        if row.subject_id not in chains:
-            chains[row.subject_id] = repository.person_consent_transitions(
-                subject_id=row.subject_id
-            )
-        chain = chains[row.subject_id]
-        # A withdrawal is not a scope somebody can grant back, so it is lifted out of the fold and
-        # passed as the short circuit it is. See exulanica.consent.states.
-        withdrawn = any(item.decision == "withdrawn" for item in chain)
-        applicable = tuple(
-            ConsentTransition(
-                scope=item.consent_scope,
-                granted=item.decision == "granted",
-                actor=str(item.actor_id),
-                decided_at=item.effective_at,
-                receipt_digest=item.consent_digest,
-            )
-            for item in chain
-            if item.decision != "withdrawn"
-            and (item.region_key is None or item.region_key == row.region_key)
+    """The live outlines, subjects and states at one database evaluation instant."""
+    inputs = current_inputs(
+        WorkspaceScope(repository.connection, repository.workspace_id), capture_id
+    )
+    outlines = {}
+    resolved = {}
+    subjects = {}
+    for row in (inputs or {}).get("regions", []):
+        key = bytes.fromhex(row["region_key"])
+        outlines[key] = Silhouette.from_digest_input(row["silhouette"])
+        subjects[key] = uuid.UUID(row["subject_id"]) if row["subject_id"] else None
+        resolved[key] = ResolvedPresentation(
+            state=row["state"], name_permitted=row["name_permitted"]
         )
-        resolved[row.region_key] = resolve_presentation(applicable, withdrawn=withdrawn)
     return CaptureRegionState(outlines, resolved, subjects)

@@ -18,12 +18,15 @@ __all__ = [
     "ReconstructionAuthorizationRow",
     "admit",
     "authorization",
+    "current_inputs",
     "insert_authorization",
     "insert_screening",
     "latest_screening",
+    "mask_is_current",
     "screening",
     "screening_allows",
     "screening_allows_observation",
+    "screening_masks",
 ]
 
 
@@ -181,7 +184,7 @@ def insert_screening(
         "sensitive_regions,mask_artifacts,eligibility_state,blocking_reasons,"
         "policy_version,policy_params_digest,authorization_scope,screened_at,valid_until,"
         "receipt_record,receipt_canonical,receipt_digest) "
-        "values (%s,%s,%s,%s,%s,%s,null,null,%s,%s,%s,'[]'::jsonb,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+        "values (%s,%s,%s,%s,%s,%s,null,null,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
         "on conflict (screening_id) do nothing",
         (
             screening_id,
@@ -193,6 +196,7 @@ def insert_screening(
             human_review_required,
             reviewed_by,
             Jsonb(sensitive_regions),
+            Jsonb(receipt_record.get("mask_artifacts", [])),
             eligibility_state,
             Jsonb(blocking_reasons),
             policy_version,
@@ -387,4 +391,42 @@ def admit(
         authorization_scope=dict(row["authorization_scope"]),
         admission_digest=bytes(row["admission_digest"]),
         valid_until=row["valid_until"],
+    )
+
+
+def current_inputs(scope: WorkspaceScope, capture_id: uuid.UUID) -> dict[str, Any] | None:
+    """One current snapshot, evaluated after taking the shared privacy lock."""
+    row = scope.connection.execute(
+        "select current_privacy_inputs(%s,%s) as inputs", (scope.workspace_id, capture_id)
+    ).fetchone()
+    return row["inputs"] if row else None
+
+
+def mask_is_current(
+    scope: WorkspaceScope, capture_id: uuid.UUID, artifact_id: uuid.UUID | None = None
+) -> bool:
+    """Match the real producer digest, optionally for one exact declared artifact."""
+    row = scope.connection.execute(
+        "select current_privacy_mask(%s,%s,%s) as allowed",
+        (scope.workspace_id, capture_id, artifact_id),
+    ).fetchone()
+    return bool(row and row["allowed"])
+
+
+def screening_masks(
+    scope: WorkspaceScope, capture_id: uuid.UUID, inputs: dict[str, Any] | None
+) -> list[dict[str, str]]:
+    """Bind a reviewed snapshot to an exact mask, never label an old output with new inputs."""
+    if not inputs or not any(
+        r["state"] in ("unknown", "present", "withdrawn") for r in inputs["regions"]
+    ):
+        return []
+    row = scope.connection.execute(
+        "select artifact_id,encode(content_sha256,'hex') as digest from artifact "
+        "where workspace_id=%s and kind='masked_source' "
+        "and privacy_mask_matches(%s,%s,artifact_id,%s) order by artifact_id limit 1",
+        (scope.workspace_id, scope.workspace_id, capture_id, Jsonb(inputs)),
+    ).fetchone()
+    return (
+        [{"artifact_id": str(row["artifact_id"]), "content_sha256": row["digest"]}] if row else []
     )
