@@ -1,8 +1,9 @@
 # Deliver exact posed image bytes through World Read
 
 Status: dispatched by the operator to task 01a0820f-2d29-7722-af7d-f7415e504b1a.
-Handoff received at 67f5811; the owner explicitly released the database/full-suite slot after
-all processes finished. Integration review is pending; no merge or push is authorized.
+Completed: owner tip 67f5811 integrated with operator authorization. See
+docs/integration-posed-views-recovery-2026-09-08.md. The database/full-suite slot is released.
+No push or retained-data activation occurred.
 The reservation below is retained as history. This task exclusively owned the Exulanica
 isolated database/full-suite slot until this release. The preceding consent-timestamp task released its slot; recovery readiness
 is documentation-only. This reservation permits only owned isolated schemas and the gates below,
