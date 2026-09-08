@@ -83,6 +83,33 @@ If motion is not complete, show a static creative edit and label simulation as f
 Before implementation, inspect the selected renderer's asset path and choose the smallest reviewed
 asset/behavior pair it can support. Schedule depends on source readiness, renderer integration, and available compute.
 
+## Immediate scene and infrastructure exit
+
+First inspect the previously trained Gaussian output in the actual application. Identify whether
+any failure comes from source coverage, camera registration, training, conversion, or rendering.
+The single-photo depth preview does not establish a coherent reconstructed place. Reuse existing
+outputs before proposing another paid run, then select an authorized source set appropriate to
+one usable place. Scope implementation with a file set and branch before dispatch.
+
+The product exit is a recognizable place that can be explored and reopened, with observed
+coverage and failures recorded. Visual acceptance is required; unit tests and a completed
+training job alone do not satisfy it.
+
+Attach a reusable infrastructure result to this same work: reproducible inputs and camera data,
+pinned execution dependencies, checkpoint recovery where supported, and measured quality,
+GPU time and memory use. Compare any proposed optimization with an unchanged baseline on the
+same inputs. Demonstrate reuse outside the original run before claiming generality; propose an
+upstream fix or contribution when a reproduced limitation belongs to an upstream project.
+Do not describe vendor usage alone as an upstream improvement or frontier advance.
+
+Existing vendor integration is bounded: the model manifest configures Nebius Token Factory
+inference, including Nemotron roles; the recorded GPU reconstruction used an NVIDIA L40S through
+Brev/MassedCompute. That run does not establish Nebius GPU deployment. See
+[compute findings](reference-gpu-compute.md). Choosing additional reconstruction or simulation
+systems requires checking compatibility, licensing and measured benefit. This milestone does
+not mandate a new runtime, an infrastructure framework, or a benchmark campaign unrelated to
+the scene's observed bottleneck.
+
 ## Subsequent milestones
 
 1. **Creative composition:** more editable assets, blending places into authored arrangements,

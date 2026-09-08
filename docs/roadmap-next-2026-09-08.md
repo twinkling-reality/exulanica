@@ -1,11 +1,31 @@
-# Next work after the verified main push
+# Infrastructure backlog and historical dispatch
 
 **Product priority update:** [product-direction.md](product-direction.md) now defines the creative-world
 sequence. This page retains the infrastructure backlog and its dependencies; it does not schedule
 the entire product or authorize dispatch.
 
+## Current checkpoint, 2026-09-08
+
+Main was pushed at `d6b89d8`. Posed-view byte delivery and the recovery readiness assessment
+have landed; see [integration evidence](integration-posed-views-recovery-2026-09-08.md).
+The approved documentation review has also landed. Do not dispatch those tasks again.
+The isolated recovery drill remains unexecuted and retained activation is not established.
+
+The next product priority is the usable-scene milestone in
+[product direction](product-direction.md#immediate-scene-and-infrastructure-exit).
+Inspect existing trained outputs before commissioning another run. This does not authorize
+paid compute, retained-data changes, or a new implementation task without a scoped brief.
+The original package count has not been re-estimated. Tier 3's fixture-backed posed-byte
+handoff is complete; real-source validation remains. Recovery assessment completion does
+not establish recoverability in deployment.
+
+## Historical dispatch at 46e106b
+
+The remainder records the earlier dispatch and its then-current findings. Its proposed tasks,
+status table and diagram are historical, not the current start list.
+
 Read against main 46e106b on 2026-09-08. Remote main was independently checked at that same tip
-after the authorized push. This is a current dispatch view, not a replacement for the historical
+after the authorized push. This was a dispatch view, not a replacement for the historical
 sizing document or the Phase 10 tickets. No revised package count or delivery date is asserted.
 
 ## What changed
