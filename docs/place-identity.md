@@ -74,9 +74,10 @@ It is not an entity, it is not a region, and it is not a property of a scene.**
 ### Why not the entity table
 
 `entity` already carries a `class` drawn from `occurrence_class`, and that enum already contains
-`'place'` (`exulanica/migrations/0001_spine.sql:75`). So an entity of class `'place'` is expressible
-today, and putting the durable place there would have been the cheapest change: it inherits naming,
-merging, confirmation and the identity ledger.
+`'place'` (`exulanica/migrations/0001_spine.sql:75`). An entity of class `'place'` is not only
+expressible, it is reachable in production, so putting the durable place there would have been the
+cheapest change: it inherits naming, merging, confirmation and the identity ledger, and it would
+have needed no new plane at all.
 
 It is the wrong plane, for three reasons that compound.
 
@@ -90,10 +91,12 @@ row would then be indistinguishable from an observed one.
 Worse, the entity plane is the machinery that turns a *name* into identity: `display_name` is
 "written ONLY via a 'user' assertion" (`exulanica/migrations/0001_spine.sql:544`), and
 `assertion_kind` reserves `'user'` as "the only kind permitted to carry a name"
-(`0001_spine.sql:69`). This note has already refused that route: a place asserted from a label is a
-claim the system cannot support. Modelling a place as an entity would make the forbidden path the
-cheapest one available, and the first time somebody took it the system would show a visitor one room
-labelled as another with no receipt to contradict it.
+(`0001_spine.sql:69`). That machinery is correct for what it does, and the section below keeps it.
+It is the wrong machinery for this: a place asserted from a label is a claim the system cannot
+support, and putting the geometric place on the same table would put both identities behind one
+`entity_id`, so a place that a user had merely named would be indistinguishable from one two
+reconstructions had agreed on. The first time the two disagreed, the world would show a visitor one
+room labelled as another with no receipt to contradict it.
 
 Third, and smallest: a similarity transform on an entity row would be the first geometry that table
 carried.
@@ -111,39 +114,60 @@ existing scene row changes a key outside that exception and is refused. So optio
 one: it costs the append-only guarantee that protects every scene in the repository, and it would
 buy an inversion of ownership the roadmap explicitly asks against.
 
-It is also wrong on its own terms. A place needs a name, a shared frame and a series of alignment
-receipts, and none of those is a property of any one scene.
+It is also wrong on its own terms, twice. A place needs a shared frame, an ordered series and a
+series of alignment receipts, and none of those is a property of any one scene. And a scene's
+identity **is** its member set: `scene_id_for` is a uuid5 over the digest of the sorted member
+capture ids (`exulanica/evidence/scene.py:105-112`), so a place cannot be modelled as a scene that
+grew, because adding a capture does not extend a scene, it names a different one.
 
 ### The collision with `occurrence_class`, and how it is closed
 
-Two things named `place` in one schema is how a query silently returns the wrong one. The fix is not
-to rename the durable thing, because the roadmap, this note and the product all say `place` and a
-third word would have to be reconciled by every reader forever. The fix is to make the schema
-single-valued for the word.
+Two things named `place` in one schema is how a query silently returns the wrong one, so the word
+has to resolve. The first draft of this decision closed it by refusing an `entity` row of class
+`'place'` outright, on the belief that such an entity could only ever be a place recognised from a
+label, which this note forbids. **That belief was wrong and the refusal is withdrawn.**
 
-`occurrence_class` keeps its `'place'` value with the meaning it has always had: a place **observed
-in one photograph**. Migration 0038 refuses an `entity` row of class `'place'` with a named check
-constraint, so the ambiguous row cannot exist and the attempt to create one fails with a constraint
-name that says why.
+What is actually there, checked 2026-09-07: the vision stage emits a whole-image occurrence of class
+`'place'` for every photograph whose model output carried a proposed place, alongside a `place_is`
+assertion (`exulanica/ingest/stages/vision.py:323-343`). Naming any occurrence creates an entity
+whose class is copied from it (`exulanica/identity/decisions.py:107`), and 0002's naming guard
+already requires an active user assertion before any entity may carry a name
+(`exulanica/migrations/0002_naming_and_admission.sql:246`). So an `entity` of class `'place'` is a
+live product path: it is a place **a person named**, admitted by the same guard that admits every
+other name. Refusing it would have deleted a working capability to solve a vocabulary problem, which
+is the wrong trade, and it would have been made on a false premise.
 
-That is not a capability being removed. An entity of class `'place'` could only be a place whose
-identity came from recognising a label or a likeness across photographs, which is the thing this
-note forbids in its own identity section and the same shape the privacy layer refuses for people.
-MEASURED 2026-09-07 on the permitted instance: `select class, count(*) from entity` returns
-`person|1` and `select class, count(*) from occurrence` returns `person|1`, so no existing row is
-affected and the constraint applies to an empty set.
+So there are two real things, and they get two planes rather than one plane and a prohibition.
 
-After 0038 the word resolves without a lookup. A place you can select from a table is a `place`. A
-place in a photograph is an `occurrence`, and it never becomes an identity.
+- An `entity` of class `'place'` is **a place a person named**. Its identity comes from a user
+  assertion over an occurrence in one photograph. It has no frame, no versions and no geometry.
+- A `place` row is **a place the geometry established**. Its identity comes from a joint
+  reconstruction over two capture sets, exactly as this note's identity section requires, and never
+  from a name.
+
+**Neither creates the other, and that is the invariant worth testing.** Naming a place occurrence
+must not bring a `place` row into being, because a label is not a measurement. Accepting an
+alignment must not mint an entity, because geometry is not a name. `place.named_entity_id` is a
+nullable column pointing at the entity that names this place when a user has supplied one, and it is
+an annotation carried alongside the place rather than any part of its identity.
+
+The ambiguity that remains is a reader's, not a query's, and the identifier closes it: `place_id`
+names the geometric plane and nothing else, while the identity plane uses `entity_id` everywhere and
+has never used `place_id`. A column called `place_id` therefore has exactly one referent, which is
+the property the warning was actually about.
 
 `region` is untouched. A region stays the world's spatial authority; a place tells a region which
-scenes belong to it and how their frames relate. `person_region.region_key` is a 16x16 grid cell and
-the place plane has no grid key, so the word is not reused.
+scenes belong to it and how their frames relate. `person_region.region_key` is a 16x16 grid cell,
+and the place plane has no grid key and no column called `region_id` or `region_key`, so none of the
+three existing meanings of "region" is reused.
 
 ### The three tables
 
-`place`. One row per durable place: `place_id`, `workspace_id`, an optional `display_name` the user
-supplied, an `anchor_scene_id`, and the usual `created_at` and `deleted_at`.
+`place`. One row per durable place: `place_id`, `workspace_id`, an optional `named_entity_id`
+pointing at the class-`'place'` entity that names it when a user has named one, an
+`anchor_scene_id`, and the usual `created_at` and `deleted_at`. There is no `display_name` column:
+naming is the identity plane's job and it already has a guard, and a second name here would be a
+second answer to the same question.
 
 The anchor is the part worth arguing about. **A place's shared frame is its anchor scene's own
 recovered frame**, not a new frame of its own. A joint reconstruction produces a third frame, and
@@ -154,9 +178,18 @@ exactly identity, and makes "the world does not move under the visitor's feet wh
 a property of the anchor rather than of a build.
 
 `place_version`. One row per scene in the place: `place_id`, `scene_id`, an `ordinal` by capture
-time, the `captured_at` it was ordered by, the `place_from_scene` similarity as a row-major 4x4 with
-its scale carried separately the way `PlaceAlignmentResult` already does, the alignment receipt that
-admitted it, and `frame_hops`.
+time, the `ordered_by_utc` it was ordered on with the `ordered_by_basis` that produced it, the
+`place_from_scene` similarity as a row-major 4x4 with its scale carried separately the way
+`PlaceAlignmentResult` already does, the alignment receipt that admitted it, and `frame_hops`.
+
+The capture time needs its own sentence, because **a scene has no capture-time column**. The only
+time available is `capture.started_at` across the scene's members, which 0001 itself calls a best
+estimate only and which is nullable, and `exulanica/graph/geometry.py` already treats it as a
+presentation ordering rather than a fact. Ordering versions by a live join on it would make a
+place's history rearrange itself when a capture's metadata is corrected, and would have no answer at
+all when it is null. So the time is **recorded at bind time**, with the basis that produced it, and
+the ordinal is fixed then. A version whose time could not be established is admitted with a null
+time and an ordinal after every dated one, which is a visible state rather than a silent guess.
 
 `frame_hops` is the honesty field. It is 0 for the anchor, 1 for a scene whose transform to the
 anchor was measured by a single joint run, and n for one composed through a chain of them. A place

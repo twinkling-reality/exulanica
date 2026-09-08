@@ -551,10 +551,11 @@ table.
       `tg_reconstruction_scene_append_only` permits exactly one UPDATE on `reconstruction_scene`,
       advancing `current_job_id` to a succeeded job, so setting a `place_id` on an existing scene
       row is refused by the database.
-- [x] The `occurrence_class` collision closed by making the schema single-valued for the word
-      rather than by renaming the durable thing. MEASURED 2026-09-07 on the permitted instance:
-      `entity` holds one row and it is `person`, `occurrence` holds one row and it is `person`, so
-      the constraint that refuses an `entity` of class `'place'` applies to an empty set.
+- [x] The `occurrence_class` collision closed by giving the two meanings two planes rather than one
+      plane and a prohibition. The first draft refused an `entity` of class `'place'` outright and
+      was wrong to: `exulanica/ingest/stages/vision.py:323-343` emits place occurrences and
+      `exulanica/identity/decisions.py:107` copies an occurrence's class onto the entity a user
+      names, so that entity is a live product path and the refusal would have deleted it.
 
 **Files.** Edited: `docs/place-identity.md`, `docs/phase-10-tickets.md`.
 
@@ -574,8 +575,10 @@ place.
 - [ ] The workspace-keyed FORCE row-level security count updated in the three files that state it
       in prose, with `test_the_prose_count_of_workspace_isolated_tables_matches_the_schema` passing
       against the live schema rather than against a remembered number.
-- [ ] An `entity` row of class `'place'` is refused by a named constraint, asserted by a test named
-      for the failure it catches.
+- [ ] Naming a place occurrence writes no `place` row, and accepting an alignment writes no
+      `entity`, asserted by a test named for the failure it catches. This is the checkable form of
+      "a label is not a measurement and geometry is not a name"; without it the two planes are a
+      convention, and section 7 of the brief says a boundary nothing checks is not a boundary.
 - [ ] An `artifact` naming two subjects, or none, is refused, asserted by a test.
 - [ ] A `place_version` for a scene already in another place is refused, asserted by a test.
 
