@@ -167,6 +167,14 @@ def main() -> int:
         default=None,
         help="path, relative to the repository root, of the record this one follows",
     )
+    # The date alone cannot separate two runs on one day against two different trees, and the
+    # comment above says why the second must not replace the first.
+    parser.add_argument(
+        "--label",
+        default="phase-10-read-paths",
+        help="filename stem after the date, so a same-day re-run against a changed tree writes a "
+        "new record rather than replacing a true statement about a tree nobody can check out",
+    )
     arguments = parser.parse_args()
 
     head = subprocess.run(
@@ -246,7 +254,7 @@ def main() -> int:
             "path": arguments.predecessor,
             "record_sha256": hashlib.sha256(canonical_json(predecessor["record"])).hexdigest(),
         }
-    output = ROOT / f"docs/evaluation/{arguments.date}-phase-10-read-paths.json"
+    output = ROOT / f"docs/evaluation/{arguments.date}-{arguments.label}.json"
     output.write_text(
         json.dumps(
             {
