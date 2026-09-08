@@ -1,0 +1,38 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_wrong_bytes_under_declared_digest_refuse_route ______________
+
+deployment = <test_api.Deployment object at 0x110e86f10>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x110e1ec10>
+tmp_path = PosixPath('<fixture-path>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110e1e3d0>
+
+    def test_wrong_bytes_under_declared_digest_refuse_route(
+        deployment, repository, tmp_path, monkeypatch
+    ):
+        scene = _scene_in(deployment, repository, tmp_path)
+        envelope = bundle(deployment, scene)
+        desc = available(envelope)[0]["photo_bytes"]
+        original_get = deployment.store.get
+        wrong = photo_bytes(when="2025:01:01 01:01:01", size=(desc["width"], desc["height"]))
+        assert hashlib.sha256(wrong).hexdigest() != desc["sha256"]
+    
+        def get(blob):
+            return wrong if blob.hex == desc["sha256"] else original_get(blob)
+    
+        monkeypatch.setattr(deployment.store, "get", get)
+        response = deployment.as_owner("GET", desc["fetch"])
+>       assert response.status_code == 409, "wrong bytes were delivered under the declared digest"
+E       AssertionError: wrong bytes were delivered under the declared digest
+E       assert 200 == 409
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_world_read_views.py:248: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_views.py::test_wrong_bytes_under_declared_digest_refuse_route

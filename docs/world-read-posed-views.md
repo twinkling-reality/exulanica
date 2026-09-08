@@ -78,3 +78,64 @@ replica mode, then asserts origin mode before actual route reads. Current produc
 of an ordinary attempted missing-lineage update is preserved in the failed-attempt log.
 This does not migrate or backfill a legacy database. Unregistered members remain visible in
 an authenticated scene bundle and their attempted bound download refuses.
+
+## Executed handoff
+
+Source base: 8e88b59aadb41088dc5fab185c088e1f36c570b5. Contract-first commit: cc4309e.
+Production implementation and verification scripts: 3b8d97b. Final gate source:
+56a13a2e565e30076cfca8e736c17433b0e1fa83. Later commits retain documentation/evidence only.
+The final gate source adds acceptance tests and a query line wrap; runtime and scripts remain
+byte-identical to 3b8d97b. Worktree: exulanica-posed-view-bytes; branch: codex/posed-view-bytes.
+No source or policy scope extension was used. Migration: NONE.
+
+The final serialized campaign passed 64 targeted cases, 2180 backend tests (3 skips), Ruff,
+all four import contracts, web typecheck and boundaries, and 876 web tests. Locked pose and
+reconstruction extras were installed. All 292 retained artifact bindings and the predecessor
+were checked, followed by retained-record checks after both new envelopes were generated.
+The backend took 397 seconds; a read-only diagnostic sample during the run found no database
+blocker. That run completed without intervention. The earlier intentionally interrupted run
+and development fixture/lint failures remain in the final artifact inventory.
+
+Actual authenticated scene and place requests each returned 200, then each delivered three
+image downloads: two originals (161x100 and 162x100) and a real 160x100 neutral-fill mask.
+The mask's generated original has a 100x160 sensor grid and EXIF orientation 6; intake produces
+the upright 160x100 mask used by the scripted pose producer. Both fresh-process verifications
+reproduced every downloaded digest, size, camera and retained source binding, with database
+connection attempts disabled. The exact mask SHA-256 equals its persisted pose input SHA-256:
+ad454bbfbe7d9212f01d4fd706b27ead9b9eb814937b0f4440bc8473b25c5d82.
+The original source digest is separately retained; it is not relabelled as the mask digest.
+
+Full and split-range delivery reproduce the complete object digest. Current replacement masks
+return 200 while the old range binding returns 409, both between requests and during buffering.
+The old pose input and new selected image digests remain distinct in the unavailable descriptor.
+Expiry is tested one microsecond before and exactly at the boundary through actual SQL/routes.
+Consent writes that retain image selection and lineage changes during buffering also refuse.
+Cross-workspace IDs return 404; withdrawal returns 410; missing/corrupt objects and stale/missing
+masks refuse. Unregistered members persist in a 200 scene bundle and their bound fetch returns
+409. A generated legacy-shaped missing-screening row returns bound-download 409 and scene 404.
+Legacy absent descriptors remain explicitly unavailable offline. Fresh processes independently
+reject tampered downloads, malformed descriptors and missing files with named JSON errors.
+
+All three controls have the exact selector's own FAILED line, not a different failing test:
+
+- tests/test_world_read_views.py::test_wrong_bytes_under_declared_digest_refuse_route
+- tests/test_world_read_views.py::test_final_permission_check_refuses_during_fetch
+- tests/test_world_read_views.py::test_camera_pixel_space_refuses_route
+
+Removing only photo_bytes from each saved scene/place bundle reproduces the same recorded v2
+digest and changes the full bundle digest. The original recipient record was not changed.
+Original citation routes still serve exact originals when permitted and refuse required masks;
+workspace isolation and internal_only remain intact.
+
+Every brief acceptance category has an executed generated-fixture or labelled legacy-simulation
+case. Successful delivery of a non-identity EXIF original is deliberately unsupported, distinct
+from the successful upright derivative case. Cropped/resized/transformed viewer-to-pose mappings
+are not established. Legacy simulations are not migration/backfill evidence. Scripted pose
+outputs are not measured reconstruction quality. Presentation permission does not grant training
+or redistribution; offline verification cannot discover subsequent withdrawals. No retained-data
+activation, personal media, hosted model, paid GPU, merge or push occurred.
+
+- [Campaign and all preserved attempts](evaluation/2026-09-08-run-02-world-read-views.json)
+- [Successor binding verification](evaluation/2026-09-08-verification-world-read-views.json)
+- [Route and digest observations](evaluation/artifacts/2026-09-08-run-02-world-read-views/acceptance-observations.json)
+- [Fresh-process negative results](evaluation/artifacts/2026-09-08-run-02-world-read-views/fresh-negative-results.json)
