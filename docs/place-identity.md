@@ -141,6 +141,9 @@ So there are two real things, and they get two planes rather than one plane and 
 
 - An `entity` of class `'place'` is **a place a person named**. Its identity comes from a user
   assertion over an occurrence in one photograph. It has no frame, no versions and no geometry.
+  The epistemic vocabulary already says as much about the predicate behind it: `place_is` is "a
+  label for where a photograph was taken", a proper noun a model is permitted to propose
+  (`exulanica/epistemics/vocabulary.py:94-107`). A label is the whole of what that plane claims.
 - A `place` row is **a place the geometry established**. Its identity comes from a joint
   reconstruction over two capture sets, exactly as this note's identity section requires, and never
   from a name.
