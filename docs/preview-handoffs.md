@@ -110,3 +110,15 @@ acceptance. It addresses the grouped-region status mode used in this walkthrough
 The separate `ui/status.ts:137` sourceOnly branch in inspection presentation also ignores
 legacy maps and can still say no reconstruction is loaded. That file remains unmodified;
 this distinct limitation was reported rather than silently included in the patch.
+
+### Integration type correction
+
+The orchestrator applied the initial patch in its separate integration worktree and reported
+41 focused preview/OPM/status tests and boundaries passing, but typecheck failed at
+main.ts:1658 (TS2345): the snapshot island ID is a string, not branded IslandId. The initial
+patch's Set<IslandId> was too narrow for this cross-projection equality comparison. The
+owner-approved correction is exactly `new Set<string>()` in place of `new Set<IslandId>()`.
+Renderer IslandId values remain valid string keys; matching remains exact with no coercion
+or casts. Only the patch and this history were updated here. The corrected patch passes
+`git apply --check`; integration typecheck and browser acceptance remain with the
+orchestrator. No new server or test campaign was started by this owner.

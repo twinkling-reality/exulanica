@@ -4,7 +4,7 @@
        showTravelStatus('No authorized source photographs are available in this session.', 'failure');
      }
    };
-+  const renderedPreviewRegions = new Set<IslandId>();
++  const renderedPreviewRegions = new Set<string>();
    const renderReconstructionStatus = (): HTMLElement => buildStatus({
      omittedRegionCount: built.omitted.length, undrawable: built.undrawable,
      notices: [...sourceMediaNotices, ...geometryNotices], reconstructionScenes: reconstructionRungs,
