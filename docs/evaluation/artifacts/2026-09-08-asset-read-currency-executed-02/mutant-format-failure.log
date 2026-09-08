@@ -1,0 +1,20 @@
+RUF100 [*] Unused `noqa` directive (unused: `E501`)
+  --> docs/evaluation/artifacts/2026-09-08-asset-read-currency-executed-02/mask-lineage-mutant.py:19:97
+   |
+17 | Migration.sql = property(mutated)
+18 | SELECTOR = (
+19 |     "tests/test_asset_read_currency.py::test_changed_outline_rebuild_does_not_revive_geometry"  # noqa: E501
+   |                                                                                                 ^^^^^^^^^^^^
+20 | )
+21 | raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
+   |
+help: Remove unused `noqa` directive
+   |
+18 | SELECTOR = (
+   -     "tests/test_asset_read_currency.py::test_changed_outline_rebuild_does_not_revive_geometry"  # noqa: E501
+19 +     "tests/test_asset_read_currency.py::test_changed_outline_rebuild_does_not_revive_geometry"
+20 | )
+   |
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

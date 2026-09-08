@@ -146,6 +146,11 @@ def main() -> None:
     controls = []
     for name, selector, kind, before, after in mutants:
         exact_selector = selector if selector.startswith("tests/") else SELECTOR + selector
+        selector_literal = (
+            "(\n"
+            + "\n".join(repr(exact_selector[i : i + 60]) for i in range(0, len(exact_selector), 60))
+            + "\n)"
+        )
         if kind == "sql":
             before_literal = (
                 "(\n"
@@ -169,7 +174,7 @@ def mutated(self: Migration) -> str:
     return sql
 
 Migration.sql = property(mutated)
-SELECTOR = {exact_selector!r}  # noqa: E501
+SELECTOR = {selector_literal}
 raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
 """
         else:
@@ -180,7 +185,7 @@ def bypass(*args: object, **kwargs: object) -> None:
     pass
 
 evidence._authorize_original = bypass
-SELECTOR = {exact_selector!r}  # noqa: E501
+SELECTOR = {selector_literal}
 raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
 """
         path = artifacts / f"{name}-mutant.py"
