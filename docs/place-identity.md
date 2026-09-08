@@ -238,18 +238,28 @@ no scene is addressed and which could be mistaken for the place's own geometry. 
 the receipt so the fit stays checkable, and the model stays a build intermediate, the same rule
 Phase 3C states for training intermediates.
 
-The queue is a new table. `reconstruction_scene_job.scene_id` is `not null` and every claim, lease
-and idempotency path in that queue is keyed on one scene, so a pair-subject build has no valid row
-to write. This repository already runs one queue per subject kind: `job` for per-capture
-derivatives, `reconstruction_scene_job` for scenes, and `purge_job`. A fourth for a pair follows
-that precedent rather than widening a table 222 commits of code addresses.
+It cannot reuse the scene queue. `reconstruction_scene_job.scene_id` is `not null` and every
+claim, lease and idempotency path in that queue is keyed on one scene, so a pair-subject build has
+no valid row to write. Worse, routing a joint run through the `scene_pose` stage would make every
+success look like a failure: `exulanica/reconstruction/pose.py:585-586` appends "joint
+reconstruction has no measured metric scale" whenever a manifest declares more than one capture set
+and carries no metric scale, and this frame is deliberately not metric. So the join is its own
+stage, and reusing `scene_pose` for it is the single most expensive mistake available here.
 
-**The trade, stated.** A fourth queue duplicates claim, lease, attempt and reclaim logic that
-already exists twice. That is a deliberate cost paid for modularity and for cheap verification: the
-existing queues keep their invariants unchanged and untouched, and the new one is checkable on its
-own. The alternative, a generic subject-polymorphic queue, would be less code and a much larger
-blast radius across every path that currently reads `scene_id` from a job row, and it would have to
-be got right for the two existing queues before it could be got right for the new one.
+**The queue is deferred, and that is a trade rather than an omission.** The build is a callable
+entry point taking two scenes and an injected COLMAP executor, which is exactly how the pose path
+is already structured and what makes it exercisable against the stub the reconstruction tests
+already use. What is not built is a leased, claimable `place_alignment_job` queue with its own
+attempt, lease-renewal and reclaim logic, which would be a fourth copy of a pattern this repository
+implements three times (`job`, `reconstruction_scene_job`, `purge_job`).
+
+The reason is verification, not effort. No joint reconstruction has ever run here, so a queue for it
+would be scheduling machinery with no executed instance to validate against, and the failure modes
+that machinery exists to survive, a worker dying mid-COLMAP and a lease expiring during a
+45-minute job, are exactly the ones a stub cannot exercise. Building it now would trade a checkable
+system for an unchecked one. What is given up in exchange is real: until the queue exists, a joint
+run is an operator action rather than something a read of an unbuilt place can trigger, which is
+the dispatcher the roadmap wants in the same phase.
 
 ## The alignment, and what makes it refusable
 
