@@ -1,0 +1,46 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+......................................................................ss [ 16%]
+...............................s........................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+.............................................................            [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_ingest_persistence.py::test_the_region_crop_refuses_an_original_over_the_pixel_budget
+tests/test_intake_upload.py::test_7_the_pixel_budget_survives_a_process_that_reset_the_warning_filters
+  <worktree>/.venv/lib/python3.11/site-packages/PIL/Image.py:3578: DecompressionBombWarning: Image size (66000000 pixels) exceeds limit of 64000000 pixels, could be decompression bomb DOS attack.
+    warnings.warn(
+
+tests/test_retained_evaluation_records.py::test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent
+  <worktree>/tests/test_retained_evaluation_records.py:196: UserWarning: predecessor chain: 43 bindings verified across 41 of 60 retained records. 19 declare no predecessor and are not required to: 2026-09-04-benchmark-browser.json, 2026-09-04-benchmark-pose.json, 2026-09-04-benchmark-scene-withdrawal.json, 2026-09-04-linux-amd64-depth-forward.json, 2026-09-04-reconstruction-validation-campaign.json, 2026-09-04-synthetic-browser.json, 2026-09-04-synthetic-person-withdrawal-browser.json, 2026-09-04-synthetic-person-withdrawal.json, 2026-09-05-atlas-reconstruction-negative-controls.json, 2026-09-05-gsplat-trainer-negative-controls.json, 2026-09-05-gsplat-trainer-verification.json, 2026-09-05-person-consent-first-pass.json, 2026-09-05-reference-bowl-inputs.json, 2026-09-05-reference-volcanic-inputs.json, 2026-09-05-reference-workflow-negative-controls.json, 2026-09-05-retained-reference-progress.json, 2026-09-06-phase-10-atlas.json, 2026-09-06-phase-10-read-paths.json, 2026-09-06-world-read-negative-controls.json
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2146 passed, 3 skipped, 4 warnings in 343.95s (0:05:43)

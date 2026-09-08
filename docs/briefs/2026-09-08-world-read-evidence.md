@@ -1,7 +1,8 @@
 # Start recipient-checkable World Read evidence work
 
-Status: dispatched as `codex/world-read-evidence`. Candidate `1328935` is under independent
-review; the unsupported-receipt repair checkpoint below must be completed before integration.
+Status: completed and integrated at `3352627` after independent corrected-head gates. See
+`docs/integration-world-read-recipient-2026-09-08.md` for the original review finding, repair,
+verification and remaining consent-writer limitation. Original scope/checkpoint is preserved below.
 
 This task follows the completed asset-read integration.
 See `docs/integration-asset-read-currency-2026-09-08.md` for verified read behavior and remaining

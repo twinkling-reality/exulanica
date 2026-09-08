@@ -1,5 +1,8 @@
 # Asset-read currency integration, 2026-09-08
 
+Follow-up: `integration-world-read-recipient-2026-09-08.md` records the subsequent recipient-
+evidence integration. The report below retains its own verified state and then-next brief.
+
 The asset-read branch is integrated on main after independent gates at `188e20c`:
 2118 backend tests passed, 3 skipped; 876 web tests passed; Ruff, four import contracts,
 typecheck and frontend boundaries passed. Locked pose and reconstruction extras were installed.

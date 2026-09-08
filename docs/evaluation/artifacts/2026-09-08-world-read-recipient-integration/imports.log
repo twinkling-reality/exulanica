@@ -1,0 +1,24 @@
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 320 files, 2452 dependencies.
+--------------------------------------
+
+The backend is layered, and the core is at the bottom KEPT
+The model client knows nothing about evidence, storage or the database KEPT
+Reconstruction cannot produce a citation, because it cannot name one KEPT
+The pure core does not know a database exists KEPT
+
+Contracts: 4 kept, 0 broken.
