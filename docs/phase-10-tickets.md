@@ -571,16 +571,35 @@ place.
 
 **Exit.**
 
-- [ ] Migration `0038` applied to the permitted test instance and the migration suite green.
-- [ ] The workspace-keyed FORCE row-level security count updated in the three files that state it
+- [x] Migration `0038` applied to the permitted test instance and the migration suite green.
+      EXECUTED 2026-09-07: `tests/test_migration.py` 197 passed.
+- [x] The workspace-keyed FORCE row-level security count updated in the three files that state it
       in prose, with `test_the_prose_count_of_workspace_isolated_tables_matches_the_schema` passing
-      against the live schema rather than against a remembered number.
+      against the live schema rather than against a remembered number. MEASURED 2026-09-07: the
+      count moved from 62 to 65, and the assertion caught the stale number before the update, which
+      is the whole point of it being a measurement. A fourth stale number was found in the same
+      pass: `tests/test_ingest_persistence.py` also said "keeps that 32 a measurement rather than a
+      memory", a count nothing checks, and it now says "that number".
+- [x] An `artifact` naming two subjects, or none, is refused, asserted by
+      `tests/test_place_plane.py::test_an_artifact_naming_a_scene_and_a_place_is_refused` and
+      `::test_an_artifact_naming_no_subject_at_all_is_refused`, with
+      `::test_an_artifact_naming_only_a_place_is_accepted` so the pair cannot pass on a schema that
+      refuses everything.
+- [x] A `place_version` for a scene already in another place is refused, asserted by
+      `tests/test_place_plane.py::test_a_scene_claimed_by_two_places_is_refused`.
+- [x] A place with no anchor, and a place whose anchor's photographs were withdrawn, are both
+      blocked, asserted by `tests/test_place_plane.py::test_a_place_with_no_anchor_is_blocked` and
+      `::test_a_place_whose_anchor_capture_was_deleted_is_blocked`. The empty case fails closed.
+- [x] `place` is probed for workspace isolation under a non-owner role, added to
+      `tests/test_row_level_security.py::test_a_workspace_reads_its_own_rows_and_no_other_workspace_sees_them`.
+      The owner-connected harness cannot prove isolation, because a superuser bypasses row-level
+      security outright, and `tests/test_place_plane.py` says so where it asserts the catalog
+      instead.
 - [ ] Naming a place occurrence writes no `place` row, and accepting an alignment writes no
       `entity`, asserted by a test named for the failure it catches. This is the checkable form of
       "a label is not a measurement and geometry is not a name"; without it the two planes are a
       convention, and section 7 of the brief says a boundary nothing checks is not a boundary.
-- [ ] An `artifact` naming two subjects, or none, is refused, asserted by a test.
-- [ ] A `place_version` for a scene already in another place is refused, asserted by a test.
+      **Open**: the second half needs the build, which is where an alignment is accepted.
 
 **Files.** New: `exulanica/migrations/0038_a_place_is_more_than_one_capture.sql`, tests. Edited:
 `exulanica/db/session.py`, `exulanica/ingest/spine/__init__.py`, `tests/test_ingest_persistence.py`
