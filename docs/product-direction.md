@@ -83,6 +83,42 @@ If motion is not complete, show a static creative edit and label simulation as f
 Before implementation, inspect the selected renderer's asset path and choose the smallest reviewed
 asset/behavior pair it can support. Schedule depends on source readiness, renderer integration, and available compute.
 
+## Delivery gates for the first demonstration
+
+The sequence above is the full first product milestone, not a promise that all six steps fit
+one submission window. Calendar scheduling remains unresolved until the operator supplies the
+deadline, target tracks and available compute budget. Do not convert the old package inventory
+into a delivery commitment. Use these gates to make progress visible and bound unfinished work.
+
+| Gate | Required demonstration | Scheduling consequence |
+| --- | --- | --- |
+| Scene viability | Existing trained output opens in the real app; inspect coverage, navigation and visible defects | Diagnose the limiting stage before commissioning training or dispatching dependent renderer work. A small object scan is a pipeline check, not proof of a reconstructed place. |
+| Memory and useful model interaction | Ask about the selected place through the actual Companion; ground the answer in available evidence and show missing information honestly | Verify the existing runtime path and record the executed model, task, latency and output. Persistent Companion shared history remains separate planned work. |
+| Small complete experience | Explore the place, ask the grounded question, accept one supported appearance change, reload and restore the original state | This is the minimum release candidate. Existing appearance persistence may support it; it must be executed, and it must not be called complete alternate-world branching. |
+| Creative extension | Add one persistent authored object, then its bounded motion, following the first-milestone contracts | Admit these extensions only with enough time to integrate, rehearse and fix them. Preserve them in the product roadmap if they miss the submission window. |
+| Release rehearsal | Repeat the complete experience from a clean start; capture actual footage and verify setup, supported claims and failure behavior | Freeze feature additions before submission. Reserve explicit time for rehearsal, recording and upload when calendar dates are set. |
+
+The memory interaction is essential to the world-memory demonstration; reconstruction and editing
+alone do not establish that experience. Nemotron use must be functional in that interaction if
+claimed, with the actual executed variant recorded rather than inferred from configuration.
+
+One owner should integrate the scene-to-browser path. A second bounded task may validate the
+existing Companion/model path against the same source contract once its inputs are available.
+Assign disjoint writable files, migration ownership if needed, and a merge order before dispatch;
+serialize shared app entry-point changes and database suites. More concurrent tasks are useful
+only when their outputs can be integrated into the same demonstration.
+
+At each handoff, require a runnable result and a short visual check before expanding scope.
+Use focused tests for changed behavior; run the applicable integrated gates once for the executable
+candidate and reuse valid results for documentation-only changes. Permission, deletion and byte
+integrity checks still apply where the demonstration exercises those boundaries.
+
+The infrastructure contribution follows the scene's measured bottleneck. A reproducible workflow
+or an upstream fix can be a useful result without a novel algorithm. Full simulation, a new package
+profile, a second developer client and broader infrastructure work do not block the minimum release
+candidate unless the chosen demonstration actually depends on them. Hosting and recovery become
+release dependencies if a live retained-data deployment is selected.
+
 ## Immediate scene and infrastructure exit
 
 First inspect the previously trained Gaussian output in the actual application. Identify whether
