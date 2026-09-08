@@ -1,12 +1,13 @@
 # Reconstruction findings
 
-Status: **MEASURED, on one photograph and on renders of it; no corpus.** This is the findings
+Status: **Historical single-photograph findings plus a retained-bowl geometry observation.**
+Sections 1 through 7 retain their original 2026-09-02/03 scope; section 8 records the later scene. This is the findings
 document [architecture-overview.md](architecture-overview.md) section 8 reserves for "reconstruction
 rungs and their quality bar". It records what was measured, on what, with what caveat, so that a
 number in the code carries its provenance. Decisions drawn from these numbers live in the decision
 records from [adr/0008-generated-geometry.md](adr/0008-generated-geometry.md) onward, not here.
 
-Every number below was measured on 2026-09-02 or 2026-09-03 on an Apple M3 Pro with 18 GiB of
+Every number in sections 1 through 7 was measured on 2026-09-02 or 2026-09-03 on an Apple M3 Pro with 18 GiB of
 unified memory, macOS 26.5.1, PyTorch 2.14.0 on MPS, and pycolmap 4.2.0 on CPU. The one photograph
 is `web/packages/app/public/fixtures/memory/glasshouse-courtyard.jpg`, 1280x960, a wet courtyard with
 a figure, a bicycle and a glasshouse. **One photograph is not a corpus.** Every threshold that
@@ -370,3 +371,59 @@ silhouette fringing, "by rendering with and without it and looking". Nothing con
   collections; personal libraries have burst structure (about 6.5 near-duplicate images per
   cluster in the one published personal collection) that cuts both ways. The experiment that
   settles it is named in ADR-0008 as M5.
+
+
+## 8. Retrospective masked-geometry count on the trained bowl
+
+**MEASURED 2026-09-08, locally on the retained delivery artifact.** The read-only evaluator
+`exulanica.evaluation.masked_geometry` decoded the bowl's compressed SOG delivery using the locked
+`@playcanvas/splat-transform` 3.3.3 CPU path and called the existing masked-geometry counter. This
+measures quantized delivery coordinates, not the original training PLY, which is not retained.
+
+| Quantity | Observed |
+| --- | ---: |
+| Actual decoded Gaussians | 1,000,000 |
+| Recovered cameras evaluated | 51 |
+| Current recorded masked regions across those cameras | 0 |
+| Current recorded confirmed regions across those cameras | 0 |
+| Gaussian/view intersections over masked regions | 0 |
+| Gaussian/view intersections over confirmed regions | 0 |
+
+The Gaussian file is parsed and validated even when no regions exist. Empty-region views skip
+projection after validation; this makes a million-Gaussian retrospective check practical without
+turning a corrupt file into a zero. Counts are sums across views, not unique people or unique
+Gaussians across the scene. Every camera's empty region snapshot is retained explicitly.
+
+The delivered artifact is `c37d30fa-50b7-5612-8b22-e306ec7fa5ae`, bound to SHA-256
+`844678b9374043b5f7e30038741fdf733e16a3da0d79b29078dd3d0b5f28eaa7`.
+The decoded PLY SHA-256 is
+`266d67266ffdbe128e13a9362f88f0645496f4fb5dee18db996f5d9a3551ab92`.
+The evaluation record binds the publication and pose receipts, prior evaluation ZIP, current
+region snapshot, executed decoder source, evaluator code and predecessor record. PostgreSQL's
+transaction was repeatable-read and enforced read-only; no public row or retained artifact was
+changed. Reproduce against the retained local state with a new output filename:
+
+```sh
+uv run python scripts/reference_instance.py evaluate-geometry --scene bowl \
+  --artifact c37d30fa-50b7-5612-8b22-e306ec7fa5ae \
+  --predecessor docs/evaluation/2026-09-05-person-consent-first-pass.json \
+  --out <new-observation.json>
+```
+
+This is a new retrospective evaluation bundle containing `masked_geometry`; it does not rewrite
+the old training ZIP. The production trainer has no current region/consent snapshot input, so it
+cannot truthfully manufacture this count itself. The seven-component corpus `SCORED` registry is
+unchanged. Historical training masks are unavailable. Non-pinhole cameras use an explicitly
+labelled pinhole approximation with a 20,000 ppm margin; the margin is not proof of conservative
+distortion inversion.
+
+**Zero over zero recorded regions does not establish privacy or masking effectiveness.** No real
+photograph screening, COLMAP run, CUDA training or hosted model ran in this follow-up. The fact
+that this bowl was trained earlier comes from retained receipts/logs; the decoded geometry and
+current empty-region count were executed here. The volcanic point-map scene was not retrained.
+
+Verification includes a nonempty region regression, refusal of nonfinite opacity even with empty
+regions, and exact predecessor/blob integrity checks. An isolated 23-test baseline passed before
+three exactly-one-occurrence mutations: dropping masked intersections, bypassing empty-region
+PLY validation, and omitting the bundle's count. Each mutation failed its named test. These
+controls demonstrate test sensitivity; they do not substitute for a masked real-person scene.
