@@ -39,6 +39,7 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.vision import SCHEMA_VERSION, prompt_digest
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
+from exulanica.reconstruction.place_alignment import PLACE_ALIGNMENT_POLICY
 
 __all__ = [
     "ARTIFACT_NAMESPACE",
@@ -562,6 +563,42 @@ STAGES: Final[dict[str, StageSpec]] = {
             # tombstone and purge paths. A manifest that lived only inside the image's metadata
             # could not be found by a withdrawal looking for what to destroy.
             "profile": "exulanica.masked-source-manifest/v1",
+        },
+    ),
+    "place_alignment": StageSpec(
+        key="place_alignment",
+        version=1,
+        output_kind="place_alignment_receipt",
+        # Deterministic in the sense this flag actually carries, which is `scene_pose`'s sense
+        # and nothing more: a content difference between two runs of one union under one policy
+        # is a fault worth an event. It is not a claim of bit reproduction. This stage runs the
+        # same mapper `scene_pose` does, and `pycolmap_executor` records that RANSAC threading
+        # still admits variation and that nobody has measured how much.
+        deterministic=True,
+        # No `model_role`, and that is a decision rather than an omission. Nothing here calls a
+        # model: the joint run is COLMAP and the fit is arithmetic. Naming a role would force
+        # `deterministic=False` under ADR-0017, which would drag this stage into the
+        # exact-recomputation exclusion sentence in `docs/domain-and-evidence-model.md` and into
+        # the digest-pinned `docs/evaluation/2026-09-05-unblocked-goal-d.json`, and amending a
+        # dated record of an executed measurement so a later stage fits is a false claim about
+        # what was measured.
+        params={
+            "profile": "exulanica.place-alignment-receipt/v1",
+            # The fitter's own policy, imported rather than restated, exactly as
+            # `scene_placement` embeds `ALIGNMENT_POLICY`. A changed tolerance therefore changes
+            # this stage's identity instead of silently reinterpreting a recorded refusal.
+            # Integer only, which is what lets it into a digest input at all.
+            "alignment": PLACE_ALIGNMENT_POLICY,
+            # The joint sparse model is a third frame that no scene is addressed in. It is a
+            # build intermediate and its digest travels in the receipt; promoting it to citable
+            # geometry would put a place's history in a frame nothing else resolves.
+            "joint_model": "build-intermediate-not-retained",
+            # A place's shared frame is its anchor scene's own recovered frame, so the anchor's
+            # transform is identity and every other version's is measured or composed toward it.
+            "frame": "anchor-scene-recovered-frame",
+            # Both frames are recovered COLMAP frames. Two captures sharing one is a statement
+            # about their consistency with each other and about nothing physical.
+            "physically_validated": False,
         },
     ),
 }

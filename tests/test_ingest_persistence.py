@@ -823,6 +823,7 @@ _SPINE_MODULES = (
     "inferences.py",
     "occurrences.py",
     "person_consent.py",
+    "places.py",
     "privacy.py",
     "reconstruction_jobs.py",
     "reconstruction_scenes.py",
