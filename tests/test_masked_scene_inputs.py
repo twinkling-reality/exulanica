@@ -39,7 +39,10 @@ ORIGINAL_B = BlobId(bytes([2]) * 32)
 class FakeRepository:
     """Only the two lookups this module uses. A real repository needs PostgreSQL."""
 
-    connection = None
+    @property
+    def connection(self):
+        return self
+
     workspace_id = uuid.UUID(int=1)
 
     current: dict[uuid.UUID, CaptureArtifactRow]
@@ -57,9 +60,15 @@ class FakeRepository:
 @pytest.fixture(autouse=True)
 def currency_policy_double(monkeypatch):
     """These shape tests use a repository double; SQL currency has real-database tests."""
-    monkeypatch.setattr("exulanica.ingest.masked_inputs.WorkspaceScope", lambda *args: None)
+    monkeypatch.setattr(
+        "exulanica.ingest.masked_inputs.WorkspaceScope", lambda connection, workspace: connection
+    )
     monkeypatch.setattr("exulanica.ingest.masked_inputs.mask_is_current", lambda *args: True)
     monkeypatch.setattr("exulanica.ingest.masked_inputs.current_inputs", lambda *args: {})
+    monkeypatch.setattr(
+        "exulanica.ingest.masked_inputs.selected_masks",
+        lambda scope, capture_ids: {c: r for c, r in scope.current.items() if c in capture_ids},
+    )
 
 
 def _row(capture_id, artifact_id, digest):

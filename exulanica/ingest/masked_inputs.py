@@ -28,7 +28,7 @@ from typing import Any
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.repository import IngestRepository
-from exulanica.ingest.spine.privacy import current_inputs, mask_is_current
+from exulanica.ingest.spine.privacy import current_inputs, mask_is_current, selected_masks
 from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
 from exulanica.ingest.spine.scope import WorkspaceScope
 from exulanica.ingest.stages import stage
@@ -58,18 +58,11 @@ def masked_source_declarations(
     extension from it, and a JPEG derivative of a PNG original staged as ``.png`` would be handed
     to COLMAP mislabelled.
     """
-    masked = repository.current_capture_artifacts(capture_ids=capture_ids, kind=MASKED_SOURCE_KIND)
+    masked = selected_masks(
+        WorkspaceScope(repository.connection, repository.workspace_id), capture_ids
+    )
     if not masked:
         return []
-    for capture_id, row in masked.items():
-        if not mask_is_current(
-            WorkspaceScope(repository.connection, repository.workspace_id),
-            capture_id,
-            row.artifact_id,
-        ):
-            raise PrivacyAdmissionError(
-                "the selected masked source is stale; rebuild before admission"
-            )
     spec = stage(MASKED_SOURCE_KIND)
     return [
         {

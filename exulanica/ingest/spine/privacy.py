@@ -9,7 +9,9 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
+from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
+from exulanica.ingest.spine.artifacts import CaptureArtifactRow, exact_for_captures
 from exulanica.ingest.spine.scope import WorkspaceScope
 
 __all__ = [
@@ -27,6 +29,7 @@ __all__ = [
     "screening_allows",
     "screening_allows_observation",
     "screening_masks",
+    "selected_masks",
 ]
 
 
@@ -430,3 +433,27 @@ def screening_masks(
     return (
         [{"artifact_id": str(row["artifact_id"]), "content_sha256": row["digest"]}] if row else []
     )
+
+
+def selected_masks(
+    scope: WorkspaceScope, capture_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, CaptureArtifactRow]:
+    """Select exact current masks only for members that currently require them."""
+    wanted = {}
+    for capture_id in capture_ids:
+        inputs = current_inputs(scope, capture_id)
+        if inputs is None:
+            raise PrivacyAdmissionError("a scene member is no longer available")
+        required = any(
+            row["state"] in ("unknown", "present", "withdrawn") for row in inputs["regions"]
+        )
+        if not required:
+            continue
+        masks = screening_masks(scope, capture_id, inputs)
+        if not masks:
+            raise PrivacyAdmissionError("a required current masked source is missing; rebuild")
+        wanted[capture_id] = uuid.UUID(masks[0]["artifact_id"])
+    rows = exact_for_captures(scope, artifact_ids_by_capture=wanted, kind="masked_source")
+    if set(rows) != set(wanted):
+        raise PrivacyAdmissionError("a required current masked source is no longer available")
+    return rows

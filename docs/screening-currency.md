@@ -79,7 +79,11 @@ admission-member/scene policy triggers from 0029, point-map selection/exact reso
 `ingest/spine/artifacts.py`, and training input selection in `world_package/training_inputs.py`.
 No frontier caller change was needed. The Python guard delegates mask currency to the same SQL
 contract. Scene mask declaration and exact resolution also check current lineage and refuse a
-missing declaration when a member now requires masking.
+missing declaration when a member now requires masking. Selection determines which captures
+currently require masks first, omits unneeded historical derivatives after deletion or likeness
+consent, and finds a matching current artifact even when an obsolete candidate sorts newest.
+Required-but-missing masks refuse; no-person and mixed scenes retain original bytes for members
+that need no mask. An explicitly queued obsolete mask is still refused rather than rebound.
 
 The point-map trigger checks both the screening and the named masked source. It also checks a
 named mask when current inputs no longer require masking, and covers relevant artifact UPDATEs

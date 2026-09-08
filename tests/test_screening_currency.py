@@ -802,3 +802,56 @@ def test_actual_personal_command_preserves_review_inputs(case, tmp_path):
                 psycopg.sql.SQL("drop schema {} cascade").format(psycopg.sql.Identifier(schema))
             )
             owner.commit()
+
+
+@pytest.mark.parametrize("change", ["delete", "likeness"])
+def test_scene_selection_omits_unneeded_historical_masks(case, change):
+    from exulanica.ingest.masked_inputs import masked_source_declarations
+
+    case.edit(subject=case.subject)
+    case.build()
+    first = case.screen()
+    assert masked_source_declarations(case.repo, [case.capture])
+    if change == "delete":
+        case.edit("delete", subject=case.subject)
+    else:
+        case.consent()
+    assert not case.allowed(first)
+    assert masked_source_declarations(case.repo, [case.capture]) == []
+    fresh = case.screen()
+    assert case.allowed(fresh)
+    assert case.scene(fresh).eligibility_state == "eligible"
+    case.point(fresh)
+
+
+def test_scene_selection_handles_mixed_members_and_missing_required_mask(case):
+    from exulanica.ingest.masked_inputs import masked_source_declarations
+
+    second = Case(case.repo, case.root / "second")
+    case.edit()
+    with pytest.raises(PrivacyAdmissionError, match="required current masked source is missing"):
+        masked_source_declarations(case.repo, [case.capture, second.capture])
+    case.build()
+    declarations = masked_source_declarations(case.repo, [case.capture, second.capture])
+    assert [item["capture_ref"] for item in declarations] == [str(case.capture)]
+    assert masked_source_declarations(case.repo, [second.capture]) == []
+
+
+def test_scene_selection_finds_current_lineage_among_obsolete_candidates(case):
+    from exulanica.ingest.masked_inputs import masked_source_declarations
+
+    case.edit()
+    case.build()
+    old = case.mask()
+    case.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
+    case.build()
+    current = case.mask()
+    # Make the obsolete candidate sort newest without relabeling its immutable input lineage.
+    case.repo.connection.execute(
+        "update artifact set created_at=clock_timestamp()+interval '1 day' where artifact_id=%s",
+        (old.artifact_id,),
+    )
+    assert case.mask().artifact_id == old.artifact_id
+    declarations = masked_source_declarations(case.repo, [case.capture])
+    assert declarations[0]["artifact_ref"] == str(current.artifact_id)
+    assert declarations[0]["content_sha256"] == current.content_sha256.hex()
