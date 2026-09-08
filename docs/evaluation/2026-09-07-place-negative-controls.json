@@ -1,0 +1,52 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.place-negative-controls/v1",
+    "date": "2026-09-07",
+    "head": "99f54440c53308dbe65dbd489334ee9c0bde5f4a",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "isolated_source_copy": true,
+    "baseline_passed": true,
+    "restored_suite_passed": true,
+    "records": [
+      {
+        "mutation": "the_validation_fold_is_held_out_of_the_fit",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "training = [item for index, item in enumerate(ordered) if index % stride != stride - 1]",
+        "with": "training = list(ordered)",
+        "test": "test_the_validation_fold_is_never_fitted_on",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "04bfbfe84d29e754945f8f3811a4d7636eca3095350676985524ad7763893b30",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_disconnected_joint_model_is_refused_before_the_numbers",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "if not connected:\n        return refused(\"place-alignment-not-connected\")",
+        "with": "if False:\n        return refused(\"place-alignment-not-connected\")",
+        "test": "test_a_disconnected_joint_reconstruction_is_refused_before_any_number_is_looked_at",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "7c20abd25039edcda2b79e367e0a9defa336adaefe32f36f1fc2acb4fe108bc8",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_mirrored_fit_is_refused_rather_than_corrected",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "    if _determinant(rotation) <= 0:",
+        "with": "    if False:",
+        "test": "test_a_mirrored_fit_is_refused_rather_than_corrected",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "93dd19f998e7df38a3ac9ba29c70b57df62d6e337b9460fa2487db8fb62b382c",
+        "observed_outcome": "the named test failed under the production mutation"
+      }
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-07-world-read-negative-controls.json",
+      "record_sha256": "3beb2e49f862873dff52e13597487c472421d20f270d5b860abd06212eea348f"
+    }
+  },
+  "record_sha256": "22f1b57cbe7276a625ee45f3014d544e1ae5525e41bb39e12d9c18a1e4c55922"
+}

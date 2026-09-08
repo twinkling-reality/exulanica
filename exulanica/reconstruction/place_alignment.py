@@ -63,6 +63,7 @@ PlaceAlignmentReason = Literal[
 _Vector = tuple[float, float, float]
 
 
+
 @dataclass(frozen=True, slots=True)
 class PlaceCorrespondence:
     """One camera, located twice: in its own scene's frame and in the joint frame.
@@ -261,6 +262,16 @@ def fit_place_alignment(
     if spread <= 0:
         # Every training camera at one point. There is no geometry to fit and a residual of zero
         # would be arithmetic rather than agreement.
+        #
+        # MEASURED 2026-09-07 by negative control: this branch is unreachable, and two separate
+        # mutations that tried to prove otherwise both survived. A coincident training set gives a
+        # zero cross-covariance, which three guards inside ``_kabsch`` catch in turn: the polar
+        # factor is singular, and if that were removed the denominator is zero, and if that were
+        # removed too the numerator is. So the coincident-cameras test is satisfied by whichever
+        # fires first, no single-guard mutation can be attributed to it, and the spread can never
+        # be non-positive by the time it is read here. Kept as defence in depth against a future
+        # ``_kabsch`` that refuses less, and documented rather than deleted because a reader who
+        # removes it should know what does the work today.
         return refused("place-alignment-inconsistent")
     joint_spread = spread * scale
 
