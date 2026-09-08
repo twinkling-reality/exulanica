@@ -35,6 +35,8 @@ Writable file set:
   `exulanica/ingest/spine/privacy.py` for this shared contract only.
 - `exulanica/ingest/person_state.py`, limited to the current-state reader and necessary
   imports/docstring, under the producer extension approved below.
+- `exulanica/ingest/personal_admission.py`, limited to preserving the obtained review rows in
+  the review/rescreen call's sensitive_regions argument, under the caller extension below.
 - `exulanica/orchestration/preflight.py` and `demonstration.py`, only existing screening
   selection/checking seams if necessary to consume the corrected shared policy.
 - New `tests/test_screening_currency.py`; relevant cases in
@@ -59,6 +61,13 @@ public shape and existing mask digest formats. Execute database-backed producer/
 expiry, future effectiveness, region/subject precedence, unknown subjects, withdrawal and
 rebuild/re-screening at the specified evaluation instant. The offline fold, pipeline, stage
 registry and asset-read endpoints are not added to scope by this approval.
+
+Caller extension approved on 2026-09-08 after inspection of candidate `9e9d8a8`: the admission
+command reduces obtained review rows to region key and state, discarding the silhouette, subject
+and naming state needed to reject stale claimed review inputs. The permitted call-site change
+passes those obtained rows through without substituting a fresh snapshot for what was reviewed.
+Execute the command's review/rescreen path and stale/missing-input refusals. A stored eligibility
+field is not evidence of standing SQL permission. No other admission behavior is added to scope.
 
 First document which exact recorded inputs establish currency, how a mask proves it used those
 inputs, how relevant consent expiry is evaluated without a write, and what is an immutable
