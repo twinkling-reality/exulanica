@@ -138,3 +138,12 @@ independent integration gates. Use only the approved test URL and isolated schem
 up, and retain intermediate failures. No retained-public migration or runtime activation is
 authorized. Record the approval as a successor to the immutable checkpoint evidence; do not
 rewrite that record to make the earlier investigation look like executed acceptance.
+
+Fixture assertion extension approved after the first full backend run (2112 passed, 3 skipped,
+1 failed): in `tests/test_world_style_postgres.py`, only the expected evidence_path assertion in
+`test_available_source_metadata_comes_only_from_authorised_local_evidence` may change from
+`/evidence/{span_id}` to `/evidence/{span_id}/masked`. The orchestrator checked the failing log
+and production URL selection: this image now uses the viewer route as explicitly required above.
+Preserve the availability, media dimensions, local-reference, capture identity and subsequent
+privacy assertions and all fixture setup. Retain the first-run failure as intermediate evidence.
+The task retains the serialized suite slot through handoff.
