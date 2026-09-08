@@ -22,10 +22,15 @@ spans. That is invariant 2 in the shape a machine can check: a consumer looking 
 behind a claim will not find a point map offered as one. The evidence path is separate and goes
 through ``/evidence/{span_id}``, which is what the click-to-evidence work builds on.
 
-**The scene is the address, and that is a limitation, not a design.** The roadmap says "for an
-entity, a place and a time". A ``place`` that persists across captures is Phase 10 capability 3 and
-does not exist yet, so v1 addresses a reconstruction scene, which is a set of photographs of one
-place at one capture. The bundle says so in its own ``addressing`` block rather than implying more.
+**Two addresses now, and a scene is still one of them.** The roadmap says "for an entity, a place
+and a time". A place that persists across captures exists as of ``docs/place-identity.md`` and
+:mod:`exulanica.graph.places`, so this bundle answers to two addresses: a reconstruction scene,
+which is one set of photographs of one place at one capture, and a place with a time, which
+resolves to the version of that place in force at that time and puts that scene's bundle in place.
+The scene address is unchanged in meaning, because a scene is still a real thing after it joins a
+place and its receipts are bound to inputs no place can be part of. What is still unaddressable is
+an **entity**: nothing routes from a person or an object to a bundle, and the ``addressing`` block
+says that rather than leaving a reader to find it out.
 
 **Consent is asked once, through one function.** See :mod:`exulanica.graph.read_consent`. While no
 per-person layer exists, the bundle is ``internal_only`` and says what that basis does not
@@ -51,6 +56,7 @@ either side.
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Any, Final
 
@@ -61,6 +67,13 @@ from exulanica.graph.payload import (
     ReconstructionSceneMemberRow,
     ReconstructionSceneRow,
     SceneGeometryReferenceRow,
+)
+from exulanica.graph.places import (
+    PlaceHistory,
+    PlaceVersion,
+    SceneMembership,
+    place_history,
+    scene_place_membership,
 )
 from exulanica.graph.read_consent import (
     consent_for_captures,
@@ -85,6 +98,7 @@ from exulanica.world import DEFAULT_WORLD_ID, WorldStructureRepository
 __all__ = [
     "NUMBER_DECIMALS",
     "WORLD_READ_PROFILE",
+    "place_read_bundle",
     "world_read_bundle",
 ]
 
@@ -367,6 +381,167 @@ def _rungs(scene: ReconstructionSceneRow) -> dict[str, Any]:
     }
 
 
+#: What a bundle can be addressed by, carried in every bundle rather than described only here. A
+#: recipient holding one response and no documentation has to be able to ask for the next thing.
+_ADDRESSES: Final = (
+    "a reconstruction scene by its id, and a place by its id with a time, which resolves to the "
+    "version of that place in force at that time. A scene is one set of photographs of one place "
+    "at one capture; a place is an ordered series of those scenes sharing the anchor's frame"
+)
+
+#: And what it cannot be addressed by. The roadmap asks for an entity, a place and a time, so this
+#: names the one of the three that has no route: there is nothing to follow from a person or an
+#: object to a bundle. Stated as the residue rather than as a general disclaimer, because a reader
+#: who has to infer what is missing infers wrongly.
+_NOT_ADDRESSABLE: Final = (
+    "an entity. Nothing routes from a person or an object to a bundle, so a caller holding an "
+    "entity id has no address here and this bundle does not claim one"
+)
+
+
+def _instant(value: dt.datetime | None) -> str | None:
+    return None if value is None else value.isoformat()
+
+
+def _membership_block(membership: SceneMembership | None) -> dict[str, Any]:
+    """What a scene-addressed bundle says about the place its scene belongs to.
+
+    The three states are distinct facts and none of them may be spelled as the absence of another.
+    ``none`` is a scene bound to no place, which is the ordinary case. ``member`` is a scene in a
+    readable place, and carries the address a caller needs to ask for the place itself.
+    ``unavailable`` is a scene whose place has no readable shared frame, which is what a withdrawn
+    anchor leaves behind: the scene is exactly as readable as it was before it joined, and its
+    place is not.
+    """
+    if membership is None:
+        return {
+            "state": "none",
+            "place_id": None,
+            "version_ordinal": None,
+            "version_count": None,
+            "undated_version_count": None,
+            "frame_hops": None,
+            "reason": "this scene is bound to no place, which is the ordinary case for a scene",
+        }
+    if membership.blocked:
+        return {
+            "state": "unavailable",
+            "place_id": str(membership.place_id),
+            "version_ordinal": None,
+            "version_count": None,
+            "undated_version_count": None,
+            "frame_hops": None,
+            "reason": (
+                "this scene belongs to a place with no readable shared frame, because the place "
+                "has no anchor or its anchor's photographs were withdrawn. This scene is "
+                "unaffected: a place is a join and never a merge"
+            ),
+        }
+    return {
+        "state": "member",
+        "place_id": str(membership.place_id),
+        "version_ordinal": membership.ordinal,
+        "version_count": membership.version_count,
+        "undated_version_count": membership.undated_version_count,
+        "frame_hops": membership.frame_hops,
+        "reason": None,
+    }
+
+
+def _version_block(version: PlaceVersion, resolved: PlaceVersion | None) -> dict[str, Any]:
+    transform = version.transform
+    return {
+        "scene_id": str(version.scene_id),
+        "ordinal": version.ordinal,
+        "ordered_by_utc": _instant(version.ordered_by_utc),
+        "ordered_by_basis": version.ordered_by_basis,
+        "frame_hops": version.frame_hops,
+        "admitted_by_alignment_id": (
+            None
+            if version.admitted_by_alignment_id is None
+            else str(version.admitted_by_alignment_id)
+        ),
+        "is_resolved": resolved is not None and version.scene_id == resolved.scene_id,
+        "place_from_scene": {
+            "state": transform.state,
+            "row_major": transform.place_from_scene_row_major,
+            "scene_units_to_place_units": transform.scene_units_to_place_units,
+            "receipt_sha256": transform.receipt_sha256,
+            "reason": transform.reason,
+        },
+    }
+
+
+def _place_block(history: PlaceHistory, resolved: PlaceVersion | None) -> dict[str, Any]:
+    """The place itself: its versions in capture order, and the joins that were refused.
+
+    Every version is listed, including the ones this address did not resolve to, because the
+    question a place answers is what changed, and a history that showed only the version in force
+    could not be asked it. What is deliberately NOT here is each version's rung, receipts, views
+    and geometry: a place does not average its versions, and building every member scene to answer
+    for one is the cost ``reconstruction_scenes.reconstruction_scene_rows`` takes a scene filter to
+    avoid. The other versions are addressed as scenes, which is what the scene address is for.
+    """
+    return {
+        "place_id": str(history.place_id),
+        "anchor_scene_id": str(history.anchor.scene_id),
+        "version_count": len(history.versions),
+        "undated_version_count": history.undated_versions,
+        "frame": (
+            "every transform here takes a scene's own recovered frame into the anchor scene's "
+            "recovered frame, which is this place's frame. The anchor's own transform is identity "
+            "by construction and nothing measured it"
+        ),
+        "frame_hops": (
+            "0 is the anchor, 1 is a frame one joint reconstruction measured against the anchor, "
+            "and n is a frame composed through n of them. A composed transform is not a measured "
+            "one, and this is the field that says which one a reader is holding"
+        ),
+        "physical_scale": (
+            "unvalidated, and a shared frame does not change that. Two captures sharing one "
+            "recovered frame is a statement about their consistency with each other and about "
+            "nothing physical; no alignment here is physically validated"
+        ),
+        "versions": [_version_block(version, resolved) for version in history.versions],
+        "refused_alignments": [
+            {
+                "alignment_id": str(refusal.alignment_id),
+                "candidate_scene_id": str(refusal.candidate_scene_id),
+                "against_scene_id": str(refusal.against_scene_id),
+                "reason": refusal.reason,
+                "receipt_sha256": refusal.receipt_sha256,
+                # Repeated on every entry rather than stated once above it, for the reason
+                # `tier` is repeated on every geometry entry: an entry separated from its list
+                # still has to say what it is.
+                "means": (
+                    "a joint reconstruction over these two capture sets ran and did not reconcile "
+                    "their frames. They are of related places whose frames could not be joined, "
+                    "which is a recorded result and not a build that failed to happen"
+                ),
+            }
+            for refusal in history.refused_alignments
+        ],
+        "omitted": (
+            "each version's own rung, receipts, views and geometry are read by addressing that "
+            "version's scene. Only the resolved version's are in this bundle, because a place "
+            "does not average its versions and this read does not build the ones nobody asked for"
+        ),
+    }
+
+
+def _resolution(at: dt.datetime | None) -> str:
+    if at is None:
+        return (
+            "no time was requested, so the latest dated version answers. This read consults no "
+            "clock: the answer moves only when a version is bound"
+        )
+    return (
+        "the latest version at or before the requested time. A time between two versions resolves "
+        "to the earlier one, because that capture was the latest record of this place at that "
+        "moment and rounding forward would answer with photographs that did not exist yet"
+    )
+
+
 def world_read_bundle(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
@@ -384,22 +559,180 @@ def world_read_bundle(
     if not scenes:
         return None
     scene = scenes[0]
+    # Binding this scene into a place changes this block, and therefore this bundle's digest,
+    # while nothing about the scene itself moves. That is correct rather than unfortunate: the
+    # digest covers what this read says, a bind is a write, and a recipient re-reading after one
+    # is entitled to see the answer change. It is not a clock, which is the property that matters:
+    # no unwritten fact can move it.
+    addressing = {
+        "by": "reconstruction_scene",
+        "scene_id": str(scene.scene_id),
+        "at": None,
+        "place": _membership_block(scene_place_membership(connection, workspace, scene.scene_id)),
+        "addresses": _ADDRESSES,
+        "not_addressable": _NOT_ADDRESSABLE,
+    }
+    return _assemble(connection, workspace, scene, store, addressing, None, world_id=world_id)
 
+
+def place_read_bundle(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    place_id: uuid.UUID,
+    store: ContentAddressedStore | None,
+    *,
+    at: dt.datetime | None = None,
+    world_id: str = DEFAULT_WORLD_ID,
+) -> dict[str, Any] | None:
+    """The bundle for the version of one place in force at one time, or ``None`` if unreadable.
+
+    ``None`` covers a place that does not exist, one in another workspace, one whose anchor was
+    withdrawn and one that has no anchor yet, for the same reason the scene read collapses its
+    own absences: the surface is not an existence oracle. The route separates those cases only
+    among ids it has already established belong to the asking workspace.
+
+    A place that exists and has no version at or before ``at`` is **not** one of those cases. It
+    answers with an unresolved bundle: the place, its versions and their times, and an explicit
+    statement that nothing was recorded of it that early. A 404 there would say the place does not
+    exist, which is false, and an empty bundle with the ordinary keys would read as a place with
+    nothing in it, which is worse.
+    """
+    history = place_history(connection, workspace, place_id, store)
+    if history is None:
+        return None
+    resolved = history.at(at)
+    if resolved is None:
+        return _unresolved(
+            history,
+            at,
+            state="no_version_at_that_time",
+            reason=(
+                "this place has no version at or before the requested time. It exists and is "
+                "readable; nothing was recorded of it that early"
+            ),
+        )
+    scenes = reconstruction_scene_rows(connection, workspace, store, scene_id=resolved.scene_id)
+    if not scenes:
+        # The version is bound and its photographs are live, and the scene still carries no
+        # readable claim: `reconstruction_scene_rows` requires an active rung assertion. Saying so
+        # is the honest answer. Falling through to a 404 would report the place as absent, and
+        # substituting the neighbouring version would answer a question nobody asked.
+        return _unresolved(
+            history,
+            at,
+            state="version_not_readable",
+            reason=(
+                "the version in force at that time carries no readable scene claim, so this read "
+                "has nothing to put in place. The place and its other versions are unaffected"
+            ),
+        )
+    addressing = {
+        "by": "place_at_time",
+        "scene_id": str(resolved.scene_id),
+        "at": _instant(at),
+        "place": {
+            "state": "resolved",
+            "place_id": str(history.place_id),
+            "version_ordinal": resolved.ordinal,
+            "version_count": len(history.versions),
+            "undated_version_count": history.undated_versions,
+            "frame_hops": resolved.frame_hops,
+            "ordered_by_utc": _instant(resolved.ordered_by_utc),
+            "ordered_by_basis": resolved.ordered_by_basis,
+            "reason": _resolution(at),
+        },
+        "addresses": _ADDRESSES,
+        "not_addressable": _NOT_ADDRESSABLE,
+    }
+    return _assemble(
+        connection,
+        workspace,
+        scenes[0],
+        store,
+        addressing,
+        _place_block(history, resolved),
+        world_id=world_id,
+    )
+
+
+def _unresolved(
+    history: PlaceHistory,
+    at: dt.datetime | None,
+    *,
+    state: str,
+    reason: str,
+) -> dict[str, Any]:
+    """A readable place with no bundle to put in place, said out loud.
+
+    This bundle deliberately carries no ``scene``, ``views`` or ``geometry`` key at all. A
+    consumer that reaches for one gets a KeyError rather than an empty list, which is the
+    difference between an answer a reader can misread as a place with nothing in it and one they
+    cannot. What it does carry is the place: every version, with its time, so the caller can see
+    what it could have asked for.
+    """
+    dated = [version.ordered_by_utc for version in history.versions if version.ordered_by_utc]
+    bundle: dict[str, Any] = {
+        "profile": WORLD_READ_PROFILE,
+        "number_encoding": NUMBER_ENCODING,
+        "addressing": {
+            "by": "place_at_time",
+            "scene_id": None,
+            "at": _instant(at),
+            "place": {
+                "state": state,
+                "place_id": str(history.place_id),
+                "version_ordinal": None,
+                "version_count": len(history.versions),
+                "undated_version_count": history.undated_versions,
+                "frame_hops": None,
+                "ordered_by_utc": None,
+                "ordered_by_basis": None,
+                "reason": reason,
+            },
+            "addresses": _ADDRESSES,
+            "not_addressable": _NOT_ADDRESSABLE,
+        },
+        "unresolved": {
+            "state": state,
+            "reason": reason,
+            "requested_at": _instant(at),
+            "earliest_version_utc": _instant(min(dated)) if dated else None,
+            "latest_version_utc": _instant(max(dated)) if dated else None,
+            "what_this_is_not": (
+                "not a missing place, not a place in another workspace and not a place with "
+                "nothing in it. This response carries no scene, no views and no geometry because "
+                "there is none to carry at this address"
+            ),
+        },
+        "place": _place_block(history, None),
+    }
+    return _seal(bundle)
+
+
+def _assemble(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    scene: ReconstructionSceneRow,
+    store: ContentAddressedStore | None,
+    addressing: dict[str, Any],
+    place: dict[str, Any] | None,
+    *,
+    world_id: str,
+) -> dict[str, Any]:
+    """One scene's bundle under whichever address reached it.
+
+    The two addresses share this body exactly, and that is the point of extracting it: a place
+    addressed at a time and the scene it resolved to must not be able to disagree about the world,
+    which is the same argument the module docstring makes for reading scenes through
+    ``reconstruction_scene_rows`` rather than through queries of this module's own.
+    """
     capture_ids = [member.capture_id for member in scene.members]
     consent = consent_for_captures(connection, workspace, capture_ids)
 
     bundle: dict[str, Any] = {
         "profile": WORLD_READ_PROFILE,
         "number_encoding": NUMBER_ENCODING,
-        "addressing": {
-            "by": "reconstruction_scene",
-            "scene_id": str(scene.scene_id),
-            "limitation": (
-                "a scene is one set of photographs of one place at one capture. Addressing by a "
-                "place that persists across captures and by time is Phase 10 capability 3 and is "
-                "not implemented; this bundle does not claim it"
-            ),
-        },
+        "addressing": addressing,
         "scene": _scene_block(scene),
         "rungs": _rungs(scene),
         "views": [_view(member, consent[str(member.capture_id)]) for member in scene.members],
@@ -440,6 +773,21 @@ def world_read_bundle(
             ),
         },
     }
+    if place is not None:
+        # A place-addressed bundle carries the place it resolved through; a scene-addressed one
+        # does not. The difference is visible in `recorded_keys` rather than hidden, and it is a
+        # decision: putting a place history into every scene bundle would answer a question the
+        # caller did not ask, and would make one bind move the digest of every scene in the place.
+        bundle["place"] = place
+    return _seal(bundle)
+
+
+def _seal(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Compute both digests over a finished bundle and wrap it in its envelope.
+
+    One function, called by every address, because two builders computing "the same" digest is how
+    two answers for one world appear.
+    """
     # Two digests, and the difference is the whole point. `recorded_sha256` covers the observed
     # world alone, so it is the digest a generation is conditioned on: filing a generation must not
     # change the thing that generation cited, and two models must be able to read the same observed

@@ -192,14 +192,33 @@ def test_recorded_and_displayed_rungs_stay_separate(partly_registered, repositor
     assert degraded["bundle"]["geometry"] == []
 
 
-def test_the_bundle_names_the_scene_addressing_limitation(published, repository):
-    """The roadmap promises addressing by entity, place and time. v1 addresses a scene."""
+def test_a_scene_bundle_says_which_address_reached_it_and_what_still_has_none(
+    published, repository
+):
+    """The limitation this used to assert became false, and a false limitation is the worst kind.
+
+    It said addressing by a place and a time was not implemented. It is, so the string is gone
+    and what replaced it has to be checkable in both directions: what this bundle CAN be
+    addressed by, and the one thing it still cannot, which is an entity. A test that only
+    asserted the string was gone would pass on a bundle that says nothing at all.
+
+    The membership half matters as much. This scene belongs to no place, and the block says so
+    with a state rather than by omitting the key, because "no place" and "this reader did not
+    look" are different facts and a missing key is indistinguishable between them.
+    """
     store, _captures, scene_id = published
     envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
     assert envelope is not None
     addressing = envelope["bundle"]["addressing"]
     assert addressing["by"] == "reconstruction_scene"
-    assert "capability 3" in addressing["limitation"]
+    assert addressing["scene_id"] == str(scene_id)
+    assert addressing["at"] is None
+    assert "limitation" not in addressing
+    assert "a place by its id with a time" in addressing["addresses"]
+    assert addressing["not_addressable"].startswith("an entity")
+    assert addressing["place"]["state"] == "none"
+    assert addressing["place"]["place_id"] is None
+    assert "ordinary case" in addressing["place"]["reason"]
 
 
 def test_every_member_appears_as_a_view_even_when_it_did_not_register(

@@ -8,6 +8,7 @@ the bundle claims.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 import uuid
@@ -17,6 +18,7 @@ from exulanica.ingest.scene_reconstruction import SceneReconstructionProcessor
 
 from conftest import write_photo, write_point_map
 from test_api import deployment as deployment
+from test_place_read_bundle import FIRST, _bind, _second_scene
 from test_scene_reconstruction_pipeline import (
     _CODE_REVISION,
     _EXECUTION_IMAGE,
@@ -186,3 +188,161 @@ def test_a_scene_whose_geometry_bytes_vanish_returns_a_different_digest(
     after = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}").json()
     assert after["bundle_sha256"] != before["bundle_sha256"]
     assert after["bundle"]["scene"]["placement_state"] != "available"
+
+
+def _place_in(deployment, repository, tmp_path):
+    """One place over two published scenes, inside the deployment's own workspace and store."""
+    first = _scene_in(deployment, repository, tmp_path)
+    _captures, second = _second_scene(repository, deployment.store, tmp_path)
+    return first, second, _bind(repository, deployment.store, first, second)
+
+
+def test_a_place_addressed_between_two_captures_serves_the_earlier_one_over_the_wire(
+    deployment, repository, tmp_path
+):
+    """The route's half of the resolution rule, checked on the bytes a caller actually receives.
+
+    The bundle's own tests resolve in process. What this adds is that the resolved scene survives
+    serialisation and that the digest still verifies over the wire, because a place address that
+    produced an unverifiable bundle would be a new way to hand a model something it cannot check.
+    """
+    first, _second, place = _place_in(deployment, repository, tmp_path)
+    between = (FIRST + dt.timedelta(days=10)).isoformat()
+    response = deployment.as_owner(
+        "GET", f"/world-read/places/{place.place_id}", params={"at": between}
+    )
+    assert response.status_code == 200, response.text
+    envelope = response.json()
+    assert envelope["bundle"]["scene"]["scene_id"] == str(first)
+    assert envelope["bundle"]["addressing"]["place"]["version_ordinal"] == 0
+    assert hashlib.sha256(_canonical(envelope["bundle"])).hexdigest() == envelope["bundle_sha256"]
+
+
+def test_a_place_addressed_before_its_first_capture_is_200_rather_than_404(
+    deployment, repository, tmp_path
+):
+    """A place that exists must not be reported as missing because the caller asked too early.
+
+    404 is the answer for an id that names nothing. Using it here would tell a caller holding a
+    real place id that their id is wrong, and the correct fact, that this place has nothing
+    recorded that early, would be unreachable from the surface.
+    """
+    _first, _second, place = _place_in(deployment, repository, tmp_path)
+    early = (FIRST - dt.timedelta(days=30)).isoformat()
+    response = deployment.as_owner(
+        "GET", f"/world-read/places/{place.place_id}", params={"at": early}
+    )
+    assert response.status_code == 200, response.text
+    bundle = response.json()["bundle"]
+    assert bundle["addressing"]["place"]["state"] == "no_version_at_that_time"
+    assert "scene" not in bundle
+    assert bundle["place"]["version_count"] == 2
+
+
+def test_a_place_with_no_anchor_is_neither_missing_nor_deleted(deployment, repository, tmp_path):
+    """Three states share one guard, and collapsing them tells the caller the wrong thing.
+
+    ``tombstone_blocks_place`` fails closed on a place with no anchor and on one whose anchor was
+    withdrawn. Both make the bundle unreadable and they are different facts: nobody has aligned
+    this place yet, versus somebody deleted the photographs its frame came from. 404 for either
+    would deny a place the caller can see in their own library.
+    """
+    place_id = repository.connection.execute(
+        "insert into place (workspace_id) values (%s) returning place_id",
+        (repository.workspace_id,),
+    ).fetchone()["place_id"]
+    response = deployment.as_owner("GET", f"/world-read/places/{place_id}")
+    assert response.status_code == 424, response.text
+    assert response.json()["code"] == "place_without_anchor"
+
+
+def test_a_withdrawn_anchor_answers_410_rather_than_pretending_the_place_never_existed(
+    deployment, repository, tmp_path
+):
+    """A caller holding an earlier place bundle is entitled to learn that the user deleted it."""
+    first, _second, place = _place_in(deployment, repository, tmp_path)
+    assert deployment.as_owner("GET", f"/world-read/places/{place.place_id}").status_code == 200
+    member = repository.connection.execute(
+        "select capture_id from reconstruction_scene_member "
+        "where workspace_id=%s and scene_id=%s order by ordinal limit 1",
+        (repository.workspace_id, first),
+    ).fetchone()
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=member["capture_id"],
+        requested_by=uuid.uuid4(),
+        reason="place route withdrawal test",
+    )
+    response = deployment.as_owner("GET", f"/world-read/places/{place.place_id}")
+    assert response.status_code == 410, response.text
+    assert response.json()["code"] == "tombstoned"
+
+
+def test_a_stranger_and_an_unknown_place_are_indistinguishable(deployment, repository, tmp_path):
+    """M10 again, on the new address. A 403 here would confirm the place belongs to somebody."""
+    _first, _second, place = _place_in(deployment, repository, tmp_path)
+    real_to_a_stranger = deployment.as_stranger("GET", f"/world-read/places/{place.place_id}")
+    invented = deployment.as_stranger("GET", f"/world-read/places/{uuid.uuid4()}")
+    assert real_to_a_stranger.status_code == 404
+    assert real_to_a_stranger.json() == invented.json()
+
+
+def test_a_time_with_no_zone_is_refused_rather_than_read_as_utc(deployment, repository, tmp_path):
+    """An assumed zone is an hour that goes missing without anybody being told.
+
+    The column is UTC and the caller's naive string is not, so the two can differ by any offset
+    on earth. Refusing costs the caller one character and removes a class of silently wrong
+    answers where a place resolves to the version before the one they meant.
+    """
+    _first, _second, place = _place_in(deployment, repository, tmp_path)
+    response = deployment.as_owner(
+        "GET", f"/world-read/places/{place.place_id}", params={"at": "2026-09-20T12:00:00"}
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "unzoned_time"
+
+
+def test_a_bounded_observation_request_says_it_was_bounded_and_what_it_left(
+    deployment, repository, tmp_path
+):
+    """A page that reads as the whole graph is the failure; a client counting it undercounts.
+
+    The unbounded answer is unchanged and still the default, so this asks for both and compares
+    them: the page has to be smaller, say so, name the total it came from, and carry a cursor
+    that reaches the rest.
+    """
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    whole = deployment.as_owner("GET", f"/world-read/scenes/{scene_id}/observations")
+    assert whole.status_code == 200, whole.text
+    complete = whole.json()
+    assert complete["bounds"]["state"] == "complete"
+    assert complete["bounds"]["point_count_not_returned"] == 0
+    assert complete["bounds"]["next_point_id"] is None
+    total = complete["bounds"]["point_count_total"]
+    assert total > 1, "a one-point scene cannot demonstrate a page"
+
+    first_page = deployment.as_owner(
+        "GET", f"/world-read/scenes/{scene_id}/observations", params={"limit": 1}
+    ).json()
+    assert first_page["bounds"]["state"] == "page"
+    assert first_page["point_count"] == 1
+    assert first_page["bounds"]["point_count_total"] == total
+    assert first_page["bounds"]["point_count_not_returned"] == total - 1
+    assert f"1 of the {total} points" in first_page["bounds"]["note"]
+    assert len(json.dumps(first_page)) < len(json.dumps(complete))
+
+    # The cursor reaches the rest, and the walk returns every point exactly once. A cursor that
+    # repeated or skipped a point would let a client assemble a graph the scene never observed.
+    walked = list(first_page["points"])
+    cursor = first_page["bounds"]["next_point_id"]
+    while cursor is not None:
+        page = deployment.as_owner(
+            "GET",
+            f"/world-read/scenes/{scene_id}/observations",
+            params={"limit": 2, "after_point_id": cursor},
+        ).json()
+        walked.extend(page["points"])
+        cursor = page["bounds"]["next_point_id"]
+    assert [point["point_id"] for point in walked] == [
+        point["point_id"] for point in complete["points"]
+    ]

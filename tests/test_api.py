@@ -61,6 +61,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/scene-geometry/{artifact_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}/observations"): {},
+    ("GET", "/world-read/places/{place_id}"): {},
     ("POST", "/world-write/scenes/{scene_id}/generated"): {
         "json": {
             "model": {"provider": "p", "model_id": "m", "model_version": "v"},
@@ -239,6 +240,11 @@ class Deployment:
             .replace("{job_id}", str(uuid.uuid4()))
             .replace("{artifact_id}", str(self.artifact_id))
             .replace("{scene_id}", str(uuid.uuid4()))
+            # A place id nobody allocated, the same choice the scene id above it makes. The
+            # sweep asks who may reach a route, and an id that resolves to nothing answers that
+            # without a place in the fixture; leaving the literal placeholder in the path would
+            # ask the uuid parser about it instead of asking the route about the session.
+            .replace("{place_id}", str(uuid.uuid4()))
         )
 
 
