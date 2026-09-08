@@ -6,8 +6,15 @@ The locked pose/reconstruction environment was installed. Six negative controls 
 own exact selectors. The [executed record](evaluation/2026-09-08-executed-asset-read-currency.json)
 binds the route-to-byte evidence; the [verification record](evaluation/2026-09-08-verification-asset-read-currency.json)
 records digest checks and the second unsuccessful recorder attempt without changing accepted records.
-No executable changes followed the tested head. Migration 0041 was exercised only in disposable
-test schemas; retained database activation, merge and push remain unperformed.
+Runtime source remains identical to that tested head. The recorder was subsequently corrected
+at `b845bad6cfc8962b1550fb03c6f73d7aabb3f88f` under the `520a192` evidence-repair approval.
+Independent integration caught personal checkout prefixes in retained command arguments because
+the original full gate ran before envelope generation. The two unpublished candidate envelopes
+were regenerated through the recorder with normalized command provenance, replaced hashes and
+the independent failure retained. Accepted historical records were preserved. Post-generation
+retained-record checks now run after writing the candidate, including after dependent bindings.
+Migration 0041 was exercised only in disposable test schemas; retained database activation, merge
+and push remain unperformed.
 
 Migration 0041 implements the scope approved at `6270115`, with the single existing viewer-URL
 assertion update approved at `6d12621`. Original/crop/by-URI image delivery now refuses current
