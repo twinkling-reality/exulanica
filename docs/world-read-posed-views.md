@@ -63,3 +63,18 @@ are checked after that snapshot closes. A final missing/corrupt buffer returns c
 Offline checks validate current-at-explicit-time recorded point lineage, including exact mask
 manifest/build snapshots, before treating the downloaded view as verified. The fresh-process
 test disables psycopg.connect as well as clearing database environment settings.
+
+The first campaign at 3b8d97b passed 57 targeted cases and killed all three controls.
+Its full backend run was deliberately interrupted to add an omitted acceptance distinction:
+a newly generated selected replacement mask must remain different from the old pose source,
+not merely cause a missing-mask refusal. That campaign and the development fixture failures
+are retained. Replacement tests exercise both between-request and during-range changes, with
+actual mask production, current /masked success, old binding 409, and separate selected/pose
+SHA-256 fields in the unavailable descriptor. No producer or policy extension was required.
+
+Absent legacy screening is exercised as a generated pre-admission-shaped row in the disposable
+schema using the existing asset-read test technique: only the fixture setup transaction uses
+replica mode, then asserts origin mode before actual route reads. Current producers' rejection
+of an ordinary attempted missing-lineage update is preserved in the failed-attempt log.
+This does not migrate or backfill a legacy database. Unregistered members remain visible in
+an authenticated scene bundle and their attempted bound download refuses.

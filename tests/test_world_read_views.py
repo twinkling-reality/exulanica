@@ -598,10 +598,28 @@ def test_unregistered_members_and_legacy_bindings_remain_unavailable(
     envelope = world_read_bundle(
         repository.connection, repository.workspace_id, scene, deployment.store
     )
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    assert response.status_code == 200, response.text
+    assert response.json() == envelope
     assert len(envelope["bundle"]["views"]) == 3
     view = next(v for v in envelope["bundle"]["views"] if not v["registered"])
     assert view["camera"] is None and view["exclusion_reason"]
     assert view["photo_bytes"]["reason"] == "view_not_registered_or_calibrated"
+    source = next(
+        c["source_sha256"]
+        for c in envelope["bundle"]["recipient_evidence"]["record"]["captures"]
+        if c["capture_id"] == view["capture_id"]
+    )
+    span = repository.connection.execute(
+        "select span_id from evidence_span where workspace_id=%s and blob_sha256=decode(%s,'hex') "
+        "and region is null",
+        (repository.workspace_id, source),
+    ).fetchone()["span_id"]
+    path = (
+        f"/evidence/{span}/masked?view_scene={scene}&view_capture={view['capture_id']}"
+        f"&view_binding={'0' * 64}"
+    )
+    assert deployment.as_owner("GET", path).status_code == 409
     # Missing exact pose evidence must refuse, without changing any producer or historical receipt.
     from exulanica.graph.world_read_views import descriptor
 
@@ -612,3 +630,152 @@ def test_unregistered_members_and_legacy_bindings_remain_unavailable(
         repository.connection, repository.workspace_id, scene, candidate, evidence, deployment.store
     )
     assert result["reason"] == "pose_binding_unavailable"
+
+
+@pytest.mark.parametrize("during", [False, True])
+def test_rebuilt_selected_mask_never_rebinds_old_pose(
+    deployment, repository, tmp_path, monkeypatch, during
+):
+    from exulanica.ingest.pipeline import PhotoIngestPipeline
+    from exulanica.ingest.privacy import record_person_detection_screening
+
+    scene, configured = _masked_scene(deployment, repository, tmp_path)
+    first = bundle(deployment, scene)
+    desc = next(v["photo_bytes"] for v in available(first) if v["photo_bytes"]["kind"] == "masked")
+    assert deployment.as_owner("GET", desc["fetch"]).status_code == 200
+    replacement = {}
+
+    def change():
+        record_region_edits(
+            repository,
+            capture_id=configured["capture"],
+            actor=ACTOR,
+            edits=[
+                {
+                    "action": "add",
+                    "region_key": (b"b" * 32).hex(),
+                    "silhouette": {
+                        "kind": "polygon",
+                        "points": [
+                            [500000, 500000],
+                            [1000000, 500000],
+                            [1000000, 1000000],
+                            [500000, 1000000],
+                        ],
+                    },
+                }
+            ],
+        )
+        auth = repository.connection.execute(
+            "select authorization_id from capture_reconstruction_authorization "
+            "where workspace_id=%s and capture_id=%s order by authorized_at desc limit 1",
+            (repository.workspace_id, configured["capture"]),
+        ).fetchone()
+        detection = record_person_detection_screening(
+            repository,
+            authorization_id=auth["authorization_id"],
+            authorized_by=ACTOR,
+            purpose="generated replacement mask",
+        )
+        outcome = PhotoIngestPipeline(repository, deployment.store).ingest_derivatives(
+            configured["capture"], privacy_screening_id=detection.screening_id
+        )
+        assert outcome.error is None, outcome.error
+        mask = repository.current_capture_artifacts(
+            capture_ids=[configured["capture"]], kind="masked_source"
+        )[configured["capture"]]
+        replacement["digest"] = mask.content_sha256.hex()
+        assert replacement["digest"] != desc["sha256"]
+
+    if during:
+        original_get = deployment.store.get
+        reads = 0
+
+        def get(blob):
+            nonlocal reads
+            data = original_get(blob)
+            if blob.hex == desc["sha256"]:
+                reads += 1
+                if reads == 2:
+                    change()
+            return data
+
+        monkeypatch.setattr(deployment.store, "get", get)
+    else:
+        change()
+    refused = deployment.as_owner("GET", desc["fetch"], headers={"Range": "bytes=0-19"})
+    assert refused.status_code == 409, refused.text
+    current = deployment.as_owner("GET", f"/evidence/{desc['span_id']}/masked")
+    assert current.status_code == 200, current.text
+    assert hashlib.sha256(current.content).hexdigest() == replacement["digest"]
+    from exulanica.graph.world_read import world_read_bundle
+
+    changed = world_read_bundle(
+        repository.connection, repository.workspace_id, scene, deployment.store
+    )
+    unavailable = next(
+        v["photo_bytes"]
+        for v in changed["bundle"]["views"]
+        if v["capture_id"] == str(configured["capture"])
+    )
+    assert unavailable["state"] == "unavailable"
+    assert unavailable["reason"] == "viewer_pose_transform_unrecorded"
+    assert unavailable["pose_input_sha256"] == desc["sha256"]
+    assert unavailable["selected_sha256"] == replacement["digest"]
+    assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
+    if target := os.environ.get("WORLD_READ_VIEW_ARTIFACTS"):
+        folder = Path(target) / f"replacement-mask-{during}"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "current.image").write_bytes(current.content)
+        (folder / "before.json").write_bytes(canonical_json(first))
+        (folder / "unavailable-descriptor.json").write_bytes(canonical_json(unavailable))
+
+
+@pytest.mark.parametrize("damage", ["partial", "invalid_digest", "wrong_binding", "wrong_capture"])
+def test_malformed_or_mismatched_fetch_binding_refuses(deployment, repository, tmp_path, damage):
+    desc = available(bundle(deployment, _scene_in(deployment, repository, tmp_path)))[0][
+        "photo_bytes"
+    ]
+    path = desc["fetch"]
+    if damage == "partial":
+        path = path.split("&view_binding=")[0]
+    elif damage == "invalid_digest":
+        path = path.replace(desc["binding_sha256"], "not-a-digest")
+    elif damage == "wrong_binding":
+        path = path.replace(desc["binding_sha256"], "0" * 64)
+    else:
+        path = path.replace(desc["capture_id"], str(uuid.uuid4()))
+    response = deployment.as_owner("GET", path)
+    assert (
+        response.status_code
+        == {"partial": 422, "invalid_digest": 422, "wrong_binding": 409, "wrong_capture": 404}[
+            damage
+        ]
+    )
+
+
+def test_absent_legacy_screening_binding_refuses_actual_routes(deployment, repository, tmp_path):
+    scene = _scene_in(deployment, repository, tmp_path)
+    first = bundle(deployment, scene)
+    view = available(first)[0]
+    point = next(
+        p
+        for p in first["bundle"]["recipient_evidence"]["record"]["point_maps"]
+        if p["capture_id"] == view["capture_id"]
+    )
+    # A generated pre-admission-shaped row, not a migration/backfill of retained data.
+    # Reuse the existing legacy-fixture method from test_asset_read_currency. Current
+    # producers correctly reject this row; only this local setup transaction emulates
+    # pre-admission state. Every actual read runs after normal triggers are restored.
+    with repository.connection.transaction():
+        repository.connection.execute("set local session_replication_role=replica")
+        repository.connection.execute(
+            "update artifact set privacy_screening_id=null where workspace_id=%s and artifact_id=%s",
+            (repository.workspace_id, point["artifact_id"]),
+        )
+    assert repository.connection.execute("show session_replication_role").fetchone()[
+        "session_replication_role"
+    ] == "origin"
+    response = deployment.as_owner("GET", view["photo_bytes"]["fetch"])
+    assert response.status_code == 409, response.text
+    assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
