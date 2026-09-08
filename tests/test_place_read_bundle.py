@@ -583,3 +583,171 @@ def test_a_place_in_another_workspace_is_not_readable(repository, place, ingest_
 
 def test_an_unknown_place_is_not_readable(repository, place):
     assert _bundle(repository, uuid.uuid4(), place.store) is None
+
+
+def _members(repository, scene_id):
+    return [
+        row["capture_id"]
+        for row in repository.connection.execute(
+            "select capture_id from reconstruction_scene_member "
+            "where workspace_id=%s and scene_id=%s order by ordinal",
+            (repository.workspace_id, scene_id),
+        )
+    ]
+
+
+def _fix(repository, capture_id, lat, lon):
+    from exulanica.ingest.exif import GpsFix
+
+    return repository.insert_assertion(
+        kind="user",
+        predicate_key="gps_position_is",
+        subject_ref={"type": "capture", "id": str(capture_id)},
+        object_value=GpsFix(lat, lon).as_object_value(),
+        emit_key=f"position-test:{uuid.uuid4()}",
+        support_span_ids=[],
+        stated_by_user=uuid.uuid4(),
+    )
+
+
+def test_missing_gps_is_an_ordinary_unavailable_position(repository, place):
+    for at in (None, FIRST - dt.timedelta(days=1)):
+        position = _bundle(repository, place.place_id, place.store, at)["bundle"]["place"][
+            "position"
+        ]
+        assert position["state"] == "unavailable"
+        assert position["member_captures"] == 6
+        assert position["captures_with_fix"] == 0
+        assert position["bounding_box_e7"] is None and position["median_e7"] is None
+        assert position["reason"]
+        assert position["basis"] == "exif-capture-fixes/v1"
+        assert "photographer stood" in position["means"]
+        assert "recovered frame stays ungeoreferenced" in position["means"]
+
+
+def test_current_fixes_replace_superseded_and_retracted_positions_in_the_digest(repository, place):
+    """Exercise the live claim lifecycle through the public bundle, without a position cache."""
+    members = _members(repository, place.anchor)
+    old = _fix(repository, members[0], -11, 101)
+    _fix(repository, members[1], 20, -200)
+    before = _bundle(repository, place.place_id, place.store)
+    position = before["bundle"]["place"]["position"]
+    assert position["captures_with_fix"] == 2
+    assert position["median_e7"] == {"lat": -11, "lon": -200}
+    assert position["bounding_box_e7"] == {"south": -11, "north": 20, "west": -200, "east": 101}
+    current = _fix(repository, members[0], 40, 300)
+    assert (
+        repository.connection.execute(
+            "select status from assertion where assertion_id=%s",
+            (old,),
+        ).fetchone()["status"]
+        == "superseded"
+    )
+    after = _bundle(repository, place.place_id, place.store)
+    assert after["bundle"]["place"]["position"]["median_e7"] == {"lat": 20, "lon": -200}
+    assert before["bundle"]["recorded_sha256"] != after["bundle"]["recorded_sha256"]
+    repository.connection.execute(
+        "update assertion set status='retracted' where assertion_id=%s", (current,)
+    )
+    final = _bundle(repository, place.place_id, place.store)
+    assert final["bundle"]["place"]["position"]["captures_with_fix"] == 1
+    assert final["bundle"]["place"]["position"]["bounding_box_e7"] == {
+        "south": 20,
+        "north": 20,
+        "west": -200,
+        "east": -200,
+    }
+    from exulanica.canonical import canonical_json
+
+    assert hashlib.sha256(canonical_json(final["bundle"])).hexdigest() == final["bundle_sha256"]
+
+
+def test_withdrawn_version_fixes_stop_contributing_before_any_purge(repository, place):
+    """Also remove the surviving photographs' fixes in that version: it is no longer live."""
+    anchor = _members(repository, place.anchor)
+    later = _members(repository, place.candidate)
+    _fix(repository, anchor[0], 10, 20)
+    _fix(repository, later[0], -100, -200)
+    _fix(repository, later[1], 100, 200)
+    before = _bundle(repository, place.place_id, place.store)
+    assert before["bundle"]["place"]["position"]["captures_with_fix"] == 3
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=later[0],
+        requested_by=uuid.uuid4(),
+        reason="position withdrawal test",
+    )
+    after = _bundle(repository, place.place_id, place.store)
+    position = after["bundle"]["place"]["position"]
+    assert position["member_captures"] == 3
+    assert position["captures_with_fix"] == 1
+    assert position["median_e7"] == {"lat": 10, "lon": 20}
+    assert position["bounding_box_e7"] == {"south": 10, "north": 10, "west": 20, "east": 20}
+    assert before["bundle_sha256"] != after["bundle_sha256"]
+
+
+def test_unusable_gps_claims_are_counted_without_inventing_coordinates(repository, place):
+    members = _members(repository, place.anchor)
+    for capture, value in zip(
+        members,
+        (
+            {"lat": "1.0", "lon": "2.0"},
+            {"lat": "0", "lon": "0", "lat_e7": True, "lon_e7": 2},
+            {"lat": "0", "lon": "0", "lat_e7": 900_000_001, "lon_e7": 2},
+        ),
+        strict=True,
+    ):
+        repository.insert_assertion(
+            kind="user",
+            predicate_key="gps_position_is",
+            subject_ref={"type": "capture", "id": str(capture)},
+            object_value=value,
+            emit_key=f"invalid-position:{uuid.uuid4()}",
+            support_span_ids=[],
+            stated_by_user=uuid.uuid4(),
+        )
+    position = _bundle(repository, place.place_id, place.store)["bundle"]["place"]["position"]
+    assert position["state"] == "unavailable"
+    assert position["unusable_fix_claims"] == 3
+    assert position["captures_with_fix"] == 0
+    assert position["median_e7"] is None
+
+
+def test_a_capture_shared_by_versions_contributes_its_fix_only_once(repository, two_scenes):
+    from exulanica.evidence.scene import scene_id_for, scene_member_digest
+
+    store, first, _ = two_scenes
+    captures = _members(repository, first)
+    subset = captures[:2]
+    scene_id = scene_id_for(subset)
+    repository.insert_completed_reconstruction_scene(
+        scene_id=scene_id,
+        member_digest=scene_member_digest(subset),
+        scene_members=[(capture, True) for capture in subset],
+    )
+    place = _bind(repository, store, first, scene_id)
+    for capture, lat in zip(captures, (10, 20, 30), strict=True):
+        _fix(repository, capture, lat, lat)
+    history = place_history(repository.connection, repository.workspace_id, place.place_id, store)
+    assert history.position.member_captures == 3
+    assert history.position.captures_with_fix == 3
+    assert history.position.median_e7 == {"lat": 20, "lon": 20}
+
+
+def test_a_historical_fix_does_not_duplicate_the_current_capture_position(repository, place):
+    capture = _members(repository, place.anchor)[0]
+    _fix(repository, capture, 10, 20)
+    repository.insert_assertion(
+        kind="user",
+        predicate_key="gps_position_is",
+        subject_ref={"type": "capture", "id": str(capture)},
+        object_value={"lat": "0", "lon": "0", "lat_e7": -10, "lon_e7": -20},
+        emit_key=f"historical-position:{uuid.uuid4()}",
+        support_span_ids=[],
+        stated_by_user=uuid.uuid4(),
+        valid_time="[2020-01-01,2020-02-01)",
+    )
+    position = _bundle(repository, place.place_id, place.store)["bundle"]["place"]["position"]
+    assert position["member_captures"] == 6
+    assert position["captures_with_fix"] == 1
+    assert position["median_e7"] == {"lat": 10, "lon": 20}

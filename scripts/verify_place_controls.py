@@ -5,8 +5,8 @@ the kill predicate. Reasoning about whether a test would fail has been wrong in 
 before, and the place work adds a fitter whose whole value is that it refuses: a refusal path that
 nothing observes failing is a refusal path nobody has evidence for.
 
-Covers ``exulanica/reconstruction/place_alignment.py``, whose four guards are the ones a plausible
-"simplification" would remove one at a time, and whatever production caller exists for it.
+Covers ``exulanica/reconstruction/place_alignment.py``, and the production build and read seams, including live position derivation.
+The geometry remains synthetic and the COLMAP executor is scripted.
 
 Uses only ``postgresql://localhost:5433/exulanica_spine_test``. The environment is scrubbed of
 ambient ``EXULANICA_`` configuration first, and the unmutated baseline must pass before any mutant
@@ -37,6 +37,10 @@ TEST_FILES = (
     "model_fakes.py",
     "test_place_alignment.py",
     "test_place_plane.py",
+    "test_place_alignment_build.py",
+    "test_place_read_bundle.py",
+    "test_world_read_bundle.py",
+    "test_scene_reconstruction_pipeline.py",
 )
 
 #: (name, production file, exact text to replace, replacement, test selector).
@@ -63,6 +67,69 @@ CONTROLS = [
         "    if _determinant(rotation) <= 0:",
         "    if False:",
         "test_a_mirrored_fit_is_refused_rather_than_corrected",
+    ),
+    (
+        "a_build_refusal_is_recorded_rather_than_raised",
+        "exulanica/ingest/place_alignment.py",
+        "    accepted = candidate_fit.accepted and against_fit.accepted",
+        '    accepted = candidate_fit.accepted and against_fit.accepted\n    if not accepted:\n        raise ValueError("mutant refuses by exception")',
+        "test_each_measured_refusal_is_a_row_with_its_reason_and_never_an_exception",
+    ),
+    (
+        "a_composed_frame_records_every_hop",
+        "exulanica/ingest/place_alignment.py",
+        "    frame_hops = against_version.frame_hops + 1",
+        "    frame_hops = 1",
+        "test_a_scene_admitted_against_a_non_anchor_version_records_two_hops",
+    ),
+    (
+        "a_composed_transform_reaches_the_anchor_frame",
+        "exulanica/ingest/place_alignment.py",
+        "            place_from_against,",
+        "            (1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.),",
+        "test_a_scene_admitted_against_a_non_anchor_version_records_two_hops",
+    ),
+    (
+        "a_withdrawn_anchor_blocks_the_place_read",
+        "exulanica/graph/places.py",
+        "   and not tombstone_blocks_place(p.workspace_id, p.place_id)",
+        "   and true",
+        "test_a_place_whose_anchor_is_withdrawn_is_not_served",
+    ),
+    (
+        "a_withdrawn_version_contributes_no_position",
+        "exulanica/graph/places.py",
+        "     and not tombstone_blocks_scene(v.workspace_id, v.scene_id)",
+        "     and true",
+        "test_withdrawn_version_fixes_stop_contributing_before_any_purge",
+    ),
+    (
+        "only_current_claims_contribute_a_position",
+        "exulanica/graph/places.py",
+        "   and a.status = 'active'",
+        "   and true",
+        "test_current_fixes_replace_superseded_and_retracted_positions_in_the_digest",
+    ),
+    (
+        "an_even_fix_set_uses_the_stated_lower_median",
+        "exulanica/graph/places.py",
+        "        middle = (len(fixes) - 1) // 2",
+        "        middle = len(fixes) // 2",
+        "test_current_fixes_replace_superseded_and_retracted_positions_in_the_digest",
+    ),
+    (
+        "a_shared_capture_is_counted_once",
+        "exulanica/graph/places.py",
+        "  select distinct m.capture_id",
+        "  select m.capture_id",
+        "test_a_capture_shared_by_versions_contributes_its_fix_only_once",
+    ),
+    (
+        "a_historical_claim_does_not_duplicate_the_current_fix",
+        "exulanica/graph/places.py",
+        "   and a.valid_time is null",
+        "   and true",
+        "test_a_historical_fix_does_not_duplicate_the_current_capture_position",
     ),
 ]
 
@@ -135,7 +202,11 @@ def main() -> int:
         default=None,
         help="path, relative to the repository root, of the record this one follows",
     )
+    parser.add_argument("--label", default="place-negative-controls")
     arguments = parser.parse_args()
+    output_path = ROOT / f"docs/evaluation/{arguments.date}-{arguments.label}.json"
+    if output_path.exists():
+        raise ValueError("a dated observation already exists; choose a new --label")
 
     work = Path(tempfile.mkdtemp(prefix="exulanica-place-mutants-"))
     shutil.copytree(
@@ -223,7 +294,6 @@ def main() -> int:
             "path": arguments.predecessor,
             "record_sha256": hashlib.sha256(canonical_json(predecessor["record"])).hexdigest(),
         }
-    output_path = ROOT / f"docs/evaluation/{arguments.date}-place-negative-controls.json"
     output_path.write_text(
         json.dumps(
             {

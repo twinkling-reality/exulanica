@@ -56,6 +56,7 @@ from exulanica.store.base import ContentAddressedStore
 __all__ = [
     "PLACE_ALIGNMENT_RECEIPT_PROFILE",
     "PlaceHistory",
+    "PlacePosition",
     "PlaceTransform",
     "PlaceVersion",
     "RefusedAlignment",
@@ -201,6 +202,104 @@ class RefusedAlignment:
     receipt_sha256: str | None
 
 
+# Reduce over distinct captures in live versions, not over membership rows: two versions may
+# share a photograph. Filtering the whole scene also withholds fixes from the surviving members
+# of a withdrawn version, matching the version list this answer accompanies.
+_POSITION_MEMBERS: Final = """
+with members as (
+  select distinct m.capture_id
+    from place_version v
+    join reconstruction_scene_member m
+      on m.workspace_id = v.workspace_id and m.scene_id = v.scene_id
+   where v.workspace_id = %s and v.place_id = %s
+     and not tombstone_blocks_scene(v.workspace_id, v.scene_id)
+)
+select m.capture_id, a.object_value
+  from members m
+  left join assertion a
+    on a.workspace_id = %s
+   and a.subject_ref ->> 'type' = 'capture'
+   and a.subject_ref ->> 'id' = m.capture_id::text
+   and a.predicate_id = (select predicate_id from predicate where key = 'gps_position_is')
+   and a.status = 'active'
+   and a.valid_time is null
+ order by m.capture_id
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class PlacePosition:
+    """Current photographer fixes, never a georeference for the recovered frame.
+
+    Coordinate-wise lower medians select an observed integer even for an even-sized set. Bounds
+    are ordinary numeric longitude bounds, not a shortest arc across the antimeridian. Invalid or
+    legacy claims without exact integer coordinates are counted separately, never guessed from
+    decimal text. This trades coverage for an exact, checkable basis.
+    """
+
+    state: Literal["available", "unavailable"]
+    member_captures: int
+    captures_with_fix: int
+    unusable_fix_claims: int
+    bounding_box_e7: dict[str, int] | None
+    median_e7: dict[str, int] | None
+    reason: str | None
+    basis: str = "exif-capture-fixes/v1"
+    reduction: str = "coordinate-wise lower median; numeric longitude bounds"
+    means: str = (
+        "A fix says where a photographer stood, not where the place is, how large it is, "
+        "or which way it faces. The recovered frame stays ungeoreferenced. "
+        "This position uses current claims over all live versions, "
+        "independent of the requested time."
+    )
+
+
+def _position(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    place_id: uuid.UUID,
+) -> PlacePosition:
+    rows = connection.execute(_POSITION_MEMBERS, (workspace, place_id, workspace)).fetchall()
+    fixes = []
+    unusable = 0
+    for row in rows:
+        value = row["object_value"]
+        if value is None:
+            continue
+        lat = value.get("lat_e7") if isinstance(value, dict) else None
+        lon = value.get("lon_e7") if isinstance(value, dict) else None
+        if (
+            type(lat) is not int
+            or type(lon) is not int
+            or not -900_000_000 <= lat <= 900_000_000
+            or not -1_800_000_000 <= lon <= 1_800_000_000
+        ):
+            unusable += 1
+            continue
+        fixes.append((lat, lon))
+    bounds = median = None
+    if fixes:
+        latitudes = sorted(lat for lat, _ in fixes)
+        longitudes = sorted(lon for _, lon in fixes)
+        middle = (len(fixes) - 1) // 2
+        median = {"lat": latitudes[middle], "lon": longitudes[middle]}
+        bounds = {
+            "south": latitudes[0],
+            "north": latitudes[-1],
+            "west": longitudes[0],
+            "east": longitudes[-1],
+        }
+    return PlacePosition(
+        state="available" if fixes else "unavailable",
+        member_captures=len(rows),
+        captures_with_fix=len(fixes),
+        unusable_fix_claims=unusable,
+        bounding_box_e7=bounds,
+        median_e7=median,
+        reason=None if fixes else "no live member capture has a usable integer GPS fix",
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class PlaceHistory:
     """A place, its live versions in capture order, and the joins that were refused."""
@@ -208,6 +307,7 @@ class PlaceHistory:
     place_id: uuid.UUID
     versions: list[PlaceVersion]
     refused_alignments: list[RefusedAlignment]
+    position: PlacePosition
 
     @property
     def anchor(self) -> PlaceVersion:
@@ -281,7 +381,12 @@ def place_history(
         )
         for row in connection.execute(_REFUSALS, (workspace, place_id)).fetchall()
     ]
-    return PlaceHistory(place_id=place_id, versions=versions, refused_alignments=refusals)
+    return PlaceHistory(
+        place_id=place_id,
+        versions=versions,
+        refused_alignments=refusals,
+        position=_position(connection, workspace, place_id),
+    )
 
 
 def _version(

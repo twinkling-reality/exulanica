@@ -668,18 +668,24 @@ need to be used.**
       the claim, `exulanica/migrations/0006_functional_predicates.sql:14` makes the predicate
       functional, and the permitted instance holds zero `gps_position_is` assertions because both
       retained collections are published datasets with EXIF stripped.
-- [ ] The position block implemented in `exulanica/graph/places.py`: member captures, captures with
+- [x] The position block implemented in `exulanica/graph/places.py`: member captures, captures with
       a fix, bounding box and median in integer ten-millionths, `basis` `exif-capture-fixes/v1`.
-- [ ] A place with no fix reports `unavailable` with a reason, asserted by a test named for the
+- [x] A place with no fix reports `unavailable` with a reason, asserted by a test named for the
       failure it catches, because absence is the ordinary case in the only corpus that exists and
       must never read as an error.
-- [ ] A withdrawn capture stops contributing its fix, asserted by a test. This is the invariant the
+- [x] A withdrawn capture stops contributing its fix, asserted by a test. This is the invariant the
       whole decision rests on and the one a stored column would have broken.
-- [ ] The block states in its own text that a fix says where a photographer stood, not where the
+- [x] The block states in its own text that a fix says where a photographer stood, not where the
       place is, how large it is, or which way it faces. The recovered frame stays ungeoreferenced.
 
 **Files.** Edited: `exulanica/graph/places.py`, `docs/place-identity.md`, `docs/phase-10-tickets.md`,
 tests. No migration.
+
+
+Executed 2026-09-08: `tests/test_place_read_bundle.py` passes all 20 tests. The position cases
+cover absence, supersession, retraction, withdrawal before purge, shared captures, historical
+claims and unusable integer coordinates. Fixtures use scripted reconstruction and synthetic GPS
+claims; this does not establish a position for a real retained place.
 
 ---
 

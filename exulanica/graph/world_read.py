@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from dataclasses import asdict
 from typing import Any, Final
 
 import psycopg
@@ -485,6 +486,7 @@ def _place_block(history: PlaceHistory, resolved: PlaceVersion | None) -> dict[s
     return {
         "place_id": str(history.place_id),
         "anchor_scene_id": str(history.anchor.scene_id),
+        "position": asdict(history.position),
         "version_count": len(history.versions),
         "undated_version_count": history.undated_versions,
         "frame": (

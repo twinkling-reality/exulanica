@@ -298,6 +298,22 @@ Georeferencing a frame needs metric scale, which needs the independent physical 
 attached a real-world coordinate to a scale-free COLMAP frame would be making exactly the unearned
 claim the rung ladder exists to prevent.
 
+#### The read basis, implemented 2026-09-08
+
+`PlaceHistory.position` reaches the place-addressed World Read bundle, including an unresolved
+time address, and participates in its digests. It describes current, untimed active claims over
+all live versions, independently of the requested scene time. Historical claims with a
+`valid_time` interval are not alternate current fixes. Shared captures count once; withdrawing
+any member of a version removes that whole version's contributions, matching the live history.
+
+For an even number of fixes, v1 takes the lower median separately on each coordinate. This
+selects an observed integer without interpolation. Longitude bounds are numeric minima and maxima,
+so a set crossing the antimeridian can have wide bounds; they do not claim a shortest geographic
+arc. Claims missing valid integer `lat_e7` and `lon_e7` count as `unusable_fix_claims`, with no
+conversion from legacy decimal text. This gives up legacy coverage to keep this basis exact.
+The fixture claims exercise the read lifecycle; they are not GPS measurements of the retained
+corpus, and the reconstruction executors used by these tests remain scripted.
+
 #### The trade, stated
 
 A derived position cannot be indexed, so "which places are near here" is a sequential scan over
