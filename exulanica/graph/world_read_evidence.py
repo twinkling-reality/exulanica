@@ -26,14 +26,21 @@ def _hex(value: bytes | None) -> str | None:
     return None if value is None else bytes(value).hex()
 
 
-def _receipt(store: ContentAddressedStore | None, digest: bytes | None) -> dict[str, Any]:
+def _receipt(
+    store: ContentAddressedStore | None,
+    digest: bytes | None,
+    expected_profile: str,
+) -> dict[str, Any]:
     if store is None or digest is None:
         return unavailable("receipt_bytes_missing")
     try:
         payload = store.get(BlobId(bytes(digest)))
         # Preserve exact persisted bytes, including noncanonical numeric encodings, without
         # introducing floats into the outer record or changing the receipt's original digest.
-        json.loads(payload)
+        body = json.loads(payload)
+        problem = receipt_problem(body, expected_profile)
+        if problem:
+            return unavailable(problem)
         return {"state": "available", "sha256": _hex(digest), "json_utf8": payload.decode()}
     except (BlobNotFoundError, IntegrityError, ValueError, UnicodeError):
         return unavailable("receipt_bytes_missing_or_corrupt")
@@ -143,8 +150,9 @@ def recorded_evidence(
                         (workspace, row["source_blob_sha256"]),
                     ).fetchall()
                     matches = []
+                    candidate_reasons = set()
                     for candidate in candidates:
-                        receipt = _receipt(store, candidate["content_sha256"])
+                        receipt = _receipt(store, candidate["content_sha256"], MASK_PROFILE)
                         if receipt["state"] == "available":
                             body = json.loads(receipt["json_utf8"])
                             if (
@@ -153,11 +161,18 @@ def recorded_evidence(
                                 and body.get("capture_id") == point["capture_ref"]
                             ):
                                 matches.append(receipt)
+                        else:
+                            candidate_reasons.add(receipt["reason"])
                     lineage["mask_manifest"] = (
                         matches[0]
                         if len(matches) == 1
                         else unavailable("exact_mask_manifest_missing_or_ambiguous")
                     )
+                    if not matches and candidate_reasons:
+                        lineage["mask_manifest"] = {
+                            **unavailable("exact_mask_manifest_unavailable"),
+                            "candidate_reasons": sorted(candidate_reasons),
+                        }
                 if read != original:
                     lineage["mask_build"] = _mask_build(
                         connection, workspace, row["privacy_screening_id"], original, read
@@ -171,7 +186,7 @@ def recorded_evidence(
             (workspace, job["pose_receipt_artifact_id"]),
         ).fetchone()
         if row:
-            pose = _receipt(store, row["content_sha256"])
+            pose = _receipt(store, row["content_sha256"], POSE_PROFILE)
     trained = []
     rows = connection.execute(
         "select artifact_id,content_sha256 from artifact where workspace_id=%s "
@@ -179,7 +194,7 @@ def recorded_evidence(
         (workspace, scene_id),
     ).fetchall()
     for row in rows:
-        trained.append(_receipt(store, row["content_sha256"]))
+        trained.append(_receipt(store, row["content_sha256"], TRAINED_PROFILE))
     record = {
         "scene_id": str(scene_id),
         "job_id": str(job["job_id"]) if job else None,
@@ -211,7 +226,25 @@ def _consent_columns_match(row: dict[str, Any]) -> bool:
         "effective_at",
         "valid_until",
     }
-    if set(record) != fields:
+    if (
+        not _shape(
+            record,
+            {
+                "profile": str,
+                "subject_id": str,
+                "actor_id": str,
+                "region_key": (str, type(None)),
+                "consent_scope": str,
+                "decision": str,
+                "sequence": int,
+                "actor_role": str,
+                "effective_at": str,
+                "valid_until": (str, type(None)),
+            },
+        )
+        or set(record) != fields
+        or record["profile"] != "exulanica.person-presentation-consent/v1"
+    ):
         return False
     for key in ("consent_scope", "decision", "sequence", "actor_role"):
         if record[key] != row[key]:
@@ -252,17 +285,45 @@ def _mask_build(
         "where workspace_id=%s and screening_id=%s",
         (workspace, screening_id),
     ).fetchone()
-    if screening is None or not screening["receipt_record"].get("privacy_inputs"):
+    if screening is None:
         return unavailable("legacy_mask_build_snapshot_missing")
     record = screening["receipt_record"]
+    if not isinstance(record, dict):
+        return unavailable("mask_build_snapshot_unsupported_shape")
+    if record.get("privacy_inputs") is None:
+        return unavailable("legacy_mask_build_snapshot_missing")
+    if not _shape(
+        record,
+        {
+            "mask_artifacts": [{"artifact_id": str, "content_sha256": str}],
+            "privacy_inputs": {
+                "capture_id": str,
+                "source_sha256": str,
+                "regions": [
+                    {
+                        "region_key": str,
+                        "silhouette": dict,
+                        "state": str,
+                        "name_permitted": bool,
+                        "subject_id": (str, type(None)),
+                    }
+                ],
+            },
+        },
+    ):
+        return unavailable("mask_build_snapshot_unsupported_shape")
     masks = [m for m in record.get("mask_artifacts", []) if m.get("content_sha256") == read]
     if len(masks) != 1:
         return unavailable("screening_does_not_bind_exact_mask")
+    try:
+        mask_artifact_id = uuid.UUID(masks[0]["artifact_id"])
+    except ValueError:
+        return unavailable("mask_build_snapshot_unsupported_shape")
     mask = connection.execute(
         "select input_digest,content_sha256,source_blob_sha256,stage_key,"
         "stage_version,params_digest "
         "from artifact where workspace_id=%s and artifact_id=%s and kind='masked_source'",
-        (workspace, masks[0]["artifact_id"]),
+        (workspace, mask_artifact_id),
     ).fetchone()
     if (
         mask is None
@@ -298,3 +359,75 @@ def _mask_build(
             for r in inputs["regions"]
         ],
     }
+
+
+MASK_PROFILE = "exulanica.masked-source-manifest/v1"
+POSE_PROFILE = "exulanica.colmap-pose-receipt/v2"
+TRAINED_PROFILE = "exulanica.scene-splat-publication/v1"
+
+
+def _shape(value: object, schema: Any) -> bool:
+    """Check accessed fields before any projection; bool is not an integer here."""
+    if isinstance(schema, dict):
+        return isinstance(value, dict) and all(
+            key in value and _shape(value[key], expected) for key, expected in schema.items()
+        )
+    if isinstance(schema, list):
+        return isinstance(value, list) and all(_shape(item, schema[0]) for item in value)
+    if isinstance(schema, tuple):
+        return type(value) in schema
+    return type(value) is schema
+
+
+def receipt_problem(value: object, expected_profile: str) -> str | None:
+    """Validate supported stored receipt shapes without copying unsupported payloads to the wire.
+
+    Required nested fields cover the recipient's projections. Producer-specific measurements
+    remain exact in json_utf8; this shape check does not replace their existing semantic checks.
+    """
+    if not isinstance(value, dict):
+        return "receipt_unsupported_shape"
+    if value.get("profile") != expected_profile:
+        return "receipt_unsupported_profile"
+    schemas = {
+        MASK_PROFILE: {
+            "profile": str,
+            "capture_id": str,
+            "source_sha256": str,
+            "masked_sha256": str,
+            "stage_version": int,
+            "dilation_millionths": int,
+            "fill": str,
+            "generative_fill": bool,
+            "masks": [{"region_key": str, "subject_id": (str, type(None)), "state": str}],
+        },
+        POSE_PROFILE: {
+            "profile": str,
+            "manifest_digest": str,
+            "quality_digest": str,
+            "manifest": {
+                "profile": str,
+                "scene_ref": str,
+                "frames": [{"capture_ref": str, "sha256": str, "filename": str}],
+            },
+            "quality": {"accepted": bool, "cameras": [dict]},
+        },
+        TRAINED_PROFILE: {
+            "profile": str,
+            "scene_ref": str,
+            "pose_receipt_sha256": str,
+            "manifest_digest": str,
+            "manifest": {"profile": str, "pose_manifest_digest": str, "source_sha256": [str]},
+            "delivery": {"artifact_id": str, "content_sha256": str},
+            "evaluation": dict,
+            "quality": {"accepted": bool},
+        },
+    }
+    schema = schemas.get(expected_profile)
+    if schema is None:
+        return "receipt_unsupported_profile"
+    if not _shape(value, schema):
+        return "receipt_unsupported_shape"
+    if set(value) != set(schema):
+        return "receipt_unsupported_fields"
+    return None

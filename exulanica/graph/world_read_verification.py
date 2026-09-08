@@ -8,7 +8,13 @@ import json
 from typing import Any
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
-from exulanica.graph.world_read_evidence import PROFILE
+from exulanica.graph.world_read_evidence import (
+    MASK_PROFILE,
+    POSE_PROFILE,
+    PROFILE,
+    TRAINED_PROFILE,
+    receipt_problem,
+)
 
 
 class EvidenceError(ValueError):
@@ -26,12 +32,20 @@ def instant(value: str) -> dt.datetime:
     return result
 
 
-def receipt(value: dict[str, Any]) -> dict[str, Any] | None:
-    if value["state"] != "available":
+def receipt(value: dict[str, Any], expected_profile: str) -> dict[str, Any] | None:
+    require(value["state"] in {"available", "unavailable"}, "receipt_state_invalid")
+    if value["state"] == "unavailable":
+        require(isinstance(value.get("reason"), str), "receipt_unavailable_reason_missing")
         return None
     raw = value["json_utf8"].encode()
     require(hashlib.sha256(raw).hexdigest() == value["sha256"], "receipt_digest_mismatch")
-    return json.loads(raw)
+    try:
+        body = json.loads(raw)
+    except (ValueError, TypeError):
+        raise EvidenceError("receipt_invalid_json") from None
+    problem = receipt_problem(body, expected_profile)
+    require(problem is None, problem or "receipt_unsupported_shape")
+    return body
 
 
 def presentation(region: dict[str, Any], at: dt.datetime) -> dict[str, Any]:
@@ -72,6 +86,16 @@ def presentation(region: dict[str, Any], at: dt.datetime) -> dict[str, Any]:
 
 
 def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) -> dict[str, Any]:
+    """Return controlled failures for unsupported wire shapes, never interpreter exceptions."""
+    try:
+        return _verify(envelope, at=at, expected_bundle_sha256=expected_bundle_sha256)
+    except EvidenceError:
+        raise
+    except (KeyError, TypeError, ValueError, AttributeError, IndexError):
+        raise EvidenceError("recipient_payload_malformed") from None
+
+
+def _verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) -> dict[str, Any]:
     """Check an exact trusted envelope and evaluate recorded permissions at a caller's time."""
     time = instant(at)
     canonical_json(envelope)  # Reject floats throughout the outer wire contract.
@@ -129,7 +153,7 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
             "person_inventory_mismatch",
         )
         evaluated[key] = [presentation(r, time) for r in capture["regions"]]
-    pose = receipt(record["pose_receipt"])
+    pose = receipt(record["pose_receipt"], POSE_PROFILE)
     frames = {}
     if pose is not None:
         manifest = pose["manifest"]
@@ -157,9 +181,9 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
                 require(source["read_sha256"] == frames[key], "point_pose_source_mismatch")
                 status = {"state": "available"}
             if source["mode"] == "masked":
-                mask = receipt(source["mask_manifest"])
+                mask = receipt(source["mask_manifest"], MASK_PROFILE)
                 if mask is None:
-                    status = {"state": "unavailable", "reason": source["mask_manifest"]["reason"]}
+                    status = dict(source["mask_manifest"])
                 else:
                     require(
                         mask["profile"] == "exulanica.masked-source-manifest/v1"
@@ -191,6 +215,7 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
                     }
         require(point["artifact_id"] not in lineage, "duplicate_point_artifact")
         lineage[point["artifact_id"]] = status
+    publications = [receipt(r, TRAINED_PROFILE) for r in record["trained_publications"]]
     for geometry in bundle["geometry"]:
         if geometry["kind"] == "point_map":
             matches = [
@@ -211,7 +236,7 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
         elif geometry["kind"] == "trained_geometry":
             matches = [
                 p
-                for p in (receipt(r) for r in record["trained_publications"])
+                for p in publications
                 if p is not None
                 and p.get("delivery", {}).get("artifact_id") == geometry["artifact_id"]
             ]

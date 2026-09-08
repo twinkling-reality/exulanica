@@ -269,7 +269,7 @@ def test_recipient_trained_publication_and_source_controls(deployment, repositor
         _verify(_reseal(changed))
 
 
-def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_path):
+def _masked_scene(deployment, repository, tmp_path):
     import uuid
     from unittest.mock import patch
 
@@ -353,6 +353,11 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
 
     with patch("test_world_read_route.write_point_map", masked_point):
         scene = _scene_in(deployment, repository, tmp_path)
+    return scene, configured
+
+
+def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_path):
+    scene, configured = _masked_scene(deployment, repository, tmp_path)
     response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
     assert response.status_code == 200, response.text
     envelope = response.json()
@@ -432,3 +437,190 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
         _verify(stale)
     assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
     _save("stale-mask-recorded-bundle.json", stale)
+
+
+@pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested"])
+def test_recipient_route_handles_unsupported_manifest_candidates(
+    deployment, repository, tmp_path, case
+):
+    import uuid
+
+    from exulanica.evidence.blob import BlobId
+
+    scene, configured = _masked_scene(deployment, repository, tmp_path)
+    route = f"/world-read/scenes/{scene}"
+    original = deployment.as_owner("GET", route)
+    assert original.status_code == 200, original.text
+    record = original.json()["bundle"]["recipient_evidence"]["record"]
+    point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
+    good = point["lineage"]["mask_manifest"]
+    body = json.loads(good["json_utf8"])
+    bad = {
+        "array": [],
+        "null": None,
+        "unsupported": {
+            **body,
+            "profile": "unsupported-private/v1",
+            "private_note": "PRIVATE_SENTINEL",
+        },
+        "nested": {**body, "masks": [None]},
+    }[case]
+    stored = deployment.store.put_bytes(canonical_json(bad))
+    source = repository.capture(configured["capture"]).blob_id
+    artifact_id = uuid.uuid4()
+    repository.insert_artifact(
+        artifact_id=artifact_id,
+        kind="masked_source_manifest",
+        source_blob=source,
+        stage_key="masked_source_manifest",
+        stage_version=99,
+        params_digest=b"p" * 32,
+        input_digest=b"i" * 32,
+        idempotency_key=str(uuid.uuid4()),
+        content_sha256=stored.blob_id.digest,
+        storage_key=deployment.store.key_for(stored.blob_id),
+        byte_size=stored.byte_size,
+        produced_by_event=None,
+    )
+    assert deployment.store.get(stored.blob_id) == canonical_json(bad)
+    _save(
+        f"unsupported-{case}-persisted-input.json",
+        {
+            "fixture": "Generated unsupported manifest, no personal data",
+            "artifact_id": str(artifact_id),
+            "content_sha256": stored.blob_id.hex,
+            "payload": bad,
+        },
+    )
+    # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
+    # candidate must not poison the exact supported manifest or disclose its private payload.
+    response = deployment.as_owner("GET", route)
+    assert response.status_code == 200, response.text
+    assert "PRIVATE_SENTINEL" not in response.text
+    assert _verify(response.json())["point_lineage"][point["artifact_id"]]["state"] == "available"
+    _save(f"unsupported-{case}-with-valid-route.json", response.json())
+    # Remove only the generated fixture's good manifest bytes. Live source authorization still
+    # has its retained mask and snapshot; evidence must now explain why its manifest is absent.
+    good_id = BlobId.from_hex(good["sha256"])
+    (deployment.store.root / deployment.store.key_for(good_id)).unlink()
+    response = deployment.as_owner("GET", route)
+    assert response.status_code == 200, response.text
+    envelope = response.json()
+    points = envelope["bundle"]["recipient_evidence"]["record"]["point_maps"]
+    missing = next(p for p in points if p["artifact_id"] == point["artifact_id"])["lineage"][
+        "mask_manifest"
+    ]
+    assert missing["state"] == "unavailable"
+    expected = (
+        "receipt_unsupported_profile" if case == "unsupported" else "receipt_unsupported_shape"
+    )
+    assert expected in missing["candidate_reasons"]
+    assert _verify(envelope)["point_lineage"][point["artifact_id"]]["state"] == "unavailable"
+    _save(f"unsupported-{case}-without-valid-route.json", envelope)
+
+
+@pytest.mark.parametrize("kind", ["pose", "mask", "trained"])
+@pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested", "extra"])
+def test_recipient_offline_unsupported_receipts_are_controlled(tmp_path, kind, case):
+    # These immutable labelled fixtures came from the authenticated database routes. Rehashing
+    # the outer envelope intentionally gets past byte integrity and tests the structural check.
+    root = Path(__file__).resolve().parents[1]
+    fixture = "masked-route-bundle.json" if kind == "mask" else "trained-route-bundle.json"
+    path = (
+        root / "docs/evaluation/artifacts/2026-09-08-run-02-world-read-recipient-evidence" / fixture
+    )
+    envelope = json.loads(path.read_bytes())
+    record = envelope["bundle"]["recipient_evidence"]["record"]
+    if kind == "pose":
+        value = record["pose_receipt"]
+    elif kind == "trained":
+        value = record["trained_publications"][0]
+    else:
+        value = next(
+            p["lineage"]["mask_manifest"]
+            for p in record["point_maps"]
+            if p["lineage"].get("mode") == "masked"
+        )
+    original = json.loads(value["json_utf8"])
+    if case == "array":
+        body = []
+    elif case == "null":
+        body = None
+    elif case == "unsupported":
+        body = {"profile": "unsupported-private/v1", "private_note": "PRIVATE_SENTINEL"}
+    elif case == "extra":
+        body = {**original, "private_note": "PRIVATE_SENTINEL"}
+    else:
+        field = {"pose": "manifest", "mask": "masks", "trained": "delivery"}[kind]
+        body = {**original, field: None}
+    value["json_utf8"] = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    import hashlib
+
+    value["sha256"] = hashlib.sha256(value["json_utf8"].encode()).hexdigest()
+    _reseal(envelope)
+    expected = {
+        "unsupported": "receipt_unsupported_profile",
+        "extra": "receipt_unsupported_fields",
+    }.get(case, "receipt_unsupported_shape")
+    with pytest.raises(EvidenceError, match=expected):
+        _verify(envelope)
+    file = tmp_path / "unsupported-bundle.json"
+    file.write_bytes(canonical_json(envelope))
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "scripts/verify_world_read_recipient_evidence.py"),
+            str(file),
+            "--at",
+            AT,
+            "--expected-bundle-sha256",
+            envelope["bundle_sha256"],
+        ],
+        cwd=tmp_path,
+        env={
+            **{k: v for k, v in os.environ.items() if "DATABASE" not in k},
+            "PYTHONPATH": str(root),
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert json.loads(result.stderr) == {"state": "invalid", "reason": expected}
+    assert result.stdout == "" and "PRIVATE_SENTINEL" not in result.stderr
+    _save(f"offline-unsupported-{kind}-{case}.json", json.loads(result.stderr))
+
+
+@pytest.mark.parametrize("body", [[], None, {"profile": "unsupported-private/v1"}])
+def test_recipient_route_withholds_unsupported_trained_receipts(
+    deployment, repository, tmp_path, body
+):
+    import uuid
+
+    scene = _scene_in(deployment, repository, tmp_path)
+    stored = deployment.store.put_bytes(canonical_json(body))
+    repository.insert_scene_artifact(
+        artifact_id=uuid.uuid4(),
+        kind="scene_splat_receipt",
+        scene_id=scene,
+        stage_key="scene_splat_receipt",
+        stage_version=99,
+        params_digest=b"p" * 32,
+        input_digest=b"i" * 32,
+        idempotency_key=str(uuid.uuid4()),
+        content_sha256=stored.blob_id.digest,
+        storage_key=deployment.store.key_for(stored.blob_id),
+        byte_size=stored.byte_size,
+        produced_by_event=None,
+    )
+    response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+    assert response.status_code == 200, response.text
+    publications = response.json()["bundle"]["recipient_evidence"]["record"]["trained_publications"]
+    assert publications == [
+        {
+            "state": "unavailable",
+            "reason": "receipt_unsupported_profile"
+            if isinstance(body, dict)
+            else "receipt_unsupported_shape",
+        }
+    ]
+    assert _verify(response.json())["release"] == "internal_only"

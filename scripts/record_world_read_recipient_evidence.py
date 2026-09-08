@@ -25,6 +25,11 @@ def main() -> None:
         "--name", required=True, help="Unique dated basename ending world-read-recipient-evidence"
     )
     parser.add_argument("--previous-attempt", type=Path)
+    parser.add_argument(
+        "--predecessor",
+        type=Path,
+        default=Path("docs/evaluation/2026-09-08-verification-world-read-recipient-evidence.json"),
+    )
     args = parser.parse_args()
     if not re.fullmatch(
         r"[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]*world-read-recipient-evidence", args.name
@@ -121,6 +126,32 @@ def main() -> None:
                 "exact_failed_line": "FAILED " + selector,
             }
         )
+    plugin = artifacts / "mutant_unsupported_receipt.py"
+    plugin.write_text(
+        '"""Executed control: restore unchecked receipt projection."""\n'
+        "def pytest_sessionstart(session: object) -> None:\n"
+        "    import exulanica.graph.world_read_evidence as evidence\n"
+        "    def unchecked(value: object, expected_profile: str) -> None:\n"
+        "        return None\n"
+        "    evidence.receipt_problem = unchecked\n"
+    )
+    selector = TEST + "::test_recipient_route_handles_unsupported_manifest_candidates[array]"
+    status, output = run(
+        "control-unsupported-receipt",
+        [sys.executable, "-m", "pytest", "-q", "-p", plugin.stem, selector],
+        {"PYTHONPATH": str(ROOT) + os.pathsep + str(artifacts)},
+    )
+    if status != 1 or ("FAILED " + selector) not in output or "AttributeError" not in output:
+        raise SystemExit("unsupported-receipt control did not reproduce its named route failure")
+    results.append(
+        {
+            "name": "unsupported-receipt",
+            "disabled_check": "supported_receipt_validation",
+            "selector": selector,
+            "exact_failed_line": "FAILED " + selector,
+            "failure_discriminator": "AttributeError",
+        }
+    )
     gates = [
         ("backend", [sys.executable, "-m", "pytest", "-q"]),
         ("ruff", [sys.executable, "-m", "ruff", "check", "."]),
@@ -133,7 +164,9 @@ def main() -> None:
         status, _ = run(label, argv)
         if status:
             raise SystemExit(label + " gate failed; logs retained, no acceptance record")
-    predecessor = ROOT / "docs/evaluation/2026-09-08-asset-read-currency-integration.json"
+    predecessor = (ROOT / args.predecessor).resolve()
+    if not predecessor.is_relative_to(ROOT / "docs/evaluation"):
+        parser.error("predecessor must be a retained evaluation record")
     previous = json.loads(predecessor.read_bytes())
     assert sha256_of_canonical(previous["record"]).hex() == previous["record_sha256"]
     files = []

@@ -102,3 +102,25 @@ These fixtures establish recorded read behavior, not real-person consent, recons
 masked Gaussian training or permission to redistribute. Retained deployment of migrations
 0039 through 0041 remains separate from this test-schema work. No public migration, personal
 media, hosted inference, GPU spend, merge or push was performed.
+
+## Unsupported-receipt repair contract
+
+The independent review of 1328935 found that digest-valid JSON was being treated as a supported
+receipt. Lists and null reached object field access; unsupported objects could also become
+spurious competing mask candidates. The original passing gates did not cover this failure.
+Authorization checkpoint 8d47fb1 permits this repair in the existing file scope.
+
+Before projection, receipt bytes must decode to an object with the expected supported profile,
+required field types and supported top-level fields. Unsupported content is withheld with
+receipt_unsupported_shape, receipt_unsupported_profile or receipt_unsupported_fields; its raw
+payload is never copied into recipient evidence. This covers mask, pose and trained-publication
+receipts. A malformed irrelevant mask candidate does not invalidate a unique supported matching
+manifest. If no matching supported manifest remains, exact_mask_manifest_unavailable carries
+sorted candidate_reasons. Recorded mask-build snapshot projections also reject unsupported
+nested shapes before field access. No live authorization or producer contract is changed.
+
+Offline verification applies the same structural checks before using stored receipt fields.
+Malformed inputs produce EvidenceError with a named reason; the command returns exit 1 and a
+small JSON error on stderr, without a traceback or the unsupported private payload. Original
+supported receipt bytes and digests remain unchanged. Original evidence envelopes are immutable;
+the repair campaign must be a successor of the original verification record, with fresh paths.
