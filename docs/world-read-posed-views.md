@@ -54,3 +54,12 @@ file digest and size, decoded orientation/dimensions, and camera agreement with 
 pose receipt. It needs neither SQL nor a store or network connection. Missing legacy descriptors
 report unavailable. Later withdrawals cannot be discovered offline. Unsigned issuer history is
 not a completeness or authority proof. No public URLs, retained activation or model execution.
+
+Implementation detail: the descriptor also commits the unchanged recipient evidence digest
+and the capture's recorded region/consent digest inventory. This binds job and point lineage
+as well as pose, and requires refresh even for a consent write that selects the same image.
+The download rebuild occurs in a read-only repeatable-read snapshot; its buffered scene inputs
+are checked after that snapshot closes. A final missing/corrupt buffer returns controlled 409.
+Offline checks validate current-at-explicit-time recorded point lineage, including exact mask
+manifest/build snapshots, before treating the downloaded view as verified. The fresh-process
+test disables psycopg.connect as well as clearing database environment settings.

@@ -43,6 +43,7 @@ from exulanica.graph.asset_read_policy import (
 )
 from exulanica.graph.observations import scene_observations
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
+from exulanica.graph.world_read_views import views_current
 
 router = APIRouter(prefix="/world-read", tags=["world-read"])
 
@@ -119,6 +120,8 @@ def scene_bundle(
             return _problem(404, "unknown_reference", "current scene inputs are unavailable")
         response = JSONResponse(content=bundle, headers={"Cache-Control": "private, no-store"})
     with final_check(connection) as at_time:
+        if not views_current(connection, session.workspace_id, bundle, at_time):
+            return _problem(409, "view_changed", "posed view selection changed; refresh bundle")
         if not all(
             scene_allowed(connection, session.workspace_id, key, value, at_time)
             for key, value in dependencies.items()
@@ -200,6 +203,8 @@ def place_bundle(
             return _problem(404, "unknown_reference", "current scene inputs are unavailable")
         response = JSONResponse(content=bundle, headers={"Cache-Control": "private, no-store"})
     with final_check(connection) as at_time:
+        if not views_current(connection, session.workspace_id, bundle, at_time):
+            return _problem(409, "view_changed", "posed view selection changed; refresh bundle")
         if not all(
             scene_allowed(connection, session.workspace_id, key, value, at_time)
             for key, value in dependencies.items()

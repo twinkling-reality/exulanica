@@ -45,12 +45,21 @@ from collections.abc import Mapping
 from typing import Annotated, Any, Final
 
 import psycopg
-from fastapi import APIRouter, Header, HTTPException, Path, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Path, Query, Request, Response
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
+from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import EvidenceAddress, parse_uri
 from exulanica.evidence.blob import BlobId
-from exulanica.graph.asset_read_policy import evaluation_time, final_check, image_source
+from exulanica.graph.asset_read_policy import (
+    evaluation_time,
+    final_check,
+    image_source,
+    scene_allowed,
+    scene_inputs,
+)
+from exulanica.graph.world_read import world_read_bundle
+from exulanica.graph.world_read_views import ViewError, current_binding, image_facts
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
@@ -88,6 +97,9 @@ def masked(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     range_header: Annotated[str | None, Header(alias="range")] = None,
+    view_scene: Annotated[uuid.UUID | None, Query()] = None,
+    view_capture: Annotated[uuid.UUID | None, Query()] = None,
+    view_binding: Annotated[str | None, Query(pattern=r"^[0-9a-f]{64}$")] = None,
 ) -> Response:
     """The derivative a viewer may see, never the original bytes behind it.
 
@@ -104,6 +116,29 @@ def masked(
     """
     address, media_type, clock = _address(connection, session, span_id)
     store = get_services(request).store
+    bound = None
+    dependencies = None
+    if any(value is not None for value in (view_scene, view_capture, view_binding)):
+        if any(value is None for value in (view_scene, view_capture, view_binding)):
+            raise HTTPException(422, "all posed view bindings are required")
+        with connection.transaction():
+            connection.execute("set transaction isolation level repeatable read read only")
+            envelope = world_read_bundle(connection, session.workspace_id, view_scene, store)
+            if envelope is None:
+                raise HTTPException(404, "no such posed view")
+            matching = [
+                v for v in envelope["bundle"]["views"] if v["capture_id"] == str(view_capture)
+            ]
+            if not matching:
+                raise HTTPException(404, "no such posed view")
+            bound = matching[0]["photo_bytes"]
+            if (
+                bound.get("state") != "available"
+                or bound.get("binding_sha256") != view_binding
+                or bound.get("span_id") != str(span_id)
+            ):
+                raise HTTPException(409, "posed view binding changed; refresh bundle")
+            dependencies = scene_inputs(connection, session.workspace_id, view_scene, store)
     if address.track_key != "img" and not media_type.startswith("image/"):
         data = resolve_original_bytes(address, store)
         _authorize_original(connection, session, address, media_type)
@@ -113,11 +148,33 @@ def masked(
     )
     if selected is None:
         raise HTTPException(409, "current viewer image is unavailable")
-    data = store.get(BlobId(selected))
+    try:
+        data = store.get(BlobId(selected))
+    except (BlobNotFoundError, IntegrityError) as error:
+        if bound is None:
+            raise
+        raise HTTPException(409, "posed view bytes missing or corrupt") from error
+    if bound is not None:
+        try:
+            image_facts(data, bound["sha256"])
+        except ViewError as error:
+            raise HTTPException(409, str(error)) from error
     with final_check(connection) as at:
         _check_span(connection, session, address, at)
         if image_source(connection, session.workspace_id, address.blob_id.digest, at) != selected:
             raise HTTPException(409, "viewer image permission changed")
+        if bound is not None and (
+            not current_binding(connection, session.workspace_id, bound, at)
+            or not scene_allowed(connection, session.workspace_id, view_scene, dependencies, at)
+        ):
+            raise HTTPException(409, "posed view permission or lineage changed; refresh bundle")
+    if bound is not None:
+        media_type = bound["media_type"]
+        clock = {
+            **clock,
+            "X-Exulanica-View-SHA256": bound["sha256"],
+            "X-Exulanica-View-Binding": bound["binding_sha256"],
+        }
     return _ranged(
         data,
         media_type if selected == address.blob_id.digest else "image/jpeg",

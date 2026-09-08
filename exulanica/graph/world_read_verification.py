@@ -335,3 +335,39 @@ def check_mask_build(
     current = {r["region_key"]: r["silhouette"] for r in capture["regions"]}
     historical = {r["region_key"]: r["silhouette"] for r in regions}
     require(current == historical, "stale_derivative_lineage")
+
+
+def verify_downloads(
+    envelope: dict[str, Any], downloads: dict[str, bytes], *, at: str, expected_bundle_sha256: str
+) -> dict[str, Any]:
+    """Add exact downloaded view verification without changing recorded v2 verification."""
+    from exulanica.graph.world_read_views import ViewError, verify_view
+
+    result = verify(envelope, at=at, expected_bundle_sha256=expected_bundle_sha256)
+    try:
+        bundle = envelope["bundle"]
+        for view in bundle.get("views", []):
+            value = view.get("photo_bytes")
+            if isinstance(value, dict) and value.get("state") == "available":
+                points = [
+                    p
+                    for p in bundle["recipient_evidence"]["record"]["point_maps"]
+                    if p["capture_id"] == view["capture_id"]
+                ]
+                require(
+                    len(points) == 1
+                    and result["point_lineage"].get(points[0]["artifact_id"])
+                    == {"state": "available"},
+                    "view_lineage_unavailable_at_evaluation",
+                )
+        result["views"] = {
+            view["capture_id"]: verify_view(
+                view, bundle["recipient_evidence"]["record"], downloads.get(view["capture_id"])
+            )
+            for view in bundle.get("views", [])
+        }
+    except ViewError as error:
+        raise EvidenceError(str(error)) from None
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise EvidenceError("view_descriptor_malformed") from None
+    return result
