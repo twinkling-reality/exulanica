@@ -1,6 +1,11 @@
 # Deliver exact posed image bytes through World Read
 
-Status: proposed, not dispatched. Repository: /Users/glendonchin/dev/Technology/orimera.
+Status: dispatched by the operator to task 01a0820f-2d29-7722-af7d-f7415e504b1a.
+This task exclusively owns the Exulanica isolated database/full-suite slot until explicit
+handoff or release. The preceding consent-timestamp task released its slot; recovery readiness
+is documentation-only. This reservation permits only owned isolated schemas and the gates below,
+not retained-public mutation. Original implementation scope is unchanged.
+Repository: /Users/glendonchin/dev/Technology/orimera.
 Baseline: pushed main 46e106b. Create worktree
 /Users/glendonchin/dev/Technology/exulanica-posed-view-bytes on codex/posed-view-bytes from current
 main. Migration: NONE. Existing 0039-0041 remain unchanged. No migration number is reserved.

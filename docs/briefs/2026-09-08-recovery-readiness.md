@@ -1,6 +1,8 @@
 # Establish recovery readiness before retained-data activation
 
-Status: proposed, not dispatched. Repository: /Users/glendonchin/dev/Technology/orimera.
+Status: dispatched by the operator to task 01a0820f-15a3-7b93-9224-01bdb2156f34.
+Documentation-only; no database/full-suite slot is assigned. The posed-view task owns that slot.
+Repository: /Users/glendonchin/dev/Technology/orimera.
 Baseline: pushed main 46e106b. Product and package: Exulanica.
 Create a separate worktree /Users/glendonchin/dev/Technology/exulanica-recovery-readiness on
 codex/recovery-readiness from current main. Reuse an existing matching task/worktree only after
