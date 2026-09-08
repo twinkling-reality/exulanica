@@ -76,7 +76,9 @@ def diff_packages(before: Path, after: Path) -> PackageDiff:
     )
     changes: list[dict[str, str]] = []
     for path in changed_files:
-        if path.endswith(".json"):
+        # Native geometry receipts retain their original floating-point representation. Their
+        # file hashes already describe a change; the canonical metadata walk accepts no floats.
+        if path.endswith(".json") and not path.startswith("assets/"):
             _walk(_json(before / path), _json(after / path), f"/{_escape(path)}", changes)
     return PackageDiff(
         from_root_sha256=before_report.merkle_root_sha256,

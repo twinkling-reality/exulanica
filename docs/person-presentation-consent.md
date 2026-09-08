@@ -580,9 +580,10 @@ Future-dated decisions do not affect an earlier export. Concurrent receipt inser
 share a workspace/package transaction lock, so the export cannot publish across a committed
 withdrawal that it did not read.
 
-Source authority has a second lock: exports share a workspace lock through publication, while
+Source authority has a second lock: exports hold a workspace lock exclusively through publication, while
 changes to capture withdrawal, person regions and decisions, screening, artifacts, scenes and job
-membership take it exclusively. Exports can run together; source mutations wait only for exports
-in their own workspace. This closes the gap where a presentation withdrawal could arrive after
+membership share it. Ordinary source writers can run together; an export waits for them and
+prevents new source mutations until publication. Other workspaces continue independently.
+This closes the gap where a presentation withdrawal could arrive after
 the export read its masks but before the signed bytes became visible. The lock also covers both
 workspaces if an update moves a source row between them.

@@ -12,7 +12,6 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from exulanica.db import Database
 from exulanica.world_package.diff import diff_packages
 from exulanica.world_package.package import (
     PackageError,
@@ -21,7 +20,6 @@ from exulanica.world_package.package import (
     load_private_key,
     verify_package,
 )
-from exulanica.world_package.projector import project_world_package
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -38,6 +36,34 @@ def _parser() -> argparse.ArgumentParser:
     project.add_argument("--world", default="atlas:default")
     project.add_argument("--parent-root")
     project.add_argument("--evaluation-report", action="append", default=[], type=Path)
+
+    decision = commands.add_parser(
+        "training-consent", help="record an account-holder training attestation"
+    )
+    decision.add_argument("--workspace", type=uuid.UUID, required=True)
+    decision.add_argument("--actor", type=uuid.UUID, required=True)
+    decision.add_argument("--terms", type=Path, required=True)
+    decision.add_argument(
+        "--subject", required=True, help="person ID, or package-owner for package opt-in"
+    )
+    decision.add_argument("--decision", choices=("granted", "revoked", "withdrawn"), required=True)
+
+    dataset = commands.add_parser(
+        "training-export", help="explicitly export a consented dataset and receipt it"
+    )
+    dataset.add_argument("--workspace", type=uuid.UUID, required=True)
+    dataset.add_argument("--actor", type=uuid.UUID, required=True)
+    dataset.add_argument("--request", type=Path, required=True)
+    dataset.add_argument("--output", type=Path, required=True)
+    dataset.add_argument("--private-key", type=Path, required=True)
+    dataset.add_argument(
+        "--opt-in", action="store_true", help="explicitly enable this training export"
+    )
+
+    ledger = commands.add_parser(
+        "training-ledger", help="read export terms, roots and subsequent revocations"
+    )
+    ledger.add_argument("--workspace", type=uuid.UUID, required=True)
 
     verify = commands.add_parser(
         "verify", help="verify bytes, inventory, policy, Merkle root, and signature"
@@ -56,9 +82,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     import_check.add_argument("package", type=Path)
     import_check.add_argument("--supported-style-profile", action="append", default=[])
-    import_check.add_argument(
-        "--supported-interaction-capability", action="append", default=[]
-    )
+    import_check.add_argument("--supported-interaction-capability", action="append", default=[])
 
     keygen = commands.add_parser(
         "keygen-test",
@@ -73,6 +97,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "project":
+            from exulanica.db import Database
+            from exulanica.world_package.projector import project_world_package
+
             private_key = load_private_key(args.private_key)
             with Database.from_env().session(args.workspace) as connection:
                 result = project_world_package(
@@ -86,6 +113,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     evaluation_reports=args.evaluation_report,
                 )
             _print(result.as_dict())
+        elif args.command in {"training-consent", "training-export", "training-ledger"}:
+            _training_command(args)
         elif args.command == "verify":
             _print(verify_package(args.package).as_dict())
         elif args.command == "inspect":
@@ -117,6 +146,79 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 1
     return 0
+
+
+def _training_command(args: argparse.Namespace) -> None:
+    from exulanica.consent.training import TrainingTerms
+    from exulanica.db import Database
+    from exulanica.ingest.repository import IngestRepository
+    from exulanica.world_package.training_store import (
+        export_training_dataset,
+        record_training_decision,
+        training_export_ledger,
+    )
+
+    if args.command == "training-export" and args.opt_in is not True:
+        raise PackageError("training export is default off; --opt-in is required")
+    with Database.from_env().session(args.workspace) as connection:
+        repository = IngestRepository(connection, args.workspace)
+        if args.command == "training-consent":
+            terms = TrainingTerms.from_dict(json.loads(args.terms.read_bytes()))
+            receipt = record_training_decision(
+                repository,
+                subject_id=args.subject,
+                terms=terms,
+                decision=args.decision,
+                actor=args.actor,
+            )
+            _print(
+                {
+                    "receipt": receipt.as_dict(),
+                    "receipt_sha256": receipt.digest,
+                    "actor_basis": "account-holder attestation; no subject identity verification",
+                }
+            )
+        elif args.command == "training-ledger":
+            _print(training_export_ledger(repository))
+        else:
+            request = json.loads(args.request.read_bytes())
+            if not isinstance(request, dict) or set(request) != {
+                "terms",
+                "materials",
+                "attribution",
+                "payment",
+            }:
+                raise PackageError(
+                    "training request requires terms, materials, attribution and payment"
+                )
+            base = args.request.resolve().parent
+            files = {}
+            for material in request["materials"]:
+                for asset in material["assets"]:
+                    relative = Path(asset["path"])
+                    if (
+                        relative.is_absolute()
+                        or ".." in relative.parts
+                        or relative.parts[0] != "assets"
+                    ):
+                        raise PackageError("training assets must be relative paths under assets/")
+                    source = base / relative
+                    if not source.resolve().is_relative_to(base) or source.is_symlink():
+                        raise PackageError("training asset escapes the request directory")
+                    files[asset["path"]] = source.read_bytes()
+            result = export_training_dataset(
+                repository,
+                output=args.output,
+                files=files,
+                materials=request["materials"],
+                terms=TrainingTerms.from_dict(request["terms"]),
+                actor=args.actor,
+                private_key=load_private_key(args.private_key),
+                owner_opt_in=args.opt_in,
+                attribution=request["attribution"],
+                payment=request["payment"],
+            )
+            _print(result)
 
 
 def _write_ephemeral_test_key(private_path: Path, public_path: Path) -> None:

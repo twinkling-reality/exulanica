@@ -200,7 +200,9 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def build_manifest(files: Mapping[str, bytes]) -> dict[str, Any]:
+def build_manifest(
+    files: Mapping[str, bytes], *, profile_version: str = PROFILE_VERSION
+) -> dict[str, Any]:
     entries = [
         {"bytes": len(files[path]), "path": path, "sha256": _sha256(files[path])}
         for path in sorted(files)
@@ -208,7 +210,7 @@ def build_manifest(files: Mapping[str, bytes]) -> dict[str, Any]:
     return {
         "entries": entries,
         "merkle_root_sha256": merkle_root(entries),
-        "profile_version": PROFILE_VERSION,
+        "profile_version": profile_version,
     }
 
 
@@ -241,7 +243,7 @@ def sign_manifest(manifest_bytes: bytes, private_key: Ed25519PrivateKey) -> dict
         {
             "manifest_sha256": manifest_sha256,
             "merkle_root_sha256": manifest["merkle_root_sha256"],
-            "profile_version": PROFILE_VERSION,
+            "profile_version": manifest["profile_version"],
         }
     )
     public_raw = private_key.public_key().public_bytes(
@@ -251,7 +253,7 @@ def sign_manifest(manifest_bytes: bytes, private_key: Ed25519PrivateKey) -> dict
         "algorithm": "Ed25519",
         "manifest_sha256": manifest_sha256,
         "merkle_root_sha256": manifest["merkle_root_sha256"],
-        "profile_version": PROFILE_VERSION,
+        "profile_version": manifest["profile_version"],
         "public_key_base64": base64.b64encode(public_raw).decode("ascii"),
         "signature_base64": base64.b64encode(private_key.sign(payload)).decode("ascii"),
         "signed_payload_profile": "exulanica-wmp-signature-payload-v1",
@@ -293,9 +295,12 @@ def verify_package(directory: Path) -> VerificationReport:
     signature_bytes = _read_regular(root, SIGNATURE_PATH)
     manifest = _load_canonical_json(manifest_bytes, MANIFEST_PATH)
     signature = _load_canonical_json(signature_bytes, SIGNATURE_PATH)
-    if manifest.get("profile_version") != PROFILE_VERSION:
+    from exulanica.world_package.dataset import DATASET_PROFILE_VERSION, validate_dataset
+
+    version = manifest.get("profile_version")
+    if version not in {PROFILE_VERSION, DATASET_PROFILE_VERSION}:
         raise PackageError(f"unsupported profile: {manifest.get('profile_version')!r}")
-    if signature.get("profile_version") != PROFILE_VERSION:
+    if signature.get("profile_version") != version:
         raise PackageError("signature profile does not match the manifest")
 
     expected_entries = manifest.get("entries")
@@ -308,9 +313,12 @@ def verify_package(directory: Path) -> VerificationReport:
         raise PackageError("manifest paths must be unique objects in sorted order")
     if len(set(expected_paths)) != len(expected_paths):
         raise PackageError("manifest contains a duplicate path")
-    missing_required = sorted(REQUIRED_PAYLOAD_PATHS - set(expected_paths))
+    from exulanica.world_package.dataset import DATASET_REQUIRED_PATHS, scan_dataset_asset
+
+    required = REQUIRED_PAYLOAD_PATHS if version == PROFILE_VERSION else DATASET_REQUIRED_PATHS
+    missing_required = sorted(required - set(expected_paths))
     if missing_required:
-        raise PackageError(f"package is incomplete for {PROFILE_VERSION}: {missing_required}")
+        raise PackageError(f"package is incomplete for {version}: {missing_required}")
     actual_paths = sorted(
         str(path.relative_to(root))
         for path in root.rglob("*")
@@ -326,8 +334,13 @@ def verify_package(directory: Path) -> VerificationReport:
     for expected in expected_entries:
         path = str(expected["path"])
         data = _read_regular(root, path)
-        scan_payload(path, None)
-        if path.endswith(".json"):
+        if version == DATASET_PROFILE_VERSION and path.startswith("assets/"):
+            scan_dataset_asset(path, data)
+        else:
+            scan_payload(path, None)
+        if path.endswith(".json") and not (
+            version == DATASET_PROFILE_VERSION and path.startswith("assets/")
+        ):
             value = _load_canonical_json(data, path)
             scan_payload(path, value)
             parsed[path] = value
@@ -337,7 +350,10 @@ def verify_package(directory: Path) -> VerificationReport:
     root_hash = merkle_root(actual_entries)
     if root_hash != manifest.get("merkle_root_sha256"):
         raise PackageError("Merkle root does not match the manifest entries")
-    _validate_profile(parsed)
+    if version == PROFILE_VERSION:
+        _validate_profile(parsed)
+    else:
+        validate_dataset(parsed, {entry["path"]: entry for entry in actual_entries})
     manifest_sha256 = _sha256(manifest_bytes)
     if manifest_sha256 != signature.get("manifest_sha256"):
         raise PackageError("signature names a different manifest")
@@ -355,14 +371,14 @@ def verify_package(directory: Path) -> VerificationReport:
                 {
                     "manifest_sha256": manifest_sha256,
                     "merkle_root_sha256": root_hash,
-                    "profile_version": PROFILE_VERSION,
+                    "profile_version": version,
                 }
             ),
         )
     except (KeyError, TypeError, ValueError, InvalidSignature) as error:
         raise PackageError("Ed25519 signature verification failed") from error
     return VerificationReport(
-        profile_version=PROFILE_VERSION,
+        profile_version=version,
         merkle_root_sha256=root_hash,
         manifest_sha256=manifest_sha256,
         signing_public_key_sha256=_sha256(public_raw),
@@ -372,6 +388,16 @@ def verify_package(directory: Path) -> VerificationReport:
 
 def inspect_package(directory: Path) -> dict[str, Any]:
     verification = verify_package(directory)
+    if verification.profile_version != PROFILE_VERSION:
+        materials = json.loads((directory / "dataset/materials.json").read_text())["materials"]
+        consent = json.loads((directory / "consent/training.json").read_text())
+        return {
+            **verification.as_dict(),
+            "materials": len(materials),
+            "training_terms": consent["terms"],
+            "consent_receipts": len(consent["receipts"]),
+            "lineage": json.loads((directory / "provenance/dataset.json").read_text()),
+        }
     components: dict[str, Any] = {}
     for path in (
         "memory/graph.json",
@@ -398,6 +424,10 @@ def import_check_package(
 ) -> dict[str, Any]:
     """Inspect receiver compatibility without writing a database or importing package state."""
     verification = verify_package(directory)
+    if verification.profile_version != PROFILE_VERSION:
+        raise PackageError(
+            "training datasets are not interactive-world imports; use verify or inspect"
+        )
     style = json.loads((directory / "appearance/style.json").read_text(encoding="utf-8"))
     interaction = json.loads((directory / "interaction/policy.json").read_text(encoding="utf-8"))
     structure = json.loads((directory / "world/structure.json").read_text(encoding="utf-8"))
@@ -406,9 +436,7 @@ def import_check_package(
     warnings: list[str] = []
     if style.get("state") == "current":
         global_style = style["global"]
-        required_profiles.add(
-            f"{global_style['profile_id']}@{global_style['profile_version']}"
-        )
+        required_profiles.add(f"{global_style['profile_id']}@{global_style['profile_version']}")
         required_profiles.update(
             f"{region['profile_id']}@{region['profile_version']}"
             for region in style.get("regions", [])
@@ -421,21 +449,15 @@ def import_check_package(
             for row in interaction.get("registry", [])
         }
         required_capabilities.update(
-            f"{key}@{versions[key]}"
-            for key in interaction.get("parameters", {})
-            if key in versions
+            f"{key}@{versions[key]}" for key in interaction.get("parameters", {}) if key in versions
         )
     else:
         warnings.append("interaction state is unavailable")
     if structure.get("state") == "unavailable":
         warnings.append("spatial structure is unavailable")
     missing_profiles = sorted(required_profiles - supported_style_profiles)
-    missing_capabilities = sorted(
-        required_capabilities - supported_interaction_capabilities
-    )
-    declarations_supplied = bool(
-        supported_style_profiles or supported_interaction_capabilities
-    )
+    missing_capabilities = sorted(required_capabilities - supported_interaction_capabilities)
+    declarations_supplied = bool(supported_style_profiles or supported_interaction_capabilities)
     compatible: bool | None = (
         not (missing_profiles or missing_capabilities) if declarations_supplied else None
     )
@@ -517,7 +539,10 @@ def _validate_profile(files: Mapping[str, Any]) -> None:
     ):
         raise PackageError("wmp/profile.json does not identify the supported WMP profile")
     crate = files["ro-crate-metadata.json"]
-    if not isinstance(crate, dict) or crate.get("@context") != "https://w3id.org/ro/crate/1.2/context":
+    if (
+        not isinstance(crate, dict)
+        or crate.get("@context") != "https://w3id.org/ro/crate/1.2/context"
+    ):
         raise PackageError("RO-Crate metadata does not use the required 1.2 context")
     graph = crate.get("@graph")
     if not isinstance(graph, list):
