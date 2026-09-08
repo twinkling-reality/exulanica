@@ -94,6 +94,7 @@ from exulanica.graph.wire_numbers import (
     decimal_strings as _decimals,
 )
 from exulanica.graph.world_read_evidence import recorded_evidence
+from exulanica.graph.world_read_views import descriptor
 from exulanica.store import ContentAddressedStore
 from exulanica.world import DEFAULT_WORLD_ID, WorldStructureRepository
 
@@ -779,6 +780,10 @@ def _assemble(
             ),
         },
     }
+    for view in bundle["views"]:
+        view["photo_bytes"] = descriptor(
+            connection, workspace, scene.scene_id, view, bundle["recipient_evidence"], store
+        )
     point_ids = {
         item["artifact_id"] for item in bundle["recipient_evidence"]["record"]["point_maps"]
     }

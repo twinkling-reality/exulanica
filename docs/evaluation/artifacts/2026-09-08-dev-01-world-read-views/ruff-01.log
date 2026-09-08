@@ -1,0 +1,12 @@
+E501 Line too long (102 > 100)
+   --> tests/test_world_read_views.py:135:101
+    |
+133 |     guard = (
+134 |         "import runpy,sys,psycopg; "
+135 |         "psycopg.connect=lambda *a,**k: (_ for _ in ()).throw(RuntimeError('offline DB forbidden')); "
+    |                                                                                                     ^^
+136 |         "sys.argv=sys.argv[1:]; runpy.run_path(sys.argv[0],run_name='__main__')"
+137 |     )
+    |
+
+Found 1 error.

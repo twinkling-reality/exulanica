@@ -1,0 +1,117 @@
+.......F.......                                                          [100%]
+=================================== FAILURES ===================================
+_______ test_mask_and_withdrawal_changes_refuse_old_binding[stale_mask] ________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x109f3a910>
+capture_id = UUID('01a08215-5207-74cd-8983-2c0ba0a33bd3')
+key = b'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+edit = {'action': 'confirm', 'region_key': '6161616161616161616161616161616161616161616161616161616161616161', 'silhouette': {'points': [[0, 0], [800000, 0], [800000, 800000], [0, 800000]]}}
+
+    def _outline_for(
+        repository: IngestRepository,
+        capture_id: uuid.UUID,
+        key: bytes,
+        edit: dict[str, Any],
+    ) -> Silhouette:
+        """The outline this edit applies to: the supplied one, or the one already recorded.
+    
+        A confirmation or a deletion does not have to restate the outline, and should not have to:
+        making a reviewer round-trip the polygon to agree with it is how a transcription error becomes
+        a mask in the wrong place.
+        """
+        supplied = edit.get("silhouette")
+        if supplied is not None:
+            try:
+>               return Silhouette.from_digest_input(supplied)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+exulanica/ingest/person_review.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+cls = <class 'exulanica.consent.regions.Silhouette'>
+value = {'points': [[0, 0], [800000, 0], [800000, 800000], [0, 800000]]}
+
+    @classmethod
+    def from_digest_input(cls, value: Mapping[str, Any]) -> Silhouette:
+        """Rebuild an outline from what :meth:`as_digest_input` wrote.
+    
+        Needed because the outline is stored as ``jsonb`` and read back as a plain dictionary,
+        and the validation in ``__post_init__`` is the only thing standing between a corrupted
+        row and a mask that covers nothing. Rebuilding through the constructor rather than
+        trusting the stored shape is what makes a bad row raise instead of silently hiding
+        nobody.
+        """
+        if value.get("kind") != "polygon":
+>           raise ValueError(f"unsupported outline kind {value.get('kind')!r}")
+E           ValueError: unsupported outline kind None
+
+exulanica/consent/regions.py:181: ValueError
+
+The above exception was the direct cause of the following exception:
+
+deployment = <test_api.Deployment object at 0x109d9f850>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x109f3a910>
+tmp_path = PosixPath('<fixture-path>')
+change = 'stale_mask'
+
+    @pytest.mark.parametrize("change", ["stale_mask", "missing_mask", "withdrawal"])
+    def test_mask_and_withdrawal_changes_refuse_old_binding(deployment, repository, tmp_path, change):
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        first = bundle(deployment, scene)
+        view = next(v for v in available(first) if v["photo_bytes"]["kind"] == "masked")
+        desc = view["photo_bytes"]
+        assert deployment.as_owner("GET", desc["fetch"]).status_code == 200
+        if change == "stale_mask":
+>           record_region_edits(
+                repository,
+                capture_id=configured["capture"],
+                actor=ACTOR,
+                edits=[
+                    {
+                        "action": "confirm",
+                        "region_key": KEY.hex(),
+                        "silhouette": {"points": [[0, 0], [800000, 0], [800000, 800000], [0, 800000]]},
+                    }
+                ],
+
+tests/test_world_read_views.py:304: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exulanica/ingest/person_review.py:132: in record_region_edits
+    outline = _outline_for(repository, capture_id, key, edit)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x109f3a910>
+capture_id = UUID('01a08215-5207-74cd-8983-2c0ba0a33bd3')
+key = b'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+edit = {'action': 'confirm', 'region_key': '6161616161616161616161616161616161616161616161616161616161616161', 'silhouette': {'points': [[0, 0], [800000, 0], [800000, 800000], [0, 800000]]}}
+
+    def _outline_for(
+        repository: IngestRepository,
+        capture_id: uuid.UUID,
+        key: bytes,
+        edit: dict[str, Any],
+    ) -> Silhouette:
+        """The outline this edit applies to: the supplied one, or the one already recorded.
+    
+        A confirmation or a deletion does not have to restate the outline, and should not have to:
+        making a reviewer round-trip the polygon to agree with it is how a transcription error becomes
+        a mask in the wrong place.
+        """
+        supplied = edit.get("silhouette")
+        if supplied is not None:
+            try:
+                return Silhouette.from_digest_input(supplied)
+            except (TypeError, ValueError) as exc:
+>               raise PrivacyAdmissionError(f"the supplied outline is not usable: {exc}") from exc
+E               exulanica.errors.PrivacyAdmissionError: the supplied outline is not usable: unsupported outline kind None
+
+exulanica/ingest/person_review.py:196: PrivacyAdmissionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_views.py::test_mask_and_withdrawal_changes_refuse_old_binding[stale_mask]

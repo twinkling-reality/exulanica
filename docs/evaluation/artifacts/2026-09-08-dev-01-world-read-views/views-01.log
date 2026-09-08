@@ -1,0 +1,139 @@
+....F.FF.......                                                          [100%]
+=================================== FAILURES ===================================
+____________________ test_camera_pixel_space_refuses_route _____________________
+
+deployment = <test_api.Deployment object at 0x128d08110>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x1288be810>
+tmp_path = PosixPath('<fixture-path>')
+
+    def test_camera_pixel_space_refuses_route(deployment, repository, tmp_path):
+        from test_scene_reconstruction_pipeline import FakeColmap
+        class WrongCamera(FakeColmap):
+            def __call__(self, command, cwd):
+                result = super().__call__(command, cwd)
+                if command[1] == "mapper":
+                    path = cwd / "sparse/0/cameras.txt"
+                    lines = []
+                    for line in path.read_text().splitlines():
+                        fields = line.split()
+                        fields[2] = str(int(fields[2]) + 7)
+                        lines.append(" ".join(fields))
+                    path.write_text("\n".join(lines) + "\n")
+                return result
+        with patch("test_world_read_route.FakeColmap", WrongCamera):
+            scene = _scene_in(deployment, repository, tmp_path)
+>       envelope = bundle(deployment, scene)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_world_read_views.py:219: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+deployment = <test_api.Deployment object at 0x128d08110>
+scene = UUID('d8cf1a4f-23b3-5a11-8998-a3a72158b666')
+
+    def bundle(deployment, scene):
+        response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
+>       assert response.status_code == 200, response.text
+E       AssertionError: {"code":"unknown_reference","detail":"no such scene"}
+E       assert 404 == 200
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+tests/test_world_read_views.py:59: AssertionError
+______________ test_store_damage_refuses_bound_download[corrupt] _______________
+
+deployment = <test_api.Deployment object at 0x11d64cad0>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x128ae7e90>
+tmp_path = PosixPath('<fixture-path>')
+damage = 'corrupt'
+
+    @pytest.mark.parametrize("damage", ["missing", "corrupt"])
+    def test_store_damage_refuses_bound_download(deployment, repository, tmp_path, damage):
+        scene = _scene_in(deployment, repository, tmp_path)
+        first = bundle(deployment, scene)
+        desc = available(first)[0]["photo_bytes"]
+        path = deployment.store.root / deployment.store.key_for(BlobId.from_hex(desc["sha256"]))
+        if damage == "missing":
+            path.unlink()
+        else:
+>           path.write_bytes(b"corrupt generated object")
+
+tests/test_world_read_views.py:234: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/pathlib.py:1067: in write_bytes
+    with self.open(mode='wb') as f:
+         ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('<fixture-path>')
+mode = 'wb', buffering = -1, encoding = None, errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       PermissionError: [Errno 13] Permission denied: '<fixture-path>'
+
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/pathlib.py:1044: PermissionError
+_______ test_mask_and_withdrawal_changes_refuse_old_binding[stale_mask] ________
+
+deployment = <test_api.Deployment object at 0x11d735a90>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x11d736410>
+tmp_path = PosixPath('<fixture-path>')
+change = 'stale_mask'
+
+    @pytest.mark.parametrize("change", ["stale_mask", "missing_mask", "withdrawal"])
+    def test_mask_and_withdrawal_changes_refuse_old_binding(deployment, repository, tmp_path, change):
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        first = bundle(deployment, scene)
+        view = next(v for v in available(first) if v["photo_bytes"]["kind"] == "masked")
+        desc = view["photo_bytes"]
+        assert deployment.as_owner("GET", desc["fetch"]).status_code == 200
+        if change == "stale_mask":
+>           record_region_edits(repository, capture_id=configured["capture"], actor=ACTOR,
+                                edits=[{"action": "replace", "region_key": KEY.hex(),
+                                        "silhouette": {"points": [[0, 0], [800000, 0],
+
+tests/test_world_read_views.py:249: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x11d736410>
+capture_id = UUID('01a08214-b0f7-7449-a151-be229e0c20c4')
+actor = UUID('00000000-0000-4000-8000-000000000001')
+edits = [{'action': 'replace', 'region_key': '6161616161616161616161616161616161616161616161616161616161616161', 'silhouette': {'points': [[0, 0], [800000, 0], [800000, 800000], [0, 800000]]}}]
+recorded_at = None
+
+    def record_region_edits(
+        repository: IngestRepository,
+        *,
+        capture_id: uuid.UUID,
+        actor: uuid.UUID,
+        edits: list[dict[str, Any]],
+        recorded_at: dt.datetime | None = None,
+    ) -> list[str]:
+        """Apply a reviewer's confirmations, additions and deletions, each as its own receipt."""
+        capture = _live_capture(repository, capture_id)
+        when = recorded_at or dt.datetime.now(dt.UTC)
+        written: list[str] = []
+        for edit in edits:
+            action = str(edit.get("action", ""))
+            if action not in REVIEW_ACTIONS:
+>               raise PrivacyAdmissionError(f"{action!r} is not one of {sorted(REVIEW_ACTIONS)}")
+E               exulanica.errors.PrivacyAdmissionError: 'replace' is not one of ['add', 'confirm', 'delete']
+
+exulanica/ingest/person_review.py:125: PrivacyAdmissionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_views.py::test_camera_pixel_space_refuses_route
+FAILED tests/test_world_read_views.py::test_store_damage_refuses_bound_download[corrupt]
+FAILED tests/test_world_read_views.py::test_mask_and_withdrawal_changes_refuse_old_binding[stale_mask]

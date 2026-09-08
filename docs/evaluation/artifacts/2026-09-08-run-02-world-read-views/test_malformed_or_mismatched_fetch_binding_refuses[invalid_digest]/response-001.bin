@@ -1,0 +1,1 @@
+{"detail":[{"type":"string_pattern_mismatch","loc":["query","view_binding"],"msg":"String should match pattern '^[0-9a-f]{64}$'","input":"not-a-digest","ctx":{"pattern":"^[0-9a-f]{64}$"}}]}

@@ -1,0 +1,12 @@
+E501 Line too long (101 > 100)
+   --> tests/test_world_read_views.py:773:101
+    |
+771 |         repository.connection.execute("set local session_replication_role=replica")
+772 |         repository.connection.execute(
+773 |             "update artifact set privacy_screening_id=null where workspace_id=%s and artifact_id=%s",
+    |                                                                                                     ^
+774 |             (repository.workspace_id, point["artifact_id"]),
+775 |         )
+    |
+
+Found 1 error.

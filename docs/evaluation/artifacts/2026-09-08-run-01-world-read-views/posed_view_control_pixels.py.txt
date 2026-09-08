@@ -1,0 +1,32 @@
+"""A child-process-only negative control, never a source-tree edit."""
+import ast
+import inspect
+
+
+def pytest_sessionstart(session: object) -> None:
+    from exulanica.api.routes import evidence
+    from exulanica.graph import world_read_views
+
+    kind = 'pixels'
+    module = evidence if kind == "final" else world_read_views
+    name = {"final": "masked", "bytes": "image_facts", "pixels": "check_pixels"}[kind]
+    function = getattr(module, name)
+    source = inspect.getsource(function)
+    if kind == "bytes":
+        source = source.replace("hashlib.sha256(data).hexdigest() == digest", "True")
+    tree = ast.parse(source)
+    node = tree.body[0]
+    node.decorator_list = []
+    if kind == "pixels":
+        node.body = [ast.Pass()]
+    if kind == "final":
+        node.body = [statement for statement in node.body if not (
+            isinstance(statement, ast.With)
+            and any(isinstance(item.context_expr, ast.Call)
+                    and isinstance(item.context_expr.func, ast.Name)
+                    and item.context_expr.func.id == "final_check" for item in statement.items)
+        )]
+    ast.fix_missing_locations(tree)
+    namespace = dict(module.__dict__)
+    exec(compile(tree, "<posed-view-negative-control>", "exec"), namespace)
+    function.__code__ = namespace[name].__code__

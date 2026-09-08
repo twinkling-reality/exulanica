@@ -1,0 +1,55 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_camera_pixel_space_refuses_route _____________________
+
+deployment = <test_api.Deployment object at 0x10a40aa50>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x10a389850>
+tmp_path = PosixPath('<fixture-path>')
+
+    def test_camera_pixel_space_refuses_route(deployment, repository, tmp_path):
+        from test_scene_reconstruction_pipeline import FakeColmap
+    
+        class WrongCamera(FakeColmap):
+            def __call__(self, command, cwd):
+                result = super().__call__(command, cwd)
+                if command[1] == "mapper":
+                    path = cwd / "sparse/0/cameras.txt"
+                    lines = []
+                    for line in path.read_text().splitlines():
+                        fields = line.split()
+                        fields[2] = str(int(fields[2]) + 7)
+                        lines.append(" ".join(fields))
+                    path.write_text("\n".join(lines) + "\n")
+                return result
+    
+        from test_scene_reconstruction_pipeline import _numeric_point_map
+    
+        with (
+            patch("test_world_read_route.FakeColmap", WrongCamera),
+            patch(
+                "test_world_read_route._numeric_point_map", lambda index: _numeric_point_map(index + 7)
+            ),
+        ):
+            scene = _scene_in(deployment, repository, tmp_path)
+        envelope = bundle(deployment, scene)
+        assert all(v["camera"] is not None for v in envelope["bundle"]["views"])
+>       assert {v["photo_bytes"].get("reason") for v in envelope["bundle"]["views"]} == {
+            "camera_pixel_space_mismatch"
+        }
+E       AssertionError: assert {None} == {'camera_pixe...ace_mismatch'}
+E         
+E         Extra items in the left set:
+E         None
+E         Extra items in the right set:
+E         'camera_pixel_space_mismatch'
+E         Use -v to get more diff
+
+tests/test_world_read_views.py:312: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_views.py::test_camera_pixel_space_refuses_route
