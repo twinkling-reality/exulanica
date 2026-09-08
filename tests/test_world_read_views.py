@@ -770,7 +770,8 @@ def test_absent_legacy_screening_binding_refuses_actual_routes(deployment, repos
     with repository.connection.transaction():
         repository.connection.execute("set local session_replication_role=replica")
         repository.connection.execute(
-            "update artifact set privacy_screening_id=null where workspace_id=%s and artifact_id=%s",
+            "update artifact set privacy_screening_id=null "
+            "where workspace_id=%s and artifact_id=%s",
             (repository.workspace_id, point["artifact_id"]),
         )
     assert repository.connection.execute("show session_replication_role").fetchone()[
