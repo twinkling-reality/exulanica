@@ -1,5 +1,8 @@
 # World Read recipient evidence integration, 2026-09-08
 
+Follow-up: `integration-consent-timestamp-2026-09-08.md` records the future-write timestamp fix.
+Historical mismatched chains remain unavailable; this report retains the earlier verified state.
+
 The branch is integrated after independent gates at `3352627`: 2146 backend tests passed,
 3 skipped; 876 web tests passed; Ruff, all four import contracts, typecheck and boundaries passed.
 Locked pose and reconstruction extras were installed. The candidate already descended from main

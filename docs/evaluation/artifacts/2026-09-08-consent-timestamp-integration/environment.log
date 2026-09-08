@@ -1,0 +1,7 @@
+Resolved 85 packages in 23ms
+   Building exulanica @ file://<worktree>
+      Built exulanica @ file://<worktree>
+Prepared 1 package in 442ms
+Uninstalled 1 package in 1ms
+Installed 1 package in 3ms
+ ~ exulanica==0.1.0 (from file://<worktree>)

@@ -1,0 +1,4 @@
+
+> exulanica-web@ typecheck <worktree>/web
+> tsc --build --force
+

@@ -1,5 +1,9 @@
 # Use one effective instant for each presentation receipt
 
+Status: completed and integrated at `d72c4f8` after independent gates. See
+`docs/integration-consent-timestamp-2026-09-08.md`. The slot is released; original dispatch and
+scope below are retained as history. Legacy receipt correction remains separately unapproved.
+
 Dispatched to task `01a081ec-cb27-70b2-8fa1-db4481364b91` after World Read recipient integration.
 The task exclusively owns the Exulanica isolated database/full-suite slot from this reservation
 on 2026-09-08 until explicit handoff or release. Other known implementation tasks are idle;
