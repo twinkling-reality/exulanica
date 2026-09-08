@@ -42,6 +42,13 @@ export interface ResidencyDemand {
   readonly priority: number;
   /** A direct-navigation target is pinned until arrival or cancellation. */
   readonly pin?: boolean;
+  /**
+   * The visitor is standing in this region. A ceiling bounds what may be LOADED next; the region
+   * under the visitor is already loaded, so stubbing it empties the world they are looking at and
+   * saves nothing that is still being paid for. Exempt from `maxStage`, and floored at the
+   * cheapest drawn stage when even that does not fit the scaled budget.
+   */
+  readonly occupied?: boolean;
 }
 
 export interface ResidencyRequest {
@@ -125,6 +132,7 @@ function combineDemands(demands: readonly ResidencyDemand[]): ReadonlyMap<Island
       desired,
       priority: Math.max(prior.priority, demand.priority),
       ...(prior.pin === true || demand.pin === true ? { pin: true } : {}),
+      ...(prior.occupied === true || demand.occupied === true ? { occupied: true } : {}),
     }));
   }
   return combined;
@@ -170,7 +178,10 @@ export function planResidency(
   for (const demand of ranked) {
     const asset = assets.get(demand.islandId)!;
     let granted: ResidencyStage = 'stub';
-    const desiredRank = Math.min(stageRank(demand.desired), stageRank(maxStage));
+    const occupied = demand.occupied === true && stageRank(demand.desired) > 0;
+    const desiredRank = occupied
+      ? stageRank(demand.desired)
+      : Math.min(stageRank(demand.desired), stageRank(maxStage));
     for (let rank = desiredRank; rank > 0; rank -= 1) {
       const candidate = RESIDENCY_STAGE_ORDER[rank]!;
       if (reservedCost + asset.cost[candidate] <= budget.maxCost) {
@@ -178,6 +189,12 @@ export function planResidency(
         break;
       }
     }
+    // A region whose cheapest drawn stage costs more than the scaled budget would otherwise fall
+    // to a stub. For the region the visitor occupies that is the failure, not the saving: it is
+    // what emptied the world thirteen seconds after arrival while the status panel still said the
+    // trained reconstruction was showing. Overshoot the ceiling for that one region and let every
+    // other region absorb the pressure.
+    if (granted === 'stub' && occupied) granted = RESIDENCY_STAGE_ORDER[1]!;
     allocated.set(demand.islandId, granted);
     reservedCost += asset.cost[granted];
     if (granted !== demand.desired) deferred.push(demand);
@@ -289,6 +306,8 @@ export interface ResidencyView {
   readonly activeNeighborhood: NeighborhoodId | null;
   readonly tier: TierState;
   readonly target: IslandId | null;
+  /** The region the visitor is standing in, from the spatial phase. Null between regions. */
+  readonly occupied?: IslandId | null;
 }
 
 const stageForTier = (tier: RepresentationTier): ResidencyStage =>
@@ -316,6 +335,20 @@ export function residencyDemandsForView(
       }
     }
   }
+  // Only a region the index knows: planResidency rejects a demand with no catalog asset, and this
+  // runs inside the render loop, where a throw costs the frame.
+  const occupied = view.occupied ?? null;
+  if (occupied !== null && index.neighborhoodOf.has(occupied)) {
+    const prior = demands.get(occupied);
+    const tier = view.tier.tier.get(occupied) ?? 0;
+    demands.set(occupied, Object.freeze({
+      islandId: occupied,
+      desired: prior?.desired ?? stageForTier(tier),
+      priority: prior?.priority ?? 200 + tier,
+      ...(prior?.pin === true ? { pin: true } : {}),
+      occupied: true,
+    }));
+  }
   if (view.target !== null) {
     const prior = demands.get(view.target);
     demands.set(view.target, Object.freeze({
@@ -326,6 +359,7 @@ export function residencyDemandsForView(
           : 'proxy',
       priority: 10_000,
       pin: true,
+      ...(prior?.occupied === true ? { occupied: true } : {}),
     }));
   }
   return Object.freeze([...demands.values()]);

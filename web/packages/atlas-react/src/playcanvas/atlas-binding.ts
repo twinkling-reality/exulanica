@@ -19,8 +19,10 @@ import type {
   NavigationPose,
   ResidencyAction,
   ResidencyAsset,
+  ResidencyCost,
   ResidencyStage,
   ResidencyState,
+  ResidencyView,
   RepresentationPressureState,
   RenderOriginState,
   SpatialClassification,
@@ -174,6 +176,48 @@ const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
  * nothing while the panel says the tier out loud.
  */
 const PROOF_LENS_SETTLE_SECONDS = 2.5;
+
+/**
+ * A trained region is all or nothing: one gsplat asset, identical at every drawn stage. The flat
+ * 24 is why the pressure controller's level-3 budget (96 * 0.22 = 21.12) cannot afford it, and
+ * why the occupied-region exemption in `planResidency` has to clear the budget as well as the
+ * stage ceiling.
+ */
+export const TRAINED_REGION_RESIDENCY_COST: ResidencyCost = Object.freeze({
+  stub: 0, proxy: 24, coarse: 24, full: 24,
+});
+
+/**
+ * The residency inputs for one frame, and the signature that decides whether to replan.
+ *
+ * `occupied` is the region the visitor is standing in. It belongs in the signature as well as the
+ * view: crossing a region boundary inside one neighborhood at unchanged tiers changes nothing
+ * else, so without it the plan that stubbed the region under the visitor would never be revisited.
+ */
+export function residencyFrameInputs(input: {
+  readonly map: boolean;
+  readonly activeNeighborhood: NeighborhoodId | null;
+  readonly tier: TierState;
+  readonly target: IslandId | null;
+  readonly occupied: IslandId | null;
+}): { readonly view: ResidencyView; readonly signature: string } {
+  return {
+    view: {
+      map: input.map,
+      activeNeighborhood: input.activeNeighborhood,
+      tier: input.tier,
+      target: input.target,
+      occupied: input.occupied,
+    },
+    signature: [
+      input.map ? 'map' : 'ground',
+      input.activeNeighborhood ?? '',
+      input.target ?? '',
+      input.occupied ?? '',
+      ...[...input.tier.tier.entries()].map(([id, tier]) => `${id}:${tier}`),
+    ].join('|'),
+  };
+}
 
 export interface AtlasBindingOptions {
   readonly canvas: HTMLCanvasElement;
@@ -542,7 +586,7 @@ export class AtlasBinding {
     const residencyCatalog: ResidencyAsset[] = options.scene.islands.map((island) => ({
       islandId: island.islandId,
       cost: trainedIslandIds.has(island.islandId)
-        ? Object.freeze({ stub: 0, proxy: 24, coarse: 24, full: 24 })
+        ? TRAINED_REGION_RESIDENCY_COST
         : pointMapsByIsland.has(island.islandId)
         ? pointMapResidencyCost(pointMapsByIsland.get(island.islandId)!.length, residencyBudget)
         : Object.freeze({ stub: 0, proxy: 2, coarse: 2, full: 2 }),
@@ -1375,22 +1419,18 @@ export class AtlasBinding {
       this.pose.position.set(s.x - origin.x, s.y - origin.y, s.z - origin.z);
       this.camera.setPosition(this.pose.position);
     }
-    const signature = [
-      this.mapState === null ? 'ground' : 'map',
-      this.activeNeighborhood ?? '',
-      this.navigationTargetIsland ?? '',
-      ...[...this.tierState.tier.entries()].map(([id, tier]) => `${id}:${tier}`),
-    ].join('|');
+    const { view: residencyView, signature } = residencyFrameInputs({
+      map: this.mapState !== null,
+      activeNeighborhood: this.activeNeighborhood,
+      tier: this.tierState,
+      target: this.navigationTargetIsland,
+      occupied: spatial.islandId,
+    });
     if (signature !== this.residencySignature) {
       this.residencySignature = signature;
       const plan = planResidency(
         this.residencyCatalog,
-        residencyDemandsForView(this.neighborhoodIndex, {
-          map: this.mapState !== null,
-          activeNeighborhood: this.activeNeighborhood,
-          tier: this.tierState,
-          target: this.navigationTargetIsland,
-        }),
+        residencyDemandsForView(this.neighborhoodIndex, residencyView),
         {
           maxCost: this.residencyBudget * this.representationPressure.state.budgetScale,
           maxStage: this.representationPressure.state.maxStage,
