@@ -178,7 +178,7 @@ def count_masked_gaussians(
         confirmed = tuple(_grown(outline, margin_ppm) for outline in view.confirmed)
         view_masked = 0
         view_confirmed = 0
-        for index, centre in enumerate(centres):
+        for index, centre in enumerate(centres if masked or confirmed else ()):
             if opacities is not None and _probability(opacities[index]) < threshold:
                 continue
             camera = _rotate(view.quaternion_wxyz, centre)

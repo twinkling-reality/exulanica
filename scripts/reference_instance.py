@@ -33,6 +33,7 @@ def main():
             "workflow",
             "compose",
             "queue",
+            "evaluate-geometry",
         ),
     )
     parser.add_argument("--scene", default="bowl", help="Stable local workspace label")
@@ -126,6 +127,17 @@ def main():
         if args.command == "depth-worker":
             env["EXULANICA_DEPTH_DEVICE"] = "mps"
         cmd = [sys.executable, "-m", "exulanica.ingest.worker_command", "--once"]
+    elif args.command == "evaluate-geometry":
+        cmd = [
+            sys.executable,
+            "-m",
+            "exulanica.evaluation.masked_geometry",
+            "--workspace",
+            scene["workspace_id"],
+            "--blobs",
+            str(STATE / "blobs"),
+            *remaining,
+        ]
     elif args.command == "queue":
         cmd = [
             sys.executable,
