@@ -1,0 +1,84 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_training_export_and_presentation_writer_share_a_lock_order ________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x108ada090>
+ingest_spine = (<exulanica.ingest.repository.IngestRepository object at 0x108ada090>, <function ingest_spine.<locals>.open_another at 0x108ab9800>)
+photo_dir = PosixPath('/private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/pytest-of-glendonchin/pytest-694/test_training_export_and_prese0/photos')
+tmp_path = PosixPath('/private/var/folders/h0/fm_6dy297xqbrns8d_43b5rh0000gn/T/pytest-of-glendonchin/pytest-694/test_training_export_and_prese0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108ada490>
+
+    def test_training_export_and_presentation_writer_share_a_lock_order(
+        repository, ingest_spine, photo_dir, tmp_path, monkeypatch
+    ):
+        """Actual export/consent callers, paused after export's pre-existing source lock."""
+        import threading
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+    
+        import exulanica.world_package.training_store as training_store
+        import psycopg
+    
+        from test_training_inputs import image_sample
+    
+        files, materials = image_sample(repository, photo_dir, tmp_path)
+        terms = _terms()
+        _grant(repository, terms)
+        subject = create_subject(repository, actor=ACTOR)
+        _, open_another = ingest_spine
+        exporter, writer = open_another(), open_another()
+        held, resume = threading.Event(), threading.Event()
+        original = training_store._lock
+    
+        def pause(connection, workspace, package):
+            original(connection, workspace, package)
+            held.set()
+            assert resume.wait(5)
+    
+        monkeypatch.setattr(training_store, "_lock", pause)
+    
+        def export():
+            try:
+                _export(exporter, tmp_path / "concurrent", files, materials, terms, owner_opt_in=True)
+                return "ok"
+            except psycopg.Error as error:
+                return error.sqlstate
+    
+        def consent():
+            try:
+                record_consent(
+                    writer,
+                    subject_id=subject,
+                    actor=ACTOR,
+                    consent_scope="likeness",
+                    decision="granted",
+                )
+                return "ok"
+            except psycopg.Error as error:
+                return error.sqlstate
+    
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            exporting = pool.submit(export)
+            assert held.wait(5)
+            consenting = pool.submit(consent)
+            deadline = time.monotonic() + 3
+            blocked = False
+            while time.monotonic() < deadline:
+                blocked = repository.connection.execute(
+                    "select %s=any(pg_blocking_pids(%s)) as waiting",
+                    (exporter.connection.info.backend_pid, writer.connection.info.backend_pid),
+                ).fetchone()["waiting"]
+                if blocked:
+                    break
+                time.sleep(0.01)
+            resume.set()
+            assert blocked, "the actual consent writer must reach the export's held source lock"
+>           assert (exporting.result(timeout=5), consenting.result(timeout=5)) == ("ok", "ok")
+E           AssertionError: assert ('ok', '40P01') == ('ok', 'ok')
+E             
+E             At index 1 diff: '40P01' != 'ok'
+E             Use -v to get more diff
+
+tests/test_training_export_postgres.py:372: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_training_export_postgres.py::test_training_export_and_presentation_writer_share_a_lock_order
