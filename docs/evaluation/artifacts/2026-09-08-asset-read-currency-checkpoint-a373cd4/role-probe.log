@@ -1,0 +1,33 @@
+BEGIN
+   current_database   | current_user | current_setting 
+----------------------+--------------+-----------------
+ exulanica_spine_test | glendonchin  | read committed
+(1 row)
+
+    rolname    | rolsuper | rolbypassrls 
+---------------+----------+--------------
+ exulanica_app | f        | f
+ exulanica_ro  | f        | f
+(2 rows)
+
+SET
+ current_user | current_setting 
+--------------+-----------------
+ exulanica_ro | on
+(1 row)
+
+ pg_advisory_xact_lock 
+-----------------------
+ 
+(1 row)
+
+     mode      | granted 
+---------------+---------
+ ExclusiveLock | t
+(1 row)
+
+ nspname | proname 
+---------+---------
+(0 rows)
+
+ROLLBACK
