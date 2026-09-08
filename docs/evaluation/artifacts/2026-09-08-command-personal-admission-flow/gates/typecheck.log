@@ -1,0 +1,4 @@
+
+> exulanica-web@ typecheck /Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+> tsc --build --force
+

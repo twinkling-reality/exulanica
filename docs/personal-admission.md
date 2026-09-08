@@ -147,3 +147,90 @@ Historical manifests contain expiring authority and a schema that the recorder r
 exact commands are audit evidence, not perpetual permissions; rerun the recorder to obtain a fresh
 isolated rehearsal. A successful command-local check is not production activation or a global
 privacy-policy guarantee.
+
+## Final verification and exact executed commands
+
+The [final command evidence](evaluation/2026-09-08-command-personal-admission-flow.json) binds the
+corrected recorder and remaining gates at `ff67b771c6993fcd8d16ae99c79950d69275a4fd`.
+The full backend run at the preceding candidate head returned **2070 passed, 3 skipped, 1 failed**:
+the failure was the retained-record test rejecting absolute workstation paths in command strings.
+The orchestrator authorized replacement of these two unpublished candidate records by real recorder
+reruns and removal of their defective unpublished history. Established main records were unchanged.
+The replacement digests and tested heads are retained in `gates/candidate-replacements.json`.
+
+After correction, all retained-record tests and 38 focused command/privacy/masking tests passed.
+Ruff, all import contracts, web typecheck, boundaries, and all 867 web tests passed. An intermediate
+Ruff failure in the generated mutant program was corrected in the recorder and re-executed; its log
+is retained too. Production and test source did not change after the full backend run. Per the
+orchestrator's explicit direction, the full backend suite was not repeated; independent full gates
+on the rebased integration tree remain pending. The known slow-stage lease test did not fail.
+
+The following commands were actually executed from the repository root. Their exact schema was
+removed after the rehearsal and their authority expires; they document the run, not a live schema.
+The pending-migrations refusal was executed before that isolated schema was migrated by the recorder.
+
+### pending-migrations (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/pending-migrations.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### missing-authority (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/missing-authority.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### expired-authority (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/expired-authority.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### wrong-source-bytes (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/wrong-source-bytes.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### admit (exit 0)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/admit.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### detection-only-geometry-refusal (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/detection-only-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### cross-workspace-refusal (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/cross-workspace-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### unmasked-person-geometry-refusal (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/unmasked-person-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### stale-mask-geometry-refusal (exit 1)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/stale-mask-geometry-refusal.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### final-geometry-permission (exit 0)
+
+```sh
+uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063 --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/final-geometry-permission.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data
+```
+
+### frontier-preflight (exit 1)
+
+```sh
+EXULANICA_DATABASE_URL='dbname=exulanica_spine_test host=localhost port=5433 hostaddr=127.0.0.1 options=-csearch_path=exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063,public' uv run python -m exulanica.orchestration.cli preflight --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-manifest.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data --output docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-output --private-key docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/not-supplied.pem
+```

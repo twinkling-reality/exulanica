@@ -1,0 +1,57 @@
+E401 [*] Multiple imports on one line
+ --> docs/evaluation/artifacts/2026-09-08-personal-admission-flow/command-guard-mutant.py:1:1
+  |
+1 | import inspect, pytest
+  | ^^^^^^^^^^^^^^^^^^^^^^
+2 | import exulanica.ingest.privacy as privacy
+3 | source = inspect.getsource(privacy)
+  |
+help: Split imports
+  |
+  - import inspect, pytest
+1 + import inspect
+2 + import pytest
+3 | import exulanica.ingest.privacy as privacy
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> docs/evaluation/artifacts/2026-09-08-personal-admission-flow/command-guard-mutant.py:1:1
+  |
+1 | / import inspect, pytest
+2 | | import exulanica.ingest.privacy as privacy
+  | |__________________________________________^
+3 |   source = inspect.getsource(privacy)
+4 |   guard = '    if not capture_mask_is_current(repository, capture_id):\n        raise PrivacyAdmissionError(\n            "privacy scre…
+  |
+help: Organize imports
+  |
+  - import inspect, pytest
+1 + import inspect
+2 +
+3 | import exulanica.ingest.privacy as privacy
+4 + import pytest
+5 +
+6 | source = inspect.getsource(privacy)
+  |
+
+E501 Line too long (218 > 100)
+ --> docs/evaluation/artifacts/2026-09-08-personal-admission-flow/command-guard-mutant.py:4:101
+  |
+2 | …
+3 | …
+4 | …dmissionError(\n            "privacy screening is stale: rebuild the current mask and re-screen before geometry"\n        )\n'
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | …
+6 | …
+  |
+
+E501 Line too long (137 > 100)
+ --> docs/evaluation/artifacts/2026-09-08-personal-admission-flow/command-guard-mutant.py:7:101
+  |
+5 | …
+6 | …le__, 'exec'), privacy.__dict__)
+7 | …dmission_flow.py::test_changed_region_requires_current_mask_before_geometry', '-q']))
+  |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Found 4 errors.
+[*] 2 fixable with the `--fix` option.

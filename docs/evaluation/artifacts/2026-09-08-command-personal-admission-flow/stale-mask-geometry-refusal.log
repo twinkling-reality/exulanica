@@ -1,0 +1,1 @@
+{"ok": false, "error": "privacy screening is stale: rebuild the current mask and re-screen before geometry", "action": "Correct the named input or obtain current review/authority; pending migrations require explicit operator application to the isolated schema. This command never migrates."}

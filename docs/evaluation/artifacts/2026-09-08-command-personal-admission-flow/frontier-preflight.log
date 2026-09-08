@@ -1,0 +1,78 @@
+{
+  "checks": [
+    {
+      "check": "manifest",
+      "detail": {
+        "sha256": "d8666e3f678766321817e7121478c1203c5483f546cc259fbf5a9581da9c05f2",
+        "sources": 2
+      },
+      "status": "passed"
+    },
+    {
+      "check": "photos",
+      "detail": {
+        "files_verified": 2,
+        "source_bytes": 4366
+      },
+      "status": "passed"
+    },
+    {
+      "action": "Create or select an owner-only Ed25519 signing key outside Git. Supply a regular PEM key file, not a symbolic link.",
+      "check": "signing_key",
+      "status": "failed"
+    },
+    {
+      "check": "write_boundary",
+      "detail": null,
+      "status": "passed"
+    },
+    {
+      "check": "store_writable",
+      "detail": "docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data/blobs",
+      "status": "passed"
+    },
+    {
+      "check": "output_writable",
+      "detail": "docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow",
+      "status": "passed"
+    },
+    {
+      "check": "disk_headroom",
+      "detail": {
+        "basis": "4x source bytes + 1 GiB reserve (+2 GiB for depth); planning allowance only",
+        "free_bytes_per_volume": [
+          101082677248
+        ],
+        "required_bytes_per_volume": 3221242936
+      },
+      "status": "passed"
+    },
+    {
+      "check": "database_environment",
+      "detail": "postgresql://localhost:5433/exulanica_spine_test",
+      "status": "passed"
+    },
+    {
+      "check": "database_schema_and_screening",
+      "detail": {
+        "migration_count": 39,
+        "schema": "exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063",
+        "screened_sources": 2
+      },
+      "status": "passed"
+    },
+    {
+      "check": "depth_dependencies",
+      "detail": "Modules present; weights, inference and hardware capacity remain runtime checks.",
+      "status": "passed"
+    }
+  ],
+  "not_executed": [
+    "model calls or live catalog",
+    "weight downloads or inference",
+    "ingest, migrations, signing, export or deletion"
+  ],
+  "profile": "exulanica-frontier-preflight/v1",
+  "read_only": true,
+  "status": "blocked"
+}

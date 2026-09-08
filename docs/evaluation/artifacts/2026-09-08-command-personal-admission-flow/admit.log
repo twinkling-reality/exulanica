@@ -1,0 +1,1 @@
+{"ok": true, "result": {"authorization_id": "333478a4-770a-5cec-a53e-2c41836b839d", "capture_id": "01a080f9-967e-7b79-b394-dc4f1b96a94f", "eligibility_state": "not-screened", "notice": "Account authority is not subject consent. Empty inventory is not human review.", "regions": [], "screening_id": null, "stages_reused": [], "stages_run": ["intake"], "stages_unavailable": []}}

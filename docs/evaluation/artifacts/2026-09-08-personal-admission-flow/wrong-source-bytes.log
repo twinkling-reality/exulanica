@@ -1,0 +1,1 @@
+{"ok": false, "error": "source bytes do not match the exact manifest digest and size", "action": "Correct the named input or obtain current review/authority; pending migrations require explicit operator application to the isolated schema. This command never migrates."}

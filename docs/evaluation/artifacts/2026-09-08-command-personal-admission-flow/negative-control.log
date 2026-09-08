@@ -1,0 +1,3 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+AssertionError: changed_region_requires_current_mask_before_geometry

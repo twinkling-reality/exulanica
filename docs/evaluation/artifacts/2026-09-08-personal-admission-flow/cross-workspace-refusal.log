@@ -1,0 +1,1 @@
+{"ok": false, "error": "exact capture is absent, deleted or belongs to another workspace", "action": "Correct the named input or obtain current review/authority; pending migrations require explicit operator application to the isolated schema. This command never migrates."}
