@@ -147,19 +147,30 @@ def main() -> None:
     for name, selector, kind, before, after in mutants:
         exact_selector = selector if selector.startswith("tests/") else SELECTOR + selector
         if kind == "sql":
+            before_literal = (
+                "(\n"
+                + "\n".join(repr(before[i : i + 60]) for i in range(0, len(before), 60))
+                + "\n)"
+            )
+            after_literal = (
+                "(\n" + "\n".join(repr(after[i : i + 60]) for i in range(0, len(after), 60)) + "\n)"
+            )
             program = f"""import pytest
 from exulanica.migrations import Migration
 original = Migration.sql.fget
+BEFORE = {before_literal}
+AFTER = {after_literal}
 
 def mutated(self: Migration) -> str:
     sql = original(self)
     if self.version == "0041":
-        assert {before!r} in sql
-        sql = sql.replace({before!r}, {after!r})
+        assert BEFORE in sql
+        sql = sql.replace(BEFORE, AFTER)
     return sql
 
 Migration.sql = property(mutated)
-raise SystemExit(pytest.main([{exact_selector!r}, "-q", "-ra"]))
+SELECTOR = {exact_selector!r}  # noqa: E501
+raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
 """
         else:
             program = f"""import pytest
@@ -169,7 +180,8 @@ def bypass(*args: object, **kwargs: object) -> None:
     pass
 
 evidence._authorize_original = bypass
-raise SystemExit(pytest.main([{exact_selector!r}, "-q", "-ra"]))
+SELECTOR = {exact_selector!r}  # noqa: E501
+raise SystemExit(pytest.main([SELECTOR, "-q", "-ra"]))
 """
         path = artifacts / f"{name}-mutant.py"
         path.write_text(program)
@@ -178,7 +190,7 @@ raise SystemExit(pytest.main([{exact_selector!r}, "-q", "-ra"]))
             [sys.executable, "-m", "ruff", "format", str(path)],
             [sys.executable, "-m", "ruff", "check", str(path)],
         ):
-            subprocess.run(argv, cwd=ROOT, check=True, capture_output=True)
+            subprocess.run(argv, cwd=ROOT, check="--fix" not in argv, capture_output=True)
         run(name, [sys.executable, str(path)], expected=1, failed=exact_selector)
         controls.append(
             {
@@ -236,6 +248,15 @@ raise SystemExit(pytest.main([{exact_selector!r}, "-q", "-ra"]))
         "commands": commands,
         "negative_controls": controls,
         "full_gates_executed": args.full_gates,
+        "recorder_intermediate_artifacts": [
+            binding(p)
+            for p in sorted(
+                (
+                    ROOT / "docs/evaluation/artifacts/2026-09-08-asset-read-currency-executed-01"
+                ).rglob("*")
+            )
+            if p.is_file()
+        ],
         "development_artifacts": [
             binding(p)
             for p in sorted(

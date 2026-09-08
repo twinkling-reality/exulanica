@@ -1,0 +1,18 @@
+E501 Line too long (112 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-asset-read-currency-executed-01/mask-lineage-mutant.py:10:101
+   |
+ 8 |     if self.version == "0041":
+ 9 |         assert 'and privacy_mask_matches(p_workspace,c.capture_id,m.artifact_id,inputs)' in sql
+10 |         sql = sql.replace('and privacy_mask_matches(p_workspace,c.capture_id,m.artifact_id,inputs)', 'and true')
+   |                                                                                                     ^^^^^^^^^^^^
+11 |     return sql
+   |
+
+E501 Line too long (136 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-asset-read-currency-executed-01/mask-lineage-mutant.py:14:101
+   |
+13 | …
+14 | …_currency.py::test_changed_outline_rebuild_does_not_revive_geometry', "-q", "-ra"]))
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Found 2 errors.

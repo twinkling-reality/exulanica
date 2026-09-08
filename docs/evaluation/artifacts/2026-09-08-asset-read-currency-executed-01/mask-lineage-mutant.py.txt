@@ -1,0 +1,14 @@
+import pytest
+from exulanica.migrations import Migration
+
+original = Migration.sql.fget
+
+def mutated(self: Migration) -> str:
+    sql = original(self)
+    if self.version == "0041":
+        assert 'and privacy_mask_matches(p_workspace,c.capture_id,m.artifact_id,inputs)' in sql
+        sql = sql.replace('and privacy_mask_matches(p_workspace,c.capture_id,m.artifact_id,inputs)', 'and true')
+    return sql
+
+Migration.sql = property(mutated)
+raise SystemExit(pytest.main(['tests/test_asset_read_currency.py::test_changed_outline_rebuild_does_not_revive_geometry', "-q", "-ra"]))
