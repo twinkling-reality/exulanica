@@ -33,6 +33,8 @@ Writable file set:
 - New `exulanica/migrations/0040_bind_geometry_admission_to_current_privacy_inputs.sql`.
 - `exulanica/ingest/privacy.py`, `exulanica/ingest/masked_inputs.py`, and
   `exulanica/ingest/spine/privacy.py` for this shared contract only.
+- `exulanica/ingest/person_state.py`, limited to the current-state reader and necessary
+  imports/docstring, under the producer extension approved below.
 - `exulanica/orchestration/preflight.py` and `demonstration.py`, only existing screening
   selection/checking seams if necessary to consume the corrected shared policy.
 - New `tests/test_screening_currency.py`; relevant cases in
@@ -47,6 +49,16 @@ registration, dependency or RLS-count changes. New columns/functions on existing
 used through 0040 if justified. If actual persisted lineage cannot support a sound check inside
 this scope, report the smallest producer/file extension before implementing a second policy or
 claiming success. Do not equate the latest timestamp or the existence of any mask with currency.
+
+Producer extension approved on 2026-09-08 after documentation checkpoint `08b3bdc`: the current
+person-state reader drops consent expiry, includes future-effective transitions and folds in a
+different order from SQL's current-consent policy. Its in-memory expired-grant probe is a
+diagnostic, not acceptance evidence. The one-file extension lets mask generation consume the
+shared current policy through the already permitted privacy seam. Preserve CaptureRegionState's
+public shape and existing mask digest formats. Execute database-backed producer/mask cases for
+expiry, future effectiveness, region/subject precedence, unknown subjects, withdrawal and
+rebuild/re-screening at the specified evaluation instant. The offline fold, pipeline, stage
+registry and asset-read endpoints are not added to scope by this approval.
 
 First document which exact recorded inputs establish currency, how a mask proves it used those
 inputs, how relevant consent expiry is evaluated without a write, and what is an immutable
