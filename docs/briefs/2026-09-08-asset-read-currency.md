@@ -1,5 +1,9 @@
 # Check current permission at asset reads
 
+Status: completed and integrated at `188e20c` after independent final gates. See
+`docs/integration-asset-read-currency-2026-09-08.md`, including the rejected evidence candidate
+and its authorized repair. Original dispatch scope and approvals are preserved below.
+
 Dispatched to `codex/asset-read-currency`; checkpoint approved below.
 Repository: `/Users/glendonchin/dev/Technology/orimera`.
 Product/package: Exulanica. This brief precedes recipient-checkable World Read evidence.

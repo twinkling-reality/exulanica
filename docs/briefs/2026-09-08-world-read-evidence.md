@@ -1,16 +1,17 @@
 # Start recipient-checkable World Read evidence work
 
-Queue this brief behind `docs/briefs/2026-09-08-asset-read-currency.md`. Shared screening currency
-has landed; see `docs/integration-screening-currency-2026-09-08.md` for executed results and the
-remaining asset-read activation dependency.
+Ready for dispatch after the asset-read integration; no task for this brief has been started.
+See `docs/integration-asset-read-currency-2026-09-08.md` for verified read behavior and remaining
+deployment, producer and real-data limits. This brief adds recipient evidence, not activation.
 Repository: `/Users/glendonchin/dev/Technology/orimera`; product/package: Exulanica.
 Read applicable AGENTS.md, `docs/integration-2026-09-08.md`, `docs/phase-10-tickets.md` P10-1/P10-5,
 `exulanica/graph/world_read.py`, `read_consent.py`, and the landed training export implementation.
 
 Create worktree `/Users/glendonchin/dev/Technology/exulanica-world-read-evidence`, branch
-`codex/world-read-evidence`, from current main containing `1353a21`.
+`codex/world-read-evidence`, from current main containing `188e20c`.
 Migration: NONE. If indispensable persisted evidence is missing, identify the producing seam and
-request a separate scoped follow-up; never invent lineage or quietly allocate migration 0040.
+request a separate scoped follow-up; never invent lineage or allocate a migration without an
+orchestrator reservation. Migrations 0039 through 0041 are already committed.
 
 Goal: add recipient-checkable recorded person-consent evidence and actual geometry source
 lineage to World Read. Current view entries carry camera/capture IDs without photo references;

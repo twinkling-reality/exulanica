@@ -1,5 +1,8 @@
 # Shared screening currency integration, 2026-09-08
 
+Follow-up: `integration-asset-read-currency-2026-09-08.md` records the subsequent asset-read
+integration. The report below preserves its original verified state and then-open dependencies.
+
 The screening-currency branch is integrated on main. Independent gates at `53039d4` passed:
 2098 backend tests, 3 skipped; 876 web tests; Ruff, all four import contracts, typecheck and
 frontend boundaries. Locked pose and reconstruction extras were installed before the suite.
