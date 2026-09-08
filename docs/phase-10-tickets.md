@@ -534,6 +534,109 @@ test module (one camera ring, transformed by a known similarity), not committed 
 
 ---
 
+### P10-3-a The place plane, decided before it is written
+
+**What.** The vocabulary decision recorded in `docs/place-identity.md`, "What a place is in the
+schema": a place is a new durable plane of `place`, `place_version` and `place_alignment`, it is not
+an `entity`, not a `region`, and not a column on `reconstruction_scene`.
+
+**Why now.** It names a durable entity that the existing code will have to address, and three
+things already mean something like it. Nothing downstream can start until the word resolves to one
+table.
+
+**Exit.**
+
+- [x] The decision written down with what it rejected and why, in `docs/place-identity.md`.
+- [x] Option C refuted against the live schema rather than on taste. MEASURED 2026-09-07:
+      `tg_reconstruction_scene_append_only` permits exactly one UPDATE on `reconstruction_scene`,
+      advancing `current_job_id` to a succeeded job, so setting a `place_id` on an existing scene
+      row is refused by the database.
+- [x] The `occurrence_class` collision closed by making the schema single-valued for the word
+      rather than by renaming the durable thing. MEASURED 2026-09-07 on the permitted instance:
+      `entity` holds one row and it is `person`, `occurrence` holds one row and it is `person`, so
+      the constraint that refuses an `entity` of class `'place'` applies to an empty set.
+
+**Files.** Edited: `docs/place-identity.md`, `docs/phase-10-tickets.md`.
+
+---
+
+### P10-3-b Migration 0038, the place plane
+
+**What.** `place`, `place_version` and `place_alignment`, each under FORCE row-level security keyed
+on `current_workspace()`, and a widened `an_artifact_names_one_subject` so an artifact may name a
+place.
+
+**Why now.** Every other part of capability 3 addresses a `place_id` that does not exist yet.
+
+**Exit.**
+
+- [ ] Migration `0038` applied to the permitted test instance and the migration suite green.
+- [ ] The workspace-keyed FORCE row-level security count updated in the three files that state it
+      in prose, with `test_the_prose_count_of_workspace_isolated_tables_matches_the_schema` passing
+      against the live schema rather than against a remembered number.
+- [ ] An `entity` row of class `'place'` is refused by a named constraint, asserted by a test named
+      for the failure it catches.
+- [ ] An `artifact` naming two subjects, or none, is refused, asserted by a test.
+- [ ] A `place_version` for a scene already in another place is refused, asserted by a test.
+
+**Files.** New: `exulanica/migrations/0038_a_place_is_more_than_one_capture.sql`, tests. Edited:
+`exulanica/db/session.py`, `exulanica/ingest/spine/__init__.py`, `tests/test_ingest_persistence.py`
+(the three prose counts only).
+
+---
+
+### P10-3-c The joint reconstruction build
+
+**What.** One new stage whose subject is a pair of scenes, its artifact kind, its receipt, its
+refusal path, and its own queue table, giving `exulanica/reconstruction/place_alignment.py` a
+production caller.
+
+**Why now.** `place_alignment.py` is measured against a synthetic fixture and called by nothing.
+Until something calls it, the fitter is a module and not a capability.
+
+**Exit.**
+
+- [ ] A `place_alignment` stage in `STAGES`, with the resulting `pipeline_digest()` movement
+      re-recorded rather than absorbed silently.
+- [ ] The stage's correspondences are built from the two scenes' retained `pose_receipt` artifacts
+      for `scene_xyz` and from the joint run for `joint_xyz`, never from a read-time join over
+      receipts, which `docs/place-identity.md` establishes cannot work.
+- [ ] Each of the three refusal reasons reachable and recorded as an outcome, asserted by tests
+      named for the refusal they catch.
+- [ ] The joint sparse model is not promoted to citable geometry; its digest is in the receipt.
+- [ ] **Open until real data.** No real COLMAP joint run has happened. MEASURED 2026-09-07:
+      `colmap` is not on this machine's PATH and is not installed through Homebrew, and the host is
+      darwin with no CUDA, so the stage's real path is scripted here exactly as every other
+      reconstruction stage's is.
+
+**Files.** New: `exulanica/ingest/stages/place_alignment.py`, queue and worker files, tests.
+Edited: `exulanica/ingest/stages/__init__.py`.
+
+---
+
+### P10-3-d The place read seam and the widened bundle
+
+**What.** A graph read seam for places following `exulanica/graph/reconstruction_scenes.py`, and a
+World Read bundle that addresses a place and a time.
+
+**Why now.** The bundle currently carries a string telling every recipient that place addressing
+does not exist. Deleting that string is the visible half of this capability.
+
+**Exit.**
+
+- [ ] `exulanica/graph/places.py` returns a place, its versions in capture order, and each
+      version's transform with the receipt that measured it and how many alignments it was composed
+      through.
+- [ ] The bundle's `addressing` block accepts a place and a time, resolves to one version, and the
+      scene address stays valid, because a scene is still a real thing after it joins a place.
+- [ ] The `limitation` string is deleted, and every retained record whose digest covered it is
+      re-recorded as a new dated record bound by `predecessor_record` to the one it follows.
+
+**Files.** New: `exulanica/graph/places.py`. Edited: `exulanica/graph/world_read.py`,
+`exulanica/api/routes/world_read.py`.
+
+---
+
 ## P10-4 Persistent objects
 
 Roadmap capability 4. Detections link into object entities across captures with user confirmation;
