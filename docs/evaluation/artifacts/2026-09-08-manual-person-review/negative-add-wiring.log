@@ -1,0 +1,29 @@
+
+ RUN  v2.1.9 /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+
+ ❯ packages/app/test/person-region-editor.test.ts (7 tests | 1 failed | 6 skipped) 5ms
+   × manual person authoring > draws a missed person from an empty detector inventory through the authenticated API payload 5ms
+     → Object.defineProperties called on non-object
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  08:04:59
+   Duration  468ms (transform 63ms, setup 0ms, collect 75ms, tests 5ms, environment 110ms, prepare 52ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/person-region-editor.test.ts > manual person authoring > draws a missed person from an empty detector inventory through the authenticated API payload
+TypeError: Object.defineProperties called on non-object
+ ❯ mounted packages/app/test/person-region-editor.test.ts:14:10
+     12|   document.body.append(root);
+     13|   const photo = root.querySelector('img')!;
+     14|   Object.defineProperties(photo, { naturalWidth: { value: 800 }, natur…
+       |          ^
+     15|   photo.dispatchEvent(new Event('load'));
+     16|   const stage = root.querySelector('.person-region-editor-stage')!;
+ ❯ packages/app/test/person-region-editor.test.ts:30:36
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+exit_code=1

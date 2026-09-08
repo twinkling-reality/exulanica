@@ -1,0 +1,68 @@
+[
+  {
+    "capture_id": "01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a",
+    "region_key": "d86e3ec3d0415a6557a430916683c7bfbc25fda228d2c67402261ec3115c9371",
+    "source_sha256": "e5207259850c1d90bf3a9f5242f01a969afa606bd55476198c9b317ee8c8c566",
+    "silhouette": {
+      "kind": "polygon",
+      "points": [
+        [
+          212686,
+          178757
+        ],
+        [
+          425683,
+          178757
+        ],
+        [
+          425683,
+          944100
+        ],
+        [
+          212686,
+          944100
+        ]
+      ]
+    },
+    "action": "added",
+    "confirmed_by": "afdc1cb3-9c4b-4885-b3c5-5994f5b10479",
+    "subject_id": null,
+    "region_record": {
+      "part": null,
+      "shape": "box",
+      "action": "added",
+      "profile": "exulanica.person-region-edit/v1",
+      "sequence": 0,
+      "capture_id": "01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a",
+      "confidence": null,
+      "region_key": "d86e3ec3d0415a6557a430916683c7bfbc25fda228d2c67402261ec3115c9371",
+      "silhouette": {
+        "kind": "polygon",
+        "points": [
+          [
+            212686,
+            178757
+          ],
+          [
+            425683,
+            178757
+          ],
+          [
+            425683,
+            944100
+          ],
+          [
+            212686,
+            944100
+          ]
+        ]
+      },
+      "subject_id": null,
+      "detector_id": null,
+      "recorded_at": "2026-09-08T12:21:24.045067Z",
+      "confirmed_by": "afdc1cb3-9c4b-4885-b3c5-5994f5b10479",
+      "source_sha256": "e5207259850c1d90bf3a9f5242f01a969afa606bd55476198c9b317ee8c8c566"
+    },
+    "region_digest": "4c2553c1cb25952270962994c11596c71c004ce89edaaee7f1aaa44fe14172a6"
+  }
+]

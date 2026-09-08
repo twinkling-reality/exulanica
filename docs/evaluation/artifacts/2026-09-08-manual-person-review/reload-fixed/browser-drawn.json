@@ -1,0 +1,27 @@
+{
+  "captureId": "01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a",
+  "coordinates": [
+    212686,
+    178757,
+    425683,
+    944100
+  ],
+  "layout": {
+    "height": "240",
+    "left": "951.0859375",
+    "naturalHeight": "400",
+    "naturalWidth": "800",
+    "top": "361.4921875",
+    "width": "277"
+  },
+  "gesture": {
+    "from": [
+      1010,
+      437
+    ],
+    "to": [
+      1069,
+      543
+    ]
+  }
+}

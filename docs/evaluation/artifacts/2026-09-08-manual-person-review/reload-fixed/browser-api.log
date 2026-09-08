@@ -1,0 +1,54 @@
+INFO:     Started server process [22820]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8137 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54465 - "GET /graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54467 - "GET /world/styles/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54469 - "GET /world/styles/versions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54468 - "GET /world/styles/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54472 - "GET /world/interactions/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54474 - "GET /world/source-media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54477 - "GET /evidence/01a080f6-8d78-77d7-8506-5dd2e5dd27d3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54480 - "GET /evidence/01a080f6-8daa-7a38-bee9-91f7e6cf9183 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54483 - "GET /geometry HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54486 - "GET /formation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54501 - "GET /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54574 - "GET /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54577 - "POST /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a/edits HTTP/1.1" 201 Created
+INFO:     127.0.0.1:54591 - "GET /graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54593 - "GET /world/styles/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54595 - "GET /world/styles/versions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54594 - "GET /world/styles/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54598 - "GET /world/interactions/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54601 - "GET /world/source-media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54604 - "GET /evidence/01a080f6-8daa-7a38-bee9-91f7e6cf9183 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54607 - "GET /geometry HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54610 - "GET /formation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54619 - "GET /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54627 - "GET /person-regions/01a080f6-8daa-7259-becf-8821c6501f73 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54678 - "GET /graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54680 - "GET /world/styles/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54682 - "GET /world/styles/versions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54681 - "GET /world/styles/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54685 - "GET /world/interactions/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54687 - "GET /world/source-media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54690 - "GET /evidence/01a080f6-8daa-7a38-bee9-91f7e6cf9183 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54693 - "GET /geometry HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54696 - "GET /formation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54713 - "GET /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54717 - "GET /person-regions/01a080f6-8daa-7259-becf-8821c6501f73 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54736 - "GET /graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54738 - "GET /world/styles/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54740 - "GET /world/styles/versions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54739 - "GET /world/styles/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54743 - "GET /world/interactions/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54745 - "GET /world/source-media HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54748 - "GET /evidence/01a080f6-8daa-7a38-bee9-91f7e6cf9183 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54751 - "GET /geometry HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54754 - "GET /formation HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54764 - "GET /person-regions/01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54768 - "GET /person-regions/01a080f6-8daa-7259-becf-8821c6501f73 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22820]

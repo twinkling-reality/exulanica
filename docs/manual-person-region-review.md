@@ -1,7 +1,8 @@
 # Manual person-region authoring
 
 Implementation branch: `codex/manual-person-review`, based on main `1353a21`.
-Migration: none. Browser acceptance: **pending serialized main.ts integration**.
+Migration: none. Browser acceptance: **executed on integrated `2af3049`**.
+The implementation branch keeps main.ts unchanged; the orchestrator owns integration.
 
 The inspector review panel accepts an editor even when the detector inventory is empty.
 The editor uses only the existing authorized source descriptor. Missing or failed media disables
@@ -33,7 +34,7 @@ memory grows with photographs actually opened in this session, not the whole cap
 
 ## Reserved integration
 
-Apply `docs/patches/manual-person-review-main.patch` in serialized integration. The patch adds
+The orchestrator applied `docs/patches/manual-person-review-main.patch` in serialized integration. The patch adds
 session draft ownership, generation checks for asynchronous review loads, immediate clearing on
 capture changes, explicit reload, and the existing authorized `sourceForCapture` descriptor.
 The onAdd adapter uses the existing API and checks whether the same draft key already landed.
@@ -49,9 +50,34 @@ switch while a response is pending. The executed negative control removes editor
 fails `draws a missed person from an empty detector inventory through the authenticated API
 payload`. It is a component control, not the still-pending mounted-browser control.
 
-After integration, use an isolated generated-image test workspace against the real authenticated
-route. Open the actual app inspector, add a region, reload, verify the stored region and owner
-receipt, and confirm another capture stays unreviewed. Bind screenshots to the generated image,
-capture, request and stored row. Execute a negative control removing the integrated add wiring
-and require that same browser path to fail. No browser screenshot or persistence result is
-claimed here. Full-suite logs will be retained after the orchestrator assigns a machine slot.
+The mounted browser was exercised against real authenticated routes in two disposable generated
+workspaces. The accepted replay is `artifacts/2026-09-08-manual-person-review/reload-fixed`,
+at integrated head `2af30493fab6a50757e0f6571d1bf14cee525e57`. It draws on a labelled 800x400 image,
+saves once, reloads the entire app, reopens the saved region with identical coordinates and key,
+and verifies the authenticated owner actor in PostgreSQL. There are zero subjects and zero
+presentation consent receipts. The other photograph remains unreviewed. The displayed normalized
+coordinates are independently recomputed from the actual image layout and pointer endpoints.
+
+The named browser control is `mounted-empty-detector-person-authoring`. Its selector is the button
+with exact accessible name `Save person region`. The intact empty-detector path passes. Removing
+only the editor mount makes that path fail with `Save person region is missing`. Exact source
+restoration restores the passing path. Both scratch schemas were dropped, both service ports
+closed, and the integration checkout was clean after the experiment. Screenshots and stored rows
+are bound by `2026-09-08-manual-person-review.json`, produced by the recorder.
+
+The first run at `098ae51` is retained separately from the accepted `reload-fixed` replay. It saved
+and reloaded the review successfully, but a full app reload exposed a metadata gap: privacy-withheld
+source media dropped its capture IDs, so the source-only inspector could not reopen the review.
+The orchestrator explicitly extended ownership to `_source_from_row` in `exulanica/world/repository.py`
+and the relevant cases in `tests/test_world_api.py` and `tests/test_world_style_postgres.py`.
+That correction retains IDs only for a live, otherwise-resolvable source withheld for a pending
+mask. State stays unavailable; evidence paths and asset references stay absent. Deleted, missing,
+purged and foreign-workspace behavior is unchanged. Existing citation resolver policy is unchanged.
+
+The full backend suite at `358be0b` passed 2058 tests with 3 skips. Import contracts passed.
+Initial Ruff and web failures caught fixture formatting and palette literals; corrected runs pass.
+At corrected frontend tip `7af8ee2`, typecheck, boundaries and all 876 web tests pass. At `f3a601f`,
+20 focused backend tests verify pending-mask identity, unavailable byte references, masked-route
+refusal, deletion and workspace isolation; Ruff and import-linter pass. Per orchestrator scheduling,
+the final independent full backend suite after that narrow correction is the orchestrator's gate.
+No final full-backend result is inferred from the earlier run.

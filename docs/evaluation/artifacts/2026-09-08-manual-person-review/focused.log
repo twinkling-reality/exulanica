@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+
+ ✓ packages/app/test/person-review.test.ts (13 tests) 11ms
+ ✓ packages/app/test/person-review-api.test.ts (8 tests) 9ms
+ ✓ packages/app/test/person-region-editor.test.ts (7 tests) 23ms
+
+ Test Files  3 passed (3)
+      Tests  28 passed (28)
+   Start at  08:04:34
+   Duration  576ms (transform 118ms, setup 0ms, collect 204ms, tests 43ms, environment 469ms, prepare 139ms)
+

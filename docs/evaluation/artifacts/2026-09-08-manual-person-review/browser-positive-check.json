@@ -1,0 +1,27 @@
+{
+  "path": "mounted-empty-detector-person-authoring",
+  "passed": true,
+  "stored_outline": [
+    [
+      212686,
+      178757
+    ],
+    [
+      425683,
+      178757
+    ],
+    [
+      425683,
+      944100
+    ],
+    [
+      212686,
+      944100
+    ]
+  ],
+  "capture_id": "01a080f0-4caf-771c-99a8-be9c9d1f46f0",
+  "other_capture_unchanged": true,
+  "subject_id": null,
+  "state": "unknown",
+  "integrated_head": "098ae51d84352efc797d8f9cddc556a5f3c12567"
+}

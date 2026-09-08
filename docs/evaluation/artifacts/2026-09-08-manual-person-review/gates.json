@@ -1,0 +1,65 @@
+[
+  {
+    "gate": "backend",
+    "command": [
+      "uv",
+      "run",
+      "--extra",
+      "pose",
+      "--extra",
+      "reconstruction",
+      "pytest"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "ruff",
+    "command": [
+      "uv",
+      "run",
+      "ruff",
+      "check",
+      "."
+    ],
+    "exit_code": 1
+  },
+  {
+    "gate": "imports",
+    "command": [
+      "uv",
+      "run",
+      "lint-imports"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "typecheck",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "typecheck"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "boundaries",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "boundaries"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "web",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "test"
+    ],
+    "exit_code": 1
+  }
+]

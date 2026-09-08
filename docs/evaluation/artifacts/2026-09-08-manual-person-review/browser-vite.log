@@ -1,0 +1,13 @@
+
+> @exulanica/app@0.1.0 dev /Users/glendonchin/dev/Technology/exulanica-manual-integration/web/packages/app
+> vite --host 127.0.0.1 --port 5197 --strictPort
+
+
+  VITE v6.4.3  ready in 698 ms
+
+  ➜  Local:   http://127.0.0.1:5197/
+8:16:09 AM [vite] (client) page reload src/ui/person-review.ts
+8:16:52 AM [vite] (client) page reload src/ui/person-review.ts
+/Users/glendonchin/dev/Technology/exulanica-manual-integration/web/packages/app:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @exulanica/app@0.1.0 dev: `vite --host 127.0.0.1 --port 5197 --strictPort`
+Exit status 143

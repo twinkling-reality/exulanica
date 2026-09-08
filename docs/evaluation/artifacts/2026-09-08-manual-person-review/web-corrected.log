@@ -1,0 +1,130 @@
+
+> exulanica-web@ test /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+> vitest run
+
+
+ RUN  v2.1.9 /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+
+ ✓ packages/atlas-react/test/opm.test.ts (20 tests) 6ms
+ ✓ packages/presentation/test/world-profiles.test.ts (13 tests) 9ms
+ ✓ packages/graph-client/test/snapshot.test.ts (19 tests) 5ms
+ ✓ packages/graph-client/test/islands.test.ts (15 tests) 6ms
+ ✓ packages/app/test/world-style-api.test.ts (7 tests) 26ms
+ ✓ packages/companion-runtime/test/option-pool.test.ts (13 tests) 13ms
+ ✓ packages/world-index/test/index.test.ts (26 tests) 13ms
+ ✓ packages/atlas-core/test/focus.test.ts (17 tests) 6ms
+ ✓ packages/atlas-core/test/manifest.test.ts (19 tests) 8ms
+ ✓ packages/atlas-core/test/layout.test.ts (18 tests) 13ms
+ ✓ packages/companion-runtime/test/proposal.test.ts (15 tests) 12ms
+ ✓ packages/atlas-core/test/observation-pick.test.ts (18 tests) 8ms
+ ✓ packages/app/test/scene.test.ts (14 tests) 12ms
+ ✓ packages/companion-runtime/test/tiers.test.ts (13 tests) 9ms
+ ✓ packages/atlas-core/test/navigation.test.ts (12 tests) 54ms
+ ✓ packages/atlas-core/test/display-frame.test.ts (5 tests) 6ms
+ ✓ packages/atlas-core/test/world-customization.test.ts (6 tests) 16ms
+ ✓ packages/presentation/test/media-palette.test.ts (8 tests) 144ms
+ ✓ packages/atlas-react/test/physical-residency.test.ts (6 tests) 35ms
+ ✓ packages/atlas-core/test/world-composer.test.ts (5 tests) 84ms
+ ✓ packages/app/test/preferences.test.ts (8 tests) 6ms
+ ✓ packages/graph-client/test/client.test.ts (9 tests) 19ms
+ ✓ packages/landing/test/motion.test.ts (4 tests) 8ms
+ ✓ packages/companion-runtime/test/initiative.test.ts (10 tests) 5ms
+ ✓ packages/formation/test/http-source.test.ts (11 tests) 28ms
+ ✓ packages/graph-client/test/person-presentation.test.ts (16 tests) 6ms
+ ✓ packages/app/test/interaction-policy.test.ts (4 tests) 7ms
+ ✓ packages/world-index/test/proposals.test.ts (10 tests) 5ms
+ ✓ packages/atlas-core/test/residency.test.ts (7 tests) 9ms
+ ✓ packages/formation/test/labels.test.ts (12 tests) 5ms
+ ✓ packages/atlas-react/test/source-presentation.test.ts (7 tests) 20ms
+ ✓ packages/app/test/geometry-api.test.ts (27 tests) 67ms
+ ✓ packages/atlas-react/test/python-writer.test.ts (6 tests) 5ms
+ ✓ packages/app/test/source-media-api.test.ts (4 tests) 13ms
+ ✓ packages/formation/test/state.test.ts (11 tests) 4ms
+ ✓ packages/atlas-three/test/semantic-state.test.ts (9 tests) 6ms
+ ✓ packages/atlas-core/test/coords.test.ts (11 tests) 5ms
+ ✓ packages/atlas-react/test/semantics.test.ts (6 tests) 2ms
+ ✓ packages/atlas-three/test/containment.test.ts (5 tests) 3ms
+ ✓ packages/presentation/test/proof-lens.test.ts (11 tests) 3ms
+ ✓ packages/atlas-core/test/neighborhood.test.ts (6 tests) 70ms
+ ✓ packages/atlas-core/test/neighborhood-snapshot.test.ts (5 tests) 12ms
+ ✓ packages/presentation/test/companion-catalog.test.ts (4 tests) 49ms
+ ✓ packages/app/test/observations-api.test.ts (15 tests) 16ms
+ ✓ packages/presentation/test/system.test.ts (5 tests) 6ms
+ ✓ packages/atlas-core/test/direct-navigation.test.ts (6 tests) 3ms
+ ✓ packages/atlas-react/test/region-relief.test.ts (5 tests) 51ms
+ ✓ packages/app/test/world-shell.test.ts (13 tests) 6ms
+ ✓ packages/formation/test/purity.test.ts (16 tests) 4ms
+ ✓ packages/graph-client/test/source.test.ts (4 tests) 6ms
+ ✓ packages/app/test/proposal.test.ts (5 tests) 4ms
+ ✓ packages/presentation/test/world-style-registry.test.ts (6 tests) 19ms
+ ✓ packages/app/test/map-peek.test.ts (8 tests) 3ms
+ ✓ packages/atlas-core/test/corridor.test.ts (3 tests) 2ms
+ ✓ packages/atlas-core/test/layout-snapshot.test.ts (5 tests) 3ms
+ ✓ packages/app/test/first-use-guidance.test.ts (4 tests) 3ms
+ ✓ packages/app/test/copy.test.ts (5 tests) 12ms
+ ✓ packages/landing/test/viewport-boundary.test.ts (5 tests) 2ms
+ ✓ packages/atlas-react/test/scene-splats.test.ts (5 tests) 25ms
+ ✓ packages/app/test/style-contract.test.ts (3 tests) 9ms
+ ✓ packages/atlas-react/test/frame-policy.test.ts (7 tests) 4ms
+ ✓ packages/atlas-react/test/interaction-affordance.test.ts (6 tests) 2ms
+ ✓ packages/app/test/companion-controller.test.ts (1 test) 2ms
+ ✓ packages/atlas-core/test/render-origin.test.ts (2 tests) 4ms
+ ✓ packages/atlas-core/test/performance-pressure.test.ts (3 tests) 5ms
+ ✓ packages/landing/test/atlas-destination.test.ts (5 tests) 3ms
+ ✓ packages/presentation/test/companion-appearance.test.ts (3 tests) 2ms
+ ✓ packages/atlas-react/test/motes.test.ts (4 tests) 3ms
+ ✓ packages/atlas-react/test/scene-point-maps.test.ts (4 tests) 6ms
+ ✓ packages/app/test/companion-placement.test.ts (2 tests) 4ms
+ ✓ packages/app/test/browser-validation.test.ts (2 tests) 2ms
+ ✓ packages/app/test/world-style-proposals.test.ts (1 test) 2ms
+ ✓ packages/presentation/test/companion-avatar-blueprint.test.ts (1 test) 7ms
+ ✓ packages/atlas-react/test/source-media.test.ts (1 test) 4ms
+ ✓ packages/atlas-react/test/source-first-arrival.test.ts (2 tests) 2ms
+ ✓ packages/atlas-react/test/world-field-buffers.test.ts (1 test) 4ms
+ ✓ packages/atlas-react/test/world-motion.test.ts (2 tests) 1ms
+ ✓ packages/landing/test/surface-transition.test.ts (11 tests) 26ms
+ ✓ packages/atlas-react/test/presentation-theme.test.ts (2 tests) 5ms
+ ✓ packages/app/test/companion-panel.test.ts (18 tests) 38ms
+ ✓ packages/app/test/person-review-api.test.ts (8 tests) 26ms
+ ✓ packages/landing/test/title-screen.test.ts (6 tests) 53ms
+ ✓ packages/app/test/options.test.ts (10 tests) 150ms
+ ✓ packages/app/test/person-region-editor.test.ts (9 tests) 67ms
+ ✓ packages/landing/test/companion-menu.test.ts (7 tests) 41ms
+ ✓ packages/app/test/surface.test.ts (20 tests) 86ms
+ ✓ packages/app/test/status-rungs.test.ts (10 tests) 27ms
+ ✓ packages/app/test/proof-lens-toggle.test.ts (6 tests) 25ms
+ ✓ packages/app/test/reconstruction-evidence.test.ts (7 tests) 44ms
+ ✓ packages/landing/test/gradient-forms.test.ts (8 tests) 75ms
+ ✓ packages/app/test/person-review.test.ts (13 tests) 20ms
+ ✓ packages/app/test/preview.test.ts (8 tests) 89ms
+ ✓ packages/app/test/region-plan.test.ts (11 tests) 24ms
+ ✓ packages/app/test/forming.test.ts (9 tests) 17ms
+ ✓ packages/app/test/reconstruction-inspector.test.ts (6 tests) 24ms
+ ✓ packages/atlas-react/test/controls.test.ts (7 tests) 29ms
+ ✓ packages/app/test/theme.test.ts (4 tests) 28ms
+ ✓ packages/app/test/companion-customization.test.ts (3 tests) 153ms
+ ✓ packages/app/test/companion-stage.test.ts (4 tests) 20ms
+ ✓ packages/app/test/confirm.test.ts (2 tests) 17ms
+ ✓ packages/atlas-react/test/scene-inspection.test.ts (5 tests) 10ms
+ ✓ packages/app/test/browser-validation-record.test.ts (1 test) 12ms
+ ✓ packages/app/test/startup-state.test.ts (3 tests) 17ms
+ ✓ packages/companion-forms/test/forms.test.ts (9 tests) 48ms
+ ✓ packages/landing/test/informational-pages.test.ts (3 tests) 11ms
+ ✓ packages/app/test/settings.test.ts (2 tests) 30ms
+ ✓ packages/app/test/atlas-commands.test.ts (2 tests) 33ms
+ ✓ packages/app/test/empty-world.test.ts (2 tests) 11ms
+ ✓ packages/app/test/world-chrome.test.ts (1 test) 5ms
+ ✓ packages/scene-synth/test/generator.test.ts (25 tests) 6361ms
+   ✓ the generator is deterministic and exact > produces byte-identical buffers for the same seed 996ms
+   ✓ the generator is deterministic and exact > produces a different world for a different seed 961ms
+   ✓ the generator is deterministic and exact > hits the requested point count exactly 1550ms
+   ✓ the generator is deterministic and exact > uses no ambient randomness 315ms
+   ✓ the output is a 2.5D shell, not a cloud in a box > labels every point with a segment id from the declared table 647ms
+   ✓ the ladder is one place at several resolutions > keeps the valid-pixel fraction stable across rungs 1835ms
+ ✓ packages/atlas-react/test/map-region-overlay.test.ts (2 tests) 5ms
+
+ Test Files  111 passed (111)
+      Tests  876 passed (876)
+   Start at  08:12:28
+   Duration  8.12s (transform 4.36s, setup 0ms, collect 24.14s, tests 8.70s, environment 11.10s, prepare 7.36s)
+

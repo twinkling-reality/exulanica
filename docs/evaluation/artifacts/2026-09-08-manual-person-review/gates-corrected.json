@@ -1,0 +1,35 @@
+[
+  {
+    "gate": "typecheck",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "typecheck"
+    ],
+    "tested_head": "7af8ee26128b4d5cd0c96c56aee91070705cbde0",
+    "exit_code": 0
+  },
+  {
+    "gate": "boundaries",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "boundaries"
+    ],
+    "tested_head": "7af8ee26128b4d5cd0c96c56aee91070705cbde0",
+    "exit_code": 0
+  },
+  {
+    "gate": "web",
+    "command": [
+      "pnpm",
+      "--dir",
+      "web",
+      "test"
+    ],
+    "tested_head": "7af8ee26128b4d5cd0c96c56aee91070705cbde0",
+    "exit_code": 0
+  }
+]

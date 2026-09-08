@@ -1,0 +1,30 @@
+[
+  {
+    "capture_id": "01a080f0-4caf-771c-99a8-be9c9d1f46f0",
+    "region_key": "38137d34cb48db2389e6c15a52a0a43906ec81b4150971037981aa574ba12014",
+    "silhouette": {
+      "kind": "polygon",
+      "points": [
+        [
+          212686,
+          178757
+        ],
+        [
+          425683,
+          178757
+        ],
+        [
+          425683,
+          944100
+        ],
+        [
+          212686,
+          944100
+        ]
+      ]
+    },
+    "action": "added",
+    "confirmed_by": "988f8ae5-5d24-4b7d-a37c-38bb6cfba00a",
+    "subject_id": null
+  }
+]

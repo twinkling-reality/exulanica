@@ -1,0 +1,3552 @@
+
+> exulanica-web@ test /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+> vitest run
+
+
+ RUN  v2.1.9 /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+
+ ✓ packages/atlas-react/test/opm.test.ts (20 tests) 5ms
+ ✓ packages/graph-client/test/snapshot.test.ts (19 tests) 6ms
+ ✓ packages/graph-client/test/islands.test.ts (15 tests) 9ms
+ ✓ packages/presentation/test/world-profiles.test.ts (13 tests) 20ms
+ ✓ packages/app/test/world-style-api.test.ts (7 tests) 33ms
+ ✓ packages/companion-runtime/test/option-pool.test.ts (13 tests) 7ms
+ ✓ packages/world-index/test/index.test.ts (26 tests) 10ms
+ ✓ packages/atlas-core/test/manifest.test.ts (19 tests) 10ms
+ ✓ packages/atlas-core/test/focus.test.ts (17 tests) 10ms
+ ✓ packages/atlas-core/test/layout.test.ts (18 tests) 22ms
+ ✓ packages/companion-runtime/test/proposal.test.ts (15 tests) 14ms
+ ✓ packages/app/test/scene.test.ts (14 tests) 8ms
+ ✓ packages/atlas-core/test/observation-pick.test.ts (18 tests) 4ms
+ ✓ packages/companion-runtime/test/tiers.test.ts (13 tests) 9ms
+ ✓ packages/atlas-core/test/navigation.test.ts (12 tests) 21ms
+ ✓ packages/atlas-core/test/world-customization.test.ts (6 tests) 9ms
+ ✓ packages/presentation/test/media-palette.test.ts (8 tests) 21ms
+ ✓ packages/atlas-core/test/display-frame.test.ts (5 tests) 6ms
+ ✓ packages/atlas-react/test/physical-residency.test.ts (6 tests) 10ms
+ ✓ packages/graph-client/test/client.test.ts (9 tests) 13ms
+ ✓ packages/atlas-core/test/world-composer.test.ts (5 tests) 39ms
+ ✓ packages/landing/test/motion.test.ts (4 tests) 4ms
+ ✓ packages/app/test/preferences.test.ts (8 tests) 13ms
+ ✓ packages/companion-runtime/test/initiative.test.ts (10 tests) 3ms
+ ✓ packages/formation/test/http-source.test.ts (11 tests) 18ms
+ ✓ packages/graph-client/test/person-presentation.test.ts (16 tests) 5ms
+ ✓ packages/world-index/test/proposals.test.ts (10 tests) 6ms
+ ✓ packages/app/test/interaction-policy.test.ts (4 tests) 8ms
+ ✓ packages/atlas-core/test/residency.test.ts (7 tests) 11ms
+ ✓ packages/formation/test/labels.test.ts (12 tests) 5ms
+ ✓ packages/atlas-react/test/python-writer.test.ts (6 tests) 6ms
+ ✓ packages/app/test/source-media-api.test.ts (4 tests) 6ms
+ ✓ packages/app/test/geometry-api.test.ts (27 tests) 89ms
+ ✓ packages/formation/test/state.test.ts (11 tests) 7ms
+ ✓ packages/atlas-react/test/source-presentation.test.ts (7 tests) 51ms
+ ✓ packages/atlas-three/test/semantic-state.test.ts (9 tests) 2ms
+ ✓ packages/atlas-core/test/coords.test.ts (11 tests) 4ms
+ ✓ packages/atlas-three/test/containment.test.ts (5 tests) 6ms
+ ✓ packages/atlas-react/test/semantics.test.ts (6 tests) 3ms
+ ✓ packages/atlas-core/test/neighborhood.test.ts (6 tests) 35ms
+ ✓ packages/atlas-core/test/neighborhood-snapshot.test.ts (5 tests) 6ms
+ ✓ packages/atlas-react/test/region-relief.test.ts (5 tests) 70ms
+ ✓ packages/presentation/test/proof-lens.test.ts (11 tests) 14ms
+ ✓ packages/app/test/observations-api.test.ts (15 tests) 9ms
+ ✓ packages/presentation/test/system.test.ts (5 tests) 8ms
+ ✓ packages/atlas-core/test/direct-navigation.test.ts (6 tests) 4ms
+ ✓ packages/app/test/world-shell.test.ts (13 tests) 10ms
+ ✓ packages/presentation/test/companion-catalog.test.ts (4 tests) 64ms
+ ✓ packages/formation/test/purity.test.ts (16 tests) 7ms
+ ✓ packages/graph-client/test/source.test.ts (4 tests) 6ms
+ ✓ packages/app/test/proposal.test.ts (5 tests) 2ms
+ ✓ packages/presentation/test/world-style-registry.test.ts (6 tests) 54ms
+ ✓ packages/app/test/map-peek.test.ts (8 tests) 5ms
+ ✓ packages/atlas-core/test/layout-snapshot.test.ts (5 tests) 3ms
+ ✓ packages/atlas-core/test/corridor.test.ts (3 tests) 4ms
+ ✓ packages/app/test/copy.test.ts (5 tests) 14ms
+ ✓ packages/app/test/first-use-guidance.test.ts (4 tests) 3ms
+ ✓ packages/atlas-react/test/scene-splats.test.ts (5 tests) 11ms
+ ✓ packages/landing/test/viewport-boundary.test.ts (5 tests) 4ms
+ ❯ packages/app/test/style-contract.test.ts (3 tests | 1 failed) 7ms
+   × world-owned interface style contract > keeps palette literals out of component styles 6ms
+     → expected '/*\n * The authenticated surface.\n *…' not to match /#[0-9a-f]{3,8}\b/i
+ ✓ packages/atlas-react/test/frame-policy.test.ts (7 tests) 4ms
+ ✓ packages/atlas-core/test/performance-pressure.test.ts (3 tests) 6ms
+ ✓ packages/atlas-react/test/interaction-affordance.test.ts (6 tests) 3ms
+ ✓ packages/atlas-core/test/render-origin.test.ts (2 tests) 5ms
+ ✓ packages/app/test/companion-controller.test.ts (1 test) 2ms
+ ✓ packages/atlas-react/test/motes.test.ts (4 tests) 3ms
+ ✓ packages/landing/test/atlas-destination.test.ts (5 tests) 1ms
+ ✓ packages/presentation/test/companion-appearance.test.ts (3 tests) 4ms
+ ✓ packages/app/test/companion-placement.test.ts (2 tests) 2ms
+ ✓ packages/app/test/browser-validation.test.ts (2 tests) 2ms
+ ✓ packages/atlas-react/test/source-media.test.ts (1 test) 1ms
+ ✓ packages/atlas-react/test/scene-point-maps.test.ts (4 tests) 3ms
+ ✓ packages/app/test/world-style-proposals.test.ts (1 test) 4ms
+ ✓ packages/presentation/test/companion-avatar-blueprint.test.ts (1 test) 3ms
+ ✓ packages/atlas-react/test/world-field-buffers.test.ts (1 test) 4ms
+ ✓ packages/atlas-react/test/source-first-arrival.test.ts (2 tests) 3ms
+ ✓ packages/landing/test/surface-transition.test.ts (11 tests) 28ms
+ ✓ packages/atlas-react/test/presentation-theme.test.ts (2 tests) 2ms
+ ✓ packages/atlas-react/test/world-motion.test.ts (2 tests) 2ms
+ ✓ packages/app/test/companion-panel.test.ts (18 tests) 35ms
+ ✓ packages/app/test/person-review-api.test.ts (8 tests) 15ms
+ ✓ packages/landing/test/title-screen.test.ts (6 tests) 46ms
+ ✓ packages/app/test/options.test.ts (10 tests) 145ms
+ ✓ packages/landing/test/companion-menu.test.ts (7 tests) 56ms
+ ✓ packages/app/test/surface.test.ts (20 tests) 52ms
+ ✓ packages/app/test/status-rungs.test.ts (10 tests) 37ms
+ ✓ packages/landing/test/gradient-forms.test.ts (8 tests) 53ms
+ ✓ packages/app/test/person-region-editor.test.ts (7 tests) 76ms
+ ✓ packages/app/test/proof-lens-toggle.test.ts (6 tests) 21ms
+ ✓ packages/app/test/reconstruction-evidence.test.ts (7 tests) 36ms
+ ✓ packages/app/test/person-review.test.ts (13 tests) 37ms
+ ✓ packages/atlas-react/test/controls.test.ts (7 tests) 8ms
+ ✓ packages/app/test/preview.test.ts (8 tests) 51ms
+ ✓ packages/app/test/forming.test.ts (9 tests) 10ms
+ ✓ packages/app/test/reconstruction-inspector.test.ts (6 tests) 25ms
+ ✓ packages/app/test/region-plan.test.ts (11 tests) 28ms
+ ✓ packages/app/test/theme.test.ts (4 tests) 20ms
+ ✓ packages/app/test/companion-customization.test.ts (3 tests) 87ms
+ ✓ packages/atlas-react/test/scene-inspection.test.ts (5 tests) 24ms
+ ✓ packages/app/test/companion-stage.test.ts (4 tests) 14ms
+ ✓ packages/app/test/confirm.test.ts (2 tests) 10ms
+ ✓ packages/app/test/browser-validation-record.test.ts (1 test) 16ms
+ ✓ packages/companion-forms/test/forms.test.ts (9 tests) 38ms
+ ✓ packages/app/test/startup-state.test.ts (3 tests) 7ms
+ ✓ packages/app/test/settings.test.ts (2 tests) 33ms
+ ✓ packages/landing/test/informational-pages.test.ts (3 tests) 11ms
+ ✓ packages/app/test/atlas-commands.test.ts (2 tests) 13ms
+ ✓ packages/app/test/empty-world.test.ts (2 tests) 6ms
+ ✓ packages/app/test/world-chrome.test.ts (1 test) 3ms
+ ✓ packages/atlas-react/test/map-region-overlay.test.ts (2 tests) 8ms
+ ✓ packages/scene-synth/test/generator.test.ts (25 tests) 5231ms
+   ✓ the generator is deterministic and exact > produces byte-identical buffers for the same seed 821ms
+   ✓ the generator is deterministic and exact > produces a different world for a different seed 800ms
+   ✓ the generator is deterministic and exact > hits the requested point count exactly 1662ms
+   ✓ the output is a 2.5D shell, not a cloud in a box > labels every point with a segment id from the declared table 358ms
+   ✓ the ladder is one place at several resolutions > keeps the valid-pixel fraction stable across rungs 1311ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/app/test/style-contract.test.ts > world-owned interface style contract > keeps palette literals out of component styles
+AssertionError: expected '/*\n * The authenticated surface.\n *…' not to match /#[0-9a-f]{3,8}\b/i
+
+- Expected: 
+/#[0-9a-f]{3,8}\b/i
+
++ Received: 
+"/*
+ * The authenticated surface.
+ *
+ * One full-bleed canvas with summoned chrome over it. The canvas is fixed behind everything and is
+ * never unmounted, so a layout change is a change of what is over it rather than a page.
+ *
+ * Colour carries meaning in exactly one place and it is declared here rather than chosen per
+ * component: the four provenance classes must be visually distinguishable wherever they appear
+ * (domain-and-evidence-model.md 2.1, interaction-model.md 6.1), so their tokens are defined once
+ * and every surface reads them.
+ */
+
+:root {
+  --gap: clamp(0.75rem, 1.4vw, 1.25rem);
+  --companion-size: min(12rem, 19vw, 28vh);
+  --companion-font: var(--ui-font-companion);
+  --companion-utility-font: var(--ui-font-utility);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--ui-font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#atlas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+#atlas[hidden] {
+  display: none;
+}
+
+/*
+ * THE WORLD IS THE PRODUCT. The shell is a layer of chrome floating over it, not a frame it sits
+ * inside.
+ *
+ * This was a three column grid, and the grid was the bug. It gave the Atlas whichever column was
+ * left over after a permanent index rail and a permanent detail pane had taken theirs, so the
+ * thing the user is supposed to walk through rendered as a letterboxed panel between two lists.
+ * A world you look at through a hole is a viewport widget; a world you stand in is the product.
+ *
+ * The index in particular does not belong here permanently. On the supported desktop/laptop
+ * viewport it is a summoned navigation surface over the same world. Showing it permanently
+ * beside the Atlas would turn the world into the leftover column of a dashboard.
+ */
+#shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  /* A lid over the canvas would swallow the mousedown that takes pointer lock, and that gesture
+   * is the only way into the world: the browser grants the lock from a real user gesture and
+   * from nothing else. Chrome opts back in below. */
+  pointer-events: none;
+}
+
+/* The presentation package supplies the non-semantic directional field in appearance.css. */
+#shell::before {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Peripheral comfort is active only while moving through the world. */
+#shell::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at center,
+    transparent 46%,
+    color-mix(in srgb, var(--ui-vignette) 88%, transparent) 118%
+  );
+  transition: opacity var(--motion-standard) var(--motion-easing);
+}
+
+/* A graph with no live regions has no Atlas scene. This is a complete state rather than an
+ * error overlay: the renderer is disposed and the retained-source boundary is stated without
+ * implying that source retention and live reconstruction are the same policy. */
+.atlas-empty {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: max(2rem, 8vw);
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--raised) 56%, transparent), transparent 42%),
+    var(--ground);
+}
+
+.atlas-empty-kicker,
+.atlas-empty-note,
+.atlas-empty h1 {
+  margin: 0;
+}
+
+.atlas-empty-kicker {
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.atlas-empty h1 {
+  max-width: 18ch;
+  font: 500 clamp(1.8rem, 4vw, 3.4rem)/1.05 var(--ui-font-display);
+  letter-spacing: -0.025em;
+}
+
+.atlas-empty-note {
+  max-width: 46rem;
+  color: var(--ink-faint);
+}
+
+#shell[data-mode='traverse'][data-moving='true'][data-vignette='subtle']::after { opacity: 0.28; }
+#shell[data-mode='traverse'][data-moving='true'][data-vignette='strong']::after { opacity: 0.52; }
+
+/*
+ * The stage is the parent the anchor overlay writes its projected labels into, and it now spans
+ * the whole viewport because the world does.
+ *
+ * `overflow: hidden` is load bearing rather than tidy: the overlay projects labels from world
+ * space, and an anchor behind the camera projects outside the frame. A label that escaped would
+ * be a label about the world sitting on top of the evidence.
+ */
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stage > * {
+  pointer-events: auto;
+}
+
+/* Everything that is chrome takes its clicks back.
+ *
+ * `:where()` is doing real work here. An id selector outranks a class one, so the obvious form of
+ * this rule, `#shell > *`, silently re-enables anything that set `pointer-events: none` on itself
+ * however far down the file it did so. It swallowed the click that enters pointer lock twice
+ * while this layout was being built, most memorably through the reticle, which sits on the exact
+ * pixel at screen centre. `:where()` contributes
+ * zero specificity, so this is a floor that any class rule below can simply opt out of, and the
+ * see-through layers no longer have to be listed here by name to stay see-through.
+ */
+:where(#shell) > * {
+  pointer-events: auto;
+}
+
+/*
+ * The two input modes, straight from interaction-model.md 2.2.
+ *
+ * `traverse` is pointer locked: the reticle is live and movement keys are active. Pointer input
+ * cannot reach a panel in this mode, but traversal must not change panel visibility. In
+ * particular, the closed Index owns `opacity: 0`; overriding that here revealed its full desktop
+ * workspace as a half-transparent layer as soon as the person entered the world.
+ */
+#shell[data-mode='traverse'] > :where(.rail, .detail, .confirm, .companion-encounter, .forming) {
+  pointer-events: none;
+}
+
+/* The reticle. Fixed screen centre, always, and never anywhere else.
+ *
+ * Pointer Lock freezes clientX and clientY while locked, so there is no cursor position in the
+ * world and screen centre is the only aim point that can exist. A design that hovered a world
+ * object with the mouse is not merely off style, it is unimplementable. */
+.reticle {
+  --reticle-size: 16px;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: var(--reticle-size);
+  height: var(--reticle-size);
+  transform: translate(-50%, -50%);
+  background:
+    linear-gradient(var(--ink), var(--ink)) left top / 5px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) left top / 1px 5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) right top / 5px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) right top / 1px 5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) left bottom / 5px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) left bottom / 1px 5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) right bottom / 5px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) right bottom / 1px 5px no-repeat;
+  opacity: 0.2;
+  transition: opacity var(--motion-quick) var(--motion-easing);
+  pointer-events: none;
+}
+
+#shell[data-mode='traverse'] .reticle {
+  opacity: 0.62;
+}
+
+/* Focus registers immediately. The size change is intentionally not eased: delayed targeting
+ * feedback reads as input latency, while the nearby verb expansion below may remain deliberate. */
+#shell[data-mode='traverse'][data-anchor-focus] .reticle {
+  --reticle-size: 22px;
+  opacity: 0.9;
+}
+
+#shell[data-camera='map'] > :where(.reticle, .companion-encounter) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ the credential gate */
+
+.gate {
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 2rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--blur-system));
+}
+
+.gate h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.gate-note {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.88rem;
+}
+
+.gate-failure {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.88rem;
+}
+
+input {
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  font: inherit;
+}
+
+input:focus-visible,
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--edge);
+  background: color-mix(in srgb, var(--raised) 66%, transparent);
+  color: var(--ink);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--ground);
+  font-weight: 500;
+}
+
+button.ghost {
+  background: none;
+}
+
+/* ------------------------------------------------------------------ the library rail */
+
+.rail,
+.detail,
+.confirm {
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--blur-system));
+}
+
+/*
+ * The World Index, summoned rather than standing.
+ *
+ * It slides in on a key and slides out again, so the default state of the screen is the world.
+ * It is still the whole index and still the accessibility route: summoned is not reduced.
+ */
+.rail {
+  position: fixed;
+  left: var(--gap);
+  top: var(--gap);
+  bottom: 2.3rem;
+  width: min(22rem, 30vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transform: translateX(calc(-100% - var(--gap)));
+  opacity: 0;
+  transition: transform var(--motion-standard) var(--motion-easing), opacity var(--motion-quick) var(--motion-easing);
+}
+
+#shell[data-index='open'] .rail {
+  transform: none;
+  opacity: 1;
+}
+
+/* Under reduced motion it appears and disappears rather than sliding, because a panel crossing
+ * a third of the screen is exactly the large peripheral movement the setting exists to remove. */
+@media (prefers-reduced-motion: reduce) {
+  .rail {
+    transition: none;
+  }
+}
+
+.rail-search {
+  width: 100%;
+}
+
+/*
+ * The open-question counter. It never grows a badge, never animates, never pops and never
+ * changes colour, and it is allowed to read the same number forever. There is no completion
+ * metric anywhere in this product (interaction-model.md 5.5), so there is nothing here a
+ * progress ring could be built from.
+ */
+.rail-counter {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.rail-head {
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.rail-note,
+.rail-empty,
+.rail-more {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-faint);
+  list-style: none;
+}
+
+.rail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  border: 1px solid transparent;
+  background: none;
+  padding: 0.4rem 0.5rem;
+}
+
+.rail-row:hover,
+.rail-row[aria-current='true'] {
+  background: color-mix(in srgb, var(--raised) 54%, transparent);
+  border-color: var(--edge);
+}
+
+.rail-kind {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.rail-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * An honest placeholder is not a name and must never look like one. Italic and dimmed, so
+ * \"Unnamed person, 4 occurrences\" cannot be misread as something somebody called them.
+ */
+.rail-name.is-placeholder {
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* The three marks. Present or absent, never a shade of confident. */
+.triad {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.mark {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-label);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--ground);
+}
+
+.mark-user { background: var(--user-mark); }
+.mark-capture { background: var(--capture-mark); }
+.mark-inference { background: var(--inference-mark); }
+.mark-external { background: var(--external-mark); }
+
+.mark.is-absent {
+  background: none;
+  border: 1px solid var(--edge);
+  color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------------------ the detail pane */
+
+.detail {
+  position: fixed;
+  right: var(--gap);
+  top: var(--gap);
+  width: min(26rem, 32vw);
+  max-height: calc(100vh - var(--gap) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-close {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+}
+
+.detail-close:hover {
+  color: var(--ink);
+}
+
+/* Absent, not empty. A pane reading \"pick something on the left\" is a permanent instruction
+ * occupying a third of the world; the world itself is the invitation. */
+.detail[hidden] {
+  display: none;
+}
+
+.detail-empty,
+.detail-note,
+.detail-lede,
+.detail-sub {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.88rem;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.detail-section h2,
+.band h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/*
+ * The four bands. Band 4 is never omitted, which is why an empty band is styled rather than
+ * hidden: what the system does not know is information, and a panel that showed only what it
+ * knew would be the panel this one exists instead of.
+ */
+.band {
+  border-left: 2px solid var(--edge);
+  padding-left: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.band-told { border-left-color: var(--user-mark); }
+.band-captures { border-left-color: var(--capture-mark); }
+.band-inferred { border-left-color: var(--inference-mark); }
+.band-unknown { border-left-color: var(--ink-faint); }
+
+.band ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.band-empty {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.band-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  font-size: 0.9rem;
+}
+
+.band-row.is-pending {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: var(--radius-label);
+}
+
+.row-label { color: var(--ink-soft); }
+.row-confidence,
+.row-method {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------------------ citations */
+
+.citations {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.citation {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.citation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.citation-actions button {
+  flex: 1 1 9rem;
+}
+
+.citation-locate {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--edge));
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.citation img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--edge);
+}
+
+.citation figcaption,
+.citation-failed {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+
+.citation-failed {
+  color: var(--error);
+}
+
+/* A travel/recovery sentence appears only while the world is changing. It sits on the same
+ * evidence axis as the selected citation instead of becoming another permanent command pill. */
+.travel-status {
+  position: fixed;
+  left: 50%;
+  bottom: 5.25rem;
+  z-index: 12;
+  max-width: min(36rem, calc(100vw - 2 * var(--gap)));
+  margin: 0;
+  padding: 0.42rem 0.7rem;
+  transform: translateX(-50%);
+  color: var(--ink-soft);
+  background: var(--material-instrument);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-label);
+  box-shadow: 0 8px 30px color-mix(in srgb, var(--ui-shadow) 24%, transparent);
+  backdrop-filter: blur(var(--blur-world));
+  font-size: 0.76rem;
+  line-height: 1.4;
+  text-align: center;
+  text-shadow: none;
+}
+
+.travel-status[data-kind='failure'] { color: var(--warning); }
+.travel-status[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ naming */
+
+.name-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.name-offer input {
+  flex: 1 1 12rem;
+}
+
+.name-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+/* ------------------------------------------------------------------ the confirmation surface */
+
+.confirm {
+  position: fixed;
+  right: var(--gap);
+  top: clamp(8.5rem, 25vh, 13rem);
+  width: min(25rem, calc(100vw - 2 * var(--gap)));
+  max-height: calc(100vh - 10rem);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--ui-shadow) 55%, transparent);
+}
+
+.confirm[hidden] {
+  display: none;
+}
+
+.confirm h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* The user's verbatim reply or the exact reviewed option wording, never a paraphrase. */
+.confirm-utterance {
+  margin: 0;
+  padding-left: 0.8rem;
+  border-left: 2px solid var(--user-mark);
+  font-style: italic;
+}
+
+.confirm-effect,
+.confirm-reversible,
+.confirm-radius {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.confirm-refused {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--error);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.companion-encounter[data-confirming] .companion-choice-rail {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ the status bar */
+
+/* A concise exception only when part of the Atlas is absent. */
+.status {
+  position: fixed;
+  left: var(--gap);
+  right: var(--gap);
+  bottom: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.2rem;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--ui-shadow) 70%, transparent);
+}
+
+.status p {
+  margin: 0;
+}
+
+.status-warning {
+  margin-left: auto;
+  text-align: right;
+  color: var(--warning);
+  opacity: 0.82;
+}
+
+.reconstruction-availability {
+  position: fixed;
+  left: clamp(1.2rem, 4vw, 4rem);
+  top: clamp(6rem, 18vh, 10rem);
+  width: min(27rem, calc(100vw - 2.4rem));
+  max-height: calc(100vh - 12rem);
+  overflow: auto;
+  padding: 1.4rem 1.6rem;
+  display: grid;
+  gap: 0.8rem;
+  background: var(--raised);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  font: 400 0.9rem/1.5 var(--ui-font-body);
+  text-shadow: none;
+  pointer-events: auto;
+  z-index: 60;
+}
+.reconstruction-availability h2 {
+  margin: 0;
+  font: 500 1.65rem/1.15 var(--ui-font-display);
+  max-width: 20ch;
+}
+.reconstruction-availability .reconstruction-availability-kicker {
+  color: var(--ink-faint);
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.reconstruction-availability-collection { display: grid; justify-items: start; gap: 0.6rem; }
+.reconstruction-availability-collection > p { font-weight: 500; }
+#shell:not([data-primary='world']) .reconstruction-availability,
+#shell[data-camera='map'] .reconstruction-availability,
+#shell:has(.reconstruction-inspector:not([hidden])) .reconstruction-availability { display: none; }
+
+.reconstruction-loading {
+  position: fixed;
+  bottom: 1rem;
+  left: var(--gap);
+  right: var(--gap);
+  padding: 0.7rem 1rem;
+  background: var(--raised);
+  color: var(--ink);
+  z-index: 80;
+}
+
+.reconstruction-inspector {
+  position: fixed;
+  right: var(--gap);
+  top: 5rem;
+  width: min(22rem, calc(100vw - 2 * var(--gap)));
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+  padding: 1rem 1.2rem;
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--ink-faint);
+  z-index: 70;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+.reconstruction-inspector[hidden], .reconstruction-inspector [hidden] { display: none; }
+.reconstruction-inspector h2 { margin-top: 0; font-size: 1.1rem; }
+.reconstruction-inspector select { width: 100%; }
+.reconstruction-inspector nav { display: flex; justify-content: space-between; margin: 0.6rem 0; }
+.reconstruction-inspector img { display: block; width: 100%; height: auto; margin-top: 0.6rem; }
+.reconstruction-inspector > button { margin-top: 0.8rem; }
+
+/* ---------------------------------------------------------------- the proof lens and evidence */
+
+/*
+ * The lens switch and its legend stand apart from the status line rather than inside it. The
+ * status bar is one flex row of small faint sentences along the bottom; a four-row legend with
+ * swatches inside it would wrap into the world. This is the same treatment the availability panel
+ * already gets, at a lower stacking order so the inspector and the loading line still sit above it.
+ */
+.proof-lens {
+  position: fixed;
+  left: var(--gap);
+  bottom: 3.2rem;
+  width: min(24rem, calc(100vw - 2 * var(--gap)));
+  padding: 0.9rem 1.1rem;
+  display: grid;
+  gap: 0.55rem;
+  background: var(--raised);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  font: 400 0.8rem/1.5 var(--ui-font-body);
+  text-shadow: none;
+  pointer-events: auto;
+  z-index: 55;
+}
+.proof-lens h2 {
+  margin: 0;
+  font: 500 0.72rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.proof-lens .proof-lens-copy { color: var(--ink-faint); }
+.proof-lens-toggle { justify-self: start; }
+.proof-lens-legend { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; }
+.proof-lens-legend li { display: grid; grid-template-columns: 0.7rem 1fr; gap: 0.6rem; align-items: start; }
+.proof-lens-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.35em;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.proof-lens-legend-text { color: var(--ink-faint); }
+.proof-lens-limit { color: var(--ink-faint); }
+/* The lens belongs to the world. It says nothing about the Index or the Map, so it leaves them. */
+#shell:not([data-primary='world']) .proof-lens,
+#shell[data-camera='map'] .proof-lens { display: none; }
+
+.reconstruction-evidence {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent);
+  display: grid;
+  gap: 0.5rem;
+}
+.reconstruction-evidence h3 {
+  margin: 0;
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.reconstruction-evidence p { margin: 0; }
+.reconstruction-evidence-how, .reconstruction-evidence-detail { color: var(--ink-faint); font-size: 0.78rem; }
+.reconstruction-evidence-resolve { justify-self: start; }
+.reconstruction-evidence-state { font-weight: 500; }
+.reconstruction-evidence-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.7rem; }
+.reconstruction-evidence-photograph { font-size: 0.78rem; }
+.reconstruction-evidence-photograph p { margin: 0.15rem 0 0; }
+.reconstruction-evidence-title { font-weight: 500; }
+.reconstruction-evidence-where,
+.reconstruction-evidence-consent,
+.reconstruction-evidence-unavailable { color: var(--ink-faint); }
+.reconstruction-evidence[data-evidence='miss'] .reconstruction-evidence-state { color: var(--warning); }
+
+/* ------------------------------------------------------------------ Atlas system surfaces */
+
+.atlas-commands {
+  position: fixed;
+  right: var(--gap);
+  top: var(--gap);
+  z-index: 10;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  backdrop-filter: none;
+}
+
+.atlas-commands button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  padding: 0;
+  color: color-mix(in srgb, var(--ui-companion-accent) 78%, transparent);
+  background: color-mix(in srgb, var(--ui-companion-surface) 66%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-accent) 22%, transparent);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--ui-companion-accent) 13%, transparent),
+    0 8px 24px color-mix(in srgb, var(--ui-shadow) 22%, transparent);
+  transition:
+    color var(--motion-quick) var(--motion-easing),
+    background var(--motion-quick) var(--motion-easing),
+    border-color var(--motion-quick) var(--motion-easing),
+    transform var(--motion-quick) var(--motion-easing);
+}
+
+.atlas-commands button:hover,
+.atlas-commands button:focus-visible,
+.atlas-commands button[aria-current='page'] {
+  /* Brightness, not inversion. Same reason as the choice rows. */
+  color: var(--ui-companion-accent);
+  background: color-mix(in srgb, var(--ui-companion-surface) 84%, transparent);
+  border-color: color-mix(in srgb, var(--ui-companion-accent) 44%, transparent);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.atlas-command-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.atlas-command-tooltip {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 50%;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.32rem 0.55rem;
+  color: var(--ui-companion-text);
+  background: color-mix(in srgb, var(--ui-companion-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-accent) 18%, transparent);
+  border-radius: var(--radius-pill);
+  font: 500 0.66rem/1 var(--companion-utility-font);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity var(--motion-quick) var(--motion-easing), transform var(--motion-quick) var(--motion-easing);
+}
+
+.atlas-commands button:hover .atlas-command-tooltip,
+.atlas-commands button:focus-visible .atlas-command-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.atlas-commands kbd { color: var(--ui-companion-secondary); opacity: 0.9; }
+
+.map-caption {
+  position: fixed;
+  left: var(--gap);
+  top: var(--gap);
+  z-index: 10;
+  margin: 0;
+  width: min(46rem, calc(100vw - 22rem));
+  min-height: 2.85rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.48rem 0.65rem;
+  color: var(--ink-soft);
+  background: var(--material-instrument);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--accent-soft);
+  border-radius: var(--radius-control);
+  backdrop-filter: blur(var(--blur-world));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ui-shadow) 20%, transparent);
+  font-size: 0.7rem;
+}
+
+.map-caption strong { color: var(--ink); font-weight: 600; white-space: nowrap; }
+.map-caption > span { line-height: 1.35; }
+.map-caption button {
+  padding: 0.28rem 0.45rem;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-label);
+  font: 500 0.66rem/1 var(--ui-font-utility);
+  white-space: nowrap;
+}
+
+.map-caption[hidden] { display: none; }
+
+.map-regions {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.map-regions[hidden] { display: none; }
+
+.map-region-target {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 5.2rem;
+  padding: 0.25rem 0.48rem;
+  translate: -50% -50%;
+  pointer-events: auto;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ground) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--edge));
+  border-radius: var(--radius-label);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--ui-shadow) 22%, transparent);
+  backdrop-filter: blur(var(--blur-world));
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.map-region-target::before {
+  content: '';
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-right: 0.4rem;
+  border: 1px solid var(--accent);
+  transform: rotate(45deg);
+}
+
+.map-region-target:hover,
+.map-region-target:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.system-overlay {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  width: min(42rem, calc(100vw - 2 * var(--gap)));
+  max-height: min(46rem, calc(100vh - 2 * var(--gap)));
+  overflow-y: auto;
+  padding: clamp(1.1rem, 2vw, 1.6rem);
+  transform: translate(-50%, -50%);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-panel);
+  box-shadow:
+    0 0 0 100vmax color-mix(in srgb, var(--ground) 68%, transparent),
+    0 30px 90px color-mix(in srgb, var(--ui-shadow) 42%, transparent);
+  backdrop-filter: blur(var(--blur-system)) saturate(var(--saturation-system));
+}
+
+.system-overlay[hidden] { display: none; }
+
+.overlay-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.4rem;
+}
+
+.overlay-kicker {
+  margin: 0 0 0.2rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.overlay-head h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  font-weight: 300;
+  letter-spacing: -0.045em;
+}
+
+.overlay-close,
+.text-action {
+  padding: 0.2rem 0;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.overlay-close:hover,
+.text-action:hover { color: var(--ink); }
+
+.option-group {
+  padding: 1rem 0 0.65rem;
+  border-top: 1px solid var(--edge);
+}
+
+.option-group h2 {
+  margin: 0 0 0.55rem;
+  color: var(--ink-faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.option-field {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(11rem, 1.2fr);
+  align-items: center;
+  gap: 0.35rem 1.25rem;
+  min-height: 3.1rem;
+  color: var(--ink-soft);
+}
+
+.option-label { color: var(--ink); }
+
+.option-note {
+  grid-column: 2;
+  margin-top: -0.25rem;
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+select {
+  min-height: 2.45rem;
+  padding: 0.4rem 2rem 0.4rem 0.7rem;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+  font: inherit;
+}
+
+.range-control {
+  display: grid;
+  grid-template-columns: 1fr 3.2rem;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.range-control input {
+  width: 100%;
+  padding: 0;
+  accent-color: var(--accent);
+  background: none;
+  border: 0;
+}
+
+.option-value {
+  color: var(--ink-faint);
+  font: 500 0.75rem/1 var(--ui-font-utility);
+  text-align: right;
+}
+
+.overlay-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--edge);
+}
+
+/*
+ * One command key, everywhere.
+ *
+ * A key legend appears in three places that used to draw it three ways: the Atlas command
+ * tooltips, the Settings controls reference, and the plate footers. They are the same object in
+ * every case, so they get the same badge, and a fourth surface inherits it by writing <kbd>.
+ *
+ * The shape is a squircle rather than a rounded rectangle. `corner-shape` is a progressive
+ * enhancement layered on top of an ordinary radius: where it is unsupported the badge is simply
+ * rounded, which is why the radius is set to a value that stands on its own.
+ */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75em;
+  padding: 0.24em 0.5em;
+  color: var(--ink);
+  font: 500 0.72rem/1 var(--ui-font-utility);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 26%, transparent);
+  border-radius: 0.6em;
+  corner-shape: squircle;
+}
+
+#shell[data-primary='options'] > :where(.rail, .detail, .confirm, .companion-encounter, .forming),
+#shell[data-primary='controls'] > :where(.rail, .detail, .confirm, .companion-encounter, .forming) {
+  pointer-events: none;
+  opacity: 0;
+}
+
+#shell[data-primary='options'] > :where(.atlas-commands, .map-caption),
+#shell[data-primary='controls'] > :where(.atlas-commands, .map-caption) {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.viewport-boundary {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ supported viewport */
+
+/* Desktop/laptop only. This is a viewport boundary, not an alternate mobile navigation mode. */
+@media (max-width: 60rem) {
+  #atlas {
+    visibility: hidden;
+  }
+
+  #shell > :not(.viewport-boundary):not(.gate):not(.reconstruction-loading):not(.atlas-empty) {
+    display: none !important;
+  }
+
+  .viewport-boundary {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    padding: 2rem;
+    color: var(--ink);
+    text-align: center;
+    background: var(--ground);
+  }
+
+  .viewport-boundary h1 {
+    max-width: 24rem;
+    margin: 0;
+    font-size: clamp(2rem, 8vw, 3.8rem);
+    font-weight: 300;
+    letter-spacing: -0.045em;
+  }
+
+  .viewport-boundary > p:last-child {
+    max-width: 31rem;
+    margin: 1rem 0 0;
+    color: var(--ink-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ forming */
+
+/*
+ * The forming panel.
+ *
+ * No bar and no ring, and that is a structural absence rather than a styling choice. There is no
+ * element here a percentage could be written into: interaction-model.md 8.1 rules out a synthetic
+ * progress bar, and a rule kept by having nowhere to put the thing is kept better than one kept
+ * by remembering not to.
+ */
+/* What is forming. Quiet, and not a card.
+ *
+ * It reports work happening elsewhere, which is the least urgent thing on the screen, so it is
+ * styled to be findable rather than noticed. Same reasoning as the status line: the content is an
+ * obligation and stays, in the register an obligation deserves. */
+.forming {
+  position: fixed;
+  left: var(--gap);
+  bottom: 2.6rem;
+  width: min(20rem, calc(100vw - 2 * var(--gap)));
+  z-index: 3;
+  padding: 0;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--edge);
+  padding-left: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  text-shadow: 0 1px 4px color-mix(in srgb, var(--ui-shadow) 70%, transparent);
+}
+
+.forming[hidden] {
+  display: none;
+}
+
+.forming-stage {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.forming-head {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.forming-headline {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.forming-detail {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.84rem;
+  color: var(--ink-faint);
+}
+
+.forming-elapsed,
+.forming-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+/* The pipeline's own words, visibly the pipeline's and not the product's. */
+.forming-note {
+  font-style: italic;
+  border-left: 2px solid var(--edge);
+  padding-left: 0.6rem;
+}
+
+/* -- the anchor overlay ---------------------------------------------------------------------
+ *
+ * The nodes the renderer projects from world space: one focus label, pinned callouts, presence
+ * markers for people, and edge chevrons. Only their APPEARANCE is set here. Position is written
+ * by the overlay as an inline transform every frame, and a rule here that touched placement would
+ * fight it silently.
+ *
+ * These had no styles in this surface at all, so every one of them rendered as raw unstyled text
+ * sprawling across the world at body size. Most of what read as \"the Atlas looks unfinished\" was
+ * this.
+ */
+.exulanica-overlay {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* The interaction sigil follows the supplied approach reference: a small world marker first,
+ * then a compact key, then one expanding verb. Memory detail never appears merely from looking. */
+.ov-sigil {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  color: var(--focus);
+  filter: drop-shadow(0 2px 5px color-mix(in srgb, var(--material-shadow) 42%, transparent));
+}
+
+.ov-sigil::before,
+.ov-sigil::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  rotate: 45deg;
+  translate: -50% -50%;
+}
+
+.ov-sigil::before {
+  width: 9px;
+  height: 9px;
+  background: color-mix(in srgb, var(--material-instrument) 84%, transparent);
+  border: 1px solid currentColor;
+}
+
+.ov-sigil::after {
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+}
+
+/* The focus prompt: one contextual verb, never a memory card. */
+.ov-focus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0.18rem;
+  overflow: hidden;
+  color: var(--ink);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--blur-world));
+}
+
+.ov-focus-key {
+  display: inline-grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  flex: 0 0 auto;
+  font-family: var(--ui-font-utility);
+  font-size: 0.68rem;
+  line-height: 1;
+  /* A key cap on paper: the plate's strongest value carrying its lightest, which is both the most
+   * legible form and the one a keyboard key actually has. */
+  color: var(--raised);
+  background: var(--ink);
+  border: 1px solid transparent;
+  border-radius: var(--radius-label);
+}
+
+.ov-focus-verb {
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-family: var(--ui-font-utility);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    max-width var(--motion-standard) var(--motion-easing),
+    margin-left var(--motion-standard) var(--motion-easing),
+    opacity var(--motion-quick) var(--motion-easing);
+}
+
+.ov-focus[data-stage='label'] .ov-focus-verb {
+  max-width: 5.5rem;
+  margin-left: 0.42rem;
+  padding-right: 0.38rem;
+  opacity: 1;
+}
+
+/* Pinned callouts. The left rule carries provenance, the same four colours as everywhere else. */
+.ov-callout {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--ground) 62%, transparent);
+  border-left: 2px solid var(--ink-faint);
+}
+
+.ov-callout[data-provenance='capture'] { border-left-color: var(--capture-mark); }
+.ov-callout[data-provenance='inference'] { border-left-color: var(--inference-mark); }
+.ov-callout[data-provenance='user'] { border-left-color: var(--user-mark); }
+.ov-callout[data-provenance='external'] { border-left-color: var(--external-mark); }
+
+/* A person is a CITATION, never a reconstruction: a timestamped marker over the position the
+ * detection was estimated at. Dashed while proposed, solid once the account holder confirms it,
+ * so the difference between a guess and a fact is visible without reading the label. */
+.ov-marker {
+  --presence-line: dashed;
+  position: relative;
+  padding: 0.1rem 0.62rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--inference);
+  background: color-mix(in srgb, var(--ground) 42%, transparent);
+  border: 0;
+}
+
+.ov-marker::before,
+.ov-marker::after {
+  content: '';
+  position: absolute;
+  top: -0.22rem;
+  bottom: -0.22rem;
+  width: 0.26rem;
+  border-block: 1px var(--presence-line) currentColor;
+}
+
+.ov-marker::before {
+  left: 0;
+  border-left: 1px var(--presence-line) currentColor;
+}
+
+.ov-marker::after {
+  right: 0;
+  border-right: 1px var(--presence-line) currentColor;
+}
+
+.ov-marker[data-link-state='confirmed'] {
+  --presence-line: solid;
+  color: var(--user);
+}
+
+.ov-chevron {
+  width: 0;
+  height: 0;
+  border-left: 6px solid color-mix(in srgb, var(--ink-soft) 60%, transparent);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  rotate: var(--angle, 0rad);
+}
+
+.companion-stage {
+  position: fixed;
+  left: 50%;
+  top: clamp(2.5rem, 9vh, 5.25rem);
+  z-index: 5;
+  width: clamp(9rem, 16vw, 13rem);
+  aspect-ratio: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-deliberate) var(--motion-easing),
+    transform var(--motion-deliberate) var(--motion-easing);
+  transform: translate(-50%, 12px) scale(0.97);
+}
+
+.companion-stage[data-shown][data-ready] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.companion-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.companion-avatar-body,
+.companion-avatar-dot {
+  vector-effect: non-scaling-stroke;
+}
+
+.companion-avatar-gaze {
+  transition: transform var(--motion-standard) var(--motion-easing);
+}
+
+.companion-avatar-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-avatar-blink var(--motion-idle-cycle) var(--motion-easing) infinite;
+}
+
+.companion-avatar-thinking {
+  display: none;
+}
+
+.companion-stage[data-state='working'] .companion-avatar-orb {
+  display: none;
+}
+
+.companion-stage[data-state='working'] .companion-avatar-thinking {
+  display: block;
+}
+
+.companion-stage[data-state='working'] .companion-avatar-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-avatar-dot var(--motion-working-cycle) var(--motion-easing) infinite;
+}
+
+.companion-stage[data-state='working'] .companion-avatar-dot-2 { animation-delay: var(--motion-stagger); }
+.companion-stage[data-state='working'] .companion-avatar-dot-3 { animation-delay: calc(var(--motion-stagger) * 2); }
+
+@keyframes companion-avatar-blink {
+  0%, 43%, 47%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(0.08); }
+}
+
+@keyframes companion-avatar-dot {
+  0%, 58%, 100% { opacity: 0.45; transform: scale(0.78); }
+  29% { opacity: 1; transform: scale(1.08); }
+}
+
+/* -- composed Companion encounter --------------------------------------------------------- */
+.companion-encounter {
+  position: fixed;
+  left: 50%;
+  bottom: 2.4rem;
+  z-index: 4;
+  color: var(--ink);
+  transform: translateX(-50%);
+  transition:
+    opacity var(--motion-standard) var(--motion-easing),
+    transform var(--motion-standard) var(--motion-easing);
+}
+
+.companion-encounter[data-state='enter'],
+.companion-encounter[data-state='summon'] {
+  display: block;
+  padding: 0.48rem 0.82rem;
+  background: var(--material-instrument);
+  border: 1px solid color-mix(in srgb, var(--edge) 78%, transparent);
+  border-radius: var(--radius-control);
+  backdrop-filter: blur(var(--blur-world));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--material-shadow) 32%, transparent);
+}
+
+.companion-prompt {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-shadow: none;
+}
+
+.companion-prompt b {
+  display: inline-block;
+  min-width: 1.15rem;
+  padding: 0.02rem 0.3rem;
+  color: var(--ink);
+  font-weight: 500;
+  text-align: center;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-label);
+}
+
+.companion-encounter[data-first-use] .companion-prompt {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.companion-prompt-statement {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.companion-prompt-actions {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding-left: 0.8rem;
+  border-left: 1px solid color-mix(in srgb, var(--edge) 72%, transparent);
+}
+
+.companion-encounter[data-compact-prompt] .companion-prompt-actions {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.companion-encounter[data-compact-prompt] .companion-prompt {
+  gap: 0.35rem;
+}
+
+.companion-prompt-action {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--ink-soft);
+}
+
+.companion-encounter[data-state='open'] {
+  --speech-width: min(58rem, calc(100vw - 12rem));
+  --choice-width: min(27rem, 31vw);
+
+  inset: 0;
+  pointer-events: none;
+  transform: none;
+}
+
+/*
+ * The Atlas commands do not move when the Companion opens.
+ *
+ * They used to be pinned to the four corners of a 66rem by 9.6rem box centred on the speech band,
+ * which was a real composition while the band was a slab that size. With the band a subtitle those
+ * corners are nowhere: four circles hanging in empty field, unattached to anything, and the same
+ * control wearing two different looks depending on whether somebody was talking. They stay in the
+ * rail they always live in.
+ */
+
+/* Fixed visual-novel composition: memory backdrop, central character, bottom speech, right choices. */
+.companion-speech {
+  /*
+   * A subtitle, not a panel.
+   *
+   * It was a fixed 58rem slab with a 9.6rem floor, so one short sentence sat in the top-left of a
+   * large empty rectangle and every line looked the same size regardless of what was said. A
+   * person talking in a game gets a band that is exactly as wide as the words and grows outward
+   * from the centre, which is why subtitles read as speech and panels read as furniture.
+   * `max-content` with a max width does that: it hugs one line, wraps at the limit, and stays
+   * centred either way. The minimum only exists so the speaker pill always has somewhere to sit.
+   */
+  position: fixed;
+  right: auto;
+  bottom: clamp(1.4rem, 3vh, 2.4rem);
+  left: 50%;
+  width: max-content;
+  min-width: 0;
+  max-width: min(52rem, calc(100vw - 10rem));
+  max-height: min(15rem, calc(100vh - 16rem));
+  padding: 0.62rem 1.05rem 0.68rem;
+  overflow: visible;
+  /*
+   * A scrim, not a surface.
+   *
+   * The held plates are light because a plate is somewhere you go and the world behind it is
+   * incidental. A subtitle is different: it is read straight over whatever the world happens to
+   * be showing, which here is a near-white field one moment and a photograph the next, and it has
+   * to stay legible over both without the world having to get out of its way. Every game subtitle
+   * solves that the same way, with a dark box and light type, and there is no reason to solve it
+   * differently. Square, because a subtitle is a caption and not a card.
+   */
+  color: var(--ui-companion-surface);
+  background: var(--companion-scrim);
+  border: 0;
+  border-radius: var(--ui-speech-radius);
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  box-shadow: none;
+  pointer-events: auto;
+  font-family: var(--companion-font);
+  transform: translateX(-50%);
+}
+
+/* Signature: the speaker name is a real component that physically bisects the lens boundary. */
+.companion-speaker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0.28rem 0.62rem 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  color: var(--ui-companion-surface);
+  text-align: left;
+  background: var(--ui-companion-text);
+  border: 0;
+  border-radius: var(--ui-speech-radius);
+  transform: translateY(-100%);
+}
+
+.companion-utterance {
+  margin: 0;
+  font-size: clamp(0.98rem, 1.25vw, 1.12rem);
+  line-height: 1.47;
+  font-weight: 500;
+  /* The scrim under it is dark, so the line is light. It was still the reading colour meant for
+   * a paper plate, which put near-black type on a near-black box at 1.75:1. */
+  color: var(--ui-companion-surface);
+  text-shadow: none;
+}
+
+.companion-speech ul,
+.companion-choice-rail ul,
+.companion-choice-rail ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.companion-evidence-action {
+  /* \"Every claim resolves to its source\" is the product, and this button is where a person does
+   * it. Drawn as bare muted text under the utterance it read as a stray caption crowding the
+   * panel rather than as the one thing worth pressing. */
+  min-height: 2rem;
+  padding: 0.4rem 0.85rem;
+  font: 600 0.75rem/1 var(--companion-font);
+  letter-spacing: 0.03em;
+  color: var(--ui-companion-ink);
+  background: var(--ui-companion-secondary);
+  border: 1px solid var(--ui-companion-secondary);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.companion-evidence-action:hover,
+.companion-evidence-action:focus-visible {
+  color: var(--ui-companion-secondary);
+  background: var(--ui-companion-ink);
+  outline: 1px solid var(--ui-companion-secondary);
+  outline-offset: 2px;
+}
+
+.companion-refusal {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--ui-companion-text) 56%, transparent);
+}
+
+.companion-choice-rail {
+  /*
+   * One panel, not a stack of floating pills.
+   *
+   * Four separate capsules hanging in the air read as four unrelated objects; the answers to one
+   * question are one thing. It takes the material and the squircle of every other held surface,
+   * and its rows carry the same key caps as the command row at the foot of the Index, so pressing
+   * 2 here looks like pressing Tab there.
+   */
+  position: fixed;
+  top: 49%;
+  right: clamp(1.5rem, 3.6vw, 4rem);
+  bottom: auto;
+  left: auto;
+  width: var(--choice-width);
+  max-height: min(28rem, calc(100vh - 5rem));
+  /*
+   * The same glass the subtitle is, for the same reason: it floats over the live world rather
+   * than replacing it. Square, one hairline, light type. It is the panel the reference draws.
+   */
+  padding: 0.7rem 0.9rem 0.6rem;
+  overflow-y: auto;
+  color: var(--ui-companion-surface);
+  background: var(--companion-scrim-soft);
+  border: 1px solid var(--companion-edge);
+  border-radius: var(--ui-speech-radius);
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  pointer-events: auto;
+  font-family: var(--companion-font);
+  scrollbar-width: thin;
+  scrollbar-color: var(--companion-edge) transparent;
+  transform: translateY(-50%);
+}
+
+.companion-choices {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.choice-item {
+  min-width: 0;
+}
+
+.companion-choice,
+.companion-choices-submit,
+.companion-composer {
+  width: 100%;
+  min-height: 2.4rem;
+  font: inherit;
+  color: var(--companion-ink);
+  background: none;
+  border: 0;
+  border-radius: var(--ui-choice-radius);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.companion-choice {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.64rem 1rem;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--motion-quick) var(--motion-easing),
+    border-color var(--motion-quick) var(--motion-easing),
+    background var(--motion-quick) var(--motion-easing);
+}
+
+.companion-choice:hover:not([disabled]),
+.companion-choice:focus-visible {
+  /*
+   * Selection is a brightness change, not an inversion.
+   *
+   * This row read light-on-dark at rest and dark-on-light under the cursor, so the same control
+   * had two polarities and the eye had to re-learn it on every hover. Lifting the row's own fill
+   * says \"this one\" without repainting the text.
+   */
+  color: var(--companion-ink);
+  background: color-mix(in srgb, var(--ui-companion-surface) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ui-companion-accent) 45%, transparent);
+  outline: none;
+}
+
+/* The same cap as the command rows, so pressing 2 here looks like pressing Tab in the Index. */
+/* Outlined, light on the glass. The reference draws its keys as a thin box around the letter, not
+ * as a filled chip, and a filled dark chip on dark glass would disappear anyway. */
+.companion-choice kbd {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.34rem;
+  font: 500 0.7rem/1 var(--ui-font-utility);
+  color: var(--ui-companion-surface);
+  background: none;
+  border: 1px solid var(--companion-key-edge);
+  border-radius: var(--radius-label);
+}
+
+.choice-label {
+  min-width: 0;
+}
+
+.companion-choice.consequential {
+  border-color: color-mix(in srgb, var(--ui-companion-accent) 21%, transparent);
+}
+
+.choice-item.unavailable {
+  padding-bottom: 0.55rem;
+  background: color-mix(in srgb, var(--ui-companion-surface) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-unavailable) 42%, transparent);
+  border-radius: var(--ui-choice-radius);
+  backdrop-filter: blur(var(--ui-companion-blur));
+}
+
+.choice-item.unavailable .companion-choice {
+  color: color-mix(in srgb, var(--ui-companion-text) 40%, transparent);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.choice-unavailable-reason {
+  display: block;
+  padding: 0 1rem 0 3.1rem;
+  font: 500 0.68rem/1.35 var(--companion-utility-font);
+  color: color-mix(in srgb, var(--ui-companion-secondary) 52%, transparent);
+}
+
+.multi-choice {
+  cursor: pointer;
+}
+
+.choice-checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--ui-companion-secondary);
+}
+
+.companion-choices-submit {
+  margin-top: 0.55rem;
+  padding: 0.62rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ui-companion-ink);
+  background: var(--ui-companion-accent);
+  cursor: pointer;
+}
+
+.companion-other {
+  min-height: 3.05rem;
+}
+
+.companion-other-reveal[hidden],
+.companion-composer[hidden] {
+  display: none;
+}
+
+.companion-composer {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.42rem 0.48rem 0.42rem 1rem;
+}
+
+.companion-reply-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--ui-companion-text);
+  background: none;
+  border: 0;
+}
+
+.companion-reply-input::placeholder {
+  color: color-mix(in srgb, var(--ui-companion-text) 42%, transparent);
+}
+
+.companion-reply-input:focus {
+  outline: none;
+}
+
+.companion-reply-submit {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.05rem;
+  height: 2.05rem;
+  padding: 0;
+  color: var(--ui-companion-ink);
+  background: var(--ui-companion-accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.reply-arrow {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.companion-reply-submit:hover,
+.companion-reply-submit:focus-visible {
+  background: var(--ui-companion-text);
+  outline: 2px solid color-mix(in srgb, var(--ui-companion-accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+/* Escapes are the quiet way out of a question, so they sit under one hairline as secondary text
+ * rather than as four more rows competing with the answers. */
+.companion-escapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-top: 0.55rem !important;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--companion-edge-faint);
+}
+
+.companion-escapes .choice-item {
+  flex: 1 1 auto;
+}
+
+.companion-escapes .companion-choice {
+  min-height: 2.15rem;
+  justify-content: center;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  /* Quiet, not unreadable. At 62% these were 3.83:1 at 10.8px, which is a way out of a question
+   * that a person has to squint at. The hairline above already says they are secondary. */
+  color: var(--companion-ink-soft);
+  background: none;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-stage,
+  .companion-encounter {
+    transition: none;
+  }
+
+  .companion-stage[data-shown][data-ready] { transform: translateX(-50%); }
+
+  .companion-avatar-blink,
+  .companion-stage[data-state='working'] .companion-avatar-dot {
+    animation: none;
+  }
+}
+
+/* 1012 × 324 keeps the same reading order: character centre, answers right, speech at bottom. */
+@media (max-height: 420px) and (min-width: 960px) {
+  .confirm {
+    top: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: min(25rem, 42vw);
+    max-height: none;
+    padding: 0.7rem;
+    gap: 0.45rem;
+  }
+
+  .confirm-effect,
+  .confirm-reversible,
+  .confirm-radius {
+    font-size: 0.72rem;
+  }
+
+  .companion-encounter[data-state='enter'],
+  .companion-encounter[data-state='summon'] {
+    bottom: 0.65rem;
+  }
+
+  .companion-encounter[data-first-use] .companion-prompt {
+    gap: 0.55rem;
+    font-size: 0.72rem;
+  }
+
+  .companion-prompt-actions {
+    gap: 0.45rem;
+    padding-left: 0.55rem;
+  }
+
+  .companion-stage {
+    top: 0.25rem;
+    width: 7rem;
+    height: 7rem;
+    transform: translate(-50%, 8px) scale(0.97);
+  }
+
+  .companion-stage[data-shown][data-ready] {
+    transform: translateX(-50%);
+  }
+
+  .companion-encounter[data-state='open'] {
+    --speech-width: calc(100vw - 8rem);
+    --choice-width: 19rem;
+  }
+
+  .companion-speech {
+    bottom: 0.5rem;
+    min-height: 6.4rem;
+    max-height: 6.4rem;
+    padding: 1.35rem 1rem 0.65rem;
+    border-radius: min(var(--ui-speech-radius), 1.35rem);
+  }
+
+  .companion-choice-rail {
+    top: 0.55rem;
+    right: 0.55rem;
+    max-height: 11.5rem;
+    transform: none;
+  }
+
+  .companion-encounter[data-state='open'] ~ .atlas-commands {
+    bottom: 0.5rem;
+    width: calc(100vw - 0.75rem);
+    height: 6.4rem;
+  }
+
+  .companion-encounter[data-state='open'] ~ .atlas-commands button {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .companion-encounter[data-state='open'] ~ .atlas-commands .atlas-command-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .companion-encounter[data-state='open'] ~ .atlas-commands .atlas-command-tooltip {
+    display: none;
+  }
+
+  .companion-speaker {
+    left: 1rem;
+    min-width: 6rem;
+    padding: 0.34rem 0.75rem 0.38rem;
+    font-size: 0.66rem;
+  }
+
+  .companion-utterance {
+    font-size: 0.8rem;
+    line-height: 1.34;
+  }
+
+  .companion-evidence-action {
+    font-size: 0.63rem;
+  }
+
+  .companion-choices {
+    gap: 0.3rem;
+  }
+
+  .companion-choice,
+  .companion-composer {
+    min-height: 2rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.7rem;
+  }
+
+  .choice-key {
+    width: 1.15rem;
+    height: 1.15rem;
+    font-size: 0.58rem;
+  }
+
+  .companion-escapes {
+    gap: 0.25rem;
+    margin-top: 0.35rem !important;
+  }
+
+  .companion-escapes .companion-choice {
+    min-height: 1.6rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.61rem;
+  }
+}
+
+/* ------------------------------------------------------------------ Atlas evidence workspace */
+
+@media (min-width: 60.001rem) {
+  /*
+   * The index is held in the world, not laid over it.
+   *
+   * It is one slab standing off the left of the view, slanted just enough to read as an object
+   * a person is holding rather than a page the browser is displaying. The world keeps rendering
+   * around and behind it, so opening the index never costs you the knowledge of where you were
+   * standing, which is the whole reason the world exists.
+   *
+   * WHERE it sits and WHAT it is made of belong to `.held-plate` in unified-interface.css.
+   * What remains here is only what the Index arranges inside that plate: four rows, running
+   * head, filters, results, footer.
+   */
+  .index-workspace.rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(9rem, 19%, 13rem);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 0;
+    transform: translate(calc(var(--plate-shift) - 2.5rem), -50%) var(--plate-tilt);
+    pointer-events: none;
+  }
+
+  #shell[data-index='open'] .index-workspace.rail {
+    transform: translate(var(--plate-shift), -50%) var(--plate-tilt);
+    pointer-events: auto;
+  }
+
+  .index-head {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.2rem;
+    padding: 0.6rem 1.15rem 0.55rem;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .index-head h1 {
+    margin: 0;
+    font-family: var(--ui-font-display);
+    font-size: 1.55rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+
+  .index-head .overlay-kicker { margin-bottom: 0; }
+
+  .index-head-state {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .index-close {
+    padding: 0.32rem 0.7rem;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-control);
+    font: 500 0.7rem/1.2 var(--ui-font-utility);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* The panel no longer reaches the top-right corner, so the Atlas commands keep their one
+   * canonical position in every destination instead of being nudged aside by this surface. */
+
+  /* Filters read left to right across one strip. */
+  /* Sized by its content. A max-height here would cap the element without shrinking its grid
+   * row, which leaves a dead band between the filters and the results. */
+  .index-facets {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem 0.9rem;
+    min-width: 0;
+    padding: 0.7rem 1.15rem 0.75rem;
+  }
+
+  .index-search-wrap { flex: 1 1 16rem; min-width: 0; }
+
+  /* Closed, the filters are one control beside the search. Open, they take a line of their own
+   * and push the results down; nothing is overlaid and nothing is hidden behind a hover. */
+  .index-filters { flex: 0 0 auto; min-width: 0; }
+  .index-filters[open] { flex: 1 1 100%; }
+
+  .index-filters-summary {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    width: fit-content;
+    padding: 0.34rem 0.7rem;
+    color: var(--ink-soft);
+    font: 500 0.68rem/1.2 var(--ui-font-utility);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    list-style: none;
+    border: 1px solid var(--edge);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+  }
+
+  .index-filters-summary::-webkit-details-marker { display: none; }
+  .index-filters[open] .index-filters-summary { color: var(--ink); }
+
+  .index-filters-summary:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .index-filter-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.34rem;
+    padding-top: 0.7rem;
+  }
+
+  .index-search-wrap {
+    display: grid;
+    gap: 0.3rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .index-result-summary,
+  .index-section-label {
+    margin: 0;
+  }
+
+  .index-clear {
+    justify-self: start;
+    font-size: 0.72rem;
+  }
+
+  .index-clear[disabled] { opacity: 0.4; }
+
+  /*
+   * Block flow, not flex. A <legend> inside a flex fieldset is a specially placed box rather
+   * than a flex item, so it always takes a line of its own and every facet costs two rows.
+   * In normal flow the legend floats and the chips run inline beside it: one row per facet.
+   */
+  .index-facet-group {
+    display: block;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /*
+   * The legend still names the group for assistive technology; visually it is the caption at the
+   * head of its own chip row, so a group costs one line instead of two. Four facets across a
+   * strip is the difference between three visible results and eight.
+   */
+  .index-facet-group legend {
+    float: left;
+    width: auto;
+    margin: 0 0.55rem 0 0;
+    line-height: 1.45rem;
+  }
+
+  .index-facet-group legend,
+  .provenance-legend h2,
+  .index-section-label {
+    margin: 0 0 0.3rem;
+    padding: 0;
+    color: var(--ink-faint);
+    font: 600 0.64rem/1.2 var(--ui-font-utility);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .index-facet-option {
+    display: inline-flex;
+    gap: 0.34rem;
+    align-items: center;
+    vertical-align: middle;
+    min-height: 1.4rem;
+    margin: 0 0.26rem 0.22rem 0;
+    padding: 0.08rem 0.5rem 0.08rem 0.38rem;
+    color: var(--ink-soft);
+    font-size: 0.69rem;
+    white-space: nowrap;
+    border: 1px solid color-mix(in srgb, var(--ink-faint) 60%, transparent);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .index-facet-option:has(input:checked) {
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  }
+
+  .index-facet-option:has(input:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .index-facet-option input {
+    width: 0.78rem;
+    height: 0.78rem;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  /* Reference material and the way out, held at the foot of the panel. */
+  .index-foot {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0.6rem 1.15rem 0.7rem;
+  }
+
+  .index-keys {
+    display: flex;
+    gap: 1rem;
+    margin: 0 0 0 auto;
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+  }
+
+  .index-key {
+    display: inline-flex;
+    gap: 0.38rem;
+    align-items: center;
+  }
+
+  .index-key kbd { color: var(--ink-soft); }
+
+  /* In the footer the legend is a single reference line, not a standing block. */
+  .index-foot .provenance-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.85rem;
+    padding: 0;
+  }
+
+  .index-foot .provenance-legend h2 { margin: 0; }
+  .index-foot .legend-item { margin: 0; font-size: 0.68rem; }
+  .index-foot .legend-note { display: none; }
+
+  .legend-item {
+    display: grid;
+    grid-template-columns: 1.15rem 1fr;
+    gap: 0.48rem;
+    align-items: center;
+    margin: 0 0 0.4rem;
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+  }
+
+  .legend-note {
+    margin: 0.65rem 0 0;
+    color: var(--ink-faint);
+    font-size: 0.68rem;
+    line-height: 1.45;
+  }
+
+  .index-results {
+    grid-column: 1;
+    grid-row: 3;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 0 1.15rem 1.2rem;
+  }
+
+  .index-results-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0 0.75rem;
+    background: var(--material-archive);
+  }
+
+  .index-result-summary { color: var(--ink); font-size: 0.9rem; }
+
+  .index-results .rail-list { gap: 0; }
+
+  .index-results .rail-row {
+    position: relative;
+    /*
+     * Three columns of slack put three wide gaps in a row, and with the separating rules gone the
+     * eye lost the line between a name and its marks. The name takes the slack; the metadata and
+     * the marks travel together at the right. One gap to cross instead of three.
+     */
+    grid-template-columns: 4.5rem minmax(9rem, 1fr) auto auto;
+    gap: 0.45rem 0.8rem;
+    min-height: 3.6rem;
+    padding: 0.62rem 0.6rem 0.62rem 0.8rem;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .index-results .rail-row::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: transparent;
+  }
+
+  .index-results .rail-row:hover,
+  .index-results .rail-row:focus-visible,
+  .index-results .rail-row[aria-current='true'] {
+    background: color-mix(in srgb, var(--raised) 60%, transparent);
+    outline: none;
+  }
+
+  .index-results .rail-row:focus-visible::before,
+  .index-results .rail-row[aria-current='true']::before { background: var(--focus); }
+
+  .rail-presence {
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+  }
+
+  .row-confidence-band {
+    grid-column: 2 / 4;
+    position: relative;
+    height: 0.8rem;
+    color: var(--inference);
+    font: 500 0.62rem/1 var(--ui-font-utility);
+  }
+
+  .row-confidence-band::before,
+  .row-confidence-band::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -0.05rem;
+    height: 2px;
+  }
+
+  .row-confidence-band::before { width: 100%; background: var(--edge); }
+  .row-confidence-band::after { background: var(--inference-mark); }
+  .row-confidence-band[data-confidence='low']::after { width: 33%; }
+  .row-confidence-band[data-confidence='medium']::after { width: 66%; }
+  .row-confidence-band[data-confidence='high']::after { width: 100%; }
+
+  .detection-section { margin-top: 1.5rem; }
+  .detection-section .rail-head { margin-bottom: 0.45rem; }
+  .detection-section .rail-note { margin-bottom: 0.6rem; }
+
+  #shell[data-primary='index'] > .detail {
+    top: calc(var(--gap) + 4.8rem);
+    right: var(--gap);
+    bottom: var(--gap);
+    z-index: 4;
+    width: min(32vw, 31rem);
+    max-height: none;
+    padding: 1rem 1.15rem 2rem;
+    background: var(--material-archive);
+    border: 0;
+    border-top: 1px solid var(--edge);
+    border-radius: 0.85rem;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  #shell[data-primary='index'] > .detail .detail-close {
+    position: sticky;
+    top: -1rem;
+    z-index: 2;
+    width: 100%;
+    padding: 0.75rem 0;
+    background: var(--material-archive);
+    text-align: left;
+  }
+}
+
+/* Provenance stays hue plus shape. The legend supplies the full readable vocabulary. */
+.mark {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.mark-capture { border-radius: 1px; }
+.mark-inference { border-radius: 1px; transform: rotate(45deg) scale(0.78); }
+.mark-external { border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+
+.mark.is-absent {
+  background: transparent;
+  border: 1px solid currentColor;
+  opacity: 0.52;
+}
+
+@media (max-height: 50rem) and (min-width: 60.001rem) {
+  .index-workspace.rail { grid-template-rows: 4.2rem minmax(0, 1fr); }
+  .index-head { padding-block: 0.55rem; }
+  .index-head h1 { font-size: 1.45rem; }
+  #shell[data-primary='index'] > .detail { top: calc(var(--gap) + 4.2rem); }
+  .index-facet-group { padding-block: 0.58rem; }
+  .index-facet-option { min-height: 1.5rem; }
+  .legend-note { display: none; }
+}
+
+/* ------------------------------------------------------------------ Atlas workshop instrument */
+
+@media (min-width: 60.001rem) {
+  /* Where this sits and what it is made of belong to `.held-plate`. Only its inner grid is here. */
+  .atlas-instrument.options-view.system-overlay {
+    display: grid;
+    column-gap: 0;
+  }
+
+  .atlas-instrument.options-view.system-overlay[hidden] { display: none; }
+
+
+}
+
+@media (max-height: 50rem) and (min-width: 60.001rem) {
+  .atlas-instrument.options-view.system-overlay {
+    grid-template-rows: 4rem minmax(0, 1fr);
+  }
+
+}
+
+#shell[data-primary='index'] > .companion-encounter:not([data-state='open']) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ index density */
+
+@media (min-width: 60.001rem) {
+  /* The filter readout rides inside the summary, so it is a value and not a sentence. */
+  .index-filter-state {
+    margin: 0;
+    color: var(--ink-faint);
+    font: 500 0.68rem/1.2 var(--ui-font-utility);
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+
+  .index-head-state {
+    display: flex;
+    gap: 1.1rem;
+    align-items: baseline;
+  }
+
+  .index-result-summary { color: var(--ink); }
+
+  /* The row carries the surface. Its name outranks its metadata rather than matching it. */
+  .index-results .rail-name {
+    font-size: 0.95rem;
+    letter-spacing: -0.005em;
+  }
+
+  .index-results .rail-presence {
+    color: var(--ink-faint);
+    font-size: 0.72rem;
+  }
+
+  .index-results .rail-kind {
+    color: var(--ink-faint);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+  }
+}
+
+/* ------------------------------------------------------------------ the region plan inset */
+
+@media (min-width: 60.001rem) {
+  .index-plan {
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0 1.15rem 1.2rem 0.9rem;
+  }
+
+  .index-plan-figure {
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: visible;
+  }
+
+  .index-plan-dot {
+    fill: color-mix(in srgb, var(--ink-faint) 55%, transparent);
+    stroke: none;
+    transition: fill var(--motion-quick) var(--motion-easing);
+  }
+
+  .index-plan-dot[data-active='true'] {
+    /* `--secondary` is not a token this app defines. `theme.ts` writes the profile's
+     * `colors.secondary` to `--accent-soft`; the name here never resolved, so the active region
+     * and the viewer marker have both been falling back to black. */
+    fill: var(--accent-soft);
+    stroke: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+    stroke-width: 3;
+  }
+
+  .index-plan-caption {
+    margin: 0;
+    color: var(--ink);
+    font: 500 0.72rem/1.2 var(--ui-font-utility);
+    letter-spacing: 0.04em;
+  }
+
+  .index-plan-readout {
+    margin: 0;
+    color: var(--ink-faint);
+    font-size: 0.66rem;
+    line-height: 1.4;
+  }
+}
+
+/* ------------------------------------------------------------------ command actions */
+
+/*
+ * One command action: the key badge, then what it does. Used by the plate footers, the Settings
+ * dismiss, and the Customize return, so the same object cannot drift into three appearances.
+ * The underline that used to carry \"this is clickable\" is gone; the badge carries it.
+ */
+.command-action {
+  display: inline-flex;
+  gap: 0.42rem;
+  align-items: center;
+  border-bottom: 0;
+  text-decoration: none;
+}
+
+.command-action-label {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+button.command-action:hover .command-action-label,
+button.command-action:focus-visible .command-action-label { color: var(--ink); }
+
+button.command-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.index-key .command-action-label { font-size: 0.7rem; }
+
+/* ------------------------------------------------------------------ the region minimap */
+
+/*
+ * Held in a corner, and only while traversing the ground. It is the same plan the Index draws,
+ * so there is one picture of the world's layout rather than two that can disagree, and it is an
+ * SVG of the placements the renderer already reads rather than a second view of the world.
+ *
+ * It stays quiet: no frame, no panel, no fill. Anything heavier would be the standing HUD the
+ * world is deliberately built without, and it is off until somebody asks for it.
+ */
+.region-minimap {
+  position: fixed;
+  right: var(--gap);
+  bottom: var(--gap);
+  z-index: 4;
+  display: grid;
+  gap: 0.4rem;
+  width: clamp(7rem, 9.5vw, 9rem);
+  padding: 0.6rem 0.6rem 0.5rem;
+  color: var(--ink);
+  background:
+    linear-gradient(102deg,
+      color-mix(in srgb, var(--atlas-plane) 86%, transparent),
+      color-mix(in srgb, var(--atlas-plane) 74%, transparent));
+  border: 1px solid var(--edge);
+  border-radius: 0.9rem;
+  corner-shape: squircle;
+  box-shadow: 0 0.7rem 2rem color-mix(in srgb, var(--ui-shadow) 34%, transparent);
+  backdrop-filter: blur(var(--blur-system)) saturate(var(--saturation-system));
+  pointer-events: none;
+}
+
+.region-minimap[hidden] { display: none; }
+
+.region-minimap .index-plan-figure {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: visible;
+}
+
+.region-minimap .index-plan-dot {
+  fill: color-mix(in srgb, var(--ink) 52%, transparent);
+}
+
+/* The count names the thing, so the card does not need a heading to be identifiable. */
+.region-minimap .index-plan-caption {
+  margin: 0;
+  color: var(--ink-faint);
+  font: 500 0.6rem/1 var(--ui-font-utility);
+  letter-spacing: 0.11em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.region-minimap .index-plan-readout { display: none; }
+
+.index-plan-viewer {
+  fill: var(--accent-soft);
+  stroke: color-mix(in srgb, var(--ground) 70%, transparent);
+  stroke-width: 1.1;
+}
+
+/* Nothing pulses or grows while you walk. The wedge moving is the only change worth noticing. */
+
+/*
+ * The citation sits at the foot of the panel, under its own rule.
+ *
+ * It is not an answer to the question and not a way out of it: it is how a person looks at the
+ * photograph before deciding. Separated so it does not read as a fifth option, and keyed to `E`,
+ * which is already the Atlas verb for interacting with what is in front of you.
+ */
+.companion-rail-foot {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--companion-edge-faint);
+}
+
+.companion-rail-foot .companion-evidence-action {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+
+/*
+ * The command label inverts inside the encounter.
+ *
+ * `.command-action-label` is authored once for the held plates, where it is dark type on paper.
+ * The Companion's surfaces are the opposite: a scrim over the live world. Reusing the one command
+ * element is right, and it has to be told which side it is on, or the labels arrive at 1.18:1.
+ */
+.companion-choice .command-action-label,
+.companion-escapes .companion-choice,
+.companion-rail-foot .command-action-label {
+  color: inherit;
+}
+
+.reconstruction-inspector-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
+.reconstruction-inspector-header h2 { margin: 0; }
+
+/* The person review, under the evidence panel in the reconstruction inspector.
+ *
+ * The outline is drawn on a neutral field and the photograph is never behind it. That is not a
+ * styling preference: `ui/person-review.ts` refuses to render the pixels because a screen that
+ * showed them would display the very body the feature exists to hide, in the tool built to hide
+ * it. So `--ink-faint` on `--raised` is the whole picture a reviewer gets, and the outline has to
+ * carry on its own. Masked outlines are filled; a shown person's is left open, so the two are
+ * distinguishable without colour. */
+.reconstruction-review:empty { display: none; }
+.reconstruction-review {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent);
+}
+.person-review { display: grid; gap: 0.6rem; }
+.person-review h3 {
+  margin: 0;
+  font: 500 0.7rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.person-review p { margin: 0; }
+.person-review-unscreened,
+.person-review-empty,
+.person-review-authority { color: var(--ink-faint); font-size: 0.78rem; }
+.person-review-region {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: 0.2rem 0.7rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--ink-faint) 30%, transparent);
+}
+/* The outline spans the rows beside it rather than sitting in the flow, so a tall silhouette does
+ * not push the sentences about it out of alignment with the next region. */
+.person-review-outline {
+  grid-row: 1 / -1;
+  width: 100%;
+  height: auto;
+  background: color-mix(in srgb, var(--ink-faint) 12%, transparent);
+  border-radius: 2px;
+}
+.person-review-part { font-weight: 500; font-size: 0.8rem; }
+.person-review-state, .person-review-provenance { color: var(--ink-faint); font-size: 0.76rem; }
+.person-review-controls { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
+.person-review-action {
+  font: inherit;
+  font-size: 0.74rem;
+  padding: 0.2rem 0.5rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--ink-faint) 60%, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.person-review-action:hover { background: color-mix(in srgb, var(--ink-faint) 12%, transparent); }
+.person-review-action:disabled { opacity: 0.45; cursor: default; }
+.person-review-failed { color: var(--ink-faint); font-size: 0.78rem; margin: 0; }
+
+/* Manual person-region authoring, using the inspector's existing typography and colors. */
+.person-region-editor { border-top: 1px solid currentColor; margin-top: 1rem; padding-top: .75rem; }
+.person-region-editor-stage { position: relative; width: 100%; height: 240px; touch-action: none; }
+.person-region-editor-stage img { width: 100%; height: 100%; object-fit: contain; user-select: none; }
+.person-region-editor-box { position: absolute; border: 2px solid #eacb79; outline: 1px solid #222; pointer-events: none; }
+.person-region-editor form { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.person-region-editor label { display: grid; gap: .25rem; }
+.person-region-editor input { min-width: 0; width: 100%; box-sizing: border-box; }
+.person-region-editor :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+/*
+ * The Atlas has one material identity and two exposures. This file assigns shared presentation
+ * tokens to app surfaces; component files do not choose new colors, blur levels or radii here.
+ */
+
+html,
+body {
+  font-family: var(--ui-font-body);
+  background-color: var(--ground);
+  transition:
+    background-color var(--motion-deliberate) var(--motion-easing),
+    color var(--motion-standard) var(--motion-easing);
+}
+
+/* Registered world texture families. The profile selects a name and strength; it cannot supply
+ * selectors, URLs, or executable CSS. The same image is used for the field and the summoned
+ * interface surfaces so the chrome belongs to the world without changing component geometry. */
+:root {
+  --ui-texture-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E\");
+  --ui-texture-size: 180px 180px;
+}
+
+:root[data-ui-texture='contour-grid'] {
+  --ui-texture-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 23px,
+      color-mix(in srgb, var(--ink-faint) 22%, transparent) 23px 24px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 23px,
+      color-mix(in srgb, var(--ink-faint) 14%, transparent) 23px 24px
+    );
+  --ui-texture-size: 24px 24px;
+}
+
+:root[data-ui-texture='none'] {
+  --ui-texture-image: none;
+}
+
+/* The rendered sky and horizon own the world atmosphere. Never tint the whole viewport in CSS. */
+#shell::before {
+  inset: 0;
+  background: transparent;
+}
+
+/* A nearly imperceptible paper tooth keeps UI surfaces related to the physical archive leaves. */
+.stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  background-image: var(--ui-texture-image);
+  background-size: var(--ui-texture-size);
+}
+
+/* A texture is an optical finish, never a new control shape. `::before` inherits the fixed system
+ * radius and paints before the ordinary DOM content, so labels, focus, and hit testing stay intact. */
+.companion-choice,
+.companion-choices-submit,
+.companion-composer {
+  position: relative;
+}
+
+:where(
+  .companion-speech,
+  .companion-choice,
+  .companion-choices-submit,
+  .companion-composer,
+  .choice-item.unavailable,
+  .atlas-commands button
+)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: var(--ui-texture-image);
+  background-size: var(--ui-texture-size);
+  mix-blend-mode: var(--grain-blend);
+}
+
+/* Access preferences outrank world material. Removing blur while leaving a translucent fill would
+ * expose moving world geometry through the text, so these modes also make the reading surfaces
+ * genuinely opaque. Shape, placement, and semantics remain unchanged. */
+/*
+ * This list used to set `background-color: var(--ui-companion-surface)`. That token was the dark
+ * one when the rule was written and is the light paper since the derivation flipped, so under
+ * Reduced the speech band was painted the exact colour of its own text: 1:1, invisible. The fill
+ * now comes from the material tokens, which the surfaces already use and which are made opaque in
+ * unified-interface.css, so there is one source for it instead of two that can disagree.
+ */
+:root:is([data-transparency='reduced'], [data-contrast='high']) :where(
+  .companion-speech,
+  .companion-choice,
+  .companion-choices-submit,
+  .companion-composer,
+  .choice-item.unavailable,
+  .companion-choice-rail
+) {
+  backdrop-filter: none;
+}
+
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-choice:hover:not([disabled]),
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-choice:focus-visible {
+  background-color: var(--companion-scrim-soft);
+}
+
+:root:is([data-transparency='reduced'], [data-contrast='high']) .atlas-commands button {
+  background-color: var(--ui-companion-surface);
+  backdrop-filter: none;
+}
+
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-encounter[data-state='open'] ~ .atlas-commands button {
+  background-color: var(--ui-companion-text);
+}
+
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-encounter[data-state='open'] ~ .atlas-commands button:hover,
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-encounter[data-state='open'] ~ .atlas-commands button:focus-visible,
+:root:is([data-transparency='reduced'], [data-contrast='high'])
+  .companion-encounter[data-state='open'] ~ .atlas-commands button[aria-current='page'] {
+  background-color: var(--ui-companion-surface-hover);
+}
+
+/* Archive sheets: summoned reading surfaces. Photographs and evidence stay visually dominant. */
+.rail,
+.detail,
+.confirm {
+  background: var(--material-archive);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(var(--blur-system));
+  box-shadow: 0 20px 56px color-mix(in srgb, var(--material-shadow) 46%, transparent);
+}
+
+/* System sheets: choices about the Atlas, separate from evidence without becoming a glass card. */
+.system-overlay,
+.gate {
+  background: var(--material-system);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(var(--blur-system));
+  box-shadow:
+    0 0 0 100vmax color-mix(in srgb, var(--ground) 76%, transparent),
+    0 28px 72px color-mix(in srgb, var(--material-shadow) 58%, transparent);
+}
+
+.system-overlay {
+  width: min(48rem, calc(100vw - 2 * var(--gap)));
+}
+
+.options-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(14rem, 0.7fr);
+  column-gap: 1.4rem;
+}
+
+.options-view[hidden] {
+  display: none;
+}
+
+.options-view > :where(.overlay-head, .appearance-options, .world-style-options, .overlay-actions) {
+  grid-column: 1 / -1;
+}
+
+.options-view .view-options {
+  grid-column: 1;
+}
+
+.options-view .companion-options {
+  grid-column: 2;
+}
+
+.companion-options .option-field {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.companion-options select {
+  width: 100%;
+}
+
+/*
+ * The preview sits above its own controls, at the size the Companion is actually read at in the
+ * world rather than as a chip. It is the real renderer, not a picture of one, so a silhouette or
+ * expression added to the contract needs no second drawing to appear here.
+ */
+.companion-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+  margin-bottom: var(--gap);
+  padding: var(--gap) 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.companion-preview .companion-avatar {
+  width: 6.5rem;
+  height: 6.5rem;
+}
+
+.options-view .overlay-actions {
+  margin-top: 0.2rem;
+}
+
+.appearance-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.8rem;
+}
+
+.appearance-options > h2 {
+  grid-column: 1 / -1;
+}
+
+.appearance-options .option-field {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.appearance-options .option-note { grid-column: 1; }
+
+.world-style-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 0.8rem;
+}
+
+.world-style-head {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.world-style-head h2,
+.world-style-head p { margin: 0; }
+
+.world-style-head p { grid-column: 1 / -1; }
+
+.world-style-name {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.world-style-state {
+  grid-column: 2;
+  color: var(--ink-faint);
+  font: 500 0.68rem/1.2 var(--ui-font-utility);
+  text-align: right;
+}
+
+.options-view[data-world-dirty='true'] .world-style-state {
+  color: var(--warning);
+}
+
+.world-dna-strip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr 1fr 0.8fr 0.8fr;
+  height: 1.55rem;
+  margin: 0.35rem 0 0.55rem;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+}
+
+.world-dna-swatch {
+  min-width: 0;
+  border-inline-start: 1px solid color-mix(in srgb, var(--raised) 42%, transparent);
+}
+
+.world-dna-swatch:first-child { border-inline-start: 0; }
+
+.world-style-explanation,
+.world-style-future {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.world-style-future {
+  margin-top: 0.5rem;
+  color: var(--ink-faint);
+}
+
+.world-style-authority[data-state='failed'],
+.world-style-lifecycle[data-state='failed'],
+.world-style-lifecycle[data-state='stale'] {
+  color: var(--warning);
+}
+
+.world-style-proposal-review {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.55rem;
+  padding: 0.65rem 0;
+  color: var(--ink-soft);
+  border-block: 1px solid var(--edge);
+  font-size: 0.72rem;
+}
+
+.world-style-proposal-review[hidden] { display: none; }
+
+.world-style-proposal-review strong { color: var(--ink); }
+
+.world-style-history {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.3rem 1rem;
+  align-items: end;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--edge);
+}
+
+.world-style-history h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.world-style-history .option-field {
+  grid-template-columns: minmax(8rem, 0.7fr) minmax(13rem, 1.3fr);
+}
+
+.world-style-history .text-action { min-height: 2.45rem; }
+
+.world-style-options .option-field {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.world-style-options .option-note { grid-column: 1; }
+
+.world-style-assurance {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 0.8rem;
+  align-items: baseline;
+  margin-top: 0.4rem;
+  padding-top: 0.65rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--edge);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.world-style-assurance strong {
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.world-style-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.65rem;
+}
+
+.world-style-apply {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.9rem;
+  color: var(--ground);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-control);
+}
+
+.world-style-apply:hover:not([disabled]),
+.world-style-apply:focus-visible {
+  color: var(--raised);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.world-style-apply[disabled],
+.world-style-actions .text-action[disabled] {
+  opacity: 0.42;
+  cursor: default;
+}
+
+/* The supported laptop floor is still a desktop surface. A short screen gets one bounded system
+ * sheet with an ordinary vertical scroll; the world remains fixed behind it and no control is
+ * compressed below its readable or operable size. */
+@media (max-height: 50rem) and (min-width: 60.001rem) {
+  .options-view.system-overlay {
+    max-height: calc(100vh - 2rem);
+    padding: 0.9rem 1.35rem;
+    overflow-y: auto;
+  }
+
+  .options-view .overlay-head { margin-bottom: 0.75rem; }
+  .options-view .option-group { padding: 0.6rem 0 0.3rem; }
+  .options-view .option-field { min-height: 2.55rem; }
+  .options-view .world-style-explanation,
+  .options-view .world-style-future,
+  .options-view .world-style-assurance { font-size: 0.68rem; }
+  .options-view .world-dna-strip { height: 1.2rem; margin-block: 0.2rem 0.35rem; }
+  .options-view .world-style-actions { margin-top: 0.35rem; }
+  .options-view .overlay-actions { padding-top: 0.55rem; }
+}
+
+/* Transient focus retains a material backing. World commands stay as unboxed type so the
+ * architecture review has no persistent pill or squircle. */
+.ov-focus {
+  background: var(--material-instrument);
+  backdrop-filter: blur(var(--blur-world));
+}
+
+.ov-focus {
+  border-radius: var(--radius-label);
+}
+
+.ov-callout,
+.ov-marker {
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  border-radius: var(--radius-label);
+}
+
+.overlay-head h1,
+.detail-title,
+.viewport-boundary h1 {
+  font-family: var(--ui-font-display);
+  font-weight: 300;
+}
+
+.overlay-kicker,
+.option-group h2,
+.rail-head,
+.detail-section h2,
+.band h3 {
+  font-weight: 500;
+}
+
+:root[data-contrast='high'] .status,
+:root[data-contrast='high'] .map-caption {
+  opacity: 1;
+  text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  #shell::before {
+    transition: none;
+  }
+}
+"
+
+ ❯ packages/app/test/style-contract.test.ts:12:33
+     10| describe('world-owned interface style contract', () => {
+     11|   it('keeps palette literals out of component styles', () => {
+     12|     expect(componentStyles).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+       |                                 ^
+     13|     expect(componentStyles).not.toMatch(/\brgba?\(/i);
+     14|     expect(componentStyles).not.toMatch(/\bhsla?\(/i);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 110 passed (111)
+      Tests  1 failed | 873 passed (874)
+   Start at  08:11:43
+   Duration  6.99s (transform 3.65s, setup 0ms, collect 21.41s, tests 7.21s, environment 8.10s, prepare 6.74s)
+
+ ELIFECYCLE  Test failed. See above for more details.

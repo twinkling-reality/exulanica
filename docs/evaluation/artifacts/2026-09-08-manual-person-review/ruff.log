@@ -1,0 +1,393 @@
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:24:1
+   |
+22 | sys.path.insert(0, str(ROOT / "tests"))
+23 |
+24 | from PIL import Image, ImageDraw
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 | from conftest import photo_bytes
+26 | from pg_harness import migrated_schema, open_scratch_connection
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:24:1
+   |
+22 |   sys.path.insert(0, str(ROOT / "tests"))
+23 |
+24 | / from PIL import Image, ImageDraw
+25 | | from conftest import photo_bytes
+26 | | from pg_harness import migrated_schema, open_scratch_connection
+27 | |
+28 | | from exulanica.db.migrate import migrations, provision_workspace
+29 | | from exulanica.db.roles import provision_runtime_role
+30 | | from exulanica.graph.scene_groups import scene_group_rows
+31 | | from exulanica.ingest.person_detectors import NoRegionDetector
+32 | | from exulanica.ingest.pipeline import PhotoIngestPipeline
+33 | | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+34 | | from exulanica.ingest.repository import IngestRepository
+35 | | from exulanica.ingest.scenes import run_scene_grouping
+36 | | from exulanica.orchestration.reference_world import compose_reference_sources
+37 | | from exulanica.store.local import LocalContentAddressedStore
+   | |____________________________________________________________^
+38 |
+39 |   OUT = ROOT / "docs/evaluation/artifacts/2026-09-08-manual-person-review"
+   |
+help: Organize imports
+   |
+23 |
+   - from PIL import Image, ImageDraw
+   - from conftest import photo_bytes
+   - from pg_harness import migrated_schema, open_scratch_connection
+   -
+24 | from exulanica.db.migrate import migrations, provision_workspace
+--------------------------------------------------------------------------------
+33 | from exulanica.store.local import LocalContentAddressedStore
+34 + from PIL import Image, ImageDraw
+35 +
+36 + from conftest import photo_bytes
+37 + from pg_harness import migrated_schema, open_scratch_connection
+38 |
+   |
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:25:1
+   |
+24 | from PIL import Image, ImageDraw
+25 | from conftest import photo_bytes
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 | from pg_harness import migrated_schema, open_scratch_connection
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:26:1
+   |
+24 | from PIL import Image, ImageDraw
+25 | from conftest import photo_bytes
+26 | from pg_harness import migrated_schema, open_scratch_connection
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 |
+28 | from exulanica.db.migrate import migrations, provision_workspace
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:28:1
+   |
+26 | from pg_harness import migrated_schema, open_scratch_connection
+27 |
+28 | from exulanica.db.migrate import migrations, provision_workspace
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 | from exulanica.db.roles import provision_runtime_role
+30 | from exulanica.graph.scene_groups import scene_group_rows
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:29:1
+   |
+28 | from exulanica.db.migrate import migrations, provision_workspace
+29 | from exulanica.db.roles import provision_runtime_role
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 | from exulanica.graph.scene_groups import scene_group_rows
+31 | from exulanica.ingest.person_detectors import NoRegionDetector
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:30:1
+   |
+28 | from exulanica.db.migrate import migrations, provision_workspace
+29 | from exulanica.db.roles import provision_runtime_role
+30 | from exulanica.graph.scene_groups import scene_group_rows
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 | from exulanica.ingest.person_detectors import NoRegionDetector
+32 | from exulanica.ingest.pipeline import PhotoIngestPipeline
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:31:1
+   |
+29 | from exulanica.db.roles import provision_runtime_role
+30 | from exulanica.graph.scene_groups import scene_group_rows
+31 | from exulanica.ingest.person_detectors import NoRegionDetector
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 | from exulanica.ingest.pipeline import PhotoIngestPipeline
+33 | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:32:1
+   |
+30 | from exulanica.graph.scene_groups import scene_group_rows
+31 | from exulanica.ingest.person_detectors import NoRegionDetector
+32 | from exulanica.ingest.pipeline import PhotoIngestPipeline
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+34 | from exulanica.ingest.repository import IngestRepository
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:33:1
+   |
+31 | from exulanica.ingest.person_detectors import NoRegionDetector
+32 | from exulanica.ingest.pipeline import PhotoIngestPipeline
+33 | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 | from exulanica.ingest.repository import IngestRepository
+35 | from exulanica.ingest.scenes import run_scene_grouping
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:34:1
+   |
+32 | from exulanica.ingest.pipeline import PhotoIngestPipeline
+33 | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+34 | from exulanica.ingest.repository import IngestRepository
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 | from exulanica.ingest.scenes import run_scene_grouping
+36 | from exulanica.orchestration.reference_world import compose_reference_sources
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:35:1
+   |
+33 | from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+34 | from exulanica.ingest.repository import IngestRepository
+35 | from exulanica.ingest.scenes import run_scene_grouping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 | from exulanica.orchestration.reference_world import compose_reference_sources
+37 | from exulanica.store.local import LocalContentAddressedStore
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:36:1
+   |
+34 | from exulanica.ingest.repository import IngestRepository
+35 | from exulanica.ingest.scenes import run_scene_grouping
+36 | from exulanica.orchestration.reference_world import compose_reference_sources
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 | from exulanica.store.local import LocalContentAddressedStore
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:37:1
+   |
+35 | from exulanica.ingest.scenes import run_scene_grouping
+36 | from exulanica.orchestration.reference_world import compose_reference_sources
+37 | from exulanica.store.local import LocalContentAddressedStore
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 |
+39 | OUT = ROOT / "docs/evaluation/artifacts/2026-09-08-manual-person-review"
+   |
+help: Move module level imports to top of file
+
+E501 Line too long (122 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:60:101
+   |
+58 |         captures = []
+59 |         for index in range(2):
+60 |             template = Image.open(io.BytesIO(photo_bytes(size=(800, 400), when=f"2026:09:08 10:0{index}:00", gps=(0, 0))))
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^
+61 |             image = Image.new("RGB", (800, 400), (220, 230, 220 + index * 10))
+62 |             draw = ImageDraw.Draw(image)
+   |
+
+E501 Line too long (113 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:63:101
+   |
+61 |             image = Image.new("RGB", (800, 400), (220, 230, 220 + index * 10))
+62 |             draw = ImageDraw.Draw(image)
+63 |             draw.text((20, 20), f"GENERATED TEST IMAGE {index + 1} - NO REAL PERSON", fill="black", font_size=24)
+   |                                                                                                     ^^^^^^^^^^^^^
+64 |             draw.ellipse((220, 85, 280, 145), fill=(80, 90, 100))
+65 |             draw.rectangle((205, 150, 295, 285), fill=(90, 100, 110))
+   |
+
+E501 Line too long (111 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:75:101
+   |
+73 |                 actor=actor, generator_manifest={"notice": "GENERATED TEST IMAGE, NO REAL PERSON"},
+74 |                 authorization_scope={"purpose": "isolated manual person browser acceptance"})
+75 |             screening = record_synthetic_exemption(repository, authorization_id=authorization.authorization_id)
+   |                                                                                                     ^^^^^^^^^^^
+76 |             result = pipeline.ingest_derivatives(result.capture_id, privacy_screening_id=screening.screening_id)
+77 |             assert result.error is None, result.error
+   |
+
+E501 Line too long (112 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:76:101
+   |
+74 |                 authorization_scope={"purpose": "isolated manual person browser acceptance"})
+75 |             screening = record_synthetic_exemption(repository, authorization_id=authorization.authorization_id)
+76 |             result = pipeline.ingest_derivatives(result.capture_id, privacy_screening_id=screening.screening_id)
+   |                                                                                                     ^^^^^^^^^^^^
+77 |             assert result.error is None, result.error
+78 |             captures.append((result.capture_id, hashlib.sha256(target.read_bytes()).hexdigest(), target.name))
+   |
+
+E501 Line too long (110 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:78:101
+   |
+76 |             result = pipeline.ingest_derivatives(result.capture_id, privacy_screening_id=screening.screening_id)
+77 |             assert result.error is None, result.error
+78 |             captures.append((result.capture_id, hashlib.sha256(target.read_bytes()).hexdigest(), target.name))
+   |                                                                                                     ^^^^^^^^^^
+79 |         run_scene_grouping(repository)
+80 |         groups = scene_group_rows(connection, workspace)
+   |
+
+E501 Line too long (120 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:83:101
+   |
+81 |         assert groups, "generated inputs must produce a real scene group"
+82 |         compose_reference_sources(repository, region_id=str(groups[0].group_id), captures=captures,
+83 |                                   source_manifest_sha256=hashlib.sha256(b"generated manual person fixture").hexdigest())
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^
+84 |         token = secrets.token_urlsafe(36)
+85 |         env = {k: v for k, v in os.environ.items() if not k.startswith(("EXULANICA_", "ORIMERA_", "VITE_EXULANICA_"))
+   |
+
+E501 Line too long (117 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:85:101
+   |
+83 |                                   source_manifest_sha256=hashlib.sha256(b"generated manual person fixture").hexdigest())
+84 |         token = secrets.token_urlsafe(36)
+85 |         env = {k: v for k, v in os.environ.items() if not k.startswith(("EXULANICA_", "ORIMERA_", "VITE_EXULANICA_"))
+   |                                                                                                     ^^^^^^^^^^^^^^^^^
+86 |                and k not in {"NEBIUS_API_KEY", "PGOPTIONS", "PGDATABASE", "PGUSER"}}
+87 |         def url(role):
+   |
+
+ANN201 Missing return type annotation for public function `url`
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:87:13
+   |
+85 |         env = {k: v for k, v in os.environ.items() if not k.startswith(("EXULANICA_", "ORIMERA_", "VITE_EXULANICA_"))
+86 |                and k not in {"NEBIUS_API_KEY", "PGOPTIONS", "PGDATABASE", "PGUSER"}}
+87 |         def url(role):
+   |             ^^^
+88 |             return DATABASE + "?options=" + urllib.parse.quote(f"-csearch_path={schema},public -crole={role}", safe="")
+89 |         env.update(EXULANICA_DATABASE_URL=url("exulanica_app"),
+   |
+help: Add return type annotation
+
+ANN001 Missing type annotation for function argument `role`
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:87:17
+   |
+85 |         env = {k: v for k, v in os.environ.items() if not k.startswith(("EXULANICA_", "ORIMERA_", "VITE_EXULANICA_"))
+86 |                and k not in {"NEBIUS_API_KEY", "PGOPTIONS", "PGDATABASE", "PGUSER"}}
+87 |         def url(role):
+   |                 ^^^^
+88 |             return DATABASE + "?options=" + urllib.parse.quote(f"-csearch_path={schema},public -crole={role}", safe="")
+89 |         env.update(EXULANICA_DATABASE_URL=url("exulanica_app"),
+   |
+
+E501 Line too long (119 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:88:101
+   |
+86 |                and k not in {"NEBIUS_API_KEY", "PGOPTIONS", "PGDATABASE", "PGUSER"}}
+87 |         def url(role):
+88 |             return DATABASE + "?options=" + urllib.parse.quote(f"-csearch_path={schema},public -crole={role}", safe="")
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^
+89 |         env.update(EXULANICA_DATABASE_URL=url("exulanica_app"),
+90 |                    EXULANICA_READONLY_DATABASE_URL=url("exulanica_ro"),
+   |
+
+E501 Line too long (115 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:92:101
+   |
+90 |                    EXULANICA_READONLY_DATABASE_URL=url("exulanica_ro"),
+91 |                    EXULANICA_DATA_DIR=str(runtime), EXULANICA_DERIVATIVE_WORKER="0",
+92 |                    EXULANICA_API_TOKENS=json.dumps({token: {"workspace_id": str(workspace), "actor": str(actor)}}),
+   |                                                                                                     ^^^^^^^^^^^^^^^
+93 |                    VITE_EXULANICA_TOKEN=token, VITE_EXULANICA_SOURCE_PRESENTATION="inspection",
+94 |                    EXULANICA_API_URL="http://127.0.0.1:8137")
+   |
+
+E501 Line too long (114 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:95:101
+   |
+93 |                    VITE_EXULANICA_TOKEN=token, VITE_EXULANICA_SOURCE_PRESENTATION="inspection",
+94 |                    EXULANICA_API_URL="http://127.0.0.1:8137")
+95 |         (OUT / "browser-fixture.json").write_text(json.dumps({"workspace_id": str(workspace), "actor": str(actor),
+   |                                                                                                     ^^^^^^^^^^^^^^
+96 |             "schema": schema, "captures": [{"capture_id": str(c), "sha256": h, "image": n} for c,h,n in captures]}, indent=2)+"\n")
+97 |         processes = []
+   |
+
+E501 Line too long (131 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:96:101
+   |
+94 |                    EXULANICA_API_URL="http://127.0.0.1:8137")
+95 |         (OUT / "browser-fixture.json").write_text(json.dumps({"workspace_id": str(workspace), "actor": str(actor),
+96 |             "schema": schema, "captures": [{"capture_id": str(c), "sha256": h, "image": n} for c,h,n in captures]}, indent=2)+"\n")
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+97 |         processes = []
+98 |         try:
+   |
+
+E501 Line too long (163 > 100)
+   --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:99:101
+    |
+ 97 | …
+ 98 | …
+ 99 | …uvicorn", "exulanica.api.app:create_app", "--factory", "--host", "127.0.0.1", "--port", "8137"]),
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+100 | …, "--filter", "@exulanica/app", "dev", "--host", "127.0.0.1", "--port", "5197", "--strictPort"])):
+101 | …
+    |
+
+E501 Line too long (164 > 100)
+   --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:100:101
+    |
+ 98 | …
+ 99 | …uvicorn", "exulanica.api.app:create_app", "--factory", "--host", "127.0.0.1", "--port", "8137"]),
+100 | …, "--filter", "@exulanica/app", "dev", "--host", "127.0.0.1", "--port", "5197", "--strictPort"])):
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+101 | …
+102 | …, stdout=log, stderr=subprocess.STDOUT))
+    |
+
+E501 Line too long (106 > 100)
+   --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:102:101
+    |
+100 | …                           ("vite", ["pnpm", "--dir", "web", "--filter", "@exulanica/app", "dev", "--host", "127.0.0.1", "--port", "…
+101 | …         log = (OUT / f"browser-{name}.log").open("w")
+102 | …         processes.append(subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT))
+    |                                                                                               ^^^^^^
+103 | …     print("Generated fixture ready; actual app at http://127.0.0.1:5197", flush=True)
+104 | …     while not (OUT / "browser-stop").exists():
+    |
+
+E501 Line too long (180 > 100)
+   --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:108:101
+    |
+106 | …ogs")
+107 | …ating point values.
+108 | …silhouette, action, confirmed_by, subject_id from person_region order by capture_id, sequence").fetchall()
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+109 | …s([
+110 | …nstance(v, uuid.UUID) else v for k,v in row.items()}
+    |
+
+E501 Line too long (126 > 100)
+   --> docs/evaluation/artifacts/2026-09-08-manual-person-review/browser_fixture.py:110:101
+    |
+108 | …     rows = connection.execute("select capture_id, region_key, silhouette, action, confirmed_by, subject_id from person_region order…
+109 | …     (OUT / "browser-stored-regions.json").write_text(json.dumps([
+110 | …         {k: v.hex() if isinstance(v, bytes) else str(v) if isinstance(v, uuid.UUID) else v for k,v in row.items()}
+    |                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+111 | …         for row in rows], indent=2)+"\n")
+112 | …     time.sleep(1)
+    |
+
+Found 32 errors.
+[*] 1 fixable with the `--fix` option.

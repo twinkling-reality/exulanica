@@ -1,0 +1,7 @@
+
+> exulanica-web@ boundaries /Users/glendonchin/dev/Technology/exulanica-manual-person-review/web
+> depcruise --config .dependency-cruiser.cjs packages
+
+
+✔ no dependency violations found (370 modules, 1173 dependencies cruised)
+

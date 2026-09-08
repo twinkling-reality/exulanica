@@ -1,0 +1,11 @@
+{
+  "scratch_schemas_removed": [
+    "exulanica_test_9de24aed0c35",
+    "exulanica_test_e1ff9edd9c71"
+  ],
+  "ports_closed": {
+    "8137": true,
+    "5197": true
+  },
+  "temporary_store_removed": true
+}

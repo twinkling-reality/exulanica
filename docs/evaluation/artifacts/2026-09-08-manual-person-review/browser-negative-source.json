@@ -1,0 +1,6 @@
+{
+  "source": "web/packages/app/src/ui/person-review.ts",
+  "original_sha256": "66b004b54cc757015252ddbac3881791c65f513c005323d50409671c00aa8fd4",
+  "mutant_sha256": "2ffac6079f8732ffa0e0a87e1070a665ca81e43d3bd4e50842a40b1ef613c3af",
+  "mutation": "Remove editor mounting only"
+}

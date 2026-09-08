@@ -1,0 +1,43 @@
+{
+  "path": "mounted-empty-detector-person-authoring",
+  "integrated_head": "2af30493fab6a50757e0f6571d1bf14cee525e57",
+  "integrated_sources": {
+    "web/packages/app/src/main.ts": "4a31511bba951e89b4abe2ff7333e03863820d355be751fda3da917a267f9dab",
+    "web/packages/app/src/ui/person-review.ts": "66b004b54cc757015252ddbac3881791c65f513c005323d50409671c00aa8fd4",
+    "web/packages/app/src/ui/person-region-editor.ts": "5020981d7e364b711e51f4a087501ded9b6850c9d30196ec27665cc0f4e4cf82",
+    "exulanica/world/repository.py": "a18b889e71433216394efde186ac1d369c2f72c1efa1690cc5905f7a354332c2"
+  },
+  "positive": true,
+  "full_page_reload": true,
+  "normalized_outline_matches_stored": true,
+  "pending_mask_has_no_editable_image": true,
+  "second_capture_unchanged": true,
+  "presentation_consent_count": 0,
+  "subject_count": 0,
+  "negative_failed": true,
+  "negative_selector": "button with exact accessible name Save person region",
+  "negative_reason": "Save person region is missing",
+  "restored_control_passed": true,
+  "integration_tree_clean": true,
+  "capture_id": "01a080f6-8d76-7b5b-b6ef-09cfaf76ec6a",
+  "other_capture_id": "01a080f6-8daa-7259-becf-8821c6501f73",
+  "region_key": "d86e3ec3d0415a6557a430916683c7bfbc25fda228d2c67402261ec3115c9371",
+  "outline": [
+    [
+      212686,
+      178757
+    ],
+    [
+      425683,
+      178757
+    ],
+    [
+      425683,
+      944100
+    ],
+    [
+      212686,
+      944100
+    ]
+  ]
+}

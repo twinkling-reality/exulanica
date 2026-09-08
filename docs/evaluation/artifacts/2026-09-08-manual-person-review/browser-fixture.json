@@ -1,0 +1,17 @@
+{
+  "workspace_id": "3c4cf872-b29a-4e92-80f1-8b6b79955a64",
+  "actor": "988f8ae5-5d24-4b7d-a37c-38bb6cfba00a",
+  "schema": "exulanica_test_9de24aed0c35",
+  "captures": [
+    {
+      "capture_id": "01a080f0-4caf-771c-99a8-be9c9d1f46f0",
+      "sha256": "e5207259850c1d90bf3a9f5242f01a969afa606bd55476198c9b317ee8c8c566",
+      "image": "generated-person-1.jpg"
+    },
+    {
+      "capture_id": "01a080f0-4cfb-7284-be03-3ffee4badfbb",
+      "sha256": "bd47c9e2278f02a6bef72b39b5b579a2102fedecbf139370fe8188b2e499a6aa",
+      "image": "generated-person-2.jpg"
+    }
+  ]
+}
