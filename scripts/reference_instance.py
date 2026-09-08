@@ -9,6 +9,7 @@ import re
 import secrets
 import subprocess
 import sys
+import urllib.parse
 import uuid
 from pathlib import Path
 
@@ -18,6 +19,35 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / ".exulanica/reference-baseline/runtime"
 CONFIG = STATE / "access.json"
 DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
+OVERRIDE = "EXULANICA_REFERENCE_DATABASE_URL"
+
+
+def resolve_database() -> str:
+    """Return the database every subcommand runs against.
+
+    The default stays the retained spine. Setting EXULANICA_REFERENCE_DATABASE_URL points the
+    whole reference instance at an isolated migrated copy instead, so HEAD can be inspected
+    without applying a pending migration to retained rows. Only a database whose name contains
+    "test" is accepted, which keeps the override from reaching a personal deployment. The URL is
+    never printed: a connection string carries credentials, so only the bare database name, which
+    cannot, appears in the refusal.
+    """
+    override = os.environ.get(OVERRIDE)
+    if not override:
+        return DATABASE
+    name = urllib.parse.urlparse(override).path.lstrip("/")
+    if "test" not in name:
+        raise SystemExit(
+            f"{OVERRIDE} names the database {name!r}, which is not a test database. Refusing to"
+            " run the retained reference against it."
+        )
+    return override
+
+
+def readonly_url(database: str) -> str:
+    """Return the read-only form of a database URL, preserving any query the URL already has."""
+    separator = "&" if "?" in database else "?"
+    return f"{database}{separator}options=-crole%3Dexulanica_ro"
 
 
 def main():
@@ -41,6 +71,7 @@ def main():
     args, remaining = parser.parse_known_args()
     if re.fullmatch(r"[a-z][a-z0-9-]{0,63}", args.scene) is None:
         parser.error("scene must be a lowercase path-safe label")
+    database = resolve_database()
     if args.command == "init":
         STATE.mkdir(parents=True, exist_ok=True)
         if not CONFIG.exists():
@@ -55,10 +86,10 @@ def main():
                 "token": secrets.token_urlsafe(36),
             }
             CONFIG.write_text(json.dumps(config, indent=2) + "\n")
-        database = Database(DATABASE)
+        connections = Database(database)
         for scene in config["scenes"].values():
             workspace = uuid.UUID(scene["workspace_id"])
-            with database.session(workspace) as connection:
+            with connections.session(workspace) as connection:
                 provision_workspace(connection, workspace)
         print(
             f"Retained local workspace identities configured in {CONFIG}; credentials not printed."
@@ -75,8 +106,8 @@ def main():
     }
     env.update(
         {
-            "EXULANICA_DATABASE_URL": DATABASE,
-            "EXULANICA_READONLY_DATABASE_URL": DATABASE + "?options=-crole%3Dexulanica_ro",
+            "EXULANICA_DATABASE_URL": database,
+            "EXULANICA_READONLY_DATABASE_URL": readonly_url(database),
             "EXULANICA_DATA_DIR": str(STATE),
             "EXULANICA_DERIVATIVE_WORKER": "0",
             "EXULANICA_WORKSPACE_IDS": scene["workspace_id"],
