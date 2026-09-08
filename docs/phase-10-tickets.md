@@ -595,11 +595,14 @@ place.
       The owner-connected harness cannot prove isolation, because a superuser bypasses row-level
       security outright, and `tests/test_place_plane.py` says so where it asserts the catalog
       instead.
-- [ ] Naming a place occurrence writes no `place` row, and accepting an alignment writes no
-      `entity`, asserted by a test named for the failure it catches. This is the checkable form of
-      "a label is not a measurement and geometry is not a name"; without it the two planes are a
-      convention, and section 7 of the brief says a boundary nothing checks is not a boundary.
-      **Open**: the second half needs the build, which is where an alignment is accepted.
+- [x] Naming a place occurrence writes no `place` row, and accepting an alignment writes no
+      `entity`, asserted by
+      `tests/test_place_plane.py::test_naming_a_place_a_person_saw_creates_no_place_row` and
+      `::test_admitting_a_place_version_creates_no_entity`. This is the checkable form of "a label
+      is not a measurement and geometry is not a name"; without it the two planes are a convention,
+      and section 7 of the brief says a boundary nothing checks is not a boundary. The first test
+      drives the real naming path, `name_occurrence`, rather than a raw insert, so it also fails if
+      that path stops producing a place entity at all.
 
 **Files.** New: `exulanica/migrations/0038_a_place_is_more_than_one_capture.sql`, tests. Edited:
 `exulanica/db/session.py`, `exulanica/ingest/spine/__init__.py`, `tests/test_ingest_persistence.py`
