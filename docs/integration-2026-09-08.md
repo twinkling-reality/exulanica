@@ -5,6 +5,10 @@ branches below. The integration owner inspected their changes, commit messages, 
 negative controls and retained evidence, then rebased and ran each branch's full gates before
 landing it. No feature code was written during integration.
 
+The subsequent admission and manual-review integration is recorded in
+`integration-personal-review-2026-09-08.md`. Its next-work decision supersedes the proposed
+generated-disclosure brief below; the earlier recommendation is retained as dated context.
+
 ## Landing order and verification
 
 | Order | Branch | Reported frozen tip | Rebased tip | Independent backend gate | Independent web gate |
