@@ -1,0 +1,58 @@
+..........F...                                                           [100%]
+=================================== FAILURES ===================================
+___________ test_restrictive_duplicate_identity_cannot_be_overridden ___________
+
+delivery = <test_asset_read_currency.Delivery object at 0x106b9f950>
+
+    def test_restrictive_duplicate_identity_cannot_be_overridden(delivery):
+        d = delivery
+        c = d.case
+>       other = c.repo.connection.execute(
+            "insert into capture(workspace_id,blob_sha256) values (%s,%s) returning capture_id",
+            (c.repo.workspace_id, hashlib.sha256(c.data).digest()),
+        ).fetchone()["capture_id"]
+
+tests/test_asset_read_currency.py:364: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=localhost port=5433 user=glendonchin database=exulanica_spine_test) at 0x106b93910>
+query = 'insert into capture(workspace_id,blob_sha256) values (%s,%s) returning capture_id'
+params = (UUID('a26a5aa9-b9fd-4bea-98fd-e40b88e97a34'), b'V\xbc[j\x84\x12\xb9\xb8\xcb\xe1\n\x98"\xa9\x85\x9c\x98N\xb5\x13\xed\xd29i\x0e\x97\x94\x03\x8d\xc7~\x9c')
+prepare = None, binary = False
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UniqueViolation: duplicate key value violates unique constraint "capture_live_bytes_uniq"
+E           DETAIL:  Key (workspace_id, blob_sha256)=(a26a5aa9-b9fd-4bea-98fd-e40b88e97a34, \x56bc5b6a8412b9b8cbe10a9822a9859c984eb513edd239690e9794038dc77e9c) already exists.
+
+.venv/lib/python3.11/site-packages/psycopg/connection.py:300: UniqueViolation
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /Users/glendonchin/dev/Technology/exulanica-asset-read-currency/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_asset_read_currency.py::test_restrictive_duplicate_identity_cannot_be_overridden
