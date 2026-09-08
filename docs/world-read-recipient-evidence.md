@@ -71,3 +71,34 @@ no effective_at is supplied, once for the immutable receipt and once for the res
 This reader returns consent_columns_disagree_with_receipt rather than silently choosing between
 those meanings. A separate consent-writer follow-up should use one explicit instant for both.
 No writer is changed in this brief.
+
+## Executed verification
+
+Code head 4c5a764 ran against the permitted test database, using generated photographs, the
+real masked-source producer, and scripted point-map, pose and trained-geometry publishers.
+Authenticated scene/place routes produced canonical bundles. Ten saved fixtures then ran in
+fresh child processes outside the repository with database settings removed. The saved stale
+mask was rejected; the labelled legacy protocol fixture reported unavailable rather than
+inventing a historical snapshot. The legacy fixture is a wire case, not a real legacy database.
+
+Checks cover elapsed time and consent expiry without writes, recorded digest movement on
+withdrawal, receipt tampering, omitted lineage, output/source disagreement, changed outlines,
+mask input commitments, workspace isolation and resolved/unresolved place compatibility.
+Five controls disabled the exact consent, output-lineage, mask-coverage, mask-input and trained
+output checks. Each failed its named selector with DID NOT RAISE. The first campaign's backend
+was deliberately interrupted after review found the existing historical screening snapshots;
+its logs and artifacts are retained, not counted as a passing full run.
+
+The complete final gates passed: 2124 backend tests and 3 skips, Ruff, four import contracts,
+web typecheck, boundaries and 876 web tests. Gates were serialized; no competing pytest suite
+was observed at dispatch. Post-generation retained-record checks passed. The verification
+record checks 65 artifact bindings and follows the campaign record, which follows the verified
+asset-read integration record. The code remained unchanged through the final gates.
+
+- [Campaign](evaluation/2026-09-08-run-02-world-read-recipient-evidence.json)
+- [Verification](evaluation/2026-09-08-verification-world-read-recipient-evidence.json)
+
+These fixtures establish recorded read behavior, not real-person consent, reconstruction quality,
+masked Gaussian training or permission to redistribute. Retained deployment of migrations
+0039 through 0041 remains separate from this test-schema work. No public migration, personal
+media, hosted inference, GPU spend, merge or push was performed.
