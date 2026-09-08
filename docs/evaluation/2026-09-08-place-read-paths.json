@@ -1,0 +1,182 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.phase-10-read-paths/v1",
+    "date": "2026-09-08",
+    "head": "4c4a3dcaf06b21f67a9e4b290d6888f34b29057a",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "store": ".exulanica/reference-baseline/runtime/blobs",
+    "read_only": true,
+    "what_this_establishes": "The Phase 10 read paths answer over the retained real reconstructions, and their digests reproduce offline under an independent canonicaliser. It establishes nothing about visual quality, physical scale, or per-person consent, none of which this work touched.",
+    "collections": [
+      {
+        "collection": "chili-salmon-bowl",
+        "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+        "scenes": [
+          {
+            "scene_id": "52ec40fd-4b9d-5898-b897-41107e240332",
+            "readable": true,
+            "bundle_sha256": "cd669463c2e35f3d012ee95617dedd8934f200d7ef8ff51e3a20309ede568430",
+            "recorded_sha256": "617d27a859e718de7a9cc619b8c513eba1ad0f923fc6d42c68185fce1de59832",
+            "bundle_byte_size": 140874,
+            "bundle_digest_reproduces_offline": true,
+            "recorded_digest_reproduces_offline": true,
+            "recorded_keys": [
+              "addressing",
+              "consent",
+              "epistemics",
+              "geometry",
+              "number_encoding",
+              "profile",
+              "region_graph",
+              "release",
+              "rungs",
+              "scene",
+              "views"
+            ],
+            "member_count": 40,
+            "registered_member_count": 40,
+            "rendering_substrate": "posed_point_maps",
+            "recorded_rung": 3,
+            "displayed_rung": 3,
+            "views_with_recovered_cameras": 0,
+            "point_map_entries": 38,
+            "trained_geometry_entries": 0,
+            "generated_entries": 0,
+            "region_graph_state": "unavailable",
+            "release_state": "internal_only",
+            "person_consent": "unscreened",
+            "captures_with_a_screening_receipt": 40,
+            "captures_whose_receipt_is_under_the_policy_in_force": 2,
+            "captures_screened_by_a_named_human": 40,
+            "no_geometry_entry_names_evidence": true,
+            "observation_graph": {
+              "available": false,
+              "reason": "no accepted pose receipt for this scene, or it is withdrawn"
+            }
+          },
+          {
+            "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+            "readable": true,
+            "bundle_sha256": "29a7bc08c8d13da150c84191eee2bea05f8cd05c506f56a2c30adfbb61320e6c",
+            "recorded_sha256": "414c7504a68f0f98e5003e1c76b1faa347b05a327835fdaad3c298221e800692",
+            "bundle_byte_size": 211297,
+            "bundle_digest_reproduces_offline": true,
+            "recorded_digest_reproduces_offline": true,
+            "recorded_keys": [
+              "addressing",
+              "consent",
+              "epistemics",
+              "geometry",
+              "number_encoding",
+              "profile",
+              "region_graph",
+              "release",
+              "rungs",
+              "scene",
+              "views"
+            ],
+            "member_count": 51,
+            "registered_member_count": 51,
+            "rendering_substrate": "gaussian_splats",
+            "recorded_rung": 3,
+            "displayed_rung": 3,
+            "views_with_recovered_cameras": 51,
+            "point_map_entries": 50,
+            "trained_geometry_entries": 1,
+            "generated_entries": 0,
+            "region_graph_state": "unavailable",
+            "release_state": "internal_only",
+            "person_consent": "unscreened",
+            "captures_with_a_screening_receipt": 51,
+            "captures_whose_receipt_is_under_the_policy_in_force": 2,
+            "captures_screened_by_a_named_human": 51,
+            "no_geometry_entry_names_evidence": true,
+            "observation_graph": {
+              "available": true,
+              "provenance": "recorded",
+              "retained_per_image": 4096,
+              "point_count": 15005,
+              "points_observed_by_more_than_one_photograph": 15004,
+              "observations_held": 71214,
+              "max_track_length": 25,
+              "no_point_holds_more_than_its_track_length": true
+            }
+          }
+        ]
+      },
+      {
+        "collection": "montserrat-volcanic-sample",
+        "workspace_id": "79004d44-ca24-4d17-9eef-56786415e233",
+        "scenes": [
+          {
+            "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+            "readable": true,
+            "bundle_sha256": "c1dcde712444cf28ef31dd365fc6d67efc45e89a0e2f0aa63d77536b5e3fdee1",
+            "recorded_sha256": "8315724081070718f5c109aada21d2854e08c8d37caf9d83ed7bfc019b8b09ba",
+            "bundle_byte_size": 856252,
+            "bundle_digest_reproduces_offline": true,
+            "recorded_digest_reproduces_offline": true,
+            "recorded_keys": [
+              "addressing",
+              "consent",
+              "epistemics",
+              "geometry",
+              "number_encoding",
+              "profile",
+              "region_graph",
+              "release",
+              "rungs",
+              "scene",
+              "views"
+            ],
+            "member_count": 210,
+            "registered_member_count": 210,
+            "rendering_substrate": "posed_point_maps",
+            "recorded_rung": 3,
+            "displayed_rung": 3,
+            "views_with_recovered_cameras": 210,
+            "point_map_entries": 210,
+            "trained_geometry_entries": 0,
+            "generated_entries": 0,
+            "region_graph_state": "unavailable",
+            "release_state": "internal_only",
+            "person_consent": "unscreened",
+            "captures_with_a_screening_receipt": 210,
+            "captures_whose_receipt_is_under_the_policy_in_force": 0,
+            "captures_screened_by_a_named_human": 210,
+            "no_geometry_entry_names_evidence": true,
+            "observation_graph": {
+              "available": true,
+              "provenance": "recorded",
+              "retained_per_image": 4096,
+              "point_count": 111694,
+              "points_observed_by_more_than_one_photograph": 105592,
+              "observations_held": 860160,
+              "max_track_length": 100,
+              "no_point_holds_more_than_its_track_length": true
+            }
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "backend": null,
+      "web": null
+    },
+    "limitations": [
+      "The per-person consent layer is present, and every retained photograph is still unscreened for people: person_region, person_subject and person_presentation_consent all hold zero rows for both collections. So every bundle reports person_consent unscreened, which says nobody has looked, and never that there is nobody there.",
+      "release internal_only is a decision, not a default. The bundle carries no state for any individual person, so a recipient holding it cannot check a more permissive claim; release.not_yet_earnable states what each higher state would require.",
+      "MEASURED 2026-09-07 over the whole public schema, by newest receipt per capture: 283 captures, of which 281 say eligible under the superseded v1 policy (273 human_review, 8 synthetic_exemption) and 2 are under the v2 policy in force and say blocked (person_detection_only). So no capture in this corpus is both eligible and current, and captures_whose_receipt_is_under_the_policy_in_force counts currency alone, not eligibility: the two bowl scenes report 2 because those receipts are current AND refused, which is the distinction the field exists to keep. Re-screening under v2 is what restores the other 281.",
+      "The masking chain has never run against these photographs. It is proven against PostgreSQL on synthetic data (tests/test_person_masking_end_to_end.py); nobody has seen it act on the bowl or the volcanic collection.",
+      "No structural snapshot is committed in either retained workspace, so every bundle reports its region graph unavailable.",
+      "No generation has been recorded against a real scene; the generated tier is exercised only by tests.",
+      "Place alignment is measured against numeric fixtures only. No two real captures of one place exist."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-07-phase-10-read-paths.json",
+      "record_sha256": "ac2daba52c3681c84d0e8de9d3d34596e345c5cb4b6f8ea372bb8f43c0aaeb25"
+    }
+  },
+  "record_sha256": "60450eef7fd2715b5ec1fba2abf046cacd0c577f10dbdab1e5f04963316ea029"
+}
