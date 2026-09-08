@@ -2,6 +2,10 @@
 
 Status: **BUILT AND EXIT-GATED**. The implementation profile is `exulanica-wmp-1.0`.
 
+**Creative-world roadmap:** [product-direction.md](product-direction.md#package-and-api-boundaries)
+plans future authored state and behavior references. These are not capabilities of the existing
+profile; this document remains the current package contract.
+
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
 live store, a backup, a consent grant, or an executable world. An exported copy cannot be recalled.
 After a deletion, a new export has a new root and the semantic diff is the durable account of what

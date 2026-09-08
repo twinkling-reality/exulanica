@@ -1,5 +1,9 @@
 # Next work after the verified main push
 
+**Product priority update:** [product-direction.md](product-direction.md) now defines the creative-world
+sequence. This page retains the infrastructure backlog and its dependencies; it does not schedule
+the entire product or authorize dispatch.
+
 Read against main 46e106b on 2026-09-08. Remote main was independently checked at that same tip
 after the authorized push. This is a current dispatch view, not a replacement for the historical
 sizing document or the Phase 10 tickets. No revised package count or delivery date is asserted.

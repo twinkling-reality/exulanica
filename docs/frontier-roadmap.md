@@ -9,43 +9,19 @@ Last reconciled: 2026-08-31.
 
 ## 1. North-star output
 
-Exulanica is not one neural world model. It is a versioned personal world system composed of several
-different authorities:
+The current product direction is [personal worlds, creation, and later simulation](product-direction.md).
+Build your own world from your life, then change what's possible inside it.
+That direction supersedes the earlier reconstruction-only and competitive "stateless imagination"
+framing. The numbered work below preserves the existing engineering history and dependencies;
+it is not the complete creative-world delivery sequence.
 
-1. original media as evidence;
-2. a semantic memory graph whose claims retain exact support;
-3. reconstruction artifacts that visualize observed places but never become evidence;
-4. protected spatial topology and layout;
-5. reviewed, capability-backed appearance state;
-6. explicit interaction and comfort preferences;
-7. proposal provenance for user, Settings, and Companion changes; and
-8. a signed export projection called the World Memory Package.
+The next product milestone is a reconstructed place, an alternate version, one created object,
+and one bounded interaction, with saved state and a concrete developer read/edit path. See the
+[new delivery gates](product-direction.md#first-milestone).
+General simulation, unconstrained creation, and compatible runtime packages remain future work.
 
-The north-star run accepts an authenticated personal photograph corpus and produces three concrete
-outputs:
-
-- a live Atlas that degrades honestly through the reconstruction ladder;
-- a machine-readable build receipt and evaluation report; and
-- a versioned, signed World Memory Package that another implementation can inspect and verify
-  without receiving executable UI code or private model internals.
-
-This is the correct scope for a frontier project. The frontier claim is not that one model invents a
-world. It is that heterogeneous perception, memory, reconstruction, interaction, personalization,
-and provenance can be assembled into one inspectable world without confusing inference with fact.
-
-Stated against the generative world models of 2026 (added 2026-09-06): those models are stateless
-imagination. They dream a plausible world for a session, know nothing about a specific person's
-life or a specific place, and cannot say which of their pixels are real. Exulanica is the memory
-they lack: a persistent, per-entity world built from real captures, with geometry, camera poses,
-time, the people who consented and the original pixels behind every part. A generative model that
-renders your kitchen should read it from here and be unable to deviate from what is real without
-saying so. The rung labels are what let imagination and record share one world without lying. The
-entity is a person first, and the same machinery serves a family, a place, a project or an
-institution. To become that layer in fact, not only in position, four things beyond today's
-reconstruction are required and are tracked as work, not claimed: a read interface a generative
-model can condition on (posed views, geometry, masks, consent state); a write-back path that stores
-generated content as its own labeled tier below every recorded rung; recognition of the same place
-and object across captures and years; and object-level entities that persist as the world grows.
+Original evidence, identity, topology, appearance, and package machinery remain foundations.
+Creative changes must preserve their source history without being restricted to reproducing it.
 
 ### 1.1 Public product and runtime naming
 

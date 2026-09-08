@@ -1,21 +1,31 @@
 # Exulanica documentation
 
-Exulanica is a Personal World Memory Model. It turns a personal photograph library into separate
-navigable 3D memory regions inside one continuous first-person browser space called the Atlas,
-connects recurring people, places, objects and events across those regions, and lets a person
-explore and query their own lived history under one rule: every historical factual claim resolves to
-the exact original source it came from. Claims resolve to captured bytes, never to derived geometry,
-so reconstruction quality never participates in the truth guarantee. The system may organize on a
-guess and may never assert on one, which is why an automatically proposed identity link can shape the
-Atlas but cannot support a factual statement until the account holder confirms it.
+The developer documentation covers world state, reconstruction, creation, API contracts, and
+runtime capabilities. The [product roadmap](product-direction.md) records delivery milestones and
+implementation status. [Development setup](development-setup.md) contains operating instructions.
 
-The corpus is photographs and carries no audio, so the recurring voices and conversations described
-in the original concept are deferred with a stated reason rather than claimed. The evidence and the
-reasoning are in [product-specification.md](product-specification.md) section 2.
+## Capability guides
+
+- [Scene reconstruction](capabilities/scene-reconstruction.md)
+- [World creation](capabilities/world-creation.md)
+- [Companion](capabilities/companion.md)
+- [Simulation runtime](capabilities/simulation.md)
+- [World API](capabilities/world-api.md)
+- [World Memory Package](world-memory-package.md)
+
+## Capability status
+
+The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate opt-in training
+dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned simulation runtime.
+World Read serves scene/place
+bundles; World Write records generation receipts. General object editing, alternate-world versions,
+and simulation require the extensions in the roadmap. The application preview does not demonstrate
+those extensions. This status describes the current implementation separately from the product
+experience presented in the root README.
 
 ## Start here
 
-**Evaluating the project.** [product-specification.md](product-specification.md) sections 1 to 4 for
+**Evaluating the project.** Read [product-direction.md](product-direction.md) first, then [product-specification.md](product-specification.md) sections 1 to 4 for
 what the product is and what the demonstration shows, then section 11 for the known limitations,
 and then [runtime-verification.md](runtime-verification.md) for what the platform actually did when
 it was called.

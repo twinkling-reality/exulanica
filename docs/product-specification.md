@@ -16,23 +16,23 @@ design. This page covers what the product is, what it does, and what it delibera
 
 ## 1. What Exulanica is
 
-Exulanica is a Personal World Memory Model. A user's captures become separate navigable 3D memory
-regions inside one continuous first-person browser Atlas. Recurring people, places, objects and
-events connect across those regions. Every historical factual claim the system makes resolves to the
-exact original source it came from.
+**DECISION, updated 2026-09-08.** Exulanica is a Personal World Memory Model for building a
+customizable world from personal experiences and extending it through creation. Movement and
+interaction are the longer-term simulation ambition. The current authority for product scope and
+delivery order is [product-direction.md](product-direction.md).
 
-Three structural commitments define the product. Everything else is negotiable.
+The remaining sections retain earlier implementation decisions and research. Still-image intake
+is a current implementation boundary, not the product identity. The earlier memory-exploration MVP
+is superseded by the creative-world demonstration in the linked direction document.
 
-1. **Evidence is the product, geometry is the presentation.** Claims resolve to original captured
-   bytes, never to derived geometry. Reconstruction quality therefore does not participate in the
-   truth guarantee. (DECISION, reconciled report A8 and D3. The rejected alternative is treating the
-   reconstructed scene as the record of what happened, which makes every truth claim hostage to
-   photogrammetry.)
-2. **The system may organize on a guess and must never assert on one.** An automatically proposed
-   identity link may drive Atlas layout, filtering and highlighting. It may not support a historical
-   factual clause until the user confirms it. (DECISION, D4.)
-3. **Uncertainty is surfaced, not hidden.** The reconstruction rung a capture earned, the provenance
-   of every field, and the questions the system cannot answer are all visible in the interface.
+Three constraints continue to apply:
+
+1. Historical claims resolve to original evidence. Creative worlds may depart from that evidence,
+   with their changes preserved as authored or generated state rather than historical fact.
+2. Models may propose identities; an identity link needs confirmation before it supports a
+   historical factual claim. The separate person-proposal policy decision remains unresolved.
+3. Reconstruction limitations and missing information remain visible. Future simulation must not
+   be implied by a static rendering or a generation receipt.
 
 ### 1.1 Why commitment 2 is forced, not chosen
 
@@ -147,8 +147,9 @@ The brief's seven step loop, corrected. Steps in bold changed.
 
 ## 4. What the MVP will actually demonstrate
 
-**DECISION.** Scope is set so that every item below is either already designed in the research or is
-a direct consequence of it. Nothing here is aspirational.
+**Historical MVP scope, superseded for delivery priority by
+[the product roadmap](product-direction.md#first-milestone).** The list below preserves the earlier
+design target; it is not a statement that each item is implemented or visually accepted.
 
 **In scope:**
 
@@ -350,8 +351,9 @@ party search index providers, so everything sent outbound must be treated as per
 Excluded from the product, not merely from the MVP:
 
 - **Always-on or background capture.** Exulanica ingests a library the user chose to give it.
-- **Any claim of on-device or local-only processing.** Media goes to third party cloud APIs. The
-  README and the documentation say so plainly, and no surface of the project implies otherwise.
+- **Any blanket claim of on-device or local-only processing.** Configured hosted model paths send
+  media to third-party APIs. Offline and local paths have different execution boundaries; see
+  [development setup](development-setup.md). The README does not promise local-only processing.
 - **Identifying strangers.** See the four guards in 6.3.
 - **Any completion metric.** No streaks, no progress rings, no "N remaining", no urgency. The open
   question counter is allowed to read a non-zero number forever.
@@ -364,11 +366,15 @@ Deferred with a path back:
 
 - Audio, voices, conversations, transcripts and speaker identity (2.3).
 - Mobile Atlas traversal (a platform constraint, see interaction-model.md section 2).
-- Trained weights of any kind. The system stays non-parametric: per-entity exemplar sets with cohort
+- Learned identity-classification weights. This identity subsystem stays non-parametric:
+  per-entity exemplar sets with cohort
   normalized scoring and a three way accept / reject / ask decision. Rejected alternative, a small
   trained head over frozen embeddings for demo credibility, was rejected on measured evidence: a
   linear probe is 38.53 points behind a non-parametric cache at 1 shot and still 4.2 points below the
   no-training baseline at 16 shots per class.
+
+That identity decision does not exclude scene-specific Gaussian training, which is implemented,
+or settle the future world-generation and simulation work in the product roadmap.
 
 ---
 
