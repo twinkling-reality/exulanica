@@ -12,7 +12,7 @@ from typing import Any
 import psycopg
 
 from exulanica.canonical import canonical_json
-from exulanica.db import Database, DatabaseNotConfigured, apply_pending, provision_workspace
+from exulanica.db import Database, DatabaseNotConfigured, provision_workspace
 from exulanica.ingest.stages import stage
 from exulanica.ingest.vision import NebiusVisionModel, VisionModel
 from exulanica.models.cache import FileResponseCache
@@ -23,6 +23,11 @@ from exulanica.orchestration.demonstration import (
     run_frontier_demonstration,
 )
 from exulanica.orchestration.manifest import BuildManifestError, load_build_manifest
+from exulanica.orchestration.preflight import (
+    permitted_database_url,
+    run_frontier_preflight,
+    validate_layout,
+)
 from exulanica.reconstruction import DepthModel
 from exulanica.world_package.package import PackageError, load_private_key
 
@@ -35,11 +40,26 @@ def _parser() -> argparse.ArgumentParser:
     demonstrate = commands.add_parser(
         "demonstrate", help="run the versioned source-to-signed-package frontier gate"
     )
-    demonstrate.add_argument("--manifest", type=Path, required=True)
-    demonstrate.add_argument("--photo-dir", type=Path, required=True)
-    demonstrate.add_argument("--data-dir", type=Path, required=True)
-    demonstrate.add_argument("--output", type=Path, required=True)
-    demonstrate.add_argument("--private-key", type=Path, required=True)
+    preflight = commands.add_parser(
+        "preflight", help="check the manifest and local prerequisites without writes"
+    )
+    for command in (demonstrate, preflight):
+        command.add_argument("--manifest", type=Path, required=True)
+        command.add_argument("--photo-dir", type=Path, required=True)
+        command.add_argument("--data-dir", type=Path, required=True)
+        command.add_argument("--output", type=Path, required=True)
+        command.add_argument("--private-key", type=Path, required=True)
+    dry_run = commands.add_parser(
+        "dry-run", help="run all gates on generated photos in a temporary database schema"
+    )
+    dry_run.add_argument(
+        "--output", type=Path, required=True, help="new directory for generated inputs and results"
+    )
+    demonstrate.add_argument(
+        "--authorize-hosted-vision",
+        action="store_true",
+        help="authorize sending this manifest's photographs to the hosted model for this run",
+    )
     demonstrate.add_argument(
         "--confirm-source-deletion",
         action="store_true",
@@ -54,7 +74,24 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None, stream: Any = None) -> int:
     stream = stream or sys.stdout
     args = _parser().parse_args(argv)
+    entered_run = False
+    output_existed = args.output.exists() or args.output.is_symlink()
     try:
+        if args.command == "preflight":
+            report = run_frontier_preflight(
+                manifest_path=args.manifest,
+                photo_dir=args.photo_dir,
+                data_dir=args.data_dir,
+                output=args.output,
+                private_key=args.private_key,
+            )
+            _print(report, stream)
+            return 0 if report["status"] == "passed" else 1
+        if args.command == "dry-run":
+            from exulanica.orchestration.dry_run import run_dry_run
+
+            _print(run_dry_run(args.output), stream)
+            return 0
         if args.command != "demonstrate":  # pragma: no cover - argparse owns the vocabulary
             raise AssertionError(args.command)
         manifest = load_build_manifest(args.manifest)
@@ -63,14 +100,30 @@ def main(argv: Sequence[str] | None = None, stream: Any = None) -> int:
                 "source_deletion_confirmation_required",
                 "step 10 creates a durable capture tombstone; pass --confirm-source-deletion",
             )
+        if manifest.pipeline.vision == "configured" and not args.authorize_hosted_vision:
+            raise FrontierDemonstrationError(
+                "hosted_vision_authorization_required",
+                "authorize this run with --authorize-hosted-vision before any model setup",
+            )
+        validate_layout(args.photo_dir, args.data_dir, args.output, args.private_key)
+        report = run_frontier_preflight(
+            manifest_path=args.manifest,
+            photo_dir=args.photo_dir,
+            data_dir=args.data_dir,
+            output=args.output,
+            private_key=args.private_key,
+        )
+        if report["status"] != "passed":
+            _print(report, stream)
+            return 1
         private_key = load_private_key(args.private_key)
         vision = _vision_model(manifest.pipeline.vision, args.data_dir)
         depth = _depth_model(manifest.pipeline.depth)
         try:
-            database = Database.from_env()
-            migration = apply_pending(database)
+            database = Database(permitted_database_url(Database.from_env().url))
             with database.session(manifest.workspace_id) as connection:
                 provision_workspace(connection, manifest.workspace_id)
+                entered_run = True
                 receipt = run_frontier_demonstration(
                     connection,
                     manifest=manifest,
@@ -90,7 +143,7 @@ def main(argv: Sequence[str] | None = None, stream: Any = None) -> int:
             {
                 "status": receipt["status"],
                 "receipt": str(args.output / "frontier-receipt.json"),
-                "migrations_applied": list(migration.applied),
+                "migrations_applied": [],
                 "terminal_fallbacks": receipt["terminal_fallbacks"],
             },
             stream,
@@ -102,7 +155,8 @@ def main(argv: Sequence[str] | None = None, stream: Any = None) -> int:
         OSError,
         ValueError,
     ) as exc:
-        _write_terminal(args, exc)
+        if entered_run and not output_existed and getattr(exc, "gate", None) != "output_boundary":
+            _write_terminal(args, exc)
         print(str(exc), file=sys.stderr)
         return 1
     return 0

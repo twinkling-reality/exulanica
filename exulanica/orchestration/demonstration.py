@@ -18,25 +18,23 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, Final
+from typing import Any
 
 import psycopg
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.evidence import BlobId
 from exulanica.graph import read_snapshot
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.formation import project_formation
 from exulanica.ingest.pipeline import PhotoIngestPipeline
-from exulanica.ingest.privacy import (
-    authorize_synthetic_capture,
-    record_synthetic_exemption,
-)
 from exulanica.ingest.report import IngestOutcome, IngestReport
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.vision import VisionModel
 from exulanica.orchestration.manifest import BuildManifest
+from exulanica.orchestration.preflight import validate_layout
 from exulanica.reconstruction import DepthModel
 from exulanica.selection import (
     Intent,
@@ -106,6 +104,10 @@ def run_frontier_demonstration(
     callers must make them agree with the manifest; an unavailable stage is represented by
     ``None`` only when the manifest says unavailable.
     """
+    try:
+        validate_layout(photo_dir, data_dir, output)
+    except ValueError as exc:
+        raise FrontierDemonstrationError("output_boundary", str(exc)) from exc
     if output.exists():
         raise FrontierDemonstrationError("output_boundary", f"output already exists: {output}")
     if not confirm_source_deletion:
@@ -131,13 +133,19 @@ def run_frontier_demonstration(
         )
     paths = manifest.validate_photo_directory(photo_dir)
 
+    repository = IngestRepository(connection, manifest.workspace_id)
+    screenings = _authorized_screenings(repository, manifest, vision=vision, depth=depth)
     output.mkdir(parents=True)
     store = LocalContentAddressedStore(data_dir / "blobs")
-    repository = IngestRepository(connection, manifest.workspace_id)
     pipeline = PhotoIngestPipeline(repository, store, vision=vision, depth=depth)
 
     first_ingest = _ingest_pass(
-        pipeline, repository, paths, photo_root=photo_dir, label="frontier:initial"
+        pipeline,
+        repository,
+        paths,
+        photo_root=photo_dir,
+        label="frontier:initial",
+        screenings=screenings,
     )
     _require_ingest(first_ingest, "initial_ingest")
     initial_sources = _source_states(connection, manifest, include_deleted=False)
@@ -175,7 +183,12 @@ def run_frontier_demonstration(
     initial_verification = _verify_clean_process(initial_package.output)
 
     repeat_ingest = _ingest_pass(
-        pipeline, repository, paths, photo_root=photo_dir, label="frontier:repeat"
+        pipeline,
+        repository,
+        paths,
+        photo_root=photo_dir,
+        label="frontier:repeat",
+        screenings=screenings,
     )
     _require_ingest(repeat_ingest, "repeat_ingest")
     if repeat_ingest["model_calls"] != 0 or repeat_ingest["stages_run"]:
@@ -325,8 +338,49 @@ def run_frontier_demonstration(
     return receipt
 
 
-#: One fixed actor, so a rerun of the demonstration mints the same authorization ids.
-_DEMONSTRATION_ACTOR: Final = uuid.UUID("6f2c1a4e-8b93-5d17-a0c6-2e4b7f8d91a3")
+def _authorized_screenings(
+    repository: IngestRepository,
+    manifest: BuildManifest,
+    *,
+    vision: VisionModel | None,
+    depth: DepthModel | None,
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Read existing authority before the first write; never infer it from a directory.
+
+    Observation-only receipts are intentionally accepted for vision without geometry. The
+    ordinary latest-screening helper filters for geometry and would hide those receipts.
+    """
+    if vision is None and depth is None:
+        return {}
+    permission = (
+        "privacy_screening_allows_capture"
+        if depth is not None
+        else "privacy_screening_allows_observation"
+    )
+    result = {}
+    for source in manifest.sources:
+        capture = repository.live_capture_for_blob(BlobId(bytes.fromhex(source.sha256)))
+        row = (
+            None
+            if capture is None
+            else repository.connection.execute(
+                "select screening_id from reconstruction_privacy_screening "
+                "where workspace_id=%s and capture_id=%s and "
+                + permission
+                + "(workspace_id,capture_id,screening_id) "
+                "order by screened_at desc,screening_id desc limit 1",
+                (repository.workspace_id, capture.capture_id),
+            ).fetchone()
+        )
+        if row is None:
+            raise FrontierDemonstrationError(
+                "privacy_authorization",
+                f"Authorize and screen {source.path} through the existing intake/privacy "
+                "workflow in this workspace before running configured models. "
+                "The demonstration never creates screening receipts for supplied photographs.",
+            )
+        result[capture.capture_id] = row["screening_id"]
+    return result
 
 
 def _ingest_one(
@@ -334,36 +388,16 @@ def _ingest_one(
     repository: IngestRepository,
     path: Path,
     batch_id: uuid.UUID,
+    screenings: Mapping[uuid.UUID, uuid.UUID],
 ) -> Any:
-    """Intake, authorize, exempt, then derive. Two calls where there used to be one.
-
-    This demonstration runs over ``exulanica.corpus``, which is generated from a seed and contains
-    no people by construction, so ``record_synthetic_exemption`` is the honest receipt for it: the
-    database refuses that exemption for anything whose authorization is not itself synthetic.
-
-    It is two calls because the vision stage now needs an eligible screening for the exact bytes,
-    the same receipt depth has always needed, and a screening is keyed to a capture that does not
-    exist until intake has committed. An acceptance path that skipped the receipt would be
-    demonstrating a pipeline nobody is allowed to run.
-    """
+    """Reuse independently recorded authority; source bytes never establish their own consent."""
     intake = pipeline.ingest_intake(path.read_bytes(), filename=path.name, batch_id=batch_id)
     if intake.capture_id is None:
         return intake
-    authorization = authorize_synthetic_capture(
-        repository,
-        capture_id=intake.capture_id,
-        actor=_DEMONSTRATION_ACTOR,
-        generator_manifest={
-            "profile": "exulanica.synthetic-corpus/v1",
-            "notice": "GENERATED CORPUS, NO PERSON PARTICIPATED",
-        },
-        authorization_scope={"purpose": "frontier demonstration"},
-    )
-    screening = record_synthetic_exemption(
-        repository, authorization_id=authorization.authorization_id
-    )
     outcome = pipeline.ingest_derivatives(
-        intake.capture_id, batch_id=batch_id, privacy_screening_id=screening.screening_id
+        intake.capture_id,
+        batch_id=batch_id,
+        privacy_screening_id=screenings.get(intake.capture_id),
     )
     # `ingest_derivatives` names its outcome by capture id, because it is reached from a queue
     # that holds identifiers rather than paths. This pass came from a file and the receipt reports
@@ -392,12 +426,13 @@ def _ingest_pass(
     *,
     photo_root: Path,
     label: str,
+    screenings: Mapping[uuid.UUID, uuid.UUID],
 ) -> dict[str, Any]:
     batch = IntakeBatch.open(repository, label=label)
     batch.declare_size(len(paths))
     report = IngestReport(pipeline_digest=pipeline.pipeline_digest, batch_id=batch.batch_id)
     for path in paths:
-        report.outcomes.append(_ingest_one(pipeline, repository, path, batch.batch_id))
+        report.outcomes.append(_ingest_one(pipeline, repository, path, batch.batch_id, screenings))
     continuity = run_continuity(repository, batch_id=batch.batch_id)
     batch.close(
         IntakeBatch.outcome_for(

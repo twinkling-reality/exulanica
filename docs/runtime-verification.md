@@ -153,3 +153,58 @@ other.
 other public entities in the corpus, including a business name legible on signage in a photograph
 rather than a landmark named in its own right. Settled by running the same script against those
 entities once the corpus is on disk.
+
+## 10. Frontier local readiness, 2026-09-08
+
+No authorized personal photo directory or production signing key was supplied for this work.
+The personal-corpus milestone remains unexecuted. These results concern generated fixtures and
+read-only inspection of the retained reference, not real vision, COLMAP or CUDA training.
+
+The standalone `exulanica-frontier preflight` was executed on this checkout with the rehearsal's
+strict manifest and generated photo directory, the permitted local database's `public` schema,
+a fresh output path, and a throwaway Ed25519 key. All local checks passed without creating the
+proposed output. The signing procedure in `frontier-demonstration.md` was executed separately:
+owner-only key creation, loading through the package implementation and sign/verify all passed.
+
+`exulanica-frontier dry-run` executed the ordinary ten-gate lifecycle with generated photographs.
+All three packages passed independent process verification. Model calls were zero, repeat stages
+run were empty, and the deletion demonstration left one live region while preserving source files.
+The rehearsal created and removed only its own database schema. This is an executable rehearsal,
+not a claim that the missing personal run has occurred.
+
+Inspection found and fixed a real authorization error: the ordinary demonstration previously
+created synthetic authorization and exemption receipts for any supplied photograph. It now reads
+existing screening authority before configured models or lifecycle writes. Only the internal
+rehearsal generator can create its synthetic receipts. Observation-only permission is accepted for
+vision alone; depth requires geometry permission. The CLI separately requires per-run hosted-model
+authorization and refuses to apply pending migrations.
+
+Read-only observation measurements reproduce 97,633,587 canonical bytes for the bowl's 15,005
+points and 71,214 observations. A 500-point page is 4,973,392 bytes and 3,649 observations, with
+cursor 543. This bounds the answer, not server work. The browser keeps its single complete request
+because the current inspector has no partial state and paging has no snapshot identity. It now
+rejects pages, wrong scenes, duplicate IDs and inconsistent counts rather than silently dropping
+evidence. The remaining browser memory cost is explicit.
+
+Three negative controls were executed in isolated source copies: allowing terminal writes into
+existing outputs, bypassing pre-run screening admission, and removing observation completeness
+validation. Each unmodified baseline passed; each mutation caused its named test to fail; restored
+baselines passed. No failure was counted merely from a nonzero process exit.
+
+Reproduce the digest-bound readiness measurement with:
+
+```sh
+uv run python -m exulanica.orchestration.record_readiness \
+  --date YYYY-MM-DD --label frontier-readiness \
+  --predecessor docs/evaluation/2026-09-08-place-read-paths.json
+```
+
+The command creates a new dated record, refuses overwrites, executes a fresh synthetic rehearsal
+and local pre-flight, and measures the retained bowl through read-only application-role queries.
+The record binds its predecessor, implementation files and pipeline digest. It preserves the
+separation between demonstrated local readiness and the still-missing personal run.
+
+The fresh worktree's plain `uv sync` omitted optional numerical dependencies required by existing
+pose/training tests. Verification installed the already-locked extras with
+`uv sync --extra pose --extra reconstruction --locked`; no dependency declaration or lockfile was
+changed. Installing these libraries does not download a model checkpoint or run inference.
