@@ -236,6 +236,12 @@ def test_recipient_scene_place_compatibility(deployment, repository, tmp_path):
     assert placed["bundle"]["recipient_evidence"] == scene_bundle["bundle"]["recipient_evidence"]
     assert _verify(placed)["release"] == "internal_only"
     _save("place-bundle.json", placed)
+    unresolved = deployment.as_owner(
+        "GET", f"/world-read/places/{place.place_id}", params={"at": "2000-01-01T00:00:00Z"}
+    )
+    assert unresolved.status_code == 200, unresolved.text
+    assert _verify(unresolved.json())["reason"] == "no_version_at_that_time"
+    _save("unresolved-place-bundle.json", unresolved.json())
 
 
 def test_recipient_trained_publication_and_source_controls(deployment, repository, tmp_path):
@@ -354,7 +360,35 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
     point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
     assert point["lineage"]["read_sha256"] == configured["mask"].content_sha256.hex()
     assert point["lineage"]["mask_manifest"]["state"] == "available"
-    assert _verify(envelope)["release"] == "internal_only"
+    result = _verify(envelope)
+    assert result["release"] == "internal_only"
+    assert result["point_lineage"][point["artifact_id"]]["state"] == "available"
+    changed_input = copy.deepcopy(envelope)
+    altered_input = next(
+        p
+        for p in changed_input["bundle"]["recipient_evidence"]["record"]["point_maps"]
+        if p["lineage"].get("mode") == "masked"
+    )
+    altered_input["lineage"]["mask_build"]["input_sha256"] = "e" * 64
+    with pytest.raises(EvidenceError, match="mask_input_commitment_mismatch"):
+        _verify(_reseal(changed_input))
+    # A legacy producer may have omitted the snapshot. The wire can preserve exact byte
+    # lineage while refusing the missing coverage proof, without guessing a replacement.
+    legacy = copy.deepcopy(envelope)
+    legacy_point = next(
+        p
+        for p in legacy["bundle"]["recipient_evidence"]["record"]["point_maps"]
+        if p["lineage"].get("mode") == "masked"
+    )
+    legacy_point["lineage"]["mask_build"] = {
+        "state": "unavailable",
+        "reason": "legacy_mask_build_snapshot_missing",
+    }
+    assert _verify(_reseal(legacy))["point_lineage"][point["artifact_id"]] == {
+        "state": "unavailable",
+        "reason": "legacy_mask_build_snapshot_missing",
+    }
+    _save("legacy-protocol-fixture.json", legacy)
     _save("masked-route-bundle.json", envelope)
     changed = copy.deepcopy(envelope)
     altered = next(
@@ -369,6 +403,15 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
     manifest["sha256"] = sha256_of_canonical(body).hex()
     with pytest.raises(EvidenceError, match="stale_derivative_lineage"):
         _verify(_reseal(changed))
+    changed_outline = copy.deepcopy(envelope)
+    outlined = next(
+        c
+        for c in changed_outline["bundle"]["recipient_evidence"]["record"]["captures"]
+        if c["regions"]
+    )
+    outlined["regions"][0]["silhouette"]["points"][1][0] = 600000
+    with pytest.raises(EvidenceError, match="stale_derivative_lineage"):
+        _verify(_reseal(changed_outline))
     # A new persisted region cannot retroactively become part of the old mask.
     record_region_edits(
         repository,

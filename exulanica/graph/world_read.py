@@ -32,7 +32,8 @@ place and its receipts are bound to inputs no place can be part of. What is stil
 an **entity**: nothing routes from a person or an object to a bundle, and the ``addressing`` block
 says that rather than leaving a reader to find it out.
 
-**Consent is asked once, through one function.** See :mod:`exulanica.graph.read_consent`. The bundle remains ``internal_only``: recorded presentation receipts and source lineage do
+**Consent is asked once, through one function.** See :mod:`exulanica.graph.read_consent`.
+The bundle remains ``internal_only``: recorded presentation receipts and source lineage do
 not authenticate redistribution authority.
 
 **Two digests, not one.** ``recorded_sha256`` covers the observed world alone; ``bundle_sha256``

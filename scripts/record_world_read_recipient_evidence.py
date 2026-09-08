@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument(
         "--name", required=True, help="Unique dated basename ending world-read-recipient-evidence"
     )
+    parser.add_argument("--previous-attempt", type=Path)
     args = parser.parse_args()
     if not re.fullmatch(
         r"[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]*world-read-recipient-evidence", args.name
@@ -81,6 +82,11 @@ def main() -> None:
         ),
         ("mask", "stale_derivative_lineage", "test_recipient_masked_sources_and_stale_lineage"),
         (
+            "mask-input",
+            "mask_input_commitment_mismatch",
+            "test_recipient_masked_sources_and_stale_lineage",
+        ),
+        (
             "trained",
             "trained_output_mismatch",
             "test_recipient_trained_publication_and_source_controls",
@@ -88,7 +94,7 @@ def main() -> None:
     ]
     results = []
     for name, reason, test in controls:
-        plugin = artifacts / ("mutant_" + name + ".py")
+        plugin = artifacts / ("mutant_" + name.replace("-", "_") + ".py")
         plugin.write_text(
             '"""Executed negative control: disable one exact recipient check."""\n'
             "def pytest_sessionstart(session: object) -> None:\n"
@@ -142,6 +148,20 @@ def main() -> None:
                 "byte_size": len(data),
             }
         )
+    if args.previous_attempt:
+        previous_root = (ROOT / args.previous_attempt).resolve()
+        if not previous_root.is_relative_to(ROOT / "docs/evaluation/artifacts"):
+            parser.error("previous attempt must be a retained artifact directory")
+        for path in sorted(previous_root.iterdir()):
+            if path.is_file():
+                data = path.read_bytes()
+                files.append(
+                    {
+                        "path": str(path.relative_to(ROOT)),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                        "byte_size": len(data),
+                    }
+                )
     for command in commands:
         command["argv"] = [
             "<venv>/lint-imports" if a.endswith("/lint-imports") else a for a in command["argv"]
@@ -163,7 +183,7 @@ def main() -> None:
         "limits": [
             "internal_only; no redistribution authority or training permission",
             "offline recipients cannot discover later withdrawals",
-            "mask outline coverage requires a separate producer evidence extension",
+            "legacy missing mask snapshots need separate producer retention; no inferred backfill",
             "retained public is not migrated; no real-data activation",
         ],
     }

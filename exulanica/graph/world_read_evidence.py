@@ -54,7 +54,7 @@ def recorded_evidence(
         ).fetchone()
         regions = connection.execute(
             "select encode(region_key,'hex') as region_key,subject_id,"
-            "encode(region_digest,'hex') as region_sha256,action "
+            "encode(region_digest,'hex') as region_sha256,action,silhouette "
             "from person_region_current where workspace_id=%s and capture_id=%s "
             "and action<>'deleted' order by region_key",
             (workspace, capture_id),
@@ -110,7 +110,8 @@ def recorded_evidence(
     if job:
         for point in job["build_inputs"].get("point_maps", []):
             row = connection.execute(
-                "select content_sha256,source_blob_sha256,read_source_sha256 from artifact "
+                "select content_sha256,source_blob_sha256,read_source_sha256,privacy_screening_id "
+                "from artifact "
                 "where workspace_id=%s and artifact_id=%s and kind='point_map'",
                 (workspace, point["artifact_ref"]),
             ).fetchone()
@@ -156,6 +157,10 @@ def recorded_evidence(
                         matches[0]
                         if len(matches) == 1
                         else unavailable("exact_mask_manifest_missing_or_ambiguous")
+                    )
+                if read != original:
+                    lineage["mask_build"] = _mask_build(
+                        connection, workspace, row["privacy_screening_id"], original, read
                     )
                 item["lineage"] = lineage
             points.append(item)
@@ -228,3 +233,68 @@ def _consent_columns_match(row: dict[str, Any]) -> bool:
     except (TypeError, ValueError):
         return False
     return True
+
+
+def _mask_build(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    screening_id: uuid.UUID,
+    original: str,
+    read: str,
+) -> dict[str, Any]:
+    """Use the point's own screening, never a later matching-looking review or mask.
+
+    This is a projection of an immutable persisted build snapshot. No resolver or clock runs.
+    Private authorization scope and free-text review material are not part of the projection.
+    """
+    screening = connection.execute(
+        "select receipt_record from reconstruction_privacy_screening "
+        "where workspace_id=%s and screening_id=%s",
+        (workspace, screening_id),
+    ).fetchone()
+    if screening is None or not screening["receipt_record"].get("privacy_inputs"):
+        return unavailable("legacy_mask_build_snapshot_missing")
+    record = screening["receipt_record"]
+    masks = [m for m in record.get("mask_artifacts", []) if m.get("content_sha256") == read]
+    if len(masks) != 1:
+        return unavailable("screening_does_not_bind_exact_mask")
+    mask = connection.execute(
+        "select input_digest,content_sha256,source_blob_sha256,stage_key,"
+        "stage_version,params_digest "
+        "from artifact where workspace_id=%s and artifact_id=%s and kind='masked_source'",
+        (workspace, masks[0]["artifact_id"]),
+    ).fetchone()
+    if (
+        mask is None
+        or _hex(mask["content_sha256"]) != read
+        or _hex(mask["source_blob_sha256"]) != original
+    ):
+        return unavailable("recorded_mask_artifact_mismatch")
+    # Intake versions may coexist. Export every candidate digest; the verifier requires exactly
+    # one digest that reproduces the mask's persisted input commitment.
+    intakes = connection.execute(
+        "select distinct content_sha256 from artifact where workspace_id=%s "
+        "and source_blob_sha256=decode(%s,'hex') and stage_key='intake' "
+        "and content_sha256 is not null order by content_sha256",
+        (workspace, original),
+    ).fetchall()
+    inputs = record["privacy_inputs"]
+    return {
+        "state": "available",
+        "screening_id": str(screening_id),
+        "mask_artifact_id": masks[0]["artifact_id"],
+        "input_sha256": _hex(mask["input_digest"]),
+        "stage_key": mask["stage_key"],
+        "stage_version": mask["stage_version"],
+        "params_sha256": _hex(mask["params_digest"]),
+        "intake_sha256": [_hex(i["content_sha256"]) for i in intakes],
+        "capture_id": inputs["capture_id"],
+        "source_sha256": inputs["source_sha256"],
+        "regions": [
+            {
+                key: r[key]
+                for key in ("region_key", "silhouette", "state", "name_permitted", "subject_id")
+            }
+            for r in inputs["regions"]
+        ],
+    }

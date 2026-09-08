@@ -12,14 +12,10 @@ per photograph, the live person regions and the state each of them is in, and
 all. Those are different facts and the second is the one default deny turns on: a photograph with
 no person-region row is ``unscreened``, which means nobody looked, not that nobody is there.
 
-**What is still not known, and it is why the release state did not move.** The World Read bundle
-carries no per-person fact. A recipient holding the bundle can see how many photographs were
-screened and how many people are recorded in them; they cannot see any individual person's state,
-so they cannot check a claim that every pictured person consented. A release state more permissive
-than ``internal_only`` would be a claim its own recipient could not verify from the bytes they
-hold, which is the failure this bundle exists to prevent. ``internal_only`` is therefore still the
-answer, but it is now computed from the scene rather than asserted, and it says which of the three
-consents is unestablished and why.
+**Why the release state remains internal_only.** Recorded per-person receipts now travel in
+world_read_evidence. They permit offline replay at an explicit time, but do not authenticate the
+person, establish account-holder authority, or grant redistribution rights. This module retains
+the clock-free screening summary and release restriction; it does not duplicate that replay.
 
 **Why none of this reads the clock.** ``person_consent_is_granted`` in migration 0037 filters on
 ``clock_timestamp()`` against ``effective_at`` and ``valid_until``, so a person's resolved state
@@ -334,13 +330,10 @@ def release_state(consent: CaptureConsent) -> dict[str, Any]:
     nobody has screened from a scene fully screened whose people this bundle cannot describe.
     Those are different distances from a release and the old constant collapsed them.
 
-    **Why not a per-scene gradient yet.** ``releasable_masked`` would have to prove that the
-    geometry *this bundle offers* descends from the masked derivatives. Nothing in the bundle
-    records which source derivative a point map or a SOG was built from; the geometry entries carry
-    the digest of the artifact produced, not of the bytes read to produce it. Until they do, a
-    scene could satisfy every consent and the claim would still be uncheckable by its recipient.
-    That is recorded in ``not_yet_earnable`` rather than in a comment, because it is the recipient
-    who needs to know it.
+    **Why not a per-scene gradient yet.** Recipient evidence can establish recorded input
+    bindings and replay a recorded permission log. Redistribution authority and an authenticated
+    subject-consent channel are separate prerequisites, so added provenance does not change this
+    owning-workspace release state.
     """
     total = len(consent)
     screened = sum(1 for record in consent.values() if record["person_consent"] == "recorded")

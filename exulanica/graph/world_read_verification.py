@@ -58,7 +58,7 @@ def presentation(region: dict[str, Any], at: dt.datetime) -> dict[str, Any]:
             and (r["valid_until"] is None or at < instant(r["valid_until"]))
         ]
         keys = [(r["region_key"] is not None, r["sequence"]) for r in candidates]
-        require(len(keys) == len(set(keys)), "ambiguous_consent_sequence")
+        require(not keys or keys.count(max(keys)) == 1, "ambiguous_consent_sequence")
         winner = max(
             candidates, key=lambda r: (r["region_key"] is not None, r["sequence"]), default=None
         )
@@ -92,6 +92,21 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
         == bundle["recorded_sha256"],
         "recorded_digest_mismatch",
     )
+    if "unresolved" in bundle:
+        require(
+            bundle["addressing"]["by"] == "place_at_time"
+            and bundle["addressing"]["scene_id"] is None
+            and not any(
+                key in bundle for key in ("scene", "views", "geometry", "recipient_evidence")
+            ),
+            "unresolved_address_mismatch",
+        )
+        return {
+            "evaluated_at": at,
+            "state": "unavailable",
+            "reason": bundle["unresolved"]["state"],
+            "release": "internal_only",
+        }
     evidence = bundle.get("recipient_evidence")
     require(evidence is not None, "recipient_evidence_missing")
     require(evidence["profile"] == PROFILE, "evidence_profile_mismatch")
@@ -153,9 +168,11 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
                         and mask["capture_id"] == key,
                         "mask_source_mismatch",
                     )
-                    # v1 identifies masked regions but does not commit their outlines.
-                    # Exact source lineage is checkable; complete mask coverage is not.
-                    status = {"state": "unavailable", "reason": "mask_outline_binding_not_supplied"}
+                    build = source["mask_build"]
+                    if build["state"] != "available":
+                        status = {"state": "unavailable", "reason": build["reason"]}
+                    else:
+                        check_mask_build(build, mask, captures[key])
                     masked_keys = {m["region_key"] for m in mask["masks"]}
                     require(
                         all(r["region_key"] in masked_keys for r in evaluated[key] if r["masked"]),
@@ -200,6 +217,22 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
             ]
             require(len(matches) == 1, "trained_publication_missing_or_ambiguous")
             publication = matches[0]
+            manifest = publication["manifest"]
+            original_manifest = json.dumps(
+                manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode()
+            require(
+                publication.get("profile") == "exulanica.scene-splat-publication/v1"
+                and publication.get("scene_ref") == record["scene_id"]
+                and publication.get("quality", {}).get("accepted") is True,
+                "trained_publication_invalid",
+            )
+            require(
+                hashlib.sha256(original_manifest).hexdigest() == publication["manifest_digest"]
+                and pose is not None
+                and manifest["pose_manifest_digest"] == pose["manifest_digest"],
+                "trained_manifest_mismatch",
+            )
             require(
                 publication["delivery"]["content_sha256"] == geometry["content_sha256"],
                 "trained_output_mismatch",
@@ -217,3 +250,63 @@ def verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) ->
         "point_lineage": lineage,
         "later_withdrawals": "not_discoverable_offline",
     }
+
+
+def check_mask_build(
+    build: dict[str, Any],
+    manifest: dict[str, Any],
+    capture: dict[str, Any],
+) -> None:
+    """Reproduce the persisted mask input commitment from its historical screening projection."""
+    require(
+        build["source_sha256"] == capture["source_sha256"]
+        and build["capture_id"] == capture["capture_id"],
+        "mask_build_source_mismatch",
+    )
+    regions = sorted(build["regions"], key=lambda r: r["region_key"])
+    require(len({r["region_key"] for r in regions}) == len(regions), "duplicate_mask_region")
+    region_digest = sha256_of_canonical(
+        {
+            "profile": "exulanica.person-region-set/v1",
+            "capture_id": capture["capture_id"],
+            "source_sha256": capture["source_sha256"],
+            "regions": [
+                {"region_key": r["region_key"], "silhouette": r["silhouette"]} for r in regions
+            ],
+        }
+    ).hex()
+    state_digest = sha256_of_canonical(
+        {
+            "profile": "exulanica.person-consent-state/v1",
+            "capture_id": capture["capture_id"],
+            "source_sha256": capture["source_sha256"],
+            "states": [
+                {
+                    "region_key": r["region_key"],
+                    "state": r["state"],
+                    "masked": r["state"] in ("unknown", "present", "withdrawn"),
+                    "name_permitted": r["name_permitted"],
+                }
+                for r in regions
+            ],
+        }
+    ).hex()
+    matches = [
+        digest
+        for digest in build["intake_sha256"]
+        if sha256_of_canonical(sorted([digest, region_digest, state_digest])).hex()
+        == build["input_sha256"]
+    ]
+    require(len(matches) == 1, "mask_input_commitment_mismatch")
+    require(
+        build["stage_key"] == "masked_source"
+        and build["stage_version"] == manifest["stage_version"],
+        "mask_stage_mismatch",
+    )
+    require(
+        manifest["fill"] == "neutral-flat" and manifest["generative_fill"] is False,
+        "mask_fill_mismatch",
+    )
+    current = {r["region_key"]: r["silhouette"] for r in capture["regions"]}
+    historical = {r["region_key"]: r["silhouette"] for r in regions}
+    require(current == historical, "stale_derivative_lineage")

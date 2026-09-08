@@ -1,6 +1,6 @@
 # World Read recipient evidence
 
-Proposed wire contract, 2026-09-08. Owning-workspace reads only; release.state remains
+Wire contract, 2026-09-08. Owning-workspace reads only; release.state remains
 internal_only. This is recorded provenance, not redistribution authorization or WMP 1.1.
 
 The additive recipient_evidence block has its own v1 profile and evidence_sha256 over its
@@ -48,21 +48,25 @@ cite the new digest. This deliberately changes conditioning identity, not scene/
 Source lineage and permission evaluation are separate results. The verifier's point_lineage
 available means the retained output, original/read digest and pose frame agree. It does not
 approve screening, training, reconstruction quality or redistribution. Masked input identity
-can be checked against a retained v1 mask manifest. Complete mask coverage returns
-mask_outline_binding_not_supplied: that manifest lists region IDs but not outlines. A missing
-or ambiguous exact manifest returns exact_mask_manifest_missing_or_ambiguous. Old points with
-no frozen build binding return frozen_point_binding_missing, and missing pose bytes remain
-receipt_bytes_missing_or_corrupt. These failures are not repaired by selecting a newer mask.
+is checked against its exact retained v1 manifest. Coverage is checked using the point's own
+screening snapshot, the mask artifact named by that snapshot, its persisted input digest, and
+retained intake digests. The verifier reproduces the original region-set and consent-state
+hashes and their sorted input hash, and compares the historical outlines to the recorded current
+region inventory. A newer screening or mask is never substituted. The privacy snapshot is an
+immutable build-time record, not a fresh clock-derived resolution. Authorization scope, free-text
+review material and account-holder authority evidence are excluded from this projection.
 
-Separate scoped follow-up requested: extend the masked-source producing seam
-(exulanica/ingest/stages/masked_source.py and exulanica/ingest/person_receipts.py) to export an
-exact, privacy-minimized historical input commitment and the material needed to verify it,
-including the intake digest, region outlines and resolved input states, together with the
-persisted mask input digest. Assess reuse of existing JSON receipts and screening snapshots
-before proposing any storage change; no migration is allocated here. Existing v1 manifests
-must retain their historical limitations. Masked Gaussian training remains separate.
+Missing historical snapshots return legacy_mask_build_snapshot_missing. Missing or ambiguous
+exact manifests return exact_mask_manifest_missing_or_ambiguous. Old points with no frozen build
+binding return frozen_point_binding_missing, and missing receipt bytes return
+receipt_bytes_missing_or_corrupt. Existing persisted snapshots suffice without a producer change
+for current fixtures. For legacy artifacts lacking them, a separate scoped producing-seam
+follow-up would need to retain the exact inputs at masked_source publication; later reconstruction
+cannot invent them. No migration is allocated and no general legacy backfill is claimed. The
+legacy unavailable wire case is a labelled protocol fixture; it is not a migrated legacy database.
+Masked Gaussian training remains separate.
 
-A second producer concern is checked explicitly: presentation writers can call now twice when
+A separate producer concern is checked explicitly: presentation writers can call now twice when
 no effective_at is supplied, once for the immutable receipt and once for the resolver column.
 This reader returns consent_columns_disagree_with_receipt rather than silently choosing between
 those meanings. A separate consent-writer follow-up should use one explicit instant for both.
