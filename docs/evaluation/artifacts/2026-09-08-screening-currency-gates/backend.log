@@ -1,0 +1,484 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+....................................................ss.................. [ 17%]
+.............s.......................................................... [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+...............FF.F..................................................... [ 58%]
+...................F..............F..................................... [ 61%]
+........................................................................ [ 65%]
+........................................................................ [ 68%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+........................................................................ [ 89%]
+.F.F....F..F............................................................ [ 92%]
+........................................................................ [ 96%]
+........................................................................ [ 99%]
+.....                                                                    [100%]
+=================================== FAILURES ===================================
+___ test_a_detected_person_leaves_a_region_row_that_arms_the_database_guard ____
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123bfcd10>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_a_detected_person_leaves_a_region_row_that_arms_the_database_guard(
+        repository, photo_dir, tmp_path
+    ):
+        """Without this row every other guarantee in this feature is inert."""
+        capture_id, outcome = _ingest(repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)))
+>       assert outcome.error is None, outcome.error
+E       AssertionError: PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn
+E       assert 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' is None
+E        +  where 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' = IngestOutcome(path=PosixPath('01a08120-d42b-7add-a3f2-f7c1a5be4c14'), blob_id=BlobId(f562cf20c806...), capture_id=UUID...withdrawn', failure_class='PrivacyAdmissionError', retryable=False, missing=False, unavailable=False, tombstoned=False).error
+
+tests/test_person_masking_end_to_end.py:89: AssertionError
+_______ test_reconstruction_reads_the_masked_derivative_not_the_original _______
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123fa2fd0>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_reconstruction_reads_the_masked_derivative_not_the_original(
+        repository, photo_dir, tmp_path
+    ):
+        _capture_id, outcome = _ingest(repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)))
+>       assert outcome.error is None, outcome.error
+E       AssertionError: PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn
+E       assert 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' is None
+E        +  where 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' = IngestOutcome(path=PosixPath('01a08120-d517-75eb-853b-8f82a6b75d0e'), blob_id=BlobId(f562cf20c806...), capture_id=UUID...withdrawn', failure_class='PrivacyAdmissionError', retryable=False, missing=False, unavailable=False, tombstoned=False).error
+
+tests/test_person_masking_end_to_end.py:106: AssertionError
+________ test_the_database_refuses_a_point_map_over_the_original_bytes _________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x1239b84d0>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_the_database_refuses_a_point_map_over_the_original_bytes(repository, photo_dir, tmp_path):
+        """The backstop, exercised. Python is not involved in this refusal.
+    
+        This is the assertion the feature was missing: until now the trigger had never once fired,
+        because nothing wrote a region row for it to find.
+        """
+        import psycopg
+    
+        keep: dict = {}
+        capture_id, _ = _ingest(
+            repository, photo_dir, tmp_path, StubRegionDetector((A_PERSON,)), keep=keep
+        )
+        capture = repository.capture(capture_id)
+        with pytest.raises(psycopg.errors.CheckViolation) as raised:
+>           repository.insert_artifact(
+                artifact_id=uuid.uuid4(),
+                kind="point_map",
+                source_blob=capture.blob_id,
+                stage_key="depth",
+                stage_version=99,
+                params_digest=b"\x00" * 32,
+                input_digest=b"\x01" * 32,
+                idempotency_key="a-point-map-over-the-original",
+                content_sha256=b"\x02" * 32,
+                storage_key="sha-256/02/02/" + "02" * 32,
+                byte_size=10,
+                produced_by_event=None,
+                privacy_screening_id=keep["screening_id"],
+                read_source_sha256=None,
+            )
+
+tests/test_person_masking_end_to_end.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exulanica/ingest/repository.py:539: in insert_artifact
+    return artifacts.insert(
+exulanica/ingest/spine/artifacts.py:180: in insert
+    cursor = scope.connection.execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [IDLE] (host=localhost port=5433 user=glendonchin database=exulanica_spine_test) at 0x1237ec650>
+query = 'insert into artifact (artifact_id, workspace_id, kind, source_blob_sha256, stage_key, stage_version, params_digest, i...es (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) on conflict (workspace_id, idempotency_key) do nothing'
+params = (UUID('9fb779f3-bc44-414f-b2c1-f2a28f8b79e8'), UUID('ca81b93f-19fe-45a1-9371-037dcb6fc250'), 'point_map', b'\xf5b\xcf \xc8\x06*P/vJ\xd2\xb7\xd3\xef\xaaa\x80\x00\xbd\xba\xa7gHo\xe5\xffy-\x98\x17\x13', 'depth', 99, ...)
+prepare = None, binary = False
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            if isinstance(query, Template):
+                if params is not None:
+                    raise TypeError(
+                        "'execute()' with string template query doesn't support parameters"
+                    )
+                return cur.execute(query, prepare=prepare)
+            else:
+                return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.IntegrityConstraintViolation: point-map production requires a current eligible privacy screening
+E           CONTEXT:  PL/pgSQL function tg_geometry_reads_the_masked_derivative() line 15 at RAISE
+
+.venv/lib/python3.11/site-packages/psycopg/connection.py:300: IntegrityConstraintViolation
+______ test_an_unlocated_person_is_not_swallowed_by_a_centred_located_one ______
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123b7a990>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_an_unlocated_person_is_not_swallowed_by_a_centred_located_one(
+        repository, photo_dir, tmp_path
+    ):
+        """The live hole, through the real pipeline: a person who was masked nowhere.
+    
+        MEASURED 2026-09-07 against this database before the fix: one ``person_region`` row, one
+        masked outline, both the centred box, and the whole frame not masked at all. The whole-frame
+        region lost because a detector reports located people first, so the located key was inserted
+        first and the unlocated one was read as an already-edited region and skipped.
+    
+        Real PostgreSQL, real migrations through 0037, real on-disk store, real ingest pipeline, real
+        consent fold. Not real: the detections are handed in rather than found, depth is flat, and no
+        vision model, COLMAP, CUDA or gsplat runs anywhere near this.
+        """
+        detections = (
+            DetectedPerson(CENTRED_BOX, "box", "high", "fixed-region-double", part="full_body"),
+            DetectedPerson(
+                whole_image_silhouette(),
+                "box",
+                "low",
+                "fixed-region-double",
+                part="partial_body",
+                located=False,
+            ),
+        )
+>       capture_id = _ingest_two_people(repository, photo_dir, tmp_path, detections)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_person_region_stages.py:288: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123b7a990>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+detections = (DetectedPerson(silhouette=Silhouette(points=((400000, 400000), (600000, 400000), (600000, 600000), (400000, 600000)))...0), (0, 1000000))), shape='box', confidence='low', detector='fixed-region-double', part='partial_body', located=False))
+
+    def _ingest_two_people(repository, photo_dir, tmp_path, detections):
+        """One synthetic photograph through the real pipeline, carrying these detections."""
+        actor = uuid.UUID("a244f9d0-9bd9-5f55-a133-2712cd05d720")
+        write_photo(photo_dir, "a.jpg", when=iso(10), gps=(64.3271, -20.1199))
+        store = LocalContentAddressedStore(tmp_path / "blobs")
+        pipeline = PhotoIngestPipeline(
+            repository,
+            store,
+            vision=None,
+            depth=FlatDepthModel(),
+            detector=StubRegionDetector(detections),
+        )
+        intake = pipeline.ingest_intake((photo_dir / "a.jpg").read_bytes(), filename="a.jpg")
+        assert intake.capture_id is not None, intake.error
+        authorization = authorize_synthetic_capture(
+            repository,
+            capture_id=intake.capture_id,
+            actor=actor,
+            generator_manifest={
+                "profile": "exulanica.person-masking-test/v1",
+                "notice": "SYNTHETIC TEST FIXTURE",
+            },
+            authorization_scope={"purpose": "unlocated person region collision test"},
+        )
+        screening = record_synthetic_exemption(
+            repository, authorization_id=authorization.authorization_id
+        )
+        outcome = pipeline.ingest_derivatives(
+            intake.capture_id, privacy_screening_id=screening.screening_id
+        )
+>       assert outcome.error is None, outcome.error
+E       AssertionError: PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn
+E       assert 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' is None
+E        +  where 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' = IngestOutcome(path=PosixPath('01a08120-e030-7a1d-acfa-4e61f4688d8e'), blob_id=BlobId(f562cf20c806...), capture_id=UUID...withdrawn', failure_class='PrivacyAdmissionError', retryable=False, missing=False, unavailable=False, tombstoned=False).error
+
+tests/test_person_region_stages.py:227: AssertionError
+__________ test_empty_schema_refuses_migrated_fallback_without_writes __________
+
+cli_database = None
+tmp_path = PosixPath('<temporary>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x123bef1d0>
+capsys = <_pytest.capture.CaptureFixture object at 0x123beeb90>
+
+    def test_empty_schema_refuses_migrated_fallback_without_writes(
+        cli_database, tmp_path, monkeypatch, capsys
+    ):
+        """The imported migration reader qualifies the FIRST schema, never its fallback."""
+        from exulanica.db import Database
+        from exulanica.ingest import personal_admission_command as command
+        from psycopg import sql
+        from psycopg.conninfo import make_conninfo
+    
+        fallback = Database.from_env()
+        empty = "exulanica_personal_empty_" + uuid.uuid4().hex
+        with fallback.unscoped() as owner:
+            fallback_schema = owner.execute("select current_schema() name").fetchone()["name"]
+            owner.execute(sql.SQL("create schema {}").format(sql.Identifier(empty)))
+            owner.commit()
+            try:
+                isolated = Database(
+                    make_conninfo(
+                        fallback.url, options=f"-csearch_path={empty},{fallback_schema},public"
+                    )
+                )
+                with isolated.unscoped() as connection:
+                    # Establish the dangerous counterfactual: unqualified history really resolves.
+>                   assert (
+                        connection.execute("select count(*) n from schema_migrations").fetchone()["n"]
+                        == 39
+                    )
+E                   assert 40 == 39
+
+tests/test_personal_admission_command.py:126: AssertionError
+_ test_durable_export_refuses_unconsented_person_and_withdrawal_removes_dependent_scene _
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123c6e990>
+tmp_path = PosixPath('<temporary>')
+
+    def test_durable_export_refuses_unconsented_person_and_withdrawal_removes_dependent_scene(
+        repository, tmp_path
+    ):
+        files, materials = scene_sample(repository, tmp_path)
+        subject = _person(repository, materials[0])
+        terms = _terms()
+        _grant(repository, terms)
+        with pytest.raises(PackageError, match="unconsented unmasked person") as refused:
+            _export(repository, tmp_path / "refused", files, materials, terms, owner_opt_in=True)
+        assert not (tmp_path / "refused").exists()
+        assert training_export_ledger(repository) == []
+        _grant(repository, terms, subject)
+>       before = _export(repository, tmp_path / "sample", files, materials, terms, owner_opt_in=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_training_export_postgres.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_training_export_postgres.py:80: in _export
+    return export_training_dataset(
+exulanica/world_package/training_store.py:254: in export_training_dataset
+    validate_dataset_inputs(repository, selected_files, admitted)
+exulanica/world_package/training_inputs.py:37: in validate_dataset_inputs
+    _validate_material(repository, files, material)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x123c6e990>
+files = {'assets/pose.json': b'{"manifest":{"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","colmap_version":"numer...\x14W\xb4s\x85\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x1f\xff\xd9', ...}
+material = {'material_id': '01a08122-9e62-7bba-9ce9-543d1ecdf742', 'capture_id': '01a08122-9e62-7bba-9ce9-543d1ecdf742', 'assets'...99-aa60-7ba0e6f37cf5', ...}], 'people': [{'subject_id': '4dcf00d0-5ce0-4076-ab4e-90925d36b316', 'masked': False}], ...}
+
+    def _validate_material(
+        repository: IngestRepository, files: Mapping[str, bytes], material: Mapping[str, Any]
+    ) -> None:
+        capture_id = uuid.UUID(material["capture_id"])
+        capture = repository.capture(capture_id)
+        live = repository.connection.execute(
+            "select capture_id from capture where workspace_id=%s and capture_id=%s "
+            "and deleted_at is null and not tombstone_blocks_capture(workspace_id,capture_id)",
+            (repository.workspace_id, capture_id),
+        ).fetchone()
+        if capture is None or live is None:
+            raise PackageError("training input capture is missing or withdrawn")
+        # The reconstruction gate checks expiry but permits future-dated screening and authority.
+        # Export cannot turn tomorrow's receipt into permission today. Statement time is after the
+        # caller acquired its source lock, unlike the transaction timestamp from before a wait.
+        screening = repository.connection.execute(
+            "select s.sensitive_regions,s.screening_method from reconstruction_privacy_screening s "
+            "join capture_reconstruction_authorization a on a.workspace_id=s.workspace_id "
+            "and a.authorization_id=s.authorization_id "
+            "where s.workspace_id=%s and s.capture_id=%s and s.source_sha256=%s "
+            "and s.receipt_digest=%s and s.screened_at<=statement_timestamp() "
+            "and a.authorized_at<=statement_timestamp() "
+            "and privacy_screening_allows_capture(s.workspace_id,s.capture_id,s.screening_id)",
+            (
+                repository.workspace_id,
+                capture_id,
+                capture.blob_id.digest,
+                bytes.fromhex(material["screening"]["receipt_sha256"]),
+            ),
+        ).fetchone()
+        if screening is None or material["screening"]["decision"] != "approved":
+>           raise PackageError("training input screening is not an eligible retained receipt")
+E           exulanica.world_package.package.PackageError: training input screening is not an eligible retained receipt
+
+exulanica/world_package/training_inputs.py:76: PackageError
+________ test_presentation_withdrawal_also_removes_prior_training_scene ________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x115c98890>
+tmp_path = PosixPath('<temporary>')
+
+    def test_presentation_withdrawal_also_removes_prior_training_scene(repository, tmp_path):
+        files, materials = scene_sample(repository, tmp_path)
+        subject = _person(repository, materials[0])
+        terms = _terms()
+        _grant(repository, terms)
+        _grant(repository, terms, subject)
+>       _export(repository, tmp_path / "before", files, materials, terms, owner_opt_in=True)
+
+tests/test_training_export_postgres.py:196: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_training_export_postgres.py:80: in _export
+    return export_training_dataset(
+exulanica/world_package/training_store.py:254: in export_training_dataset
+    validate_dataset_inputs(repository, selected_files, admitted)
+exulanica/world_package/training_inputs.py:37: in validate_dataset_inputs
+    _validate_material(repository, files, material)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x115c98890>
+files = {'assets/pose.json': b'{"manifest":{"code_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","colmap_version":"numer...\x14W\xb4s\x85\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x05\x14Q@\x1f\xff\xd9', ...}
+material = {'material_id': '01a08122-a128-7ae0-9461-471d365f5f13', 'capture_id': '01a08122-a128-7ae0-9461-471d365f5f13', 'assets'...cf-8139-c950a7ddd172', ...}], 'people': [{'subject_id': 'af8866da-3043-4fe0-a713-4b96353cfeee', 'masked': False}], ...}
+
+    def _validate_material(
+        repository: IngestRepository, files: Mapping[str, bytes], material: Mapping[str, Any]
+    ) -> None:
+        capture_id = uuid.UUID(material["capture_id"])
+        capture = repository.capture(capture_id)
+        live = repository.connection.execute(
+            "select capture_id from capture where workspace_id=%s and capture_id=%s "
+            "and deleted_at is null and not tombstone_blocks_capture(workspace_id,capture_id)",
+            (repository.workspace_id, capture_id),
+        ).fetchone()
+        if capture is None or live is None:
+            raise PackageError("training input capture is missing or withdrawn")
+        # The reconstruction gate checks expiry but permits future-dated screening and authority.
+        # Export cannot turn tomorrow's receipt into permission today. Statement time is after the
+        # caller acquired its source lock, unlike the transaction timestamp from before a wait.
+        screening = repository.connection.execute(
+            "select s.sensitive_regions,s.screening_method from reconstruction_privacy_screening s "
+            "join capture_reconstruction_authorization a on a.workspace_id=s.workspace_id "
+            "and a.authorization_id=s.authorization_id "
+            "where s.workspace_id=%s and s.capture_id=%s and s.source_sha256=%s "
+            "and s.receipt_digest=%s and s.screened_at<=statement_timestamp() "
+            "and a.authorized_at<=statement_timestamp() "
+            "and privacy_screening_allows_capture(s.workspace_id,s.capture_id,s.screening_id)",
+            (
+                repository.workspace_id,
+                capture_id,
+                capture.blob_id.digest,
+                bytes.fromhex(material["screening"]["receipt_sha256"]),
+            ),
+        ).fetchone()
+        if screening is None or material["screening"]["decision"] != "approved":
+>           raise PackageError("training input screening is not an eligible retained receipt")
+E           exulanica.world_package.package.PackageError: training input screening is not an eligible retained receipt
+
+exulanica/world_package/training_inputs.py:76: PackageError
+_ test_omitting_a_detected_person_cannot_turn_a_source_into_training_material __
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x124285650>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_omitting_a_detected_person_cannot_turn_a_source_into_training_material(
+        repository, photo_dir, tmp_path
+    ):
+>       files, materials = image_sample(repository, photo_dir, tmp_path, person=True)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_training_inputs.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x124285650>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+person = True
+
+    def image_sample(repository, photo_dir, tmp_path, *, person=False):
+        keep = {}
+        with patch("test_person_masking_end_to_end.write_photo", _public_fixture_photo):
+            capture_id, outcome = _ingest(
+                repository,
+                photo_dir,
+                tmp_path,
+                StubRegionDetector((A_PERSON,)) if person else NoRegionDetector(),
+                keep,
+            )
+>       assert outcome.error is None
+E       AssertionError: assert 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' is None
+E        +  where 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' = IngestOutcome(path=PosixPath('01a08122-a802-7a27-9b7e-fbd29b5ee99c'), blob_id=BlobId(71f7dad9dfb7...), capture_id=UUID...withdrawn', failure_class='PrivacyAdmissionError', retryable=False, missing=False, unavailable=False, tombstoned=False).error
+
+tests/test_training_inputs.py:58: AssertionError
+_______ test_unknown_person_exports_only_the_current_receipt_bound_mask ________
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x125c972d0>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+
+    def test_unknown_person_exports_only_the_current_receipt_bound_mask(
+        repository, photo_dir, tmp_path
+    ):
+>       files, materials = image_sample(repository, photo_dir, tmp_path, person=True)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_training_inputs.py:243: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+repository = <exulanica.ingest.repository.IngestRepository object at 0x125c972d0>
+photo_dir = PosixPath('<temporary>')
+tmp_path = PosixPath('<temporary>')
+person = True
+
+    def image_sample(repository, photo_dir, tmp_path, *, person=False):
+        keep = {}
+        with patch("test_person_masking_end_to_end.write_photo", _public_fixture_photo):
+            capture_id, outcome = _ingest(
+                repository,
+                photo_dir,
+                tmp_path,
+                StubRegionDetector((A_PERSON,)) if person else NoRegionDetector(),
+                keep,
+            )
+>       assert outcome.error is None
+E       AssertionError: assert 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' is None
+E        +  where 'PrivacyAdmissionError: privacy screening is failed, blocked, stale, or withdrawn' = IngestOutcome(path=PosixPath('01a08122-abc2-7474-b865-e8afbcf0c3e5'), blob_id=BlobId(71f7dad9dfb7...), capture_id=UUID...withdrawn', failure_class='PrivacyAdmissionError', retryable=False, missing=False, unavailable=False, tombstoned=False).error
+
+tests/test_training_inputs.py:58: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <worktree>/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_ingest_persistence.py::test_the_region_crop_refuses_an_original_over_the_pixel_budget
+tests/test_intake_upload.py::test_7_the_pixel_budget_survives_a_process_that_reset_the_warning_filters
+  <worktree>/.venv/lib/python3.11/site-packages/PIL/Image.py:3578: DecompressionBombWarning: Image size (66000000 pixels) exceeds limit of 64000000 pixels, could be decompression bomb DOS attack.
+    warnings.warn(
+
+tests/test_retained_evaluation_records.py::test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent
+  <worktree>/tests/test_retained_evaluation_records.py:196: UserWarning: predecessor chain: 32 bindings verified across 30 of 49 retained records. 19 declare no predecessor and are not required to: 2026-09-04-benchmark-browser.json, 2026-09-04-benchmark-pose.json, 2026-09-04-benchmark-scene-withdrawal.json, 2026-09-04-linux-amd64-depth-forward.json, 2026-09-04-reconstruction-validation-campaign.json, 2026-09-04-synthetic-browser.json, 2026-09-04-synthetic-person-withdrawal-browser.json, 2026-09-04-synthetic-person-withdrawal.json, 2026-09-05-atlas-reconstruction-negative-controls.json, 2026-09-05-gsplat-trainer-negative-controls.json, 2026-09-05-gsplat-trainer-verification.json, 2026-09-05-person-consent-first-pass.json, 2026-09-05-reference-bowl-inputs.json, 2026-09-05-reference-volcanic-inputs.json, 2026-09-05-reference-workflow-negative-controls.json, 2026-09-05-retained-reference-progress.json, 2026-09-06-phase-10-atlas.json, 2026-09-06-phase-10-read-paths.json, 2026-09-06-world-read-negative-controls.json
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_person_masking_end_to_end.py::test_a_detected_person_leaves_a_region_row_that_arms_the_database_guard
+FAILED tests/test_person_masking_end_to_end.py::test_reconstruction_reads_the_masked_derivative_not_the_original
+FAILED tests/test_person_masking_end_to_end.py::test_the_database_refuses_a_point_map_over_the_original_bytes
+FAILED tests/test_person_region_stages.py::test_an_unlocated_person_is_not_swallowed_by_a_centred_located_one
+FAILED tests/test_personal_admission_command.py::test_empty_schema_refuses_migrated_fallback_without_writes
+FAILED tests/test_training_export_postgres.py::test_durable_export_refuses_unconsented_person_and_withdrawal_removes_dependent_scene
+FAILED tests/test_training_export_postgres.py::test_presentation_withdrawal_also_removes_prior_training_scene
+FAILED tests/test_training_inputs.py::test_omitting_a_detected_person_cannot_turn_a_source_into_training_material
+FAILED tests/test_training_inputs.py::test_unknown_person_exports_only_the_current_receipt_bound_mask
+9 failed, 2081 passed, 3 skipped, 4 warnings in 307.29s (0:05:07)

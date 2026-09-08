@@ -1,0 +1,56 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_concurrent_subject_writers_refuse_duplicate_allocation __________
+
+ingest_spine = (<exulanica.ingest.repository.IngestRepository object at 0x10542a5d0>, <function ingest_spine.<locals>.open_another at 0x10540b6a0>)
+tmp_path = PosixPath('<temporary>')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x105428e50>
+
+    def test_concurrent_subject_writers_refuse_duplicate_allocation(
+        ingest_spine, tmp_path, monkeypatch
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+    
+        from exulanica.ingest.repository import IngestRepository
+    
+        repo, open_another = ingest_spine
+        case = Case(repo, tmp_path)
+        writers = [open_another(), open_another()]
+        barrier = threading.Barrier(2)
+        original = IngestRepository.next_person_consent_sequence
+    
+        def allocated(self, **kwargs):
+            sequence = original(self, **kwargs)
+            barrier.wait(timeout=5)
+            return sequence
+    
+        monkeypatch.setattr(IngestRepository, "next_person_consent_sequence", allocated)
+        when = dt.datetime.now(dt.UTC)
+    
+        def write(pair):
+            writer, decision = pair
+            try:
+                record_consent(
+                    writer,
+                    subject_id=case.subject,
+                    actor=ACTOR,
+                    consent_scope="likeness",
+                    decision=decision,
+                    effective_at=when,
+                )
+                return "committed"
+            except psycopg.errors.SerializationFailure:
+                return "retry"
+    
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(write, zip(writers, ["granted", "revoked"], strict=True)))
+>       assert sorted(results) == ["committed", "retry"], "duplicate subject-wide sequence was accepted"
+E       AssertionError: duplicate subject-wide sequence was accepted
+E       assert ['committed', 'committed'] == ['committed', 'retry']
+E         
+E         At index 1 diff: 'committed' != 'retry'
+E         Use -v to get more diff
+
+tests/test_screening_currency.py:594: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_screening_currency.py::test_concurrent_subject_writers_refuse_duplicate_allocation

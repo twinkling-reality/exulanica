@@ -1,0 +1,30 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_producer_consent_currency[expired] ____________________
+
+case = <test_screening_currency.Case object at 0x10741a990>, kind = 'expired'
+
+    @pytest.mark.parametrize("kind", ["expired", "future", "region-precedence", "unknown"])
+    def test_producer_consent_currency(case, kind):
+        now = dt.datetime.now(dt.UTC)
+        subject = case.subject if kind != "unknown" else None
+        case.edit(subject=subject)
+        if kind == "expired":
+            case.consent(
+                effective_at=now - dt.timedelta(days=2), valid_until=now - dt.timedelta(days=1)
+            )
+        elif kind == "future":
+            case.consent(effective_at=now + dt.timedelta(days=1))
+        elif kind == "region-precedence":
+            case.consent("revoked", region_key=KEY, effective_at=now - dt.timedelta(days=1))
+            case.consent(effective_at=now)
+>       assert region_state_for_capture(case.repo, case.capture).any_masked
+E       AssertionError: assert False
+E        +  where False = <exulanica.ingest.person_state.CaptureRegionState object at 0x107a30140>.any_masked
+E        +    where <exulanica.ingest.person_state.CaptureRegionState object at 0x107a30140> = region_state_for_capture(<exulanica.ingest.repository.IngestRepository object at 0x1079c9fd0>, UUID('01a08130-6e7f-7991-bcee-40c61078ac5c'))
+E        +      where <exulanica.ingest.repository.IngestRepository object at 0x1079c9fd0> = <test_screening_currency.Case object at 0x10741a990>.repo
+E        +      and   UUID('01a08130-6e7f-7991-bcee-40c61078ac5c') = <test_screening_currency.Case object at 0x10741a990>.capture
+
+tests/test_screening_currency.py:296: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_screening_currency.py::test_producer_consent_currency[expired]

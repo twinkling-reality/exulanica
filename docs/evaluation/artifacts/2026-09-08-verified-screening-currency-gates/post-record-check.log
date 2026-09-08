@@ -1,0 +1,7 @@
+.....................                                                    [100%]
+=============================== warnings summary ===============================
+tests/test_retained_evaluation_records.py::test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent
+  <worktree>/tests/test_retained_evaluation_records.py:196: UserWarning: predecessor chain: 34 bindings verified across 32 of 51 retained records. 19 declare no predecessor and are not required to: 2026-09-04-benchmark-browser.json, 2026-09-04-benchmark-pose.json, 2026-09-04-benchmark-scene-withdrawal.json, 2026-09-04-linux-amd64-depth-forward.json, 2026-09-04-reconstruction-validation-campaign.json, 2026-09-04-synthetic-browser.json, 2026-09-04-synthetic-person-withdrawal-browser.json, 2026-09-04-synthetic-person-withdrawal.json, 2026-09-05-atlas-reconstruction-negative-controls.json, 2026-09-05-gsplat-trainer-negative-controls.json, 2026-09-05-gsplat-trainer-verification.json, 2026-09-05-person-consent-first-pass.json, 2026-09-05-reference-bowl-inputs.json, 2026-09-05-reference-volcanic-inputs.json, 2026-09-05-reference-workflow-negative-controls.json, 2026-09-05-retained-reference-progress.json, 2026-09-06-phase-10-atlas.json, 2026-09-06-phase-10-read-paths.json, 2026-09-06-world-read-negative-controls.json
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html

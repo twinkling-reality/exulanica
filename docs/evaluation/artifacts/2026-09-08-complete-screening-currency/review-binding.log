@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_receipt_input_binding_guard _______________________
+
+case = <test_screening_currency.Case object at 0x107719cd0>
+
+    def test_receipt_input_binding_guard(case):
+        case.edit()
+        case.build()
+        first = case.screen()
+        assert case.allowed(first)
+        # A new review input with identical effective pixels can reuse its mask, but the earlier
+        # review must not silently attest to the new edit receipt.
+        case.edit("confirm")
+        assert capture_mask_is_current(case.repo, case.capture)
+>       assert not case.allowed(first), "changed review inputs reused a historical screening"
+E       AssertionError: changed review inputs reused a historical screening
+E       assert not True
+E        +  where True = allowed(PrivacyScreeningRow(screening_id=UUID('926e2ad5-f54e-51c2-8276-5eca59ae471e'), authorization_id=UUID('cd3c8bc2-3969-59...cZ\x02', screened_at=datetime.datetime(2026, 9, 8, 13, 23, 48, 107716, tzinfo=datetime.timezone.utc), valid_until=None))
+E        +    where allowed = <test_screening_currency.Case object at 0x107719cd0>.allowed
+
+tests/test_screening_currency.py:525: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_screening_currency.py::test_receipt_input_binding_guard - A...

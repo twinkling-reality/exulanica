@@ -1,0 +1,194 @@
+I001 [*] Import block is un-sorted or un-formatted
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/consent-expiry-mutant.py:1:1
+  |
+1 | / import re
+2 | | import pytest
+3 | | from exulanica.migrations import Migration
+  | |__________________________________________^
+4 |   original = Migration.sql.fget
+5 |   def mutated(self):
+  |
+help: Organize imports
+  |
+1 | import re
+2 +
+3 | import pytest
+4 | from exulanica.migrations import Migration
+5 +
+6 | original = Migration.sql.fget
+  |
+
+F401 [*] `re` imported but unused
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/consent-expiry-mutant.py:1:8
+  |
+1 | import re
+  |        ^^
+2 | import pytest
+3 | from exulanica.migrations import Migration
+  |
+help: Remove unused import: `re`
+  |
+  - import re
+1 | import pytest
+  |
+
+ANN201 Missing return type annotation for public function `mutated`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/consent-expiry-mutant.py:5:5
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |     ^^^^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+help: Add return type annotation
+
+ANN001 Missing type annotation for function argument `self`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/consent-expiry-mutant.py:5:13
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |             ^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+
+E501 Line too long (121 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/consent-expiry-mutant.py:13:101
+   |
+11 |     return sql
+12 | Migration.sql = property(mutated)
+13 | raise SystemExit(pytest.main(["tests/test_screening_currency.py::test_producer_consent_currency[expired]", "-q", "-ra"]))
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/mask-input-digest-mutant.py:1:1
+  |
+1 | / import re
+2 | | import pytest
+3 | | from exulanica.migrations import Migration
+  | |__________________________________________^
+4 |   original = Migration.sql.fget
+5 |   def mutated(self):
+  |
+help: Organize imports
+  |
+1 | import re
+2 +
+3 | import pytest
+4 | from exulanica.migrations import Migration
+5 +
+6 | original = Migration.sql.fget
+  |
+
+ANN201 Missing return type annotation for public function `mutated`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/mask-input-digest-mutant.py:5:5
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |     ^^^^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+help: Add return type annotation
+
+ANN001 Missing type annotation for function argument `self`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/mask-input-digest-mutant.py:5:13
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |             ^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+
+E501 Line too long (107 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/mask-input-digest-mutant.py:8:101
+   |
+ 6 |     sql = original(self)
+ 7 |     if self.version == "0040":
+ 8 |         sql, count = re.subn(r"and m.input_digest=\(select digest.*?x\(h\)\)", "and true", sql, flags=re.S)
+   |                                                                                                     ^^^^^^^
+ 9 |         assert count == 1
+10 |     return sql
+   |
+
+E501 Line too long (105 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/mask-input-digest-mutant.py:12:101
+   |
+10 |     return sql
+11 | Migration.sql = property(mutated)
+12 | raise SystemExit(pytest.main(["tests/test_screening_currency.py::test_input_digest_guard", "-q", "-ra"]))
+   |                                                                                                     ^^^^^
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/review-binding-mutant.py:1:1
+  |
+1 | / import re
+2 | | import pytest
+3 | | from exulanica.migrations import Migration
+  | |__________________________________________^
+4 |   original = Migration.sql.fget
+5 |   def mutated(self):
+  |
+help: Organize imports
+  |
+1 | import re
+2 +
+3 | import pytest
+4 | from exulanica.migrations import Migration
+5 +
+6 | original = Migration.sql.fget
+  |
+
+F401 [*] `re` imported but unused
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/review-binding-mutant.py:1:8
+  |
+1 | import re
+  |        ^^
+2 | import pytest
+3 | from exulanica.migrations import Migration
+  |
+help: Remove unused import: `re`
+  |
+  - import re
+1 | import pytest
+  |
+
+ANN201 Missing return type annotation for public function `mutated`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/review-binding-mutant.py:5:5
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |     ^^^^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+help: Add return type annotation
+
+ANN001 Missing type annotation for function argument `self`
+ --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/review-binding-mutant.py:5:13
+  |
+3 | from exulanica.migrations import Migration
+4 | original = Migration.sql.fget
+5 | def mutated(self):
+  |             ^^^^
+6 |     sql = original(self)
+7 |     if self.version == "0040":
+  |
+
+E501 Line too long (114 > 100)
+  --> docs/evaluation/artifacts/2026-09-08-shared-screening-currency/review-binding-mutant.py:12:101
+   |
+10 |     return sql
+11 | Migration.sql = property(mutated)
+12 | raise SystemExit(pytest.main(["tests/test_screening_currency.py::test_receipt_input_binding_guard", "-q", "-ra"]))
+   |                                                                                                     ^^^^^^^^^^^^^^
+
+Found 15 errors.
+[*] 5 fixable with the `--fix` option.

@@ -1,0 +1,36 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_stale_or_missing_claimed_review_inputs_do_not_authorize _________
+
+case = <test_screening_currency.Case object at 0x108d761d0>
+
+    def test_stale_or_missing_claimed_review_inputs_do_not_authorize(case):
+        case.edit()
+        case.build()
+        original = review_list(case.repo, case.capture)
+        minimal = [{"region_key": original[0]["region_key"], "state": original[0]["state"]}]
+        receipt = record_human_screening(
+            case.repo,
+            authorization_id=case.auth.authorization_id,
+            reviewed_by=ACTOR,
+            sensitive_regions=minimal,
+        )
+        assert receipt.eligibility_state == "eligible"  # Historical caller outcome, not permission.
+        assert not case.allowed(receipt), "missing claimed review fields must not be synthesized"
+        case.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
+        case.build()
+        stale = record_human_screening(
+            case.repo,
+            authorization_id=case.auth.authorization_id,
+            reviewed_by=ACTOR,
+            sensitive_regions=original,
+        )
+>       assert not case.allowed(stale), "old review outline must not bind fresh inputs"
+E       AssertionError: old review outline must not bind fresh inputs
+E       assert not True
+E        +  where True = allowed(PrivacyScreeningRow(screening_id=UUID('a179f43c-3eb9-55f6-bbe9-3a6ce2003731'), authorization_id=UUID('eaec29b7-1443-5b...6l\xa4', screened_at=datetime.datetime(2026, 9, 8, 13, 15, 42, 503513, tzinfo=datetime.timezone.utc), valid_until=None))
+E        +    where allowed = <test_screening_currency.Case object at 0x108d761d0>.allowed
+
+tests/test_screening_currency.py:650: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_screening_currency.py::test_stale_or_missing_claimed_review_inputs_do_not_authorize

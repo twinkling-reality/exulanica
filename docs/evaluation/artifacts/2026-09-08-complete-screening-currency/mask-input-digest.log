@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________________ test_input_digest_guard ____________________________
+
+case = <test_screening_currency.Case object at 0x1078d2a10>
+
+    def test_input_digest_guard(case):
+        case.edit()
+        case.build()
+        assert capture_mask_is_current(case.repo, case.capture)
+        case.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
+>       assert not capture_mask_is_current(case.repo, case.capture), (
+            "obsolete mask input digest accepted"
+        )
+E       AssertionError: obsolete mask input digest accepted
+E       assert not True
+E        +  where True = capture_mask_is_current(<exulanica.ingest.repository.IngestRepository object at 0x1078d2790>, UUID('01a08130-6aa2-7bba-a1f1-d00a8edd64e3'))
+E        +    where <exulanica.ingest.repository.IngestRepository object at 0x1078d2790> = <test_screening_currency.Case object at 0x1078d2a10>.repo
+E        +    and   UUID('01a08130-6aa2-7bba-a1f1-d00a8edd64e3') = <test_screening_currency.Case object at 0x1078d2a10>.capture
+
+tests/test_screening_currency.py:424: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_screening_currency.py::test_input_digest_guard - AssertionE...
