@@ -12,6 +12,12 @@ import psycopg
 
 from exulanica.errors import BlobNotFoundError, IntegrityError, TombstonedError
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.asset_read_policy import (
+    evaluation_time,
+    final_check,
+    scene_allowed,
+    scene_inputs,
+)
 from exulanica.graph.geometry import GeometryBytes
 from exulanica.graph.payload import (
     SceneGeometryReferenceRow,
@@ -33,6 +39,16 @@ def trained_geometry_row(
     decision: SceneGateDecision,
     store: ContentAddressedStore,
 ) -> SceneTrainedGeometryRow | None:
+    buffered = scene_inputs(connection, workspace, scene_id, store)
+    if not scene_allowed(connection, workspace, scene_id, buffered, evaluation_time(connection)):
+        return None
+    assert buffered is not None
+    if (
+        bytes(buffered[0]["content_sha256"]).hex() != pose_digest
+        or bytes(buffered[0]["gate_sha256"]).hex()
+        != hashlib.sha256(decision.to_bytes()).hexdigest()
+    ):
+        return None
     training = next((receipt for receipt in decision.receipts if receipt.kind == "splat"), None)
     if training is None or not training.accepted:
         return None
@@ -63,6 +79,16 @@ def trained_geometry_row(
         ).hexdigest()
         if manifest_digest != receipt.get("manifest_digest"):
             raise ValueError("training manifest no longer reproduces its digest")
+        assert buffered is not None
+        pose_manifest = buffered[1]
+        if manifest.get("pose_manifest_digest") != hashlib.sha256(
+            json.dumps(
+                pose_manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode()
+        ).hexdigest() or manifest.get("source_sha256") != [
+            f["sha256"] for f in pose_manifest["frames"]
+        ]:
+            raise ValueError("training inputs do not match recorded pose frames")
         quality, delivery = receipt["quality"], receipt["delivery"]
         if (
             quality.get("accepted") is not True
@@ -188,4 +214,38 @@ def read_scene_geometry(
     data = store.get(digest)
     if len(data) != row["byte_size"]:
         raise IntegrityError("trained scene byte size disagrees with its artifact row")
+    buffered = scene_inputs(connection, workspace, row["scene_id"], store)
+    if (
+        buffered is None
+        or buffered[0]["content_sha256"] != row["pose_sha256"]
+        or buffered[0]["gate_sha256"] != row["gate_sha256"]
+    ):
+        return None
+    with final_check(connection) as at:
+        if not scene_allowed(connection, workspace, row["scene_id"], buffered, at):
+            return None
+        current_row = connection.execute(
+            "select content_sha256,scene_id,byte_size,kind,"
+            "asset_artifact_live(workspace_id,artifact_id,%s) as live from artifact "
+            "where workspace_id=%s and artifact_id=%s",
+            (at, workspace, artifact_id),
+        ).fetchone()
+        if (
+            current_row is None
+            or not current_row["live"]
+            or current_row["scene_id"] != row["scene_id"]
+            or current_row["byte_size"] != len(data)
+            or current_row["kind"] != TRAINED_GEOMETRY_KIND
+            or bytes(current_row["content_sha256"] or b"") != digest.digest
+        ):
+            return None
+        training = next(r for r in decision.receipts if r.kind == "splat" and r.accepted)
+        receipt_live = connection.execute(
+            "select exists(select 1 from artifact where workspace_id=%s and scene_id=%s "
+            "and kind='scene_splat_receipt' and content_sha256=%s "
+            "and asset_artifact_live(workspace_id,artifact_id,%s)) as live",
+            (workspace, row["scene_id"], bytes.fromhex(training.sha256), at),
+        ).fetchone()["live"]
+        if not receipt_live:
+            return None
     return GeometryBytes(artifact_id, digest.hex, "sog/1", data)

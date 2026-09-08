@@ -34,6 +34,13 @@ from fastapi.responses import JSONResponse
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
 from exulanica.errors import CanonicalisationError
+from exulanica.graph.asset_read_policy import (
+    bundle_scene_ids,
+    evaluation_time,
+    final_check,
+    scene_allowed,
+    scene_inputs,
+)
 from exulanica.graph.observations import scene_observations
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
 
@@ -100,7 +107,24 @@ def scene_bundle(
             if _withdrawn(connection, session.workspace_id, scene_id):
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
             return _problem(404, "unknown_reference", "no such scene")
-    return JSONResponse(content=bundle)
+        dependencies = {
+            key: scene_inputs(connection, session.workspace_id, key, services.store)
+            for key in bundle_scene_ids(bundle)
+        }
+        at_time = evaluation_time(connection)
+        if not dependencies or not all(
+            scene_allowed(connection, session.workspace_id, key, value, at_time)
+            for key, value in dependencies.items()
+        ):
+            return _problem(404, "unknown_reference", "current scene inputs are unavailable")
+        response = JSONResponse(content=bundle, headers={"Cache-Control": "private, no-store"})
+    with final_check(connection) as at_time:
+        if not all(
+            scene_allowed(connection, session.workspace_id, key, value, at_time)
+            for key, value in dependencies.items()
+        ):
+            return _problem(404, "unknown_reference", "current scene inputs are unavailable")
+    return response
 
 
 @router.get(
@@ -164,7 +188,24 @@ def place_bundle(
                     "this place has no anchor scene, so it has no shared frame to read yet",
                 )
             return _problem(410, "tombstoned", "this place's anchor scene was withdrawn")
-    return JSONResponse(content=bundle)
+        dependencies = {
+            key: scene_inputs(connection, session.workspace_id, key, services.store)
+            for key in bundle_scene_ids(bundle)
+        }
+        at_time = evaluation_time(connection)
+        if not dependencies or not all(
+            scene_allowed(connection, session.workspace_id, key, value, at_time)
+            for key, value in dependencies.items()
+        ):
+            return _problem(404, "unknown_reference", "current scene inputs are unavailable")
+        response = JSONResponse(content=bundle, headers={"Cache-Control": "private, no-store"})
+    with final_check(connection) as at_time:
+        if not all(
+            scene_allowed(connection, session.workspace_id, key, value, at_time)
+            for key, value in dependencies.items()
+        ):
+            return _problem(404, "unknown_reference", "current scene inputs are unavailable")
+    return response
 
 
 @router.get(
@@ -215,4 +256,13 @@ def scene_observation_graph(
             if _withdrawn(connection, session.workspace_id, scene_id):
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
             return _problem(404, "unknown_reference", "no observation graph for this scene")
-    return JSONResponse(content=records)
+        buffered = scene_inputs(connection, session.workspace_id, scene_id, services.store)
+        if not scene_allowed(
+            connection, session.workspace_id, scene_id, buffered, evaluation_time(connection)
+        ):
+            return _problem(404, "unknown_reference", "current observation inputs are unavailable")
+        response = JSONResponse(content=records, headers={"Cache-Control": "private, no-store"})
+    with final_check(connection) as at_time:
+        if not scene_allowed(connection, session.workspace_id, scene_id, buffered, at_time):
+            return _problem(404, "unknown_reference", "current observation inputs are unavailable")
+    return response

@@ -373,7 +373,7 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
 
     metadata = styles.require_source_media(source_id, store)
     assert metadata.state is SourceMediaState.AVAILABLE
-    assert metadata.evidence_path == f"/evidence/{span_id}"
+    assert metadata.evidence_path == f"/evidence/{span_id}/masked"
     assert metadata.media_type == "image/jpeg"
     assert metadata.width == 160 and metadata.height == 100
     assert "http" not in metadata.evidence_path

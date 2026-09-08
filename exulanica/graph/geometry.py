@@ -74,8 +74,9 @@ from typing import Any, Final
 
 import psycopg
 
-from exulanica.errors import TombstonedError
+from exulanica.errors import IntegrityError, TombstonedError
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.asset_read_policy import evaluation_time, final_check, point_allowed
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
@@ -219,6 +220,9 @@ select distinct on (c.capture_id)
 _ONE: Final = """
 select a.artifact_id,
        a.source_blob_sha256,
+       a.read_source_sha256,
+       a.privacy_screening_id,
+       a.input_digest,
        a.content_sha256,
        a.byte_size,
        a.purged_at,
@@ -283,7 +287,12 @@ def point_map_descriptors(
     _require_workspace_context(connection, workspace)
     rows = connection.execute(_DESCRIPTORS, (workspace, POINT_MAP_KIND)).fetchall()
     ordered = sorted(rows, key=_presentation_order)
-    return tuple(_descriptor(row, store) for row in ordered)
+    at = evaluation_time(connection)
+    return tuple(
+        _descriptor(row, store)
+        for row in ordered
+        if point_allowed(connection, workspace, row["artifact_id"], at)
+    )
 
 
 def read_point_map(
@@ -310,13 +319,7 @@ def read_point_map(
     answers with 410 rather than 404, and :class:`~exulanica.errors.BlobNotFoundError` when the
     row survived and the object did not.
 
-    **There is a time-of-check window between the liveness question and the read, and it is not
-    closed here.** ``store.get`` re-hashes several megabytes, and a tombstone committing inside
-    that span is not seen, so one response can carry geometry that was deleted while it was being
-    assembled. Closing it would mean taking the purger's advisory lock on every read, which
-    serialises reads against a deletion for a window that is one local file read wide and that
-    the next request already answers 410 for. What actually stops the bytes from surviving the
-    deletion is the purge queue, and what stops them from being fetched again is this check.
+    Bytes are buffered and verified before a fresh serialized final permission check.
     """
     _require_workspace_context(connection, workspace)
     row = connection.execute(_ONE, (workspace, artifact_id, POINT_MAP_KIND)).fetchone()
@@ -358,11 +361,20 @@ def read_point_map(
     # descriptor names, or nothing leaves it: a mismatch raises IntegrityError, which the API
     # answers with a loud 500 rather than serving content nobody chose.
     digest = bytes(row["content_sha256"])
+    payload = store.get(BlobId(digest))
+    if len(payload) != row["byte_size"]:
+        raise IntegrityError("point-map bytes disagree with their recorded size")
+    with final_check(connection) as at:
+        if not point_allowed(connection, workspace, artifact_id, at):
+            return None
+        current = connection.execute(_ONE, (workspace, artifact_id, POINT_MAP_KIND)).fetchone()
+        if current != row:
+            return None
     return GeometryBytes(
         artifact_id=row["artifact_id"],
         content_sha256=digest.hex(),
         container=row["container"],
-        payload=store.get(BlobId(digest)),
+        payload=payload,
     )
 
 

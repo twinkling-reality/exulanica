@@ -302,3 +302,71 @@ def test_cli_records_opt_in_exports_exact_assets_and_reads_user_ledger(
     assert ledger[0]["merkle_root_sha256"] == exported["merkle_root_sha256"]
     signed = json.loads((tmp_path / "cli/provenance/dataset.json").read_bytes())
     assert signed["licensing"] == {"attribution": "Fixture author", "payment": "No payment"}
+
+
+def test_training_export_and_presentation_writer_share_a_lock_order(
+    repository, ingest_spine, photo_dir, tmp_path, monkeypatch
+):
+    """Actual export/consent callers, paused after export's pre-existing source lock."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    import exulanica.world_package.training_store as training_store
+    import psycopg
+
+    from test_training_inputs import image_sample
+
+    files, materials = image_sample(repository, photo_dir, tmp_path)
+    terms = _terms()
+    _grant(repository, terms)
+    subject = create_subject(repository, actor=ACTOR)
+    _, open_another = ingest_spine
+    exporter, writer = open_another(), open_another()
+    held, resume = threading.Event(), threading.Event()
+    original = training_store._lock
+
+    def pause(connection, workspace, package):
+        original(connection, workspace, package)
+        held.set()
+        assert resume.wait(5)
+
+    monkeypatch.setattr(training_store, "_lock", pause)
+
+    def export():
+        try:
+            _export(exporter, tmp_path / "concurrent", files, materials, terms, owner_opt_in=True)
+            return "ok"
+        except psycopg.Error as error:
+            return error.sqlstate
+
+    def consent():
+        try:
+            record_consent(
+                writer,
+                subject_id=subject,
+                actor=ACTOR,
+                consent_scope="likeness",
+                decision="granted",
+            )
+            return "ok"
+        except psycopg.Error as error:
+            return error.sqlstate
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        exporting = pool.submit(export)
+        assert held.wait(5)
+        consenting = pool.submit(consent)
+        deadline = time.monotonic() + 3
+        blocked = False
+        while time.monotonic() < deadline:
+            blocked = repository.connection.execute(
+                "select %s=any(pg_blocking_pids(%s)) as waiting",
+                (exporter.connection.info.backend_pid, writer.connection.info.backend_pid),
+            ).fetchone()["waiting"]
+            if blocked:
+                break
+            time.sleep(0.01)
+        resume.set()
+        assert blocked, "the actual consent writer must reach the export's held source lock"
+        assert (exporting.result(timeout=5), consenting.result(timeout=5)) == ("ok", "ok")

@@ -17,6 +17,7 @@ from typing import Any, Final
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.errors import (
@@ -1091,7 +1092,7 @@ class WorldStyleRepository:
             params.append(source_id)
         return self.connection.execute(
             "select ws.source_id,ws.region_id,ws.slot_key,ws.evidence_span_id,ws.missing_reason,"
-            "s.modality,b.blob_sha256,b.media_type,b.byte_size,b.storage_key,b.purged_at,"
+            "s.modality,s.track_key,b.blob_sha256,b.media_type,b.byte_size,b.storage_key,b.purged_at,"
             "t.disp_w,t.disp_h,t.coded_w,t.coded_h,a.utc_instant,a.uncertainty_ms,"
             "case when s.span_id is null then false else "
             "tombstone_blocks_any_span(ws.workspace_id,array[s.span_id]) end as tombstoned,"
@@ -1100,16 +1101,9 @@ class WorldStyleRepository:
             ",array(select c.capture_id from capture c where c.workspace_id=ws.workspace_id "
             "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null "
             "order by c.capture_id) as capture_ids "
-            # Whether anybody in this photograph has not consented to their likeness, and whether
-            # the masked derivative that hides them exists. Asked here rather than in the client
-            # because this is the row that decides which bytes a viewer is handed: a photograph
-            # that needs a mask and has none must not resolve to its original.
-            ",exists(select 1 from capture c where c.workspace_id=ws.workspace_id "
-            "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null "
-            "and capture_requires_masking(c.workspace_id,c.capture_id)) as needs_mask "
-            ",exists(select 1 from artifact ma where ma.workspace_id=ws.workspace_id "
-            "and ma.kind='masked_source' and ma.source_blob_sha256=s.blob_sha256 "
-            "and ma.purged_at is null and ma.content_sha256 is not null) as has_mask "
+            ",case when b.media_type like 'image/%%' or s.track_key='img' then "
+            "asset_image_source(ws.workspace_id,s.blob_sha256,statement_timestamp(),false) "
+            "else s.blob_sha256 end as viewer_sha256 "
             "from world_topology_source ws "
             "left join evidence_span s on s.workspace_id=ws.workspace_id "
             "and s.span_id=ws.evidence_span_id "
@@ -1127,7 +1121,6 @@ class WorldStyleRepository:
     def _source_from_row(row: Mapping[str, Any], store: ContentAddressedStore) -> WorldSourceMedia:
         state = SourceMediaState.AVAILABLE
         reason: str | None = None
-        pending_mask = False
         if row["evidence_span_id"] is None:
             state = SourceMediaState.MISSING_EVIDENCE
             reason = row["missing_reason"]
@@ -1143,19 +1136,18 @@ class WorldStyleRepository:
         elif row["blob_sha256"] is None or not store.exists(BlobId(bytes(row["blob_sha256"]))):
             state = SourceMediaState.UNAVAILABLE_ASSET
             reason = "source bytes are missing from storage"
-        elif row.get("needs_mask") and not row.get("has_mask"):
-            # Somebody in this photograph has not consented to their likeness and nothing has
-            # produced the derivative that hides them. Withheld rather than served: falling back
-            # to the original here would show exactly the person the whole feature exists to hide,
-            # and it would do it on the path a viewer actually looks at.
+        elif row.get("viewer_sha256") is None or not store.exists(
+            BlobId(bytes(row["viewer_sha256"]))
+        ):
             state = SourceMediaState.UNAVAILABLE_ASSET
-            reason = "source contains a person who has not consented and is not yet masked"
-            # Identity lets the authenticated reviewer reopen the saved review after reload.
-            # This branch is reached only for a live, otherwise-resolvable source; it grants
-            # neither a media reference nor pixels, and never covers deleted or missing data.
-            pending_mask = True
+            reason = "current viewer image is unavailable; review or rebuild required"
+        if state is SourceMediaState.AVAILABLE:
+            try:
+                store.get(BlobId(bytes(row["viewer_sha256"])))
+            except (BlobNotFoundError, IntegrityError):
+                state = SourceMediaState.UNAVAILABLE_ASSET
+                reason = "current viewer bytes are missing or corrupt"
         available = state is SourceMediaState.AVAILABLE
-        masked = bool(row.get("needs_mask"))
         return WorldSourceMedia(
             source_id=row["source_id"],
             slot_key=row["slot_key"],
@@ -1167,7 +1159,8 @@ class WorldStyleRepository:
                 None
                 if not available
                 else f"/evidence/{row['evidence_span_id']}/masked"
-                if masked
+                if row["track_key"] == "img"
+                or (row["media_type"] and row["media_type"].startswith("image/"))
                 else f"/evidence/{row['evidence_span_id']}"
             ),
             modality=row["modality"],
@@ -1177,7 +1170,9 @@ class WorldStyleRepository:
             height=row["disp_h"] or row["coded_h"],
             captured_at=row["utc_instant"],
             captured_at_uncertainty_ms=row["uncertainty_ms"],
-            capture_ids=tuple(row["capture_ids"]) if available or pending_mask else (),
+            capture_ids=(
+                tuple(row["capture_ids"]) if row["live_capture"] and not row["tombstoned"] else ()
+            ),
         )
 
 

@@ -9,21 +9,72 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.api.services import Services
 from exulanica.graph import GraphPayload, read_snapshot
+from exulanica.graph.asset_read_policy import (
+    evaluation_time,
+    final_check,
+    scene_allowed,
+    scene_inputs,
+)
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
 
 @router.get("", summary="The entity graph, as one snapshot at one state version.")
 def snapshot(
+    response: Response,
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> GraphPayload:
+    response.headers["Cache-Control"] = "private, no-store"
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
-        return read_snapshot(connection, session.workspace_id, services.store)
+        payload = read_snapshot(connection, session.workspace_id, services.store)
+        buffered = {
+            scene.scene_id: scene_inputs(
+                connection, session.workspace_id, scene.scene_id, services.store
+            )
+            for scene in payload.reconstruction_scenes
+        }
+        at = evaluation_time(connection)
+        allowed = {
+            key
+            for key, value in buffered.items()
+            if scene_allowed(connection, session.workspace_id, key, value, at)
+        }
+    # Scene rows embed recovered camera/placement geometry. Reauthorize those buffered
+    # dependencies after the snapshot; denied rows retain review identity but no geometry.
+    with final_check(connection) as at:
+        allowed = {
+            key
+            for key in allowed
+            if scene_allowed(connection, session.workspace_id, key, buffered[key], at)
+        }
+    scenes = []
+    for scene in payload.reconstruction_scenes:
+        if scene.scene_id in allowed:
+            scenes.append(scene)
+        else:
+            scenes.append(
+                scene.model_copy(
+                    update={
+                        "members": [
+                            member.model_copy(update={"placement": None, "recovered_camera": None})
+                            for member in scene.members
+                        ],
+                        "trained_geometry": None,
+                        "placement_state": "unavailable",
+                        "rendering_substrate": "source_photographs",
+                        "displayed_rung": 4,
+                        "display_reasons": [
+                            "Current permission or persisted geometry lineage is unavailable."
+                        ],
+                    }
+                )
+            )
+    return payload.model_copy(update={"reconstruction_scenes": scenes})

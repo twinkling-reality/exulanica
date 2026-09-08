@@ -37,6 +37,7 @@ the bytes and a second round trip to learn them would be a second thing to get o
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import re
 import uuid
@@ -49,6 +50,7 @@ from fastapi import APIRouter, Header, HTTPException, Path, Request, Response
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
 from exulanica.evidence import EvidenceAddress, parse_uri
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.asset_read_policy import evaluation_time, final_check, image_source
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
@@ -72,6 +74,7 @@ def original(
 ) -> Response:
     address, media_type, clock = _address(connection, session, span_id)
     data = resolve_original_bytes(address, get_services(request).store)
+    _authorize_original(connection, session, address, media_type)
     return _ranged(data, media_type, range_header, clock)
 
 
@@ -100,38 +103,26 @@ def masked(
     looks at, and it would do it precisely when something upstream had already gone wrong.
     """
     address, media_type, clock = _address(connection, session, span_id)
-    row = connection.execute(
-        "select c.capture_id, capture_requires_masking(c.workspace_id, c.capture_id) as needed, "
-        "(select a.content_sha256 from artifact a where a.workspace_id = c.workspace_id "
-        " and a.kind = 'masked_source' and a.source_blob_sha256 = c.blob_sha256 "
-        " and a.purged_at is null and a.content_sha256 is not null "
-        " order by a.stage_version desc, a.created_at desc limit 1) as masked_sha256 "
-        "from capture c where c.workspace_id = %s and c.blob_sha256 = %s "
-        "and c.deleted_at is null limit 1",
-        (session.workspace_id, address.blob_id.digest),
-    ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=404, detail="no live capture holds these bytes")
-    if not row["needed"]:
-        # Nobody in this photograph is hidden, so the masked view and the original are the same
-        # picture. Served rather than refused, so a caller does not have to ask twice.
-        return _ranged(
-            resolve_original_bytes(address, get_services(request).store),
-            media_type,
-            range_header,
-            clock,
-        )
-    if row["masked_sha256"] is None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "this photograph contains a person who has not consented to their likeness and "
-                "no masked derivative exists yet"
-            ),
-        )
     store = get_services(request).store
+    if address.track_key != "img" and not media_type.startswith("image/"):
+        data = resolve_original_bytes(address, store)
+        _authorize_original(connection, session, address, media_type)
+        return _ranged(data, media_type, range_header, clock)
+    selected = image_source(
+        connection, session.workspace_id, address.blob_id.digest, evaluation_time(connection)
+    )
+    if selected is None:
+        raise HTTPException(409, "current viewer image is unavailable")
+    data = store.get(BlobId(selected))
+    with final_check(connection) as at:
+        _check_span(connection, session, address, at)
+        if image_source(connection, session.workspace_id, address.blob_id.digest, at) != selected:
+            raise HTTPException(409, "viewer image permission changed")
     return _ranged(
-        store.get(BlobId(bytes(row["masked_sha256"]))), "image/jpeg", range_header, clock
+        data,
+        media_type if selected == address.blob_id.digest else "image/jpeg",
+        range_header,
+        clock,
     )
 
 
@@ -152,6 +143,7 @@ def region(
     image = resolve_region_image(address, get_services(request).store)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
+    _authorize_original(connection, session, address, _media_type)
     return Response(
         content=buffer.getvalue(),
         media_type="image/png",
@@ -201,6 +193,7 @@ def by_uri(
             headers={"Cache-Control": "private, no-store"},
         )
     data = resolve_original_bytes(address, get_services(request).store)
+    _authorize_original(connection, session, address, row["media_type"])
     return _ranged(data, row["media_type"], range_header, _evidence_headers(str(address.modality)))
 
 
@@ -312,3 +305,37 @@ def _ranged(
         media_type=media_type,
         headers={**common, "Content-Range": f"bytes {start}-{end}/{total}"},
     )
+
+
+def _check_span(
+    connection: psycopg.Connection, session: Session, address: EvidenceAddress, at: dt.datetime
+) -> None:
+    blocked = connection.execute(
+        "select asset_tombstone_span(%s,%s,%s,%s,%s,%s) as blocked",
+        (
+            session.workspace_id,
+            address.blob_id.digest,
+            address.track_key,
+            address.interval.start_ns,
+            address.interval.end_ns,
+            at,
+        ),
+    ).fetchone()["blocked"]
+    if blocked:
+        raise HTTPException(410, "evidence was withdrawn")
+
+
+def _authorize_original(
+    connection: psycopg.Connection,
+    session: Session,
+    address: EvidenceAddress,
+    media_type: str | None,
+) -> None:
+    with final_check(connection) as at:
+        _check_span(connection, session, address, at)
+        if (
+            address.track_key == "img" or (media_type and media_type.startswith("image/"))
+        ) and image_source(
+            connection, session.workspace_id, address.blob_id.digest, at, original=True
+        ) != address.blob_id.digest:
+            raise HTTPException(409, "current permission does not allow original image delivery")
