@@ -104,6 +104,16 @@ assert needle in sql
 sql = sql.replace(needle, "and c.effective_at<=p_at")""",
         ),
     ]
+    mutants.extend([
+        ("claimed-outline", "test_stale_or_missing_claimed_review_inputs_do_not_authorize",
+         """needle = "and sr->'silhouette'=r->'silhouette'"
+assert needle in sql
+sql = sql.replace(needle, "and true")"""),
+        ("consent-allocation", "test_concurrent_subject_writers_refuse_duplicate_allocation",
+         """needle = "and c.consent_id<>new.consent_id)"
+assert needle in sql
+sql = sql.replace(needle, "and false)")"""),
+    ])
     controls = []
     for name, selector, mutation in mutants:
         program = (
@@ -111,7 +121,7 @@ sql = sql.replace(needle, "and c.effective_at<=p_at")""",
 import pytest
 from exulanica.migrations import Migration
 original = Migration.sql.fget
-def mutated(self):
+def mutated(self: Migration) -> str:
     sql = original(self)
     if self.version == "0040":
 """
@@ -124,6 +134,13 @@ raise SystemExit(pytest.main(["SELECTOR", "-q", "-ra"]))
         )
         program_path = artifacts / f"{name}-mutant.py"
         program_path.write_text(program)
+        # These programs are retained source artifacts, so apply the project's normal checks.
+        subprocess.run([sys.executable, "-m", "ruff", "check", "--fix", str(program_path)],
+                       cwd=ROOT, check=False, capture_output=True)
+        subprocess.run([sys.executable, "-m", "ruff", "format", str(program_path)],
+                       cwd=ROOT, check=True, capture_output=True)
+        subprocess.run([sys.executable, "-m", "ruff", "check", str(program_path)],
+                       cwd=ROOT, check=True, capture_output=True)
         run(
             name,
             [sys.executable, str(program_path)],
@@ -156,6 +173,7 @@ raise SystemExit(pytest.main(["SELECTOR", "-q", "-ra"]))
             for p in [
                 "exulanica/migrations/0040_bind_geometry_admission_to_current_privacy_inputs.sql",
                 "exulanica/ingest/person_state.py",
+                "exulanica/ingest/personal_admission.py",
                 "exulanica/ingest/privacy.py",
                 "exulanica/ingest/masked_inputs.py",
                 "exulanica/ingest/spine/privacy.py",

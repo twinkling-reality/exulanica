@@ -551,3 +551,254 @@ def test_expiry_is_rechecked_after_waiting_for_privacy_lock(ingest_spine, tmp_pa
     worker.join(timeout=5)
     assert not worker.is_alive()
     assert results == [False]
+
+
+def test_concurrent_subject_writers_refuse_duplicate_allocation(
+    ingest_spine, tmp_path, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from exulanica.ingest.repository import IngestRepository
+
+    repo, open_another = ingest_spine
+    case = Case(repo, tmp_path)
+    writers = [open_another(), open_another()]
+    barrier = threading.Barrier(2)
+    original = IngestRepository.next_person_consent_sequence
+
+    def allocated(self, **kwargs):
+        sequence = original(self, **kwargs)
+        barrier.wait(timeout=5)
+        return sequence
+
+    monkeypatch.setattr(IngestRepository, "next_person_consent_sequence", allocated)
+    when = dt.datetime.now(dt.UTC)
+
+    def write(pair):
+        writer, decision = pair
+        try:
+            record_consent(
+                writer,
+                subject_id=case.subject,
+                actor=ACTOR,
+                consent_scope="likeness",
+                decision=decision,
+                effective_at=when,
+            )
+            return "committed"
+        except psycopg.errors.SerializationFailure:
+            return "retry"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(write, zip(writers, ["granted", "revoked"], strict=True)))
+    assert sorted(results) == ["committed", "retry"], "duplicate subject-wide sequence was accepted"
+    monkeypatch.setattr(IngestRepository, "next_person_consent_sequence", original)
+    case.consent("revoked", effective_at=when + dt.timedelta(microseconds=1))
+    rows = repo.connection.execute(
+        "select sequence from person_presentation_consent where subject_id=%s order by sequence",
+        (case.subject,),
+    ).fetchall()
+    assert [row["sequence"] for row in rows] == [0, 1]
+    # An exact stored receipt can still be replayed with its original ID/content.
+    row = repo.connection.execute(
+        "select * from person_presentation_consent where subject_id=%s and sequence=0",
+        (case.subject,),
+    ).fetchone()
+    repo.insert_person_consent(
+        **{
+            key: row[key]
+            for key in (
+                "consent_id",
+                "subject_id",
+                "region_key",
+                "consent_scope",
+                "decision",
+                "sequence",
+                "actor_id",
+                "actor_role",
+                "effective_at",
+                "valid_until",
+                "consent_record",
+                "consent_canonical",
+                "consent_digest",
+            )
+        }
+    )
+
+
+def test_stale_or_missing_claimed_review_inputs_do_not_authorize(case):
+    case.edit()
+    case.build()
+    original = review_list(case.repo, case.capture)
+    minimal = [{"region_key": original[0]["region_key"], "state": original[0]["state"]}]
+    receipt = record_human_screening(
+        case.repo,
+        authorization_id=case.auth.authorization_id,
+        reviewed_by=ACTOR,
+        sensitive_regions=minimal,
+    )
+    assert receipt.eligibility_state == "eligible"  # Historical caller outcome, not permission.
+    assert not case.allowed(receipt), "missing claimed review fields must not be synthesized"
+    case.edit("confirm", outline=Silhouette(((0, 0), (900000, 0), (900000, 500000), (0, 500000))))
+    case.build()
+    stale = record_human_screening(
+        case.repo,
+        authorization_id=case.auth.authorization_id,
+        reviewed_by=ACTOR,
+        sensitive_regions=original,
+    )
+    assert not case.allowed(stale), "old review outline must not bind fresh inputs"
+    assert case.allowed(case.screen())
+
+
+def test_subject_consent_serializes_across_captures(ingest_spine, tmp_path):
+    repo, open_another = ingest_spine
+    first = Case(repo, tmp_path / "first")
+    second = Case(repo, tmp_path / "second")
+    first.edit(subject=first.subject)
+    second.edit(subject=first.subject)
+    first.build()
+    second.build()
+    screening = second.screen()
+    other = open_another()
+    results = []
+    entered = threading.Event()
+
+    def check():
+        entered.set()
+        results.append(other.privacy_screening_allows(second.capture, screening.screening_id))
+
+    with repo.connection.transaction():
+        first.consent()
+        worker = threading.Thread(target=check)
+        worker.start()
+        assert entered.wait(1)
+        time.sleep(0.05)
+        assert worker.is_alive()
+    worker.join(timeout=5)
+    assert not worker.is_alive()
+    assert results == [False]
+
+
+def test_actual_personal_command_preserves_review_inputs(case, tmp_path):
+    import json
+    import subprocess
+    import sys
+
+    from exulanica.migrations import migrations
+
+    from pg_harness import apply_migration
+    from test_personal_admission_command import document
+
+    root = (
+        Path(os.environ["EXULANICA_SCREENING_EVIDENCE_DIR"]) / "command"
+        if "EXULANICA_SCREENING_EVIDENCE_DIR" in os.environ
+        else tmp_path / "command"
+    )
+    root = root.resolve()
+    photos = root / "photos"
+    photos.mkdir(parents=True)
+    (photos / "a.jpg").write_bytes(case.data)
+    doc = document(case.data)
+    doc["source"]["path"] = "a.jpg"
+    schema = "exulanica_personal_currency_" + uuid.uuid4().hex
+    calls = []
+    with psycopg.connect("postgresql://localhost:5433/exulanica_spine_test") as owner:
+        apply_migration(owner, schema)
+        try:
+            for migration in migrations():
+                owner.execute(
+                    "insert into schema_migrations(version,checksum) values (%s,%s)",
+                    (migration.version, migration.checksum),
+                )
+            owner.commit()
+
+            def run(operation, *, expected=0, **changes):
+                doc.update(
+                    operation=operation,
+                    recorded_at=dt.datetime.now(dt.UTC).isoformat(),
+                    review="not-reviewed",
+                    edits=[],
+                )
+                doc.update(changes)
+                path = root / f"{len(calls):02d}-{operation}.json"
+                path.write_bytes(canonical_json(doc))
+                argv = [
+                    sys.executable,
+                    "-m",
+                    "exulanica.ingest.personal_admission_command",
+                    "--schema",
+                    schema,
+                    "--manifest",
+                    str(path),
+                    "--photo-dir",
+                    str(photos),
+                    "--data-dir",
+                    str(root / "data"),
+                ]
+                result = subprocess.run(argv, capture_output=True, text=True, check=False)
+                payload = json.loads(result.stdout)
+                assert result.returncode == expected, payload
+                calls.append(
+                    {
+                        "argv": [s.replace(str(Path.cwd()), "<worktree>") for s in argv],
+                        "exit_code": result.returncode,
+                        "response": payload,
+                    }
+                )
+                return payload.get("result")
+
+            admitted = run("admit")
+            doc["source"]["capture_id"] = admitted["capture_id"]
+            doc["authorization_id"] = admitted["authorization_id"]
+            detection = run("detect")
+            doc["screening_id"] = detection["screening_id"]
+            assert (
+                run(
+                    "review",
+                    review="confirmed-regions",
+                    edits=[
+                        {
+                            "action": "add",
+                            "region_key": KEY.hex(),
+                            "silhouette": OUTLINE.as_digest_input(),
+                        }
+                    ],
+                )["eligibility_state"]
+                == "blocked"
+            )
+            run("mask")
+            final = run("rescreen", review="confirmed-regions")
+            assert final["eligibility_state"] == "eligible"
+            doc["screening_id"] = final["screening_id"]
+            run("geometry-check")
+            assert (
+                run(
+                    "review",
+                    review="confirmed-regions",
+                    edits=[
+                        {
+                            "action": "confirm",
+                            "region_key": KEY.hex(),
+                            "silhouette": Silhouette(
+                                ((0, 0), (900000, 0), (900000, 500000), (0, 500000))
+                            ).as_digest_input(),
+                        }
+                    ],
+                )["eligibility_state"]
+                == "blocked"
+            )
+            run("geometry-check", expected=1)
+            doc["screening_id"] = detection["screening_id"]
+            run("mask")
+            final = run("rescreen", review="confirmed-regions")
+            doc["screening_id"] = final["screening_id"]
+            run("geometry-check")
+            if "EXULANICA_SCREENING_EVIDENCE_DIR" in os.environ:
+                (root / "commands.json").write_bytes(canonical_json({"calls": calls}))
+        finally:
+            owner.rollback()
+            owner.execute(
+                psycopg.sql.SQL("drop schema {} cascade").format(psycopg.sql.Identifier(schema))
+            )
+            owner.commit()

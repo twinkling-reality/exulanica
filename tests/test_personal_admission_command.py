@@ -106,6 +106,7 @@ def test_empty_schema_refuses_migrated_fallback_without_writes(
     """The imported migration reader qualifies the FIRST schema, never its fallback."""
     from exulanica.db import Database
     from exulanica.ingest import personal_admission_command as command
+    from exulanica.migrations import migrations
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
 
@@ -123,10 +124,9 @@ def test_empty_schema_refuses_migrated_fallback_without_writes(
             )
             with isolated.unscoped() as connection:
                 # Establish the dangerous counterfactual: unqualified history really resolves.
-                assert (
-                    connection.execute("select count(*) n from schema_migrations").fetchone()["n"]
-                    == 39
-                )
+                assert connection.execute("select count(*) n from schema_migrations").fetchone()[
+                    "n"
+                ] == len(list(migrations()))
                 before = connection.execute(
                     "select (select count(*) from pg_inherits "
                     "where inhparent='embedding'::regclass) workspace_partitions, "

@@ -263,9 +263,7 @@ def execute(manifest: Manifest, data: bytes, pipeline: PhotoIngestPipeline) -> d
                 repository,
                 authorization_id=authorization.authorization_id,
                 reviewed_by=actor,
-                sensitive_regions=[
-                    {"region_key": r["region_key"], "state": r["state"]} for r in regions
-                ],
+                sensitive_regions=regions,
                 screened_at=at,
                 valid_until=until,
             )

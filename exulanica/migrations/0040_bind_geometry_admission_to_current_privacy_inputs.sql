@@ -18,6 +18,17 @@ create function tg_privacy_currency_lock() returns trigger
 language plpgsql volatile as $fn$
 begin
   perform privacy_currency_lock(new.workspace_id);
+  if tg_table_name='person_presentation_consent' then
+    -- Allocation occurs before INSERT in existing writers. NULL scope keys do not conflict
+    -- under the old unique constraint, so explicitly refuse the losing allocation after lock.
+    if exists(select 1 from person_presentation_consent c where c.workspace_id=new.workspace_id
+      and c.subject_id=new.subject_id and c.consent_scope=new.consent_scope
+      and c.region_key is not distinct from new.region_key and c.sequence=new.sequence
+      and c.consent_id<>new.consent_id) then
+      raise exception 'consent sequence was concurrently allocated; retry the decision'
+        using errcode='40001';
+    end if;
+  end if;
   return new;
 end $fn$;
 create trigger aa_privacy_currency_lock before insert on person_region
@@ -31,13 +42,23 @@ for each row execute function tg_privacy_currency_lock();
 -- region-specific then sequence precedence. An expired grant cannot stand in for active consent.
 create function privacy_consent_at(
   p_workspace uuid, p_subject uuid, p_region bytea, p_scope text, p_at timestamptz)
-returns boolean language sql volatile as $fn$
-  select coalesce((select c.decision='granted' from person_presentation_consent c
+returns boolean language plpgsql volatile as $fn$
+declare decisions boolean[];
+begin
+  select array_agg(granted) into decisions from (
+    select c.decision='granted' as granted,
+      dense_rank() over(order by (c.region_key is not null) desc,c.sequence desc) as priority
+    from person_presentation_consent c
     where c.workspace_id=p_workspace and c.subject_id=p_subject and c.consent_scope=p_scope
       and (c.region_key is null or c.region_key=p_region)
       and c.effective_at<=p_at and (c.valid_until is null or c.valid_until>p_at)
-    order by (c.region_key is not null) desc,c.sequence desc,c.consent_digest desc limit 1),false);
-$fn$;
+  ) ranked where priority=1;
+  if cardinality(decisions)>1 then
+    raise exception 'ambiguous legacy consent sequence; append a resolving decision'
+      using errcode='40001';
+  end if;
+  return coalesce(decisions[1],false);
+end $fn$;
 
 create function privacy_inputs_at(p_workspace uuid, p_capture uuid, p_at timestamptz)
 returns jsonb language sql volatile as $fn$
@@ -172,7 +193,10 @@ begin
         jsonb_array_length(s.sensitive_regions)=jsonb_array_length(inputs->'regions')
         and not exists(select 1 from jsonb_array_elements(inputs->'regions') r
           where not exists(select 1 from jsonb_array_elements(s.sensitive_regions) sr
-            where sr->>'region_key'=r->>'region_key' and sr->>'state'=r->>'state'))))
+            where sr->>'region_key'=r->>'region_key' and sr->>'state'=r->>'state'
+              and sr ?& array['silhouette','subject_id','name_permitted']
+              and sr->'silhouette'=r->'silhouette' and sr->'subject_id'=r->'subject_id'
+              and sr->'name_permitted'=r->'name_permitted'))))
       and (not exists(select 1 from jsonb_array_elements(inputs->'regions') r
           where r->>'state' in ('unknown','present','withdrawn'))
         or exists(select 1 from artifact m where m.workspace_id=p_workspace and m.kind='masked_source'
@@ -225,7 +249,7 @@ begin
     select 1 from artifact m where m.workspace_id=new.workspace_id
       and m.content_sha256=new.read_source_sha256
       and privacy_mask_matches(new.workspace_id,capture_ref,m.artifact_id,inputs)) then
-    raise exception 'point map must name a current masked source derivative in read_source_sha256' using errcode='23514';
+    raise exception 'point map must read the masked derivative: name a current masked source in read_source_sha256' using errcode='23514';
   end if;
   return new;
 end $fn$;

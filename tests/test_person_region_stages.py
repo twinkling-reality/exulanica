@@ -28,9 +28,14 @@ from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import DisplayGeometry, Rect
 from exulanica.identity.keys import region_bucket
 from exulanica.ingest.person_detectors import StubRegionDetector, whole_image_silhouette
+from exulanica.ingest.person_review import review_list
 from exulanica.ingest.person_state import region_state_for_capture
 from exulanica.ingest.pipeline import PhotoIngestPipeline
-from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+from exulanica.ingest.privacy import (
+    authorize_synthetic_capture,
+    record_human_screening,
+    record_person_detection_screening,
+)
 from exulanica.ingest.stages import stage
 from exulanica.ingest.stages.masked_source import hidden_outlines
 from exulanica.ingest.stages.person_regions import located_people, unlocated_people
@@ -218,8 +223,21 @@ def _ingest_two_people(repository, photo_dir, tmp_path, detections):
         },
         authorization_scope={"purpose": "unlocated person region collision test"},
     )
-    screening = record_synthetic_exemption(
-        repository, authorization_id=authorization.authorization_id
+    detection = record_person_detection_screening(
+        repository,
+        authorization_id=authorization.authorization_id,
+        authorized_by=actor,
+        purpose="Locate simulated people in generated fixture bytes",
+    )
+    observation = PhotoIngestPipeline(
+        repository, store, vision=None, depth=None, detector=StubRegionDetector(detections)
+    ).ingest_derivatives(intake.capture_id, privacy_screening_id=detection.screening_id)
+    assert observation.error is None, observation.error
+    screening = record_human_screening(
+        repository,
+        authorization_id=authorization.authorization_id,
+        reviewed_by=actor,
+        sensitive_regions=review_list(repository, intake.capture_id),
     )
     outcome = pipeline.ingest_derivatives(
         intake.capture_id, privacy_screening_id=screening.screening_id

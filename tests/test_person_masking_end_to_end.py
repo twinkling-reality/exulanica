@@ -27,8 +27,13 @@ import pytest
 from exulanica.consent.regions import DetectedPerson, Silhouette
 from exulanica.evidence.region import Rect
 from exulanica.ingest.person_detectors import NoRegionDetector, StubRegionDetector
+from exulanica.ingest.person_review import review_list
 from exulanica.ingest.pipeline import PhotoIngestPipeline
-from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
+from exulanica.ingest.privacy import (
+    authorize_synthetic_capture,
+    record_human_screening,
+    record_person_detection_screening,
+)
 from exulanica.reconstruction.testing import FlatDepthModel
 from exulanica.store.local import LocalContentAddressedStore
 
@@ -62,8 +67,21 @@ def _ingest(repository, photo_dir, tmp_path, detector, keep=None):
         },
         authorization_scope={"purpose": "person masking end to end test"},
     )
-    screening = record_synthetic_exemption(
-        repository, authorization_id=authorization.authorization_id
+    detection = record_person_detection_screening(
+        repository,
+        authorization_id=authorization.authorization_id,
+        authorized_by=ACTOR,
+        purpose="Locate simulated people in generated fixture bytes",
+    )
+    observation = PhotoIngestPipeline(
+        repository, store, vision=None, depth=None, detector=detector
+    ).ingest_derivatives(intake.capture_id, privacy_screening_id=detection.screening_id)
+    assert observation.error is None, observation.error
+    screening = record_human_screening(
+        repository,
+        authorization_id=authorization.authorization_id,
+        reviewed_by=ACTOR,
+        sensitive_regions=review_list(repository, intake.capture_id),
     )
     outcome = pipeline.ingest_derivatives(
         intake.capture_id, privacy_screening_id=screening.screening_id

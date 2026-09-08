@@ -14,7 +14,13 @@ from pathlib import Path
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.consent.training import TrainingTerms
-from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
+from exulanica.ingest.person_review import (
+    create_subject,
+    record_consent,
+    record_region_edits,
+    review_list,
+)
+from exulanica.ingest.privacy import record_human_screening
 from exulanica.world_package.package import PackageError, verify_package
 from exulanica.world_package.training_store import (
     export_training_dataset,
@@ -73,6 +79,18 @@ def _person(repository, material):
         effective_at=dt.datetime.now(dt.UTC),
     )
     material["people"] = [{"subject_id": str(subject), "masked": False}]
+    previous = repository.connection.execute(
+        "select authorization_id from reconstruction_privacy_screening "
+        "where workspace_id=%s and receipt_digest=%s",
+        (repository.workspace_id, bytes.fromhex(material["screening"]["receipt_sha256"])),
+    ).fetchone()
+    screening = record_human_screening(
+        repository,
+        authorization_id=previous["authorization_id"],
+        reviewed_by=ACTOR,
+        sensitive_regions=review_list(repository, uuid.UUID(material["capture_id"])),
+    )
+    material["screening"]["receipt_sha256"] = screening.receipt_digest.hex()
     return str(subject)
 
 

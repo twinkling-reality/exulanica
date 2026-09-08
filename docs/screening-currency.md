@@ -14,6 +14,16 @@ one database-resolved snapshot through `ingest/spine/privacy.py`. `CaptureRegion
 existing mask digest formats remain unchanged. The offline fold, pipeline, stage registry and
 other producer files are unchanged.
 
+The orchestrator subsequently approved only the personal-admission review/rescreen argument
+that now preserves its already-read review rows, including silhouette, subject and naming fields.
+The shared predicate refuses stale or missing claimed fields; it never synthesizes omitted human
+review input from current state. Approved test-only adaptations are the `_ingest` helper in
+`test_person_masking_end_to_end.py`, `_ingest_two_people` in `test_person_region_stages.py`,
+`_person` in `test_training_export_postgres.py`, and the migration-count assertion in
+`test_personal_admission_command.py`, plus necessary imports. The first two explicitly separate
+observation/masking, review and geometry; the third re-screens after changing person inputs.
+All original masking, collision, training-consent and withdrawal assertions remain.
+
 `current_privacy_inputs` takes the workspace privacy lock, then evaluates at one database clock
 instant. Its snapshot names the workspace, capture, exact original bytes, latest edit digest for
 **every** region key (including deleted regions), and each live region's key, silhouette, subject,
@@ -22,7 +32,7 @@ new review input even if its pixels are identical; keeping deleted edit identiti
 old empty-inventory review from reviving after add/delete. Capture absence is not an empty review.
 
 Consent evaluation preserves SQL's region-specific-over-subject-wide precedence, then sequence,
-with receipt digest as a deterministic tie breaker. Future decisions are excluded. Expired
+with explicit refusal if a legacy highest-priority sequence is ambiguous. Future decisions are excluded. Expired
 receipts no longer hold; an older still-valid applicable receipt may hold under this established
 resolver. Withdrawals remain terminal even if another grant follows. All scopes use the same
 instant. A future effective time or expiry can change the snapshot without a database write.
@@ -83,7 +93,12 @@ Person-region writes, consent writes, screening insertion and permission checks 
 transaction advisory lock per workspace. Subject-wide consent therefore cannot bypass a
 capture-only lock. The predicate takes a fresh snapshot after acquiring the lock. READ COMMITTED
 is required; repeatable-read/serializable transaction snapshots are refused with serialization
-failure so the caller can retry in a supported transaction. Time-dependent consent is evaluated
+failure so the caller can retry in a supported transaction. An executed two-writer control
+showed that the existing consent writer allocates `max(sequence)+1` before its INSERT lock, and
+subject-wide NULL region keys can collide. The new INSERT guard checks the allocated slot after
+locking and gives the loser serialization failure; exact receipt replay is preserved. No digest
+tie breaker substitutes for correct allocation. Existing ambiguous highest-priority sequences
+refuse until a new resolving decision is appended. Time-dependent consent is evaluated
 **after** waiting for the lock. The linearization point is the permission check, not eventual
 commit or later asset delivery; a permission does not promise that consent will never expire.
 
@@ -106,10 +121,12 @@ Additional cases cover expired and future grants, region-specific precedence, un
 consent changes, expiry without writes, withdrawal, region deletion, cross-workspace requests,
 legacy receipts, premature unbound reviews, immutable mask lineage, geometry UPDATE, missing/stale
 worker declarations, unchanged inputs and exact evaluation boundaries. Two-connection tests
-exercise region commit and expiry while a predicate waits; stale transaction snapshots refuse.
+exercise region commit, consent across captures, duplicate writer allocation and expiry while a
+predicate waits; stale transaction snapshots refuse.
 
 Executed negative controls remove review-input binding, mask-input digest comparison and consent
-expiry filtering in subprocess memory. Every killed claim requires its exact selector's `FAILED`
+expiry filtering, claimed-outline comparison and duplicate consent-allocation refusal in
+subprocess memory. Every killed claim requires its exact selector's `FAILED`
 line. These are shared SQL policy mutants. The earlier personal-admission baseline is still an
 observed SQL defect, and its earlier command-local mutant proved only that local caller's guard.
 Neither earlier record demonstrated a stale depth write or disclosure.
