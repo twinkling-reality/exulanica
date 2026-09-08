@@ -146,7 +146,23 @@ uv run python scripts/record_screening_currency_evidence.py \
 
 Records have exactly `profile`, `record`, `record_sha256`, a canonical SHA-256, no floats, explicit
 predecessor and digest/size-bound artifact paths. The test harness removes isolated schemas.
-Full backend/Ruff/import/web gates must be bound to a frozen commit in the final gate record.
+The [final acceptance record](evaluation/2026-09-08-complete-screening-currency.json) binds
+25 real-database tests and five exact-selector SQL mutants to frozen source commit
+`d5733c425087c632382f6f90ce1fa11c81bdb3c7`. The actual personal-admission CLI sequence and its
+manifests/results are retained with the generated rehearsal. The
+[verification record](evaluation/2026-09-08-verification-screening-currency.json) binds the full
+serial gates: **2098 backend passed, 3 skipped; Ruff and all four import contracts passed;
+web typecheck and boundaries passed; all 876 web tests passed.** The backend ran with the permitted
+`EXULANICA_TEST_DATABASE_URL` and locked pose/reconstruction extras. No source, migration or test
+was edited during those gates. Final documentation/evidence commits follow the tested code head.
+
+Both intermediate gate runs and the executed two-writer failure baseline are retained. The
+initial run found nine legacy-fixture failures and generated-mutant Ruff errors; the approved
+fixture adaptations preserve their original assertions, and the recorder actually reran the
+controls after correcting generated source formatting. Only the explicitly approved unpublished
+candidate envelope/artifacts were replaced; accepted predecessors were preserved. The second
+run was green before the final required-mask selection correction, so it remains an intermediate
+result rather than being misrepresented as a test of later edits.
 
 ## Separate remaining activation dependency: asset-read currency
 
