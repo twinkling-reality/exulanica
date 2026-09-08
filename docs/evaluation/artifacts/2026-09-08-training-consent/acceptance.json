@@ -1,0 +1,14 @@
+{
+  "refusal": "training export refused: unconsented unmasked person a4f21dff-db8a-4887-9470-15ebc08d95de in material 01a080b9-858d-7e36-ab18-1d37d8bc1e60",
+  "before_root": "cc7e3da15f38aea917bda82be34969e96c76702796ec80acd5bbea03d4860530",
+  "after_root": "a9ffecafd3c450372b562f7c300354b9f356daa1f786ec1cfcf3a4f098a9013a",
+  "removed_material_ids": [
+    "01a080b9-858d-7e36-ab18-1d37d8bc1e60",
+    "01a080b9-85be-7618-814e-7e1a30863293",
+    "01a080b9-85c8-7b23-b31e-c3975a50a262",
+    "01a080b9-85d4-751c-900f-76531bd340b0"
+  ],
+  "offline_process_exit": 0,
+  "corpus_class": "synthetic",
+  "pose_and_training": "scripted test doubles; no real CUDA or COLMAP"
+}

@@ -1,0 +1,56 @@
+{
+  "baseline_passed": true,
+  "restored_passed": true,
+  "controls": [
+    {
+      "name": "empty-log-default-deny",
+      "selector": "tests/test_training_consent.py::test_an_empty_log_and_a_different_licensee_never_grant_training",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_______ test_an_empty_log_and_a_different_licensee_never_grant_training ________\ntests/test_training_consent.py:25: in test_an_empty_log_and_a_different_licensee_never_grant_training\n    assert not training_is_granted((), subject_id=\"person\", terms=TERMS, at=NOW)\nE   AssertionError: assert not True\nE    +  where True = training_is_granted((), subject_id='person', terms=TrainingTerms(package_id='package', licensee='licensee', model_classes=('world-model',), valid_from=datetime.datetime(..., 0, 0, tzinfo=datetime.timezone.utc), terms_sha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), at=datetime.datetime(2026, 9, 8, 0, 0, tzinfo=datetime.timezone.utc))\n=========================== short test summary info ============================\nFAILED tests/test_training_consent.py::test_an_empty_log_and_a_different_licensee_never_grant_training\n"
+    },
+    {
+      "name": "withdrawal-dominates-regrant",
+      "selector": "tests/test_training_consent.py::test_withdrawal_dominates_later_grants_and_a_new_term",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n____________ test_withdrawal_dominates_later_grants_and_a_new_term _____________\ntests/test_training_consent.py:35: in test_withdrawal_dominates_later_grants_and_a_new_term\n    assert not training_is_granted(log, subject_id=\"person\", terms=newer, at=NOW)\nE   AssertionError: assert not True\nE    +  where True = training_is_granted((TrainingReceipt(subject_id='person', terms=TrainingTerms(package_id='package', licensee='licensee', model_classes=('w...000-0000-0000-000000000001', sequence=2, decided_at=datetime.datetime(2026, 9, 8, 0, 0, tzinfo=datetime.timezone.utc))), subject_id='person', terms=TrainingTerms(package_id='package', licensee='licensee', model_classes=('world-model',), valid_from=datetime.datetime(..., 0, 0, tzinfo=datetime.timezone.utc), terms_sha256='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'), at=datetime.datetime(2026, 9, 8, 0, 0, tzinfo=datetime.timezone.utc))\n=========================== short test summary info ============================\nFAILED tests/test_training_consent.py::test_withdrawal_dominates_later_grants_and_a_new_term\n"
+    },
+    {
+      "name": "owner-grant-required",
+      "selector": "tests/test_world_package_dataset.py::test_training_export_requires_opt_in_even_without_people",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n___________ test_training_export_requires_opt_in_even_without_people ___________\ntests/test_world_package_dataset.py:89: in test_training_export_requires_opt_in_even_without_people\n    with pytest.raises(PackageError, match=\"immutable package-owner grant\"):\nE   Failed: DID NOT RAISE PackageError\n=========================== short test summary info ============================\nFAILED tests/test_world_package_dataset.py::test_training_export_requires_opt_in_even_without_people\n"
+    },
+    {
+      "name": "unmasked-person-refused",
+      "selector": "tests/test_world_package_dataset.py::test_training_export_refuses_unconsented_unmasked_person",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n___________ test_training_export_refuses_unconsented_unmasked_person ___________\ntests/test_world_package_dataset.py:73: in test_training_export_refuses_unconsented_unmasked_person\n    with pytest.raises(\nE   Failed: DID NOT RAISE PackageError\n=========================== short test summary info ============================\nFAILED tests/test_world_package_dataset.py::test_training_export_refuses_unconsented_unmasked_person\n"
+    },
+    {
+      "name": "screening-digest-bound",
+      "selector": "tests/test_training_inputs.py::test_invented_screening_cannot_authorize_an_export",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n______________ test_invented_screening_cannot_authorize_an_export ______________\ntests/test_training_inputs.py:167: in test_invented_screening_cannot_authorize_an_export\n    with pytest.raises(PackageError, match=\"eligible retained receipt\"):\nE   Failed: DID NOT RAISE PackageError\n=========================== short test summary info ============================\nFAILED tests/test_training_inputs.py::test_invented_screening_cannot_authorize_an_export\n"
+    },
+    {
+      "name": "source-mutations-serialize-with-export",
+      "selector": "tests/test_training_consent.py::test_a_source_mutation_waits_for_an_export_in_its_workspace_only",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n_______ test_a_source_mutation_waits_for_an_export_in_its_workspace_only _______\ntests/test_training_consent.py:128: in test_a_source_mutation_waits_for_an_export_in_its_workspace_only\n    with pytest.raises(psycopg.errors.LockNotAvailable), writer.transaction():\nE   Failed: DID NOT RAISE LockNotAvailable\n=========================== short test summary info ============================\nFAILED tests/test_training_consent.py::test_a_source_mutation_waits_for_an_export_in_its_workspace_only\n"
+    },
+    {
+      "name": "recovered-calibration-is-exact",
+      "selector": "tests/test_training_inputs.py::test_retained_scene_exports_exact_cameras_and_refuses_invented_calibration",
+      "killed": true,
+      "returncode": 1,
+      "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n__ test_retained_scene_exports_exact_cameras_and_refuses_invented_calibration __\ntests/test_training_inputs.py:230: in test_retained_scene_exports_exact_cameras_and_refuses_invented_calibration\n    with pytest.raises(PackageError, match=\"differs from retained measurements\"):\nE   Failed: DID NOT RAISE PackageError\n=========================== short test summary info ============================\nFAILED tests/test_training_inputs.py::test_retained_scene_exports_exact_cameras_and_refuses_invented_calibration\n"
+    }
+  ],
+  "all_killed": true
+}

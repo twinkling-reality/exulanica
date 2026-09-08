@@ -1,0 +1,326 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.training-consent-acceptance/v1",
+    "date": "2026-09-08",
+    "implementation_commit": "66cf07bc36101861e23b1809bbe35be67fad0333",
+    "base_commit": "4c4a3dcaf06b21f67a9e4b290d6888f34b29057a",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-07-world-read-negative-controls.json",
+      "record_sha256": "3beb2e49f862873dff52e13597487c472421d20f270d5b860abd06212eea348f"
+    },
+    "predecessor_relationship": "Adds independent training issuance to the established presentation-consent and offline release boundary; does not assert earlier demand or real-model limitations are closed.",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "migration": {
+      "version": "0039",
+      "prior_highest_on_disk": "0038",
+      "application": "isolated test schemas only; public was not migrated or modified",
+      "workspace_rls_before": 65,
+      "workspace_rls_after": 66,
+      "live_count_selector": "tests/test_migration.py::test_the_prose_count_of_workspace_isolated_tables_matches_the_schema"
+    },
+    "scope_decision": "Separate package/licensee/model-class/term training plane; presentation scopes and states unchanged.",
+    "default_off_enforcement": [
+      {
+        "path": "exulanica/world_package/cli.py",
+        "symbol": "_training_command",
+        "rule": "--opt-in required before database session"
+      },
+      {
+        "path": "exulanica/world_package/training_store.py",
+        "symbol": "export_training_dataset",
+        "rule": "owner_opt_in defaults false; exact-term durable package-owner grant required"
+      },
+      {
+        "path": "exulanica/world_package/dataset.py",
+        "symbol": "validate_dataset",
+        "rule": "offline receipt replay requires explicit opt-in and immutable owner grant even with no people"
+      }
+    ],
+    "acceptance": {
+      "refusal": "training export refused: unconsented unmasked person a4f21dff-db8a-4887-9470-15ebc08d95de in material 01a080b9-858d-7e36-ab18-1d37d8bc1e60",
+      "before_root": "cc7e3da15f38aea917bda82be34969e96c76702796ec80acd5bbea03d4860530",
+      "after_root": "a9ffecafd3c450372b562f7c300354b9f356daa1f786ec1cfcf3a4f098a9013a",
+      "removed_material_ids": [
+        "01a080b9-858d-7e36-ab18-1d37d8bc1e60",
+        "01a080b9-85be-7618-814e-7e1a30863293",
+        "01a080b9-85c8-7b23-b31e-c3975a50a262",
+        "01a080b9-85d4-751c-900f-76531bd340b0"
+      ],
+      "offline_process_exit": 0,
+      "corpus_class": "synthetic",
+      "pose_and_training": "scripted test doubles; no real CUDA or COLMAP"
+    },
+    "sample": {
+      "file_count": 12,
+      "manifest_sha256": "8e0a6f85646092908a997de2aa04e0231f64c3b478a002ce1eb67b1705ecf8f0",
+      "merkle_root_sha256": "cc7e3da15f38aea917bda82be34969e96c76702796ec80acd5bbea03d4860530",
+      "profile_version": "exulanica-wmp-training-1.1",
+      "signing_public_key_sha256": "293861ceb0c53b44be5f149ca84041e42b4717b337d938137ef012115074229d",
+      "verified": true
+    },
+    "successor": {
+      "file_count": 5,
+      "manifest_sha256": "55df68feee9b3e9e45cebd7bac3d262bd2efc397b013447642305f3ee6a65858",
+      "merkle_root_sha256": "a9ffecafd3c450372b562f7c300354b9f356daa1f786ec1cfcf3a4f098a9013a",
+      "profile_version": "exulanica-wmp-training-1.1",
+      "signing_public_key_sha256": "9287205016e86bf318500729d71b7d37206585885542babf5917e51d875dc53f",
+      "verified": true
+    },
+    "validation": {
+      "backend": {
+        "passed": 2019,
+        "skipped": 3,
+        "seconds": "687.42",
+        "command": "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest --tb=short"
+      },
+      "targeted": {
+        "passed": 86,
+        "exit_code": 0
+      },
+      "web": {
+        "passed": 852,
+        "files": 109,
+        "typecheck_exit": 0,
+        "boundaries_exit": 0,
+        "modules": 367
+      },
+      "ruff_exit": 0,
+      "import_contracts_kept": 4,
+      "old_profile_selector": "tests/test_world_package_verifier.py::test_adding_a_required_path_retroactively_breaks_an_already_signed_package",
+      "offline_selector": "tests/test_training_export_postgres.py::test_durable_export_refuses_unconsented_person_and_withdrawal_removes_dependent_scene"
+    },
+    "negative_controls": {
+      "isolated_source_copy": true,
+      "exulanica_environment_scrubbed": true,
+      "unmutated_baseline_passed": true,
+      "restored_baseline_passed": true,
+      "named_failed_line_required": true,
+      "killed": 7,
+      "selectors": [
+        "tests/test_training_consent.py::test_an_empty_log_and_a_different_licensee_never_grant_training",
+        "tests/test_training_consent.py::test_withdrawal_dominates_later_grants_and_a_new_term",
+        "tests/test_world_package_dataset.py::test_training_export_requires_opt_in_even_without_people",
+        "tests/test_world_package_dataset.py::test_training_export_refuses_unconsented_unmasked_person",
+        "tests/test_training_inputs.py::test_invented_screening_cannot_authorize_an_export",
+        "tests/test_training_consent.py::test_a_source_mutation_waits_for_an_export_in_its_workspace_only",
+        "tests/test_training_inputs.py::test_retained_scene_exports_exact_cameras_and_refuses_invented_calibration"
+      ]
+    },
+    "tradeoffs": [
+      "Exports hold an exclusive workspace source lock during validation and publication; ordinary source writers share that lock and remain concurrent outside an export. Same-workspace export concurrency is traded for withdrawal consistency.",
+      "The sample authoring API holds selected asset bytes in memory; streaming large datasets is not claimed."
+    ],
+    "limitations": [
+      "Synthetic sources and scripted pose/trainer fixtures only; no real COLMAP reconstruction, CUDA gsplat training, or vision-model run was executed.",
+      "No real photograph was sent to a hosted model.",
+      "Account-holder attestations do not establish independent subject authentication or licensor authority.",
+      "Offline verification establishes export-time signed state; later revocations require a current ledger and cannot retract downloaded copies or reverse prior model training.",
+      "FR-11 demand evidence from two prospective licensees is outstanding; Phase 7B remains a design.",
+      "Retained logs replace local absolute paths; raw run logs remain in the task temporary directory."
+    ],
+    "source_files": [
+      {
+        "path": "exulanica/consent/training.py",
+        "sha256": "ffd9e8e0925570da87f410ca158229725a02d4cd009496a8c4cb6d07c737ba1b"
+      },
+      {
+        "path": "exulanica/db/session.py",
+        "sha256": "0faec22574eb1af948ec41341e7ba787aba866f69654c2f4d6a2e9e4f671ab7d"
+      },
+      {
+        "path": "exulanica/ingest/spine/__init__.py",
+        "sha256": "ab79102a51c8adfff4462e39913eaf2519456263b2b97697ad592f6630cb71e5"
+      },
+      {
+        "path": "exulanica/migrations/0039_training_is_a_separate_permission.sql",
+        "sha256": "59df2d65d5d3566dbe475272dd9e22e57f46397d2f1529ca63beb4dad062b987"
+      },
+      {
+        "path": "exulanica/world_package/__init__.py",
+        "sha256": "127d2828327c127ba944c070a6498d859a4e6b2dcde0ca4f6afd02258677676e"
+      },
+      {
+        "path": "exulanica/world_package/cli.py",
+        "sha256": "12ef603a8966796fe55657f4726fffc821d5c751bf4690e68ade8b8479aeb32c"
+      },
+      {
+        "path": "exulanica/world_package/dataset.py",
+        "sha256": "b67c0baf4e530d6fde29b4449eccc083ae2ff6493b2e4ffa5da5d45ac4c03d75"
+      },
+      {
+        "path": "exulanica/world_package/diff.py",
+        "sha256": "1e8683536c107ff6bdc74eba07353e5ee8ddf5ed7010279fca9d2d27d0cd976c"
+      },
+      {
+        "path": "exulanica/world_package/package.py",
+        "sha256": "9e57e5c51c880504f8646fbe6a5efdd701a491c033d23a39117eda6d38ec83d5"
+      },
+      {
+        "path": "exulanica/world_package/training_inputs.py",
+        "sha256": "a275a14dc66d22d6f7612f21baae3e78b09022230194ed3d5f20d4d711f14bd4"
+      },
+      {
+        "path": "exulanica/world_package/training_store.py",
+        "sha256": "5f0d83207161b2cd27023d7394fca83ffbe416fa20ec4b21609ecfa2fffedf5c"
+      },
+      {
+        "path": "tests/test_ingest_persistence.py",
+        "sha256": "b5a5d52df516b1bd867e4e514fb9b04ea9ae49ec46ee9521606387817dd6e6d9"
+      },
+      {
+        "path": "tests/test_training_consent.py",
+        "sha256": "e372084f1e46ba6c2346114eb0ae823d979368bf3ee2746bc2067acb5a3777b1"
+      },
+      {
+        "path": "tests/test_training_export_controls.py",
+        "sha256": "a531d3166c7ba4b8b00b6cf75836dbabef99177300829f1fb00802ae0d2752ff"
+      },
+      {
+        "path": "tests/test_training_export_postgres.py",
+        "sha256": "95321372cd515274cb48c28d9dd6cb244fd823f7ace3ac6dc77f3cd9233da89d"
+      },
+      {
+        "path": "tests/test_training_inputs.py",
+        "sha256": "fe18c9a39c8b94ea2c935cb97044cf2097fed125c04f0790b1b6bcf470f6319f"
+      },
+      {
+        "path": "tests/test_world_package_dataset.py",
+        "sha256": "69e8b0c8496baf8ae6515cc6aaa8e27e49e4be31871d99f711ee62111d6aff3e"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/acceptance.json",
+        "bytes": 667,
+        "sha256": "d25b5becc947944b3c06ab8c6898f1887392f86f45428b5f19ea8f99193527ed"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/backend.log",
+        "bytes": 4422,
+        "sha256": "8111fc669f1911fa67adb22388ef1029d9d02d3a03e958df43bebca66da6a116"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/negative-controls.json",
+        "bytes": 7257,
+        "sha256": "1657d72df40a734092f8d887164b9ae04c43a21b780fdd5b78879077be3bb558"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/pose.json",
+        "bytes": 58211,
+        "sha256": "b5799b0da7f08313cc126d99239b5513eecb2fe5ae08951ead74e496d47abc2b"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/source-0.jpg",
+        "bytes": 1558,
+        "sha256": "71f7dad9dfb7407b57924d577178600c74655a69ba0d0db7bbfabc903468cadc"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/source-1.jpg",
+        "bytes": 1611,
+        "sha256": "6b6e058d071c9e8a5b2d355868dd0a0f69b29fedf3cff443b2e0e375cfbf61f3"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/source-2.jpg",
+        "bytes": 1617,
+        "sha256": "938569fad3db20e68c5d05f37bde6140ded8088416b39bebeb216c843d23004c"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/source-3.jpg",
+        "bytes": 1617,
+        "sha256": "d49adf0a423ae51662dc00b6ce204b45a0527addded516bafdd8f008bb747bea"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/trained.sog",
+        "bytes": 976,
+        "sha256": "04f0f7bef19e21bddb4c06bb6900868c36e60ac5bf7a884d175f2d695edda907"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/assets/training.json",
+        "bytes": 4183,
+        "sha256": "fcce60268b76e846244a0be3a49a272fe81136866b942c1537236545f8add7b3"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/consent/training.json",
+        "bytes": 1223,
+        "sha256": "4d72f7aad2ae67d67d2f4d7bb6cb0be907d4fc5df650e3be8127740d7486d5e8"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/dataset/materials.json",
+        "bytes": 4998,
+        "sha256": "7f5a636f44ff13db49b78bdddd688b7a1498005e69c354a791fb1f8460a02827"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/provenance/dataset.json",
+        "bytes": 441,
+        "sha256": "83880d8666bea2cd06df31941d0bd759cc2426498d2b912c11e00f363630d371"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/ro-crate-metadata.json",
+        "bytes": 2876,
+        "sha256": "6259a002b5e8dabaf2ae8166aa8baf0a9f949540be45655de41c5912fcf15316"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/wmp/manifest.json",
+        "bytes": 1592,
+        "sha256": "8e0a6f85646092908a997de2aa04e0231f64c3b478a002ce1eb67b1705ecf8f0"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/wmp/profile.json",
+        "bytes": 945,
+        "sha256": "b766ad407a3b454f6f98c903586ba957e74ed2f31fde67714c1ff7b51979cade"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/sample/wmp/signature.json",
+        "bytes": 482,
+        "sha256": "b7bf7f970890e73f6fadc71f69fdc6667da017e7b9a41ad763de58be042a6c37"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/targeted.log",
+        "bytes": 160,
+        "sha256": "b7dee23c5b0bdea31c1d8ae048f013874efa279f477dccaba3f25c872d457efb"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/web.log",
+        "bytes": 7935,
+        "sha256": "afd66cb54c22810053652879144509d9a4d87ade2a4b0db1ddc54b04fe5f00f1"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/consent/training.json",
+        "bytes": 2155,
+        "sha256": "bf06bd14bab8163fc3be0ce4c3f0cd14cd987b5f05b9a09fffbe68db802e832d"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/dataset/materials.json",
+        "bytes": 16,
+        "sha256": "93d158dcead5cd5823d4e4ffd36fbbfa648ac95dfb1c3143ee36c5cff10af334"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/provenance/dataset.json",
+        "bytes": 658,
+        "sha256": "ef71dac26f0682883442c8dfc6ecd0fa130824bfc115e6ed31281ce45a05a78d"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/ro-crate-metadata.json",
+        "bytes": 1676,
+        "sha256": "62f16d7feb0cead81a07df313c6a4afed75bf3bca7b56b32034373c4f89fa658"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/wmp/manifest.json",
+        "bytes": 753,
+        "sha256": "55df68feee9b3e9e45cebd7bac3d262bd2efc397b013447642305f3ee6a65858"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/wmp/profile.json",
+        "bytes": 945,
+        "sha256": "b766ad407a3b454f6f98c903586ba957e74ed2f31fde67714c1ff7b51979cade"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-08-training-consent/withdrawn/wmp/signature.json",
+        "bytes": 482,
+        "sha256": "07892b50ad125d83f22383bf92bfae0cfc491060b66ac5fc2f8a7ca117aaef55"
+      }
+    ]
+  },
+  "record_sha256": "baa59a8daf88a364e71be7267472e4ee743c2e22348b138463b8af4bb5137fe5"
+}
