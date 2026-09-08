@@ -194,6 +194,67 @@ the scene's observed bottleneck.
    capability negotiation, and asset resolution. Prove a second tool can make an accepted change
    without depending on private interface state before claiming interoperability.
 
+## Improvement over time and training boundaries
+
+This is planned longitudinal work after the usable-scene baseline, not an additional October
+release requirement. It complements the existing place-alignment and two-capture backlog rather
+than creating a second competing pipeline. Trace those contracts before scoping implementation.
+Capture dates and alignment do not alone establish successful incremental reconstruction.
+
+Distinguish four mechanisms:
+
+| Mechanism | Existing basis | Next proof |
+| --- | --- | --- |
+| Retain and resume scene training | Saved Gaussian output and complete checkpoints bound to the run's exact identity | Preserve the useful scene and recover compatible interrupted work; neither operation learns a general reconstruction model |
+| Improve a particular world | Source, placement and publication lineage; same-input resume does not accept arbitrary new inputs | Add authorized observations and publish a measurably improved candidate version while preserving historical meaning |
+| Develop Companion continuity | Existing evidence/context and reviewed interaction machinery | Persist approved memory, retrieve it across sessions, and support correction and deletion; this is not model weight training |
+| Improve shared reconstruction or language models | Existing model/stage integration and evaluation machinery | A separately approved experiment must outperform a relevant baseline on unseen examples before promotion; ongoing cross-world learning and Nemotron fine-tuning are not established |
+
+### First longitudinal exit
+
+Use one authorized place with an initial source set and additional observations. Separate extra
+coverage of the same state from a later physical change. A later room arrangement must remain a
+new historical state; an authored edit must remain separate from both. Uncertain alignment or
+time association must remain unresolved rather than silently fused.
+
+Produce a new candidate through the existing reconstruction/publication boundaries. Start with
+a full rebuild as the correctness and cost baseline. Continuing from an earlier scene's parameters
+with changed inputs is a distinct capability from resuming an interrupted run: introduce it only
+with explicit compatibility, alignment and input-lineage checks, never by weakening checkpoint
+identity validation. Compare it with the rebuild before calling it an optimization.
+
+Evaluate both old and new coverage using evaluation views excluded from training and fitting,
+plus a browser inspection of navigation, holes and visible artifacts. Record quality regressions,
+GPU time, peak memory and storage growth. A candidate must improve the targeted deficiency without
+unacceptable regression in previously supported views; define the task's thresholds before running.
+Preview, accept, reopen and, where still authorized, return to the previous version. A failed update
+must leave the last valid version usable unless withdrawal or deletion makes it unavailable.
+
+Current permissions govern all versions and checkpoint reuse. Removal of training sources must
+invalidate affected artifacts according to existing deletion contracts. Rebuilding from remaining
+authorized sources, if separately requested, produces a new artifact; it is not exact restoration
+or proof of model unlearning. Historical versioning never authorizes resurrection of removed data.
+
+### Modularity and scale
+
+Reuse the existing separation between source/pose preparation, training, evaluation, publication
+and rendering. Keep provider-specific GPU launch behavior behind the existing compute boundary;
+the renderer consumes published assets rather than trainer internals. New implementations need
+explicit input/output compatibility and capability reporting, not a speculative universal framework.
+
+Measure growing input counts and retained versions before choosing selective recomputation,
+scene partitioning, storage retention or multi-GPU execution. Retain reusable valid intermediate
+artifacts only within their lineage and permission boundaries. Demonstrate that an update avoids
+unnecessary work without stale outputs; measure concurrency, recovery and resource limits before
+claiming scalable operation. Reuse existing job leases and recovery mechanisms where they fit.
+
+For Companion quality, first establish a small representative failure set and compare context,
+retrieval, prompts and model selection. Fine-tuning requires authorized training data, separation
+of training and evaluation examples, a measured advantage over that baseline, versioned deployment
+and a rollback policy. Private user memories are not automatically pooled into shared training.
+Choose broader learned reconstruction or language-model work only when these measurements justify
+it. This roadmap does not authorize training runs, collect new data or assign a migration.
+
 ## Package and API boundaries
 
 Keep `exulanica-wmp-1.0` compatible. Do not silently add required simulation fields to the current
