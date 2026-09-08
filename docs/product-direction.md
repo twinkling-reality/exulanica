@@ -86,8 +86,8 @@ asset/behavior pair it can support. Schedule depends on source readiness, render
 ## Delivery gates for the first demonstration
 
 The sequence above is the full first product milestone, not a promise that all six steps fit
-one submission window. Calendar scheduling remains unresolved until the operator supplies the
-deadline, target tracks and available compute budget. Do not convert the old package inventory
+one submission window. The October 30 deadline now bounds the working schedule below; available
+compute budget and scene feasibility remain unresolved. Do not convert the old package inventory
 into a delivery commitment. Use these gates to make progress visible and bound unfinished work.
 
 | Gate | Required demonstration | Scheduling consequence |
@@ -96,7 +96,7 @@ into a delivery commitment. Use these gates to make progress visible and bound u
 | Memory and useful model interaction | Ask about the selected place through the actual Companion; ground the answer in available evidence and show missing information honestly | Verify the existing runtime path and record the executed model, task, latency and output. Persistent Companion shared history remains separate planned work. |
 | Small complete experience | Explore the place, ask the grounded question, accept one supported appearance change, reload and restore the original state | This is the minimum release candidate. Existing appearance persistence may support it; it must be executed, and it must not be called complete alternate-world branching. |
 | Creative extension | Add one persistent authored object, then its bounded motion, following the first-milestone contracts | Admit these extensions only with enough time to integrate, rehearse and fix them. Preserve them in the product roadmap if they miss the submission window. |
-| Release rehearsal | Repeat the complete experience from a clean start; capture actual footage and verify setup, supported claims and failure behavior | Freeze feature additions before submission. Reserve explicit time for rehearsal, recording and upload when calendar dates are set. |
+| Release rehearsal | Repeat the complete experience from a clean start; capture actual footage and verify setup, supported claims and failure behavior | Freeze feature additions before submission. Protect the rehearsal, recording and upload buffer in the dated schedule below. |
 
 The memory interaction is essential to the world-memory demonstration; reconstruction and editing
 alone do not establish that experience. Nemotron use must be functional in that interaction if
@@ -118,6 +118,38 @@ or an upstream fix can be a useful result without a novel algorithm. Full simula
 profile, a second developer client and broader infrastructure work do not block the minimum release
 candidate unless the chosen demonstration actually depends on them. Hosting and recovery become
 release dependencies if a live retained-data deployment is selected.
+
+## Working delivery schedule through October 2026
+
+These are decision checkpoints, not measured duration estimates or promises of completion.
+The operator supplied an October 30 deadline. Plan to submit on October 28 and freeze features
+on October 16. All working dates use America/New_York. Reassess feasibility after the first
+scene inspection; no paid run or deployment is authorized by this schedule.
+
+| Checkpoint | Required outcome | If the gate fails |
+| --- | --- | --- |
+| September 11 | Inspect the retained trained output in the real app, identify the limiting stage, and choose an authorized place source plus a compute plan | Resolve source, renderer or compute readiness before expanding implementation. Record a revised scene target; do not spend the remaining weeks blindly retraining. |
+| September 18 | One coherent place is explorable and reopens; an existing Companion path is traced against its actual evidence | Concentrate implementation on the failing path and defer creative extensions. Inspect geometry earlier than this checkpoint whenever output becomes available. |
+| September 25 | Complete the minimum experience: explore, grounded model interaction, accepted appearance edit, reload and restore | Re-plan extension scope immediately. Choose how judges will access the working build, with an owner and any hosting cost identified. |
+| October 9 | Target one authored object and bounded interaction; reproduce the useful infrastructure result on another run or input | Keep incomplete extensions out of the release candidate. Finish the baseline and document actual infrastructure findings without claiming an unproved improvement. |
+| October 16 | Freeze features; integrate the selected experience and test its judge-access path | Cut unfinished additions from the demonstration, keeping them in the longer-term roadmap. Fix core failures rather than concealing them. |
+| October 23 | Rehearse from a clean start, complete focused usability checks, record the demonstration, and prepare setup and submission material | Use the remaining buffer for fixes, recording and access issues. No new architecture or model migration. |
+| October 28 | Submit and verify links and access | October 29 and the time before the October 30 cutoff are contingency, not scheduled feature development. |
+
+Begin usability observation at the September 25 baseline and fix confusion before the freeze.
+Do not wait until recording to learn whether someone understands the place, the Companion's
+answer, or how to undo a change. Keep evidence of useful model behavior and shortcomings during
+these same sessions. Model variant choices should follow observed quality, response time and
+cost; a larger model is not an acceptance criterion.
+
+Open-source work remains attached to the product path. Select its bounded target after the
+September 11 diagnosis, compare against the baseline during development, and aim to have a
+reproducible result by October 9. An upstream submission can be prepared from that result;
+acceptance by maintainers is external and must not be promised by the release date.
+
+This schedule deliberately does not require completing every product milestone within 52 days.
+Source readiness, authorized compute, reviewer availability and integration discoveries can
+change capacity. Keep the dates as explicit points to narrow scope or revise the forecast.
 
 ## Immediate scene and infrastructure exit
 
