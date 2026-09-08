@@ -224,6 +224,7 @@ def record_consent(
     sequence = repository.next_person_consent_sequence(
         subject_id=subject_id, consent_scope=consent_scope, region_key=region_key
     )
+    when = effective_at if effective_at is not None else dt.datetime.now(dt.UTC)
     try:
         consent_id, record, canonical, digest = consent_receipt(
             workspace_id=repository.workspace_id,
@@ -234,7 +235,7 @@ def record_consent(
             sequence=sequence,
             actor=actor,
             actor_role="owner",
-            effective_at=effective_at or dt.datetime.now(dt.UTC),
+            effective_at=when,
             valid_until=valid_until,
         )
     except ValueError as exc:
@@ -248,7 +249,7 @@ def record_consent(
         sequence=sequence,
         actor_id=actor,
         actor_role="owner",
-        effective_at=effective_at or dt.datetime.now(dt.UTC),
+        effective_at=when,
         valid_until=valid_until,
         consent_record=record,
         consent_canonical=canonical,
