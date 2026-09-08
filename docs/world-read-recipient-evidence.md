@@ -124,3 +124,21 @@ Malformed inputs produce EvidenceError with a named reason; the command returns 
 small JSON error on stderr, without a traceback or the unsupported private payload. Original
 supported receipt bytes and digests remain unchanged. Original evidence envelopes are immutable;
 the repair campaign must be a successor of the original verification record, with fresh paths.
+
+The repair at code head 0120faf passed 2146 backend tests with 3 skips, Ruff, all four import
+contracts, web typecheck/boundaries and 876 web tests. The 22 added cases comprise four persisted
+malformed-mask route scenarios, three persisted unsupported-trained-receipt route scenarios and
+15 controlled offline receipt checks across pose, mask and trained profiles. Each masked-route
+scenario checks both an irrelevant malformed candidate beside a valid manifest and the absence
+of usable manifest bytes. Unsupported payloads are withheld from the authenticated response.
+
+All six negative controls failed their exact selectors. The new control disables supported
+receipt validation and reproduces AttributeError in the real authenticated route. Eighteen saved
+fixtures replayed in clean processes; all ten original saved outcomes were also preserved.
+The successor campaign binds the retained failing route baseline. Its 81 artifact bindings and
+the post-generation check log are verified by the new verification envelope. Both original
+envelopes remain byte-identical to 1328935. No executable code changed after the corrected-source
+gates. These results renew the handoff; independent acceptance and merge remain separate.
+
+- [Repair campaign](evaluation/2026-09-08-repair-01-world-read-recipient-evidence.json)
+- [Repair verification](evaluation/2026-09-08-repair-verification-world-read-recipient-evidence.json)

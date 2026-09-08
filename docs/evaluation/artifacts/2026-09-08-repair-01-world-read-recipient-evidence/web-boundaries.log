@@ -1,0 +1,7 @@
+
+> exulanica-web@ boundaries <worktree>/web
+> depcruise --config .dependency-cruiser.cjs packages
+
+
+✔ no dependency violations found (370 modules, 1174 dependencies cruised)
+

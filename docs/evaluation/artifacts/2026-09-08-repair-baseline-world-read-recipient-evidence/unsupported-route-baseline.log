@@ -1,0 +1,641 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_____ test_recipient_route_handles_unsupported_manifest_candidates[array] ______
+
+deployment = <test_api.Deployment object at 0x106539e10>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x106182210>
+tmp_path = PosixPath('<fixture-path>')
+case = 'array'
+
+    @pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested"])
+    def test_recipient_route_handles_unsupported_manifest_candidates(
+        deployment, repository, tmp_path, case
+    ):
+        import uuid
+    
+        from exulanica.evidence.blob import BlobId
+    
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        route = f"/world-read/scenes/{scene}"
+        original = deployment.as_owner("GET", route)
+        assert original.status_code == 200, original.text
+        record = original.json()["bundle"]["recipient_evidence"]["record"]
+        point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
+        good = point["lineage"]["mask_manifest"]
+        body = json.loads(good["json_utf8"])
+        bad = {"array": [], "null": None,
+               "unsupported": {**body, "profile": "unsupported-private/v1", "private_note": "PRIVATE_SENTINEL"},
+               "nested": {**body, "masks": [None]}}[case]
+        stored = deployment.store.put_bytes(canonical_json(bad))
+        source = repository.capture(configured["capture"]).blob_id
+        repository.insert_artifact(
+            artifact_id=uuid.uuid4(), kind="masked_source_manifest", source_blob=source,
+            stage_key="masked_source_manifest", stage_version=99, params_digest=b"p"*32,
+            input_digest=b"i"*32, idempotency_key=str(uuid.uuid4()),
+            content_sha256=stored.blob_id.digest, storage_key=deployment.store.key_for(stored.blob_id),
+            byte_size=stored.byte_size, produced_by_event=None,
+        )
+        # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
+        # candidate must not poison the exact supported manifest or disclose its private payload.
+>       response = deployment.as_owner("GET", route)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_world_read_evidence.py:472: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_api.py:228: in as_owner
+    return self._request(_OWNER_TOKEN, method, path, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_api.py:225: in _request
+    return self.client.request(method, path, headers=headers, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:455: in request
+    return super().request(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:354: in handle_request
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:351: in handle_request
+    portal.call(self.app, scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/anyio/from_thread.py:338: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+../orimera/.venv/lib/python3.11/site-packages/anyio/from_thread.py:263: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/fastapi/applications.py:1163: in __call__
+    await super().__call__(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/applications.py:96: in __call__
+    await self.middleware_stack(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+exulanica/api/body_limit.py:66: in __call__
+    await self._app(scope, _counted(receive, self._limit), send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/routing.py:670: in __call__
+    await self.middleware_stack(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:2734: in app
+    await route.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1780: in handle
+    await self.original_router.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:2789: in handle
+    await included_router._handle_selected(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1800: in _handle_selected
+    await original_route.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1279: in handle
+    await app(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:158: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:144: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:706: in app
+    raw_response = await run_endpoint_function(
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:354: in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/concurrency.py:34: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/anyio/to_thread.py:65: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+../orimera/.venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py:2641: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py:1033: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/api/routes/world_read.py:100: in scene_bundle
+    bundle = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/graph/world_read.py:578: in world_read_bundle
+    return _assemble(connection, workspace, scene, store, addressing, None, world_id=world_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/graph/world_read.py:740: in _assemble
+    "recipient_evidence": recorded_evidence(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+connection = <psycopg.Connection [BAD] at 0x10654c7d0>
+workspace = UUID('304e97f8-2a3b-475d-a273-64262f0e7b59')
+scene_id = UUID('b5afad83-1d3d-5bfc-a9ed-a9d0111dcc78')
+capture_ids = [UUID('01a081a1-0a86-7693-8b59-e09a65d02cc9'), UUID('01a081a1-0ab2-771b-84a2-a24c43b5565d'), UUID('01a081a1-0ac8-7a15-a6ce-03ce90159858')]
+store = <exulanica.store.local.LocalContentAddressedStore object at 0x106181890>
+
+    def recorded_evidence(
+        connection: psycopg.Connection,
+        workspace: uuid.UUID,
+        scene_id: uuid.UUID,
+        capture_ids: list[uuid.UUID],
+        store: ContentAddressedStore | None,
+    ) -> dict[str, Any]:
+        captures = []
+        for capture_id in sorted(capture_ids, key=str):
+            source = connection.execute(
+                "select blob_sha256 from capture where workspace_id=%s and capture_id=%s",
+                (workspace, capture_id),
+            ).fetchone()
+            regions = connection.execute(
+                "select encode(region_key,'hex') as region_key,subject_id,"
+                "encode(region_digest,'hex') as region_sha256,action,silhouette "
+                "from person_region_current where workspace_id=%s and capture_id=%s "
+                "and action<>'deleted' order by region_key",
+                (workspace, capture_id),
+            ).fetchall()
+            people = []
+            for region in regions:
+                receipts = []
+                if region["subject_id"] is not None:
+                    rows = connection.execute(
+                        "select consent_record,consent_canonical,consent_digest,subject_id,region_key,"
+                        "consent_scope,decision,sequence,actor_id,actor_role,effective_at,valid_until "
+                        "from person_presentation_consent where workspace_id=%s and subject_id=%s "
+                        "and (region_key is null or region_key=decode(%s,'hex') "
+                        "or decision='withdrawn') order by consent_digest",
+                        (workspace, region["subject_id"], region["region_key"]),
+                    ).fetchall()
+                    for row in rows:
+                        raw = bytes(row["consent_canonical"])
+                        if hashlib.sha256(raw).digest() != bytes(row["consent_digest"]):
+                            receipts.append(unavailable("consent_receipt_corrupt"))
+                        elif not _consent_columns_match(row):
+                            receipts.append(unavailable("consent_columns_disagree_with_receipt"))
+                        else:
+                            receipts.append(
+                                {
+                                    "state": "available",
+                                    "sha256": _hex(row["consent_digest"]),
+                                    "record": row["consent_record"],
+                                }
+                            )
+                people.append(
+                    {
+                        **region,
+                        "subject_id": str(region["subject_id"]) if region["subject_id"] else None,
+                        "receipts": receipts,
+                    }
+                )
+            captures.append(
+                {
+                    "capture_id": str(capture_id),
+                    "source_sha256": _hex(source["blob_sha256"]) if source else None,
+                    "photo_bytes": unavailable("posed_photo_bytes_not_served"),
+                    "regions": people,
+                }
+            )
+        job = connection.execute(
+            "select j.job_id,j.build_inputs,j.pose_receipt_artifact_id from reconstruction_scene s "
+            "join reconstruction_scene_job j on j.workspace_id=s.workspace_id "
+            "and j.job_id=s.current_job_id where s.workspace_id=%s and s.scene_id=%s",
+            (workspace, scene_id),
+        ).fetchone()
+        points = []
+        if job:
+            for point in job["build_inputs"].get("point_maps", []):
+                row = connection.execute(
+                    "select content_sha256,source_blob_sha256,read_source_sha256,privacy_screening_id "
+                    "from artifact "
+                    "where workspace_id=%s and artifact_id=%s and kind='point_map'",
+                    (workspace, point["artifact_ref"]),
+                ).fetchone()
+                item = {
+                    "kind": "point_map",
+                    "artifact_id": point["artifact_ref"],
+                    "capture_id": point["capture_ref"],
+                    "content_sha256": point["content_sha256"],
+                }
+                if row is None:
+                    item["lineage"] = unavailable("point_artifact_missing")
+                elif _hex(row["content_sha256"]) != point["content_sha256"]:
+                    item["lineage"] = unavailable("output_to_build_mismatch")
+                else:
+                    original = _hex(row["source_blob_sha256"])
+                    read = _hex(row["read_source_sha256"]) or original
+                    lineage = {
+                        "state": "available",
+                        "source_sha256": original,
+                        "read_sha256": read,
+                        "mode": "original" if read == original else "masked",
+                    }
+                    if read != original:
+                        # Search retained manifests by their actual content, never a current key.
+                        candidates = connection.execute(
+                            "select content_sha256 from artifact where workspace_id=%s "
+                            "and source_blob_sha256=%s and kind='masked_source_manifest' "
+                            "order by content_sha256",
+                            (workspace, row["source_blob_sha256"]),
+                        ).fetchall()
+                        matches = []
+                        for candidate in candidates:
+                            receipt = _receipt(store, candidate["content_sha256"])
+                            if receipt["state"] == "available":
+                                body = json.loads(receipt["json_utf8"])
+                                if (
+>                                   body.get("masked_sha256") == read
+                                    ^^^^^^^^
+                                    and body.get("source_sha256") == original
+                                    and body.get("capture_id") == point["capture_ref"]
+                                ):
+E                               AttributeError: 'list' object has no attribute 'get'
+
+exulanica/graph/world_read_evidence.py:151: AttributeError
+______ test_recipient_route_handles_unsupported_manifest_candidates[null] ______
+
+deployment = <test_api.Deployment object at 0x113d9be10>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x113d16090>
+tmp_path = PosixPath('<fixture-path>')
+case = 'null'
+
+    @pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested"])
+    def test_recipient_route_handles_unsupported_manifest_candidates(
+        deployment, repository, tmp_path, case
+    ):
+        import uuid
+    
+        from exulanica.evidence.blob import BlobId
+    
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        route = f"/world-read/scenes/{scene}"
+        original = deployment.as_owner("GET", route)
+        assert original.status_code == 200, original.text
+        record = original.json()["bundle"]["recipient_evidence"]["record"]
+        point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
+        good = point["lineage"]["mask_manifest"]
+        body = json.loads(good["json_utf8"])
+        bad = {"array": [], "null": None,
+               "unsupported": {**body, "profile": "unsupported-private/v1", "private_note": "PRIVATE_SENTINEL"},
+               "nested": {**body, "masks": [None]}}[case]
+        stored = deployment.store.put_bytes(canonical_json(bad))
+        source = repository.capture(configured["capture"]).blob_id
+        repository.insert_artifact(
+            artifact_id=uuid.uuid4(), kind="masked_source_manifest", source_blob=source,
+            stage_key="masked_source_manifest", stage_version=99, params_digest=b"p"*32,
+            input_digest=b"i"*32, idempotency_key=str(uuid.uuid4()),
+            content_sha256=stored.blob_id.digest, storage_key=deployment.store.key_for(stored.blob_id),
+            byte_size=stored.byte_size, produced_by_event=None,
+        )
+        # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
+        # candidate must not poison the exact supported manifest or disclose its private payload.
+>       response = deployment.as_owner("GET", route)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_world_read_evidence.py:472: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_api.py:228: in as_owner
+    return self._request(_OWNER_TOKEN, method, path, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_api.py:225: in _request
+    return self.client.request(method, path, headers=headers, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:455: in request
+    return super().request(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:354: in handle_request
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/testclient.py:351: in handle_request
+    portal.call(self.app, scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/anyio/from_thread.py:338: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+../orimera/.venv/lib/python3.11/site-packages/anyio/from_thread.py:263: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/fastapi/applications.py:1163: in __call__
+    await super().__call__(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/applications.py:96: in __call__
+    await self.middleware_stack(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+exulanica/api/body_limit.py:66: in __call__
+    await self._app(scope, _counted(receive, self._limit), send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/routing.py:670: in __call__
+    await self.middleware_stack(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:2734: in app
+    await route.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1780: in handle
+    await self.original_router.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:2789: in handle
+    await included_router._handle_selected(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1800: in _handle_selected
+    await original_route.handle(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:1279: in handle
+    await app(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:158: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+../orimera/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:144: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:706: in app
+    raw_response = await run_endpoint_function(
+../orimera/.venv/lib/python3.11/site-packages/fastapi/routing.py:354: in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/starlette/concurrency.py:34: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/anyio/to_thread.py:65: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+../orimera/.venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py:2641: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+../orimera/.venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py:1033: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/api/routes/world_read.py:100: in scene_bundle
+    bundle = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/graph/world_read.py:578: in world_read_bundle
+    return _assemble(connection, workspace, scene, store, addressing, None, world_id=world_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exulanica/graph/world_read.py:740: in _assemble
+    "recipient_evidence": recorded_evidence(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+connection = <psycopg.Connection [BAD] at 0x113ad6dd0>
+workspace = UUID('b2577be7-6984-4f61-82bf-6a7ad6148eaa')
+scene_id = UUID('811b8168-716e-5546-982d-4b12a966d118')
+capture_ids = [UUID('01a081a1-0eaa-7f8b-8960-c72c33c3ea88'), UUID('01a081a1-0ed9-7631-90f8-7e99a1c844d0'), UUID('01a081a1-0eee-7fcd-a516-1e3237355305')]
+store = <exulanica.store.local.LocalContentAddressedStore object at 0x113d14250>
+
+    def recorded_evidence(
+        connection: psycopg.Connection,
+        workspace: uuid.UUID,
+        scene_id: uuid.UUID,
+        capture_ids: list[uuid.UUID],
+        store: ContentAddressedStore | None,
+    ) -> dict[str, Any]:
+        captures = []
+        for capture_id in sorted(capture_ids, key=str):
+            source = connection.execute(
+                "select blob_sha256 from capture where workspace_id=%s and capture_id=%s",
+                (workspace, capture_id),
+            ).fetchone()
+            regions = connection.execute(
+                "select encode(region_key,'hex') as region_key,subject_id,"
+                "encode(region_digest,'hex') as region_sha256,action,silhouette "
+                "from person_region_current where workspace_id=%s and capture_id=%s "
+                "and action<>'deleted' order by region_key",
+                (workspace, capture_id),
+            ).fetchall()
+            people = []
+            for region in regions:
+                receipts = []
+                if region["subject_id"] is not None:
+                    rows = connection.execute(
+                        "select consent_record,consent_canonical,consent_digest,subject_id,region_key,"
+                        "consent_scope,decision,sequence,actor_id,actor_role,effective_at,valid_until "
+                        "from person_presentation_consent where workspace_id=%s and subject_id=%s "
+                        "and (region_key is null or region_key=decode(%s,'hex') "
+                        "or decision='withdrawn') order by consent_digest",
+                        (workspace, region["subject_id"], region["region_key"]),
+                    ).fetchall()
+                    for row in rows:
+                        raw = bytes(row["consent_canonical"])
+                        if hashlib.sha256(raw).digest() != bytes(row["consent_digest"]):
+                            receipts.append(unavailable("consent_receipt_corrupt"))
+                        elif not _consent_columns_match(row):
+                            receipts.append(unavailable("consent_columns_disagree_with_receipt"))
+                        else:
+                            receipts.append(
+                                {
+                                    "state": "available",
+                                    "sha256": _hex(row["consent_digest"]),
+                                    "record": row["consent_record"],
+                                }
+                            )
+                people.append(
+                    {
+                        **region,
+                        "subject_id": str(region["subject_id"]) if region["subject_id"] else None,
+                        "receipts": receipts,
+                    }
+                )
+            captures.append(
+                {
+                    "capture_id": str(capture_id),
+                    "source_sha256": _hex(source["blob_sha256"]) if source else None,
+                    "photo_bytes": unavailable("posed_photo_bytes_not_served"),
+                    "regions": people,
+                }
+            )
+        job = connection.execute(
+            "select j.job_id,j.build_inputs,j.pose_receipt_artifact_id from reconstruction_scene s "
+            "join reconstruction_scene_job j on j.workspace_id=s.workspace_id "
+            "and j.job_id=s.current_job_id where s.workspace_id=%s and s.scene_id=%s",
+            (workspace, scene_id),
+        ).fetchone()
+        points = []
+        if job:
+            for point in job["build_inputs"].get("point_maps", []):
+                row = connection.execute(
+                    "select content_sha256,source_blob_sha256,read_source_sha256,privacy_screening_id "
+                    "from artifact "
+                    "where workspace_id=%s and artifact_id=%s and kind='point_map'",
+                    (workspace, point["artifact_ref"]),
+                ).fetchone()
+                item = {
+                    "kind": "point_map",
+                    "artifact_id": point["artifact_ref"],
+                    "capture_id": point["capture_ref"],
+                    "content_sha256": point["content_sha256"],
+                }
+                if row is None:
+                    item["lineage"] = unavailable("point_artifact_missing")
+                elif _hex(row["content_sha256"]) != point["content_sha256"]:
+                    item["lineage"] = unavailable("output_to_build_mismatch")
+                else:
+                    original = _hex(row["source_blob_sha256"])
+                    read = _hex(row["read_source_sha256"]) or original
+                    lineage = {
+                        "state": "available",
+                        "source_sha256": original,
+                        "read_sha256": read,
+                        "mode": "original" if read == original else "masked",
+                    }
+                    if read != original:
+                        # Search retained manifests by their actual content, never a current key.
+                        candidates = connection.execute(
+                            "select content_sha256 from artifact where workspace_id=%s "
+                            "and source_blob_sha256=%s and kind='masked_source_manifest' "
+                            "order by content_sha256",
+                            (workspace, row["source_blob_sha256"]),
+                        ).fetchall()
+                        matches = []
+                        for candidate in candidates:
+                            receipt = _receipt(store, candidate["content_sha256"])
+                            if receipt["state"] == "available":
+                                body = json.loads(receipt["json_utf8"])
+                                if (
+>                                   body.get("masked_sha256") == read
+                                    ^^^^^^^^
+                                    and body.get("source_sha256") == original
+                                    and body.get("capture_id") == point["capture_ref"]
+                                ):
+E                               AttributeError: 'NoneType' object has no attribute 'get'
+
+exulanica/graph/world_read_evidence.py:151: AttributeError
+__ test_recipient_route_handles_unsupported_manifest_candidates[unsupported] ___
+
+deployment = <test_api.Deployment object at 0x113b55510>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x113b55750>
+tmp_path = PosixPath('<fixture-path>')
+case = 'unsupported'
+
+    @pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested"])
+    def test_recipient_route_handles_unsupported_manifest_candidates(
+        deployment, repository, tmp_path, case
+    ):
+        import uuid
+    
+        from exulanica.evidence.blob import BlobId
+    
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        route = f"/world-read/scenes/{scene}"
+        original = deployment.as_owner("GET", route)
+        assert original.status_code == 200, original.text
+        record = original.json()["bundle"]["recipient_evidence"]["record"]
+        point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
+        good = point["lineage"]["mask_manifest"]
+        body = json.loads(good["json_utf8"])
+        bad = {"array": [], "null": None,
+               "unsupported": {**body, "profile": "unsupported-private/v1", "private_note": "PRIVATE_SENTINEL"},
+               "nested": {**body, "masks": [None]}}[case]
+        stored = deployment.store.put_bytes(canonical_json(bad))
+        source = repository.capture(configured["capture"]).blob_id
+        repository.insert_artifact(
+            artifact_id=uuid.uuid4(), kind="masked_source_manifest", source_blob=source,
+            stage_key="masked_source_manifest", stage_version=99, params_digest=b"p"*32,
+            input_digest=b"i"*32, idempotency_key=str(uuid.uuid4()),
+            content_sha256=stored.blob_id.digest, storage_key=deployment.store.key_for(stored.blob_id),
+            byte_size=stored.byte_size, produced_by_event=None,
+        )
+        # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
+        # candidate must not poison the exact supported manifest or disclose its private payload.
+        response = deployment.as_owner("GET", route)
+        assert response.status_code == 200, response.text
+        assert "PRIVATE_SENTINEL" not in response.text
+>       assert _verify(response.json())["point_lineage"][point["artifact_id"]]["state"] == "available"
+E       AssertionError: assert 'unavailable' == 'available'
+E         
+E         - available
+E         + unavailable
+E         ? ++
+
+tests/test_world_read_evidence.py:475: AssertionError
+_____ test_recipient_route_handles_unsupported_manifest_candidates[nested] _____
+
+deployment = <test_api.Deployment object at 0x106393c90>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x113b56250>
+tmp_path = PosixPath('<fixture-path>')
+case = 'nested'
+
+    @pytest.mark.parametrize("case", ["array", "null", "unsupported", "nested"])
+    def test_recipient_route_handles_unsupported_manifest_candidates(
+        deployment, repository, tmp_path, case
+    ):
+        import uuid
+    
+        from exulanica.evidence.blob import BlobId
+    
+        scene, configured = _masked_scene(deployment, repository, tmp_path)
+        route = f"/world-read/scenes/{scene}"
+        original = deployment.as_owner("GET", route)
+        assert original.status_code == 200, original.text
+        record = original.json()["bundle"]["recipient_evidence"]["record"]
+        point = next(p for p in record["point_maps"] if p["lineage"].get("mode") == "masked")
+        good = point["lineage"]["mask_manifest"]
+        body = json.loads(good["json_utf8"])
+        bad = {"array": [], "null": None,
+               "unsupported": {**body, "profile": "unsupported-private/v1", "private_note": "PRIVATE_SENTINEL"},
+               "nested": {**body, "masks": [None]}}[case]
+        stored = deployment.store.put_bytes(canonical_json(bad))
+        source = repository.capture(configured["capture"]).blob_id
+        repository.insert_artifact(
+            artifact_id=uuid.uuid4(), kind="masked_source_manifest", source_blob=source,
+            stage_key="masked_source_manifest", stage_version=99, params_digest=b"p"*32,
+            input_digest=b"i"*32, idempotency_key=str(uuid.uuid4()),
+            content_sha256=stored.blob_id.digest, storage_key=deployment.store.key_for(stored.blob_id),
+            byte_size=stored.byte_size, produced_by_event=None,
+        )
+        # Both artifacts are genuine persisted rows and store objects. An unrelated unsupported
+        # candidate must not poison the exact supported manifest or disclose its private payload.
+        response = deployment.as_owner("GET", route)
+        assert response.status_code == 200, response.text
+        assert "PRIVATE_SENTINEL" not in response.text
+>       assert _verify(response.json())["point_lineage"][point["artifact_id"]]["state"] == "available"
+E       AssertionError: assert 'unavailable' == 'available'
+E         
+E         - available
+E         + unavailable
+E         ? ++
+
+tests/test_world_read_evidence.py:475: AssertionError
+=============================== warnings summary ===============================
+../orimera/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <local-path> StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_evidence.py::test_recipient_route_handles_unsupported_manifest_candidates[array]
+FAILED tests/test_world_read_evidence.py::test_recipient_route_handles_unsupported_manifest_candidates[null]
+FAILED tests/test_world_read_evidence.py::test_recipient_route_handles_unsupported_manifest_candidates[unsupported]
+FAILED tests/test_world_read_evidence.py::test_recipient_route_handles_unsupported_manifest_candidates[nested]
