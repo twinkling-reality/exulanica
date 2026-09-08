@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -21,7 +23,26 @@ def main() -> int:
     parser.add_argument("--actor", type=uuid.UUID, required=True)
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument("--training-request", type=Path)
+    parser.add_argument(
+        "--worker-command",
+        nargs=argparse.REMAINDER,
+        help="launch this command after queueing; --once, --job and --workspace are supplied",
+    )
     args = parser.parse_args()
+    if args.worker_command is not None:
+        if not args.worker_command:
+            parser.error("--worker-command requires an executable")
+        if any(
+            value.startswith(("--job", "--workspace"))
+            or (
+                value.startswith("--")
+                and any(
+                    option.startswith(value.split("=", 1)[0]) for option in ("--job", "--workspace")
+                )
+            )
+            for value in args.worker_command
+        ):
+            parser.error("worker command must not override the queued job or workspace")
     manifest = read_manifest(args.directory / "inputs.json")
     intake = json.loads((args.directory / "intake.json").read_bytes())
     if intake["source_manifest_sha256"] != manifest["record_sha256"] or intake["refused"]:
@@ -61,6 +82,23 @@ def main() -> int:
     }
     (args.directory / "reconstruction-job.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
+    if args.worker_command is not None:
+        # The worker parser unions flags and environment; replace inherited scope so an old
+        # deployment setting cannot spend another job's final attempt during this pass.
+        environment = dict(os.environ)
+        environment["EXULANICA_SCENE_JOB_IDS"] = str(selected.job_id)
+        environment["EXULANICA_WORKSPACE_IDS"] = str(args.workspace)
+        return subprocess.call(
+            [
+                *args.worker_command,
+                "--once",
+                "--job",
+                str(selected.job_id),
+                "--workspace",
+                str(args.workspace),
+            ],
+            env=environment,
+        )
     return 0
 
 

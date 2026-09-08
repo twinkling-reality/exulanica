@@ -149,3 +149,85 @@ The step-by-step commands are in [the reference workflow](retained-reference-wor
 "Run the scene worker on an authorized CUDA host". Two scripts hold the reusable parts:
 `deploy/gsplat/host-bootstrap.sh` and `deploy/gsplat/run-scene-worker.sh`. Delete the instance when
 the work is finished; an L40S left idle costs about $25 a day at this rate.
+
+
+## 2026-09-08 registry decision and spend boundary
+
+No instance was created for this follow-up. The authorized incremental rental spend is **$0.00**.
+The retained bowl can be evaluated on this Mac, and queue isolation can be exercised with a
+scripted processor against an isolated test schema; neither requires renting a card.
+
+The provider's **Billing page showed $40.70 current balance**, read directly on 2026-09-08 at
+11:09 UTC after the operator signed into the in-app browser. The account had no environments
+listed. No balance has been inferred from job receipts. The compute selector then listed the
+single L40S MassedCompute option at **$1.06/hour**, 48 GB VRAM, 12 CPUs, fixed 625 GB SSD and no
+stop/start. This is a viewed quote; no instance was deployed.
+
+A durable private GitHub Container Registry is a candidate for both images. GitHub's
+[billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-packages),
+read on 2026-09-08, states that Container Registry image storage and bandwidth are currently free.
+That is a registry storage/transfer price, not a free build host. Nothing was published in this
+follow-up and there is no measured fresh-host saving yet. Pulling a prebuilt image still transfers
+its layers; the saving must be measured rather than treating the whole old base pull as eliminated.
+
+A proposed measurement budget is three aggregate billed instance-hours: two for a clean build,
+push and baseline, and one on a separate fresh host for an immutable-digest pull and readiness
+check. At the observed $1.06/hour rate, that allowance would be **$3.18**.
+This is a planning allowance, not a measured duration or authorization. The first host would
+have a $2.12 allowance and the second a $1.06 allowance, with separate approval before each.
+Image publication, build time and a fresh host's download rate remain unmeasured. Before each
+instance, read the actual billing balance and current rate, state the resulting cost and a stop
+budget no larger than that balance, and obtain the operator's explicit approval. Record provider
+start/delete timestamps, image digests, readiness seconds and before/after billing values. Do not
+substitute training receipts for the bill: overlapping jobs' full-rate `usd_cost` values remain
+upper bounds.
+
+The registry measurement stopped before spending: no billable instance was authorized, and
+the existing GitHub CLI credential does not advertise `write:packages` access. A reviewed private
+registry destination and scoped publish/read credentials must be prepared before renting the
+first host, or the GPU would again wait on operator setup. The old approximately 25-minute build observation above is retained
+history. It is not a before/after experiment for a registry that has not been populated.
+
+
+### Queue and claim in one invocation
+
+The reference queue now accepts `--worker-command` as its final option. It commits the selected
+job and writes `reconstruction-job.json` before starting that command, appends the exact `--job`
+and `--workspace` plus `--once`, and propagates the command's exit status. Both the local dispatch
+and GPU launcher replace inherited job scope; the general worker normally combines flags and
+environment IDs, so appending a flag alone would not close the stale-job hazard.
+
+On an already authorized host with its reviewed images, reverse database tunnel and environment
+prepared, the local invocation is:
+
+```sh
+uv run python scripts/reference_instance.py queue --scene bowl \
+  --directory <reviewed-reference-directory> \
+  --training-request <reviewed-training-request.json> \
+  --worker-command ssh <authorized-host> \
+  <remote-repository>/deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --name bowl
+```
+
+This starts a worker on an existing host; it does not provision one. Scope overrides in the
+command are refused before queueing. The GPU launcher also refuses a bare unscoped `--once`
+before inspecting or running Docker. Local database regressions exercise a stale job one attempt
+from exhaustion alongside the new job, with a scripted processor. They do not execute SSH,
+Docker, COLMAP or CUDA training.
+
+
+MEASURED 2026-09-08: all 11 queue-dispatch regressions passed. Before the fix, the newly added
+unscoped-launch and queue-and-dispatch tests failed. A copied-tree baseline then passed, followed
+by two single-occurrence mutations: replacing authoritative scope with inherited scope, and
+removing the launcher's no-scope guard. Each failed its named test. The committed reproduction
+command writes logs and mutation descriptions to a new directory:
+
+```sh
+uv run python -m exulanica.evaluation.queue_controls --output <new-control-directory>
+```
+
+The harness removes inherited `EXULANICA_` settings, uses only the permitted test database,
+runs an unmutated baseline first and counts a kill only when the selected test appears on a
+`FAILED` line. It mutates a temporary source copy, not the working tree.
+
+The [dated negative-control record](evaluation/2026-09-08-gpu-geometry-negative-controls.json)
+retains both queue mutations and the three geometry mutations, with predecessor and log digests.

@@ -1,0 +1,108 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.gpu-geometry-negative-controls/v1",
+    "recorded_at": "2026-09-08T11:17:27.248984+00:00",
+    "git_head_when_recorded": "aed9ef696b5137709e41ed42d3a50d583db2c4ec",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-08-bowl-retrospective-masked-geometry.json",
+      "record_sha256": "175c398e6b21bb75b30e268645ae6fdfa99e76b46f6ba42d6895c9639f7a0a04"
+    },
+    "source_sha256": {
+      "scripts/queue_reference_reconstruction.py": "185d5d294e8132e192b31c0cbe74450161d3fdf50389eebb0153af5d432f4a69",
+      "deploy/gsplat/run-scene-worker.sh": "b77e4ff9ae3f3f2591d84c0536803770d13442c1a37a31a84275070092e43ba0",
+      "tests/test_reference_queue_dispatch.py": "8baf13ce4522384fa1a6154eb743c100206ebd2ed959c3ed35275ccba6b3b547",
+      "exulanica/evaluation/queue_controls.py": "18aabfafdf3101f78733ab497648bb2688b48d94c2ebe27769c6a81feef0ca2b",
+      "exulanica/evaluation/masked_geometry.py": "e42d948369c0208d355ad3ceb163e2bcd9eccd262cffca05b24eb10788f4127a",
+      "exulanica/ingest/masked_geometry.py": "2e4ee8c1969691fa185329e190924a4884fb5fe133a12d1c47502112a40e8d8e",
+      "tests/test_retrospective_masked_geometry.py": "ce57b0e3a317e0d0bee3a6b936c58dd52818e2627832883d63bba157038c97fd",
+      "tests/test_masked_geometry.py": "d49b0e65361ced707637c755b72838f029426aec5359ce4aac670913d2e094c3"
+    },
+    "protocol": {
+      "isolated_temporary_source_copy": true,
+      "inherited_exulanica_environment_scrubbed": true,
+      "database": "postgresql://localhost:5433/exulanica_spine_test",
+      "unmutated_baseline_before_mutations": true,
+      "replacement_occurrences_required": 1,
+      "kill_requires_named_test_failed_line": true
+    },
+    "suites": {
+      "queue": {
+        "baseline_tests_passed": 11,
+        "baseline_passed": true,
+        "controls": [
+          {
+            "name": "inherited_scope",
+            "production_file": "scripts/queue_reference_reconstruction.py",
+            "replace": "environment[\"EXULANICA_SCENE_JOB_IDS\"] = str(selected.job_id)",
+            "with": "environment.setdefault(\"EXULANICA_SCENE_JOB_IDS\", str(selected.job_id))",
+            "test": "test_queue_dispatch_preserves_an_older_jobs_final_attempt",
+            "returncode": 1,
+            "killed": true,
+            "output_sha256": "296446e16497a011565803b802720304ada9e20492a0cf587db8e8420af29416"
+          },
+          {
+            "name": "unscoped_launcher",
+            "production_file": "deploy/gsplat/run-scene-worker.sh",
+            "replace": "if [[ -z \"${SCOPE_CHECK//[[:space:],]/}\" ]]; then",
+            "with": "if false; then",
+            "test": "test_unscoped_gpu_pass_is_refused_before_docker",
+            "returncode": 1,
+            "killed": true,
+            "output_sha256": "d490b5a4e7fdc8ad13f1ec992df119cd8d4d08d362836fae31fc766ccd3ec763"
+          }
+        ],
+        "retained_log_sha256": {
+          "baseline.log": "08faea39fd19189f6544839f505d91d76ecb1367e219f5db362cdf22916ef869",
+          "inherited_scope.log": "296446e16497a011565803b802720304ada9e20492a0cf587db8e8420af29416",
+          "unscoped_launcher.log": "d490b5a4e7fdc8ad13f1ec992df119cd8d4d08d362836fae31fc766ccd3ec763"
+        }
+      },
+      "geometry": {
+        "baseline_tests_passed": 23,
+        "baseline_passed": true,
+        "controls": [
+          {
+            "name": "drop_nonempty_regions",
+            "file": "exulanica/ingest/masked_geometry.py",
+            "old": "view_masked += 1",
+            "new": "view_masked += 0",
+            "test": "test_retrospective_bundle_reports_geometry_inside_recorded_regions",
+            "killed": true,
+            "output_sha256": "4925b9d5a52b875c6edd115cafc92b0dd571fce236ca199604cc12b2b205ddb6"
+          },
+          {
+            "name": "skip_empty_region_validation",
+            "file": "exulanica/ingest/masked_geometry.py",
+            "old": "centres, opacities = read_gaussian_centres(ply)",
+            "new": "centres, opacities = (read_gaussian_centres(ply) if any(v.masked or v.confirmed for v in views) else ([], None))",
+            "test": "test_empty_regions_still_validate_actual_gaussian_bytes",
+            "killed": true,
+            "output_sha256": "e985c21b98f03d982effda360c20a6292d104d96c58126b17fef50455a3e29c4"
+          },
+          {
+            "name": "omit_bundle_count",
+            "file": "exulanica/evaluation/masked_geometry.py",
+            "old": "\"masked_geometry\": count_masked_gaussians(ply=ply, views=views, margin_ppm=margin),",
+            "new": "\"omitted_geometry\": count_masked_gaussians(ply=ply, views=views, margin_ppm=margin),",
+            "test": "test_retrospective_bundle_reports_geometry_inside_recorded_regions",
+            "killed": true,
+            "output_sha256": "a7e17ab6d2a4fde603629e3ff3e30b94ee754ffcd2860138b2f81898fb3a3f9b"
+          }
+        ],
+        "retained_log_sha256": {
+          "baseline.log": "475bcfb56b286d857c4310602373e306e2cb722ad6df6053d0e1aff939c18220",
+          "drop_nonempty_regions.log": "4925b9d5a52b875c6edd115cafc92b0dd571fce236ca199604cc12b2b205ddb6",
+          "skip_empty_region_validation.log": "e985c21b98f03d982effda360c20a6292d104d96c58126b17fef50455a3e29c4",
+          "omit_bundle_count.log": "a7e17ab6d2a4fde603629e3ff3e30b94ee754ffcd2860138b2f81898fb3a3f9b"
+        }
+      }
+    },
+    "limitations": [
+      "Scripted scene processing and synthetic person regions; no real COLMAP, CUDA training or vision model executed.",
+      "These controls test sensitivity to the five declared mutations, not all possible defects.",
+      "Raw baseline and mutation logs are retained separately with the integration operator; their exact bytes are bound here."
+    ]
+  },
+  "record_sha256": "0b4f92e883b57fa32e4fb15c61b702363d366878472136b8bb8f1e6623dc5e5a"
+}

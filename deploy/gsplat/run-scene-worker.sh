@@ -9,6 +9,7 @@
 #
 # Required environment: CODE_REVISION (40 hex), EXULANICA_WORKSPACE_IDS (comma separated),
 # EXULANICA_DATABASE_URL (for example postgresql://<os-user>@127.0.0.1:5433/exulanica_spine_test).
+# A job scope is required. Explicit --job flags replace inherited environment scope.
 # Optional: EXULANICA_DATA_DIR (default ~/exulanica-data), PGOPTIONS (default -c role=exulanica_app),
 # REPO_DIR (default ~/orimera, must hold deploy/gsplat/compressor/node_modules), NODE_DIR (~/node),
 # EXULANICA_SCENE_JOB_IDS (comma separated; the worker then claims only those jobs instead of
@@ -17,6 +18,30 @@
 # its k-means; the container is given the GPU with graphics capability so Vulkan can open it).
 # Usage: deploy/gsplat/run-scene-worker.sh exulanica-scene-worker --once --name <worker-name> [--job <id>]
 set -euo pipefail
+# Refuse an unscoped rented pass before touching Docker. CLI scope is authoritative even
+# over a stale host environment, including when this launcher is reached through SSH.
+JOB_SCOPE=""
+EXPECT_JOB=0
+for argument in "$@"; do
+  if [[ "$EXPECT_JOB" == 1 ]]; then
+    JOB_SCOPE="${JOB_SCOPE:+$JOB_SCOPE,}$argument"
+    EXPECT_JOB=0
+  elif [[ "$argument" == --job ]]; then
+    EXPECT_JOB=1
+  elif [[ "$argument" == --job=* ]]; then
+    JOB_SCOPE="${JOB_SCOPE:+$JOB_SCOPE,}${argument#--job=}"
+  fi
+done
+if [[ "$EXPECT_JOB" == 1 ]]; then
+  echo "--job requires a UUID" >&2; exit 2
+fi
+if [[ -n "$JOB_SCOPE" ]]; then
+  EXULANICA_SCENE_JOB_IDS="$JOB_SCOPE"
+fi
+SCOPE_CHECK="${EXULANICA_SCENE_JOB_IDS:-}"
+if [[ -z "${SCOPE_CHECK//[[:space:],]/}" ]]; then
+  echo "rented scene worker requires --job <UUID> or EXULANICA_SCENE_JOB_IDS" >&2; exit 2
+fi
 : "${CODE_REVISION:?set CODE_REVISION to the exact 40-character Git revision the images were built at}"
 : "${EXULANICA_WORKSPACE_IDS:?set EXULANICA_WORKSPACE_IDS}"
 : "${EXULANICA_DATABASE_URL:?set EXULANICA_DATABASE_URL}"

@@ -1,0 +1,629 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "code": {
+      "git_head": "aed9ef696b5137709e41ed42d3a50d583db2c4ec",
+      "executed_files_sha256": {
+        "exulanica/evaluation/masked_geometry.py": "e42d948369c0208d355ad3ceb163e2bcd9eccd262cffca05b24eb10788f4127a",
+        "exulanica/ingest/masked_geometry.py": "2e4ee8c1969691fa185329e190924a4884fb5fe133a12d1c47502112a40e8d8e",
+        "exulanica/ingest/person_state.py": "4613c7fa2ee7ba8404117c37732c5018dea625cba25eb7ccbe084d2d5054fe54",
+        "exulanica/consent/states.py": "fe684ee60fb43fd6835c8216a5d619be34f7f14977ec6f7dec4b82b91e6eaa16"
+      }
+    },
+    "observed_at": "2026-09-08T07:16:25.145107-04:00",
+    "workspace_id": "bdba4f95-07e3-4ff6-8c5b-eb8989ab63cb",
+    "scene_id": "851ca35b-31c3-560c-84f9-4e142962755b",
+    "artifact_id": "c37d30fa-50b7-5612-8b22-e306ec7fa5ae",
+    "artifact_sha256": "844678b9374043b5f7e30038741fdf733e16a3da0d79b29078dd3d0b5f28eaa7",
+    "publication_receipt_sha256": "976c5ef480d87b52eae6d8340522c5d2011ea15209bb645fd84cf5b706cb6a18",
+    "pose_receipt_sha256": "292d697be5d0abdd888fb87e42e9d7893ede87ffdb4bdfb42ec4b6f0e6f267df",
+    "retained_evaluation_bundle_sha256": "113b15e89c713730a3aa00bb8014d72ee0b56bdb0e386822205eae8d2cf14508",
+    "retained_metrics_sha256": "61baedaace3429d04c9a4fdfc9a7fdb45828421dfef9ffbdd64597b5f087227d",
+    "database_read_only": true,
+    "region_snapshot": [
+      {
+        "image_name": "000000.jpg",
+        "capture_id": "01a0722b-6fe5-7e98-a7f6-27192462c8a5",
+        "regions": []
+      },
+      {
+        "image_name": "000001.jpg",
+        "capture_id": "01a0722b-703d-705c-95c1-20636c25e36c",
+        "regions": []
+      },
+      {
+        "image_name": "000002.jpg",
+        "capture_id": "01a0722b-70ab-7653-a573-48abf12190c0",
+        "regions": []
+      },
+      {
+        "image_name": "000003.jpg",
+        "capture_id": "01a0722b-70e0-72de-a7c6-9075f43ad5d1",
+        "regions": []
+      },
+      {
+        "image_name": "000004.jpg",
+        "capture_id": "01a0722b-711c-7e57-b17f-f170ce70db67",
+        "regions": []
+      },
+      {
+        "image_name": "000005.jpg",
+        "capture_id": "01a0722b-7164-7c8d-91b2-f6cdff7623e8",
+        "regions": []
+      },
+      {
+        "image_name": "000006.jpg",
+        "capture_id": "01a0722b-71a9-7640-ae0a-c98a74c8cef3",
+        "regions": []
+      },
+      {
+        "image_name": "000007.jpg",
+        "capture_id": "01a0722b-71f7-7145-9744-0625f6cccb0b",
+        "regions": []
+      },
+      {
+        "image_name": "000008.jpg",
+        "capture_id": "01a0722b-7262-705b-8d4a-6761a4a7c97e",
+        "regions": []
+      },
+      {
+        "image_name": "000009.jpg",
+        "capture_id": "01a0722b-72b2-7adf-bf4b-30b0b2d52119",
+        "regions": []
+      },
+      {
+        "image_name": "000010.jpg",
+        "capture_id": "01a0722b-72ef-73d8-a9ad-ec2741a7d97d",
+        "regions": []
+      },
+      {
+        "image_name": "000011.jpg",
+        "capture_id": "01a0722b-7324-77e1-8041-67a23629b114",
+        "regions": []
+      },
+      {
+        "image_name": "000012.jpg",
+        "capture_id": "01a0722b-7355-72ca-8975-9c88b6e59e90",
+        "regions": []
+      },
+      {
+        "image_name": "000013.jpg",
+        "capture_id": "01a0722b-7389-7b23-8ac0-f66abf251a4c",
+        "regions": []
+      },
+      {
+        "image_name": "000014.jpg",
+        "capture_id": "01a0722b-73bc-7468-b5a5-a5b9a31ec01a",
+        "regions": []
+      },
+      {
+        "image_name": "000015.jpg",
+        "capture_id": "01a0722b-73fa-773f-a23a-09126f782ff4",
+        "regions": []
+      },
+      {
+        "image_name": "000016.jpg",
+        "capture_id": "01a0722b-7437-7038-8b58-c670c2ca9f83",
+        "regions": []
+      },
+      {
+        "image_name": "000017.jpg",
+        "capture_id": "01a0722b-7472-75c0-a577-f0a9df50bd3c",
+        "regions": []
+      },
+      {
+        "image_name": "000018.jpg",
+        "capture_id": "01a0722b-74a8-71e3-99d7-dc8c2cba5423",
+        "regions": []
+      },
+      {
+        "image_name": "000019.jpg",
+        "capture_id": "01a0722b-74d6-7664-b8c0-81dd240c8f2a",
+        "regions": []
+      },
+      {
+        "image_name": "000020.jpg",
+        "capture_id": "01a0722b-74fd-7c7a-ba67-ada79207da2b",
+        "regions": []
+      },
+      {
+        "image_name": "000021.jpg",
+        "capture_id": "01a0722b-7524-7ef3-903b-53321a0929da",
+        "regions": []
+      },
+      {
+        "image_name": "000022.jpg",
+        "capture_id": "01a0722b-7552-73c5-9a78-75c512dbe29f",
+        "regions": []
+      },
+      {
+        "image_name": "000023.jpg",
+        "capture_id": "01a0722b-7585-72d5-8349-ad30f509b716",
+        "regions": []
+      },
+      {
+        "image_name": "000024.jpg",
+        "capture_id": "01a0722b-7615-7ca4-88a1-b6feac1d4100",
+        "regions": []
+      },
+      {
+        "image_name": "000025.jpg",
+        "capture_id": "01a0722b-7658-78ef-a8c0-19cc470dfc73",
+        "regions": []
+      },
+      {
+        "image_name": "000026.jpg",
+        "capture_id": "01a0722b-768f-7a2f-9188-5cfa0b1fe280",
+        "regions": []
+      },
+      {
+        "image_name": "000027.jpg",
+        "capture_id": "01a0722b-76db-7294-bc02-89f8f50a2958",
+        "regions": []
+      },
+      {
+        "image_name": "000028.jpg",
+        "capture_id": "01a0722b-770f-78b7-9fdf-147bb4ffc169",
+        "regions": []
+      },
+      {
+        "image_name": "000029.jpg",
+        "capture_id": "01a0722b-7741-7e25-a07c-b5033e11f620",
+        "regions": []
+      },
+      {
+        "image_name": "000030.jpg",
+        "capture_id": "01a0722b-7771-7322-98d5-31547276ecb2",
+        "regions": []
+      },
+      {
+        "image_name": "000031.jpg",
+        "capture_id": "01a0722b-77a0-7dee-b4b1-31afd4f9dafb",
+        "regions": []
+      },
+      {
+        "image_name": "000032.jpg",
+        "capture_id": "01a0722b-77e5-77b8-a265-a203efb50cb3",
+        "regions": []
+      },
+      {
+        "image_name": "000033.jpg",
+        "capture_id": "01a0722b-781b-7a94-a7b1-29fcbf71c8dd",
+        "regions": []
+      },
+      {
+        "image_name": "000034.jpg",
+        "capture_id": "01a0722b-784f-767c-86c3-e5093ded07f7",
+        "regions": []
+      },
+      {
+        "image_name": "000035.jpg",
+        "capture_id": "01a0722b-787d-7cc4-89a5-dc31943322d4",
+        "regions": []
+      },
+      {
+        "image_name": "000036.jpg",
+        "capture_id": "01a0722b-78b4-7099-b6cd-7413c8d49803",
+        "regions": []
+      },
+      {
+        "image_name": "000037.jpg",
+        "capture_id": "01a0722b-78ec-788c-b4a5-ae49886e69f0",
+        "regions": []
+      },
+      {
+        "image_name": "000038.jpg",
+        "capture_id": "01a0722b-7920-70c1-a481-1f54d2d7f850",
+        "regions": []
+      },
+      {
+        "image_name": "000039.jpg",
+        "capture_id": "01a0722b-7952-7a20-9cb9-7e81610e511a",
+        "regions": []
+      },
+      {
+        "image_name": "000040.jpg",
+        "capture_id": "01a0722b-7988-750c-be9d-a4cd57bc348d",
+        "regions": []
+      },
+      {
+        "image_name": "000041.jpg",
+        "capture_id": "01a0722b-79bc-7980-8d14-d9d7ee9693a9",
+        "regions": []
+      },
+      {
+        "image_name": "000042.jpg",
+        "capture_id": "01a0722b-79ed-7f68-98b5-dae5c5667830",
+        "regions": []
+      },
+      {
+        "image_name": "000043.jpg",
+        "capture_id": "01a0722b-7a24-7d6b-b19a-b129fb7b566f",
+        "regions": []
+      },
+      {
+        "image_name": "000044.jpg",
+        "capture_id": "01a0722b-7a56-7f6a-b583-0ff69cd80e1c",
+        "regions": []
+      },
+      {
+        "image_name": "000045.jpg",
+        "capture_id": "01a0722b-7a8c-7232-820f-be018e4b521c",
+        "regions": []
+      },
+      {
+        "image_name": "000046.jpg",
+        "capture_id": "01a0722b-7abb-79a6-bc84-b73b07b1cdea",
+        "regions": []
+      },
+      {
+        "image_name": "000047.jpg",
+        "capture_id": "01a0722b-7ae9-7d5b-9ed6-383fdb18ab6f",
+        "regions": []
+      },
+      {
+        "image_name": "000048.jpg",
+        "capture_id": "01a0722b-7b20-7d3d-9d19-1e46c2218e5c",
+        "regions": []
+      },
+      {
+        "image_name": "000049.jpg",
+        "capture_id": "01a0722b-7b62-7647-8fcb-84caefa1ee9a",
+        "regions": []
+      },
+      {
+        "image_name": "000050.jpg",
+        "capture_id": "01a0722b-7bae-7417-9477-92ca3dea160b",
+        "regions": []
+      }
+    ],
+    "region_snapshot_sha256": "cf767d5a3b61c0edbc60538f1441f4eaa7e7c1ad2497f8ce45b22f21c95981ef",
+    "decoder": {
+      "name": "@playcanvas/splat-transform",
+      "version": "3.3.3",
+      "decoder_source_sha256": "35490e58df2d7107abaf4d14f04c9bafb1b207b606ed3a5fecc65425abc3c348",
+      "package_lock_sha256": "4e608c12bf1f1f0bc740f277a255886e52fa1c5889ace1d14924901ffcb1d04f",
+      "decoded_ply_sha256": "266d67266ffdbe128e13a9362f88f0645496f4fb5dee18db996f5d9a3551ab92",
+      "execution_log": "splat-transform v3.3.3 (d092ae9)\n\u25b8 [2/2] Output <scratch>/decoded.ply\n  \u00b7 1M gaussians \u00b7 3 SH bands\n  \u25b8 Writing [####################] 0.727s\ndone in 0.929s  [peak cpu=613.2MB]\n",
+      "geometry_basis": "decoded quantized SOG delivery, not original training PLY",
+      "gpu": "cpu"
+    },
+    "evaluation_bundle": {
+      "profile": "exulanica.retrospective-geometry-evaluation/v1",
+      "masked_geometry": {
+        "profile": "exulanica.masked-geometry-check/v1",
+        "gaussians": 1000000,
+        "opacity": "present",
+        "opacity_reading": "logit or probability, whichever is higher",
+        "min_opacity_millionths": 0,
+        "margin_ppm": 20000,
+        "gaussians_over_masked_region": 0,
+        "gaussians_over_confirmed_region": 0,
+        "views": [
+          {
+            "image_name": "000000.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000001.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000002.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000003.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000004.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000005.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000006.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000007.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000008.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000009.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000010.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000011.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000012.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000013.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000014.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000015.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000016.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000017.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000018.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000019.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000020.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000021.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000022.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000023.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000024.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000025.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000026.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000027.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000028.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000029.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000030.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000031.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000032.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000033.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000034.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000035.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000036.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000037.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000038.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000039.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000040.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000041.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000042.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000043.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000044.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000045.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000046.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000047.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000048.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000049.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          },
+          {
+            "image_name": "000050.jpg",
+            "gaussians_over_masked_region": 0,
+            "gaussians_over_confirmed_region": 0,
+            "projection": "pinhole-approximation"
+          }
+        ]
+      },
+      "recorded_masked_regions": 0,
+      "recorded_confirmed_regions": 0,
+      "region_basis": "current database snapshot; historical training masks unavailable",
+      "privacy_verdict": "not established by this retrospective count"
+    },
+    "limitations": [
+      "No COLMAP, CUDA training, hosted model, or photograph screening was executed.",
+      "Counts cover recorded current regions in recovered cameras only; unrecorded people are not assessed.",
+      "Distorted cameras use a pinhole approximation with a 20000 ppm margin, not exact distortion inversion.",
+      "The retained training evaluation ZIP remains immutable; this is a new retrospective bundle."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-05-person-consent-first-pass.json",
+      "record_sha256": "83dc8108e394fb0e4d7ff9bcaaed0c6c3f221f019b6d9c128415da82296de7a5"
+    },
+    "completed_at": "2026-09-08T11:16:27.730578+00:00"
+  },
+  "record_sha256": "175c398e6b21bb75b30e268645ae6fdfa99e76b46f6ba42d6895c9639f7a0a04"
+}
