@@ -25,6 +25,8 @@
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 
+import { validateOutline, type ManualRegion } from './ui/person-region-editor.js';
+
 import type { ReviewRegion } from './ui/person-review.js';
 
 const REVIEW_TIMEOUT_MS = 20_000;
@@ -155,6 +157,20 @@ export class PersonReviewApi {
   ): Promise<void> {
     try {
       await this.#transport().postJson(`/person-regions/${captureId}/edits`, { edits: [edit] });
+    } catch (error) {
+      throw asUnavailable(error);
+    }
+  }
+
+  /** Add only a location. No subject, consent or other capture is changed. */
+  async add(captureId: string, region: ManualRegion): Promise<void> {
+    validateOutline(region.silhouette);
+    if (!/^[0-9a-f]{64}$/u.test(region.region_key)) throw new Error('Invalid region key.');
+    try {
+      await this.#transport().postJson(`/person-regions/${captureId}/edits`, {
+        edits: [{ region_key: region.region_key, action: 'add', shape: 'box',
+          silhouette: region.silhouette }],
+      });
     } catch (error) {
       throw asUnavailable(error);
     }

@@ -9,11 +9,8 @@
  *
  * Three things it deliberately does NOT do.
  *
- * It never renders the photograph behind the outlines. A review screen that showed the pixels
- * would be a place where an unconsented person is displayed, and drawing the very body the
- * feature exists to hide, in the tool built to hide it, would be a strange thing to ship. The
- * outlines are drawn on a neutral field with the frame's aspect, which is enough to tell one
- * person from another and to see a false positive.
+ * Manual authoring uses only the session's existing authorized media descriptor.
+ * Existing region thumbnails remain neutral outlines.
  *
  * It does not offer a "consent on their behalf" control that pretends to be the subject's own
  * decision. Every consent recorded here is the account holder's, the API records `owner`, and
@@ -24,6 +21,7 @@
  * collects the same worthless answer in a new shape.
  */
 
+import { buildPersonRegionEditor, type PersonRegionEditorInput } from './person-region-editor.js';
 import { el, replace } from './dom.js';
 
 /** One region as the review endpoint reports it. */
@@ -49,6 +47,8 @@ export interface PersonReviewInput {
   readonly captureId: string;
   readonly reviewState: 'unscreened' | 'screened';
   readonly regions: readonly ReviewRegion[];
+  readonly editor?: PersonRegionEditorInput;
+  readonly onReload?: () => void;
   readonly onConfirm?: (regionKey: string) => void;
   readonly onDelete?: (regionKey: string) => void;
   readonly onConsent?: (
@@ -127,6 +127,9 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
   const panel = el('section', { class: 'person-review' });
   panel.dataset.captureId = input.captureId;
   const body: (Node | string)[] = [el('h2', { text: 'People in this photograph' })];
+
+  if (input.editor) body.push(buildPersonRegionEditor(input.editor));
+  if (input.onReload) body.push(button('Reload review', input.onReload));
 
   if (input.reviewState === 'unscreened') {
     // Said as its own state rather than as an empty list. "Nobody has looked" and "somebody
