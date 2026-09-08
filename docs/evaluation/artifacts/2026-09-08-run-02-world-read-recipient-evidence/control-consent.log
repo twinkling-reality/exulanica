@@ -1,0 +1,75 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_recipient_consent_expiry_and_record_movement _______________
+
+deployment = <test_api.Deployment object at 0x1061bf190>
+repository = <exulanica.ingest.repository.IngestRepository object at 0x106159a90>
+tmp_path = PosixPath('<fixture-path>')
+
+    def test_recipient_consent_expiry_and_record_movement(deployment, repository, tmp_path):
+        from unittest.mock import patch
+    
+        from exulanica.ingest.person_review import review_list
+        from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
+    
+        from conftest import write_point_map
+    
+        configured = {}
+        boundary = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=15)
+    
+        def write_with_person(repo, store, blob, payload):
+            capture = repo.live_capture_for_blob(blob).capture_id
+            if not configured:
+                subject = _person(repo, capture)
+                record_consent(
+                    repo,
+                    subject_id=subject,
+                    actor=ACTOR,
+                    consent_scope="naming",
+                    decision="granted",
+                    effective_at=boundary - dt.timedelta(days=1),
+                    valid_until=boundary,
+                )
+                configured.update(capture=capture, subject=subject)
+            auth = authorize_personal_capture(
+                repo,
+                capture_id=capture,
+                actor=ACTOR,
+                account_authority_basis="Generated fixture, no personal media",
+                authorization_scope={"purpose": "recipient test"},
+                purpose="recipient test",
+            )
+            screen = record_human_screening(
+                repo,
+                authorization_id=auth.authorization_id,
+                reviewed_by=ACTOR,
+                sensitive_regions=review_list(repo, capture),
+            )
+            return write_point_map(repo, store, blob, payload, privacy_screening_id=screen.screening_id)
+    
+        with patch("test_world_read_route.write_point_map", write_with_person):
+            scene = _scene_in(deployment, repository, tmp_path)
+        path = f"/world-read/scenes/{scene}"
+        capture, subject = configured["capture"], configured["subject"]
+        first = deployment.as_owner("GET", path)
+        assert first.status_code == 200, first.text
+        first = first.json()
+        tampered = copy.deepcopy(first)
+        region = next(
+            c["regions"][0]
+            for c in tampered["bundle"]["recipient_evidence"]["record"]["captures"]
+            if c["regions"]
+        )
+        region["receipts"][0]["record"]["decision"] = "revoked"
+>       with pytest.raises(EvidenceError, match="consent_digest_mismatch"):
+E       Failed: DID NOT RAISE EvidenceError
+
+tests/test_world_read_evidence.py:163: Failed
+=============================== warnings summary ===============================
+../orimera/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  <local-path> StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_world_read_evidence.py::test_recipient_consent_expiry_and_record_movement
