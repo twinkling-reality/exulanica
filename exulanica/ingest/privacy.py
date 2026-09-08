@@ -559,6 +559,10 @@ def require_privacy_screening(
         raise PrivacyAdmissionError("privacy screening is missing for the exact capture")
     if not repository.privacy_screening_allows(capture_id, screening_id):
         raise PrivacyAdmissionError("privacy screening is failed, blocked, stale, or withdrawn")
+    if not capture_mask_is_current(repository, capture_id):
+        raise PrivacyAdmissionError(
+            "privacy screening is stale: rebuild the current mask and re-screen before geometry"
+        )
     return screening
 
 
