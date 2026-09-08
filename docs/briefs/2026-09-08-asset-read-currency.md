@@ -147,3 +147,32 @@ and production URL selection: this image now uses the viewer route as explicitly
 Preserve the availability, media dimensions, local-reference, capture identity and subsequent
 privacy assertions and all fixture setup. Retain the first-run failure as intermediate evidence.
 The task retains the serialized suite slot through handoff.
+
+Integration evidence repair authorized on 2026-09-08 after candidate `d434fea`, rebased unchanged
+to `d4cffba`, failed the independent full backend gate: 2117 passed, 3 skipped, 1 failed.
+`test_retained_evaluation_records_contain_no_personal_path_or_credential_material` found fourteen
+absolute checkout paths in the executed envelope's commands.argv. The recorder normalized logs
+but retained raw sys.executable and mutant script paths in command metadata. Its full suite ran
+before emitting the new envelope; the later digest-only verification did not exercise this rule.
+
+The existing recorder file is authorized for a narrow fix: normalize retained argv paths while
+executing the real argv, and verify the newly written envelope with the retained-record checks
+before declaring success. Do not weaken the test, omit command provenance or claim that canonical
+digest verification also checks disclosure rules. Preserve intermediate logs and the independent
+failure at `/tmp/exulanica-asset-read-integration-d4cffba/backend.log` with checkout-prefix
+normalization in a uniquely named retained artifact directory.
+
+Only the unpublished executed candidate envelope (old record digest
+`582004804995515f8635f666d65bb82a879c8ad620190773867c3bfb5174876b`) and its dependent verification
+envelope (`9d502d1fee24ae76c0ef646d247096709086396987b089e4243ca85a2649e597`) may be regenerated
+through code for corrected command provenance and bindings. Record the replaced hashes and
+reason explicitly. No hand-editing JSON; no relocation of defective envelopes to evade the
+retained-record rule; no rewrite of the valid checkpoint or any accepted record on main. A
+branch-history correction is permitted if needed, with original/replacement tips recorded.
+Preserve real executed logs and historical source bindings. This is evidence repair, not a
+feature-scope extension or approval to claim runtime defects from an envelope failure.
+
+The owner again holds the exclusive isolated database/full-suite slot until renewed handoff.
+Re-run gates appropriate to the corrected recorder and include a post-generation retained-record
+check on the actual final candidate. The orchestrator will independently verify the final tree
+after handoff. Main remains unmerged; no public migration or push is authorized.
