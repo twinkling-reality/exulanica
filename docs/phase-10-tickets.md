@@ -641,9 +641,20 @@ and it is the operator's call.
 - [ ] `uv run python scripts/record_world_read_evidence.py --date <today> --label place-read-paths
       --predecessor docs/evaluation/2026-09-07-phase-10-read-paths.json` executed, producing a new
       dated record bound to the one it follows rather than replacing it.
-- [ ] `uv run python scripts/verify_world_read_controls.py --date <today> --label place-world-read
+- [x] `uv run python scripts/verify_world_read_controls.py --date <today> --label place-world-read
       --predecessor docs/evaluation/2026-09-07-world-read-negative-controls.json` re-executed,
       because the fifteen world-read controls were measured against the narrower bundle.
+
+MEASURED 2026-09-08: read-only preflight verified the applied checksums through `0037`, only
+`0038` pending, and 284 captures plus 5 scenes in `public`. Applying the migration remains pending
+an explicit operator decision. No retained-schema write or real-scene re-record was performed.
+The isolated World Read controls need no retained-schema migration: all 15 were killed, with
+passing unmodified and restored baselines. The latest record is
+`docs/evaluation/2026-09-08-place-position-world-read-negative-controls.json`, executed after
+committing the position implementation at `76c7b4d`. Its predecessor is the earlier same-day run,
+which copied the working tree before that commit; that earlier record's `head` names the base
+commit, not a complete description of the then-uncommitted source. Use the latest run to reproduce
+the result from a checkout.
 
 **Files.** No source change. Two records under `docs/evaluation/`.
 
@@ -686,6 +697,21 @@ Executed 2026-09-08: `tests/test_place_read_bundle.py` passes all 20 tests. The 
 cover absence, supersession, retraction, withdrawal before purge, shared captures, historical
 claims and unusable integer coordinates. Fixtures use scripted reconstruction and synthetic GPS
 claims; this does not establish a position for a real retained place.
+
+MEASURED 2026-09-08: all 12 place negative controls were killed by their named tests, with
+passing unmodified and restored baselines, recorded in
+`docs/evaluation/2026-09-08-place-negative-controls.json` and bound to the 2026-09-07 record.
+The added controls cover recorded build refusals, frame composition and hop count, withdrawn
+anchors, withdrawn-version positions, active claims, lower median, duplicate membership and
+historical claims. These execute synthetic geometry with a scripted COLMAP executor. They do not
+validate alignment policy thresholds against real captures or exercise real COLMAP invocation.
+
+
+Verification on 2026-09-08: full backend suite **1989 passed, 3 skipped, 0 failed** in 339.21s;
+Ruff clean; all four import contracts kept. Web typecheck passed, 367 modules boundary-clean,
+and 852 tests passed across 109 files. The retained-record checks also passed after all three
+new records existed. No web source was changed. Capability 3's real-capture exit remains open.
+
 
 ---
 

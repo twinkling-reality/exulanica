@@ -1,0 +1,151 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.place-negative-controls/v1",
+    "date": "2026-09-08",
+    "head": "76c7b4d4d10739a2ba6f743baa00b5008d0c5553",
+    "database": "postgresql://localhost:5433/exulanica_spine_test",
+    "isolated_source_copy": true,
+    "baseline_passed": true,
+    "restored_suite_passed": true,
+    "records": [
+      {
+        "mutation": "the_validation_fold_is_held_out_of_the_fit",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "training = [item for index, item in enumerate(ordered) if index % stride != stride - 1]",
+        "with": "training = list(ordered)",
+        "test": "test_the_validation_fold_is_never_fitted_on",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "52c255fa1bec78928687c17acaa4c355bd05d3a16def1f549a94f39276098547",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_disconnected_joint_model_is_refused_before_the_numbers",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "if not connected:\n        return refused(\"place-alignment-not-connected\")",
+        "with": "if False:\n        return refused(\"place-alignment-not-connected\")",
+        "test": "test_a_disconnected_joint_reconstruction_is_refused_before_any_number_is_looked_at",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "9fb6b7c483f36ab29fdc91572103006d33ea8e356176e282ffec1406ee1f601d",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_mirrored_fit_is_refused_rather_than_corrected",
+        "production_file": "exulanica/reconstruction/place_alignment.py",
+        "replace": "    if _determinant(rotation) <= 0:",
+        "with": "    if False:",
+        "test": "test_a_mirrored_fit_is_refused_rather_than_corrected",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "ca264a4e00c51ceec60da59006210e8cb104eb3d2378108c559c19241cffb2d4",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_build_refusal_is_recorded_rather_than_raised",
+        "production_file": "exulanica/ingest/place_alignment.py",
+        "replace": "    accepted = candidate_fit.accepted and against_fit.accepted",
+        "with": "    accepted = candidate_fit.accepted and against_fit.accepted\n    if not accepted:\n        raise ValueError(\"mutant refuses by exception\")",
+        "test": "test_each_measured_refusal_is_a_row_with_its_reason_and_never_an_exception",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "2707a66ff7a946009750db623e3ec7caac94f457e6a87a0c6c5d274e06676565",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_composed_frame_records_every_hop",
+        "production_file": "exulanica/ingest/place_alignment.py",
+        "replace": "    frame_hops = against_version.frame_hops + 1",
+        "with": "    frame_hops = 1",
+        "test": "test_a_scene_admitted_against_a_non_anchor_version_records_two_hops",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "b3238376f8e73d1f20f04dc0a95d65fcf5d854082f5f1dd4267c7a76ae4c405c",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_composed_transform_reaches_the_anchor_frame",
+        "production_file": "exulanica/ingest/place_alignment.py",
+        "replace": "            place_from_against,",
+        "with": "            (1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.),",
+        "test": "test_a_scene_admitted_against_a_non_anchor_version_records_two_hops",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "60a6ad24042f2224c887efc9dd26170c4d27dc8a3112d0d427f837f8d834129f",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_withdrawn_anchor_blocks_the_place_read",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "   and not tombstone_blocks_place(p.workspace_id, p.place_id)",
+        "with": "   and true",
+        "test": "test_a_place_whose_anchor_is_withdrawn_is_not_served",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "e3be62f87efd2da236a4539f19cf81ea7b7f92083e1a1233efcd321aa6846387",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_withdrawn_version_contributes_no_position",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "     and not tombstone_blocks_scene(v.workspace_id, v.scene_id)",
+        "with": "     and true",
+        "test": "test_withdrawn_version_fixes_stop_contributing_before_any_purge",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "e07a9d406075e9baf1bc5a551497b035d643aea4b8932371f11ad645e832efbf",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "only_current_claims_contribute_a_position",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "   and a.status = 'active'",
+        "with": "   and true",
+        "test": "test_current_fixes_replace_superseded_and_retracted_positions_in_the_digest",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "ce3aeb0de3437599f85639edaf8e27da66ed0f12cd9a41d484727b04cd58018b",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "an_even_fix_set_uses_the_stated_lower_median",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "        middle = (len(fixes) - 1) // 2",
+        "with": "        middle = len(fixes) // 2",
+        "test": "test_current_fixes_replace_superseded_and_retracted_positions_in_the_digest",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "aa9cf1a77940fd040213a8dc88ef31747bab46f588559ca8746ff64c562f3062",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_shared_capture_is_counted_once",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "  select distinct m.capture_id",
+        "with": "  select m.capture_id",
+        "test": "test_a_capture_shared_by_versions_contributes_its_fix_only_once",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "4b7d0ed709812d7321f91f4eff0e3099845a3df0d113c6525ff4099e07ac71b7",
+        "observed_outcome": "the named test failed under the production mutation"
+      },
+      {
+        "mutation": "a_historical_claim_does_not_duplicate_the_current_fix",
+        "production_file": "exulanica/graph/places.py",
+        "replace": "   and a.valid_time is null",
+        "with": "   and true",
+        "test": "test_a_historical_fix_does_not_duplicate_the_current_capture_position",
+        "returncode": 1,
+        "killed": true,
+        "observed_output_sha256": "e7deb3ebe0c00a43c37524d3d1dd3fa42cd4be4a226a5886bbc119a3212f31b2",
+        "observed_outcome": "the named test failed under the production mutation"
+      }
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-07-place-negative-controls.json",
+      "record_sha256": "22f1b57cbe7276a625ee45f3014d544e1ae5525e41bb39e12d9c18a1e4c55922"
+    }
+  },
+  "record_sha256": "8980621e9869860e8be63927d76505c0d838e70f729801a2dd6b151a8bb9e052"
+}
