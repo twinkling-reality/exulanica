@@ -398,7 +398,8 @@ The delivered artifact is `c37d30fa-50b7-5612-8b22-e306ec7fa5ae`, bound to SHA-2
 `844678b9374043b5f7e30038741fdf733e16a3da0d79b29078dd3d0b5f28eaa7`.
 The decoded PLY SHA-256 is
 `266d67266ffdbe128e13a9362f88f0645496f4fb5dee18db996f5d9a3551ab92`.
-The evaluation record binds the publication and pose receipts, prior evaluation ZIP, current
+The [dated measurement record](evaluation/2026-09-08-bowl-retrospective-masked-geometry.json)
+binds the publication and pose receipts, prior evaluation ZIP, current
 region snapshot, executed decoder source, evaluator code and predecessor record. PostgreSQL's
 transaction was repeatable-read and enforced read-only; no public row or retained artifact was
 changed. Reproduce against the retained local state with a new output filename:
@@ -427,3 +428,5 @@ regions, and exact predecessor/blob integrity checks. An isolated 23-test baseli
 three exactly-one-occurrence mutations: dropping masked intersections, bypassing empty-region
 PLY validation, and omitting the bundle's count. Each mutation failed its named test. These
 controls demonstrate test sensitivity; they do not substitute for a masked real-person scene.
+Their [digest-bound result](evaluation/2026-09-08-gpu-geometry-negative-controls.json) follows
+the bowl measurement record and binds each baseline and mutation log.

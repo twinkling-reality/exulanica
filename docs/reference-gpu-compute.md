@@ -228,3 +228,6 @@ uv run python -m exulanica.evaluation.queue_controls --output <new-control-direc
 The harness removes inherited `EXULANICA_` settings, uses only the permitted test database,
 runs an unmutated baseline first and counts a kill only when the selected test appears on a
 `FAILED` line. It mutates a temporary source copy, not the working tree.
+
+The [dated negative-control record](evaluation/2026-09-08-gpu-geometry-negative-controls.json)
+retains both queue mutations and the three geometry mutations, with predecessor and log digests.
