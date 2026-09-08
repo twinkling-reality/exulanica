@@ -338,3 +338,54 @@ def test_a_limit_of_zero_is_refused_rather_than_answering_with_no_points(reposit
     store, _captures, scene_id = _scene(repository, tmp_path)
     with pytest.raises(ValueError, match="at least one point"):
         scene_observations(repository.connection, repository.workspace_id, scene_id, store, limit=0)
+
+
+def test_withdrawal_between_pages_refuses_the_remaining_observations(repository, tmp_path):
+    """The first response gives no authority to keep reading after its source is withdrawn."""
+    store, captures, scene_id = _scene(repository, tmp_path)
+    first = scene_observations(
+        repository.connection, repository.workspace_id, scene_id, store, limit=1
+    )
+    assert first is not None
+    cursor = first["bounds"]["next_point_id"]
+    assert cursor is not None
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=captures[0],
+        requested_by=uuid.uuid4(),
+        reason="withdrawal between observation pages",
+    )
+    assert (
+        scene_observations(
+            repository.connection,
+            repository.workspace_id,
+            scene_id,
+            store,
+            limit=1,
+            after_point_id=cursor,
+        )
+        is None
+    )
+
+
+def test_an_exhausted_cursor_does_not_claim_the_scene_observed_nothing(repository, tmp_path):
+    """An empty continuation retains scene totals and never claims to be the complete graph."""
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    assert whole is not None and whole["point_count"] > 0
+    page = scene_observations(
+        repository.connection,
+        repository.workspace_id,
+        scene_id,
+        store,
+        limit=2,
+        after_point_id=whole["points"][-1]["point_id"],
+    )
+    assert page is not None
+    assert page["points"] == []
+    assert page["bounds"]["state"] == "page"
+    assert page["bounds"]["next_point_id"] is None
+    assert page["bounds"]["point_count_total"] == whole["point_count"]
+    assert page["bounds"]["point_count_not_returned"] == whole["point_count"]
+    assert page["bounds"]["observations_returned"] == 0
+    assert page["bounds"]["observations_total"] == whole["bounds"]["observations_total"]

@@ -12,12 +12,18 @@
  * over these, so parsing them is safe; what would not be safe is letting a float reach a hash, and
  * that never happens on this path.
  *
- * **This is a whole-scene read and it is not small.** The real bowl scene answers with 15005
- * points and about 71000 observations, which is around 53 MB of JSON: measured 2026-09-06 against
- * the retained reference instance, roughly 200 ms to parse once fetched. So the load is started
- * once when the inspector opens, cached per scene for the session, and never repeated per click.
- * A per-point route would be smaller and does not exist; when one does, this is the file that
- * changes.
+ * **The inspector still needs a whole-scene read.** MEASURED 2026-09-08, read-only against
+ * the retained reference: the bowl graph is 97,633,587 canonical bytes, 15,005 points and 71,214
+ * observations. A 500-point page is 4,973,392 bytes. Paging bounds each answer, but the server
+ * still groups the entire receipt for each request. Loading every page would repeat that work
+ * 31 times and retain the same complete graph here. The inspector cannot display partial state,
+ * so returning only the first page would silently make clicks miss recorded evidence.
+ *
+ * Keep the single complete request until a different read contract can improve that tradeoff.
+ * The route also supplies no snapshot identity: an immutable receipt does not freeze the scene's
+ * current job, membership or consent across requests. Assembling pages could mix those states.
+ * A response must therefore prove completeness before reaching the inspector. This choice does
+ * not solve large-scene browser memory use; it avoids disguising a partial answer as the graph.
  *
  * **Nothing here filters.** Every observation carries its photograph's consent state. CORRECTED
  * 2026-09-07: that state used to be `unavailable` on every observation, meaning no per-person
@@ -104,6 +110,17 @@ interface WirePoint {
   readonly observations: readonly WireObservation[];
 }
 
+interface WireBounds {
+  readonly state: string;
+  readonly after_point_id: number | null;
+  readonly next_point_id: number | null;
+  readonly point_count_total: number;
+  readonly point_count_returned: number;
+  readonly point_count_not_returned: number;
+  readonly observations_total: number;
+  readonly observations_returned: number;
+}
+
 interface WireObservations {
   readonly profile: string;
   readonly scene_id: string;
@@ -111,14 +128,47 @@ interface WireObservations {
   readonly method: string;
   readonly sampling: string;
   readonly retained_per_image: number;
+  readonly bounds: WireBounds;
   readonly point_count: number;
   readonly points: readonly WirePoint[];
 }
 
 function decimal(value: string): number {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new TypeError('an observation coordinate is not a decimal string');
+  }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new TypeError('an observation coordinate is not a number');
   return parsed;
+}
+
+/** A page cannot enter the inspector's whole-graph cache, even if its profile is familiar. */
+function requireComplete(wire: WireObservations, sceneId: string): void {
+  const bounds = wire?.bounds;
+  if (wire?.scene_id !== sceneId || !Array.isArray(wire.points) || bounds == null
+    || bounds.state !== 'complete' || bounds.after_point_id !== null
+    || bounds.next_point_id !== null || bounds.point_count_not_returned !== 0
+    || wire.point_count !== wire.points.length
+    || bounds.point_count_total !== wire.points.length
+    || bounds.point_count_returned !== wire.points.length) {
+    throw new ObservationsUnavailable('unreadable', 'The server did not return a complete observation graph for this scene.');
+  }
+  let observations = 0;
+  let previous = -1;
+  for (const point of wire.points) {
+    if (!Number.isSafeInteger(point.point_id) || point.point_id <= previous
+      || !Array.isArray(point.observations) || point.observations.length === 0
+      || point.observations_retained !== point.observations.length
+      || !Number.isSafeInteger(point.track_length) || point.track_length < point.observations.length
+      || !Array.isArray(point.world_xyz) || point.world_xyz.length !== 3) {
+      throw new ObservationsUnavailable('unreadable', 'The observation graph contains inconsistent point records.');
+    }
+    previous = point.point_id;
+    observations += point.observations.length;
+  }
+  if (bounds.observations_total !== observations || bounds.observations_returned !== observations) {
+    throw new ObservationsUnavailable('unreadable', 'The observation graph does not hold the observations its counts declare.');
+  }
 }
 
 function text(value: unknown, fallback: string): string {
@@ -213,6 +263,7 @@ export class ObservationsClient {
     } catch (error) {
       throw asUnavailable(error);
     }
+    requireComplete(wire, sceneId);
     if (wire.profile !== OBSERVATIONS_PROFILE) {
       throw new ObservationsUnavailable(
         'unreadable',
