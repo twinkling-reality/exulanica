@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**114 documents**, excluding `docs/evaluation/`.
+**115 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
