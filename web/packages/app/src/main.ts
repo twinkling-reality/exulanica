@@ -58,8 +58,6 @@ import { buildConfirm } from './ui/confirm.js';
 import { buildCompanionEncounter } from './ui/companion-encounter.js';
 import { resolveCompanionPlacement } from './ui/companion-placement.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
-import { buildControlsGuide } from './ui/controls-guide.js';
-import { buildOptions } from './ui/options.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildCompanionStage, type CompanionStage } from './ui/companion-stage.js';
 import { createCompanionController } from './companion.js';
@@ -88,34 +86,19 @@ import {
   type ObservationGraph,
 } from './observations-api.js';
 import { PersonReviewApi, ReviewUnavailable } from './person-review-api.js';
-import { writePreferences, type AtlasPreferences } from './preferences.js';
-import type { ActiveWorldStylePreview } from './world-style-api.js';
-import { worldStyleProposalInbox } from './world-style-proposals.js';
 import {
   applyDocumentAppearance,
   applyDocumentWorldStyle,
   themeForPreferences,
 } from './theme.js';
-import {
-  companionAppearanceConfiguration,
-  readSourceLight,
-  sourceLightParameters,
-  worldArtProfile,
-} from '@exulanica/presentation';
+import { companionAppearanceConfiguration, worldArtProfile } from '@exulanica/presentation';
 import {
   commandForKeystroke,
   initialWorldShell,
   updateWorldShell,
   type WorldShellEvent,
 } from './world-shell.js';
-import {
-  describeWorldStyleFailure,
-  preferencesForWorldReference,
-  preferencesForWorldVersion,
-  presentWorldStyleAuthority,
-  syncWorldStyleConnection,
-  worldStylePreviewMatches,
-} from './composition/appearance.js';
+import { mountAppearance } from './composition/appearance.js';
 import {
   mountSessionGeometry,
   openAppSession,
@@ -139,7 +122,6 @@ const {
 let atlas: MountedAtlas | null = null;
 let stopWatching: (() => void) | null = null;
 let mountedCompanionStage: CompanionStage | null = null;
-let settingsStylePreviewId: string | null = null;
 
 /**
  * Whether the proof lens is switched on, for this session only.
@@ -164,7 +146,6 @@ let observationGraph_: ObservationGraph | null = null;
 let observationGraphSceneId_: string | null = null;
 let observationLoad_: Promise<void> | null = null;
 
-let stopWorldStyleProposalInbox: (() => void) | null = null;
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
@@ -302,7 +283,7 @@ async function mount(): Promise<void> {
     mountListeners = null;
     atlas?.dispose();
     atlas = null;
-    settingsStylePreviewId = null;
+    state.settingsStylePreviewId = null;
     canvas.hidden = true;
     shell.setAttribute('data-world-state', 'empty');
     replace(shell, [emptyWorld]);
@@ -594,296 +575,16 @@ async function mount(): Promise<void> {
         'Widen this window to at least 60rem to continue.',
     }),
   ]);
-  let optionsView: ReturnType<typeof buildOptions>;
-  let serverPreviewTimer: number | null = null;
-  let previewSequence = 0;
-
-  const reflectLocalWorldPreview = (
-    candidate: AtlasPreferences,
-    origin: 'settings' | 'companion' = 'settings',
-  ): boolean => {
-    if (atlas === null) return false;
-    const styleChanged = candidate.worldArtProfile !== state.preferences.worldArtProfile ||
-      candidate.worldArtProfileVersion !== state.preferences.worldArtProfileVersion ||
-      JSON.stringify(candidate.worldStyleParameters) !==
-        JSON.stringify(state.preferences.worldStyleParameters);
-    if (!styleChanged) return false;
-    if (settingsStylePreviewId !== null) {
-      atlas.binding.discardArtProfilePreview(settingsStylePreviewId);
-      settingsStylePreviewId = null;
-    }
-    const candidateProfile = worldArtProfile(
-      candidate.worldArtProfile,
-      candidate.worldArtProfileVersion,
-      candidate.worldStyleParameters,
-    );
-    const previewSession = atlas.binding.previewArtProfile(
-      candidateProfile,
-      origin,
-      candidate.worldStyleParameters,
-    );
-    if (!previewSession.validation.ok) return false;
-    settingsStylePreviewId = previewSession.sessionId;
-    applyDocumentWorldStyle(candidateProfile);
-    return true;
-  };
-
-  const previewOnServer = async (candidate: AtlasPreferences): Promise<ActiveWorldStylePreview | null> => {
-    const client = state.worldStyles;
-    if (client === null) {
-      optionsView.reportWorldLifecycle(
-        'failed',
-        state.worldStyleFailure ?? 'World style authority is unavailable. This preview cannot be saved.',
-      );
-      return null;
-    }
-    const sequence = ++previewSequence;
-    optionsView.reportWorldLifecycle('checking');
-    try {
-      const active = await client.previewSettings({
-        profileId: candidate.worldArtProfile,
-        profileVersion: candidate.worldArtProfileVersion,
-        parameters: candidate.worldStyleParameters,
-      });
-      if (sequence === previewSequence) {
-        syncWorldStyleConnection(state, client);
-        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, active);
-        optionsView.reportWorldLifecycle(
-          active.recoveredFromStale ? 'stale' : 'ready',
-        );
-      }
-      return active;
-    } catch (error) {
-      if (sequence === previewSequence) {
-        optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
-      }
-      return null;
-    }
-  };
-
-  const queueServerPreview = (candidate: AtlasPreferences): void => {
-    if (serverPreviewTimer !== null) window.clearTimeout(serverPreviewTimer);
-    serverPreviewTimer = window.setTimeout(() => {
-      serverPreviewTimer = null;
-      void previewOnServer(candidate);
-    }, 220);
-  };
-
-  optionsView = buildOptions({
-    preferences: state.preferences,
-    onChange: applyPreferences,
-    /*
-     * The person's own photographs, read as four control positions.
-     *
-     * It samples the blob URLs the renderer already holds rather than fetching again, so no extra
-     * authorized request is made for a colour, and it returns values rather than applying them:
-     * the existing preview and Apply own the change exactly as they do for a slider.
-     */
-    onReadSourceLight: async () => {
-      const catalog = state.previewSourceMedia;
-      if (catalog === undefined) return null;
-      const sources = [...catalog.values()]
-        .filter((entry) => entry.available && entry.url !== null)
-        .map((entry) => ({ url: entry.url as string, available: true }));
-      if (sources.length === 0) return null;
-      const { sampleSources } = await import('./media-sampler.js');
-      const reading = readSourceLight(await sampleSources(sources));
-      if (reading.sampled === 0) return null;
-      return sourceLightParameters(reading, state.preferences.worldStyleParameters);
-    },
-    onPreview: (candidate) => {
-      shell.setAttribute('data-vignette', candidate.vignette);
-      atlas?.binding.setFieldOfView(candidate.fieldOfView);
-      atlas?.binding.setSensitivityMultiplier(candidate.mouseSensitivity);
-      if (reflectLocalWorldPreview(candidate)) queueServerPreview(candidate);
-    },
-    onWorldDiscard: (restored) => {
-      if (serverPreviewTimer !== null) {
-        window.clearTimeout(serverPreviewTimer);
-        serverPreviewTimer = null;
-      }
-      previewSequence += 1;
-      if (settingsStylePreviewId !== null && atlas !== null) {
-        atlas.binding.discardArtProfilePreview(settingsStylePreviewId);
-        settingsStylePreviewId = null;
-      }
-      applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
-        restored.worldArtProfile,
-        restored.worldArtProfileVersion,
-        restored.worldStyleParameters,
-      ));
-      const client = state.worldStyles;
-      if (client !== null) {
-        void client.discardActive().then(() => {
-          syncWorldStyleConnection(state, client);
-          presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
-          optionsView.reportWorldLifecycle('idle');
-        }).catch((error) => optionsView.reportWorldLifecycle(
-          'failed', describeWorldStyleFailure(error),
-        ));
-      }
-    },
-    onWorldApply: async (candidate) => {
-      if (serverPreviewTimer !== null) {
-        window.clearTimeout(serverPreviewTimer);
-        serverPreviewTimer = null;
-      }
-      const client = state.worldStyles;
-      if (client === null) {
-        optionsView.reportWorldLifecycle(
-          'failed',
-          state.worldStyleFailure ?? 'World style authority is unavailable. No durable change was made.',
-        );
-        return false;
-      }
-      const existing = client.activePreview();
-      const active = existing !== null && worldStylePreviewMatches(existing, candidate)
-        ? existing
-        : await previewOnServer(candidate);
-      if (active === null) return false;
-      optionsView.reportWorldLifecycle('checking', 'Applying the reviewed preview…');
-      try {
-        const result = await client.applyActive();
-        syncWorldStyleConnection(state, client);
-        if (result.kind === 'stale-recovered') {
-          presentWorldStyleAuthority(
-            optionsView, state.worldStyleConnection, state.worldStyleFailure, result.preview,
-          );
-          optionsView.reportWorldLifecycle('stale');
-          return false;
-        }
-        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
-        optionsView.reportWorldLifecycle('saved');
-        return true;
-      } catch (error) {
-        optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
-        return false;
-      }
-    },
-    onWorldRollback: async (targetVersionId) => {
-      const client = state.worldStyles;
-      if (client === null) {
-        optionsView.reportWorldLifecycle(
-          'failed', state.worldStyleFailure ?? 'World style authority is unavailable.',
-        );
-        return null;
-      }
-      optionsView.reportWorldLifecycle('checking', 'Restoring the selected saved design…');
-      try {
-        const result = await client.rollback(targetVersionId);
-        syncWorldStyleConnection(state, client);
-        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
-        if (result.kind === 'stale') {
-          const latest = preferencesForWorldVersion(state.preferences, result.state.current);
-          applyPreferences(latest);
-          optionsView.reportWorldLifecycle(
-            'stale',
-            'The saved world changed elsewhere. The latest version is shown; choose the restore target again.',
-          );
-          return null;
-        }
-        optionsView.reportWorldLifecycle('saved', `Restored as revision ${result.version.revision}.`);
-        return preferencesForWorldVersion(state.preferences, result.version);
-      } catch (error) {
-        optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
-        return null;
-      }
-    },
-    onClose: () => dispatchShell({ type: 'toggle-options' }),
+  const appearance = mountAppearance({
+    env,
+    state,
+    applyProofLens: () => applyProofLens(),
+    setCompanionAppearance: () => companionStage.setAppearance(companionAppearance()),
+    onCloseOptions: () => dispatchShell({ type: 'toggle-options' }),
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
-  });
-  presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
-  stopWorldStyleProposalInbox?.();
-  stopWorldStyleProposalInbox = worldStyleProposalInbox.subscribe(async (proposal) => {
-    const client = state.worldStyles;
-    if (client === null) {
-      optionsView.reportWorldLifecycle(
-        'failed',
-        state.worldStyleFailure ?? 'World style authority is unavailable. The proposal was not previewed.',
-      );
-      return;
-    }
-    if (proposal.scope?.kind === 'region') {
-      optionsView.reportWorldLifecycle(
-        'failed',
-        'Regional style proposals require a regional renderer preview and are not shown as a global change.',
-      );
-      return;
-    }
-    try {
-      optionsView.reportWorldLifecycle('checking', 'Validating the upstream proposal…');
-      const active = await client.previewUpstream(proposal);
-      const candidate = preferencesForWorldReference(
-        state.preferences,
-        active.preview.candidate.globalStyle,
-      );
-      optionsView.setPreferences(candidate);
-      reflectLocalWorldPreview(
-        candidate,
-        proposal.origin === 'companion' ? 'companion' : 'settings',
-      );
-      syncWorldStyleConnection(state, client);
-      presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, active);
-      optionsView.reportWorldLifecycle(active.recoveredFromStale ? 'stale' : 'ready');
-    } catch (error) {
-      optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
-    }
-  });
-  const settingsView = buildControlsGuide({
-    preferences: state.preferences,
-    onChange: applyPreferences,
-    onClose: () => dispatchShell({ type: 'toggle-controls' }),
+    onCloseControls: () => dispatchShell({ type: 'toggle-controls' }),
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
   });
-
-  let latestSettingsSave = 0;
-  function applyPreferences(next: AtlasPreferences): void {
-    const previous = state.preferences;
-    state.preferences = next;
-    if (settingsStylePreviewId !== null && atlas !== null) {
-      atlas.binding.discardArtProfilePreview(settingsStylePreviewId);
-      settingsStylePreviewId = null;
-    }
-    try {
-      writePreferences(window.localStorage, state.preferences);
-    } catch {
-      // Private browsing may refuse storage. The live setting still applies for this session.
-    }
-    const theme = applyDocumentAppearance(state.preferences, systemAppearance.matches);
-    const profile = previewArtProfile ?? worldArtProfile(
-      state.preferences.worldArtProfile,
-      state.preferences.worldArtProfileVersion,
-      state.preferences.worldStyleParameters,
-    );
-    applyDocumentWorldStyle(profile);
-    optionsView.setPreferences(state.preferences);
-    settingsView.setPreferences(state.preferences);
-    companionStage.setAppearance(companionAppearance());
-    shell.setAttribute('data-vignette', state.preferences.vignette);
-    atlas?.binding.setTheme(theme);
-    // A new theme is a new palette, so a lit lens has to be re-resolved from it. Off stays off.
-    applyProofLens();
-    atlas?.binding.setArtProfile(
-      profile,
-      'settings',
-      state.preferences.worldStyleParameters,
-    );
-    atlas?.binding.setFieldOfView(state.preferences.fieldOfView);
-    atlas?.binding.setSensitivityMultiplier(state.preferences.mouseSensitivity);
-    if (state.interactionPolicies !== null) {
-      latestSettingsSave += 1;
-      const save = latestSettingsSave;
-      optionsView.reportPersistence('saving');
-      void state.interactionPolicies
-        .syncSettings(previous, state.preferences, systemReducedMotion.matches)
-        .then(() => {
-          if (save === latestSettingsSave) optionsView.reportPersistence('saved');
-        })
-        .catch(() => {
-          if (save === latestSettingsSave) optionsView.reportPersistence('failed');
-        });
-    }
-  }
 
   /*
    * THE PROOF LENS AND CLICK-TO-EVIDENCE.
@@ -1319,8 +1020,8 @@ async function mount(): Promise<void> {
     mapCaption,
     travelStatus,
     minimap.root,
-    optionsView.root,
-    settingsView.root,
+    appearance.options.root,
+    appearance.settings.root,
     viewportBoundary,
     reconstructionInspector.root,
     reconstructionStatus,
@@ -1336,8 +1037,8 @@ async function mount(): Promise<void> {
     chrome.setIndexOpen(shellState.primary === 'index');
     worldIndex.root.inert = shellState.primary !== 'index';
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
-    optionsView.setVisible(shellState.primary === 'options');
-    settingsView.setVisible(shellState.primary === 'controls');
+    appearance.options.setVisible(shellState.primary === 'options');
+    appearance.settings.setVisible(shellState.primary === 'controls');
     const systemSurfaceOpen = shellState.primary === 'options' || shellState.primary === 'controls';
     const modalBackground = [
       stage,
@@ -1352,8 +1053,8 @@ async function mount(): Promise<void> {
     // On close, release the command bar before the dialog restores focus to its trigger. On open,
     // move focus into the dialog before making that same trigger inert.
     if (!systemSurfaceOpen) for (const surface of modalBackground) surface.inert = false;
-    optionsView.setVisible(shellState.primary === 'options');
-    settingsView.setVisible(shellState.primary === 'controls');
+    appearance.options.setVisible(shellState.primary === 'options');
+    appearance.settings.setVisible(shellState.primary === 'controls');
     if (systemSurfaceOpen) for (const surface of modalBackground) surface.inert = true;
     commandBar.reflect(shellState.primary, shellState.camera);
     mapCaption.hidden = shellState.camera !== 'map';
@@ -1407,7 +1108,7 @@ async function mount(): Promise<void> {
   });
 
   atlas?.dispose();
-  settingsStylePreviewId = null;
+  state.settingsStylePreviewId = null;
   const activeTheme = themeForPreferences(state.preferences, systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
@@ -1744,7 +1445,7 @@ async function mount(): Promise<void> {
   );
   systemAppearance.addEventListener(
     'change',
-    () => applyPreferences(state.preferences),
+    () => appearance.applyPreferences(state.preferences),
     { signal: mountListeners.signal },
   );
 
