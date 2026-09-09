@@ -314,7 +314,7 @@ snake_case, and this fixture matches them.
 | `POST` | `/world/versions/{version_id}/objects` | Add one authored object |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/move` | Replace one object's transform |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
-| `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit |
+| `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
 | `GET` | `/world/assets` | The reviewed asset registry with availability |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
@@ -323,10 +323,13 @@ snake_case, and this fixture matches them.
 The two byte routes follow `GET /geometry/{artifact_id}`: a `Response` with an `ETag` that is the
 content digest, `X-Content-Type-Options: nosniff` and `Accept-Ranges: none`. They differ from it in
 one header, deliberately. The point map sets `Cache-Control: no-store` because it serves a personal
-derivative a tombstone must be able to reach. A reviewed CC0 mesh is global reviewed data holding
-nothing personal, and it is immutable under content addressing, so it sets
-`private, max-age=31536000, immutable`. A reviewed asset is never a citation target and never
-evidence.
+derivative a tombstone must be able to reach, and a cached copy is a copy deletion cannot clear. A
+reviewed CC0 mesh holds nothing personal, so it is cacheable: `private, max-age=3600`.
+
+Cacheable, and not `immutable`. The bytes are immutable under content addressing; these URLs are
+not, because they are keyed by `asset_key`, and a later migration could point that key at a
+different digest. `immutable` tells the browser never to revalidate, which would leave the ETag
+unable to correct it. A reviewed asset is never a citation target and never evidence.
 
 Remove and undo are POST rather than DELETE because both carry a base token in the body and both
 append history rather than destroying a row. A DELETE that stores a row and requires a request body

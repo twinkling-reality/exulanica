@@ -106,6 +106,51 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/world/styles/current"): {},
     ("GET", "/world/styles/versions"): {},
     ("GET", "/world/styles/proposals/{proposal_id}"): {},
+    # Authored world versions and created objects. Every one of these needs a workspace bearer
+    # token, so every one is probed without a credential here.
+    ("GET", "/world/versions"): {},
+    ("GET", "/world/versions/{version_id}"): {},
+    ("POST", "/world/versions"): {
+        "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())}
+    },
+    ("POST", "/world/versions/{version_id}/objects"): {
+        "json": {
+            "base_state_sha256": "0" * 64,
+            "object_id": "object:probe",
+            "asset_sha256": "1" * 64,
+            "region_id": "region-a",
+            "transform": {
+                "x_mm": 0,
+                "y_mm": 0,
+                "z_mm": 0,
+                "yaw_microradians": 0,
+                "scale_milli": 1000,
+            },
+            "origin_role": "fictional",
+        }
+    },
+    ("POST", "/world/versions/{version_id}/objects/{object_id}/move"): {
+        "json": {
+            "base_state_sha256": "0" * 64,
+            "transform": {
+                "x_mm": 0,
+                "y_mm": 0,
+                "z_mm": 0,
+                "yaw_microradians": 0,
+                "scale_milli": 1000,
+            },
+        }
+    },
+    ("POST", "/world/versions/{version_id}/objects/{object_id}/remove"): {
+        "json": {"base_state_sha256": "0" * 64}
+    },
+    ("POST", "/world/versions/{version_id}/objects/undo"): {
+        "json": {"base_state_sha256": "0" * 64}
+    },
+    ("GET", "/world/assets"): {},
+    ("GET", "/world/assets/{asset_key}"): {},
+    ("GET", "/world/assets/{asset_key}/bytes"): {},
+    ("GET", "/world/assets/{asset_key}/licence"): {},
     ("GET", "/world/interactions/catalog"): {},
     ("GET", "/world/interactions/current"): {},
     ("GET", "/world/interactions/versions"): {},
