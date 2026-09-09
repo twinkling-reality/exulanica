@@ -68,11 +68,12 @@ both on one machine runs them as two processes. On Linux the two wheels have not
 together here, and nothing should assume they coexist until they have been.
 
 **Feature extraction is bounded by capping its thread count, and that is the whole of the memory
-fix.** ``docs/scene-inspection-2026-09-08.md`` records a 210 photograph run that reached file 199
-with the process footprint at about 20 GB, the machine swapping at 17.5 of 18.4 GB, and was
-SIGTERMed. MEASURED 2026-09-09, reproducing it on forty of those photographs: the footprint reaches
-23.9 GB after twelve images and the run then stalls in swap. Twelve is not a coincidence, it is
-``os.cpu_count()`` on this machine, and COLMAP says so itself in its own log before it starts:
+fix.** ``docs/records/2026-09-08-scene-inspection.md`` records a 210 photograph run that reached
+file 199 with the process footprint at about 20 GB, the machine swapping at 17.5 of 18.4 GB, and
+was SIGTERMed. MEASURED 2026-09-09, reproducing it on forty of those photographs: the footprint
+reaches 23.9 GB after twelve images and the run then stalls in swap. Twelve is not a coincidence,
+it is ``os.cpu_count()`` on this machine, and COLMAP says so itself in its own log before it
+starts:
 
     Your current options use the maximum number of threads on the machine to extract features.
     Extracting SIFT features on the CPU can consume a lot of RAM per thread for large images.

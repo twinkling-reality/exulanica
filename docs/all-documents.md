@@ -14,22 +14,18 @@ rule about where a new document goes.
 
 How the system works now. Edited as the system changes.
 
-74 documents.
+58 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
 - [atlas-frontend-integration](atlas-frontend-integration.md) : IMPLEMENTED for the global world-appearance lifecycle, production source-media
-- [atlas-interface-architecture](atlas-interface-architecture.md) : IMPLEMENTATION PLAN. This plan is grounded in the frontend at 6685041, the live
 - [atlas-reconstruction-inspection](atlas-reconstruction-inspection.md) : The production Atlas reads scene identity, ordered capture membership, quality gates
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [atlas-world-research](atlas-world-research.md) : VERIFIED for repository measurements and cited source behavior; DECISION for the
 - [colmap-pose-jobs](colmap-pose-jobs.md) : production worker integrated and contract-tested; no authorized real dense capture run
-- [companion-native-evaluation](companion-native-evaluation.md) : SVG GEOMETRIC AVATAR ACTIVE; SPLINE AND HUMANOID PROTOTYPE REMOVED. Updated 2026-08-31
 - [companion-question-main.patch](companion-question-main.patch) : diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
 - [companion-question](companion-question.md) : built, covered by tests, and measured once against the retained bowl workspace with real
-- [consent-timestamp-consistency](consent-timestamp-consistency.md) : recordconsent resolves one effective instant after allocating the sequence, then passes that
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
 - [demo-runbook](demo-runbook.md) : mixed, labelled per item. Buildability audited against the repository on 2026-08-28
@@ -48,17 +44,9 @@ How the system works now. Edited as the system changes.
 - [goal-brief-2026-09-05-unblocked-backend-program](goal-brief-2026-09-05-unblocked-backend-program.md) : Written 2026-09-05, at commit ef73866, immediately after the semantic-answers and
 - [goal-brief-2026-09-08-remaining-work](goal-brief-2026-09-08-remaining-work.md) : Measured 2026-09-08 against main at 4c4a3dc. This is a sizing and sequencing document, not a
 - [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
-- [integration-2026-09-08](integration-2026-09-08.md) : This is an integration audit, not an implementation ticket. Feature work belongs to the three
-- [integration-asset-read-currency-2026-09-08](integration-asset-read-currency-2026-09-08.md) : Follow-up: integration-world-read-recipient-2026-09-08.md records the subsequent recipient-
-- [integration-consent-timestamp-2026-09-08](integration-consent-timestamp-2026-09-08.md) : Integrated after independent gates at d72c4f8: 2152 backend tests passed, 3 skipped
-- [integration-personal-review-2026-09-08](integration-personal-review-2026-09-08.md) : Follow-up: the shared admission-policy gap described here was subsequently addressed in
-- [integration-posed-views-recovery-2026-09-08](integration-posed-views-recovery-2026-09-08.md) : The operator authorized local integration of both completed branches. Posed-view owner tip
-- [integration-screening-currency-2026-09-08](integration-screening-currency-2026-09-08.md) : Follow-up: integration-asset-read-currency-2026-09-08.md records the subsequent asset-read
-- [integration-world-read-recipient-2026-09-08](integration-world-read-recipient-2026-09-08.md) : Follow-up: integration-consent-timestamp-2026-09-08.md records the future-write timestamp fix
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
-- [manual-person-region-review](manual-person-region-review.md) : Implementation branch: codex/manual-person-review, based on main 1353a21
 - [model-and-service-selection](model-and-service-selection.md) : mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : This is an operator command for exact capture bytes. It composes existing intake, personal
@@ -67,20 +55,16 @@ How the system works now. Edited as the system changes.
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
 - [preview-handoffs-main.patch](preview-handoffs-main.patch) : +++ b/web/packages/app/src/main.ts
-- [preview-handoffs](preview-handoffs.md) : Source: local main d2234f8818650958d7cfcd0c2b22e70796a20cfb. Branch:
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
 - [product-direction](product-direction.md) : Updated 2026-09-08. This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
 - [reconstruction-throughput](reconstruction-throughput.md) : Executed on 2026-09-09 in the worktree exulanica-recon-throughput, branch
-- [recovery-readiness-2026-09-08](recovery-readiness-2026-09-08.md) : source-grounded assessment; retained recovery and activation are unexecuted
 - [reference-gpu-compute](reference-gpu-compute.md) : First executed 2026-09-05. This records what was rented, why, what it cost, and what the run taught
 - [retained-reference-workflow](retained-reference-workflow.md) : A real trained reconstruction is established for one collection and refused for the other
-- [roadmap-audit-2026-09-08](roadmap-audit-2026-09-08.md) : Read against main at 1353a21, 2026-09-08. This is a read-only code audit and a set of proposed
 - [roadmap-next-2026-09-08](roadmap-next-2026-09-08.md) : Product priority update: product-direction.md now defines the creative-world
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
-- [scene-inspection-2026-09-08](scene-inspection-2026-09-08.md) : Executed on 2026-09-08 in the worktree exulanica-scene-inspection, branch codex/scene-inspection
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
 - [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
@@ -149,6 +133,29 @@ What was intended, written before the work.
 - [2026-09-08-retained-activation](briefs/2026-09-08-retained-activation.md) : proposed, not dispatched. No retained operation is authorized by this document
 - [2026-09-08-stale-screening-policy](briefs/2026-09-08-stale-screening-policy.md) : completed and integrated at 53039d4; see
 - [2026-09-08-world-read-evidence](briefs/2026-09-08-world-read-evidence.md) : completed and integrated at 3352627 after independent corrected-head gates. See
+
+## Dated records
+
+Closed accounts of what happened on a date. Never edited after.
+
+16 documents.
+
+- [2026-08-30-atlas-world-research](records/2026-08-30-atlas-world-research.md) : VERIFIED for repository measurements and cited source behavior; DECISION for the
+- [2026-08-31-atlas-interface-plan](records/2026-08-31-atlas-interface-plan.md) : IMPLEMENTATION PLAN. This plan is grounded in the frontend at 6685041, the live
+- [2026-08-31-companion-native-evaluation](records/2026-08-31-companion-native-evaluation.md) : SVG GEOMETRIC AVATAR ACTIVE; SPLINE AND HUMANOID PROTOTYPE REMOVED. Updated 2026-08-31
+- [2026-09-08-consent-timestamp-consistency](records/2026-09-08-consent-timestamp-consistency.md) : recordconsent resolves one effective instant after allocating the sequence, then passes that
+- [2026-09-08-integration-asset-read-currency](records/2026-09-08-integration-asset-read-currency.md) : Follow-up: integration-world-read-recipient-2026-09-08.md records the subsequent recipient-
+- [2026-09-08-integration-consent-timestamp](records/2026-09-08-integration-consent-timestamp.md) : Integrated after independent gates at d72c4f8: 2152 backend tests passed, 3 skipped
+- [2026-09-08-integration-personal-review](records/2026-09-08-integration-personal-review.md) : Follow-up: the shared admission-policy gap described here was subsequently addressed in
+- [2026-09-08-integration-posed-views-recovery](records/2026-09-08-integration-posed-views-recovery.md) : The operator authorized local integration of both completed branches. Posed-view owner tip
+- [2026-09-08-integration-screening-currency](records/2026-09-08-integration-screening-currency.md) : Follow-up: integration-asset-read-currency-2026-09-08.md records the subsequent asset-read
+- [2026-09-08-integration-world-read-recipient](records/2026-09-08-integration-world-read-recipient.md) : Follow-up: integration-consent-timestamp-2026-09-08.md records the future-write timestamp fix
+- [2026-09-08-integration](records/2026-09-08-integration.md) : This is an integration audit, not an implementation ticket. Feature work belongs to the three
+- [2026-09-08-manual-person-region-review](records/2026-09-08-manual-person-region-review.md) : Implementation branch: codex/manual-person-review, based on main 1353a21
+- [2026-09-08-preview-handoffs](records/2026-09-08-preview-handoffs.md) : Source: local main d2234f8818650958d7cfcd0c2b22e70796a20cfb. Branch:
+- [2026-09-08-recovery-readiness](records/2026-09-08-recovery-readiness.md) : source-grounded assessment; retained recovery and activation are unexecuted
+- [2026-09-08-roadmap-audit](records/2026-09-08-roadmap-audit.md) : Read against main at 1353a21, 2026-09-08. This is a read-only code audit and a set of proposed
+- [2026-09-08-scene-inspection](records/2026-09-08-scene-inspection.md) : Executed on 2026-09-08 in the worktree exulanica-scene-inspection, branch codex/scene-inspection
 
 ## Patches
 

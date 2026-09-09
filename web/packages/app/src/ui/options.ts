@@ -201,7 +201,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
    * Choosing an appearance from three dropdowns of words meant reading "Lozenge" and hoping. The
    * real avatar renderer draws it here, so the choice is visible where it is made rather than
    * behind the surface that is covering the Companion. It is decorative: the selects remain the
-   * controls, and atlas-interface-architecture.md asks for exactly this.
+   * controls, and records/2026-08-31-atlas-interface-plan.md asks for exactly this.
    */
   const companionPreview = createCompanionAvatar();
   const companionPreviewFrame = el('div', { class: 'companion-preview', 'aria-hidden': 'true' });

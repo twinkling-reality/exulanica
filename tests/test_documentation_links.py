@@ -58,8 +58,8 @@ ALLOWED_DANGLING: dict[str, str] = {
         "the record its brief commissioned, never written; the work did not close out"
     ),
     "docs/generated-tier-disclosure.md": (
-        "docs/integration-2026-09-08.md describes a branch that created this file; it is not in "
-        "this tree, so either the branch did not land or the document was renamed on the way in"
+        "docs/records/2026-09-08-integration.md describes a branch that created this file; it "
+        "is not in this tree, so either the branch did not land or it was renamed on the way in"
     ),
 }
 

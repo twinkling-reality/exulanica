@@ -1,6 +1,6 @@
 """Measure what a COLMAP pose run costs in memory, per photograph, and prove two runs agree.
 
-WHY THIS EXISTS. `docs/scene-inspection-2026-09-08.md` records the one measurement that stopped a
+WHY THIS EXISTS. `docs/records/2026-09-08-scene-inspection.md` records the one measurement that stopped a
 real 210 photograph run on this laptop: in-process pycolmap feature extraction reached file 199 of
 210 with the process footprint at about 20 GB, the machine swapping at 17.5 of 18.4 GB, and the job
 was SIGTERMed. A resumed attempt extracted the remaining eleven in 0.748 minutes. That record

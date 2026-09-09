@@ -7,7 +7,7 @@ the entire product or authorize dispatch.
 ## Current checkpoint, 2026-09-08
 
 Main was pushed at `d6b89d8`. Posed-view byte delivery and the recovery readiness assessment
-have landed; see [integration evidence](integration-posed-views-recovery-2026-09-08.md).
+have landed; see [integration evidence](records/2026-09-08-integration-posed-views-recovery.md).
 The approved documentation review has also landed. Do not dispatch those tasks again.
 The isolated recovery drill remains unexecuted and retained activation is not established.
 
