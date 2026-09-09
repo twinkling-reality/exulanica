@@ -297,9 +297,14 @@ def measure() -> int:
                     "why_this_question": why,
                     "status_code": status,
                     "answered": True,
+                    # Both nullable since the planner-failure abstention: a question that never
+                    # became a search has no Selection to report, and reporting an empty one
+                    # would say the whole library was looked at.
                     "plan": body["plan"],
                     "packet_citable_items": len(body["citations"]),
-                    "selection_total_matched": body["selection"]["total_matched"],
+                    "selection_total_matched": (
+                        None if body["selection"] is None else body["selection"]["total_matched"]
+                    ),
                     "answer": " ".join(c["text"] for c in body["answer"]["clauses"]),
                     "clause_types": [c["type"] for c in body["answer"]["clauses"]],
                     "abstained": body["abstained"],
@@ -340,6 +345,11 @@ def measure() -> int:
             if not run.get("answered"):
                 comparison.append({"key": run["key"], "skipped": "the route refused this question"})
                 continue
+            if run["plan"] is None:
+                comparison.append(
+                    {"key": run["key"], "skipped": "the question never became a Selection"}
+                )
+                continue
             packet, _ = packet_for(connection, run["plan"], session)
             if packet.is_empty:
                 comparison.append({"key": run["key"], "skipped": "the packet is empty"})
@@ -374,7 +384,12 @@ def measure() -> int:
         # -- does the escalation tier still answer with something that is not JSON? ----------
         escalation = "nvidia/nemotron-3-super-120b-a12b"
         first = next(
-            (r for r in runs if r.get("answered") and r["packet_citable_items"] > 0), None
+            (
+                r
+                for r in runs
+                if r.get("answered") and r["plan"] is not None and r["packet_citable_items"] > 0
+            ),
+            None,
         )
         if first is not None:
             packet, _ = packet_for(connection, first["plan"], session)
@@ -425,7 +440,9 @@ def measure() -> int:
     print(json.dumps({
         "questions": len(runs),
         "answered": [r["key"] for r in runs if r.get("answered")],
-        "abstained": [r["key"] for r in runs if r.get("abstained") is not None],
+        "abstained": [
+            f"{r['key']}:{r['abstained']}" for r in runs if r.get("abstained") is not None
+        ],
         "refused": [f"{r['key']}:{r['status_code']}" for r in runs if not r.get("answered")],
         "total_cost_micro_usd": record["total_cost_micro_usd"],
     }))

@@ -885,6 +885,126 @@ def test_an_abstention_asked_IN_WORDS_still_lists_the_planner_it_paid_for(deploy
     assert transport.call_count == 1, "the composer was asked something on an empty packet"
 
 
+def _planner_reply(payload: str) -> HttpResponse:
+    return HttpResponse(
+        status_code=200,
+        text=json.dumps(chat_body(payload, model="Qwen/Qwen3-235B-A22B-Instruct-2507")),
+    )
+
+
+def test_a_question_the_planner_cannot_express_abstains_rather_than_failing(deployment):
+    """MEASURED 2026-09-09, and this is the payload the live endpoint actually returned.
+
+    "What is the current exchange rate for the pound?" asked against the retained reference
+    workspace came back HTTP 502 ``model_refused``, which a caller cannot tell from the server
+    falling over. The archived body is
+    ``docs/evaluation/artifacts/2026-09-09-companion-question/ask-unrelated.response.json`` and
+    the reply is copied from it verbatim below rather than invented, so this test fails if the
+    handling of the real shape regresses.
+
+    **The cause is not what it looked like.** ``entities`` is null, so the empty-catalogue prompt
+    worked. What failed is ``time``: asked a question carrying no time at all, the planner
+    stamped the same instant into ``start`` and ``end``, and a zero-width half-open window is
+    empty by construction. ``CaptureWindow._non_empty`` is a Pydantic model validator, so the
+    schema-enforcing endpoint cannot see it and the failure lands locally, twice.
+
+    Nothing was searched, so nothing is claimed about the library. ``plan`` is null rather than
+    empty, because an empty plan is legal and means EVERYTHING, and reporting one would say the
+    whole library was looked at.
+    """
+    same_instant = "2026-09-09T11:48:13.308113+00:00"
+    zero_width_window = json.dumps(
+        {
+            "intent": "entities",
+            "entities": None,
+            "time": [{"start": same_instant, "end": same_instant}],
+            "place": None,
+            "capture": None,
+            "epistemic": "confirmed",
+            "semantic_query": None,
+            "limit": 10,
+        }
+    )
+    reply = _planner_reply(zero_width_window)
+    transport = _with_model(deployment, [reply, reply])
+
+    response = deployment.as_owner(
+        "POST", "/selection/ask", json={"question": "what is the exchange rate for the pound?"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert body["abstained"] == "UNANSWERABLE_NOT_UNDERSTOOD"
+    assert body["plan"] is None, "an empty plan would say the whole library was searched"
+    assert body["selection"] is None
+    assert body["citations"] == {}
+    assert [clause["type"] for clause in body["answer"]["clauses"]] == ["meta"]
+    assert all(not clause["citations"] for clause in body["answer"]["clauses"])
+    assert transport.call_count == 2, "one try and one repair, then the abstention"
+
+    # The failure is kept where the composer's refusals are kept, and NOT read aloud.
+    assert body["execution"]["rejections"], "the record has to say what the model returned"
+    said = " ".join(clause["text"] for clause in body["answer"]["clauses"]).lower()
+    assert "capture window" not in said
+    assert "json" not in said and "schema" not in said
+
+
+def test_a_model_invented_entity_id_abstains_instead_of_reporting_a_missing_one(deployment):
+    """The same defect wearing a 404, which is the shape it had before the prompt was fixed.
+
+    A schema-valid Selection naming an id nobody has is still a Selection that cannot be run.
+    Reporting ``unknown_reference`` to somebody who never named an id tells them a fact about an
+    id the MODEL invented, which is not an answer and is not their business.
+    """
+    invented = json.dumps(
+        {
+            "intent": "entities",
+            "entities": {"ids": [str(uuid.uuid4())], "mode": "any"},
+            "time": [],
+            "place": None,
+            "capture": None,
+            "epistemic": "confirmed",
+            "semantic_query": None,
+            "limit": 10,
+        }
+    )
+    _with_model(deployment, [_planner_reply(invented)])
+
+    response = deployment.as_owner(
+        "POST", "/selection/ask", json={"question": "who was with me there?"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["abstained"] == "UNANSWERABLE_NOT_UNDERSTOOD"
+    assert body["selection"] is None
+    # The plan IS kept here, unlike above: the planner returned one and the lookup refused it,
+    # so showing it is how somebody sees that the model named an entity nobody has.
+    assert body["plan"] is not None
+    assert body["execution"]["calls"], "the planner call happened and is recorded"
+
+
+def test_a_caller_supplied_id_still_gets_the_404_that_is_not_an_existence_oracle(deployment):
+    """The line the abstention above must not cross.
+
+    ``unknown_reference`` is deliberately ONE code for "not there" and "not yours", so the
+    surface is not an existence oracle. Answering 200 for an id the CALLER supplied would answer
+    the question that code exists to refuse: a stranger could probe ids and read existence off
+    the difference between an abstention and a refusal. Only an id the model invented abstains,
+    because that one was never the caller's to ask about.
+    """
+    _with_model(deployment, [_refused_answer_body()])
+    response = deployment.as_owner(
+        "POST",
+        "/selection/ask",
+        json={
+            "question": "who is this?",
+            "plan": {"intent": "entities", "entities": {"ids": [str(uuid.uuid4())], "mode": "any"}},
+        },
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "unknown_reference"
+
+
 def test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code(deployment):
     """A refusal has to arrive as a refusal, not as the server falling over.
 

@@ -52,7 +52,9 @@ export type ClauseType = 'historical' | 'uncertain' | 'meta';
 export type Abstention =
   | 'UNANSWERABLE_NOT_CAPTURED'
   | 'UNANSWERABLE_AMBIGUOUS'
-  | 'UNANSWERABLE_NOT_IN_MODALITY';
+  | 'UNANSWERABLE_NOT_IN_MODALITY'
+  /** The question never became a search. Nothing was looked at, so nothing is claimed. */
+  | 'UNANSWERABLE_NOT_UNDERSTOOD';
 
 export interface AnswerClause {
   readonly text: string;
@@ -91,7 +93,13 @@ export interface ModelCall {
  * provenance line that named the model anyway would be attributing a sentence to something that
  * did not write it.
  */
-export type Composed = 'model' | 'discarded' | 'search' | 'none';
+export type Composed =
+  | 'model'
+  | 'discarded'
+  | 'search'
+  /** A model was asked and could not turn the question into a search. Nothing was looked at. */
+  | 'unreadable'
+  | 'none';
 
 export interface AnswerProvenance {
   readonly composed: Composed;
@@ -189,6 +197,7 @@ const ABSTENTIONS: readonly string[] = [
   'UNANSWERABLE_NOT_CAPTURED',
   'UNANSWERABLE_AMBIGUOUS',
   'UNANSWERABLE_NOT_IN_MODALITY',
+  'UNANSWERABLE_NOT_UNDERSTOOD',
 ];
 
 export interface CompanionAskOptions extends TransportOptions {
@@ -305,7 +314,11 @@ export class CompanionAskClient {
       deterministic: body.deterministic === true,
       repaired: body.repaired === true,
       evidence,
-      provenance: provenanceOf(calls, body.deterministic === true),
+      provenance: provenanceOf(
+        calls,
+        body.deterministic === true,
+        ABSTENTIONS.includes(abstained ?? '') ? (abstained as Abstention) : null,
+      ),
       promptVersion: body.execution?.prompt_version ?? '',
       calls,
     };
@@ -357,7 +370,11 @@ export class CompanionAskClient {
  * `search` is that case, named. A model read the question; the answer under it was rendered from
  * the query result, and the line says both.
  */
-function provenanceOf(calls: readonly ModelCall[], deterministic: boolean): AnswerProvenance {
+function provenanceOf(
+  calls: readonly ModelCall[],
+  deterministic: boolean,
+  abstained: Abstention | null,
+): AnswerProvenance {
   const latencyMs = calls.reduce((total, call) => total + call.latencyMs, 0);
   const usedFallback = calls.some((call) => call.usedFallback);
   // The composing call is the LAST reasoning call rather than the first: a repair replaces the
@@ -366,6 +383,18 @@ function provenanceOf(calls: readonly ModelCall[], deterministic: boolean): Answ
   const planning = calls.find((call) => !call.role.startsWith('reasoning')) ?? null;
   const plannedBy = planning?.servedModel ?? null;
 
+  /*
+   * Checked BEFORE the empty-list branch, and the order is the whole point.
+   *
+   * A planner failure abstains with `UNANSWERABLE_NOT_UNDERSTOOD`, and the calls behind it are
+   * often not in the list: `client.structured` raises before any result reaches the recorder, so
+   * two failed attempts leave nothing. Falling through to `none` would print "No model was
+   * asked" over an answer two models had just been asked to produce, which is the same falsehood
+   * `search` was added to stop, one branch further down.
+   */
+  if (abstained === 'UNANSWERABLE_NOT_UNDERSTOOD') {
+    return { composed: 'unreadable', servedModel: null, plannedBy, latencyMs, usedFallback };
+  }
   if (calls.length === 0) {
     return { composed: 'none', servedModel: null, plannedBy: null, latencyMs, usedFallback };
   }

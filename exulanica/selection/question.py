@@ -51,13 +51,19 @@ from exulanica.selection.answer import (
     Answer,
     AnswerRejected,
     abstain,
+    abstain_without_a_selection,
     render_deterministic_answer,
     validate_answer,
 )
 from exulanica.selection.executor import SelectionResult, execute
 from exulanica.selection.packet import EvidencePacket, build_packet
 from exulanica.selection.plan import SelectionPlan
-from exulanica.selection.validation import Session, validate
+from exulanica.selection.validation import (
+    RejectionCode,
+    SelectionRejected,
+    Session,
+    validate,
+)
 
 __all__ = [
     "AnsweredQuestion",
@@ -265,9 +271,14 @@ class AnsweredQuestion:
     """
 
     answer: Answer
-    plan: SelectionPlan
-    result: SelectionResult
-    packet: EvidencePacket
+    #: The Selection this answer rests on. ``None`` only when the planner never produced a
+    #: runnable one, which is the abstention :data:`Abstention.NOT_UNDERSTOOD` names.
+    plan: SelectionPlan | None = None
+    #: What the Selection resolved to. ``None`` when no Selection was ever run.
+    result: SelectionResult | None = None
+    #: ``None`` when nothing was executed, which is not the same as an empty packet: an empty
+    #: packet is a search that found nothing, and this is no search at all.
+    packet: EvidencePacket | None = None
     #: Set when the composer failed validation once and was asked again.
     repaired: bool = False
     #: Set when the model's output was discarded and the deterministic answer used instead.
@@ -579,12 +590,52 @@ def answer_question(
     The composer is not called at all when the packet is empty. That is the abstention
     guarantee, and having no code path from an empty packet to a model call is a stronger form
     of it than any instruction in a prompt.
+
+    **A question the planner cannot express abstains rather than failing.** Measured against the
+    live endpoint: "What is the current exchange rate for the pound?" produced a Selection naming
+    an entity id that is not a UUID, twice, and the question came back HTTP 502 ``model_refused``.
+    A caller cannot tell that from the server falling over, and what happened was neither a fault
+    nor an answer: the system could not read the sentence as a search over photographs.
+
+    Two failures are caught and both mean that, and NOTHING is invented to paper over either.
+    There is still no honest default plan, which is the reason ``propose_plan`` refuses rather
+    than returning an empty one; the answer here is to say so and search nothing, not to search
+    everything and call it a reply.
     """
+    proposed = plan is None
     log = CallLog()
     if plan is None:
         catalogue = entity_catalogue(connection, session.workspace_id)
-        plan = propose_plan(client, question, catalogue, now=now, log=log)
-    validated = validate(connection, plan, session)
+        try:
+            plan = propose_plan(client, question, catalogue, now=now, log=log)
+        except StructuredOutputError as refused:
+            # The endpoint answered and the answer was not a plan, twice. Nothing was searched
+            # and nothing is claimed about the library.
+            answer, reason = abstain_without_a_selection(str(refused))
+            return AnsweredQuestion(
+                answer=answer, abstention=reason, rejections=(str(refused),), calls=log.calls
+            )
+    try:
+        validated = validate(connection, plan, session)
+    except SelectionRejected as rejected:
+        # **Only a plan the MODEL proposed, and only this one code.** A caller who supplied a
+        # plan naming an id gets the 404 they always got: `unknown_reference` is deliberately one
+        # code for "not there" and "not yours", so that the surface is not an existence oracle,
+        # and turning it into a 200 for a caller-supplied id would answer the question that code
+        # exists to refuse. An id the model invented was never the caller's to ask about.
+        if not proposed or rejected.code is not RejectionCode.UNKNOWN_REFERENCE:
+            raise
+        answer, reason = abstain_without_a_selection(str(rejected))
+        return AnsweredQuestion(
+            answer=answer,
+            # Kept, unlike the case above, because here there IS one: the planner returned a
+            # schema-valid Selection and it was the lookup that refused it. Showing it is how
+            # somebody sees that the model named an entity nobody has.
+            plan=plan,
+            abstention=reason,
+            rejections=(str(rejected),),
+            calls=log.calls,
+        )
     result = execute(connection, validated)
     packet = build_packet(connection, result, workspace_id=session.workspace_id, now=now)
 

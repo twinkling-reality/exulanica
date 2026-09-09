@@ -50,6 +50,12 @@ happens when it cannot, and the guarantee is structural rather than promised:
   importer of `@exulanica/graph-client/mutations` fails the boundary check rather than a review.
 * The rail an answer renders holds two controls, and neither is an assertion about anybody.
 
+**A question it cannot read is an abstention, not an error.** The path has four ways to say
+nothing and they are four different facts: nothing matched, the matches are unconfirmed, the
+answer would need a modality this corpus does not have, and the question never became a search at
+all. Merging the last into the first would assert something about the user's photographs from a
+failure to read their sentence.
+
 **A failure is stated, never substituted.** A 503 from an instance with no model credential, a
 refusal, a lost session and a request that never arrived are four different facts, and the
 encounter says which. There is no path from a failed question to a sentence from the copy table
@@ -78,6 +84,10 @@ Two, named in one set in `companion.ts` rather than inferred:
 | `refused.noTurn` | The panel is not open | no |
 | `refused.useSubmit`, `refused.notAMultiSet`, `refused.nothingSelected` | Statements about a choice | no |
 | `refused.tierNotOfferableHere`, `refused.subjectMissing`, `refused.unavailable`, `refused.unknownOption` | Statements about a permission or a target | no |
+
+A refusal routed here becomes a question. What the ANSWER path then does with a question it
+cannot express is section 6: it abstains under `UNANSWERABLE_NOT_UNDERSTOOD` rather than
+failing, and it says so without claiming anything about the library.
 
 **`refused.noSubject` is in that set for a measured reason and it is a deviation from the
 original instruction, which named only `refused.couldNotParse`.** `generateTurn` returns the
@@ -127,6 +137,11 @@ of what was observed, so these are read from the raw body instead.
 `attempts` is zero exactly when the client's cache served the response, which is the convention
 `exulanica/models/results.py` already established. The API builds its `ModelClient` without a
 cache, so on this route the count is at least one.
+
+`plan` and `selection` are nullable, for one case only: `abstained` is
+`UNANSWERABLE_NOT_UNDERSTOOD` and the planner never produced a runnable Selection. Null rather
+than an empty plan, because an empty plan is legal and means everything. A client that never hits
+that case sees exactly the response it saw before.
 
 `rejections` carries the validator's own words about the model's output. It is present because a
 measurement of this path has to record which rule an answer broke: `deterministic` says the
@@ -218,47 +233,84 @@ constant is an input to the response cache key.
 
 | Question | Outcome | Model latency | Wall clock | Cost |
 | --- | --- | --- | --- | --- |
-| When were these photographs taken? | Answered, one cited historical clause | 17.9 s | 17.9 s | 1250 uUSD |
-| How many photographs are there? | Answered, `capture_count` 51 | 24.3 s | 24.3 s | 1565 uUSD |
-| What is this place? | Abstained, `UNANSWERABLE_NOT_CAPTURED` | 1.0 s | 1.0 s | 139 uUSD |
-| Who is in these photographs? | Abstained, `UNANSWERABLE_NOT_CAPTURED` | 1.6 s | 1.7 s | 147 uUSD |
-| What is the current exchange rate for the pound? | Refused, HTTP 502 | n/a | 3.4 s | not itemised |
+| When were these photographs taken? | Answered, one cited historical clause | 42.3 s | 42.3 s | 2038 uUSD |
+| How many photographs are there? | Answered, `capture_count` 51 | 43.5 s | 43.6 s | 2337 uUSD |
+| What is this place? | Abstained, `UNANSWERABLE_NOT_CAPTURED` | 1.8 s | 1.9 s | 139 uUSD |
+| Who is in these photographs? | Answered, hedged, named nobody | 38.9 s | 39.2 s | 2092 uUSD |
+| What is the current exchange rate for the pound? | Abstained, `UNANSWERABLE_NOT_UNDERSTOOD` | n/a | 6.7 s | 0 |
 
-Nobody was named on a workspace with no named entities, which is the failure the whole path
-exists against. The two abstentions are fast because the composer is never called on an empty
-packet; the avatar's working state exists for the other two, which are eighteen and twenty-four
-seconds of silence.
+**Nobody was named on a workspace with no named entities**, which is the failure the whole path
+exists against. Across passes the "who" question came back both ways, sometimes as an abstention
+and sometimes as an `uncertain` clause saying it cannot tell who is there; both are honest and
+neither ever produced a name.
 
-The last row is a defect of shape rather than of safety. A question about something outside the
-library should reach an abstention; it reaches a 502 because `propose_plan` has no honest default
-and spends its one repair before refusing.
+Composer latency is not stable. The same two questions measured 17.9 s and 24.3 s on one pass and
+42.3 s and 43.5 s on another, on packets of the same size. An abstention is fast because the
+composer is never called on an empty packet; the avatar's working state exists for the rest.
+
+### The last row used to be a 502
+
+A question about something outside the library came back HTTP 502 `model_refused`, which a caller
+cannot tell from the server falling over. It now abstains.
+
+**The cause was not what it looked like.** `entities` was null, so the empty-catalogue prompt was
+working. The planner was asked a question carrying no time at all and stamped the same instant
+into `start` and `end`, and a zero-width half-open window is empty by construction.
+`CaptureWindow._non_empty` is a Pydantic model validator, invisible to a schema-enforcing
+endpoint, so the failure lands locally after the endpoint has said yes. Reproduced three times
+out of three, the same `[now, now)` window each time.
+
+`answer_question` now catches the terminal planner failure and abstains under a fourth reason
+code, `UNANSWERABLE_NOT_UNDERSTOOD`, with `plan` and `selection` null. It catches the same defect
+wearing a 404 as well: `unknown_reference` on a plan the **model** proposed.
+
+**A fourth code rather than reusing `NOT_CAPTURED`, and that is the whole argument.**
+`NOT_CAPTURED` says "Nothing in your library matches". Saying that about a question nobody
+searched would assert a fact about somebody's photographs from a failure to read their sentence,
+and M3 would score it as a correct abstention. That is exactly the laundering M3 adds reason
+codes to prevent, and it is the same argument that added `NOT_IN_MODALITY`.
+
+**`plan` is null rather than empty**, because an empty plan is legal and means *everything*, and
+reporting one would say the whole library was searched when nothing was. That is the same reason
+`propose_plan` still refuses instead of returning one.
+
+Two things are deliberately still refusals:
+
+* `POST /selection/plan` still answers 502. Its whole job is to return a plan, so it has nothing
+  to abstain with.
+* `unknown_reference` on a **caller-supplied** plan is still 404. That code is deliberately one
+  code for "not there" and "not yours" so the surface is not an existence oracle, and answering
+  200 would let a stranger read existence off the difference between an abstention and a refusal.
+  Only an id the model invented abstains, because that one was never the caller's to ask about.
 
 **The composer is the latency, and its own fallback is four times faster.**
 
-| Model | Role | Packet 1 | Packet 2 | Conformed |
-| --- | --- | --- | --- | --- |
-| `Qwen/Qwen3-235B-A22B-Instruct-2507` | planner | 1.1 s | 2.5 s | yes |
-| `nvidia/Nemotron-3_5-Lightning` | composer | 16.7 s | 21.8 s | yes |
-| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | composer, pinned | 4.8 s | 5.6 s | yes |
-| `nvidia/nemotron-3-super-120b-a12b` | escalation, one call | 2.3 s | n/a | yes |
+| Model | Role | Packet 1 | Packet 2 | Packet 3 | Conformed |
+| --- | --- | --- | --- | --- | --- |
+| `Qwen/Qwen3-235B-A22B-Instruct-2507` | planner | 1.1 s | 2.5 s | n/a | yes |
+| `nvidia/Nemotron-3_5-Lightning` | composer | 16.7 s | 21.8 s | n/a | yes |
+| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | composer, pinned | 7.9 s | 7.4 s | **never finished** | twice of three |
+| `nvidia/nemotron-3-super-120b-a12b` | escalation | 2.3 s | n/a | n/a | once of three |
 
 The reasoning core spends almost all of its wall clock on reasoning it cannot be told to skip:
 4354 of 4416 completion tokens on one answer, 5673 of 5731 on the other. Its declared fallback
-answered the same packets in a quarter of the time and reported no reasoning tokens at all.
+answered the same packets in roughly a fifth of the time and reported no reasoning tokens at all.
 
-**Pointing `reasoning_cheap` at the Nano is the obvious proposal and it is not made here.** It is
-a change to `models.manifest.json`, which this task was told not to edit, and two questions is
-not evidence about answer quality. The measurement is offered as the ground a decision could
-rest on.
+**And on a third packet the fallback ran away.** It spent all 32768 completion tokens without
+producing an answer, and the composer fell through to the deterministic floor. That is why
+pointing `reasoning_cheap` at the Nano is offered here as a proposal and not made: two packets in
+a fifth of the time and a third that never finished is a reason to measure more, not a model swap
+this measurement supports. It is also a change to `models.manifest.json`, which this task was
+told not to edit.
 
-`nvidia/nemotron-3-super-120b-a12b` conformed, so the "returns text that is not JSON" line in
-`question.py` no longer reproduces on a full packet. On an empty one, in the same session, it
-answered with a top-level JSON array rather than the object the schema asked for. It is reliably
-neither, which is why nothing routes to it and why validating the reply locally is what makes the
-difference visible rather than silent.
+`nvidia/nemotron-3-super-120b-a12b` conformed once and did not twice. On one ten-item packet it
+returned exactly what the original note describes, text that is not JSON at all; on another it
+answered correctly; on an empty packet it returned a top-level JSON array rather than an object.
+It is reliably neither, which is why nothing routes to it, and why validating every reply locally
+is what makes the difference visible instead of silent.
 
-Spend: 3860 micro-dollars for the recorded pass, about 10600 across every pass including the one
-that answered nothing, against a cap of $0.50. The balance behind it was NOT verified: the
+Spend: 7360 micro-dollars for the recorded pass, about 25000 across all five passes, against a
+cap of $0.50. The balance behind it was NOT verified: the
 inference API exposes no balance endpoint and the Token Factory console failed to render its
 billing panel, so a three-token embedding call was made first to prove the credential serves and
 the prepaid balance is not exhausted.

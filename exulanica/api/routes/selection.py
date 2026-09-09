@@ -166,8 +166,17 @@ class AnswerView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     answer: Answer
-    plan: SelectionPlan
-    selection: SelectionView
+    #: The Selection the answer rests on, or ``null``.
+    #:
+    #: Nullable since 2026-09-09, and only for one case: ``abstained`` is
+    #: ``UNANSWERABLE_NOT_UNDERSTOOD`` and the planner never produced a runnable Selection, so
+    #: there is nothing to show. It is null rather than an empty plan because an empty plan is
+    #: legal and means EVERYTHING, and reporting one here would say the whole library was
+    #: searched when nothing was.
+    plan: SelectionPlan | None
+    #: What the Selection resolved to, or ``null`` when none was run. Null is not an empty
+    #: selection: an empty one is a search that found nothing.
+    selection: SelectionView | None
     citations: dict[str, str] = Field(
         description="Citation token to the permalink it resolves to, for this response only."
     )
@@ -229,8 +238,12 @@ def ask(
     return AnswerView(
         answer=outcome.answer,
         plan=outcome.plan,
-        selection=_view(outcome.result),
-        citations={item.token: item.uri for item in outcome.packet.items},
+        selection=None if outcome.result is None else _view(outcome.result),
+        citations=(
+            {}
+            if outcome.packet is None
+            else {item.token: item.uri for item in outcome.packet.items}
+        ),
         abstained=outcome.abstention,
         deterministic=outcome.deterministic,
         repaired=outcome.repaired,

@@ -45,6 +45,7 @@ from exulanica.selection import (
     SelectionPlan,
     Session,
     abstain,
+    abstain_without_a_selection,
     build_packet,
     execute,
     render_deterministic_answer,
@@ -404,10 +405,34 @@ def test_an_empty_selection_never_reaches_the_model(answered):
     assert all(not clause.citations for clause in outcome.answer.clauses)
 
 
-def test_the_three_abstention_codes_are_distinct_values():
-    """M3: "Merging them lets a system that always says 'I don't know' score perfectly.\""""
-    assert len({str(code) for code in Abstention}) == 3
+def test_every_abstention_code_is_a_distinct_value():
+    """M3: "Merging them lets a system that always says 'I don't know' score perfectly."""
+    assert len({str(code) for code in Abstention}) == 4
     assert Abstention.NOT_CAPTURED != Abstention.AMBIGUOUS != Abstention.NOT_IN_MODALITY
+    assert Abstention.NOT_UNDERSTOOD not in (
+        Abstention.NOT_CAPTURED,
+        Abstention.AMBIGUOUS,
+        Abstention.NOT_IN_MODALITY,
+    )
+
+
+def test_a_question_that_never_became_a_search_does_not_claim_the_library_was_searched():
+    """The whole reason the fourth code exists, as one assertion.
+
+    ``NOT_CAPTURED`` says "Nothing in your library matches". Reusing it for a planning failure
+    would be asserting that about photographs nobody looked at, from a failure to read a
+    sentence, and M3 would score it as a correct abstention.
+    """
+    answer, reason = abstain_without_a_selection("the model returned something that is not a plan")
+    assert reason is Abstention.NOT_UNDERSTOOD
+    assert all(clause.type is ClauseType.META for clause in answer.clauses)
+    assert all(not clause.citations for clause in answer.clauses)
+
+    said = " ".join(clause.text for clause in answer.clauses).lower()
+    assert "matches" not in said, "this must not claim the library was searched"
+    assert "not looked" in said
+    # The model's raw output never reaches the reader. It goes to `rejections`.
+    assert "not a plan" not in said
 
 
 # -- injection ---------------------------------------------------------------------------

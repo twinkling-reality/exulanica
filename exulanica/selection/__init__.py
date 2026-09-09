@@ -28,6 +28,7 @@ from exulanica.selection.answer import (
     AnswerRejected,
     ClauseType,
     abstain,
+    abstain_without_a_selection,
     render_deterministic_answer,
     validate_answer,
 )
@@ -102,6 +103,7 @@ __all__ = [
     "ValidatedPlan",
     "ValueReference",
     "abstain",
+    "abstain_without_a_selection",
     "answer_question",
     "build_packet",
     "compose_answer",

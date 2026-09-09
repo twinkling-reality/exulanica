@@ -156,6 +156,9 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'abstention.UNANSWERABLE_NOT_CAPTURED': 'No photograph in the library matches that.',
   'abstention.UNANSWERABLE_AMBIGUOUS': 'That could be read more than one way.',
   'abstention.UNANSWERABLE_NOT_IN_MODALITY': 'Answering that would need something a photograph does not hold.',
+  // The fourth is not about the library at all. It says the question never became a search, so
+  // it must not borrow the wording of the first, which claims nothing matched.
+  'abstention.UNANSWERABLE_NOT_UNDERSTOOD': 'That did not become a search, so nothing was looked at.',
 
   // Evidence behind an answer. A chip that cannot open says so instead of opening nothing.
   'answer.openEvidence': 'Open the photograph',
@@ -182,6 +185,12 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'A model was asked and took {duration}. What it wrote was not supported by the evidence, so '
     + 'this is the answer built from the search itself.',
   'provenance.none': 'No model was asked. This is what the search found.',
+  // A model WAS asked and gave back something unusable. Saying "no model was asked" here would
+  // be false, and saying anything about the search would be false too, because there was none.
+  'provenance.unreadable': 'A model was asked and could not turn that into a search.',
+  'provenance.unreadableNamed':
+    '{model} read the question in {duration} and could not turn it into a search of your '
+    + 'photographs.',
 });
 
 /**

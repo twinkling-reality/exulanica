@@ -43,6 +43,7 @@ __all__ = [
     "AnswerRejected",
     "ClauseType",
     "abstain",
+    "abstain_without_a_selection",
     "render_deterministic_answer",
     "validate_answer",
 ]
@@ -91,6 +92,22 @@ class Abstention(StrEnum):
     AMBIGUOUS = "UNANSWERABLE_AMBIGUOUS"
     #: The answer would need audio, speech or continuous time, none of which this corpus has.
     NOT_IN_MODALITY = "UNANSWERABLE_NOT_IN_MODALITY"
+    #: The question could not be turned into a Selection at all, so nothing was searched.
+    #:
+    #: **A fourth code, added for the same reason the third was, and it is the same argument.**
+    #: M3 adds ``NOT_IN_MODALITY`` so "the corpus's modality gap" is not "laundered into a
+    #: general abstention score". This is the planning gap and it launders the same way, in the
+    #: direction that matters most: without it, a question the planner could not express would
+    #: have to be reported as ``NOT_CAPTURED``, which asserts that nothing in the library matches
+    #: when the library was never looked at. That is a claim about the user's photographs made
+    #: from a failure to read their sentence, and it would be scored as a correct abstention.
+    #:
+    #: Measured 2026-09-09 against the live endpoint, which is why this exists rather than being
+    #: hypothetical: "What is the current exchange rate for the pound?" produced a Selection
+    #: naming an entity id that is not a UUID, twice, and the question failed with HTTP 502.
+    #: A model failing to fill in a form is not the server falling over, and it is not evidence
+    #: about a photograph library either.
+    NOT_UNDERSTOOD = "UNANSWERABLE_NOT_UNDERSTOOD"
 
 
 class AnswerClause(BaseModel):
@@ -178,6 +195,39 @@ def validate_answer(answer: Answer, packet: EvidencePacket) -> Answer:
     if reasons:
         raise AnswerRejected(tuple(reasons))
     return answer
+
+
+def abstain_without_a_selection(detail: str) -> tuple[Answer, Abstention]:
+    """The answer when the question never became a search, and the code M3 scores it under.
+
+    Separate from :func:`abstain` because it takes no packet, and it takes no packet because
+    there is not one: the planner failed before anything was executed. That is the whole
+    distinction the code carries, and it is why this cannot borrow the sentence below. "Nothing
+    in your library matches" is a statement about the library. This says what actually happened,
+    which is that the sentence could not be turned into a search.
+
+    ``detail`` is the failure in the system's own words and is NOT put in the answer. It goes to
+    ``AnsweredQuestion.rejections``, where the composer's refusals go, because the model's raw
+    output has no business being read aloud to somebody who asked a question.
+
+    Every clause is ``meta``, for the reason the sibling gives: M3 scores a false answer as "a
+    historical factual claim emitted on an unanswerable question", so an abstention that emitted
+    a historical clause would be the failure it exists to avoid.
+    """
+    return (
+        Answer(
+            clauses=[
+                AnswerClause(
+                    text=(
+                        "I could not turn that into a search of your photographs, so I have not "
+                        "looked. Ask it another way and I will try again."
+                    ),
+                    type=ClauseType.META,
+                )
+            ]
+        ),
+        Abstention.NOT_UNDERSTOOD,
+    )
 
 
 def abstain(

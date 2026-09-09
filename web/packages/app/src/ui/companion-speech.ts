@@ -44,6 +44,15 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
   const spent = duration(provenance.latencyMs);
   if (provenance.composed === 'none') return say('provenance.none');
 
+  if (provenance.composed === 'unreadable') {
+    // Named when a planner call was recorded, unnamed when both attempts raised before any
+    // result reached the recorder. Either way it does not mention a search, because there
+    // wasn't one.
+    return provenance.plannedBy === null
+      ? say('provenance.unreadable')
+      : fill('provenance.unreadableNamed', { model: provenance.plannedBy, duration: spent });
+  }
+
   if (provenance.composed === 'search') {
     // A model read the question and none wrote the answer. Falling through to
     // `provenance.none` here, which is what this function used to do whenever no composing

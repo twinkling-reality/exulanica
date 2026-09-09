@@ -2,7 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { AskUnavailable, CompanionAskClient } from '../src/companion-ask-api.js';
+import { AskUnavailable, CompanionAskClient, type Abstention } from '../src/companion-ask-api.js';
+import { say } from '../src/ui/copy.js';
 
 /**
  * The browser's half of the answer path, against the shapes the API actually sends.
@@ -285,6 +286,62 @@ describe('asking the library a question', () => {
     expect(answer.evidence).toHaveLength(0);
   });
 
+  it('does not say "no model was asked" when a model was asked and failed', async () => {
+    /*
+     * The planner-failure abstention, whose calls are usually NOT in the list: both attempts
+     * raise inside the client before any result reaches the recorder. The empty list used to
+     * fall through to `none`, which prints "No model was asked" over an answer two models had
+     * just been asked to produce.
+     */
+    const { fetch, seen } = transport(json(answerBody({
+      answer: {
+        clauses: [{
+          text: 'I could not turn that into a search of your photographs, so I have not looked.',
+          type: 'meta', citations: [], value_refs: [],
+        }],
+      },
+      plan: null,
+      selection: null,
+      citations: {},
+      abstained: 'UNANSWERABLE_NOT_UNDERSTOOD',
+      execution: { prompt_version: 'selection-2', calls: [], rejections: ['not a plan'] },
+    })));
+    const answer = await new CompanionAskClient({ ...WHERE, fetch }).ask('exchange rate?');
+
+    expect(answer.abstained).toBe('UNANSWERABLE_NOT_UNDERSTOOD');
+    expect(answer.provenance.composed).toBe('unreadable');
+    expect(answer.provenance.servedModel).toBeNull();
+    // A null plan must not be posted to the packet route, and there is nothing cited anyway.
+    expect(seen).toHaveLength(1);
+    expect(answer.evidence).toHaveLength(0);
+  });
+
+  it('names the planner when the Selection it produced could not be run', async () => {
+    const { fetch } = transport(json(answerBody({
+      answer: {
+        clauses: [{ text: 'I could not turn that into a search.', type: 'meta', citations: [], value_refs: [] }],
+      },
+      selection: null,
+      citations: {},
+      abstained: 'UNANSWERABLE_NOT_UNDERSTOOD',
+      execution: {
+        prompt_version: 'selection-2',
+        rejections: ['unknown_reference'],
+        calls: [call({
+          role: 'structured_extraction',
+          requested_model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+          served_model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+          latency_ms: 2100,
+        })],
+      },
+    })));
+    const answer = await new CompanionAskClient({ ...WHERE, fetch }).ask('who was with me?');
+
+    expect(answer.provenance.composed).toBe('unreadable');
+    expect(answer.provenance.plannedBy).toBe('Qwen/Qwen3-235B-A22B-Instruct-2507');
+    expect(answer.provenance.latencyMs).toBe(2100);
+  });
+
   it('names the fallback when the primary was the one that was withdrawn', async () => {
     const { fetch } = transport(
       json(answerBody({
@@ -354,6 +411,25 @@ describe('asking the library a question', () => {
     expect(signals).toHaveLength(4);
     expect(new Set(signals).size).toBe(4);
     for (const signal of signals) expect(signal?.aborted).toBe(false);
+  });
+
+  it('has a sentence for every abstention code the server can send', () => {
+    /*
+     * An unmapped key renders AS THE KEY, visibly, which is copy.ts's deliberate choice. That
+     * makes this the guard that matters when a fourth code is added to the backend enum and the
+     * table is not: the screen would read "abstention.UNANSWERABLE_NOT_UNDERSTOOD" to somebody
+     * who asked a question.
+     */
+    const codes: readonly Abstention[] = [
+      'UNANSWERABLE_NOT_CAPTURED',
+      'UNANSWERABLE_AMBIGUOUS',
+      'UNANSWERABLE_NOT_IN_MODALITY',
+      'UNANSWERABLE_NOT_UNDERSTOOD',
+    ];
+    for (const code of codes) {
+      const key = `abstention.${code}`;
+      expect(say(key), `${key} has no sentence`).not.toBe(key);
+    }
   });
 
   it('never sends the token in a query string', async () => {
