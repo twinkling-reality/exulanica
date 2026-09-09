@@ -198,13 +198,22 @@ Established by execution, on this branch:
   "Looking through your library" for a claim about a person that nobody chose.
 * `docs/companion-question-main.patch` applies to `main.ts` at 5675b33, and section 7 is that
   patch applied and driven in a browser.
+* That the planner prompt describes the form the schema actually sends. Every field the prompt
+  offers `null` is nullable in the generated JSON Schema, and the one array field is offered `[]`.
+  This is the invariant `selection-2` broke, and it is a test rather than a habit.
 
 NOT established here, and stated plainly:
 
 * **No answer quality is measured.** Five questions is not a gold question set, and
   `evaluation-methodology.md` M3 needs one before an abstention rate or a hallucination rate
-  means anything. Section 6 records what four answers said and what two silences were; it scores
-  none of them. Every test in this repository still drives a scripted transport.
+  means anything. Section 6 records what five answers said; it scores none of them. Every test in
+  this repository still drives a scripted transport.
+* **Three of the `selection-3` rules are held by the prompt and by nothing else.** That a
+  historical clause cites a source is enforced; **what that source depicts is not**, and cannot
+  be, because the validator resolves a token and never sees a photograph. The composer asserting
+  a person into a picture it has no description of is refused by wording alone, and a model that
+  ignored the wording would pass every mechanical check. This is the sharpest limit in the whole
+  path and it is why section 6.1 records the failure rather than only the fix.
 * **No latency claim from the tests.** The scripted transport returns instantly, so every
   `latency_ms` in a test is zero or near it, which is a true measurement of a fake. The numbers
   in section 6 come from the live run and from nowhere else.
@@ -233,55 +242,82 @@ constant is an input to the response cache key.
 
 | Question | Outcome | Model latency | Wall clock | Cost |
 | --- | --- | --- | --- | --- |
-| When were these photographs taken? | Answered, one cited historical clause | 42.3 s | 42.3 s | 2038 uUSD |
-| How many photographs are there? | Answered, `capture_count` 51 | 43.5 s | 43.6 s | 2337 uUSD |
-| What is this place? | Abstained, `UNANSWERABLE_NOT_CAPTURED` | 1.8 s | 1.9 s | 139 uUSD |
-| Who is in these photographs? | Answered, hedged, named nobody | 38.9 s | 39.2 s | 2092 uUSD |
-| What is the current exchange rate for the pound? | Abstained, `UNANSWERABLE_NOT_UNDERSTOOD` | n/a | 6.7 s | 0 |
+| When were these photographs taken? | *"These photographs were taken on 2026-02-01"*, cited | 40.2 s | 40.2 s | 2119 uUSD |
+| How many photographs are there? | *"Your photographs number 51."* | 27.3 s | 27.4 s | 1656 uUSD |
+| What is this place? | Abstained, `UNANSWERABLE_NOT_CAPTURED` | 10.4 s | 10.5 s | 449 uUSD |
+| Who is in these photographs? | *"Your photographs contain no describable information about people"* | 10.1 s | 10.1 s | 1219 uUSD |
+| What is the current exchange rate for the pound? | *"Your photographs do not contain any information about currency exchange rates."* | 6.6 s | 6.7 s | 1235 uUSD |
 
-**Nobody was named on a workspace with no named entities**, which is the failure the whole path
-exists against. Across passes the "who" question came back both ways, sometimes as an abstention
-and sometimes as an `uncertain` clause saying it cannot tell who is there; both are honest and
-neither ever produced a name.
+**Nobody was named on a workspace with no named entities.** That is the failure the whole path
+exists against, and getting there took three prompt corrections rather than one; section 6.1 is
+the sequence. Composer latency is not stable: the same two questions measured between 17.7 s and
+54.5 s across passes on packets of the same size. An abstention is fast because the composer is
+never called on an empty packet.
 
-Composer latency is not stable. The same two questions measured 17.9 s and 24.3 s on one pass and
-42.3 s and 43.5 s on another, on packets of the same size. An abstention is fast because the
-composer is never called on an empty packet; the avatar's working state exists for the rest.
+### 6.1 The out-of-library question, from a 502 to an answer, in three steps
 
-### The last row used to be a 502
+**It was a 502.** `model_refused`, which a caller cannot tell from the server falling over.
 
-A question about something outside the library came back HTTP 502 `model_refused`, which a caller
-cannot tell from the server falling over. It now abstains.
-
-**The cause was not what it looked like.** `entities` was null, so the empty-catalogue prompt was
-working. The planner was asked a question carrying no time at all and stamped the same instant
-into `start` and `end`, and a zero-width half-open window is empty by construction.
-`CaptureWindow._non_empty` is a Pydantic model validator, invisible to a schema-enforcing
-endpoint, so the failure lands locally after the endpoint has said yes. Reproduced three times
-out of three, the same `[now, now)` window each time.
+**Step one: the answer path learned to abstain.** The cause was not what it looked like.
+`entities` was null, so the empty-catalogue prompt was working. The planner was asked a question
+carrying no time at all and stamped the same instant into `start` and `end`. A zero-width
+half-open window is empty by construction, and `CaptureWindow._non_empty` is a Pydantic model
+validator, invisible to a schema-enforcing endpoint, so the refusal lands locally after the call
+is paid for. Three times out of three.
 
 `answer_question` now catches the terminal planner failure and abstains under a fourth reason
 code, `UNANSWERABLE_NOT_UNDERSTOOD`, with `plan` and `selection` null. It catches the same defect
 wearing a 404 as well: `unknown_reference` on a plan the **model** proposed.
 
-**A fourth code rather than reusing `NOT_CAPTURED`, and that is the whole argument.**
-`NOT_CAPTURED` says "Nothing in your library matches". Saying that about a question nobody
-searched would assert a fact about somebody's photographs from a failure to read their sentence,
-and M3 would score it as a correct abstention. That is exactly the laundering M3 adds reason
-codes to prevent, and it is the same argument that added `NOT_IN_MODALITY`.
+**A fourth code rather than reusing `NOT_CAPTURED`.** That one says "Nothing in your library
+matches". Saying it about a question nobody searched would assert a fact about somebody's
+photographs from a failure to read their sentence, and M3 would score it as a correct abstention.
+That is the laundering M3 adds reason codes to prevent, and it is the argument that added
+`NOT_IN_MODALITY`. `plan` is null rather than empty for the same family of reason: an empty plan
+is legal and means *everything*.
 
-**`plan` is null rather than empty**, because an empty plan is legal and means *everything*, and
-reporting one would say the whole library was searched when nothing was. That is the same reason
-`propose_plan` still refuses instead of returning one.
+**Step two: the planner stopped failing, and the instruction that broke it was one this work
+added.** `selection-2` told the planner that "`entities`, `time`, `place`, `capture` and
+`semantic_query` are each either a value or null". `time` is an **array** and takes no null. A
+model that tried null there would be refused by the schema, so it filled the field instead. That
+line was added one turn earlier, while fixing the entity case.
 
-Two things are deliberately still refusals:
+`selection-3` states the empty value per field, says a window is half-open with `end` strictly
+after `start`, and says never to put the current time in a window at all. **A test now holds the
+prompt against the schema it describes**, so the two cannot drift again; the negative control is
+in the commit message of its own test, and the `selection-2` wording fails it.
+
+Measured after: `time: []` on all five questions and no planner failure in any pass. The
+abstention from step one therefore no longer fires here. It remains the floor for a planner that
+genuinely cannot produce a runnable Selection, and its tests drive that shape directly.
+
+**Step three: the composer had to learn two things before the answer was honest.** With the
+planner succeeding, the question reached the composer, and:
+
+* Asked who is in them, on a workspace with zero entities and zero captions where every packet
+  line carries `text: null`, it wrote *"This photograph features an individual not further
+  identified"* three times, each citing a token that resolves. **The validator passed it.**
+  Mechanism 1 checks that a claim is supported by a source; it cannot check what that source
+  depicts.
+* Asked for an exchange rate it answered *"51 photographs are captured"*, which invents nothing
+  and answers nothing.
+
+Two rules close both: you have not seen any photograph and know nothing about one with no
+description, and if the evidence has nothing to do with the question, say so plainly and stop.
+Plus a list of this system's own words that may not appear in an answer, because the first draft
+of the rule modelled the very word it was forbidding and the model dutifully echoed it.
+
+**Three of those rules are held by the prompt and nothing else**, and that is stated here rather
+than implied. The validator cannot refute a claim about what a photograph shows.
+
+Two things stay refusals, deliberately:
 
 * `POST /selection/plan` still answers 502. Its whole job is to return a plan, so it has nothing
   to abstain with.
 * `unknown_reference` on a **caller-supplied** plan is still 404. That code is deliberately one
   code for "not there" and "not yours" so the surface is not an existence oracle, and answering
   200 would let a stranger read existence off the difference between an abstention and a refusal.
-  Only an id the model invented abstains, because that one was never the caller's to ask about.
+  Only an id the model invented abstains.
 
 **The composer is the latency, and its own fallback is four times faster.**
 
@@ -309,7 +345,7 @@ answered correctly; on an empty packet it returned a top-level JSON array rather
 It is reliably neither, which is why nothing routes to it, and why validating every reply locally
 is what makes the difference visible instead of silent.
 
-Spend: 7360 micro-dollars for the recorded pass, about 25000 across all five passes, against a
+Spend: 6678 micro-dollars for the recorded pass, about 55000 across all nine passes, against a
 cap of $0.50. The balance behind it was NOT verified: the
 inference API exposes no balance endpoint and the Token Factory console failed to render its
 billing panel, so a three-token embedding call was made first to prove the credential serves and

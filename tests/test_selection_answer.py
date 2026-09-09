@@ -557,6 +557,160 @@ def test_the_plan_is_kept_with_the_answer(answered):
     assert not outcome.deterministic
 
 
+# -- the prompts, held against the schema they describe ----------------------------------------
+#
+# A prompt is not enforcement, which this module says twice. But a prompt that describes the
+# FORM WRONGLY is worse than one that says nothing: it teaches the model to do something the
+# schema will refuse. That is not hypothetical here. `selection-2` told the planner that
+# `entities`, `time`, `place`, `capture` and `semantic_query` "are each either a value or null".
+# `time` is an array and takes no null. Asked a question with no time in it, the model filled the
+# field instead of emptying it, wrote the same instant into `start` and `end`, and the window was
+# empty by construction. Every question carrying no time failed.
+#
+# So the half of the prompt that describes the form is checked against the form.
+
+
+def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
+    """The regression that produced a zero-width capture window, as an invariant.
+
+    Both halves matter. The schema half means this cannot rot into asserting the prompt against
+    itself: if a field stops being nullable, or a new list field appears, the first two
+    assertions fail and somebody has to look at the sentence.
+    """
+    from exulanica.models.schema import response_format_for
+    from exulanica.selection.question import _PLANNER_SYSTEM
+
+    properties = response_format_for(SelectionPlan)["json_schema"]["schema"]["properties"]
+    nullable = {
+        name
+        for name, spec in properties.items()
+        if any(option.get("type") == "null" for option in spec.get("anyOf", ()))
+    }
+    arrays = {name for name, spec in properties.items() if "items" in spec}
+
+    assert nullable == {"entities", "place", "capture", "semantic_query"}
+    assert arrays == {"time"}, "a new list field needs its own empty value in the prompt"
+
+    paragraph = next(
+        (
+            line
+            for line in _PLANNER_SYSTEM.splitlines()
+            if "the empty answer differs by field" in line
+        ),
+        None,
+    )
+    assert paragraph is not None, "the prompt no longer says what an empty field looks like"
+    assert "take null" in paragraph, (
+        "the prompt no longer separates the fields that take null from the ones that do not, "
+        "which is the shape `selection-2` had when it told the model a list field was nullable"
+    )
+    offered_null, offered_empty_list = paragraph.split("take null", 1)
+
+    for name in arrays:
+        assert f"`{name}` takes []" in offered_empty_list, f"{name} is a list and needs []"
+        assert f"`{name}`" not in offered_null, (
+            f"{name} is an array: offering it null teaches the model to fill it instead"
+        )
+    for name in nullable:
+        assert f"`{name}`" in offered_null, f"{name} takes null and the prompt should say so"
+
+
+def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant():
+    """The rule ``CaptureWindow._non_empty`` enforces, said where the model can act on it.
+
+    Measured three times out of three against the live endpoint: asked "What is the current
+    exchange rate for the pound?", a question with no time in it at all, the planner wrote the
+    current instant into both ends. The validator is a Pydantic model validator, so the
+    schema-enforcing endpoint cannot see it and the refusal lands after the call is paid for.
+    """
+    from exulanica.selection.question import _PLANNER_SYSTEM
+
+    assert "strictly AFTER" in _PLANNER_SYSTEM
+    assert "empty window" in _PLANNER_SYSTEM
+    # And the specific thing it actually did, named so it is not merely implied.
+    assert "CURRENT time" in _PLANNER_SYSTEM
+
+
+def test_the_planner_is_told_when_epistemic_scope_is_not_its_choice():
+    """Measured twice in three live asks: it chose ``include_proposals`` unprompted.
+
+    Nothing reached under that scope may be cited, so the packet comes back uncitable and an
+    answerable question becomes an ``UNANSWERABLE_AMBIGUOUS`` abstention telling the reader to
+    confirm matches, about a question that never mentioned confidence.
+    """
+    from exulanica.selection.question import _PLANNER_SYSTEM
+
+    for scope in EpistemicScope:
+        assert scope.value in _PLANNER_SYSTEM, f"the prompt does not say when to choose {scope}"
+    assert "unless the question ASKS about guesses" in _PLANNER_SYSTEM
+
+
+def test_the_composer_is_told_its_clause_type_is_not_prose():
+    """Measured: "Historical: this photograph was taken on 2026-02-01" reached a person's screen.
+
+    Tied to :class:`ClauseType` rather than to a list written twice, so a fourth clause kind
+    fails this until the prompt forbids leaking that one too.
+    """
+    from exulanica.selection.question import _COMPOSER_SYSTEM
+
+    for clause_type in ClauseType:
+        label = f'"{clause_type.value.capitalize()}:"'
+        assert label in _COMPOSER_SYSTEM, f"the prompt does not forbid a {label} prefix"
+
+
+def test_the_composer_is_told_it_has_not_seen_any_photograph():
+    """The one rule the validator cannot enforce, so it has to be in the prompt and recorded.
+
+    Measured: on a workspace with zero entities and zero captions, where every packet line
+    carries ``text: null``, the composer wrote "This photograph features an individual not
+    further identified" three times. Each cited a token that resolves, so
+    :func:`validate_answer` passed it: mechanism 1 checks that a claim is SUPPORTED by a source
+    and cannot check what that source depicts.
+    """
+    from exulanica.selection.question import _COMPOSER_SYSTEM
+
+    assert "YOU HAVE NOT SEEN ANY PHOTOGRAPH" in _COMPOSER_SYSTEM
+    assert "inventing a person is the worst thing" in _COMPOSER_SYSTEM
+
+
+def test_the_composer_is_told_to_say_so_when_the_evidence_is_beside_the_point():
+    """Measured: asked for an exchange rate, it answered "51 photographs are captured"."""
+    from exulanica.selection.question import _COMPOSER_SYSTEM
+
+    assert "has nothing to do with the question" in _COMPOSER_SYSTEM
+
+
+def test_the_composer_is_told_which_count_answers_how_many_there_are():
+    """Measured: asked how many photographs there are on a library of 51, it answered ten.
+
+    Both counts are value references, so the validator passes either. The difference is that one
+    of them answers the question and the other answers a question about this system's packet
+    size, which is not a thing the reader has.
+    """
+    from exulanica.selection.question import _COMPOSER_SYSTEM
+
+    assert "capture_count" in _COMPOSER_SYSTEM and "shown_count" in _COMPOSER_SYSTEM
+    assert "Answer about the LIBRARY" in _COMPOSER_SYSTEM
+
+
+def test_the_composer_is_told_which_words_are_the_machinery_and_not_the_answer():
+    """Measured: "The packet contains no descriptions of who appears in the photographs".
+
+    Honest, and written in the vocabulary of the thing rather than of the person holding it. The
+    rule is listed as words rather than as a principle so that it is checkable, and so that the
+    sentence the model is being asked NOT to write does not appear in the instruction telling it
+    not to.
+    """
+    from exulanica.selection.question import _COMPOSER_SYSTEM
+
+    forbidden = ("packet", "selection", "evidence", "clause", "token", "query")
+    rule = next(
+        line for line in _COMPOSER_SYSTEM.splitlines() if "Write for the person who asked" in line
+    )
+    for word in forbidden:
+        assert f'"{word}"' in rule, f"{word} is machinery and the rule should name it"
+
+
 # -- what the answer actually cost, read off the response rather than the manifest ------------
 #
 # `docs/product-direction.md` makes this a delivery gate rather than telemetry: the memory
