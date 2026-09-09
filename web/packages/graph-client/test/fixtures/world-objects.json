@@ -1,0 +1,119 @@
+{
+  "$provisional": "Written by the renderer and interface task before any /world-objects route existed, from the field list in docs/world-objects-contract.md. Replace this whole file with the one the backend task publishes; the client parsers and their tests are the things that will tell you what disagrees. Wire keys are snake_case, as every other Exulanica response is, and the client is the only layer that renames them.",
+  "$shape": "One envelope holding the three GET responses the client reads, keyed by route so a replacement can be diffed against the routes rather than against this arrangement.",
+
+  "assets": {
+    "registry_version": 1,
+    "assets": [
+      {
+        "asset_id": "standing-lantern",
+        "label": "Standing lantern",
+        "container": "glb/2.0",
+        "reference": {
+          "href": "/world-objects/assets/standing-lantern/bytes",
+          "authorization": "workspace-bearer",
+          "content_sha256": "3d0f8a1c7b5e2949d6c81f34a70b52e8cd91647af0328b5d6e1c9407b2a8f351",
+          "byte_size": 20348
+        },
+        "origin": "fictional-source",
+        "footprint": { "radius": 0.28, "height": 1.65 },
+        "supported_behaviours": ["motion.bounded"]
+      },
+      {
+        "asset_id": "field-marker",
+        "label": "Field marker",
+        "container": "glb/2.0",
+        "reference": {
+          "href": "/world-objects/assets/field-marker/bytes",
+          "authorization": "workspace-bearer",
+          "content_sha256": "b71c4e0a92d8563f18ea27cb40915d63f8a2074e5c39bd18620fa4c7e93d5182",
+          "byte_size": 8112
+        },
+        "origin": "appearance-reference",
+        "footprint": { "radius": 0.15, "height": 0.9 },
+        "supported_behaviours": ["motion.bounded"]
+      },
+      {
+        "asset_id": "withdrawn-figure",
+        "label": "Withdrawn figure",
+        "container": "glb/2.0",
+        "reference": null,
+        "origin": "personal-association",
+        "footprint": { "radius": 0.4, "height": 1.8 },
+        "supported_behaviours": []
+      }
+    ]
+  },
+
+  "objects": {
+    "world_version_id": "wv-0002",
+    "based_on_world_version_id": "wv-0001",
+    "recorded_sha256": "9f2b6104c8ad35e7b0146fa9d283517ce640b8fa27d5913e04ac7be6182f0d94",
+    "objects": [
+      {
+        "object_id": "obj-0001",
+        "asset_id": "standing-lantern",
+        "region_id": "region-volcanic",
+        "scene_id": "scene-volcanic-01",
+        "scene_from_object": [
+          1, 0, 0, 0.75,
+          0, 1, 0, 0,
+          0, 0, 1, -1.5,
+          0, 0, 0, 1
+        ],
+        "origin": "fictional-source",
+        "behaviour": {
+          "behaviour_id": "motion.bounded",
+          "parameters": { "axis": "y", "amplitude": 0.35, "period": 4 }
+        },
+        "based_on_world_version_id": "wv-0001",
+        "recorded_sha256": "51c8e70b3a94df26185cb0e7f4a3926d0be581cf72a4d3096be15748ca20f8b3"
+      },
+      {
+        "object_id": "obj-0002",
+        "asset_id": "field-marker",
+        "region_id": "region-volcanic",
+        "scene_id": "scene-volcanic-01",
+        "scene_from_object": [
+          0.7071067811865476, 0, 0.7071067811865476, -2.25,
+          0, 1, 0, 0,
+          -0.7071067811865476, 0, 0.7071067811865476, 3,
+          0, 0, 0, 1
+        ],
+        "origin": "appearance-reference",
+        "behaviour": null,
+        "based_on_world_version_id": "wv-0001",
+        "recorded_sha256": "2ea6f9147d0538bc61a94e7f03d2856b1ca4079e5f38d6210b7ce4a985f31d60"
+      },
+      {
+        "object_id": "obj-0003",
+        "asset_id": "standing-lantern",
+        "region_id": "region-volcanic",
+        "scene_id": "scene-volcanic-01",
+        "scene_from_object": [
+          1, 0, 0, 4,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1
+        ],
+        "origin": "fictional-source",
+        "$note": "A behaviour id this build does not support, kept in the fixture on purpose: the milestone requires that it fail visibly rather than render as a motionless object with no explanation.",
+        "behaviour": {
+          "behaviour_id": "motion.orbit",
+          "parameters": { "radius": 2, "period": 8 }
+        },
+        "based_on_world_version_id": "wv-0001",
+        "recorded_sha256": "6b03fa5d7c418d29e05b7fa316c8402d1e7b93f5a06c84e1d2937bf0a5e24c19"
+      }
+    ]
+  },
+
+  "placement": {
+    "$note": "The 201 answer to POST /world-objects/versions/{id}/objects, and the 200 replay of the same proposal id.",
+    "object_id": "obj-0004",
+    "world_version_id": "wv-0003",
+    "based_on_world_version_id": "wv-0002",
+    "recorded_sha256": "c40a7e18b3d962f5074ac1e8b25d3f9016ea7c4b8d20539fe671ba394c02d8f7",
+    "already_recorded": false
+  }
+}

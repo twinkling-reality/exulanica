@@ -7,4 +7,9 @@ fixtures/
 # which are tens of megabytes and are rebuilt by `pnpm synth`.
 !packages/atlas-react/test/fixtures/
 !packages/atlas-react/test/fixtures/*.opm
+# ...and except the world-objects contract fixture, which is hand written rather than generated:
+# it is 4 KB of wire shapes that `world-objects-api.test.ts` parses, and losing it would leave the
+# client's tests reading a file that is not in the repository.
+!packages/graph-client/test/fixtures/
+!packages/graph-client/test/fixtures/*.json
 bakeoff-results/
