@@ -82,6 +82,7 @@ questions in both.
 | [demo-runbook.md](demo-runbook.md) | What can be demonstrated today and what cannot, audited against the build rather than against the plan, with the remaining gaps named | Mixed, buildability audited 2026-08-28 |
 | [demo-integrity.md](demo-integrity.md) | What is pre-seeded versus computed live and the prohibitions that follow, the hosted topology and its per-visitor reset, unattended operation, the failure modes with a fallback for each, and the pre-demonstration checklist | Mixed, DECISION with OPEN items inline |
 | [platform-findings.md](platform-findings.md) | Findings on Token Factory, AI Cloud, the NVIDIA models and Tavily, each carrying the execution or the primary source that evidences it, ending with a prioritised list | Mixed. Sections 1 to 3 executed 2026-08-27, section 4 documentation-verified 2026-08-28 |
+| [engineering-log.md](engineering-log.md) | The struggles the other documents round off: dead ends, tests that were wrong, tools that misled, assumptions a measurement overturned. Newest first. A record is for commissioned and gated work; this is for everything else worth remembering | Running, appended as work happens |
 
 ### Decision records
 
