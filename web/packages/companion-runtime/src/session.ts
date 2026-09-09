@@ -13,8 +13,20 @@ import { finalizeDraft, makeDraft } from './draft.js';
 import { escapeDraft } from './escapes.js';
 import type { IdFactory } from './ids.js';
 import { sequentialIds } from './ids.js';
-import type { CompanionMemory, TranscriptEntry } from './memory.js';
-import { EMPTY_MEMORY, recordAsked, recordEscape, recordTranscript } from './memory.js';
+import type {
+  CompanionMemory,
+  PersistedAnswer,
+  PersistedMemory,
+  TranscriptEntry,
+} from './memory.js';
+import {
+  EMPTY_MEMORY,
+  memoryFromPersisted,
+  recordAsked,
+  recordEscape,
+  recordTranscript,
+  standingAnswers,
+} from './memory.js';
 import { generateTurn } from './generator.js';
 import { subjectFootprint } from './pool.js';
 import { draftFromParse, parseUtterance } from './parse.js';
@@ -37,6 +49,12 @@ import { findOption } from './turn.js';
  * tier's confirmation requirements are unmet. Behind it sits graph-client's `ProposalGate`,
  * which refuses again on its own terms. Two independent checks, because the guarantee is worth
  * more than the duplication.
+ *
+ * `adoptPersistedMemory` is the one method added since, and it is worth saying what it is not.
+ * Durable memory is what the person has already told this Companion to leave alone; it decides
+ * which questions may be ASKED and it never decides what may be written. It reaches `#memory`
+ * and nothing else, and there is no path from a stored answer to a `ProposalDraft` anywhere in
+ * this package.
  */
 
 export type SelectionOutcome =
@@ -72,6 +90,19 @@ export interface CompanionSessionOptions {
   readonly gate: ProposalGate;
   readonly ids?: IdFactory;
   readonly memory?: CompanionMemory;
+  /**
+   * Durable memory to open with, and the instant to fold it against.
+   *
+   * One field carrying both rather than two fields beside each other, because a `PersistedMemory`
+   * with no instant is not a thing that can be folded: `memoryFromPersisted` decides which
+   * cooldowns are still in force, and the caller's clock is the only honest source for that.
+   * Pairing them here makes the missing half a type error instead of a silently wrong window.
+   *
+   * Optional because a session is often opened before its memory has arrived. The app's
+   * composition root builds the engine while `GET /graph` is the only thing it has waited for,
+   * and hands the durable memory over later through `adoptPersistedMemory`.
+   */
+  readonly persisted?: { readonly memory: PersistedMemory; readonly nowMs: number };
   /** Which mount point this session's confirmations render in. Tier 3 is refused in `dialogue`. */
   readonly surface?: ConfirmationSurface;
   readonly anchorForEvidence?: ReadonlyMap<EvidenceHandle, string>;
@@ -81,6 +112,15 @@ export class CompanionSession {
   #snapshot: GraphSnapshot;
   #memory: CompanionMemory;
   #turn: Turn | null = null;
+  /**
+   * What this person has already been told, newest first, with corrections resolved.
+   *
+   * Held beside the memory rather than inside it because it is not an input to a turn. Nothing in
+   * `generateTurn`, `hardSuppression` or the value function reads an answer: what suppresses a
+   * question is an ESCAPE, and mixing the two would put stored prose one field away from the
+   * policy that decides what the Companion says next.
+   */
+  #remembered: readonly PersistedAnswer[] = Object.freeze([]);
   readonly #gate: ProposalGate;
   readonly #ids: IdFactory;
   readonly #surface: ConfirmationSurface;
@@ -94,6 +134,9 @@ export class CompanionSession {
     this.#memory = options.memory ?? EMPTY_MEMORY;
     this.#surface = options.surface ?? 'dialogue';
     this.#anchorForEvidence = options.anchorForEvidence ?? new Map<EvidenceHandle, string>();
+    if (options.persisted !== undefined) {
+      this.adoptPersistedMemory(options.persisted.memory, options.persisted.nowMs);
+    }
   }
 
   get snapshot(): GraphSnapshot {
@@ -102,6 +145,53 @@ export class CompanionSession {
 
   get memory(): CompanionMemory {
     return this.#memory;
+  }
+
+  /** Every answer that still stands, newest first. A correction hides what it corrected. */
+  get rememberedAnswers(): readonly PersistedAnswer[] {
+    return this.#remembered;
+  }
+
+  /** The last thing this person was told, or null. Exposed so a surface can put it back. */
+  get lastAnswer(): PersistedAnswer | null {
+    return this.#remembered[0] ?? null;
+  }
+
+  /**
+   * Take on durable memory that arrived after the session opened.
+   *
+   * **THIS IS NOT A WRITE PATH AND CANNOT BECOME ONE.** It touches `#memory` and `#remembered`
+   * and nothing else: not `#gate`, not `#pending`, not `#snapshot`. Nothing it stores is read by
+   * `#stage`, and no value it accepts is a `ProposalDraft` or reaches one, so the invariant at
+   * the top of this file is untouched by it. A method rather than construction only, because the
+   * app builds this engine from `GET /graph` in `session.ts` and the memory is a second request
+   * that has not landed yet; refusing a method would have meant either blocking the world on the
+   * memory read or building the engine twice.
+   *
+   * **The session's own half of the memory is kept.** The load is asynchronous and can land after
+   * a turn has already been delivered, so taking the folded object wholesale would forget what
+   * this sitting has already asked and the generator would re-ask it on the next advance. The
+   * durable fields come from the fold and the session-scoped fields stay where they were, which
+   * is the same line `memoryFromPersisted` draws and the reason it is drawn in one place.
+   */
+  adoptPersistedMemory(persisted: PersistedMemory, nowMs: number): void {
+    const durable = memoryFromPersisted(persisted, nowMs);
+    this.#memory = Object.freeze({
+      ...durable,
+      dismissed: this.#memory.dismissed,
+      askedThisSession: this.#memory.askedThisSession,
+      spokeAtMs: this.#memory.spokeAtMs,
+      transcript: this.#memory.transcript,
+      // The larger of the two rather than their product. In the ordinary case this session has
+      // taken no escape yet and its multiplier is 1, so the fold's value simply wins; if a Skip
+      // HAS been taken here and the same row also came back from the store, multiplying would
+      // count one Skip twice and charge the person double for saying one thing once.
+      initiativeCooldownMultiplier: Math.max(
+        durable.initiativeCooldownMultiplier,
+        this.#memory.initiativeCooldownMultiplier,
+      ),
+    });
+    this.#remembered = standingAnswers(persisted);
   }
 
   get currentTurn(): Turn | null {

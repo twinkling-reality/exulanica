@@ -749,7 +749,7 @@ def test_the_execution_record_names_the_model_that_answered_not_the_one_asked_fo
     compose_answer(client, "where was I?", packet, log=log)
 
     (call,) = log.calls
-    assert call.requested_model == "nvidia/Nemotron-3_5-Lightning"
+    assert call.requested_model == COMPOSER_PRIMARY
     assert call.served_model == "served/by-something-else"
     assert call.role == "reasoning_cheap"
     assert call.used_fallback is False
@@ -779,7 +779,7 @@ def test_both_calls_are_listed_in_the_order_the_question_made_them(answered):
     assert [call.role for call in outcome.calls] == ["structured_extraction", "reasoning_cheap"]
     assert [call.requested_model for call in outcome.calls] == [
         "Qwen/Qwen3-235B-A22B-Instruct-2507",
-        "nvidia/Nemotron-3_5-Lightning",
+        COMPOSER_PRIMARY,
     ]
 
 
@@ -851,7 +851,7 @@ def test_a_reported_count_is_carried_through_exactly(answered):
         [
             _usage_body(
                 _cited(packet),
-                model="nvidia/Nemotron-3_5-Lightning",
+                model=COMPOSER_PRIMARY,
                 prompt_tokens=1234,
                 completion_tokens=567,
                 reasoning_tokens=89,
@@ -891,25 +891,41 @@ def test_the_fallback_model_is_recorded_as_the_one_that_served(answered):
 
     packet = answered.packet()
     client = answered.client([])
-    answered.transport.by_model["nvidia/Nemotron-3_5-Lightning"] = model_not_found(
-        "nvidia/Nemotron-3_5-Lightning"
-    )
-    answered.transport.by_model["nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"] = HttpResponse(
+    answered.transport.by_model[COMPOSER_PRIMARY] = model_not_found(COMPOSER_PRIMARY)
+    answered.transport.by_model[COMPOSER_FALLBACK] = HttpResponse(
         status_code=200,
         text=json.dumps(
-            chat_body(
-                _cited(packet).model_dump_json(), model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-            )
+            chat_body(_cited(packet).model_dump_json(), model=COMPOSER_FALLBACK)
         ),
     )
     log = CallLog()
     compose_answer(client, "where was I?", packet, log=log)
 
     (call,) = log.calls
-    assert call.requested_model == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-    assert call.served_model == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    assert call.requested_model == COMPOSER_FALLBACK
+    assert call.served_model == COMPOSER_FALLBACK
     assert call.used_fallback is True
     assert call.attempts == 2, "the withdrawn primary cost one request before the fallback"
+
+
+#: The composer's binding, read from the manifest rather than repeated here.
+#:
+#: These assertions used to name `nvidia/Nemotron-3_5-Lightning` in eleven places, and moving the
+#: `reasoning_cheap` role on measured evidence broke four tests that were not about the identifier
+#: at all: they are about the composer asking the role's PRIMARY, and about a failover being
+#: recorded as the identifier that actually served. The manifest's own note says it is "the only
+#: place in this codebase where a model identifier appears"; a test that repeats one is a second
+#: place, and the next measured swap should move the manifest and nothing else.
+def _reasoning_cheap() -> tuple[str, str]:
+    from exulanica.models.manifest import load_manifest
+
+    role = load_manifest().roles["reasoning_cheap"]
+    assert role.fallback is not None, "this role's fallback is what the failover tests drive"
+    # `.model_id`, because a role binding resolves to a `ModelSpec` and not to a string.
+    return role.primary.model_id, role.fallback.model_id
+
+
+COMPOSER_PRIMARY, COMPOSER_FALLBACK = _reasoning_cheap()
 
 
 # -- which model does which job, and why it is not the other way round ------------------------
@@ -943,7 +959,7 @@ def test_the_composer_asks_the_nvidia_reasoning_core(answered):
     client = answered.client([_answer_body(good)])
     compose_answer(client, "where was I?", packet)
     called = answered.transport.models_called
-    assert called == ["nvidia/Nemotron-3_5-Lightning"], called
+    assert called == [COMPOSER_PRIMARY], called
 
 
 def test_the_planner_asks_the_extraction_role_and_the_measurement_says_why(answered):

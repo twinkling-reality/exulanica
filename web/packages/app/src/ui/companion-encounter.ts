@@ -18,6 +18,20 @@ export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
+  /**
+   * An answer has been taken by this surface. Fired once per arriving answer, AFTER it is drawn.
+   *
+   * The hook is here rather than in the controller because this is the file that renders, so
+   * "after the answer is on the screen" is a fact at this call site instead of an assumption
+   * about scheduling somewhere else. `reflect` has already run when it fires, which is also true
+   * in the case that looks like an exception and is not: an answer arriving while the Companion
+   * is away is held rather than drawn, and it is still an answer this surface accepted and will
+   * show on the next summon.
+   *
+   * It reports and decides nothing. `ui/` takes handlers and returns elements; what a host does
+   * with an answer, including keeping it, is the host's to decide.
+   */
+  readonly onAnswerShown?: (answer: CompanionAnswer) => void;
 }
 
 export interface CompanionEncounter {
@@ -41,6 +55,28 @@ export interface CompanionEncounter {
   reportAskFailure(failure: AskUnavailable): void;
   /** Whether an answer, rather than the turn, is what the panel is currently showing. */
   showingAnswer(): boolean;
+  /**
+   * Say that something the Companion was told to keep was not kept.
+   *
+   * Held like a late failure rather than appended once and lost. The write-back that fails can
+   * fail while the person is looking at the Index or walking around, and a notice written into a
+   * panel nobody has open is a notice nobody reads; this one waits for the next summon and is
+   * then drawn under whichever face is showing.
+   */
+  /**
+   * Put back an answer this person was already given, from durable memory.
+   *
+   * Separate from `showAnswer` for one reason and it is not stylistic: `onAnswerShown` does NOT
+   * fire here. A restored answer is not a new answer, and a host that stored it again on every
+   * mount would write one row per page load of a conversation that happened once, each of them
+   * claiming a latency nobody waited for.
+   *
+   * Everything else is identical, deliberately. A remembered answer renders through the same
+   * band, cites through the same chips and opens through the same masked route, because it is
+   * the same answer.
+   */
+  restoreAnswer(answer: CompanionAnswer): void;
+  noteMemoryFailure(reasonKey: string, detail: string): void;
   /**
    * What the panel is showing. `pressNumber` and `E` are routed by it.
    *
@@ -108,6 +144,8 @@ export function buildCompanionEncounter(
   let mode: PanelMode = 'turn';
   /** An answer that arrived while the Companion was away, held until it is summoned back. */
   let pendingFailure: AskUnavailable | null = null;
+  /** A durability notice, held on the same terms and for the same reason. */
+  let memoryNotice: { readonly reasonKey: string; readonly detail: string } | null = null;
   let lastQuestion: string | null = null;
   let currentPlacement: CompanionPlacement | null = null;
   let firstUsePrompt: FirstUsePrompt | null = null;
@@ -186,12 +224,22 @@ export function buildCompanionEncounter(
     else if (answer !== null) renderAnswer(answer);
     else if (mode === 'asking' && lastQuestion !== null) renderAsking(lastQuestion);
     else if (lastTurn !== null) renderTurn(lastTurn);
-    else renderPrompt();
+    else {
+      // The prompt replaces the speech band entirely, so there is nothing to append under.
+      renderPrompt();
+      return;
+    }
+    // Appended after the face is drawn, and re-appended on every draw because each of the four
+    // render paths replaces the speech band's children. One notice per render, never a stack.
+    if (memoryNotice !== null) speech.noteMemoryFailure(memoryNotice.reasonKey, memoryNotice.detail);
   }
 
   function backToQuestion(): void {
     answer = null;
     pendingFailure = null;
+    // The notice was about the answer that is now off the screen. Left standing, it would read as
+    // a statement about the open question, which nothing has tried to keep.
+    memoryNotice = null;
     mode = 'turn';
     root.removeAttribute('data-answering');
     reflect();
@@ -239,9 +287,21 @@ export function buildCompanionEncounter(
     askStarted(question) {
       answer = null;
       pendingFailure = null;
+      memoryNotice = null;
       lastQuestion = question;
       mode = 'asking';
       root.setAttribute('data-answering', 'asking');
+      reflect();
+    },
+    restoreAnswer(remembered) {
+      answer = remembered;
+      pendingFailure = null;
+      mode = 'answer';
+      root.setAttribute('data-answering', 'answered');
+      // Marked, so the surface and a test can both tell an answer that was just composed from
+      // one that was read back. Nothing styles it differently today; what it buys is that
+      // "is this a fresh answer" stops being a guess.
+      root.setAttribute('data-remembered', 'true');
       reflect();
     },
     showAnswer(shown) {
@@ -249,9 +309,24 @@ export function buildCompanionEncounter(
       pendingFailure = null;
       mode = 'answer';
       root.setAttribute('data-answering', 'answered');
+      root.removeAttribute('data-remembered');
       // Held rather than drawn when the Companion is away. The answer is not discarded: it is
       // what the person asked for, and summoning again shows it.
       reflect();
+      // AFTER the render, and after it unconditionally. A host that keeps answers must not be
+      // able to delay one reaching the screen or to stop one arriving at all.
+      try {
+        options.onAnswerShown?.(shown);
+      } catch (error) {
+        // Re-thrown out of band rather than swallowed or let through. Let through, it would reach
+        // the `catch` around `showAnswer` in `companion.ts` and be reported as a question that
+        // failed, which it was not: the question was answered and the answer is on the screen.
+        // Swallowed, a host defect would leave no trace anywhere. Out of band it is an uncaught
+        // error where uncaught errors belong, and the answer is untouched.
+        setTimeout(() => {
+          throw error;
+        });
+      }
     },
     reportAskFailure(failure) {
       answer = null;
@@ -261,6 +336,10 @@ export function buildCompanionEncounter(
       reflect();
     },
     showingAnswer: () => answer !== null,
+    noteMemoryFailure(reasonKey, detail) {
+      memoryNotice = { reasonKey, detail };
+      reflect();
+    },
     mode: () => mode,
     pressNumber(index) {
       // Only while the numbered options are ON THE SCREEN. See the comment on `mode`: the rail

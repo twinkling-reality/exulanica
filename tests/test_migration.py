@@ -81,12 +81,58 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 }
 
 
+#: Numbers assigned to concurrent branches that have not landed yet.
+#:
+#: A hole in the sequence is normally a file somebody lost, and the assertion below is what
+#: catches that. On a repository where numbers are handed out centrally across parallel
+#: worktrees it is also the shape a RESERVATION takes: 0042 was assigned to another task and
+#: 0043 to durable Companion memory, so whichever lands first carries a hole until the other
+#: arrives.
+#:
+#: **Closing the hole by renumbering is the worse failure by a wide margin**, and the sibling
+#: test below is the whole argument for why. Two branches claiming one number merge cleanly,
+#: because neither touched the other's file; ``apply_pending`` then runs both bodies and records
+#: only the first, and the next boot refuses to start citing checksum drift on a schema that has
+#: already forked. A hole is visible and harmless. A collision is invisible and is not.
+#:
+#: Every entry here is temporary by construction: it is deleted by whoever lands the number.
+RESERVED_ELSEWHERE: dict[str, str] = {
+    "0042": "assigned to a concurrent task; 0043 was reserved above it for companion memory",
+}
+
+
 def test_the_migrations_are_numbered_and_ordered():
     files = list(migrations())
-    assert [m.version for m in files] == [f"{number:04d}" for number in range(1, len(files) + 1)], [
-        m.version for m in files
+    versions = [m.version for m in files]
+
+    # Stated directly rather than inferred from the 0001..N equality, which used to carry this
+    # check implicitly and now cannot, because a reserved hole makes the count and the maximum
+    # version legitimately disagree. `migrations()` refuses a duplicate before enumeration
+    # reaches here at all; this is the second of the two independent checks.
+    assert len(set(versions)) == len(versions), versions
+    assert versions == sorted(versions), versions
+
+    expected = [
+        f"{number:04d}"
+        for number in range(1, int(versions[-1]) + 1)
+        if f"{number:04d}" not in RESERVED_ELSEWHERE
     ]
+    assert versions == expected, versions
     assert len(files) >= 8, "a migration went missing from the directory"
+
+
+def test_every_reserved_number_is_still_actually_missing():
+    """A reservation that outlived its branch is a hole nobody is filling.
+
+    Without this, landing 0042 would leave its entry behind and permanently excuse the next hole
+    at that number. The list has to shrink on its own or it stops meaning anything.
+    """
+    present = {migration.version for migration in migrations()}
+    landed = sorted(present & set(RESERVED_ELSEWHERE))
+    assert not landed, (
+        f"{landed} has landed, so delete it from RESERVED_ELSEWHERE and let the contiguity "
+        "assertion cover it again."
+    )
 
 
 def test_a_duplicate_migration_number_surviving_a_merge_refuses_to_enumerate(tmp_path, monkeypatch):
@@ -99,10 +145,12 @@ def test_a_duplicate_migration_number_surviving_a_merge_refuses_to_enumerate(tmp
     that single recorded checksum against the other file and refuses to start citing checksum
     drift, on a schema where both migrations have in fact already run.
 
-    The test above does fail on a duplicate, structurally: an extra file raises the count without
-    raising the maximum version, so the 0001..N equality cannot hold. But it fails by printing a
-    list diff that reads as a missing file, and it is a test, so it protects nothing that runs
-    outside pytest. This is the refusal in the library, checked here at the point of enumeration.
+    The test above does fail on a duplicate, by a uniqueness assertion that names it. It used to
+    fail structurally instead, because an extra file raised the count without raising the maximum
+    version and the 0001..N equality could not hold; that reasoning stopped applying when the
+    sequence was allowed a reserved hole, and the check it was carrying implicitly is now written
+    out. Either way it is a test, so it protects nothing that runs outside pytest. This is the
+    refusal in the library, checked here at the point of enumeration.
     """
     (tmp_path / "0001_spine.sql").write_text("begin;\ncommit;\n", encoding="utf-8")
     (tmp_path / "0002_alpha_change.sql").write_text("begin;\ncommit;\n", encoding="utf-8")

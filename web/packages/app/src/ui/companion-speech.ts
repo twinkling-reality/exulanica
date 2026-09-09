@@ -19,6 +19,18 @@ export interface CompanionSpeech {
   renderAsking(question: string): void;
   renderAnswer(answer: CompanionAnswer): void;
   reportAskFailure(failure: AskUnavailable): void;
+  /**
+   * Say that something was not kept, under whatever is currently being said.
+   *
+   * Appended rather than substituted, and that ordering is the whole point. An answer that
+   * reached the screen and failed to store is still a correct, cited answer to the question that
+   * was asked: a durability failure is not an answer failure, and replacing the sentence with a
+   * notice would take away the thing the person asked for because a second request went wrong.
+   * It is also not silent. A Companion that quietly forgot what it was told to remember is
+   * exactly the state this whole path exists to leave, and one that forgets without saying so is
+   * worse than one that never claimed to remember.
+   */
+  noteMemoryFailure(reasonKey: string, detail: string): void;
 }
 
 /**
@@ -192,6 +204,15 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
     },
     reportRefusal(reasonKey) {
       root.append(el('p', { class: 'companion-refusal', text: say(reasonKey) }));
+    },
+    noteMemoryFailure(reasonKey, detail) {
+      // The kind, then whatever the failing side said, which is the same two-sentence shape
+      // `reportAskFailure` uses. An empty detail is the case with no server in it at all: an
+      // answer whose citations this session could not resolve was refused here, not there.
+      root.append(el('p', { class: 'companion-memory-notice', text: say(reasonKey) }));
+      if (detail !== '') {
+        root.append(el('p', { class: 'companion-memory-notice-detail', text: detail }));
+      }
     },
   };
 }

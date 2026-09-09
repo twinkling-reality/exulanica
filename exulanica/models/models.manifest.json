@@ -1,6 +1,6 @@
 {
   "manifest_version": "1",
-  "pipeline_version": 1,
+  "pipeline_version": 2,
   "base_url": "https://api.tokenfactory.nebius.com/v1",
   "catalog_url": "https://tokenfactory.nebius.com/api/public/models_info",
   "api_key_env": "NEBIUS_API_KEY",
@@ -139,10 +139,10 @@
 
   "roles": {
     "reasoning_cheap": {
-      "primary": "nvidia/Nemotron-3_5-Lightning",
-      "fallback": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "primary": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "fallback": "nvidia/Nemotron-3_5-Lightning",
       "required_use_cases": ["text", "reasoning"],
-      "rationale": "Every Companion turn and every cross-scene continuity decision. Context length, not parameter count, is the binding constraint on a long shallow reasoning task over an evidence packet."
+      "rationale": "Every Companion turn and every cross-scene continuity decision. SWAPPED on 48 measured composer calls over the same four packets, recorded in docs/evaluation/2026-09-09-companion-memory.json. The Nano answered at a median of 3627 ms against 18617 ms, 5.1 times faster, with zero validator rejections in 24 calls against one for the Lightning, and it never exhausted its ceiling. The single runaway that made this a proposal rather than a change on the predecessor record did not reproduce in 24 attempts. Prices are identical, so the swap costs nothing and is not a saving. The mechanism is in the usage object: the Lightning spends a median 5190 reasoning tokens per answer and the Nano reports none, on answers of about 60 tokens either way. The rationale here previously read that context length was the binding constraint; a ten-item packet measured 1325 prompt tokens, so the Nano 262144 window holds roughly two thousand items and the constraint was never binding at any observed size. The Lightning remains the fallback and keeps its 1048576 window for the case where it becomes so."
     },
     "reasoning_mid": {
       "primary": "nvidia/nemotron-3-super-120b-a12b",

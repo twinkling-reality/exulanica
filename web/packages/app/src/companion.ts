@@ -99,6 +99,18 @@ export interface CompanionController {
   say(text: string): void;
   /** The evidence behind a chip, for opening the photograph it came from. */
   evidenceAt(index: number): EvidenceHandle | null;
+  /**
+   * Put back an answer this person was already given, from durable memory.
+   *
+   * It goes through the controller rather than straight to the panel, and running it in a
+   * browser is what proved that matters. `evidenceAt` resolves a chip against the controller's
+   * OWN held answer, so a restored answer drawn by calling `panel.restoreAnswer` directly
+   * rendered its chips correctly and opened nothing: `shownAnswer()` returned null, the lookup
+   * fell through to the turn's evidence, and the open turn was an acknowledgement with none.
+   * The citation was on the screen and dead. Nothing in the unit tests could see it, because
+   * both halves were individually correct.
+   */
+  restoreAnswer(remembered: CompanionAnswer): void;
   /** The answer on the screen, if one is. Exposed so a test can read what was rendered. */
   answer(): CompanionAnswer | null;
   /** Whether a turn is open. Drives the presence's attending behavior. */
@@ -262,6 +274,10 @@ export function createCompanionController(
       const shown = shownAnswer();
       if (shown !== null) return shown.evidence[index]?.handle ?? null;
       return turn?.evidence[index] ?? null;
+    },
+    restoreAnswer(remembered) {
+      answer = remembered;
+      panel?.restoreAnswer(remembered);
     },
     answer: shownAnswer,
     active: () => panel?.state() === 'open',

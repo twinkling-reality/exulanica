@@ -44,6 +44,7 @@ from fastapi.responses import JSONResponse
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.routes import (
+    companion,
     evidence,
     formation,
     geometry,
@@ -172,6 +173,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(geometry.router)
     app.include_router(geometry.scene_router)
     app.include_router(selection.router)
+    app.include_router(companion.router)
     app.include_router(identity.router)
     app.include_router(evidence.router)
     app.include_router(formation.router)

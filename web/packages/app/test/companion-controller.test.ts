@@ -22,8 +22,22 @@ const ANSWER: CompanionAnswer = {
   deterministic: false,
   repaired: false,
   evidence: [
-    { token: 'TOKENAAAA1', uri: 'exulanica://blob/ni:///sha-256;aaaa', handle: 'span-a', capturedAt: null },
-    { token: 'TOKENBBBB2', uri: 'exulanica://blob/ni:///sha-256;bbbb', handle: null, capturedAt: null },
+    {
+      token: 'TOKENAAAA1',
+      uri: 'exulanica://blob/ni:///sha-256;aaaa',
+      handle: 'span-a',
+      captureId: 'capture-a',
+      capturedAt: null,
+    },
+    // The packet located neither the span nor the capture for this one, so it renders as a
+    // chip that cannot open and it is not something a stored answer may claim to have quoted.
+    {
+      token: 'TOKENBBBB2',
+      uri: 'exulanica://blob/ni:///sha-256;bbbb',
+      handle: null,
+      captureId: null,
+      capturedAt: null,
+    },
   ],
   provenance: {
     composed: 'model',
@@ -411,5 +425,36 @@ describe('free text that turns out to be a question', () => {
     expect(controller.answer()).toBeNull();
     expect(panel.root.textContent).toContain('Noted.');
     expect(advance).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('an answer restored from durable memory', () => {
+  /**
+   * The defect this exists for was found by running it, not by testing it, and it was invisible
+   * to both halves: the panel drew the chips correctly and the controller resolved chips
+   * correctly, and the restored answer still opened nothing because the controller had never
+   * been told about it. `evidenceAt` fell through to the open turn, which was an acknowledgement
+   * with no evidence, so `E` pointed at nothing and the citation on the screen was dead.
+   */
+  it('resolves its citations, so the chip on the screen opens the photograph it names', () => {
+    const panel = buildCompanionEncounter({
+      onSelect: () => undefined,
+      onSubmit: () => undefined,
+      onSay: () => undefined,
+      onEvidence: () => undefined,
+    });
+    const controller = createCompanionController({
+      companion: refusing('refused.noSubject'),
+      onAwaitingConfirmation: () => undefined,
+    });
+    controller.attach(panel);
+    controller.summon(Date.now());
+    controller.restoreAnswer(ANSWER);
+    expect(panel.showingAnswer()).toBe(true);
+    expect(controller.answer()?.text).toBe(ANSWER.text);
+    expect(controller.evidenceAt(0)).toBe('span-a');
+    // The second citation is one the packet could not locate. It stops at null rather than
+    // falling through to the turn's evidence, which is a different photograph.
+    expect(controller.evidenceAt(1)).toBeNull();
   });
 });

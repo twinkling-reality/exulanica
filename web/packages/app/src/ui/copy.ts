@@ -150,6 +150,29 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'ask.failed.refused': 'The question was refused.',
   'ask.failed.unreachable': 'The question did not reach the library.',
 
+  // An answer that reached the screen and was not kept. Said out loud, and said UNDER the answer
+  // rather than instead of it, because the two facts are separate: the answer is correct and
+  // cited, and the Companion will not have it next time. A Companion that quietly forgot what it
+  // was told to keep is the state this whole path exists to leave, and one that forgets without
+  // saying so is worse than one that never offered to remember.
+  //
+  // Five kinds rather than one sentence, on the same argument as the four above: "something went
+  // wrong" is the reply that tells a person nothing they can act on.
+  'memory.notKept.unauthenticated': 'This session is no longer allowed to keep what it was told.',
+  'memory.notKept.unknown_reference': 'That answer is no longer here to change.',
+  'memory.notKept.refused': 'The library would not keep this answer.',
+  'memory.notKept.unreadable': 'The library answered in a form this page could not read.',
+  'memory.notKept.unreachable': 'This answer did not reach the library, so it is not kept.',
+  // The one refusal that is ours rather than the server's, and it says so.
+  'memory.notKept.incomplete':
+    'This answer is not kept, because one of the photographs it cites could not be located and a '
+    + 'later deletion of that photograph could not have reached it.',
+
+  // The read half, which fails differently and costs something different. A question that cannot
+  // be answered is a question; a memory that cannot be read is a Companion that has forgotten
+  // somebody, and it will ask them things they have already answered.
+  'memory.notLoaded': 'Earlier answers could not be loaded, so this Companion is starting fresh.',
+
   // The scored abstention categories, as labels for the answer the server already wrote. They
   // name the KIND of silence; the sentence itself stays the server's. evaluation-methodology.md
   // M3 keeps the three apart, because merging them lets a system that always declines score well.

@@ -2,7 +2,7 @@
 
 Neither setting is optional, and neither is a convenience.
 
-*   **``exulanica.workspace_id``.** 70 tables are under FORCE row-level security keyed on
+*   **``exulanica.workspace_id``.** 71 tables are under FORCE row-level security keyed on
     ``current_workspace()``, whose policy is ``workspace_id = current_workspace()`` and which
     reads exactly this setting. One more, ``consent_record``, is forced too and keyed on the
     tenant instead, which is why the number here counts the workspace-keyed ones rather than the
