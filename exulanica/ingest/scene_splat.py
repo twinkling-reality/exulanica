@@ -15,7 +15,7 @@ import tempfile
 import time
 import zipfile
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -34,6 +34,11 @@ class ContainerCleanupUnconfirmed(RuntimeError):
 #: The stage parameter is the single source of the budget, so the value that enters stage
 #: identity is the value the packager enforces.
 EVALUATION_MAX_BYTES = int(STAGES["scene_splat_evaluation"].params["max_bytes"])
+
+#: A capture reference in its ordinary lowercase dashed form. Spelled out rather than parsed with
+#: ``uuid.UUID`` because the value has to survive a canonical JSON round trip unchanged, and
+#: ``uuid.UUID`` accepts braces, urn prefixes and bare hex that would come back out reformatted.
+_CAPTURE_REF = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
 def evaluation_bundle(output: Path) -> bytes:
@@ -121,6 +126,53 @@ def evaluation_bundle(output: Path) -> bytes:
     return memory.getvalue()
 
 
+def _remap_from_payload(value: Any) -> tuple[tuple[str, str, str], ...]:
+    """Read the stored object form back into the ordered tuples the dataclass holds."""
+    if not isinstance(value, dict):
+        raise ValueError("training request masked_source_remap must be an object")
+    entries = []
+    for capture_ref, item in value.items():
+        if not isinstance(item, dict) or set(item) != {"source_sha256", "masked_source_sha256"}:
+            raise ValueError("a masked source remap entry is malformed")
+        entries.append((capture_ref, item["source_sha256"], item["masked_source_sha256"]))
+    return tuple(sorted(entries))
+
+
+def _validate_remap(remap: tuple[tuple[str, str, str], ...]) -> None:
+    """The shape rules a remap must satisfy before anything reads a digest out of it.
+
+    Spelled again in :mod:`exulanica.reconstruction.splat` rather than imported from here. The
+    layering contract forbids reconstruction from importing ingest, and the manifest has to be
+    able to refuse a malformed remap on its own, because the runner reads that manifest back from
+    a file inside a container with no database and no queue anywhere near it.
+    """
+    captures, originals, derivatives = [], [], []
+    for entry in remap:
+        if not isinstance(entry, tuple) or len(entry) != 3:
+            raise ValueError("a masked source remap entry is not a capture and two hashes")
+        capture_ref, original, masked = entry
+        if not isinstance(capture_ref, str) or not _CAPTURE_REF.fullmatch(capture_ref):
+            raise ValueError("a masked source remap entry has no exact capture reference")
+        for digest in (original, masked):
+            if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("a masked source remap entry needs exact source hashes")
+        if original == masked:
+            # A derivative whose bytes are the original's is a mask that painted nothing. Trusting
+            # it would let an unmasked photograph enter training under a masked member's name.
+            raise ValueError("a masked derivative cannot be the original bytes")
+        captures.append(capture_ref)
+        originals.append(original)
+        derivatives.append(masked)
+    if (
+        len(set(captures)) != len(captures)
+        or len(set(originals)) != len(originals)
+        or len(set(derivatives)) != len(derivatives)
+    ):
+        raise ValueError("a masked source remap names a capture, original or derivative twice")
+    if list(remap) != sorted(remap):
+        raise ValueError("a masked source remap must be ordered by capture reference")
+
+
 @dataclass(frozen=True, slots=True)
 class SceneSplatRequest:
     """An operator's explicit compute configuration, bound before any work is queued.
@@ -144,6 +196,10 @@ class SceneSplatRequest:
     max_floaters_fraction_millionths: int
     min_coverage_fraction_millionths: int
     max_browser_bytes: int
+    #: ``(capture_ref, original_sha256, masked_sha256)`` per hidden member, ordered by capture.
+    #: Derived from current privacy inputs at enqueue by :meth:`bind_masked_sources` and never
+    #: declared by an operator, who cannot know a derivative digest that does not exist yet.
+    masked_source_remap: tuple[tuple[str, str, str], ...] = ()
 
     def __post_init__(self) -> None:
         for name, value in asdict(self).items():
@@ -152,6 +208,7 @@ class SceneSplatRequest:
                 "requested_gpu",
                 "dependency_inventory",
                 "heldout_source_sha256",
+                "masked_source_remap",
             }:
                 continue
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -178,6 +235,7 @@ class SceneSplatRequest:
             for digest in self.heldout_source_sha256
         ):
             raise ValueError("training request needs exact held-out source hashes")
+        _validate_remap(self.masked_source_remap)
 
     def validate_sources(self, sources: tuple[str, ...]) -> None:
         heldout = set(self.heldout_source_sha256)
@@ -218,6 +276,16 @@ class SceneSplatRequest:
         value = {"profile": "exulanica.scene-splat-request/v1", **asdict(self)}
         value["dependency_inventory"] = list(self.dependency_inventory)
         value["heldout_source_sha256"] = list(self.heldout_source_sha256)
+        # Absent when nobody in the set is hidden, for the same reason `masked_sources` is absent
+        # from the build inputs then: a corpus with no people in it keeps the exact request bytes,
+        # build input digest and job identity it had before this key existed.
+        if self.masked_source_remap:
+            value["masked_source_remap"] = {
+                capture_ref: {"source_sha256": original, "masked_source_sha256": masked}
+                for capture_ref, original, masked in self.masked_source_remap
+            }
+        else:
+            value.pop("masked_source_remap")
         canonical_json(value)  # Reject floats or other noncanonical queue input.
         return value
 
@@ -230,6 +298,10 @@ class SceneSplatRequest:
             if not isinstance(arguments.get(key), list):
                 raise ValueError(f"training request {key} must be a list")
             arguments[key] = tuple(arguments[key])
+        if "masked_source_remap" in arguments:
+            arguments["masked_source_remap"] = _remap_from_payload(
+                arguments["masked_source_remap"]
+            )
         try:
             request = cls(**arguments)
         except TypeError as error:
@@ -238,12 +310,64 @@ class SceneSplatRequest:
             raise ValueError("noncanonical scene training request")
         return request
 
+    def bind_masked_sources(
+        self, remap: list[dict[str, str]], *, sources: tuple[str, ...]
+    ) -> SceneSplatRequest:
+        """Freeze which derivative replaced each hidden original, and resolve the split onto it.
+
+        This is the whole remap, and it runs once, here, where the current privacy inputs that
+        chose those derivatives were just read. The alternative -- carrying originals forward and
+        relaxing the manifest's rule that held-out hashes are a subset of the training sources --
+        was refused: with the rule relaxed, a partially masked scene still matches its unmasked
+        held-out views, so `load_dataset` finds one held-out view, raises nothing, and quietly
+        trains on the masked photographs the split said it was withholding.
+
+        The request an operator wrote keeps naming the photographs they actually reviewed. What
+        the queue stores names the bytes training will read, beside the map that says which is
+        which, so neither statement has to be inferred from the other later.
+        """
+        if self.masked_source_remap:
+            raise ValueError("a masked source remap is derived at enqueue, never declared")
+        if not remap:
+            return self
+        entries = tuple(
+            sorted(
+                (item["capture_ref"], item["source_sha256"], item["masked_source_sha256"])
+                for item in remap
+            )
+        )
+        admitted = set(sources)
+        if any(original not in admitted for _, original, _ in entries):
+            raise ValueError("a masked source remap names bytes outside this admitted scene")
+        resolution = {original: masked for _, original, masked in entries}
+        heldout = tuple(resolution.get(digest, digest) for digest in self.heldout_source_sha256)
+        if len(set(heldout)) != len(heldout):
+            raise ValueError("a masked source remap collapses two held-out photographs into one")
+        return replace(self, heldout_source_sha256=heldout, masked_source_remap=entries)
+
     def manifest(self, pose: PoseBuildManifest) -> SplatBuildManifest:
+        """Bind the frozen remap to the frames this build will stage, or refuse the build.
+
+        The pose frames are the ground truth of what training reads: the worker has already
+        re-resolved every declared mask against current privacy inputs and rebound each hidden
+        member to its derivative. So this is where a remap that was frozen against a mask which
+        has since been rebuilt, or one whose entries were swapped between two hidden members,
+        stops being a build. The manifest itself cannot make this check, because it never learns
+        which capture a hash belonged to.
+        """
+        carried = {frame.capture_ref: frame.sha256 for frame in pose.frames}
+        for capture_ref, _original, masked in self.masked_source_remap:
+            if carried.get(capture_ref) != masked:
+                raise ValueError(
+                    "the frozen masked source remap does not bind the derivative this scene's "
+                    "pose frames carry; rebuild the mask and re-admit the scene"
+                )
         return SplatBuildManifest(
             scene_ref=pose.scene_ref,
             code_revision=pose.code_revision,
             pose_manifest_digest=pose.digest,
             source_sha256=tuple(frame.sha256 for frame in pose.frames),
+            masked_source_remap=self.masked_source_remap,
             gsplat_revision=GSPLAT_REVISION,
             execution_image=self.execution_image,
             requested_gpu=self.requested_gpu,

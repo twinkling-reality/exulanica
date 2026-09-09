@@ -36,7 +36,9 @@ __all__ = [
     "SplatBuildManifest",
     "SplatJobResult",
     "SplatQuality",
+    "masked_training_binding",
     "run_gsplat_job",
+    "verify_masked_training_sources",
 ]
 
 _RUNNER_PROFILE = "exulanica.gsplat-scene-runner/v1"
@@ -71,6 +73,11 @@ def _sha(value: str, field: str) -> None:
         raise ValueError(f"{field} must be lowercase SHA-256 hex")
 
 
+#: A capture reference in its ordinary lowercase dashed form, matched rather than parsed so the
+#: value survives a canonical JSON round trip byte for byte.
+_CAPTURE_REF = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
 def _positive(value: float, field: str, *, allow_zero: bool = False) -> None:
     if not math.isfinite(value) or value < 0 or (not allow_zero and value == 0):
         qualifier = "non-negative" if allow_zero else "positive"
@@ -99,6 +106,11 @@ class SplatBuildManifest:
     max_floaters_fraction: float
     min_coverage_fraction: float
     max_browser_bytes: int
+    #: ``(capture_ref, original_sha256, masked_sha256)`` for every member whose photograph was
+    #: replaced by a masked derivative before pose ran, ordered by capture reference. Empty for a
+    #: scene with nobody hidden in it, and omitted from the payload then, so those builds keep the
+    #: manifest digest and job directory they had before this existed.
+    masked_source_remap: tuple[tuple[str, str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.scene_ref or not self.requested_gpu:
@@ -125,6 +137,7 @@ class SplatBuildManifest:
                 raise ValueError(f"{field} must be positive")
         if self.checkpoint_every > self.max_iterations:
             raise ValueError("checkpoint_every cannot exceed max_iterations")
+        self._check_masked_source_remap()
         if (
             not self.heldout_source_sha256
             or len(set(self.heldout_source_sha256)) != len(self.heldout_source_sha256)
@@ -145,6 +158,58 @@ class SplatBuildManifest:
             raise ValueError("min_coverage_fraction must be between zero and one")
         if self.max_browser_bytes <= 0:
             raise ValueError("max_browser_bytes must be positive")
+
+    def _check_masked_source_remap(self) -> None:
+        """Every rule about hidden members that can be decided from hashes alone.
+
+        The two that matter are the last two. A derivative that is not among the training sources
+        is a claim about bytes this build never reads; an original that *is* among them means the
+        photograph a person asked to be hidden in reached the trainer, which is the failure this
+        whole path exists to make impossible rather than unlikely.
+        """
+        captures, originals, derivatives = [], [], []
+        for entry in self.masked_source_remap:
+            if len(entry) != 3:
+                raise ValueError("a masked source remap entry is not a capture and two hashes")
+            capture_ref, original, masked = entry
+            if any(not isinstance(item, str) for item in entry):
+                # A ValueError rather than the TypeError `re.fullmatch` would raise on a number:
+                # the runner's `main` catches only ValueError, RuntimeError, OSError and
+                # ImportError, so anything else reaches an operator as a traceback in a stderr
+                # tail instead of as the one refusal line the controller records.
+                raise ValueError("a masked source remap entry is not a capture and two hashes")
+            if not _CAPTURE_REF.fullmatch(capture_ref):
+                raise ValueError("a masked source remap entry has no exact capture reference")
+            _sha(original, "masked source original digest")
+            _sha(masked, "masked derivative digest")
+            if original == masked:
+                raise ValueError("a masked derivative cannot be the original bytes")
+            captures.append(capture_ref)
+            originals.append(original)
+            derivatives.append(masked)
+        if (
+            len(set(captures)) != len(captures)
+            or len(set(originals)) != len(originals)
+            or len(set(derivatives)) != len(derivatives)
+        ):
+            raise ValueError("a masked source remap names a capture, original or derivative twice")
+        if list(self.masked_source_remap) != sorted(self.masked_source_remap):
+            raise ValueError("a masked source remap must be ordered by capture reference")
+        if not set(derivatives) <= set(self.source_sha256):
+            raise ValueError("a masked derivative is not among the training sources")
+        if set(originals) & set(self.source_sha256):
+            raise ValueError("a masked capture's original bytes are among the training sources")
+
+    @property
+    def heldout_original_source_sha256(self) -> tuple[str, ...]:
+        """The withheld views named by the photographs a person reviewed, not by the derivatives.
+
+        Identical to ``heldout_source_sha256`` when nobody is hidden. It exists so a receipt can
+        say which photograph each held-out render corresponds to without anything having to read
+        that photograph, or hold it, to find out.
+        """
+        originals = {masked: original for _, original, masked in self.masked_source_remap}
+        return tuple(originals.get(digest, digest) for digest in self.heldout_source_sha256)
 
     def as_payload(self) -> dict[str, object]:
         return {
@@ -170,6 +235,19 @@ class SplatBuildManifest:
                 "gaussian_cap": self.gaussian_cap,
                 "heldout_every": self.heldout_every,
                 "heldout_source_sha256": list(self.heldout_source_sha256),
+                **(
+                    {
+                        "masked_source_remap": {
+                            capture_ref: {
+                                "source_sha256": original,
+                                "masked_source_sha256": masked,
+                            }
+                            for capture_ref, original, masked in self.masked_source_remap
+                        }
+                    }
+                    if self.masked_source_remap
+                    else {}
+                ),
             },
             "cost_rate": {"usd_per_gpu_hour": self.usd_per_gpu_hour},
             "quality_thresholds": {
@@ -402,6 +480,56 @@ def _verify_pose_receipt(manifest: SplatBuildManifest, path: Path, dataset_dir: 
             "dataset sparse model bytes differ from the accepted pose artifact inventory"
         )
     return selected
+
+
+def masked_training_binding(manifest: SplatBuildManifest) -> dict[str, object]:
+    """What a split receipt has to say when this scene hid somebody, and nothing when it did not.
+
+    Kept out of the unmasked case deliberately. A scene with no people in it writes the same
+    ``split.json`` bytes it wrote before this existed, so its runtime digest binding, its retained
+    evaluation bundle and every receipt downstream of them reproduce exactly.
+    """
+    if not manifest.masked_source_remap:
+        return {}
+    return {
+        "masked_source_remap": [
+            {
+                "capture_ref": capture_ref,
+                "source_sha256": original,
+                "masked_source_sha256": masked,
+            }
+            for capture_ref, original, masked in manifest.masked_source_remap
+        ],
+        "heldout_original_source_sha256": list(manifest.heldout_original_source_sha256),
+        "reference_pixels": (
+            "masked-derivative-bytes-only: every held-out render is scored against the masked "
+            "derivative, and no original photograph of a hidden member is read, rendered or "
+            "compared at any point in this build"
+        ),
+    }
+
+
+def verify_masked_training_sources(manifest: SplatBuildManifest, dataset_dir: Path) -> None:
+    """Re-derive the remap from the staged bytes, before rectification or a single view.
+
+    The manifest's own rules are about hashes agreeing with each other; this one is about hashes
+    agreeing with files. It is the last point at which an original that should have been masked
+    can still be caught by something other than a person looking at a render, which is what the
+    extra pass over the images buys. A build with nobody hidden in it returns immediately and pays
+    nothing: it has no remap to re-derive, and `_verify_dataset_sources` has already proved its
+    staged bytes are exactly the manifest's sources.
+    """
+    if not manifest.masked_source_remap:
+        return
+    staged = {_digest_file(path) for path in (dataset_dir / "images").rglob("*") if path.is_file()}
+    if {original for _, original, _ in manifest.masked_source_remap} & staged:
+        raise ValueError(
+            "the staged training dataset holds an original the mask inputs require to be masked"
+        )
+    if not {masked for _, _, masked in manifest.masked_source_remap} <= staged:
+        raise ValueError("a declared masked derivative is not among the staged training images")
+    if not set(manifest.heldout_source_sha256) <= staged:
+        raise ValueError("a held-out source does not resolve to a staged training image")
 
 
 def _verify_dataset_sources(manifest: SplatBuildManifest, dataset_dir: Path) -> None:

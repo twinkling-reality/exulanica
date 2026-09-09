@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 from exulanica.reconstruction.gsplat_protocol import TRAINING_PROTOCOL
 from exulanica.reconstruction.pose import CommandResult
-from exulanica.reconstruction.splat import SplatBuildManifest, run_gsplat_job
+from exulanica.reconstruction.splat import (
+    SplatBuildManifest,
+    masked_training_binding,
+    run_gsplat_job,
+    verify_masked_training_sources,
+)
 
 _SPARSE_FILES = {
     "0/cameras.bin": b"test-camera-model",
@@ -477,3 +482,212 @@ def test_wrong_compressor_version_cannot_publish_delivery(tmp_path):
     assert result.status == "failed"
     assert "compressor" in result.reason
     assert not (result.job_directory / "output/scene.sog").exists()
+
+
+# --------------------------------------------------------------------------------------------
+# The masked-source remap, at the one layer that can check it with no database anywhere near.
+# `source_sha256` here is the masked space: the bytes the dataset holds and the trainer reads.
+# The remap says which photograph each of those replaced, and every rule below exists because
+# some way of getting that wrong would otherwise reach a render without anything noticing.
+# --------------------------------------------------------------------------------------------
+
+_CAPTURE = "00000000-0000-4000-8000-000000000001"
+
+
+def _masked_manifest(**changes) -> SplatBuildManifest:
+    """One member hidden: its photograph is `original`, and the dataset holds `masked` instead."""
+    original = hashlib.sha256(b"the-photograph").hexdigest()
+    masked = hashlib.sha256(b"source-a").hexdigest()
+    values = {
+        "masked_source_remap": ((_CAPTURE, original, masked),),
+        "heldout_source_sha256": (masked,),
+    }
+    values.update(changes)
+    return _manifest(**values)
+
+
+def test_a_masked_build_withholds_the_derivative_and_records_the_photograph_it_replaced():
+    manifest = _masked_manifest()
+    original = hashlib.sha256(b"the-photograph").hexdigest()
+    assert manifest.heldout_original_source_sha256 == (original,)
+    parameters = manifest.as_payload()["parameters"]
+    assert parameters["masked_source_remap"] == {
+        _CAPTURE: {
+            "source_sha256": original,
+            "masked_source_sha256": hashlib.sha256(b"source-a").hexdigest(),
+        }
+    }
+    # A build with nobody hidden keeps the payload, and therefore the digest, it always had.
+    plain = _manifest()
+    assert "masked_source_remap" not in plain.as_payload()["parameters"]
+    assert plain.heldout_original_source_sha256 == plain.heldout_source_sha256
+    assert masked_training_binding(plain) == {}
+
+
+def test_an_original_among_the_training_sources_is_refused():
+    """The failure this exists to prevent: a hidden person's photograph reaching the trainer."""
+    with pytest.raises(ValueError, match="original bytes are among the training sources"):
+        _masked_manifest(
+            masked_source_remap=(
+                (
+                    _CAPTURE,
+                    hashlib.sha256(b"source-b").hexdigest(),
+                    hashlib.sha256(b"source-a").hexdigest(),
+                ),
+            ),
+            heldout_source_sha256=(hashlib.sha256(b"source-a").hexdigest(),),
+        )
+
+
+def test_a_derivative_outside_the_training_sources_is_refused():
+    with pytest.raises(ValueError, match="not among the training sources"):
+        _masked_manifest(masked_source_remap=((_CAPTURE, "c" * 64, "d" * 64),))
+
+
+@pytest.mark.parametrize(
+    ("remap", "message"),
+    [
+        ((("not-a-capture", "c" * 64, hashlib.sha256(b"source-a").hexdigest()),), "capture ref"),
+        (((_CAPTURE, "c" * 64, "c" * 64),), "cannot be the original bytes"),
+        (
+            (
+                (_CAPTURE, "c" * 64, hashlib.sha256(b"source-a").hexdigest()),
+                (_CAPTURE, "d" * 64, hashlib.sha256(b"source-b").hexdigest()),
+            ),
+            "twice",
+        ),
+        (
+            (
+                ("00000000-0000-4000-8000-000000000002", "d" * 64, hashlib.sha256(b"source-b")
+                 .hexdigest()),
+                (_CAPTURE, "c" * 64, hashlib.sha256(b"source-a").hexdigest()),
+            ),
+            "ordered by capture reference",
+        ),
+    ],
+)
+def test_a_malformed_remap_is_refused_by_the_manifest(remap, message):
+    with pytest.raises(ValueError, match=message):
+        _masked_manifest(masked_source_remap=remap)
+
+
+def test_the_staged_dataset_is_re_derived_before_a_view_is_loaded(tmp_path):
+    """Hash agreement is not file agreement, and this is the last point that can tell them apart."""
+    manifest = _masked_manifest()
+    dataset = _dataset(tmp_path / "dataset")
+    verify_masked_training_sources(manifest, dataset)
+    (dataset / "images" / "a.jpg").write_bytes(b"the-photograph")
+    with pytest.raises(ValueError, match="holds an original"):
+        verify_masked_training_sources(manifest, dataset)
+    (dataset / "images" / "a.jpg").write_bytes(b"neither one nor the other")
+    with pytest.raises(ValueError, match="declared masked derivative is not among the staged"):
+        verify_masked_training_sources(manifest, dataset)
+
+
+def test_a_masked_manifest_round_trips_through_the_runner_reader(tmp_path):
+    from exulanica.reconstruction.gsplat_runner import read_manifest
+
+    manifest = _masked_manifest()
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(manifest.as_payload()))
+    assert read_manifest(path) == manifest
+    payload = manifest.as_payload()
+    payload["parameters"]["masked_source_remap"][_CAPTURE].pop("source_sha256")
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="remap entry is malformed"):
+        read_manifest(path)
+
+
+def test_a_masked_build_runs_through_the_controller_and_binds_its_remap(tmp_path):
+    """The controller's existing source check is already what forbids a staged original.
+
+    `_verify_dataset_sources` proves the dataset bytes are exactly `source_sha256`, and the
+    manifest has already refused any remap whose originals appear there, so the two together
+    leave no way for a hidden member's photograph to be in this directory. The runner repeats the
+    statement against files immediately before loading a view; that repetition is deliberate.
+    """
+    manifest = _masked_manifest()
+    result = run_gsplat_job(
+        manifest,
+        dataset_dir=_dataset(tmp_path / "dataset"),
+        pose_receipt=_pose_receipt(tmp_path / "pose.json", manifest),
+        jobs_root=tmp_path / "jobs",
+        executor=FakeRunner(manifest),
+    )
+    assert result.status == "completed" and result.quality.accepted is True
+    recorded = json.loads((result.job_directory / "manifest.json").read_bytes())
+    assert recorded["parameters"]["masked_source_remap"][_CAPTURE]["masked_source_sha256"] == (
+        hashlib.sha256(b"source-a").hexdigest()
+    )
+    assert result.manifest_digest != _manifest().digest
+
+
+def test_the_staged_check_runs_before_rectification_and_before_any_view_is_loaded():
+    """An ordering guard, read out of the source rather than executed.
+
+    `_train_locked` needs torch, numpy and pycolmap in one process, which this host cannot give
+    it, so the ordering that makes the check meaningful has no executable test here. Reading the
+    call sites is weaker than running them and stronger than nothing.
+
+    Both comparisons matter and the first is the one worth having. `prepare_dataset` decodes every
+    staged image and writes it back into the job directory, so a check that ran after it would let
+    a leaked original be re-encoded into retained scratch before anything refused the build. The
+    split receipt binding is asserted here for the same reason: the runner's own call site is
+    unexecuted on this host, so its absence would otherwise be invisible.
+    """
+    import inspect
+
+    from exulanica.reconstruction import gsplat_runner
+
+    body = inspect.getsource(gsplat_runner._train_locked)
+    check = body.index("verify_masked_training_sources(manifest, dataset)")
+    assert check < body.index("prepare_dataset(")
+    assert check < body.index("load_dataset(")
+    assert "masked_training_binding(manifest)" in body
+
+
+def test_a_remap_that_collapses_or_duplicates_is_refused_by_the_manifest():
+    """Two hidden members must not share an original or a derivative.
+
+    Sharing a derivative would silently shrink the held-out set; sharing an original would mean
+    one photograph was masked into two different sets of bytes, which no selection can produce.
+    """
+    second = "00000000-0000-4000-8000-000000000002"
+    source_a = hashlib.sha256(b"source-a").hexdigest()
+    source_b = hashlib.sha256(b"source-b").hexdigest()
+    for remap in (
+        ((_CAPTURE, "c" * 64, source_a), (second, "c" * 64, source_b)),
+        ((_CAPTURE, "c" * 64, source_a), (second, "d" * 64, source_a)),
+    ):
+        with pytest.raises(ValueError, match="twice"):
+            _masked_manifest(masked_source_remap=remap, heldout_source_sha256=(source_a,))
+
+
+def test_a_non_string_digest_in_a_remap_is_a_refusal_and_not_a_traceback():
+    """The runner's `main` catches ValueError; a TypeError would reach an operator as a trace."""
+    with pytest.raises(ValueError, match="capture and two hashes"):
+        _masked_manifest(masked_source_remap=((_CAPTURE, 7, hashlib.sha256(b"source-a")
+                                               .hexdigest()),))
+
+
+def test_a_held_out_source_missing_from_the_staged_dataset_is_refused(tmp_path):
+    """The third clause: the split may not withhold bytes the dataset does not contain."""
+    manifest = _masked_manifest(
+        heldout_source_sha256=(hashlib.sha256(b"source-b").hexdigest(),),
+    )
+    dataset = _dataset(tmp_path / "dataset")
+    verify_masked_training_sources(manifest, dataset)
+    (dataset / "images" / "b.jpg").write_bytes(b"some other training image")
+    with pytest.raises(ValueError, match="held-out source does not resolve"):
+        verify_masked_training_sources(manifest, dataset)
+
+
+def test_an_unmasked_build_does_no_staged_work_at_all(tmp_path, monkeypatch):
+    """The claim that a corpus with nobody in it pays nothing for this, made checkable."""
+    from exulanica.reconstruction import splat
+
+    def refuse(_path):
+        raise AssertionError("an unmasked build hashed a staged image")
+
+    monkeypatch.setattr(splat, "_digest_file", refuse)
+    verify_masked_training_sources(_manifest(), tmp_path / "absent")
