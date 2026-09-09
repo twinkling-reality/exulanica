@@ -31,13 +31,11 @@ import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas
 import { FACET_KEYS, decodeFacets, encodeFacets, type IndexFacets } from '@exulanica/world-index';
 import { mountAtlas, type MountedAtlas } from './atlas.js';
 import { applicationTitle, developmentToken, sourcePresentation } from './config.js';
-import { listBatches, watchBatch, type BatchSummary } from './formation.js';
 import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { CompanionAskClient } from './companion-ask-api.js';
 import { buildDetail } from './ui/detail.js';
-import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
 import { buildStartupState } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
@@ -61,6 +59,7 @@ import {
 import { mountAppearance } from './composition/appearance.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
+import { disposeFormationWatch, mountFormation } from './composition/formation.js';
 import {
   mountStatusAndInspector,
   type MountedStatusAndInspector,
@@ -86,7 +85,6 @@ const {
 } = env;
 
 let atlas: MountedAtlas | null = null;
-let stopWatching: (() => void) | null = null;
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
@@ -215,8 +213,7 @@ async function mount(): Promise<void> {
     // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
     // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
     disposeCompanionStage(state);
-    stopWatching?.();
-    stopWatching = null;
+    disposeFormationWatch(state);
     mountListeners?.abort();
     mountListeners = null;
     atlas?.dispose();
@@ -428,7 +425,7 @@ async function mount(): Promise<void> {
   // Moving it into the shell would put it in the shell's stacking context, where it paints over
   // the rail. The stage is the hole it shows through and the parent the anchor overlay writes
   // its nodes into, which is a different job from being the canvas.
-  const forming = buildFormation();
+  const formation = mountFormation({ state, credentials: currentCredentials });
   const chrome = buildWorldChrome(shell);
   const handleAtlasCommand = (command: AtlasCommand): void => {
     if (companion.panel.state() === 'open') companion.dismiss();
@@ -499,7 +496,7 @@ async function mount(): Promise<void> {
     chrome.reticle,
     worldIndex.root,
     detail.root,
-    forming.root,
+    formation.root,
     companion.panel.root,
     writePath.confirm.root,
     commandBar.root,
@@ -530,7 +527,7 @@ async function mount(): Promise<void> {
       stage,
       worldIndex.root,
       detail.root,
-      forming.root,
+      formation.root,
       companion.panel.root,
       writePath.confirm.root,
       mapCaption,
@@ -578,20 +575,7 @@ async function mount(): Promise<void> {
   reflectShell();
 
   worldIndex.render(current, indexFacets, selected);
-  forming.render(null, null);
-
-  // What there is to watch. There is no upload endpoint yet, so an intake starts from the command
-  // line and this asks the API rather than assuming: an empty list renders as nothing forming,
-  // which is a true statement, and a fabricated batch would not be.
-  stopWatching?.();
-  stopWatching = null;
-  void listBatches(currentCredentials!).then((batches) => {
-    const watching = mostRecentlyStarted(batches);
-    if (watching === undefined) return;
-    stopWatching = watchBatch(currentCredentials!, watching.batchId, (state) => {
-      forming.render(state, watching.label);
-    });
-  });
+  formation.begin();
 
   atlas?.dispose();
   state.settingsStylePreviewId = null;
@@ -924,13 +908,3 @@ function syncIndexRoute(facets: IndexFacets): void {
 
 
 
-/**
- * The batch to watch, or none.
- *
- * The most recently started one, running or not. A finished batch replays its history and ends,
- * which is the same code path a live subscriber takes, so somebody who opens the page after an
- * ingest finished reads what happened rather than finding nothing and concluding it was lost.
- */
-function mostRecentlyStarted(batches: readonly BatchSummary[]): BatchSummary | undefined {
-  return [...batches].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
-}
