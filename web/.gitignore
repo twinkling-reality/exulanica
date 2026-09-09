@@ -12,4 +12,10 @@ fixtures/
 # client's tests reading a file that is not in the repository.
 !packages/graph-client/test/fixtures/
 !packages/graph-client/test/fixtures/*.json
+# ...and the three reviewed CC0 meshes the same contract publishes. The backend generates these
+# deterministically and deliberately commits no binary; `web/` commits binary fixtures, and the
+# renderer's container validator is only worth having if it is run against the actual reviewed
+# bytes. `scene-objects.test.ts` asserts their digests against world-objects.json, so a generator
+# change fails here loudly instead of drifting.
+!packages/graph-client/test/fixtures/*.glb
 bakeoff-results/

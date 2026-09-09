@@ -1,119 +1,149 @@
 {
-  "$provisional": "Written by the renderer and interface task before any /world-objects route existed, from the field list in docs/world-objects-contract.md. Replace this whole file with the one the backend task publishes; the client parsers and their tests are the things that will tell you what disagrees. Wire keys are snake_case, as every other Exulanica response is, and the client is the only layer that renames them.",
-  "$shape": "One envelope holding the three GET responses the client reads, keyed by route so a replacement can be diffed against the routes rather than against this arrangement.",
-
-  "assets": {
-    "registry_version": 1,
-    "assets": [
-      {
-        "asset_id": "standing-lantern",
-        "label": "Standing lantern",
-        "container": "glb/2.0",
-        "reference": {
-          "href": "/world-objects/assets/standing-lantern/bytes",
-          "authorization": "workspace-bearer",
-          "content_sha256": "3d0f8a1c7b5e2949d6c81f34a70b52e8cd91647af0328b5d6e1c9407b2a8f351",
-          "byte_size": 20348
-        },
-        "origin": "fictional-source",
-        "footprint": { "radius": 0.28, "height": 1.65 },
-        "supported_behaviours": ["motion.bounded"]
+  "schema_version": 1,
+  "version_id": "6f1d2c40-0000-7000-8000-000000000001",
+  "world_id": "atlas:default",
+  "source_snapshot_id": "6f1d2c40-0000-7000-8000-000000000002",
+  "parent_version_id": null,
+  "title": "Lantern study",
+  "origin": "authored",
+  "style_version_id": null,
+  "state_sha256": "6e1482e8b3a519be4197798a1a3b8e3b4b8e5106b7ebfb4b1002d8587c041126",
+  "edit_seq": 5,
+  "source_invalidated": false,
+  "created_by": "6f1d2c40-0000-7000-8000-000000000003",
+  "created_at": "2026-09-09T12:00:00+00:00",
+  "objects": [
+    {
+      "object_id": "object:lantern",
+      "asset": {
+        "asset_key": "cc0.marker-pillar",
+        "title": "Marker pillar",
+        "summary": "A two-metre square pillar resting on the ground plane.",
+        "media_type": "model/gltf-binary",
+        "content_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737",
+        "byte_size": 784,
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "6f89ee797a8cb18ff880d0d38840884953b437230709a84dfa94cf2a5869ea6f",
+        "availability": "available"
       },
-      {
-        "asset_id": "field-marker",
-        "label": "Field marker",
-        "container": "glb/2.0",
-        "reference": {
-          "href": "/world-objects/assets/field-marker/bytes",
-          "authorization": "workspace-bearer",
-          "content_sha256": "b71c4e0a92d8563f18ea27cb40915d63f8a2074e5c39bd18620fa4c7e93d5182",
-          "byte_size": 8112
-        },
-        "origin": "appearance-reference",
-        "footprint": { "radius": 0.15, "height": 0.9 },
-        "supported_behaviours": ["motion.bounded"]
+      "region_id": "region-a",
+      "transform": {
+        "coordinate_space": "region_local",
+        "coordinate_unit": "millimetre",
+        "x_mm": 1200,
+        "y_mm": 0,
+        "z_mm": -450,
+        "yaw_microradians": 785398,
+        "scale_milli": 1000
       },
-      {
-        "asset_id": "withdrawn-figure",
-        "label": "Withdrawn figure",
-        "container": "glb/2.0",
-        "reference": null,
-        "origin": "personal-association",
-        "footprint": { "radius": 0.4, "height": 1.8 },
-        "supported_behaviours": []
-      }
-    ]
-  },
-
-  "objects": {
-    "world_version_id": "wv-0002",
-    "based_on_world_version_id": "wv-0001",
-    "recorded_sha256": "9f2b6104c8ad35e7b0146fa9d283517ce640b8fa27d5913e04ac7be6182f0d94",
-    "objects": [
-      {
-        "object_id": "obj-0001",
-        "asset_id": "standing-lantern",
-        "region_id": "region-volcanic",
-        "scene_id": "scene-volcanic-01",
-        "scene_from_object": [
-          1, 0, 0, 0.75,
-          0, 1, 0, 0,
-          0, 0, 1, -1.5,
-          0, 0, 0, 1
-        ],
-        "origin": "fictional-source",
-        "behaviour": {
-          "behaviour_id": "motion.bounded",
-          "parameters": { "axis": "y", "amplitude": 0.35, "period": 4 }
-        },
-        "based_on_world_version_id": "wv-0001",
-        "recorded_sha256": "51c8e70b3a94df26185cb0e7f4a3926d0be581cf72a4d3096be15748ca20f8b3"
+      "origin": {
+        "kind": "authored",
+        "role": "fictional"
       },
-      {
-        "object_id": "obj-0002",
-        "asset_id": "field-marker",
-        "region_id": "region-volcanic",
-        "scene_id": "scene-volcanic-01",
-        "scene_from_object": [
-          0.7071067811865476, 0, 0.7071067811865476, -2.25,
-          0, 1, 0, 0,
-          -0.7071067811865476, 0, 0.7071067811865476, 3,
-          0, 0, 0, 1
-        ],
-        "origin": "appearance-reference",
-        "behaviour": null,
-        "based_on_world_version_id": "wv-0001",
-        "recorded_sha256": "2ea6f9147d0538bc61a94e7f03d2856b1ca4079e5f38d6210b7ce4a985f31d60"
+      "behaviour": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "travel_mm": 2000,
+          "period_milliseconds": 4000
+        }
       },
-      {
-        "object_id": "obj-0003",
-        "asset_id": "standing-lantern",
-        "region_id": "region-volcanic",
-        "scene_id": "scene-volcanic-01",
-        "scene_from_object": [
-          1, 0, 0, 4,
-          0, 1, 0, 0,
-          0, 0, 1, 0,
-          0, 0, 0, 1
-        ],
-        "origin": "fictional-source",
-        "$note": "A behaviour id this build does not support, kept in the fixture on purpose: the milestone requires that it fail visibly rather than render as a motionless object with no explanation.",
-        "behaviour": {
-          "behaviour_id": "motion.orbit",
-          "parameters": { "radius": 2, "period": 8 }
-        },
-        "based_on_world_version_id": "wv-0001",
-        "recorded_sha256": "6b03fa5d7c418d29e05b7fa316c8402d1e7b93f5a06c84e1d2937bf0a5e24c19"
-      }
-    ]
-  },
-
-  "placement": {
-    "$note": "The 201 answer to POST /world-objects/versions/{id}/objects, and the 200 replay of the same proposal id.",
-    "object_id": "obj-0004",
-    "world_version_id": "wv-0003",
-    "based_on_world_version_id": "wv-0002",
-    "recorded_sha256": "c40a7e18b3d962f5074ac1e8b25d3f9016ea7c4b8d20539fe671ba394c02d8f7",
-    "already_recorded": false
-  }
+      "removed": false
+    },
+    {
+      "object_id": "object:plinth",
+      "asset": {
+        "asset_key": "cc0.marker-plate",
+        "title": "Marker plate",
+        "summary": "A one-metre flat square lying on the ground plane.",
+        "media_type": "model/gltf-binary",
+        "content_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e",
+        "byte_size": 684,
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "6f89ee797a8cb18ff880d0d38840884953b437230709a84dfa94cf2a5869ea6f",
+        "availability": "available"
+      },
+      "region_id": "region-a",
+      "transform": {
+        "coordinate_space": "region_local",
+        "coordinate_unit": "millimetre",
+        "x_mm": 1400,
+        "y_mm": 0,
+        "z_mm": -450,
+        "yaw_microradians": 0,
+        "scale_milli": 2000
+      },
+      "origin": {
+        "kind": "authored",
+        "role": "personal"
+      },
+      "behaviour": null,
+      "removed": false
+    }
+  ],
+  "element_overrides": [],
+  "edits": [
+    {
+      "edit_id": "6f1d2c40-0000-7000-8000-000000000011",
+      "edit_seq": 1,
+      "kind": "add_object",
+      "object_id": "object:lantern",
+      "element_id": null,
+      "undone_edit_id": null,
+      "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+      "result_state_sha256": "05dabfebf3041c5dfe8c3c6e303e6de74353f2aec40ef5cb7363ae318ca52ddd",
+      "actor": "6f1d2c40-0000-7000-8000-000000000003",
+      "recorded_at": "2026-09-09T12:01:00+00:00"
+    },
+    {
+      "edit_id": "6f1d2c40-0000-7000-8000-000000000012",
+      "edit_seq": 2,
+      "kind": "add_object",
+      "object_id": "object:plinth",
+      "element_id": null,
+      "undone_edit_id": null,
+      "base_state_sha256": "05dabfebf3041c5dfe8c3c6e303e6de74353f2aec40ef5cb7363ae318ca52ddd",
+      "result_state_sha256": "bf0752b2ed41b6254e8e51248310d148f6f87da059370905111d978c69cc400b",
+      "actor": "6f1d2c40-0000-7000-8000-000000000003",
+      "recorded_at": "2026-09-09T12:02:00+00:00"
+    },
+    {
+      "edit_id": "6f1d2c40-0000-7000-8000-000000000013",
+      "edit_seq": 3,
+      "kind": "move_object",
+      "object_id": "object:plinth",
+      "element_id": null,
+      "undone_edit_id": null,
+      "base_state_sha256": "bf0752b2ed41b6254e8e51248310d148f6f87da059370905111d978c69cc400b",
+      "result_state_sha256": "6e1482e8b3a519be4197798a1a3b8e3b4b8e5106b7ebfb4b1002d8587c041126",
+      "actor": "6f1d2c40-0000-7000-8000-000000000003",
+      "recorded_at": "2026-09-09T12:03:00+00:00"
+    },
+    {
+      "edit_id": "6f1d2c40-0000-7000-8000-000000000014",
+      "edit_seq": 4,
+      "kind": "remove_object",
+      "object_id": "object:plinth",
+      "element_id": null,
+      "undone_edit_id": null,
+      "base_state_sha256": "6e1482e8b3a519be4197798a1a3b8e3b4b8e5106b7ebfb4b1002d8587c041126",
+      "result_state_sha256": "c726788570357e04a4e44886fe50c44d74efb6cae8615af447956a136f2ae856",
+      "actor": "6f1d2c40-0000-7000-8000-000000000003",
+      "recorded_at": "2026-09-09T12:04:00+00:00"
+    },
+    {
+      "edit_id": "6f1d2c40-0000-7000-8000-000000000015",
+      "edit_seq": 5,
+      "kind": "undo",
+      "object_id": "object:plinth",
+      "element_id": null,
+      "undone_edit_id": "6f1d2c40-0000-7000-8000-000000000014",
+      "base_state_sha256": "c726788570357e04a4e44886fe50c44d74efb6cae8615af447956a136f2ae856",
+      "result_state_sha256": "6e1482e8b3a519be4197798a1a3b8e3b4b8e5106b7ebfb4b1002d8587c041126",
+      "actor": "6f1d2c40-0000-7000-8000-000000000003",
+      "recorded_at": "2026-09-09T12:05:00+00:00"
+    }
+  ]
 }
