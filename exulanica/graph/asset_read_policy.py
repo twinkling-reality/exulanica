@@ -7,12 +7,15 @@ buffer's identity under the lock, then releases it before returning a response.
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import hashlib
 import json
 import uuid
+from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager
+from threading import Lock
 from typing import Any
 
 import psycopg
@@ -20,6 +23,19 @@ import psycopg
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
+
+__all__ = [
+    "bundle_scene_ids",
+    "clear_scene_inputs_memo",
+    "evaluation_time",
+    "final_check",
+    "image_source",
+    "point_allowed",
+    "scene_allowed",
+    "scene_inputs",
+    "scene_inputs_memo_frames",
+    "scene_inputs_memo_size",
+]
 
 
 def evaluation_time(connection: psycopg.Connection) -> dt.datetime:
@@ -83,6 +99,112 @@ where s.workspace_id=%s and s.scene_id=%s
 """
 
 
+# -- the parsed pose manifest memo -----------------------------------------------------------------
+#
+# MEASURED 2026-09-09 under cProfile against the retained reference copy, and recorded in
+# `docs/evaluation/2026-09-09-graph-read-memo.json`: a warm `GET /graph` for the 210 member volcanic
+# scene spends 2.896 s in the route body, of which `scene_inputs` is 2.060 s over two calls and
+# `json.loads` is 1.924 s. The two calls are one scene: `read_snapshot` reaches `scene_inputs`
+# through `trained_geometry_row`, and the route buffers it again for the asset-read policy.
+#
+# MEASURED 2026-09-09 on that scene's pose receipt, which is 107,742,795 bytes: `json.loads` of the
+# whole receipt is 1.29 s, and the parsed receipt is 258 MB in Python. But the manifest this
+# function returns is 45,829 bytes of that JSON and 114,312 bytes parsed, or 544 bytes per frame.
+# The other 114,588,190 bytes are `quality`, which this function reads, hashes and discards. So the
+# whole cost is parsing 108 MB to keep 114 KB, twice a request.
+#
+# The manifest is a pure function of the receipt bytes and the scene it was asked about: the bytes
+# are content addressed, `manifest_digest` is checked against a canonical re-encoding of the
+# manifest, and `scene_ref` is checked against the scene. Nothing else in the returned pair is
+# memoised: `row` is re-read from the database on every call, exactly as before, because it carries
+# `purged_at`, `needs_repair` and the active rung assertion, and `scene_allowed` compares the row it
+# reads at the locked time against it. The final check is untouched, so liveness and permission are
+# still evaluated fresh under the lock.
+#
+# THE TRADE, precisely, and it is the one `reconstruction_scenes` already made for point maps.
+# `store.get` re-hashes the bytes it returns, so today a pose receipt whose bytes rot on disk fails
+# its digest, `scene_inputs` returns None and the scene's geometry is withheld. On a memo hit the
+# only per-request check is `store.exists`, a bare `is_file()`, so a receipt that was sound when the
+# entry was filled and rots afterwards keeps its scene available until the entry is evicted or
+# `clear_scene_inputs_memo` is called. A PURGE is still seen, because presence is checked on every
+# hit. A REPAIR under the same digest is still seen, because a read that raised is never cached: the
+# memo is filled only from a read that returned bytes which verified.
+#
+# The returned manifest is a deep copy. MEASURED: 0.327 ms against the 1,290 ms parse it replaces,
+# which is 3,900 times cheaper, and it means the held object cannot be reached by a caller. No
+# caller mutates the manifest today; this is so that none can start.
+#
+# The bound is on total frames rather than entries, and it is the same 20,000 the placement memo
+# uses, for the same reason: `reconstruction_scene_rows` sweeps every scene in the workspace on a
+# graph read, so the access pattern is a cycle, and a bound shorter than the cycle evicts each entry
+# before it is reused and the hit rate is zero rather than merely lower. At 544 bytes per frame,
+# 20,000 frames is about 11 MB.
+
+_MEMO_MAX_FRAMES = 20_000
+
+#: (scene ref, pose receipt digest). The digest is what makes the entry safe to reuse; the scene is
+#: in the key because `scene_ref` is checked against it and one receipt must not answer for another.
+_MemoKey = tuple[str, str]
+
+_memo_lock = Lock()
+_memo: OrderedDict[_MemoKey, dict[str, Any]] = OrderedDict()
+
+
+def clear_scene_inputs_memo() -> None:
+    """Forget every memoised manifest.
+
+    For tests, and for an operator who has replaced bytes under an existing digest, which the
+    content-addressed store is not supposed to allow.
+    """
+    with _memo_lock:
+        _memo.clear()
+
+
+def scene_inputs_memo_size() -> int:
+    """How many parsed manifests are currently held. For tests and for operational reporting."""
+    with _memo_lock:
+        return len(_memo)
+
+
+def _frame_count(manifest: dict[str, Any]) -> int:
+    """How many frames a manifest declares, for anything a manifest could hold.
+
+    Total rather than trusting the shape: the digest check that fills the memo proves the manifest
+    is the one the receipt commits to, not that `frames` is a list. A manifest that carried
+    something else would otherwise raise from inside the eviction loop, and a malformed receipt is
+    exactly the case where a read must fail quietly rather than in a new way.
+    """
+    frames = manifest.get("frames")
+    return len(frames) if isinstance(frames, list) else 0
+
+
+def scene_inputs_memo_frames() -> int:
+    """How many frames the held manifests cover, which is what the bound is expressed in."""
+    with _memo_lock:
+        return sum(_frame_count(manifest) for manifest in _memo.values())
+
+
+def _memo_get(key: _MemoKey) -> dict[str, Any] | None:
+    with _memo_lock:
+        manifest = _memo.get(key)
+        if manifest is not None:
+            _memo.move_to_end(key)
+        return manifest
+
+
+def _memo_put(key: _MemoKey, manifest: dict[str, Any]) -> None:
+    with _memo_lock:
+        _memo[key] = manifest
+        _memo.move_to_end(key)
+        # Never evict down to nothing: a scene larger than the whole bound should still be held, or
+        # it would be inserted and dropped on every request and the memo would be pure cost for it.
+        while (
+            len(_memo) > 1
+            and sum(_frame_count(entry) for entry in _memo.values()) > _MEMO_MAX_FRAMES
+        ):
+            _memo.popitem(last=False)
+
+
 def scene_inputs(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
@@ -93,14 +215,26 @@ def scene_inputs(
     row = connection.execute(_SCENE_BINDING, (workspace, scene_id)).fetchone()
     if row is None or row["content_sha256"] is None:
         return None
+    blob = BlobId(bytes(row["content_sha256"]))
+    key = (str(scene_id), blob.hex)
+    memoised = _memo_get(key)
+    if memoised is not None:
+        # Presence is checked on every hit rather than being part of the key, because a purged
+        # receipt has to keep turning its scene unavailable and this is the cheap half of what
+        # `store.get` did. What is no longer re-checked per request is the digest of the bytes.
+        return (row, copy.deepcopy(memoised)) if store.exists(blob) else None
     try:
-        receipt = json.loads(store.get(BlobId(bytes(row["content_sha256"]))))
+        receipt = json.loads(store.get(blob))
         manifest = receipt["manifest"]
         digest = hashlib.sha256(
             json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
         ).hexdigest()
         if receipt["manifest_digest"] != digest or manifest["scene_ref"] != str(scene_id):
             return None
+        # Only a read that returned verified bytes fills the memo. A BlobNotFoundError or an
+        # IntegrityError falls through to the handler below and caches nothing, so a receipt
+        # restored or repaired under the same digest is seen on the next request.
+        _memo_put(key, copy.deepcopy(manifest))
         return row, manifest
     except (BlobNotFoundError, IntegrityError, ValueError, KeyError, TypeError):
         return None

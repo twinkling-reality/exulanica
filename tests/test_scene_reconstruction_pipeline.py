@@ -17,6 +17,12 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.evidence.blob import BlobId
 from exulanica.graph import read_snapshot
+from exulanica.graph.asset_read_policy import (
+    clear_scene_inputs_memo,
+    scene_inputs,
+    scene_inputs_memo_frames,
+    scene_inputs_memo_size,
+)
 from exulanica.graph.geometry import point_map_descriptors, read_point_map
 from exulanica.graph.reconstruction_scenes import (
     _MEMO_MAX_MEMBERS,
@@ -952,10 +958,13 @@ def test_a_repeated_graph_read_reuses_the_validated_placement_without_refetching
     The pose receipt and every point map are content addressed and their digests are columns on the
     scene row, so a second read of an unchanged scene must not rebuild the placement from them.
 
-    The pose receipt is still read once per scene by `scene_inputs`, which the asset-read policy
-    calls from `trained_geometry_row`. That read is outside this memo and remains a cost.
+    The pose receipt used to be read once more per scene by `scene_inputs`, which the asset-read
+    policy calls from `trained_geometry_row`. That read is outside this memo and is now bounded by
+    its own, in `exulanica/graph/asset_read_policy.py`; the assertions below hold either way,
+    because they compare the second read against the first rather than naming a count.
     """
     clear_placement_memo()
+    clear_scene_inputs_memo()
     store, _captures, point_artifacts, job_id = _queued_scene(repository, tmp_path)
     claimed = repository.claim_reconstruction_scene(worker="memo-test", lease_seconds=60)
     assert claimed is not None
@@ -1191,3 +1200,240 @@ def test_a_point_map_repaired_under_the_same_digest_is_seen_on_the_next_read(
     ).reconstruction_scenes[0]
     assert repaired.members[1].placement is not None
     assert placement_memo_size() == 1
+
+
+# -- the parsed pose manifest memo ------------------------------------------------------------
+
+
+def _read_manifest(repository, store):
+    """`scene_inputs` for the one scene in the fixture workspace, as the graph route calls it."""
+    scene_id = repository.connection.execute(
+        "select scene_id from reconstruction_scene where workspace_id=%s",
+        (repository.workspace_id,),
+    ).fetchone()["scene_id"]
+    return scene_inputs(repository.connection, repository.workspace_id, scene_id, store)
+
+
+def _built_scene(repository, tmp_path, worker):
+    """A processed scene, its store and its pose receipt digest: the setup these tests share."""
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    store, _captures, _point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker=worker, lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+    return store, _scene_receipt_digests(repository, job_id)
+
+
+def test_a_second_scene_inputs_call_reuses_the_parsed_manifest_without_refetching_the_receipt(
+    repository, tmp_path
+):
+    """The measured cost the placement memo left behind.
+
+    MEASURED 2026-09-09 under cProfile: a warm `GET /graph` spent 2.060 s in `scene_inputs` over
+    two calls for one scene, 1.924 s of it in `json.loads`. The two calls are `read_snapshot`
+    reaching it through `trained_geometry_row` and the route buffering it again for the asset-read
+    policy. Both parse the same 107,742,795 byte receipt to keep a 45,829 byte manifest.
+
+    The manifest is a pure function of the receipt bytes and the scene, both of which are in the
+    key, so the second call must not fetch the bytes again. What it must still do is check that the
+    receipt is present, which is the cheap half of what `store.get` was doing.
+    """
+    store, pose_digest = _built_scene(repository, tmp_path, "manifest-memo")
+
+    first_store = _CountingStore(store)
+    first = _read_manifest(repository, first_store)
+    assert first is not None
+    assert pose_digest in first_store.fetched
+    assert scene_inputs_memo_size() == 1
+
+    second_store = _CountingStore(store)
+    second = _read_manifest(repository, second_store)
+    assert second is not None
+    assert pose_digest not in second_store.fetched, "the receipt bytes must not be read again"
+    assert pose_digest in second_store.probed, "but its presence must still be checked"
+    assert second[1] == first[1], "and the manifest must be the one the first read verified"
+    # The row is not memoised: it carries purged_at, needs_repair and the active rung assertion,
+    # and `scene_allowed` compares a freshly read row against it under the final lock.
+    assert second[0] == first[0]
+
+
+def test_the_memoised_manifest_cannot_be_reached_by_a_caller(repository, tmp_path):
+    """A held object a caller can mutate is a held object that will eventually be wrong.
+
+    No caller mutates the manifest today. This exists so that none can start: each call returns its
+    own deep copy, which MEASURED 2026-09-09 costs 0.327 ms against the 1,290 ms parse it replaces.
+    """
+    store, _pose_digest = _built_scene(repository, tmp_path, "manifest-alias")
+
+    # The miss returns the parse it just made and keeps its own copy, so mutating this one proves
+    # only that the memo did not hand out the object it stored.
+    first = _read_manifest(repository, store)
+    assert first is not None
+    first[1]["frames"].clear()
+    first[1]["scene_ref"] = "tampered from the miss"
+
+    # The hit is the path that matters: without a copy here the caller holds the memo itself.
+    second = _read_manifest(repository, store)
+    assert second is not None
+    assert second[1]["frames"], "the held manifest kept its frames"
+    assert second[1]["scene_ref"] != "tampered from the miss"
+    second[1]["frames"].clear()
+    second[1]["scene_ref"] = "tampered from the hit"
+
+    third = _read_manifest(repository, store)
+    assert third is not None
+    assert third[1]["frames"], "a caller mutating a hit must not empty the held manifest"
+    assert third[1]["scene_ref"] != "tampered from the hit"
+    assert third[1] is not second[1]
+
+
+def test_losing_the_pose_receipt_after_a_memoised_parse_is_still_seen(repository, tmp_path):
+    """A purge must still withhold the scene, so presence is checked on every hit."""
+    store, pose_digest = _built_scene(repository, tmp_path, "manifest-purge")
+
+    assert _read_manifest(repository, store) is not None
+    assert scene_inputs_memo_size() == 1
+
+    path = store.root / store.key_for(BlobId.from_hex(pose_digest))
+    path.chmod(0o644)
+    path.unlink()
+
+    assert _read_manifest(repository, store) is None
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.receipt_state == "missing"
+    assert scene.rendering_substrate == "source_photographs"
+
+
+def test_a_pose_receipt_corrupted_after_a_memoised_parse_is_trusted_until_the_memo_is_cleared(
+    repository, tmp_path
+):
+    """The one property this memo gives up, pinned so it cannot change unnoticed.
+
+    `store.get` re-hashes what it returns, so before the memo a rotted receipt failed its digest
+    and the scene's geometry was withheld. On a hit the only check is `store.exists`, a bare
+    `is_file()`, so the scene stays available until the entry is evicted or the memo is cleared.
+    This is the same trade the placement memo already makes for point maps, and it is asserted here
+    as behaviour rather than left in a comment.
+    """
+    store, pose_digest = _built_scene(repository, tmp_path, "manifest-corrupt")
+
+    assert _read_manifest(repository, store) is not None
+
+    path = store.root / store.key_for(BlobId.from_hex(pose_digest))
+    path.chmod(0o644)
+    sound = path.read_bytes()
+    path.write_bytes(b"not the pose receipt")
+
+    assert _read_manifest(repository, store) is not None, "documented: the memo still trusts it"
+
+    clear_scene_inputs_memo()
+    assert _read_manifest(repository, store) is None
+    path.write_bytes(sound)
+
+
+def test_a_pose_receipt_repaired_under_the_same_digest_is_seen_on_the_next_read(
+    repository, tmp_path
+):
+    """A read that raised must never fill the memo.
+
+    Restoring correct bytes leaves the scene id and the digest identical, so a cached failure would
+    outlive the repair that fixed it and no request would ever see the sound receipt again.
+    """
+    store, pose_digest = _built_scene(repository, tmp_path, "manifest-repair")
+
+    path = store.root / store.key_for(BlobId.from_hex(pose_digest))
+    path.chmod(0o644)
+    sound = path.read_bytes()
+    path.write_bytes(b"not the pose receipt")
+
+    clear_scene_inputs_memo()
+    assert _read_manifest(repository, store) is None
+    assert scene_inputs_memo_size() == 0, "a read that raised must not be cached"
+
+    path.write_bytes(sound)
+    assert _read_manifest(repository, store) is not None
+    assert scene_inputs_memo_size() == 1
+
+
+def test_the_manifest_memo_is_bounded_by_frames_and_clearable():
+    """The bound is on frames, not entries, because that is what tracks memory.
+
+    A graph read sweeps every scene in the workspace, so the access pattern is a cycle and a bound
+    shorter than the cycle would evict each entry before it is reused, giving a zero hit rate.
+    MEASURED 2026-09-09 on the 210 frame volcanic manifest: 114,312 bytes parsed, or 544 bytes per
+    frame, so the 20,000 frame bound is about 11 MB.
+    """
+    from exulanica.graph.asset_read_policy import _MEMO_MAX_FRAMES, _memo_get, _memo_put
+
+    def manifest(frames):
+        return {"frames": [{"capture_ref": f"c{n}"} for n in range(frames)]}
+
+    clear_scene_inputs_memo()
+    assert scene_inputs_memo_size() == 0 and scene_inputs_memo_frames() == 0
+
+    for index in range(10):
+        _memo_put((str(index), "digest"), manifest(2_500))
+    assert scene_inputs_memo_frames() <= _MEMO_MAX_FRAMES
+    assert _memo_get(("0", "digest")) is None, "the oldest went first"
+    assert _memo_get(("9", "digest")) is not None, "the newest is still held"
+
+    clear_scene_inputs_memo()
+    for index in range(200):
+        _memo_put((str(index), "digest"), manifest(3))
+    assert scene_inputs_memo_size() == 200
+    assert scene_inputs_memo_frames() == 600
+
+    # One scene larger than the whole bound is still held, rather than inserted and dropped on
+    # every request, which would make the memo pure cost for it.
+    clear_scene_inputs_memo()
+    _memo_put(("0", "digest"), manifest(_MEMO_MAX_FRAMES * 2))
+    assert scene_inputs_memo_size() == 1
+    assert _memo_get(("0", "digest")) is not None
+
+    clear_scene_inputs_memo()
+    assert scene_inputs_memo_size() == 0 and scene_inputs_memo_frames() == 0
+
+
+def test_the_final_check_still_re_evaluates_permission_at_the_locked_time(repository, tmp_path):
+    """The memo must not reach the decision, only the buffering that precedes it.
+
+    `scene_inputs` buffers; `scene_allowed` decides, and the route calls it a second time inside
+    `final_check`, where the lock is held and the evaluation time is the locked one. What makes
+    that still work is that only the parsed manifest is memoised: the `_SCENE_BINDING` row is
+    re-read on every call, and it joins the rung assertion on `status='active'`. So retracting the
+    assertion after the manifest is held stops the buffer resolving at all, and no memoised
+    manifest can deliver geometry the permission no longer covers.
+    """
+    store, _pose_digest = _built_scene(repository, tmp_path, "manifest-final")
+
+    before = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert before.placement_state == "available"
+    assert scene_inputs_memo_size() == 1
+
+    scene_id = repository.connection.execute(
+        "select scene_id from reconstruction_scene where workspace_id=%s",
+        (repository.workspace_id,),
+    ).fetchone()["scene_id"]
+    repository.connection.execute(
+        "update assertion set status='retracted' where workspace_id=%s and assertion_id="
+        "(select rung_assertion_id from reconstruction_scene_job j "
+        " join reconstruction_scene s on s.workspace_id=j.workspace_id "
+        " and s.current_job_id=j.job_id where s.workspace_id=%s and s.scene_id=%s)",
+        (repository.workspace_id, repository.workspace_id, scene_id),
+    )
+    repository.connection.commit()
+
+    assert _read_manifest(repository, store) is None, (
+        "the scene binding no longer resolves, so there is nothing to buffer"
+    )
+    after = read_snapshot(repository.connection, repository.workspace_id, store)
+    assert not [
+        scene
+        for scene in after.reconstruction_scenes
+        if scene.scene_id == scene_id and scene.placement_state == "available"
+    ], "a retracted rung assertion must not leave a memoised manifest delivering geometry"
