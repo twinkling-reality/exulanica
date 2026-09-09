@@ -228,13 +228,21 @@ source world.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
 a migration cannot write to an object store and should not pretend to.
 
-**That call is not yet on a deployment path**, and until it is, a deployment that has run migration
-0042 holds three registry rows whose bytes nothing wrote, so every asset read honestly answers
-`unavailable_asset`. It belongs beside the store's construction in `exulanica/api/services.py`
-(`build_services`) or in the `exulanica-db` command that already runs migrations and role grants,
-and it is idempotent, so running it on every start costs three hashes of about 800 bytes each.
-Neither of those files is writable by the task that wrote this document, which is why the wiring is
-named here rather than done.
+The application's lifespan calls it at boot, after the schema check and before the derivative
+worker starts. It is idempotent under content addressing, so a warm start costs three hashes of
+about 800 bytes and writes nothing.
+
+Three placements were considered and two rejected. The `exulanica-db` command runs migrations and
+role grants once, which is the right moment, but the composition does not mount the media volume
+into that container, so it cannot reach the store. `build_services` constructs the store and would
+be the tidiest line, but it resolves configuration and returns, and no test calls it: every test
+builds a `Services` by hand, so seeding there would leave the one path a deployment depends on
+unexercised. The lifespan runs for a hand-constructed `Services` too, which is why
+`tests/test_world_objects_api.py` seeds nothing and asserts the bytes are present anyway.
+
+The call is deliberately not wrapped in `try`/`except`. A store this cannot write is a store the
+evidence path cannot write either, so it is a broken deployment rather than a degraded feature, and
+it should say so at boot rather than at the first asset read.
 
 The HTTP routes report two states and never invent a third:
 

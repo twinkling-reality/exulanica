@@ -16,13 +16,9 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.evidence.blob import BlobId
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.world import (
-    GLB_MEDIA_TYPE,
-    WorldStructureRepository,
-    reviewed_assets,
-    seed_reviewed_assets,
-)
+from exulanica.world import GLB_MEDIA_TYPE, WorldStructureRepository, reviewed_assets
 from fastapi.testclient import TestClient
 
 from world_structure_fixtures import structural_candidate
@@ -128,8 +124,9 @@ def objects_api(repository, spine_schema, tmp_path, monkeypatch):
     )
     from tests_support_api import scratch_database
 
+    # NOT seeded here. The application's own lifespan seeds the reviewed assets, and a fixture
+    # that did it first would test a store the deployment path never filled.
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    seed_reviewed_assets(store)
     database = scratch_database(scratch)
     services = Services(
         database=database,
@@ -157,6 +154,21 @@ def test_the_registry_lists_three_reviewed_cc0_assets_with_their_licence(objects
         assert asset["availability"] == "available"
         assert len(asset["content_sha256"]) == 64
         assert len(asset["licence_sha256"]) == 64
+
+
+def test_starting_the_application_is_what_puts_the_reviewed_bytes_in_the_store(objects_api):
+    """The deployment path, asserted rather than assumed.
+
+    Nothing in this file writes the reviewed assets. Migration 0042 installs three registry rows
+    naming bytes by digest, and only a process holding the object store can put those bytes
+    there, so if the lifespan stopped seeding them every asset here would report
+    `unavailable_asset` and this is the test that would say so."""
+    for asset in reviewed_assets():
+        assert objects_api.store.exists(BlobId.from_hex(asset.content_sha256))
+        assert objects_api.store.get(BlobId.from_hex(asset.content_sha256)) == asset.payload
+        assert objects_api.store.exists(BlobId.from_hex(asset.licence_sha256))
+    listed = objects_api.get("/world/assets").json()
+    assert {a["availability"] for a in listed} == {"available"}
 
 
 def test_the_registry_serves_the_exact_bytes_it_names(objects_api):
