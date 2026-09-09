@@ -12,12 +12,16 @@ from exulanica.errors import ExulanicaError
 __all__ = [
     "InvalidInteractionData",
     "InvalidInteractionPreviewState",
+    "InvalidObjectData",
+    "InvalidObjectState",
     "InvalidPreviewState",
     "InvalidStructuralData",
     "InvalidStructuralPreviewState",
     "InvalidStyleData",
+    "InvalidatedSourceVersion",
     "ProtectedTopologyConflict",
     "StaleInteractionPolicy",
+    "StaleObjectBase",
     "StaleStructuralBase",
     "StaleStyleVersion",
     "UnavailableAsset",
@@ -81,3 +85,19 @@ class StaleInteractionPolicy(WorldStyleError):
 
 class InvalidInteractionPreviewState(WorldStyleError):
     """An interaction preview is absent, closed, or otherwise cannot be applied."""
+
+
+class InvalidObjectData(WorldStyleError):
+    """An authored object's asset, region, transform, origin, or behaviour is not acceptable."""
+
+
+class StaleObjectBase(WorldStyleError):
+    """An object edit named a version state that another edit has already replaced."""
+
+
+class InvalidObjectState(WorldStyleError):
+    """The edit is well formed but the version cannot be in the state it would produce."""
+
+
+class InvalidatedSourceVersion(WorldStyleError):
+    """The alternate version's source snapshot was invalidated by a committed deletion."""

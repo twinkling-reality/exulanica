@@ -307,6 +307,8 @@ _PRESERVED_TABLES = frozenset(
         "schema_migrations",
         "stage_registry",
         "interaction_capability_registry",
+        "world_object_behaviour_registry",
+        "world_reviewed_asset",
         "world_art_profile_parameter",
         "world_art_profile_registry",
         "world_style_capability_registry",

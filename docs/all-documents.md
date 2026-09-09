@@ -8,13 +8,13 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**113 documents**, excluding `docs/evaluation/`.
+**114 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-54 documents.
+55 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -67,6 +67,7 @@ How the system works now. Edited as the system changes.
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
+- [world-objects-contract](world-objects-contract.md) : DECISION and IMPLEMENTED for alternate world versions, authored object add/move/
 - [world-read-posed-views](world-read-posed-views.md) : Design contract written before implementation, 2026-09-08. Migration: NONE
 - [world-read-recipient-evidence](world-read-recipient-evidence.md) : Wire contract, 2026-09-08. Owning-workspace reads only; release.state remains
 - [world-style-backend](world-style-backend.md) : IMPLEMENTED for appearance styles and protected source-media metadata. Structural

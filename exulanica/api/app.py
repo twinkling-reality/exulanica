@@ -90,6 +90,7 @@ from exulanica.world import (
     UnavailableAsset,
     UnknownWorldResource,
     WorldNotConfigured,
+    seed_reviewed_assets,
 )
 
 __all__ = ["create_app"]
@@ -116,6 +117,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     In that order, and the order is the point. A worker started against a schema this code does
     not recognise would begin writing before the check that exists to stop it, and what that
     produces is a wrong artifact rather than a refusal to boot.
+
+    Seeding the reviewed assets sits between those two for the same ordering reason. Migration
+    0042 installs three registry rows that name bytes by digest, and only a process holding the
+    object store can put those bytes there, so the schema check runs first and the store write
+    follows it. It is here rather than in ``build_services`` because that function resolves
+    configuration and returns, and because a hand-constructed ``Services`` still runs this
+    lifespan: the seeding a deployment depends on is the seeding the tests exercise.
     """
     services: Services = app.state.services
     if app.state.verify_schema_at_boot:
@@ -123,6 +131,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         with services.database.unscoped() as connection:
             assert_runtime_role(connection)
     verify_restore(services.database, services.restore_state_path)
+    # Idempotent under content addressing: three hashes of about 800 bytes on a warm start, and
+    # no write. Deliberately not guarded by try/except. A store this cannot write is a store the
+    # evidence path cannot write either, so it is a broken deployment rather than a degraded
+    # feature, and it should say so at boot instead of at the first asset read.
+    seed_reviewed_assets(services.store)
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:
