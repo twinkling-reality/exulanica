@@ -16,6 +16,8 @@ are NOT evidence about photographs.
 from __future__ import annotations
 
 import hashlib
+import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -30,9 +32,11 @@ pytest.importorskip("pycolmap", reason="the pose extra is not installed")
 pytest.importorskip("numpy", reason="rendering the synthetic capture needs numpy")
 pytest.importorskip("PIL.Image", reason="rendering the synthetic capture needs Pillow")
 
+from exulanica.reconstruction import pycolmap_executor as executor_module
 from exulanica.reconstruction.pycolmap_executor import (
     PYCOLMAP_EXECUTABLE,
     PycolmapExecutor,
+    default_extraction_threads,
     pycolmap_version,
 )
 
@@ -145,10 +149,163 @@ def test_an_unknown_stage_is_a_failed_result_and_not_a_raised_exception():
 
     An executor that raised instead would skip the checkpoint write that records which stage
     failed, so the job would lose the one fact worth keeping about its failure.
+
+    Asserted for both process placements and asserted to be the SAME strings, because the failure
+    text is what the checkpoint hashes: the stage process runs the same ``run_stage_here`` the
+    in-process path does, so an error message that differed would mean the two had drifted apart.
     """
-    outcome = PycolmapExecutor()(("pycolmap", "point_triangulator"), Path.cwd())
+    unknown = ("pycolmap", "point_triangulator")
+    isolated = PycolmapExecutor(stage_isolation=True)(unknown, Path.cwd())
+    here = PycolmapExecutor(stage_isolation=False)(unknown, Path.cwd())
+    assert isolated.returncode == here.returncode == 1
+    assert "point_triangulator" in here.stderr
+    assert (isolated.stdout, isolated.stderr) == (here.stdout, here.stderr)
+
+
+def _extracted_features(job_directory: Path) -> dict[str, tuple]:
+    """Every image's keypoint and descriptor blob from the COLMAP database, by image name.
+
+    This, and not the sparse model, is what a comparison across process placements can assert.
+    MEASURED 2026-09-09 on forty 12 megapixel photographs and recorded in
+    `docs/reconstruction-throughput.md`: two runs of the SAME executor on the SAME inputs produce
+    different `matches`, different `two_view_geometries` and a different sparse model, because
+    COLMAP's matcher and incremental mapper are not bit-reproducible run to run even with the
+    mapper's `random_seed` fixed. Feature extraction is, and feature extraction is what the memory
+    bound touches. A test that compared model bytes would be asserting a property the pipeline has
+    never had, and would fail at random rather than when something broke.
+    """
+    database = job_directory / "database.db"
+    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    try:
+        names = dict(connection.execute("select image_id, name from images"))
+        found = {}
+        for image_id, name in names.items():
+            blobs = []
+            for table in ("keypoints", "descriptors"):
+                row = connection.execute(
+                    f"select rows, cols, data from {table} where image_id=?", (image_id,)
+                ).fetchone()
+                blobs.append(
+                    None if row is None else (row[0], row[1], hashlib.sha256(row[2]).hexdigest())
+                )
+            found[name] = tuple(blobs)
+        return found
+    finally:
+        connection.close()
+
+
+def _placeless(command: list[str], job_directory: Path) -> list[str]:
+    """The recorded argument vector with this run's own job directory taken out of it.
+
+    Two runs need two directories, so the absolute paths in the vector differ by construction.
+    Everything else in it must not.
+    """
+    return [token.replace(str(job_directory), "<job>") for token in command]
+
+
+def test_the_stage_process_records_the_same_result_and_checkpoint_as_running_in_process(
+    synthetic_capture: Path, tmp_path: Path
+):
+    """The bound may not move anything the controller writes down.
+
+    Running each stage in its own process is only admissible if the pose job cannot tell. What the
+    job keeps is the checkpoint, so this compares it field by field across the two placements: the
+    same stages, the same status and return code, the same stdout and stderr digests, and the same
+    argument vector once each run's own directory is removed. `duration_ms` is wall clock and is
+    expected to differ; it is asserted to be present and numeric rather than equal, because a test
+    that demanded equality there would be asserting that two runs took the same time.
+
+    Then the output the bound actually touches, byte for byte: every image's keypoint and
+    descriptor blob. Not the sparse model, which `docs/reconstruction-throughput.md` measures as
+    not bit-reproducible between two runs of the same executor; see `_extracted_features`. The
+    model is compared on the facts the quality gate reads instead, which are stable.
+    """
+    manifest = _manifest(synthetic_capture)
+    results = {}
+    for name, isolation in (("in_process", False), ("child_process", True)):
+        results[name] = run_colmap_pose_job(
+            manifest,
+            source_dir=synthetic_capture,
+            jobs_root=tmp_path / name,
+            executable=PYCOLMAP_EXECUTABLE,
+            # Pinned rather than derived so the comparison is between process placements and
+            # nothing else, on a machine of any size.
+            executor=PycolmapExecutor(stage_isolation=isolation, extraction_threads=2),
+        )
+        assert results[name].status == "completed", results[name].failure_reason
+
+    here, isolated = results["in_process"], results["child_process"]
+    checkpoints = {
+        name: json.loads((result.job_directory / "checkpoint.json").read_text(encoding="utf-8"))
+        for name, result in results.items()
+    }
+    left, right = checkpoints["in_process"]["stages"], checkpoints["child_process"]["stages"]
+    assert set(left) == set(right), "the same stages ran, under the same names"
+    for stage, recorded in left.items():
+        other = right[stage]
+        assert set(recorded) == set(other), stage
+        for field in ("status", "returncode", "stdout_sha256", "stderr_sha256"):
+            assert recorded[field] == other[field], (stage, field)
+        assert isinstance(recorded["duration_ms"], float)
+        assert isinstance(other["duration_ms"], float)
+        assert _placeless(recorded["command"], here.job_directory) == _placeless(
+            other["command"], isolated.job_directory
+        )
+
+    left = _extracted_features(here.job_directory)
+    right = _extracted_features(isolated.job_directory)
+    assert left == right, "the same photographs must yield the same keypoints and descriptors"
+    assert len(left) == _VIEWS
+    assert here.quality is not None and isolated.quality is not None
+    assert here.quality.registered_images == isolated.quality.registered_images
+    assert here.quality.source_count == isolated.quality.source_count
+    assert here.quality.accepted == isolated.quality.accepted
+    assert here.manifest_digest == isolated.manifest_digest
+
+
+def test_a_stage_process_that_dies_without_a_result_is_a_failed_stage_not_a_lost_worker(
+    tmp_path: Path, monkeypatch
+):
+    """The failure mode process isolation introduces, and the one it removes.
+
+    In-process, a stage killed for memory took the whole worker with it and the checkpoint never
+    recorded which stage died: that is what happened on 2026-09-08. Here the child dies and the
+    parent survives to report a failed `CommandResult`, which the controller checkpoints and turns
+    into a rung 3 fallback with a reason. The reason has to name the stage, or the report is worse
+    than the crash it replaced.
+    """
+    (tmp_path / "dying_stage.py").write_text(
+        "import os, sys\nos._exit(9)\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    monkeypatch.setattr(executor_module, "PYCOLMAP_STAGE_MODULE", "dying_stage")
+
+    outcome = PycolmapExecutor(stage_isolation=True)(
+        ("pycolmap", "feature_extractor", "--database_path", "d.db"), tmp_path
+    )
+
     assert outcome.returncode == 1
-    assert "point_triangulator" in outcome.stderr
+    assert outcome.stdout == ""
+    assert "feature_extractor" in outcome.stderr
+    assert "exited 9" in outcome.stderr
+    assert outcome.duration_ms > 0
+
+
+def test_the_extraction_thread_cap_is_derived_from_the_machine_and_never_zero():
+    """The cap is a measurement about this machine, not a constant somebody liked.
+
+    MEASURED 2026-09-09: twelve threads on 4272x2848 photographs reached a 23.9 GB footprint on an
+    18 GB machine and stalled it in swap. The derived cap must stay inside the core count, because
+    more threads than cores buys nothing, and must never fall to zero, because a zero would refuse
+    to extract at all on a machine that reported very little memory.
+    """
+    import os
+
+    threads = default_extraction_threads()
+    assert 1 <= threads <= (os.cpu_count() or 1)
+    assert PycolmapExecutor(extraction_threads=1)._extraction_threads == 1
+    with pytest.raises(ValueError):
+        PycolmapExecutor(extraction_threads=0)
 
 
 def test_importing_pycolmap_leaves_the_process_termination_handling_in_python():
