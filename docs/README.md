@@ -46,47 +46,63 @@ every call and the one structured-output mechanism that is actually honoured.
 [runtime-verification.md](runtime-verification.md) for the measurements that settled the open
 questions in both.
 
-## Documents
+## Where things live
 
-| Document | Contents | Status |
+Documents are filed by **how they change over time**, not by subject. A subject folder decays
+because a document can belong to two subjects; "does this get edited later" has exactly one answer.
+
+| Directory | What is in it | May it be edited later? |
 | --- | --- | --- |
-| **Product** | | |
-| [product-specification.md](product-specification.md) | What Exulanica is, the defining loop, the scoped MVP, the reconstruction fallback ladder, what is excluded, and the known limitations | Mixed, labelled per claim |
-| [interaction-model.md](interaction-model.md) | Atlas and coordinate model, navigation and the two platform limits that force it, the two verbs, the Companion, update proposals and confirmation tiers, World Index and Atlas Map, recomposition, formation, accessibility | Mixed, labelled per claim |
-| [frontier-roadmap.md](frontier-roadmap.md) | Exit-gated plan from source media through memory, reconstruction, protected adaptation, runtime publication, independent evaluation, and the signed World Memory Package | DECISION and IMPLEMENTATION PLAN |
-| **Architecture** | | |
-| [architecture-overview.md](architecture-overview.md) | System shape, platform split and deployment topology, storage and one consistency domain, object storage limits, query and answer safety, prompt injection posture, the 46 day uptime obligation | DECISION, with OPEN and ASSUMPTION items inline |
-| [atlas-spatial-architecture.md](atlas-spatial-architecture.md) | Grounded memory archipelago, navigation, neighborhoods, residency, Map correspondence, and phased spatial roadmap | DECISION and ACTIVE IMPLEMENTATION |
-| [atlas-visual-language.md](atlas-visual-language.md) | Aeroheart source-weather thesis, source aperture, continuity-field architecture, semantic visual dictionary, opening/encounter rules, removals, validation record, and focused-fixture limitations | DECISION and IMPLEMENTED for the focused slice |
-| [atlas-world-research.md](atlas-world-research.md) | Procedural-world, persistence, wayfinding, streaming, accessibility, and customization research; repository measurements; prioritized gaps and acceptance gates | VERIFIED, DECISION, and ASSUMPTION, labelled |
-| [atlas-world-customization-contract.md](atlas-world-customization-contract.md) | Protected topology, appearance and structural proposal lifecycles, profile compatibility, failures, safe fallbacks, and the production frontend handshake | DECISION; global frontend/backend lifecycle implemented |
-| [atlas-frontend-integration.md](atlas-frontend-integration.md) | Atlas startup hydration, wire translation, transient review, stale recovery, history, conversational handoff, and authenticated source loading | IMPLEMENTED; external proposal service and regional renderer preview remain |
-| [world-style-backend.md](world-style-backend.md) | Reviewed profile/capability registry, immutable style persistence, preview/apply/discard/rollback API, concurrency errors, provenance, and source-media states | IMPLEMENTED |
-| [interaction-policy-backend.md](interaction-policy-backend.md) | Reviewed comfort/navigation/disclosure/initiative registry, immutable policy versions, shared Settings/Companion review lifecycle, rollback, recommendations, and evaluation boundary | IMPLEMENTED; real-participant evaluation not run |
-| [physical-streaming-runtime.md](physical-streaming-runtime.md) | Cancel-safe physical residency, authenticated fetch and Range observation, pressure downgrade, neighborhood rebasing, context recovery, disposal, and the production measurement boundary | RENDERER CONTRACT IMPLEMENTED; real asset/hardware gate blocked |
-| [derivative-worker-operations.md](derivative-worker-operations.md) | Production derivative-worker process, RLS role, leases, retries, reclaim, progress, metrics, replay, shutdown, and failure recovery | IMPLEMENTED and PostgreSQL-tested 2026-08-31 |
-| [scene-reconstruction-operations.md](scene-reconstruction-operations.md) | Production multi-photograph selection, leases, pose and placement receipts, graph delivery, multi-map rendering, rung disclosure, deletion, scratch cleanup, and recovery | IMPLEMENTED and PostgreSQL/browser-tested 2026-09-04; real-corpus quality run blocked |
-| [evaluation/2026-09-04-readiness-and-architecture-audit.json](evaluation/2026-09-04-readiness-and-architecture-audit.json) | The post-reconstruction readiness audit: confirmed architecture, the contradictions it found, the eight identity and evidence decisions it closed, what is still open, and the entry and exit gates for the four goals that follow | Retained, digest bound, checked by `tests/test_retained_evaluation_records.py` |
-| [domain-and-evidence-model.md](domain-and-evidence-model.md) | The evidence address, the epistemic model, occurrence versus entity, schemas, idempotency, deletion and tombstones, the provenance ledger, the World Memory Package | DECISION, with CORRECTED and OPEN items inline |
-| [model-and-service-selection.md](model-and-service-selection.md) | The model and service matrix with exact identifiers and declared fallbacks, the 2026-08-31 deprecation, the catalog type-field hazard, routing and cost discipline, and what may be claimed about model use | VERIFIED 2026-08-27, with OPEN items listed |
-| [runtime-verification.md](runtime-verification.md) | What the platform does when called rather than when read about: the archived NVIDIA provenance record, measured image token costs, reasoning-token behaviour, which structured-output mechanism works, embedding width, and the resolved spend exposure | VERIFIED by execution 2026-08-27 |
-| **Compliance and safety** | | |
-| [privacy-consent-threat-model.md](privacy-consent-threat-model.md) | Legal landscape, architectural guards, consent schema, deletion cascade, honest disclosure copy, prompt injection, misuse boundaries | Mixed, labelled per claim |
-| [license-matrix.md](license-matrix.md) | Ship and do-not-ship verdicts per component, the NVIDIA license distinction, accidental-violation traps, third party notice obligations | VERIFIED 2026-08-27, with OPEN items listed |
-| **Evaluation** | | |
-| [evaluation-methodology.md](evaluation-methodology.md) | Gold corpus adapted to a photograph corpus, metrics with their measurement procedures, the honesty constraint, learning evaluation, adversarial suite | DECISION and ASSUMPTION, labelled |
-| [evaluation-corpus-contract.md](evaluation-corpus-contract.md) | Private OGC-1 bundle, immutable split, consent-index, blind-access, and local blocker contract | IMPLEMENTED INPUT BOUNDARY; REAL INPUTS BLOCKED |
-| [evaluation-run-archive.md](evaluation-run-archive.md) | Write-once, digest-verifiable reports with exact repository, model, stage, migration, ledger, timing, cost, and reuse provenance | IMPLEMENTED; REAL REPLAY BLOCKED |
-| [evaluation-clean-replay.md](evaluation-clean-replay.md) | New-database, non-owner, purpose-scoped two-pass corpus replay and gate receipt | REPLAY MECHANICS IMPLEMENTED; REAL BASELINE BLOCKED |
-| **Project** | | |
-| [demo-runbook.md](demo-runbook.md) | What can be demonstrated today and what cannot, audited against the build rather than against the plan, with the remaining gaps named | Mixed, buildability audited 2026-08-28 |
-| [demo-integrity.md](demo-integrity.md) | What is pre-seeded versus computed live and the prohibitions that follow, the hosted topology and its per-visitor reset, unattended operation, the failure modes with a fallback for each, and the pre-demonstration checklist | Mixed, DECISION with OPEN items inline |
-| [platform-findings.md](platform-findings.md) | Findings on Token Factory, AI Cloud, the NVIDIA models and Tavily, each carrying the execution or the primary source that evidences it, ending with a prioritised list | Mixed. Sections 1 to 3 executed 2026-08-27, section 4 documentation-verified 2026-08-28 |
+| `docs/` | Living contracts and reference tables | Yes, freely, as the system changes |
+| `capabilities/` | Guides for somebody choosing to use it, not build it | Yes |
+| `adr/` | Numbered decisions with their alternatives | Status may change; the number never does |
+| `briefs/` | What was intended, written before the work | Only while the work is undispatched |
+| `evaluation/` | Machine-written, digest-bound evidence | **Never.** See below |
+| `artifacts/`, `patches/` | Images and patches that documents point at | Only by the document that owns them |
 
-### Decision records
+**Where a new document goes**, first yes wins:
 
-`adr/` holds the decisions that were expensive enough to be worth recording with their alternatives
-and their consequences, so that a later reader can tell a considered choice from an inherited default.
+1. Machine-readable evidence with a digest? `evaluation/`, and a script writes it, not you.
+2. A numbered architectural decision? `adr/`, next free number, never reusing one.
+3. A plan for work not yet done? `briefs/YYYY-MM-DD-slug.md`.
+4. Would editing it in a month falsify an account of what happened on a date? It is a record. Do not
+   edit it afterwards: append a dated `CORRECTED` note, or write a new document that cites it.
+5. Written for somebody deciding whether to use the product rather than build it? `capabilities/`.
+6. Otherwise it is a living contract or a reference table, and it belongs at `docs/` root.
+
+The distinction step 4 turns on, and the one most easily got wrong: **a record is closed, a log is
+open.** [engineering-log.md](engineering-log.md), [runtime-verification.md](runtime-verification.md),
+[reconstruction-findings.md](reconstruction-findings.md) and
+[platform-findings.md](platform-findings.md) are appended to and read as current evidence, so they
+stay at root even though their content is dated.
+
+### Two things that cannot move
+
+**`evaluation/` is immutable.** Its records bind their predecessor and every artifact they cite by
+sha256, so correcting a path inside one would change its digest, which the next record binds in
+turn, cascading through the chain. There is no way to fix a record after the fact, which is the
+point of it.
+
+**A document named inside a record is pinned at that path.** Thirty-four documents are pinned this
+way today: 19 at root, 14 decision records and one patch.
+[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails, naming the records
+that would be stranded, if one of them moves. Moving such a document is not forbidden, but it is a
+decision to leave a record permanently wrong, and the test makes you take it deliberately.
+
+### The full inventory
+
+[all-documents.md](all-documents.md) lists every document in the tree with a one-line summary. It is
+generated by `scripts/generate_docs_index.py` and a test fails if it drifts, because the table this
+section replaced was hand-maintained, covered 45 of 111 files, and never mentioned `briefs/` at all.
+
+## Decision records
+
+`adr/` holds the decisions expensive enough to be worth recording with their alternatives and their
+consequences, so a later reader can tell a considered choice from an inherited default. The number
+is the identifier: ADR-0010 is cited symbolically 85 times against 3 citations by filename, so a
+number is never reused and never reassigned.
+[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails if a record is
+missing from this table.
 
 | Record | Decision | Status |
 | --- | --- | --- |
@@ -106,6 +122,12 @@ and their consequences, so that a later reader can tell a considered choice from
 | [adr/0015-timebase-rounding.md](adr/0015-timebase-rounding.md) | `round_half_down` is ties toward zero and quantises measurements only; the tick-to-nanosecond conversion rounds up so the tick round trip is exact, corrected while it was still free | ACCEPTED; closes two section 9.1 items |
 | [adr/0016-ocr-is-a-region.md](adr/0016-ocr-is-a-region.md) | Text read off a photograph is a `frame_region` span carrying an `ocr_text_is` assertion; `transcript_text` is reserved for time-anchored transcripts and refused on the image track | ACCEPTED; closes the last section 9.1 address blocker |
 | [adr/0017-exact-recomputation.md](adr/0017-exact-recomputation.md) | Exact recomputation covers the deterministic stages only; a model-produced artifact is invalidated and removed, never regenerated identically, and the type refuses to let a model stage claim otherwise | ACCEPTED; narrows A-24 |
+| [adr/0018-contextual-provisional-links.md](adr/0018-contextual-provisional-links.md) | Automatic identity proposals organize as explicit guesses, written from context alone | ACCEPTED |
+| [adr/0019-offline-restore-tombstone-replay.md](adr/0019-offline-restore-tombstone-replay.md) | A declared offline restore replays every sealed tombstone before it serves or starts a worker | ACCEPTED for the local mechanism; production rehearsal OPEN |
+| [adr/0020-manifest-gold-question-evaluation.md](adr/0020-manifest-gold-question-evaluation.md) | Gold answers are derived from the manifest before retrieval, and model and declared-plan measurements stay separate | ACCEPTED |
+| [adr/0021-observed-recomputation-scope.md](adr/0021-observed-recomputation-scope.md) | Exactness belongs to observed content; the wider closure stays open | ACCEPTED |
+| [adr/0022-withdrawal-at-evidence-serving.md](adr/0022-withdrawal-at-evidence-serving.md) | Every evidence entrypoint checks withdrawal before reading stored bytes | ACCEPTED |
+| [adr/gsplat-training-and-recorded-rung.md](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and the recorded scene rung are separate decisions, so a nonmetric scene can be trained honestly | ACCEPTED for implementation; unnumbered, deliberately |
 
 ## Current state
 
@@ -118,10 +140,13 @@ on conflict.
 The evidence spine is implemented rather than only specified: migration
 `exulanica/migrations/0001_spine.sql` and the `exulanica/evidence/` modules, with tests. Building it
 found errors in the committed design, and those are corrected in place and marked **CORRECTED**
-rather than left for the next reader to trip over. The suite is 1447 tests, 677 of which require a
-live PostgreSQL instance and skip without one. All 1445 pass against the documented target,
-PostgreSQL 18 with pgvector, with nothing substituted for either, so the SQL-level guarantees are
-executed rather than described. The SQLite mirror the ingest path used to write is deleted:
+rather than left for the next reader to trip over. MEASURED 2026-09-09 at `fd84627`, against the documented target of PostgreSQL 18 with pgvector
+and nothing substituted for either: **2,200 passed, 14 failed, 4 skipped**. Every one of the
+fourteen is a missing optional dependency in the plain environment rather than a defect, and
+they are named in [reconstruction-throughput.md](reconstruction-throughput.md). The count in
+this paragraph previously said 1,447 tests of which 1,445 passed, which was stale and
+internally inconsistent. Quote a suite count with the date and the head it was measured at, or
+do not quote one. The SQLite mirror the ingest path used to write is deleted:
 there is one schema.
 
 The browser renderer is decided: PlayCanvas Engine 2.21.4, on matched-resolution measurement

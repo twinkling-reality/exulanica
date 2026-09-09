@@ -20,7 +20,7 @@ interface; the World Memory Package describes a portable snapshot for developers
 This document supersedes narrower product definitions in product-specification.md and the
 north-star framing and delivery priority in frontier-roadmap.md. Older implementation records,
 acceptance evidence, and operational requirements remain valid within their stated boundaries.
-roadmap-next-2026-09-08.md remains the infrastructure backlog, not the complete product roadmap.
+infrastructure-backlog.md remains the infrastructure backlog, not the complete product roadmap.
 
 Identity confirmation, permissions, deletion, evidence, and versioning remain foundational.
 Evidence supports claims about the source world; authored changes remain distinct from that source.

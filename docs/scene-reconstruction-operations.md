@@ -391,3 +391,52 @@ results.
 Those producers are additive inputs to the scene gate. They do not change scene identity, member
 registration, OPM/2, the placement record, deletion reachability, or the graph's distinction among
 recorded rung, displayed rung, and substrate.
+
+## 12. The pose job controller, absorbed from a retired document
+
+This section absorbs the retired `colmap-pose-jobs.md`, which stood at the root of `docs/`
+until 2026-09-09. It is named without a path on purpose: the file is gone, and a live-looking
+path to it would fail the documentation link check, which is the behaviour we want. That document was the operating
+note for `exulanica.reconstruction.pose` before this one existed, and it was retired rather than
+kept because its status line had become false: it read "no authorized real dense capture run" while
+three committed documents record real runs, including the ETH3D benchmark in section 9 above and the
+volcanic and bowl reconstructions. A document whose own status line contradicts the tree is worse
+than no document, because a reader who trusts it is misled in the one place they were looking for
+the truth. Everything below is its durable content, unedited except where marked.
+
+**The manifest and the job directory.** `exulanica.reconstruction.pose` runs COLMAP feature
+extraction, exhaustive matching and sparse mapping from an exact authorized source manifest. The
+manifest pins every staged filename and byte digest, an exact Git revision, an exact COLMAP version,
+a digest-pinned execution image, explicit reviewed quality thresholds, capture-set membership, and an
+optional measured scale with its method. Original paths, media bytes, semantic labels and inferred
+consent are absent. Each manifest has one content-addressed job directory outside Git, and a
+filesystem lock serializes claimants.
+
+**What a stage records, and what a restart may skip.** Every executor result records the exact
+argument vector, actual duration, return code, and stdout and stderr digests. A checkpoint is
+fsynced after feature extraction, matching, mapping, and each binary-to-text model conversion. A
+restart skips only completed stages whose required durable outputs still exist, and a completed
+receipt is reused only after the current sparse artifacts reproduce its quality digest.
+
+CORRECTED 2026-09-09: the retired document described the recorded COLMAP version as pinned exactly.
+It is not. `PoseBuildManifest.colmap_version` is required to be non-empty and is never checked
+against the library that ran; `exulanica/reconstruction/pycolmap_executor.py` closes that gap for
+the in-process backend only, by building the string from the library about to do the work.
+
+**What the parser reads.** Registered image names and camera centres from COLMAP `images.txt`, and
+actual reprojection errors from `points3D.txt`. It reports registration fraction, mean reprojection
+error, camera-translation extent, all output digests and sizes, the selected connected model, and
+every fallback reason. The largest connected model is selected deterministically by registered image
+count and path; a place name never participates.
+
+**Co-registration is not metricity.** Multiple capture sets are co-registered only when registered
+images from every declared set occur in one connected model. That still does not make the result
+metric: a shared metric frame also requires an explicit positive measured scale and its method.
+Failure, low coverage, poor reprojection, insufficient translation, disconnection or missing scale
+retains rung 3 with the recorded reason.
+
+**Sensitive scratch.** Staged images, COLMAP databases, descriptors and sparse working files are
+separate from the durable receipt and are removed after success, handled failure or cancellation. A
+process crash retains only restartable scratch until lease reclaim or the age-gated startup sweep,
+and a crash on the final claim is terminalized before that sweep, so no expired job remains
+permanently `running`. Section 6 above is the fuller deletion contract.
