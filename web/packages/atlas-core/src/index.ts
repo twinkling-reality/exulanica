@@ -443,3 +443,28 @@ export {
   pickObservedPoint,
   projectToSourcePixel,
 } from './observation-pick.js';
+
+export type {
+  BehaviourDefinition,
+  BehaviourParameterResolution,
+  BehaviourRange,
+  BehaviourResolution,
+  BoundedMotionParameters,
+  BoundedMotionRanges,
+  MotionAxis,
+} from './behaviour/registry.js';
+export {
+  BEHAVIOUR_REGISTRY,
+  BOUNDED_MOTION_ID,
+  BehaviourRegistry,
+  MOTION_AXES,
+} from './behaviour/registry.js';
+
+export type { MotionOffset, MotionState } from './behaviour/bounded-motion.js';
+export {
+  BoundedMotion,
+  NO_MOTION_OFFSET,
+  isAtAuthoredOffset,
+  motionOffsetAt,
+  motionTransform,
+} from './behaviour/bounded-motion.js';
