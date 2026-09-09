@@ -170,6 +170,142 @@ plus a `comparisons.json` that binds the bundle, the render and reference digest
 images. A tampered or truncated bundle is refused rather than drawn. The comparisons show
 appearance at photographed viewpoints only.
 
+## Masked members and the held-out remap
+
+Implemented 2026-09-09. A scene may contain members whose photograph is replaced by a masked
+derivative before anything reads a pixel: pose, placement and the gate have run fully masked since
+`exulanica.ingest.masked_inputs` existed. Training was refused until now, and the refusal was
+about one specific hazard rather than about masking generally. The build manifest requires
+`heldout_source_sha256` to be a proper subset of `source_sha256`; `source_sha256` comes from the
+pose frames, which under masking are derivative digests, while a held-out split is declared over
+the photographs a person actually reviewed. Relaxing the subset rule to accept the mismatch is the
+fix that looks obvious and is wrong: on a partially masked scene the unmasked held-out members
+still match by digest, so `load_dataset` finds a held-out view, raises nothing, and trains on the
+masked photographs the split said it was withholding.
+
+What is delivered instead is a remap. At enqueue, `_enqueue_capture_set` derives from the same
+current privacy selection that produced `masked_sources` a second view of it: per hidden member,
+the capture reference, the original photograph's SHA-256 and the derivative's SHA-256. It binds
+that into the stored training request, which also resolves `heldout_source_sha256` onto the
+derivatives. The request an operator wrote still names the photographs they reviewed; what the
+queue stores names the bytes training will read, beside the map that says which is which. **The
+subset rule is unchanged.**
+
+Resolving at enqueue rather than carrying originals downstream is forced, not preferred.
+`world_package/training_inputs.py` validates a training export by comparing pose-frame digests,
+which are derivative digests, against `build_inputs.splat_training.heldout_source_sha256` and
+against `manifest.parameters.heldout_source_sha256` in the publication receipt. Leaving originals
+in either place would make package export refuse every masked trained scene with "training split
+differs from the frozen scene build", in a file this work does not touch. Nothing downstream has
+to infer one space from the other, and the frozen split of an admitted reference source is still
+compared in the original space, before the substitution, so `validate_admitted_sources` means
+exactly what it always meant.
+
+The map is checked three times, in three different currencies:
+
+- **At enqueue**, against current privacy inputs. `selected_masks` already refuses a member that
+  needs a mask and has no current one, or whose declared derivative has gone stale under 0040's
+  matcher; `bind_masked_sources` additionally refuses a map naming bytes outside the admitted
+  source set, a map an operator declared rather than one derived here, and any resolution that
+  would collapse two held-out photographs onto one derivative.
+- **At manifest construction**, against the pose frames. By then the worker has re-resolved every
+  declared mask and rebound each hidden member, so the frames are the ground truth of what will be
+  staged. `SceneSplatRequest.manifest` refuses when the derivative a frame carries is not the one
+  the map was frozen with, which is what catches a map whose entries were exchanged between two
+  hidden members, or a stored declaration and a map that fell out of step. A mask genuinely
+  rebuilt between enqueue and run does not normally reach here: `verify_masked_sources` resolves
+  the declared artifact before pose runs, `mask_is_current` no longer matches it, and the job is
+  refused earlier and more cheaply. This bullet is the second line for that case and the only
+  line for the exchange, which the manifest cannot catch on its own because it never learns which
+  capture a hash belonged to. That is why the map carries a capture reference and not only a pair
+  of digests.
+- **In the manifest, against the hashes alone.** A declared derivative must be among the training
+  sources, and a mapped original must not be. The second is the load-bearing one: it is the rule
+  that says the photograph of somebody who asked to be hidden is not in the set the trainer reads.
+
+`verify_masked_training_sources` restates the last of those against files rather than hashes, in
+the runner and before `prepare_dataset` rather than merely before `load_dataset`. The earlier
+position is the point: rectification decodes every staged image and writes it back into the job
+directory, so a leaked original checked afterwards would already be re-encoded into retained
+scratch by the time anything refused it. The check is otherwise deliberately a restatement. The
+controller's `_verify_dataset_sources` already proves the staged bytes are exactly `source_sha256`,
+and the manifest has already refused any map whose originals appear there, so the two together
+leave no room; this buys independence, not new coverage. A build with nobody hidden returns from it
+immediately and pays no extra pass over the images.
+
+Nothing had to change for the renders themselves to be scored against the masked derivative,
+because the staged dataset holds only derivatives and every pixel path is rooted in it.
+`per_view.source_sha256` digests the staged image, so on a masked scene it is the derivative's;
+`per_view.reference_pixels_sha256` digests the pixels actually compared, which is the same file
+for a PINHOLE scene and its rectification for a distorted one. Neither is ever an original, and
+that inequality is exactly what the evaluation bundle uses to decide whether to retain a rectified
+reference, so recording an original in `per_view` would break the bundle as well as falsify it.
+This has never run on a masked scene: it is a property of the paths, not an observation.
+
+What the receipts now add is the statement of which photograph each derivative replaced. The
+training publication receipt carries the map under `manifest.parameters.masked_source_remap`, and
+`split.json` carries it again beside `heldout_original_source_sha256` and an explicit
+`reference_pixels` note, inside the retained evaluation bundle.
+
+### What changes identity, and what does not
+
+Only scenes that actually have a hidden member. `masked_source_remap` is omitted from the request
+payload and from the manifest's `parameters` when it is empty, exactly as `masked_sources` is
+omitted from the build inputs, so a corpus with nobody in it reproduces its request bytes, build
+input digest, job id, manifest digest, job directory, checkpoint identity, `split.json` and
+retained bundle byte for byte. No stage version or stage parameter changes, and `pipeline_digest()`
+is unchanged: the map alters no output schema any stage owns, and identity separation between a
+mapped and an unmapped build already comes from the build input and manifest digests. For a masked
+scene every one of those identities moves, which is the intended behaviour and the same rule a
+consent change has always followed: a new build rather than a mutated accepted one.
+
+### Limits
+
+**No masked scene has been trained on a GPU.** Every check above is exercised through the scripted
+trainer in `tests/test_scene_splat_pipeline.py` against real PostgreSQL, real person regions and
+the real `masked_source` stage, plus manifest-level controls in `tests/test_reconstruction_splat.py`
+and the read helper's own tests. Those establish the enqueue, manifest, staging and receipt
+boundaries. They establish nothing about appearance, convergence, cost or how a masked region
+behaves under Gaussian optimization, and the floater and coverage proxies have never been measured
+on a scene containing flat masked fill. A masked reference scene remains the next thing to measure.
+
+**The runner-side check has never executed at its call site.** `verify_masked_training_sources` has
+direct tests, and an ordering test reads its position out of `_train_locked` rather than running
+it, because `_train_locked` needs torch, numpy and pycolmap in one process and this host cannot
+give it that. The same is true of the `split.json` remap block: the scripted trainer writes it
+through the same helper the runner uses, which is what makes the retained bundle's shape real, but
+the runner's own call site is unexecuted here.
+
+**The map publishes a hidden member's original photograph digest.** It has to: a map from original
+to derivative is what was asked for, and a receipt that named only derivatives would say nothing.
+The consequence is that `manifest.parameters.masked_source_remap` now carries, in the published
+training receipt and therefore in a world package export, a content address for bytes that were
+deliberately not exported. That address discloses no pixels, but it does let anyone already holding
+the photograph confirm it was in this scene. Nothing before this change put that digest in a
+training receipt.
+
+**`scripts/heldout_comparisons.py` will mislabel a masked scene.** It captions its left panel
+"held-out photograph" and copies `per_view.source_sha256` into `comparisons.json`, both of which
+are the masked derivative on a masked scene, and it never reads `split.json` where the remap and
+its `reference_pixels` note live. It is correct about the pixels and wrong about the word. That
+script is outside this work's scope; a masked scene's comparisons should not be read as showing a
+photograph until it is corrected.
+
+**`TRAINING_PROTOCOL["split"]` still describes the frozen split in terms of original source
+digests.** That wording predates masked training and is now imprecise for a masked build, where
+the frozen split names derivatives and the remap names the originals. It is left alone on purpose:
+it is inside the manifest's protocol block, so editing it would change every existing build
+identity, including the retained bowl and volcanic receipts.
+
+The remap is a statement about bytes, not about people. It says which derivative replaced which
+photograph; it does not establish that the derivative hides everyone it should, which is the
+`masked_source` stage's claim and the human review's, recorded elsewhere. A mixed-format corpus is
+worth one caution: a masked derivative is always JPEG, so a hidden member whose original was a PNG
+stages under a different filename than it would have unmasked, and only that member does. That
+interacts badly with a pre-existing defect outside this work, where per-member registration is
+computed from the un-rebound media type and so looks for `000003.png` when the staged frame is
+`000003.jpg`; a masked non-JPEG member is recorded unregistered until that is fixed separately.
+
 ## Build and run on available CUDA compute
 
 `deploy/gsplat/Dockerfile` is the concrete build recipe. It requires a real **digest-pinned** CUDA
@@ -211,6 +347,13 @@ and does not promise bit-identical GPU output.
 
 ```bash
 uv run pytest tests/test_gsplat_runner.py tests/test_gsplat_dataset.py tests/test_gsplat_container.py tests/test_reconstruction_splat.py
+```
+
+The masked-training contract additionally needs a database, because its subject is what current
+privacy inputs say rather than what a fixture asserts:
+
+```bash
+EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest tests/test_scene_splat_pipeline.py tests/test_masked_scene_inputs.py tests/test_reconstruction_splat.py
 ```
 
 The local Apple M3 Pro host reports Torch 2.14.0, CUDA unavailable, and MPS available. gsplat's reviewed
