@@ -2,18 +2,30 @@
  * Boot: one session, one snapshot, one scene, and one write path.
  *
  * The shape of this file is the argument. It builds a session, reads the graph once, adapts it
- * into a scene, mounts the renderer, and wires three surfaces to that one snapshot. In a normal
+ * into a scene, mounts the renderer, and wires the surfaces to that one snapshot. In a normal
  * build there is no second source of truth and no fixture: everything on the screen came from
  * `GET /graph`, `GET /evidence/{span}` or a write that went through the gate. The Vite development
  * server has one explicit `?preview=1` exception for UI work while the API is unavailable. It is
  * synthetic, identified in the document title and contextual surfaces, and read-only; production
  * builds cannot enter it.
  *
+ * **This file composes; it does not implement.** Each surface lives in `composition/` behind a
+ * mount function that takes its dependencies explicitly and returns a dispose. What remains here
+ * is the order those mounts run in, the world shell they all talk through, and the two cycles
+ * that are real: the Companion needs the confirmation surface to render a staged proposal, and
+ * the confirmation surface needs the Companion's presence to report a pending commit on. Both are
+ * closed here, in the one scope that legitimately knows every surface exists.
+ *
+ * **The credential stays in this file.** `CompanionAskClient` is constructed here and the
+ * Companion module is handed a function rather than a client, for the same reason `session.ts`
+ * builds the write gate: a surface that held a credential could reach a route nobody wired it to.
+ *
  * **Every write goes through the confirmation surface**, and the confirmation surface is the only
  * caller of `session.commit`. The chain is: the user types a name, a draft is built by
  * `world-index`, translated into an update proposal, staged on the gate, rendered for reading,
  * and committed only when the user presses confirm. Skipping any link is not possible from here,
  * because `session` exposes `stage` and `commit` separately and the panel is what sits between.
+ * `composition/write-path.ts` holds that whole chain, panel included.
  *
  * **The snapshot is re-read after a write rather than patched.** A local patch would be a second
  * model of the graph maintained by hand, and the first time it disagreed with the server the
