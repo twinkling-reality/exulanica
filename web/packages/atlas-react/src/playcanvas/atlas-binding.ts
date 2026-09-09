@@ -112,6 +112,7 @@ import { createPointCloud } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
+import { SceneObjectRuntime } from './scene-objects.js';
 import {
   opmPointInScene,
   type PlacedScenePointMap,
@@ -307,6 +308,8 @@ export class AtlasBinding {
   readonly regionMass: RegionMass;
   readonly regionRelief: RegionRelief;
   readonly customization: WorldCustomizationController;
+  /** Authored objects. Empty until a surface places one; see `scene-objects.ts`. */
+  readonly objects: SceneObjectRuntime;
   readonly neighborhoodIndex: NeighborhoodIndex;
   readonly renderRoot: pc.Entity;
 
@@ -375,6 +378,7 @@ export class AtlasBinding {
 
   private applyResidencyPresentation(): void {
     this.sourceFirst.setResidency(this.residencyAllocated, this.mapState !== null);
+    this.objects.setResidency(this.residencyAllocated, this.mapState !== null);
     for (const visual of this.islands) {
       const inspecting = visual.island.islandId === this.inspection?.view.islandId;
       visual.entity.enabled = !this.trainedScenes.some((splat) => splat.geometry.sceneId === visual.pointMap.sceneId)
@@ -416,6 +420,7 @@ export class AtlasBinding {
     residencyCatalog: readonly ResidencyAsset[],
     residencyBudget: number,
     sourcePresentation: 'world' | 'inspection',
+    objectRoots: ReadonlyMap<IslandId, pc.Entity>,
   ) {
     this.app = app;
     this.device = app.graphicsDevice;
@@ -437,6 +442,7 @@ export class AtlasBinding {
     this.navigationWorld = navigationWorld;
     this.field = field;
     this.sourceFirst = sourceFirst;
+    this.objects = new SceneObjectRuntime(app, objectRoots);
     this.topology = topology;
     this.composedWorld = composedWorld;
     this.regionMass = regionMass;
@@ -476,7 +482,12 @@ export class AtlasBinding {
       pc.LightComponentSystem,
       pc.GSplatComponentSystem,
     ];
-    appOptions.resourceHandlers = [pc.TextureHandler, pc.GSplatHandler];
+    // `ContainerHandler` is what decodes an authored object's GLB, and `TextureHandler` is what
+    // its embedded images become. The container's own sub-assets (render, material, animation)
+    // are constructed already loaded by `GlbContainerResource` and never reach the loader, so
+    // they need no handler; a missing one here is reported as a bare string rather than an
+    // Error, which is why `scene-objects.ts` converts it before a status line sees it.
+    appOptions.resourceHandlers = [pc.TextureHandler, pc.GSplatHandler, pc.ContainerHandler];
     app.init(appOptions);
     app.setCanvasFillMode(pc.FILLMODE_NONE);
     app.setCanvasResolution(pc.RESOLUTION_AUTO);
@@ -660,10 +671,12 @@ export class AtlasBinding {
     const visuals: IslandVisual[] = [];
     const trainedScenes: Array<AtlasBinding['trainedScenes'][number]> = [];
 
+    const objectRoots = new Map<IslandId, pc.Entity>();
     for (const island of options.scene.islands) {
       const islandEntity = new pc.Entity(`island:${island.islandId}`);
       applyPlacement(islandEntity, island);
       renderRoot.addChild(islandEntity);
+      objectRoots.set(island.islandId, islandEntity);
       for (const [geometry, { asset, entity }] of trainedAssets) {
         if (geometry.islandId !== island.islandId) continue;
         islandEntity.addChild(entity);
@@ -767,6 +780,7 @@ export class AtlasBinding {
       Object.freeze(residencyCatalog),
       residencyBudget,
       options.sourcePresentation ?? 'world',
+      objectRoots,
     );
   }
 
@@ -1497,6 +1511,7 @@ export class AtlasBinding {
       // in `setProofLens`; this loop only delivers them.
       visual.cloud.material.setParameter('uLens', visual.uLens);
     }
+    this.objects.update(dt);
     this.settleProofLens();
 
     // The motes read the same emphasis buffer the manifest writes and the same projection scale
@@ -1591,6 +1606,7 @@ export class AtlasBinding {
     this.composedWorld.destroy();
     this.regionMass.destroy();
     this.regionRelief.destroy();
+    this.objects.destroy();
     for (const visual of this.islands) visual.cloud.destroy();
     for (const visual of this.trainedScenes) {
       visual.entity.destroy();
