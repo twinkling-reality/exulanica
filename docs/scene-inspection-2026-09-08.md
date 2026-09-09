@@ -525,3 +525,158 @@ Only the rows that changed. Everything else in the table above still holds.
   point and observation counts and its 108,267,697 byte pose receipt.
 - The graph-read profile was taken under cProfile, which roughly doubles wall time; the per-call
   figures are relative, and the unprofiled component timings above are the ones to quote.
+
+# 2026-09-09, later: the graph read fixed
+
+The section above measured the fifty second graph read and proposed three follow-ups without making
+them, because every file involved was read-only for this branch. The owner then asked for the first
+of the three. **This changes the writable set: `exulanica/graph/reconstruction_scenes.py` and
+`tests/test_scene_reconstruction_pipeline.py` were edited, so the whole backend suite is a gate
+here where the earlier sections did not need one.** The other two proposals were not made.
+
+The change was then reviewed adversarially, and the first version of it was wrong in three ways.
+What is described below is the reviewed version; the corrections are called out where they land,
+because an earlier draft of this section asserted one thing that is simply false.
+
+## What changed
+
+One file, `exulanica/graph/reconstruction_scenes.py`.
+
+`_scene_row` rebuilt every scene's placement on every request. It fetched the pose receipt and every
+point map from the store, which verifies each blob's digest as it reads it, then ran
+`fit_point_map_scale` once per member and `validate_opm` over every point. None of that depends on
+anything mutable: the pose receipt, the placement record, the gate receipt and each point map are
+content addressed, and their digests are already columns on the scene row the function has just
+read.
+
+So the rebuilt placement and the recovered cameras are now memoised, keyed on the workspace, the
+scene, those four digests, the scene's member list in order, the placement's point-map references in
+record order, and whether each of those point maps' bytes are present. On a hit the pose receipt and
+the point maps are not fetched at all.
+
+What is deliberately **not** memoised is everything that can change without a digest changing: the
+scene's members, the person regions and review states, the artifact rows with their `purged_at` and
+tombstone predicates, the gate agreement, and the asset-read policy the route applies afterwards.
+Those are re-read on every request as before. Nothing privacy-bearing is cached.
+
+The memo is guarded by a lock, because FastAPI runs a synchronous endpoint on a threadpool, and is
+process-local, so it cannot go stale across a restart. `clear_placement_memo()` empties it.
+
+**The bound is on total members, not on entries.** MEASURED 2026-09-09 on the 210 member volcanic
+scene: one entry is 639.6 KiB, or 3.05 KiB per member, and holds no point-map bytes at all. The
+bound is 20,000 members, about 60 MiB, which is roughly 95 scenes the size of the volcanic one.
+Entry count would have been the wrong unit, and a small entry count would have been worse than
+wrong: `reconstruction_scene_rows` sweeps every scene in the workspace on a graph read, so the
+access pattern is a cycle, and a bound shorter than the cycle evicts each entry before it is reused
+and gives a hit rate of exactly zero rather than a lower one. The first draft of this change used
+sixteen entries and would have fallen off that cliff at seventeen scenes.
+
+## What the review found, and what it changed
+
+- **A memory safeguard that did nothing, justified by a false claim.** The first draft stripped
+  `point_map_inputs` from the record before caching, on the stated grounds that
+  `validate_placement_record` returns a record still holding 780 MB of point-map bytes. It does not.
+  `build_placement_record` rebuilds those inputs as three positional arguments, so `content` keeps
+  its `None` default and the bytes never enter the record. The stripper was a no-op, its docstring
+  was false, and the test written to protect it passed identically with the function deleted. All
+  three are gone. The property itself is still worth pinning, because the memo makes it
+  load-bearing, so the test remains with an honest docstring and the measured 639.6 KiB behind it.
+- **A purge misclassified as an inconsistent receipt chain.** Moving the pose-receipt read out of
+  the first `try` and into the memo-miss branch put it under a handler that catches
+  `(KeyError, TypeError, ValueError)`. `BlobNotFoundError` is a `KeyError`, so a pose receipt purged
+  between the presence check and the read would have been reported as `invalid` with "The pose,
+  placement and gate records do not reproduce one consistent scene", where the old code said
+  `bytes_missing`. It now has its own arm. The presence check was also moved ahead of the placement
+  and gate reads, so a double fault still reports what the unmemoised reader reported.
+- **A repair that would never be seen.** This is the one that mattered most. `store.exists` is a
+  bare `is_file()`, so "present and valid" and "present but rotted" build the same key while
+  producing different correct records. A point map that was corrupt when the memo was filled would
+  have left its scene degraded for the life of the process even after an operator restored the
+  bytes, because restoring under content addressing leaves every key component unchanged. **A record
+  built from a read that failed its digest is now never cached**, so a repair is picked up on the
+  very next request.
+
+## The trade that remains, stated exactly
+
+Before this memo every graph read pulled each point map through `store.get`, which re-hashes the
+bytes. A blob that had rotted came back as `content=None`, its member was excluded as
+`alignment-unavailable`, and no fetch reference was emitted. On a memo hit the only per-request
+check is `store.exists`. So a point map that was sound when the entry was filled and rots afterwards
+is reported as placed and available, with a `/geometry` reference, until the entry is evicted or the
+memo is cleared.
+
+The bytes themselves are still safe: `exulanica/api/routes/geometry.py:234` reads them through the
+store and refuses on `IntegrityError`, so a visitor gets a refusal rather than wrong geometry. What
+is lost is that the graph used to withhold the reference rather than advertise it. A purge is still
+seen, because presence is in the key. A repair is seen, because a failed-digest read is never
+cached. This is the single remaining narrowing, it is pinned by a test that asserts the behaviour as
+it is, and it is the thing to revisit if it is judged too expensive.
+
+## Measured
+
+Same isolated copy, same machine, curl wall clock, on a genuinely cold process each time. An earlier
+attempt at these numbers was invalid because a stale API process was still holding port 8000 and
+serving from a warm memo; the measurement script now refuses to run if the port is taken.
+
+| | before `51f8b01` | after, cold process | after, warm |
+| --- | ---: | ---: | ---: |
+| Volcanic, 210 members | 48,013 / 51,066 / 50,622 ms | 47,880 ms | **2,681 / 2,599 / 2,632 ms** |
+| Bowl, 91 members, geometry withheld | 21,683 / 21,495 / 21,444 ms | 21,321 ms | **322 / 319 / 338 ms** |
+
+That is 50.6 s to 2.63 s for the volcanic scene and 21.5 s to 0.32 s for the bowl, about nineteen
+and sixty-seven times. Response bytes are unchanged at 320,775 and 22,832.
+
+In the browser, with the memo warm, **mount fell from 54,948 ms to 15,741 ms**, frame p95 from
+350 ms to 132.6 ms, and the measured frame count over the same sixty seconds rose from 515 to 1,072.
+All 210 point maps still load and the scene still draws. The remaining sixteen seconds is the
+390,141,944 bytes of geometry the browser fetches, decodes and uploads.
+
+### What is left, now measured rather than proposed
+
+A profile of the **warm** route body is 2.896 s, and `scene_inputs` is 2.060 s of it across two
+calls, of which `json.loads` is 1.924 s. That is the 108,267,697 byte pose receipt being read,
+hashed and parsed once per scene inside `read_snapshot` through `trained_geometry_row`, and once
+again by the route. It is now the whole remaining cost.
+
+The obvious next step is to stop parsing that receipt twice per request: either memoise the parsed
+pose manifest on its digest the same way, or have the route reuse what `read_snapshot` already
+produced. Neither needs an index or a migration reservation, for the same reason as before: there is
+no slow query here.
+
+Proposals 2 and 3 from the section above stand unmade. Proposal 2, evaluating the guard before
+building the placement, is now worth much less: the bowl's withheld scene costs 0.32 s warm.
+Proposal 3, the per-point Python walk in `validate_opm`, now runs only on a cold miss, and doing it
+properly wants an array library this package does not depend on.
+
+## Gates
+
+The backend suite was run in full before and after, on a dedicated scratch database. **60 tests fail
+in both runs and the two failure sets are identical**, so this change introduces no regression and
+fixes none. The pre-existing failures are concentrated in `test_world_read_views.py` (28),
+`test_asset_read_currency.py` (15) and `test_gsplat_runner.py` (7); a sampled one fails in its own
+fixture setup with "no such scene" and is unrelated to anything here. Both lists are retained under
+`artifacts/2026-09-09-graph-read-memo`.
+
+Seven focused tests were added to `tests/test_scene_reconstruction_pipeline.py`, where the scene
+fixtures already are: the reuse itself, the absent bytes, a point map lost after a memoised read,
+the pose receipt lost after a memoised read, the member bound with eviction, the corruption that the
+memo does not see, and the repair that it does. On the unfixed tree the module fails to import,
+because the memo does not exist. Two mutations confirm the load-bearing assertions rather than
+assuming them: making `_memo_get` always miss fails the reuse test on
+`assert point_digests.isdisjoint(second_store.fetched)`, and caching failed-digest reads fails the
+repair test on `assert placement_memo_size() == 0`.
+
+## Limitations
+
+- The cold path is unchanged. A fresh process still pays 47.9 s for the volcanic scene and 21.3 s
+  for the bowl on the first request. Only repeat reads are fast.
+- The memo is per process. Several API workers each keep their own, and the first request to each is
+  cold.
+- A point map that rots after a successful read is advertised until its entry is evicted. This is
+  the deliberate trade described above, and the only one left.
+- 20,000 members is sized against this corpus and the deployment note of three to five scenes. It is
+  not a measured ceiling for a workspace an order of magnitude larger.
+- The 60 pre-existing backend failures were not investigated beyond confirming they are identical
+  before and after and sampling one. They were failing at `51f8b01`.
+- The browser mount figure is with the memo already warm; a first visit after a restart still waits
+  for the cold read.
