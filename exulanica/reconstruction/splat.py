@@ -501,10 +501,13 @@ def masked_training_binding(manifest: SplatBuildManifest) -> dict[str, object]:
             for capture_ref, original, masked in manifest.masked_source_remap
         ],
         "heldout_original_source_sha256": list(manifest.heldout_original_source_sha256),
+        # Scoped deliberately to decoding and scoring. The worker does read a hidden member's
+        # original bytes once, at `_store.get` after training, to reverify the digest it was
+        # admitted with; claiming here that no original is "read" would make this receipt false.
         "reference_pixels": (
             "masked-derivative-bytes-only: every held-out render is scored against the masked "
-            "derivative, and no original photograph of a hidden member is read, rendered or "
-            "compared at any point in this build"
+            "derivative, and no original photograph of a hidden member is decoded, rendered or "
+            "compared against a render anywhere in this build"
         ),
     }
 
