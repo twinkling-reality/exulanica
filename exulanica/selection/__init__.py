@@ -28,6 +28,7 @@ from exulanica.selection.answer import (
     AnswerRejected,
     ClauseType,
     abstain,
+    abstain_without_a_selection,
     render_deterministic_answer,
     validate_answer,
 )
@@ -51,8 +52,11 @@ from exulanica.selection.plan import (
     SelectionPlan,
 )
 from exulanica.selection.question import (
+    PROMPT_VERSION,
     AnsweredQuestion,
+    CallLog,
     EntityChoice,
+    ModelCall,
     answer_question,
     compose_answer,
     entity_catalogue,
@@ -68,11 +72,13 @@ from exulanica.selection.validation import (
 )
 
 __all__ = [
+    "PROMPT_VERSION",
     "Abstention",
     "Answer",
     "AnswerClause",
     "AnswerRejected",
     "AnsweredQuestion",
+    "CallLog",
     "CaptureSelector",
     "CaptureWindow",
     "ClauseType",
@@ -83,6 +89,7 @@ __all__ = [
     "EvidenceItem",
     "EvidencePacket",
     "Intent",
+    "ModelCall",
     "PlaceSelector",
     "ProcessingState",
     "RejectionCode",
@@ -96,6 +103,7 @@ __all__ = [
     "ValidatedPlan",
     "ValueReference",
     "abstain",
+    "abstain_without_a_selection",
     "answer_question",
     "build_packet",
     "compose_answer",

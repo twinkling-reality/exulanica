@@ -17,6 +17,7 @@ thinking about who may call it is not possible here; the suite goes red.
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import importlib.util
 import json
 import uuid
@@ -31,6 +32,8 @@ from exulanica.evidence.blob import BlobId
 from exulanica.identity import IdentityRepository, name_occurrence
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.models.transport import HttpResponse
+from exulanica.selection.question import PROMPT_VERSION
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
 
@@ -41,6 +44,7 @@ from conftest import (
     write_photo,
     write_point_map,
 )
+from model_fakes import chat_body
 
 #: Routes that are deliberately unauthenticated, with the reason each one is.
 PUBLIC_ROUTES: dict[str, str] = {
@@ -713,6 +717,292 @@ def test_an_unanswerable_question_refuses_over_http_without_calling_the_model(de
     assert [clause["type"] for clause in body["answer"]["clauses"]] == ["meta"]
     assert all(not clause["citations"] for clause in body["answer"]["clauses"])
     assert transport.call_count == 0, "an empty packet reached the model"
+
+
+def test_the_answer_says_which_model_answered_it_and_what_that_cost(deployment):
+    """The delivery gate, over HTTP.
+
+    ``docs/product-direction.md`` requires the memory interaction to "record the executed model,
+    task, latency and output", and adds that "Nemotron use must be functional in that interaction
+    if claimed, with the actual executed variant recorded rather than inferred from
+    configuration". Before this block the response carried no executed identifier, no latency and
+    no usage at all: the only way to say which model answered was to read the manifest, which
+    says which one was asked.
+
+    The scripted body echoes a model the manifest does not name, so a response that reported the
+    configured identifier would fail here rather than look right.
+    """
+    served = "served/not-in-the-manifest"
+    body = json.dumps(
+        chat_body(
+            json.dumps(
+                {
+                    "clauses": [
+                        {
+                            "text": "Some photographs match.",
+                            "type": "meta",
+                            "citations": [],
+                            "value_refs": [],
+                        }
+                    ]
+                }
+            ),
+            model=served,
+            prompt_tokens=910,
+            completion_tokens=222,
+            reasoning_tokens=111,
+        )
+    )
+    _with_model(deployment, [HttpResponse(status_code=200, text=body)])
+    response = deployment.as_owner(
+        "POST",
+        "/selection/ask",
+        json={"question": "which photographs?", "plan": {"intent": "captures"}},
+    )
+    assert response.status_code == 200, response.text
+    execution = response.json()["execution"]
+
+    assert execution["prompt_version"] == PROMPT_VERSION
+    (call,) = execution["calls"]
+    assert call["role"] == "reasoning_cheap"
+    assert call["requested_model"] == "nvidia/Nemotron-3_5-Lightning"
+    assert call["served_model"] == served
+    assert call["used_fallback"] is False
+    assert call["attempts"] == 1
+    assert call["prompt_tokens"] == 910
+    assert call["completion_tokens"] == 222
+    assert call["reasoning_tokens"] == 111
+    assert isinstance(call["latency_ms"], int) and call["latency_ms"] >= 0
+
+
+def test_the_execution_block_is_additive_and_changes_nothing_above_it(deployment):
+    """Every field the response carried before is still there and still means the same thing.
+
+    A client written against the previous shape must not have to change, so this asserts the old
+    keys by name rather than trusting that nothing moved.
+    """
+    _with_model(deployment, [_refused_answer_body(), _refused_answer_body()])
+    response = deployment.as_owner(
+        "POST",
+        "/selection/ask",
+        json={"question": "which photographs?", "plan": {"intent": "captures"}},
+    )
+    body = response.json()
+    assert set(body) == {
+        "answer",
+        "plan",
+        "selection",
+        "citations",
+        "abstained",
+        "deterministic",
+        "repaired",
+        "execution",
+    }
+    assert body["deterministic"] is True
+    assert body["citations"], "the citation map is what the answer's tokens resolve through"
+    assert len(body["execution"]["calls"]) == 2, "the refused attempt was a call that happened"
+    # WHICH rule was broken, not merely that one was. `_refused_answer_body` is a historical
+    # claim with no citation, and a measurement that could not tell that from an invented number
+    # would be measuring "the model failed" rather than anything actionable.
+    assert any("no citation" in reason for reason in body["execution"]["rejections"])
+
+
+def test_an_abstention_on_a_SUPPLIED_plan_reports_no_model_call_at_all(deployment):
+    """A plan the caller already had, so nothing was asked and the list is empty.
+
+    This is the abstention guarantee made checkable by whoever received the answer, which is the
+    only place it matters: the interface has to be able to tell "I have no evidence for that"
+    apart from "a model wrote that I have no evidence for that".
+
+    It is HALF the picture, and the name says which half. The test below covers the other, which
+    is the shape the interface sends: no plan, so the planner runs and is listed.
+    """
+    transport = _with_model(deployment, [_refused_answer_body()])
+    response = deployment.as_owner(
+        "POST",
+        "/selection/ask",
+        json={
+            "question": "was I ever in Antarctica?",
+            "plan": {
+                "intent": "captures",
+                "time": [
+                    {"start": "1999-01-01T00:00:00+00:00", "end": "1999-12-31T00:00:00+00:00"}
+                ],
+            },
+        },
+    )
+    body = response.json()
+    assert body["abstained"] == "UNANSWERABLE_NOT_CAPTURED"
+    assert body["execution"]["calls"] == []
+    assert body["execution"]["rejections"] == []
+    assert body["execution"]["prompt_version"] == PROMPT_VERSION
+    assert transport.call_count == 0
+
+
+def test_an_abstention_asked_IN_WORDS_still_lists_the_planner_it_paid_for(deployment):
+    """The shape the interface actually sends, which the test above does not.
+
+    ``test_an_abstention_reports_an_empty_call_list_over_http`` supplies a plan, so the planner
+    never runs and the list is empty. No browser does that: the Companion sends the question
+    alone, the planner is asked, and the packet comes back empty afterwards. The list then holds
+    exactly one call, and reading the empty case as the general one is how the interface came to
+    print "No model was asked" over an answer a model had just been asked to plan.
+
+    What an abstention guarantees is the second half of this test: no COMPOSER call, because
+    there is no code path from an empty packet to one.
+    """
+    # Built through the model rather than hand written. `response_format` is json_schema strict
+    # with additionalProperties false and every field required, so a partial object is refused
+    # by the client before the route ever sees it, exactly as a real endpoint's would be.
+    from exulanica.selection import CaptureWindow, Intent, SelectionPlan
+
+    plan = SelectionPlan(
+        intent=Intent.CAPTURES,
+        time=[
+            CaptureWindow(
+                start=dt.datetime(1999, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(1999, 12, 31, tzinfo=dt.UTC),
+            )
+        ],
+    )
+    planner = HttpResponse(
+        status_code=200,
+        text=json.dumps(
+            chat_body(plan.model_dump_json(), model="Qwen/Qwen3-235B-A22B-Instruct-2507")
+        ),
+    )
+    transport = _with_model(deployment, [planner, _refused_answer_body()])
+    response = deployment.as_owner(
+        "POST", "/selection/ask", json={"question": "was I ever in Antarctica?"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert body["abstained"] == "UNANSWERABLE_NOT_CAPTURED"
+    calls = body["execution"]["calls"]
+    assert [call["role"] for call in calls] == ["structured_extraction"]
+    assert calls[0]["served_model"] == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    assert transport.call_count == 1, "the composer was asked something on an empty packet"
+
+
+def _planner_reply(payload: str) -> HttpResponse:
+    return HttpResponse(
+        status_code=200,
+        text=json.dumps(chat_body(payload, model="Qwen/Qwen3-235B-A22B-Instruct-2507")),
+    )
+
+
+def test_a_question_the_planner_cannot_express_abstains_rather_than_failing(deployment):
+    """MEASURED 2026-09-09, and this is the payload the live endpoint actually returned.
+
+    "What is the current exchange rate for the pound?" asked against the retained reference
+    workspace came back HTTP 502 ``model_refused``, which a caller cannot tell from the server
+    falling over. The archived body is
+    ``docs/evaluation/artifacts/2026-09-09-companion-question/ask-unrelated.response.json`` and
+    the reply is copied from it verbatim below rather than invented, so this test fails if the
+    handling of the real shape regresses.
+
+    **The cause is not what it looked like.** ``entities`` is null, so the empty-catalogue prompt
+    worked. What failed is ``time``: asked a question carrying no time at all, the planner
+    stamped the same instant into ``start`` and ``end``, and a zero-width half-open window is
+    empty by construction. ``CaptureWindow._non_empty`` is a Pydantic model validator, so the
+    schema-enforcing endpoint cannot see it and the failure lands locally, twice.
+
+    Nothing was searched, so nothing is claimed about the library. ``plan`` is null rather than
+    empty, because an empty plan is legal and means EVERYTHING, and reporting one would say the
+    whole library was looked at.
+    """
+    same_instant = "2026-09-09T11:48:13.308113+00:00"
+    zero_width_window = json.dumps(
+        {
+            "intent": "entities",
+            "entities": None,
+            "time": [{"start": same_instant, "end": same_instant}],
+            "place": None,
+            "capture": None,
+            "epistemic": "confirmed",
+            "semantic_query": None,
+            "limit": 10,
+        }
+    )
+    reply = _planner_reply(zero_width_window)
+    transport = _with_model(deployment, [reply, reply])
+
+    response = deployment.as_owner(
+        "POST", "/selection/ask", json={"question": "what is the exchange rate for the pound?"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert body["abstained"] == "UNANSWERABLE_NOT_UNDERSTOOD"
+    assert body["plan"] is None, "an empty plan would say the whole library was searched"
+    assert body["selection"] is None
+    assert body["citations"] == {}
+    assert [clause["type"] for clause in body["answer"]["clauses"]] == ["meta"]
+    assert all(not clause["citations"] for clause in body["answer"]["clauses"])
+    assert transport.call_count == 2, "one try and one repair, then the abstention"
+
+    # The failure is kept where the composer's refusals are kept, and NOT read aloud.
+    assert body["execution"]["rejections"], "the record has to say what the model returned"
+    said = " ".join(clause["text"] for clause in body["answer"]["clauses"]).lower()
+    assert "capture window" not in said
+    assert "json" not in said and "schema" not in said
+
+
+def test_a_model_invented_entity_id_abstains_instead_of_reporting_a_missing_one(deployment):
+    """The same defect wearing a 404, which is the shape it had before the prompt was fixed.
+
+    A schema-valid Selection naming an id nobody has is still a Selection that cannot be run.
+    Reporting ``unknown_reference`` to somebody who never named an id tells them a fact about an
+    id the MODEL invented, which is not an answer and is not their business.
+    """
+    invented = json.dumps(
+        {
+            "intent": "entities",
+            "entities": {"ids": [str(uuid.uuid4())], "mode": "any"},
+            "time": [],
+            "place": None,
+            "capture": None,
+            "epistemic": "confirmed",
+            "semantic_query": None,
+            "limit": 10,
+        }
+    )
+    _with_model(deployment, [_planner_reply(invented)])
+
+    response = deployment.as_owner(
+        "POST", "/selection/ask", json={"question": "who was with me there?"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["abstained"] == "UNANSWERABLE_NOT_UNDERSTOOD"
+    assert body["selection"] is None
+    # The plan IS kept here, unlike above: the planner returned one and the lookup refused it,
+    # so showing it is how somebody sees that the model named an entity nobody has.
+    assert body["plan"] is not None
+    assert body["execution"]["calls"], "the planner call happened and is recorded"
+
+
+def test_a_caller_supplied_id_still_gets_the_404_that_is_not_an_existence_oracle(deployment):
+    """The line the abstention above must not cross.
+
+    ``unknown_reference`` is deliberately ONE code for "not there" and "not yours", so the
+    surface is not an existence oracle. Answering 200 for an id the CALLER supplied would answer
+    the question that code exists to refuse: a stranger could probe ids and read existence off
+    the difference between an abstention and a refusal. Only an id the model invented abstains,
+    because that one was never the caller's to ask about.
+    """
+    _with_model(deployment, [_refused_answer_body()])
+    response = deployment.as_owner(
+        "POST",
+        "/selection/ask",
+        json={
+            "question": "who is this?",
+            "plan": {"intent": "entities", "entities": {"ids": [str(uuid.uuid4())], "mode": "any"}},
+        },
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "unknown_reference"
 
 
 def test_a_question_the_planner_cannot_fill_in_is_refused_with_a_code(deployment):
