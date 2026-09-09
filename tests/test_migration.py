@@ -96,9 +96,7 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 #: already forked. A hole is visible and harmless. A collision is invisible and is not.
 #:
 #: Every entry here is temporary by construction: it is deleted by whoever lands the number.
-RESERVED_ELSEWHERE: dict[str, str] = {
-    "0042": "assigned to a concurrent task; 0043 was reserved above it for companion memory",
-}
+RESERVED_ELSEWHERE: dict[str, str] = {}
 
 
 def test_the_migrations_are_numbered_and_ordered():
