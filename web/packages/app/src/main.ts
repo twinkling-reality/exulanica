@@ -27,20 +27,7 @@ import './unified-interface.css';
 
 import type { OccurrenceRecord, RenderingSubstrate } from '@exulanica/graph-client';
 import { ApiError } from '@exulanica/graph-client';
-import {
-  anchorId as toAnchorId,
-  islandId as toIslandId,
-  type IslandId,
-} from '@exulanica/atlas-core';
-// A second atlas-core import, deliberately its own statement. Click-to-evidence's geometry is a
-// self-contained group, and keeping it apart from the block above leaves that block byte-identical
-// to the one the person-consent branch also edits.
-import {
-  canvasToSourcePixel,
-  observationSentence,
-  pickObservedPoint,
-  type PickCamera,
-} from '@exulanica/atlas-core';
+import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
 import {
   FACET_KEYS,
   confirmationFor,
@@ -66,26 +53,13 @@ import type { Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
-import { buildPersonReview } from './ui/person-review.js';
-import { PersonRegionDrafts } from './ui/person-region-editor.js';
-import { buildReconstructionInspector } from './ui/reconstruction-inspector.js';
 import { buildStartupState } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
 import { buildRegionPlan } from './ui/region-plan.js';
-import { buildStatus, MAP_ORIENTATION_CAPTION } from './ui/status.js';
-// Below the status import rather than beside it: the person-consent branch adds its own imports
-// at the top of this block, and two branches inserting into one sorted list conflict over nothing.
-import { proofLensIslandColors } from './ui/proof-lens.js';
-import {
-  ObservationsClient,
-  ObservationsUnavailable,
-  consentSentence,
-  type ObservationGraph,
-} from './observations-api.js';
-import { PersonReviewApi, ReviewUnavailable } from './person-review-api.js';
+import { MAP_ORIENTATION_CAPTION } from './ui/status.js';
 import {
   applyDocumentAppearance,
   applyDocumentWorldStyle,
@@ -99,6 +73,10 @@ import {
   type WorldShellEvent,
 } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
+import {
+  mountStatusAndInspector,
+  type MountedStatusAndInspector,
+} from './composition/status-and-inspector.js';
 import {
   mountSessionGeometry,
   openAppSession,
@@ -122,30 +100,6 @@ const {
 let atlas: MountedAtlas | null = null;
 let stopWatching: (() => void) | null = null;
 let mountedCompanionStage: CompanionStage | null = null;
-
-/**
- * Whether the proof lens is switched on, for this session only.
- *
- * Not a preference and not persisted. The lens is a way of looking at what is already on screen,
- * and a stored one would change what a visitor sees on arrival on the strength of something they
- * did once. It is also the reason this is a plain variable rather than renderer state: switching
- * it writes one uniform per region and nothing else.
- */
-let proofLensEnabled = false;
-/**
- * Which photograph the review panel is currently about, so a late answer cannot land on another.
- *
- * Not cached, unlike the observation graph below. An accepted pose receipt is immutable and
- * re-reading it says nothing new; a review is the opposite, since every button in it writes a
- * receipt that changes what the next read returns.
- */
-let reviewCaptureId_: string | null = null;
-
-/** One scene's recorded observation graph, cached for the session. See `observations-api.ts`. */
-let observationGraph_: ObservationGraph | null = null;
-let observationGraphSceneId_: string | null = null;
-let observationLoad_: Promise<void> | null = null;
-
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
@@ -575,10 +529,11 @@ async function mount(): Promise<void> {
         'Widen this window to at least 60rem to continue.',
     }),
   ]);
+  let status: MountedStatusAndInspector;
   const appearance = mountAppearance({
     env,
     state,
-    applyProofLens: () => applyProofLens(),
+    applyProofLens: () => status.applyProofLens(),
     setCompanionAppearance: () => companionStage.setAppearance(companionAppearance()),
     onCloseOptions: () => dispatchShell({ type: 'toggle-options' }),
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
@@ -586,428 +541,14 @@ async function mount(): Promise<void> {
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
   });
 
-  /*
-   * THE PROOF LENS AND CLICK-TO-EVIDENCE.
-   *
-   * Both live here, between the settings block and the inspector, because both need the graph,
-   * the theme and the binding at once and this is the only scope that holds all three. The
-   * person-consent branch edits neither of the two functions above or below, so this whole region
-   * is textually its own.
-   */
-
-  /** Which region draws which scene, as the regions themselves already decided. */
-  const islandOfScene = (sceneId: string): IslandId | undefined => {
-    const region = current.islands.find((island) => island.reconstructionSceneId === sceneId);
-    return region === undefined ? undefined : toIslandId(region.islandId);
-  };
-
-  /**
-   * Push the lens state at the renderer, and push nothing else.
-   *
-   * Every argument is read fresh: the disclosures the status panel is already showing, the region
-   * each scene resolved to, and the current theme. Nothing is stored, no scene is rebuilt, and the
-   * one call this makes writes four floats per region.
-   */
-  const applyProofLens = (): void => {
-    atlas?.binding.setProofLens(
-      proofLensEnabled
-        ? proofLensIslandColors(
-            state.reconstructionRungs,
-            islandOfScene,
-            themeForPreferences(state.preferences, systemAppearance.matches),
-          )
-        : null,
-    );
-  };
-
-  /**
-   * How far from the cursor, in screen pixels, a recorded point may be and still count as clicked.
-   *
-   * Expressed in screen pixels and converted to the photograph's own pixels per click, because the
-   * two are not the same scale: the inspector fits a 4080-pixel-tall original into a canvas around
-   * 700 pixels tall, so eight screen pixels is about forty-five source pixels. A tolerance typed
-   * in source pixels would be a different gesture on every display.
-   */
-  const PICK_TOLERANCE_CANVAS_PX = 8;
-  const PICK_OCCLUSION_BAND_CANVAS_PX = 2;
-
-  /** The raw recovered camera for one capture: the frame the observation graph is recorded in. */
-  const pickCameraFor = (sceneId: string, captureId: string): PickCamera | null => {
-    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
-    const camera = record?.members.find((member) => member.captureId === captureId)?.recoveredCamera;
-    if (camera == null) return null;
-    /*
-     * THE RAW TRANSFORM, NOT THE DISPLAYED ONE, and the difference is the whole correctness of
-     * this gesture. `geometry-api.ts` composes each scene's display frame into the cameras it
-     * hands the renderer, so the scene stands upright and at walking scale; the observation
-     * graph's world coordinates are the recovered COLMAP frame and are not composed with
-     * anything. Projecting one through the other would be a silent, plausible-looking error.
-     *
-     * Either pair would in fact agree, because a similarity applied to both a camera and a point
-     * cancels in the projection. Using the recorded pair is still the right choice: it is the one
-     * that stays correct if the display frame ever stops being a similarity, and it is the pair
-     * whose agreement was measured. Against this scene on 2026-09-06, reprojecting every retained
-     * observation of the first photograph through this transform reproduced COLMAP's own recorded
-     * pixel to a median of 2.8 px and a maximum of 9.9 px on a 3060x4080 original, which is the
-     * SIMPLE_RADIAL distortion that `pinhole-approximation` says it is dropping.
-     */
-    return {
-      sceneFromCameraRowMajor: camera.sceneFromCameraRowMajor,
-      calibration: camera.calibration,
-      projection: camera.projection,
-    };
-  };
-
-  /**
-   * Load the scene's recorded observation graph once, when the inspector opens on it.
-   *
-   * Started on open rather than on the first click so the answer is ready when a visitor asks:
-   * the real bowl scene's graph is about 53 MB of JSON. Cached by scene id for the session,
-   * because an accepted pose receipt is immutable and re-reading it could not say anything new.
-   */
-  const loadObservations = (sceneId: string): void => {
-    if (observationGraphSceneId_ === sceneId && (observationGraph_ !== null || observationLoad_ !== null)) return;
-    const where = state.credentials;
-    if (where === null) {
-      reconstructionInspector.showEvidence({
-        kind: 'failed', reason: 'This session has no credentials to read the observation graph with.',
-      });
-      return;
-    }
-    observationGraphSceneId_ = sceneId;
-    observationGraph_ = null;
-    reconstructionInspector.showEvidence({ kind: 'loading' });
-    observationLoad_ = new ObservationsClient(where).load(sceneId).then((graph) => {
-      if (observationGraphSceneId_ !== sceneId) return;
-      observationGraph_ = graph;
-      reconstructionInspector.showEvidence({
-        kind: 'ready', pointCount: graph.points.length, retainedPerImage: graph.retainedPerImage,
-      });
-    }).catch((error: unknown) => {
-      if (observationGraphSceneId_ !== sceneId) return;
-      reconstructionInspector.showEvidence({
-        kind: 'failed',
-        reason: error instanceof ObservationsUnavailable
-          ? error.message
-          : 'The recorded observation graph could not be read.',
-      });
-    }).finally(() => {
-      if (observationGraphSceneId_ === sceneId) observationLoad_ = null;
-    });
-  };
-
-  /** What one capture's original looks like in this session, through its own evidence handles. */
-  /**
-   * Load who is in the photograph this view stands on, and let a reviewer answer.
-   *
-   * Called on every view change, including with null, because the panel is about ONE photograph
-   * and leaving the previous one on screen would offer buttons that write receipts against a
-   * capture the visitor has already left. `reviewCaptureId_` is the guard: a slow answer for the
-   * previous photograph is dropped rather than rendered.
-   *
-   * Every action refetches instead of patching the panel in place. One receipt can move more than
-   * the row it was written against, because a subject can be bound to several regions and the
-   * resolved state is a fold over all of that subject's receipts; a client that edited one row
-   * would be a second implementation of a rule the server already owns.
-   */
-  const manualDrafts = new PersonRegionDrafts();
-  let reviewGeneration = 0;
-  const loadPersonReview = (captureId: string | null): void => {
-    const generation = ++reviewGeneration;
-    reconstructionInspector.showReview(null);
-    reviewCaptureId_ = captureId;
-    if (captureId === null) {
-      reconstructionInspector.showReview(null);
-      return;
-    }
-    const where = state.credentials;
-    if (where === null) {
-      reconstructionInspector.showReview(
-        el('p', { text: 'This session has no credentials to read who is in this photograph.' }),
-      );
-      return;
-    }
-    const api = new PersonReviewApi(where);
-    const act = (run: () => Promise<unknown>): void => {
-      void run()
-        .then(() => { if (reviewCaptureId_ === captureId && generation === reviewGeneration) loadPersonReview(captureId); })
-        .catch((error: unknown) => {
-          if (reviewCaptureId_ !== captureId || generation !== reviewGeneration) return;
-          reconstructionInspector.showReview(el('p', {
-            class: 'person-review-failed',
-            text: error instanceof ReviewUnavailable
-              ? error.message
-              : 'That review edit was not recorded.',
-          }));
-        });
-    };
-    void api.load(captureId).then((review) => {
-      // Dropped rather than drawn: the visitor has moved to another photograph since this asked.
-      if (reviewCaptureId_ !== captureId || generation !== reviewGeneration) return;
-      reconstructionInspector.showReview(buildPersonReview({
-        captureId: review.captureId,
-        reviewState: review.reviewState,
-        regions: review.regions,
-        onReload: () => loadPersonReview(captureId),
-        editor: {
-          captureId, source: sourceForCapture(captureId), drafts: manualDrafts,
-          isCurrent: () => reviewCaptureId_ === captureId && generation === reviewGeneration
-            && reconstructionInspector.selected?.captureId === captureId,
-          onAdd: async (region) => {
-            // Reconcile an uncertain previous response before writing another receipt.
-            const latest = await api.load(captureId);
-            if (!latest.regions.some((item) => item.regionKey === region.region_key)) {
-              await api.add(captureId, region);
-            }
-          },
-        },
-        onConfirm: (regionKey) => act(() =>
-          api.edit(captureId, { region_key: regionKey, action: 'confirm' })),
-        onDelete: (regionKey) => act(() =>
-          api.edit(captureId, { region_key: regionKey, action: 'delete' })),
-        onConsent: (regionKey, scope, decision) => {
-          const region = review.regions.find((item) => item.regionKey === regionKey);
-          if (region === undefined) return;
-          act(() => api.consent(captureId, region, scope, decision));
-        },
-      }));
-    }).catch((error: unknown) => {
-      if (reviewCaptureId_ !== captureId || generation !== reviewGeneration) return;
-      reconstructionInspector.showReview(el('p', {
-        class: 'person-review-failed',
-        text: error instanceof ReviewUnavailable
-          ? error.message
-          : 'Who is in this photograph could not be read.',
-      }));
-    });
-  };
-
-  const sourceForCapture = (captureId: string) =>
-    [...(state.previewSourceMedia?.values() ?? [])].find((descriptor) =>
-      descriptor.captureIds?.includes(captureId))
-    ?? current.occurrences
-      .filter((occurrence) => occurrence.captureId === captureId)
-      .flatMap((occurrence) => occurrence.evidence)
-      .map((handle) => state.previewSourceMedia?.get(handle))
-      .find((descriptor) => descriptor !== undefined) ?? null;
-
-  /**
-   * One click in the inspector, resolved to the photographs that observed that piece of the world.
-   *
-   * The answer is recorded provenance and nothing else: the point is one COLMAP actually stored,
-   * and the photographs listed are the ones whose observations of it were retained. Nothing here
-   * reprojects the point into other cameras to ask which of them could have seen it, because that
-   * is a geometric guess about visibility rather than a record of an observation.
-   */
-  const resolveEvidenceAt = (clientX: number, clientY: number): void => {
-    const view = atlas?.binding.inspectionView ?? null;
-    if (view === null) return;
-    const captureId = view.captureIds[0];
-    if (view.kind !== 'source-camera' || view.calibration === null || captureId === undefined) {
-      reconstructionInspector.showEvidence({
-        kind: 'unsupported',
-        reason: view.kind === 'between-cameras'
-          ? 'This is a midpoint between two photographs, not a photograph. No camera stood here, '
-            + 'so there is no calibrated projection to invert. Choose either adjacent source camera.'
-          : 'This view has no accepted calibration, so a click cannot be inverted exactly.',
-      });
-      return;
-    }
-    const graph = observationGraph_;
-    if (graph === null) {
-      if (observationLoad_ === null) loadObservations(view.sceneId);
-      return;
-    }
-    const camera = pickCameraFor(view.sceneId, captureId);
-    if (camera === null) {
-      reconstructionInspector.showEvidence({
-        kind: 'unsupported',
-        reason: 'This session holds no recovered camera for that photograph.',
-      });
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-    const cursor = canvasToSourcePixel(
-      camera.calibration,
-      { width: rect.width, height: rect.height },
-      { x: clientX - rect.left, y: clientY - rect.top },
-    );
-    const sourcePxPerCanvasPx = camera.calibration.height / rect.height;
-    const tolerancePx = PICK_TOLERANCE_CANVAS_PX * sourcePxPerCanvasPx;
-    const result = pickObservedPoint(camera, graph.points, cursor, {
-      tolerancePx,
-      occlusionBandPx: PICK_OCCLUSION_BAND_CANVAS_PX * sourcePxPerCanvasPx,
-    });
-    if (result === null) {
-      reconstructionInspector.showEvidence({
-        kind: 'miss', toleranceSourcePx: tolerancePx, canvasPx: PICK_TOLERANCE_CANVAS_PX,
-      });
-      return;
-    }
-    const observedBy = graph.observedBy.get(result.point.pointId) ?? [];
-    reconstructionInspector.showEvidence({
-      kind: 'hit',
-      // Verbatim from atlas-core. It is the sentence that must state both the full track length
-      // and the retained count whenever they differ, and rewording it here is how they diverge.
-      sentence: observationSentence(result),
-      pointId: result.point.pointId,
-      pixelDistance: result.pixelDistance,
-      // The POINT's mean residual over its whole track, which is what the receipt records: the
-      // pose stage copies `points3D.txt` field 7 onto every row of a track, so all of these are
-      // the same number and it belongs to the point, not to any one photograph.
-      meanReprojectionErrorPx: observedBy[0]?.reprojectionErrorPx ?? 0,
-      projection: result.projection,
-      photographs: observedBy.map((observation, index) => {
-        const source = sourceForCapture(observation.captureId);
-        return {
-          captureId: observation.captureId,
-          title: source?.title ?? null,
-          label: `Photograph ${String(index + 1)}`,
-          url: source?.url ?? null,
-          alt: source?.alt ?? 'An authorized original photograph.',
-          available: source?.available === true && source.url !== null,
-          x: observation.x,
-          y: observation.y,
-          consentSentence: consentSentence(observation.consent),
-        };
-      }),
-    });
-  };
-
-  const reconstructionInspector = buildReconstructionInspector({
-    onView: (sceneId, viewId) => atlas?.binding.inspectSceneView(sceneId, viewId) ?? false,
-    onReturn: () => { loadPersonReview(null); atlas?.binding.endSceneInspection(); },
-    // The world canvas is aria-hidden, so the click has to have a real button beside it or the
-    // gesture exists only for sighted mouse users.
-    onResolveCentre: () => {
-      const rect = canvas.getBoundingClientRect();
-      resolveEvidenceAt(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    },
-    onViewShown: (sceneId, view) => {
-      // A new view is a new projection, so the previous pick no longer describes what is on
-      // screen. The panel goes back to saying what a click could resolve rather than keeping an
-      // answer about a camera the visitor has left.
-      // The review is about a photograph, so it follows the view that stands on one and is
-      // cleared by every view that does not. Called before the early return below for exactly
-      // that reason: a midpoint between two cameras must not keep the previous photograph's
-      // people on screen with buttons that write receipts against it.
-      loadPersonReview(view.captureId ?? null);
-      if (view.kind !== 'source-camera' || view.projection === 'opm-estimate') {
-        reconstructionInspector.showEvidence({
-          kind: 'unsupported',
-          reason: view.kind === 'between-cameras'
-            ? 'This is a midpoint between two photographs. No camera stood here, so there is no '
-              + 'calibrated projection to invert. Choose either adjacent source camera.'
-            : 'This view has no accepted calibration, so a click cannot be inverted exactly.',
-        });
-        return;
-      }
-      loadObservations(sceneId);
-      const graph = observationGraph_;
-      if (graph !== null && observationGraphSceneId_ === sceneId) {
-        reconstructionInspector.showEvidence({
-          kind: 'ready', pointCount: graph.points.length, retainedPerImage: graph.retainedPerImage,
-        });
-      }
-    },
+  status = mountStatusAndInspector({
+    env,
+    state,
+    snapshot: current,
+    built,
+    showWorld: () => dispatchShell({ type: 'show-world' }),
+    showTravelStatus,
   });
-  const inspectReconstruction = (sceneId: string): void => {
-    dispatchShell({ type: 'show-world' });
-    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
-    const views = atlas?.binding.inspectionViews(sceneId) ?? [];
-    let cameraNumber = 0;
-    const choices = views.map((view) => {
-      const member = view.kind === 'source-camera'
-        ? record?.members.find((candidate) => candidate.captureId === view.captureIds[0]
-          || (view.captureIds.length === 0 && candidate.placement?.artifactId === view.artifactIds[0]))
-        : undefined;
-      if (view.kind === 'source-camera') cameraNumber += 1;
-      // World source IDs name topology slots, not captures. Join through the actual evidence
-      // handles of this capture; matching a generated source ID to a capture ID loses every source.
-      const source = member === undefined ? null :
-        [...(state.previewSourceMedia?.values() ?? [])].find((descriptor) =>
-          descriptor.captureIds?.includes(member.captureId))
-        ?? current.occurrences
-          .filter((occurrence) => occurrence.captureId === member.captureId)
-          .flatMap((occurrence) => occurrence.evidence)
-          .map((handle) => state.previewSourceMedia?.get(handle))
-          .find((descriptor) => descriptor !== undefined) ?? null;
-      return {
-        id: view.id, kind: view.kind, projection: view.projection,
-        label: view.kind === 'source-camera'
-          ? `Source camera ${cameraNumber}` : `Between cameras ${cameraNumber} and ${cameraNumber + 1}`,
-        source,
-        // Taken from the member already resolved above rather than from `view.captureIds`, which
-        // names topology slots on a source-only view. Null for a midpoint, where no single
-        // photograph is being looked at and so no review is about anything.
-        captureId: member?.captureId ?? null,
-      };
-    });
-    if (!reconstructionInspector.open(sceneId, choices)) {
-      showTravelStatus('No verified reconstruction cameras are available. The original sources remain in Index.', 'failure');
-    }
-  };
-  // Both the availability panel and inspector count the same authorized, deduplicated set.
-  const sourcesForScene = (sceneId: string) => {
-    const record = current.reconstructionScenes?.find((scene) => scene.sceneId === sceneId);
-    const region = current.islands.find((island) => island.islandId === (record?.islandId ?? sceneId));
-    const captures = new Set(record?.members.map((member) => member.captureId) ?? region?.captureIds ?? []);
-    const regionId = record?.islandId ?? region?.islandId;
-    const seen = new Set<string>();
-    return [...(state.previewSourceMedia?.values() ?? [])].filter((source) => {
-      if (seen.has(source.evidenceRef)) return false;
-      if ((regionId === undefined || source.regionId !== regionId)
-        && !source.captureIds?.some((id) => captures.has(id))) return false;
-      seen.add(source.evidenceRef);
-      return true;
-    });
-  };
-  const inspectSceneSources = (sceneId: string): void => {
-    atlas?.binding.endSceneInspection();
-    dispatchShell({ type: 'show-world' });
-    const sources = sourcesForScene(sceneId);
-    const choices = sources.map((source, index) => ({
-      id: `source:${source.evidenceRef}`, kind: 'source-only' as const,
-      label: `Photograph ${index + 1}`, source,
-      captureId: source.captureIds?.length === 1 ? source.captureIds[0] ?? null : null,
-    }));
-    if (!reconstructionInspector.open(sceneId, choices)) {
-      showTravelStatus('No authorized source photographs are available in this session.', 'failure');
-    }
-  };
-  const renderedPreviewRegions = new Set<string>();
-  const renderReconstructionStatus = (): HTMLElement => buildStatus({
-    omittedRegionCount: built.omitted.length, undrawable: built.undrawable,
-    notices: [...state.sourceMediaNotices, ...state.geometryNotices], reconstructionScenes: state.reconstructionRungs,
-    sourceRegions: current.islands
-      .filter((island) => !renderedPreviewRegions.has(island.islandId)
-        && !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
-      .map((island) => ({ regionId: island.islandId, captureCount: island.captureIds.length })),
-    onInspectScene: inspectReconstruction, onInspectSources: inspectSceneSources,
-    // The lens switch, last in the input as it is last in the panel. Toggling it calls
-    // `applyProofLens` and nothing else: no scene is rebuilt and this panel is not re-rendered,
-    // which is what makes "toggling the lens changes no scene, no rung and no receipt" checkable
-    // rather than merely asserted.
-    proofLens: {
-      enabled: proofLensEnabled,
-      theme: themeForPreferences(state.preferences, systemAppearance.matches),
-      onToggle: (enabled) => {
-        proofLensEnabled = enabled;
-        applyProofLens();
-      },
-    },
-    ...(sourcePresentation() === 'inspection' ? {
-      reconstructionFocus: {
-        collections: current.islands.map((island) => {
-          const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
-            ?? island.islandId;
-          return { sceneId, sourceCount: sourcesForScene(sceneId).length };
-        }),
-      },
-    } : {}),
-  });
-  let reconstructionStatus = renderReconstructionStatus();
   replace(shell, [
     stage,
     chrome.reticle,
@@ -1023,14 +564,14 @@ async function mount(): Promise<void> {
     appearance.options.root,
     appearance.settings.root,
     viewportBoundary,
-    reconstructionInspector.root,
-    reconstructionStatus,
+    status.inspectorRoot,
+    status.statusElement,
   ]);
 
   reflectShell = (): void => {
     if (shellState.primary !== 'world') {
       atlas?.binding.endSceneInspection();
-      reconstructionInspector.hide();
+      status.hideInspector();
     }
     shell.setAttribute('data-primary', shellState.primary);
     shell.setAttribute('data-camera', shellState.camera);
@@ -1175,7 +716,7 @@ async function mount(): Promise<void> {
   // Only renderer-accepted legacy preview maps suppress the source-only region notice.
   if (preview) {
     for (const visual of atlas.binding.islands) {
-      if (state.pointMaps?.has(visual.island.islandId)) renderedPreviewRegions.add(visual.island.islandId);
+      if (state.pointMaps?.has(visual.island.islandId)) status.noteRenderedPreviewRegion(visual.island.islandId);
     }
   }
   const actualRendering = new Map<string, RenderingSubstrate>();
@@ -1184,12 +725,10 @@ async function mount(): Promise<void> {
   state.reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, state.notDrawnScenes, state.displayFrames);
   state.geometryNotices = Object.freeze([...state.geometryNotices, ...atlas.binding.trainedSceneFailures
     .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
-  const refreshedStatus = renderReconstructionStatus();
-  reconstructionStatus.replaceWith(refreshedStatus);
-  reconstructionStatus = refreshedStatus;
+  status.refreshStatus();
   // The lens survives a remount. It is session state, not renderer state, so a world that has just
   // been rebuilt has to be told what the visitor is currently looking through.
-  applyProofLens();
+  status.applyProofLens();
   canvas.dataset.companionRenderer = 'svg';
   reflectShell();
 
@@ -1200,7 +739,7 @@ async function mount(): Promise<void> {
   // application tracked itself would be wrong within seconds of the user tabbing away.
   const mounted = atlas;
   mounted.binding.onInspectionChange = (view) => {
-    if (view === null) reconstructionInspector.hide();
+    if (view === null) status.hideInspector();
   };
   mounted.binding.mapOverlay?.setActive(shellState.camera === 'map');
   mounted.binding.onMapTarget = (islandId) => {
@@ -1307,8 +846,8 @@ async function mount(): Promise<void> {
   canvas.addEventListener(
     'pointerup',
     (event) => {
-      if (event.button !== 0 || reconstructionInspector.root.hidden) return;
-      resolveEvidenceAt(event.clientX, event.clientY);
+      if (event.button !== 0 || status.inspectorRoot.hidden) return;
+      status.resolveEvidenceAt(event.clientX, event.clientY);
     },
     { signal: mountListeners.signal },
   );
