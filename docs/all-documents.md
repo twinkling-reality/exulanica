@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**112 documents**, excluding `docs/evaluation/`.
+**113 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -134,11 +134,12 @@ What was intended, written before the work.
 
 Closed accounts of what happened on a date. Never edited after.
 
-17 documents.
+18 documents.
 
 - [2026-08-30-atlas-world-research](records/2026-08-30-atlas-world-research.md) : VERIFIED for repository measurements and cited source behavior; DECISION for the
 - [2026-08-31-atlas-interface-plan](records/2026-08-31-atlas-interface-plan.md) : IMPLEMENTATION PLAN. This plan is grounded in the frontend at 6685041, the live
 - [2026-08-31-companion-native-evaluation](records/2026-08-31-companion-native-evaluation.md) : SVG GEOMETRIC AVATAR ACTIVE; SPLINE AND HUMANOID PROTOTYPE REMOVED. Updated 2026-08-31
+- [2026-09-08-asset-read-currency-investigation](records/2026-09-08-asset-read-currency-investigation.md) : investigation only, at base 59edce3 (main contains 53039d4 and the brief)
 - [2026-09-08-consent-timestamp-consistency](records/2026-09-08-consent-timestamp-consistency.md) : recordconsent resolves one effective instant after allocating the sequence, then passes that
 - [2026-09-08-integration-asset-read-currency](records/2026-09-08-integration-asset-read-currency.md) : Follow-up: integration-world-read-recipient-2026-09-08.md records the subsequent recipient-
 - [2026-09-08-integration-consent-timestamp](records/2026-09-08-integration-consent-timestamp.md) : Integrated after independent gates at d72c4f8: 2152 backend tests passed, 3 skipped
