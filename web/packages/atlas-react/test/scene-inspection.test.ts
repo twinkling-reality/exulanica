@@ -56,7 +56,8 @@ describe('bounded reconstruction inspection', () => {
       controls: { state: { x: 1, y: 2, z: 3, yaw: 0, pitch: 0 }, setEnabled: vi.fn() },
       device: { canvas: document.createElement('canvas') }, inspection: null, mapState: null,
       navigationTransition: null, applicationControlsEnabled: true,
-      sourceFirst: { setResidency: vi.fn() }, residencyAllocated: new Map(),
+      sourceFirst: { setResidency: vi.fn() }, objects: { setResidency: vi.fn() },
+      residencyAllocated: new Map(),
     });
     expect(binding.inspectionViews('unloaded')).toEqual([]);
     const views = binding.inspectionViews('scene');
@@ -107,7 +108,8 @@ describe('bounded reconstruction inspection', () => {
       controls: { state: { ...start }, setEnabled: enabled },
       camera: { camera: { fov: 73 } }, device: { canvas: document.createElement('canvas') },
       inspection: null, mapState: null, navigationTransition: null, applicationControlsEnabled: true,
-      sourceFirst: { setResidency: vi.fn() }, islands: [], residencyAllocated: new Map(),
+      sourceFirst: { setResidency: vi.fn() }, objects: { setResidency: vi.fn() },
+      islands: [], residencyAllocated: new Map(),
       trainedScenes: [],
       inspectionViews: () => views,
     });

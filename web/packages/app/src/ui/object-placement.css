@@ -1,0 +1,292 @@
+/*
+ * The authored-object surface.
+ *
+ * The first stylesheet in this package named after a single view, and it is here rather than in
+ * `style.css` because the object surface is the one panel that is neither evidence nor a system
+ * sheet: it is a workbench for things the visitor made. It still takes its materials from the
+ * same two places every other surface does, so it can be read as one of them.
+ *
+ * Shape comes from `style.css`'s vocabulary and material from `appearance.css`'s tokens. There
+ * are no colour literals here and no timing literals, for the reason `test/style-contract.test.ts`
+ * asserts on both files and now on this one: a component that picked its own colour would put a
+ * second palette in the product, and a component that picked its own duration would ignore the
+ * visitor's reduced-motion preference.
+ *
+ * The panel stands on the right, under the confirmation surface's own position, because the two
+ * appear together: placing an object opens the confirmation panel above this one, and a person
+ * has to be able to read what they are about to save without losing sight of what they chose.
+ */
+
+.object-placement {
+  position: fixed;
+  right: var(--gap);
+  bottom: 2.6rem;
+  width: min(23rem, calc(100vw - 2 * var(--gap)));
+  max-height: min(30rem, calc(100vh - 18rem));
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  color: var(--ink);
+  background: var(--material-instrument);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(var(--blur-system));
+}
+
+.object-placement h2 {
+  margin: 0;
+  font-family: var(--companion-utility-font);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+/*
+ * The provenance note is not decoration and is not dismissible.
+ *
+ * It is the sentence that keeps a created object from reading as a recovered one, so it sits at
+ * the top of the panel at full contrast rather than as a footnote under the controls.
+ */
+.object-placement-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--capture-mark);
+  padding-left: 0.6rem;
+}
+
+.object-placement-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.object-placement-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.object-placement-field > label {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+
+.object-placement-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.object-placement-field-row > input[type='range'] {
+  flex: 1;
+}
+
+.object-placement-field-row > output {
+  min-width: 3.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.object-placement select,
+.object-placement input[type='range'] {
+  width: 100%;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+  font-family: var(--companion-utility-font);
+}
+
+.object-placement select:disabled,
+.object-placement button:disabled,
+.object-placement input:disabled {
+  opacity: 0.45;
+}
+
+.object-placement-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.object-placement-motion-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--edge);
+}
+
+.object-placement-hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+}
+
+.object-placement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.object-placement-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+}
+
+/* Which object the arrow keys move. An outline, because selection is not a colour meaning. */
+.object-placement-item[data-selected='yes'] {
+  border-color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.object-placement-choose {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.object-placement-choose > strong {
+  font-size: 0.86rem;
+}
+
+.object-placement-where,
+.object-placement-motion {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+
+/*
+ * A note on a row is always a refusal or a correction, never a caption.
+ *
+ * A behaviour this build cannot run, or a parameter that was clamped to its declared bound, is
+ * shown on the object it belongs to rather than only in the one-line status, because the status
+ * line moves on and the object stays.
+ */
+.object-placement-item-note {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--inference);
+}
+
+.object-placement-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.object-placement-controls > button {
+  font-size: 0.76rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.object-placement-empty {
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.object-placement-status {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+/* The one coloured state, and it is the honest one: something did not happen. */
+.object-placement-status[data-kind='failure'] {
+  color: var(--error);
+}
+
+.object-placement-status[data-kind='settled'] {
+  color: var(--accent);
+}
+
+.object-placement[data-busy='yes'] {
+  cursor: progress;
+}
+
+.object-placement-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.object-placement :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/*
+ * Hidden means hidden, even for a flex box.
+ *
+ * The browser hides `[hidden]` with `display: none` at user-agent weight, which ANY author
+ * `display` overrides. Three things in this surface are flex containers that spend most of their
+ * life hidden: the panel itself, the motion fields behind their checkbox, and the unsaved-move
+ * block. Without this they are all permanently visible, which is how it first shipped and how the
+ * browser check caught it. The descendant selector outranks the single class names it applies to,
+ * so no `!important` is needed.
+ */
+.object-placement[hidden],
+.object-placement [hidden] {
+  display: none;
+}
+
+[data-transparency='reduced'] .object-placement {
+  background: var(--panel);
+  backdrop-filter: none;
+}
+
+[data-contrast='high'] .object-placement {
+  border-color: var(--ink);
+}
+
+[data-contrast='high'] .object-placement-note,
+[data-contrast='high'] .object-placement-hint,
+[data-contrast='high'] .object-placement-where,
+[data-contrast='high'] .object-placement-motion,
+[data-contrast='high'] .object-placement-status {
+  color: var(--ink);
+}
+
+/*
+ * The uncommitted nudge.
+ *
+ * Arrow keys move the object in the world at once, because a move nobody can see is a move nobody
+ * can judge. Nothing is written until this block's first control is pressed, so it has to read as
+ * unfinished business rather than as a state the world is already in.
+ */
+.object-placement-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+}
+
+.object-placement-pending-text {
+  font-size: 0.78rem;
+  color: var(--ink);
+}

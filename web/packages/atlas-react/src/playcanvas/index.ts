@@ -16,6 +16,34 @@ export { decodeOpm, footprintRadiusOf, packedVertexBytes, sourcePanelEnvelopeOf 
 export type { PlacedScenePointMap } from './scene-point-maps.js';
 export type { SceneInspectionView, RecoveredSceneCamera } from './scene-inspection.js';
 export { sceneInspectionViews, validateRecoveredSceneCamera, calibratedCameraFrustum } from './scene-inspection.js';
+export type {
+  AuthoredObjectAssetReference,
+  AuthoredObjectBehaviour,
+  BehaviourControl,
+  GlbSummary,
+  ObjectPlacementOutcome,
+  PlacedAuthoredObject,
+  RegionPose,
+} from './scene-objects.js';
+export {
+  AUTHORED_OBJECT_MEDIA_TYPE,
+  DEFAULT_PLACEMENT_DISTANCE_MM,
+  MICRORADIANS_PER_RADIAN,
+  MM_PER_METRE,
+  SCALE_MILLI_UNIT,
+  SceneObjectRuntime,
+  createObjectContainerAsset,
+  fetchVerifiedObjectAsset,
+  nudgedPose,
+  objectAssetBytesPath,
+  placementPoseAtAtlasPoint,
+  placementPoseBeforeVisitor,
+  regionPointFromAtlas,
+  safeObjectAssetPath,
+  validateGlbContainer,
+  yawMicroradiansOf,
+} from './scene-objects.js';
+
 export type { TrainedSceneGeometry } from './scene-splats.js';
 export { PROOF_LENS_SPLAT_MODIFIER, validateSogBundle, validateTrainedSceneGeometry, trainedSceneFootprint } from './scene-splats.js';
 export {

@@ -301,6 +301,21 @@ module.exports = {
       to: { path: String.raw`^packages/app/src/composition/` },
     },
     {
+      name: 'ui-may-not-import-the-renderer',
+      severity: 'error',
+      comment:
+        'A view module may not reach the renderer binding AT RUNTIME. `ui/` takes handlers and ' +
+        'returns elements; a module that could call into atlas-react could draw, move or delete ' +
+        'something in the world without the surface that mounted it ever seeing the call, and the ' +
+        'whole reason every object write stops at the confirmation surface is that exactly one ' +
+        'layer decides what reaches the world. The `dependencyTypesNot` is the point rather than ' +
+        'an escape: three view modules (detail, reconstruction-inspector, proof-lens) already ' +
+        '`import type` from the binding to name a PointMap or a scene view in a prop, which ' +
+        'compiles to nothing and can call nothing. A type is a vocabulary; a value is a reach.',
+      from: { path: String.raw`^packages/app/src/ui/` },
+      to: { path: pkgRef('atlas-react'), dependencyTypesNot: ['type-only'] },
+    },
+    {
       name: 'composition-is-reached-through-main',
       severity: 'error',
       comment:
