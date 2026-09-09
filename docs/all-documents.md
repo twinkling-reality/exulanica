@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**111 documents**, excluding `docs/evaluation/`.
+**112 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -41,6 +41,7 @@ How the system works now. Edited as the system changes.
 - [goal-brief-2026-09-05-unblocked-backend-program](goal-brief-2026-09-05-unblocked-backend-program.md) : Written 2026-09-05, at commit ef73866, immediately after the semantic-answers and
 - [goal-brief-2026-09-08-remaining-work](goal-brief-2026-09-08-remaining-work.md) : Measured 2026-09-08 against main at 4c4a3dc. This is a sizing and sequencing document, not a
 - [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
+- [infrastructure-backlog](infrastructure-backlog.md) : Product priority: product-direction.md defines the creative-world
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
@@ -59,7 +60,6 @@ How the system works now. Edited as the system changes.
 - [reconstruction-throughput](reconstruction-throughput.md) : Executed on 2026-09-09 in the worktree exulanica-recon-throughput, branch
 - [reference-gpu-compute](reference-gpu-compute.md) : First executed 2026-09-05. This records what was rented, why, what it cost, and what the run taught
 - [retained-reference-workflow](retained-reference-workflow.md) : A real trained reconstruction is established for one collection and refused for the other
-- [roadmap-next-2026-09-08](roadmap-next-2026-09-08.md) : Product priority update: product-direction.md now defines the creative-world
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
 - [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
@@ -134,7 +134,7 @@ What was intended, written before the work.
 
 Closed accounts of what happened on a date. Never edited after.
 
-16 documents.
+17 documents.
 
 - [2026-08-30-atlas-world-research](records/2026-08-30-atlas-world-research.md) : VERIFIED for repository measurements and cited source behavior; DECISION for the
 - [2026-08-31-atlas-interface-plan](records/2026-08-31-atlas-interface-plan.md) : IMPLEMENTATION PLAN. This plan is grounded in the frontend at 6685041, the live
@@ -151,6 +151,7 @@ Closed accounts of what happened on a date. Never edited after.
 - [2026-09-08-preview-handoffs](records/2026-09-08-preview-handoffs.md) : Source: local main d2234f8818650958d7cfcd0c2b22e70796a20cfb. Branch:
 - [2026-09-08-recovery-readiness](records/2026-09-08-recovery-readiness.md) : source-grounded assessment; retained recovery and activation are unexecuted
 - [2026-09-08-roadmap-audit](records/2026-09-08-roadmap-audit.md) : Read against main at 1353a21, 2026-09-08. This is a read-only code audit and a set of proposed
+- [2026-09-08-roadmap-dispatch](records/2026-09-08-roadmap-dispatch.md) : A record. Written 2026-09-08, sealed 2026-09-09, and not edited afterwards. It was the second
 - [2026-09-08-scene-inspection](records/2026-09-08-scene-inspection.md) : Executed on 2026-09-08 in the worktree exulanica-scene-inspection, branch codex/scene-inspection
 
 ## Patches
