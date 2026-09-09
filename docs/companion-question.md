@@ -1,8 +1,11 @@
 # The Companion question path
 
-Status: built, covered by tests, and measured once against the retained bowl workspace with real
-models. Section 6 has what that measured. The record is
-`docs/evaluation/2026-09-09-companion-question.json`.
+Status: built, covered by tests, and measured twice against the retained bowl workspace with real
+models. Section 6 has what the first run measured and the record is
+`docs/evaluation/2026-09-09-companion-question.json`. Sections 9 to 12 are the second pass: the
+Companion's memory of all this is now durable, and the composer swap section 6.1 offered as a
+proposal has been measured again and made. That record is
+`docs/evaluation/2026-09-09-companion-memory.json`.
 
 `product-direction.md` makes this a delivery gate: "Ask about the selected place through the
 actual Companion; ground the answer in available evidence and show missing information
@@ -409,3 +412,282 @@ instance without a model credential answers `POST /selection/ask` with.
 
 The reference launcher strips `NEBIUS_API_KEY` by design and is not edited. A live run starts
 uvicorn directly with the same environment it sets, plus the key and the two budget variables.
+
+---
+
+## 9. The Companion now remembers, and what that changed
+
+Everything above happened inside one page. `web/packages/companion-runtime/src/memory.ts` held
+the whole model of what the Companion had been told: the Not sure and Skip cooldown windows, the
+wrong-question signal, the dismissed threads, a transcript of every turn. All of it was built at
+mount and dropped at unload.
+
+**That was not a missing nicety, and the sharpest way to say so is with the contract's own
+words.** `interaction-model.md` 4.3 and 5.5 both say the Companion may never speak "within 7 days
+of a Skip or 14 days of a Not sure on the same entity". A fourteen-day window held in a page a
+reload discards is a fourteen-day window that had never once been enforced past a single page
+view. The person who said "not sure" and came back the next day was asked the same question again,
+by a system whose own contract said it would not.
+
+`product-direction.md` makes the durable half a delivery gate in the Improvement over time table,
+on the Companion continuity row: **"Persist approved memory, retrieve it across sessions, and
+support correction and deletion; this is not model weight training."** All four verbs are section
+10. Nothing in this work trains anything.
+
+### 9.1 Conversation text is stored, and it is not a policy input
+
+This is the boundary worth stating first, because storing conversation durably for the first time
+is exactly the change that makes it easy to erode. There is now a table full of the very text the
+interaction-policy plane refuses, one import away from it.
+
+`exulanica/world/interaction_repository.py` refuses a proposal whose input carries `conversation`,
+`messages`, `raw_utterance`, `transcript` or `prompt_text`, and 0021 says the same in its own
+header: that plane "contains no camera pose, open panel, pending choice, conversation transcript,
+topology, renderer code, or neural weights".
+
+**That refusal is not a statement that conversation text may never be stored.** It is a statement
+that it may never become an INPUT TO A POLICY DECISION about what this system is permitted to do.
+A question somebody typed is evidence about that person. A capability the system may exercise is a
+rule. Letting the first author the second is how a typed sentence silently widens a permission.
+
+The word "policy" means two different things across these files and the collision is why this is
+spelled out. 4.4's "policy over the entity graph snapshot plus the conversation transcript" is the
+TURN GENERATOR: per session, in the browser, choosing the next question. The plane the exclusion
+protects is the durable capability policy. The first may inform the next question and may never
+author the second.
+
+Held three ways, and only one of them is the existing refusal:
+
+* **Structurally.** Neither `exulanica/world/companion_memory.py` nor
+  `exulanica/api/routes/companion.py` imports an interaction type, so a call site that wanted to
+  launder a question into a capability decision has to add the import first, in a diff a reviewer
+  can see. A test parses both files and fails on one.
+* **In the schema.** No foreign key joins the two planes in either direction, checked against
+  `information_schema` rather than asserted.
+* **By the existing guard**, re-driven with real stored text under every one of the five refused
+  keys, so the thing being refused is the thing this branch actually keeps.
+
+The one limit, stated rather than implied: `_private_keys` walks keys and never values, so a
+transcript filed under an unlisted key is not caught. That limit is the interaction plane's and
+was not this task's to change. What this branch adds is a test that fails if the five refused
+names ever shrink, because a set losing a member is indistinguishable from the guard working right
+up until somebody uses the removed name.
+
+## 10. Migration 0043, and what a withdrawal reaches
+
+Three tables, all workspace-scoped under FORCE row-level security, all append-only:
+`companion_answer`, `companion_answer_citation`, `companion_escape`.
+
+**A correction supersedes and never edits.** The spine settled this shape for `assertion` already:
+`supersedes`, a status enum, and a trigger whose hint reads "Write a new assertion with supersedes
+set, or record a retraction." The reasoning transfers exactly. A correction is somebody telling the
+system it was wrong, which is the most valuable row in the table; an UPDATE that overwrote the
+wrong answer would destroy the evidence that the system had ever been wrong, which is the one
+record the correction exists to create. 5.4: "Nothing is ever silently rewritten."
+
+The correction inherits the superseded answer's citations verbatim, and that is not tidiness. It
+is the same question about the same photographs, so it must be reachable by the same withdrawal.
+
+**A withdrawal reaches this plane through the machinery that already exists.**
+`domain-and-evidence-model.md` 6.4 names the failure in its own words: "a generated title naming a
+person can be invalidated when that person is deleted. Without the recorded set, the name survives
+its own deletion inside a caption." An answer is a generated title with a longer sentence.
+`companion_answer_citation` is the recorded set.
+
+Both halves of 0035's lesson are present and they are different mechanisms:
+
+| | What it does | Where |
+| --- | --- | --- |
+| Backwards, at tombstone time | Withdraws every stored answer the new tombstone reaches | `tg_tombstone_withdraws_companion_memory`, AFTER INSERT ON tombstone |
+| Forwards, afterwards | Refuses a NEW citation of evidence a tombstone already covers | `tg_companion_answer_citation_live`, BEFORE INSERT |
+
+The sweep asks the existing `tombstone_blocks_capture` and `tombstone_blocks_span` predicates
+rather than branching on the scope name, so it is correct for workspace, capture and interval
+scopes at once and a fourth scope would not need a fourth branch. It is also independent of
+trigger order: `tombstone_blocks_capture` reads the `tombstone` table directly and never looks at
+`capture.deleted_at`, which another trigger writes.
+
+**The forward half REFUSES where 0035 marks stale, and the asymmetry is deliberate.** 0035 argues
+that refusing an insert "would fail the whole ingest for a workspace where somebody has withdrawn,
+which turns exercising a right into an outage". Neither half of that applies here: one composed
+answer is not an ingest, and an answer citing withdrawn evidence has no legitimate remainder to
+preserve. Refusing costs one unstored answer the person can ask for again.
+
+**What it deliberately does NOT reach, named rather than half-solved:** an entity tombstone.
+Withdrawing a person does not withdraw the photographs they appear in, and the cascade 0030 and
+0035 build for that case works on `person_derivative_dependency`, which a Companion answer has no
+row in. An answer that named a withdrawn person is a real problem and a different one: it would
+need the answer's text attributable to an entity, which nothing records, because the composer is
+never told an entity id.
+
+### 10.1 Why 0043 sits above a gap
+
+0042 is assigned to a concurrent task and this number was reserved above it, so this branch
+carries a hole until that one lands. **Closing it by renumbering would be the worse failure by a
+wide margin.** Two branches claiming one number merge cleanly, because neither touched the other's
+file; `apply_pending` then runs both bodies and records only the first, and the next boot refuses
+to start citing checksum drift on a schema that has already forked. That is what
+`exulanica/migrations/__init__.py` refuses to enumerate, in those words. A hole is visible and
+harmless; a collision is invisible and is not. `tests/test_migration.py` names the reservation and
+fails once 0042 lands with the entry still in place, so the list shrinks on its own.
+
+### 10.2 The routes, and one thing they are not
+
+`GET /companion/memory/recent`, `POST /companion/memory/answers`, `POST /companion/memory/escapes`,
+`POST /companion/memory/answers/{id}/corrections`, `DELETE /companion/memory/answers/{id}`.
+Authenticated by the same session dependency as everything else; the actor comes from the resolved
+session and no request model carries one.
+
+The actor is the SCOPE here rather than provenance, which is why `CompanionMemoryRepository` takes
+it as a constructor argument and not as a per-method keyword. Row-level security keys on the
+workspace and cannot see the actor, so `and actor_id=%s` in every statement is the whole of the
+separation between two people sharing a workspace, and a keyword a call site can omit is the wrong
+shape for the one clause that must never be omitted.
+
+Deleting one memory withdraws its whole lineage in both directions. A correction quotes what it
+corrected, so leaving the correction behind would leave the deleted thing on the screen inside its
+own replacement.
+
+## 11. Hydration, and what the reload actually shows
+
+`companion-runtime` gains a durable shape and one function that folds it back:
+`memoryFromPersisted` replays the stored escapes through `recordEscape` itself, in chronological
+order, rather than writing `takenAtMs + SKIP_COOLDOWN_MS` into a map directly. Three lines saved
+would have been a second implementation of a rule that already has one, and the failure that
+prevents is the sharp one: somebody fixes a cooldown in the live path and the durable fold keeps
+the old rule, so a window is one thing in this session and another after a reload. A test asserts
+the two produce the identical instant rather than trusting that they do.
+
+**What is durable and what is only this sitting is a decision, not a consequence of what was easy
+to store.** `askedThisSession` is NOT hydrated: it exists to stop the generator looping on one
+question inside one sitting, and hydrating it would permanently suppress every question ever
+delivered, leaving the Companion silent for good on the library it knows most about. `later` is
+not hydrated either, because 4.3 gives it "NO PENALTY" and says a dismissal is not re-opened "in
+the same session"; a new session is not the same session, and carrying it over would turn the one
+escape that costs nothing into the one that lasts forever.
+
+The write-back hook lives in `ui/companion-encounter.ts` rather than in the controller, and fires
+AFTER the answer is drawn and unconditionally. "After it is on the screen" is then a fact at that
+call site instead of an assumption about microtask ordering somewhere else, and a host that keeps
+answers cannot delay one reaching the screen or stop one arriving. A write-back that fails is
+drawn UNDER the answer as its own sentence: a durability failure is not an answer failure, and
+what is on the screen is still correct and still cited.
+
+An answer whose cited photographs the packet could not locate is not stored at all. Dropping the
+unlocatable citations and keeping the rest would be the same defect wearing a tidier shape, because
+the citation set is the join a withdrawal travels along.
+
+**`main.ts` is not edited on this branch.** It is the composition root and several concurrent
+branches own it at once, so the wiring ships as `docs/patches/companion-memory-main.patch`, exactly
+as `companion-question-main.patch` did before it. `persistedMemory` and `rememberAnswer` are
+optional and a host that has not applied the patch gets the behaviour it had. That is deliberate
+rather than a courtesy: a default that half worked would be a Companion claiming to remember and
+quietly not.
+
+### 11.1 In the running app
+
+Driven in a browser on 2026-09-09 against a throwaway world at this branch's own schema, for the
+reason section 7 gives: the retained bowl database is at 0038 and this branch needs 0043. Nothing
+was migrated. Three photographs were ingested through `CountingVisionModel`, the test fake, so the
+browser check spent nothing.
+
+One gate was bypassed and it is the same one: **Pointer Lock**. Everything after that ran for real.
+
+1. On first paint, before any question, `GET /api/companion/memory/recent?limit=50` returned 200.
+2. Summoning the Companion put the previous answer back on the screen, with its provenance line,
+   under `data-remembered="true"`, which is what says it was read back rather than composed and is
+   why it was not stored a second time.
+3. `Open the photograph` on that restored answer made `GET /api/evidence/{span}/masked`. The
+   citation survived the reload as something that opens, through the route that applies person
+   masking rather than the permalink route that returns original bytes.
+
+**Running it found a defect the tests did not, again.** A restored answer's chip rendered
+correctly and opened nothing. `evidenceAt` resolves a chip against the CONTROLLER's held answer,
+and the restore had been drawn by calling the panel directly, so the lookup fell through to the
+open turn, which was an acknowledgement with no evidence. Both halves were individually correct
+and the citation on the screen was dead. Restoring now goes through the controller, and a test
+holds it.
+
+## 12. The composer swap, measured and made
+
+Section 6.1 offered pointing `reasoning_cheap` at the Nano as a proposal and refused to make it:
+"two packets in a fifth of the time and a third that never finished is a reason to measure more,
+not a model swap this measurement supports." The single runaway is what held it. This is 48 more
+composer calls on the same packets, and the swap is now made. The record is
+`docs/evaluation/2026-09-09-companion-memory.json`; the harness is
+`scripts/measure_companion_memory.py`.
+
+Four questions, two models, two ceilings, three passes each. The packets are rebuilt once per
+question and reused across every cell, so exactly one thing varies.
+
+| Composer | Ceiling | Calls | Median | Min | Max | Reasoning tokens | Rejections | Ran away |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | 32768 | 12 | **3.6 s** | 1.9 s | 6.8 s | none reported | 0 | 0 |
+| `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | 16384 | 12 | 3.5 s | 2.3 s | 8.6 s | none reported | 0 | 0 |
+| `nvidia/Nemotron-3_5-Lightning` | 32768 | 12 | **18.6 s** | 10.4 s | 44.1 s | 5190 | 1 | 0 |
+| `nvidia/Nemotron-3_5-Lightning` | 16384 | 12 | 21.5 s | 7.1 s | 53.4 s | 5836 | 0 | 0 |
+
+**5.1 times faster at the median, and the Nano's worst case is below the Lightning's best.** The
+mechanism is in the usage object rather than in the parameter count: the declared primary spends a
+median 5190 reasoning tokens per answer and the Nano reports none at all, on answers of about 60
+tokens either way.
+
+**The runaway did not reproduce.** Zero of 24 Nano calls exhausted the ceiling and zero reached the
+deterministic floor. That does not explain the recorded one; it bounds it at under one in
+twenty-four rather than the one in three that was visible before.
+
+**The one conformance failure belonged to the declared primary.** Zero validator rejections in 24
+Nano calls, one in 24 Lightning calls, and it is worth naming: *"clause 0 references value
+'capture_count: 51', which the packet does not have"*.
+
+**Cost is not the reason and is not a saving.** Both models are $0.06 per million input tokens and
+$0.24 per million output. This is a latency and conformance decision.
+
+**The context rationale it replaces.** The role's rationale read that context length, not parameter
+count, was the binding constraint. A ten-item packet measured 1325 prompt tokens, so the Nano's
+262144 window holds roughly two thousand items and the constraint was never binding at any observed
+size. The Lightning stays as the fallback and keeps its 1048576 window for the case where it
+becomes so. `pipeline_version` moves 1 to 2 because it is an input to the response cache key.
+
+### 12.1 The second ceiling changed nothing, and is not moved
+
+16384 was chosen because it is the largest ceiling at which this call has ever been recorded to
+fail: `COMPOSER_MAX_TOKENS`'s own comment says the composer "conformed at 16384 on a 24-item packet
+and TRUNCATED at the same ceiling on an 8-item one", with no artifact behind it.
+
+It did not reproduce. Nothing truncated at either ceiling for either model in 48 calls, and the
+medians differ by less than the spread inside a single cell. That is not a refutation: the packets
+here are ten items and the note describes an eight-item one, and a note with no artifact cannot be
+refuted by a run that does not reproduce it. `COMPOSER_MAX_TOKENS` stays at 32768. It lives in
+`exulanica/selection/question.py`, which this task may not edit, and nothing measured here asks for
+it to move: the Nano's median completion is about 1100 tokens, so the ceiling is thirty times the
+observed spend and is doing no work either way. The measurement rebound it in memory for the
+duration of each call and restored it in a `finally`; no source file was touched.
+
+### 12.2 Streaming would not make the first words appear early
+
+Token Factory does stream. `stream: true` returns `text/event-stream`, `stream_options:
+{"include_usage": true}` puts the usage object including `reasoning_tokens` in the final chunk, and
+reasoning arrives in a `reasoning_content` delta separate from the answer's `content` delta.
+
+Three instants were timed separately, because conflating them would report a first token in
+milliseconds for an answer whose first word arrives twenty seconds later:
+
+| Composer | Ceiling | First SSE chunk | First reasoning | **First ANSWER word** | Total |
+| --- | --- | --- | --- | --- | --- |
+| Lightning | 32768 | 0 ms | 1 ms | **19.9 s** | 20.0 s |
+| Lightning | 16384 | 0 ms | 1 ms | **34.2 s** | 34.4 s |
+| Nano | 32768 | 0 ms | never | **2.8 s** | 3.0 s |
+| Nano | 16384 | 0 ms | never | **4.9 s** | 5.1 s |
+
+The first answer word arrives at 99.2% of the Lightning's wall clock at the declared ceiling, and
+99.5% at the lower one. The cause is structural rather than incidental: the composer is schema
+constrained, so the content channel carries one JSON object the model does not begin emitting until
+it has finished thinking.
+
+**So streaming is not implemented, and it is not proposed either.** It would buy between 0.5 and 8
+percent of the wait and would surface a reasoning monologue the interface has nowhere to put. It
+would also mean editing `exulanica/models/transport.py` and `client.py`, which are a `post_json` /
+`get_json` protocol over a fully materialised response, and `exulanica/selection/question.py`, none
+of which this task may write. The swap in section 12 takes the same wait from 18.6 seconds to 3.6,
+which is the thing streaming was meant to hide.
