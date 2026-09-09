@@ -27,7 +27,7 @@ import './unified-interface.css';
 
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
-import { FACET_KEYS, decodeFacets, encodeFacets, type IndexFacets } from '@exulanica/world-index';
+import { FACET_KEYS, encodeFacets, type IndexFacets } from '@exulanica/world-index';
 import { applicationTitle, developmentToken } from './config.js';
 import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
@@ -44,17 +44,13 @@ import { buildRegionPlan } from './ui/region-plan.js';
 import { MAP_ORIENTATION_CAPTION } from './ui/status.js';
 import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
-import {
-  commandForKeystroke,
-  initialWorldShell,
-  updateWorldShell,
-  type WorldShellEvent,
-} from './world-shell.js';
+import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
 import { disposeRenderer, mountRenderer } from './composition/renderer.js';
+import { disposeMountListeners, mountInputModes } from './composition/input-modes.js';
 import {
   mountStatusAndInspector,
   type MountedStatusAndInspector,
@@ -70,23 +66,11 @@ const env = createAppEnvironment();
 const state = createSessionState();
 const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewArtProfile } = env;
 
-
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
   state.atlas?.binding.setReducedMotion(event.matches);
 });
 applyDocumentAppearance(state.preferences, systemAppearance.matches);
-/**
- * Window listeners belonging to the current mount.
- *
- * `mount` runs again after every committed write and again on a hot reload, and a listener added
- * without one of these survives the mount that added it. Two of them turn one key press into two
- * toggles, which is a summon immediately undone by a dismiss and looks exactly like a key that
- * does nothing.
- */
-let mountListeners: AbortController | null = null;
-let indexFacets: IndexFacets = decodeFacets(window.location.search);
-let selected: string | null = null;
 document.title = applicationTitle(preview);
 applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
   state.preferences.worldArtProfile,
@@ -199,8 +183,7 @@ async function mount(): Promise<void> {
     // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
     disposeCompanionStage(state);
     disposeFormationWatch(state);
-    mountListeners?.abort();
-    mountListeners = null;
+    disposeMountListeners(state);
     disposeRenderer(state);
     canvas.hidden = true;
     shell.setAttribute('data-world-state', 'empty');
@@ -364,37 +347,37 @@ async function mount(): Promise<void> {
   minimap.render(new Set(), null);
   const worldIndex = buildWorldIndex({
     onEntity: (entityId, activation) => {
-      selected = entityId;
+      state.selected = entityId;
       const entity = current.entities.find((e) => e.entityId === entityId);
       if (entity !== undefined) {
         detail.showEntity(current, entity);
         dispatchShell({ type: 'show-detail', id: entityId });
       }
-      worldIndex.render(current, indexFacets, selected);
+      worldIndex.render(current, state.indexFacets, state.selected);
       if (activation === 'keyboard') {
         window.setTimeout(() => detail.root.querySelector<HTMLElement>('button')?.focus(), 0);
       }
     },
     onOccurrence: (occurrenceId, activation) => {
-      selected = occurrenceId;
+      state.selected = occurrenceId;
       const occurrence = current.occurrences.find((o) => o.occurrenceId === occurrenceId);
       if (occurrence !== undefined) {
         detail.showOccurrence(occurrence);
         dispatchShell({ type: 'show-detail', id: occurrenceId });
       }
-      worldIndex.render(current, indexFacets, selected);
+      worldIndex.render(current, state.indexFacets, state.selected);
       if (activation === 'keyboard') {
         window.setTimeout(() => detail.root.querySelector<HTMLElement>('button')?.focus(), 0);
       }
     },
     onSearch: (text) => {
-      indexFacets = Object.freeze({ ...indexFacets, text });
-      worldIndex.render(current, indexFacets, selected);
+      state.indexFacets = Object.freeze({ ...state.indexFacets, text });
+      worldIndex.render(current, state.indexFacets, state.selected);
     },
     onFacets: (next) => {
-      indexFacets = next;
+      state.indexFacets = next;
       syncIndexRoute(next);
-      worldIndex.render(current, indexFacets, selected);
+      worldIndex.render(current, state.indexFacets, state.selected);
     },
     onClose: () => dispatchShell({ type: 'toggle-index' }),
   }, {
@@ -557,7 +540,7 @@ async function mount(): Promise<void> {
   shell.setAttribute('data-vignette', state.preferences.vignette);
   reflectShell();
 
-  worldIndex.render(current, indexFacets, selected);
+  worldIndex.render(current, state.indexFacets, state.selected);
   formation.begin();
 
   const renderer = await mountRenderer({
@@ -579,224 +562,27 @@ async function mount(): Promise<void> {
   // The mode follows the browser's pointer lock state and is never guessed at: the browser drops
   // the lock on Escape and on focus loss without telling the application first, so a mode the
   // application tracked itself would be wrong within seconds of the user tabbing away.
-  const mounted = renderer.atlas;
-  mounted.binding.onInspectionChange = (view) => {
-    if (view === null) status.hideInspector();
-  };
-  mounted.binding.mapOverlay?.setActive(shellState.camera === 'map');
-  mounted.binding.onMapTarget = (islandId) => {
-    const resolution = mounted.binding.navigateToIsland(islandId, travelUsesReducedMotion());
-    if (!resolution.ok) {
-      showTravelStatus('No safe arrival point is available in that region.', 'failure');
-      return;
-    }
-    dispatchShell({ type: 'show-world' });
-    showTravelStatus(travelUsesReducedMotion() ? 'Located the region.' : 'Moving to the region…');
-  };
-  mounted.binding.onNavigationArrive = (target) => {
-    if (target.kind === 'anchor') {
-      const index = mounted.binding.table.indexOf.get(target.anchorId);
-      if (index !== undefined) mounted.binding.focusAnchor(index);
-    }
-    showTravelStatus(target.kind === 'anchor' ? 'Located the source.' : 'The memory is in focus.');
-  };
-  function reflectMode(next: 'traverse' | 'converse'): void {
-    inputMode = next;
-    chrome.setMode(next);
-    if (next === 'traverse') mounted.binding.releaseFocusedAnchor();
-    if (next === 'traverse' && (shellState.primary !== 'world' || shellState.camera !== 'ground')) {
-      dispatchShell({ type: 'show-world' });
-    }
-    // The prompt says what is true right now. With the mouse free the useful instruction is how
-    // to get into the world; once inside it is how to call the Companion. An open conversation
-    // outranks both and is left alone.
-    if (companion.panel.state() === 'open') return;
-    companion.panel.setState(next === 'traverse' ? 'summon' : 'enter');
-    firstUse.observeMode(next);
-    reflectFirstUse();
-  }
-  mounted.binding.controls.onModeChange = reflectMode;
-  reflectMode(mounted.binding.controls.mode);
-
-  mounted.binding.controls.onSummon = () => companion.toggle();
-  mounted.binding.controls.onInteract = () => {
-    const index = mounted.binding.engageFocusedAnchor();
-    if (index === null) return;
-    const anchor = mounted.binding.table.anchors[index];
-    const occurrence = anchor === undefined
-      ? undefined
-      : current.occurrences.find((value) => value.occurrenceId === anchor.occurrenceId);
-    if (occurrence === undefined) {
-      mounted.binding.releaseFocusedAnchor();
-      showTravelStatus('This memory reference is unavailable.', 'failure');
-      return;
-    }
-    selected = occurrence.occurrenceId;
-    detail.showOccurrence(occurrence);
-    worldIndex.render(current, indexFacets, selected);
-    if (shellState.primary !== 'index') dispatchShell({ type: 'toggle-index' });
-    dispatchShell({ type: 'show-detail', id: occurrence.occurrenceId });
-  };
-
-  mountListeners?.abort();
-  mountListeners = new AbortController();
-  /*
-   * CLICK-TO-EVIDENCE, bound here and not beside the function that resolves it.
-   *
-   * The listener is on the shared world canvas, which the inspector does not own, so it has to
-   * hang off `mountListeners` like every other listener outside a mounted element: the inspector
-   * is rebuilt on each mount and the old one is simply discarded, so a listener registered beside
-   * it would survive the mount that created it. This file already records that failure mode.
-   *
-   * Guarded on the inspector being open, so traverse is untouched: while traversing,
-   * `inspectionView` is null and `resolveEvidenceAt` returns before reading anything.
-   * `pointerup` rather than `pointerdown`, so a drag that happens to end over the canvas is not
-   * taken as a click on a surface the visitor never pointed at.
-   */
-  canvas.addEventListener(
-    'pointerup',
-    (event) => {
-      if (event.button !== 0 || status.inspectorRoot.hidden) return;
-      status.resolveEvidenceAt(event.clientX, event.clientY);
-    },
-    { signal: mountListeners.signal },
-  );
-  canvas.addEventListener(
-    'webglcontextlost',
-    (event) => {
-      event.preventDefault();
-      dispatchShell({ type: 'show-index' });
-      showTravelStatus(
-        'The 3D renderer became unavailable. The complete World Index remains available.',
-        'failure',
-      );
-    },
-    { signal: mountListeners.signal },
-  );
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      const target = event.target;
-      const typing =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable);
-      /*
-       * Escape steps back by exactly one, and only once the browser has finished with it.
-       *
-       * While the pointer is locked Escape belongs to the user agent: it releases the mouse and
-       * we neither see nor want it, which is the rule the renderer controls are built around.
-       * Released, it has no browser job left, and the key everyone already tries for "out of
-       * this" becomes the way out. One press, one level: the exchange, then the entry, then the
-       * plate. Backspace keeps its meaning for people who learned it, but nobody guesses it.
-       */
-      if (event.code === 'Escape' && document.pointerLockElement === null) {
-        // Search is the innermost thing open, so it is the first thing Escape takes back.
-        if (shellState.primary === 'index' && worldIndex.closeSearch()) {
-          event.preventDefault();
-          return;
-        }
-        if (companion.panel.state() === 'open') {
-          event.preventDefault();
-          companion.dismiss();
-          return;
-        }
-        if (shellState.detailId !== null) {
-          event.preventDefault();
-          dispatchShell({ type: 'close-detail' });
-          return;
-        }
-        if (shellState.primary !== 'world') {
-          event.preventDefault();
-          dispatchShell({ type: 'show-world' });
-          return;
-        }
-      }
-      const command = commandForKeystroke({
-        code: event.code,
-        key: event.key,
-        modified: event.altKey || event.ctrlKey || event.metaKey,
-        typing,
-      });
-      if (
-        !typing && companion.panel.state() === 'open' &&
-        !event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyE'
-      ) {
-        if (companion.panel.openEvidence()) {
-          event.preventDefault();
-          return;
-        }
-      }
-      if (
-        !typing && shellState.primary === 'index' &&
-        !event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyS'
-      ) {
-        event.preventDefault();
-        worldIndex.focusSearch();
-        return;
-      }
-      if (command === 'toggle-index') {
-        event.preventDefault();
-        handleAtlasCommand('index');
-        return;
-      }
-      if (command === 'toggle-map') {
-        event.preventDefault();
-        // Tap or hold is decided on the way back up, so the key does nothing yet.
-        mapPeek.press();
-        return;
-      }
-      if (command === 'toggle-options') {
-        event.preventDefault();
-        handleAtlasCommand('options');
-        return;
-      }
-      if (command === 'toggle-controls') {
-        event.preventDefault();
-        handleAtlasCommand('controls');
-        return;
-      }
-      if (command === 'selection-back' && shellState.detailId !== null) {
-        event.preventDefault();
-        dispatchShell({ type: 'close-detail' });
-        return;
-      }
-      // Not while the user is typing an answer into the Companion or a name into the index.
-      if (typing) return;
-      // Answering by number, which is the only way to answer while the pointer is locked: there
-      // is no cursor to click with, and releasing the lock to reply would mean leaving the world
-      // for every question. Unavailable options return null and the key does nothing, rather than
-      // selecting the next one along and committing something nobody chose.
-      if (/^Digit[1-9]$/.test(event.code)) {
-        if (companion.panel.pressNumber(Number(event.code.slice(5)))) event.preventDefault();
-        return;
-      }
-    },
-    { signal: mountListeners.signal },
-  );
-  window.addEventListener(
-    'keyup',
-    (event: KeyboardEvent) => {
-      if (event.code === 'KeyM') mapPeek.release();
-    },
-    { signal: mountListeners.signal },
-  );
-  // A hold that loses the window never receives its keyup, and a look must not become a journey.
-  window.addEventListener('blur', () => mapPeek.abort(), { signal: mountListeners.signal });
-  window.addEventListener(
-    'popstate',
-    () => {
-      indexFacets = decodeFacets(window.location.search);
-      worldIndex.render(current, indexFacets, selected);
-    },
-    { signal: mountListeners.signal },
-  );
-  systemAppearance.addEventListener(
-    'change',
-    () => appearance.applyPreferences(state.preferences),
-    { signal: mountListeners.signal },
-  );
+  mountInputModes({
+    env,
+    state,
+    snapshot: current,
+    atlas: renderer.atlas,
+    companion,
+    status,
+    chrome,
+    worldIndex,
+    detail,
+    mapPeek,
+    firstUse,
+    shellState: () => shellState,
+    dispatchShell,
+    handleAtlasCommand,
+    showTravelStatus,
+    travelUsesReducedMotion,
+    setInputMode: (mode) => { inputMode = mode; },
+    reflectFirstUse: () => reflectFirstUse(),
+    applyPreferences: (next) => appearance.applyPreferences(next),
+  });
 
   // Nothing is asked unprompted. The Companion arrives when it is called, and until then the
   // world is the whole of what is on screen.
