@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Annotated, Literal, TypeAlias
+from collections.abc import Callable
+from typing import Annotated, Final, Literal, TypeAlias
 
-from fastapi import APIRouter, Depends, Path, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -32,15 +34,32 @@ from exulanica.api.dependencies import (
     get_services,
 )
 from exulanica.api.services import Services
+from exulanica.evidence.blob import BlobId
+from exulanica.store.base import ContentAddressedStore
 from exulanica.world import (
+    GLB_MEDIA_TYPE,
+    MAX_SCALE_MILLI,
+    MAX_YAW_MICRORADIANS,
     STYLE_REGISTRY,
+    AlternateVersion,
+    AuthoredObject,
+    InvalidatedSourceVersion,
+    InvalidObjectData,
+    InvalidObjectState,
+    ObjectBehaviour,
+    ObjectOrigin,
     ProposalOrigin,
     ProposalProvenance,
+    ReviewedAssetRow,
+    StaleObjectBase,
     StyleProposal,
     StyleProposalRecord,
     StyleReference,
     StyleScope,
     StyleVersion,
+    Transform,
+    UnavailableAsset,
+    WorldObjectRepository,
     WorldSourceMedia,
     WorldStyleRepository,
 )
@@ -550,3 +569,564 @@ def _source_view(source: WorldSourceMedia) -> SourceMediaView:
         asset_reference=asset_reference,
         capture_ids=source.capture_ids,
     )
+
+
+# ------------------------------------------------------------------------------------------
+# Authored world versions and created objects.
+#
+# A separate surface on the same router, and separate for a reason worth stating where the code
+# is. The style routes above adapt an existing frontend recipe, so they accept camelCase aliases
+# alongside snake_case. This surface has no prior client, `world_read.py` and `world_write.py`
+# accept snake_case only, and the graph-client fixtures are snake_case. Inventing a second casing
+# for a contract nobody has generated against yet would be inventing the problem the aliases
+# above exist to solve.
+#
+# Domain failures here are mapped locally rather than through an `app.py` exception handler,
+# following `world_write.py`. Registering this router therefore adds no global handler, and the
+# response shape is the same `{code, detail}` every other route returns.
+# ------------------------------------------------------------------------------------------
+
+
+class TransformBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: StrictInt throughout. A float here would be refused by the canonical encoder later with a
+    #: message about digests; refusing it at the transport edge names the field instead.
+    x_mm: StrictInt
+    y_mm: StrictInt
+    z_mm: StrictInt
+    yaw_microradians: StrictInt = Field(ge=0, le=MAX_YAW_MICRORADIANS)
+    scale_milli: StrictInt = Field(ge=1, le=MAX_SCALE_MILLI)
+
+    def domain(self) -> Transform:
+        return Transform(self.x_mm, self.y_mm, self.z_mm, self.yaw_microradians, self.scale_milli)
+
+
+class BehaviourBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    behaviour_key: str = Field(max_length=200)
+    behaviour_version: int = Field(ge=1)
+    parameters: dict[str, JsonValue]
+
+    def domain(self) -> ObjectBehaviour:
+        return ObjectBehaviour(self.behaviour_key, self.behaviour_version, self.parameters)
+
+
+class CreateVersionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=200)
+    source_snapshot_id: uuid.UUID | None = None
+    parent_version_id: uuid.UUID | None = None
+    style_version_id: uuid.UUID | None = None
+
+
+class AddObjectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(min_length=64, max_length=64)
+    object_id: str = Field(min_length=1, max_length=200)
+    asset_key: str = Field(min_length=1, max_length=200)
+    region_id: str = Field(min_length=1, max_length=500)
+    transform: TransformBody
+    #: The person chooses. Product direction is explicit that the first slice asks rather than
+    #: classifies, so there is no default and no inference from the asset.
+    origin_role: Literal["fictional", "personal"]
+    behaviour: BehaviourBody | None = None
+
+
+class MoveObjectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(min_length=64, max_length=64)
+    transform: TransformBody
+
+
+class BaseStateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(min_length=64, max_length=64)
+
+
+class ReviewedAssetView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_key: str
+    title: str
+    summary: str
+    media_type: str
+    content_sha256: str
+    byte_size: int
+    licence_id: str
+    licence_sha256: str
+    availability: str
+
+
+class ObjectBehaviourView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    behaviour_key: str
+    behaviour_version: int
+    parameters: dict[str, JsonValue]
+
+
+class TransformView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    coordinate_space: str
+    coordinate_unit: str
+    x_mm: int
+    y_mm: int
+    z_mm: int
+    yaw_microradians: int
+    scale_milli: int
+
+
+class ObjectOriginView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    role: str
+
+
+class AuthoredObjectView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    object_id: str
+    asset: ReviewedAssetView
+    region_id: str
+    transform: TransformView
+    origin: ObjectOriginView
+    behaviour: ObjectBehaviourView | None
+    removed: bool
+
+
+class ElementOverrideView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element_id: str
+    suppressed: bool
+    transform: TransformView | None
+
+
+class VersionEditView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    edit_id: uuid.UUID
+    edit_seq: int
+    kind: str
+    object_id: str | None
+    element_id: str | None
+    undone_edit_id: uuid.UUID | None
+    base_state_sha256: str
+    result_state_sha256: str
+    actor: uuid.UUID
+    recorded_at: str
+
+
+class AlternateVersionView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int
+    version_id: uuid.UUID
+    world_id: str
+    source_snapshot_id: uuid.UUID
+    parent_version_id: uuid.UUID | None
+    title: str
+    origin: str
+    style_version_id: uuid.UUID | None
+    state_sha256: str
+    edit_seq: int
+    source_invalidated: bool
+    created_by: uuid.UUID
+    created_at: str
+    objects: list[AuthoredObjectView]
+    element_overrides: list[ElementOverrideView]
+    edits: list[VersionEditView]
+
+
+def object_read_repository(
+    connection: ReadOnlyConnection, session: CurrentSession
+) -> WorldObjectRepository:
+    return WorldObjectRepository(connection, session.workspace_id)
+
+
+def object_write_repository(
+    connection: ScopedConnection, session: CurrentSession
+) -> WorldObjectRepository:
+    return WorldObjectRepository(connection, session.workspace_id)
+
+
+ReadObjects = Annotated[WorldObjectRepository, Depends(object_read_repository)]
+WriteObjects = Annotated[WorldObjectRepository, Depends(object_write_repository)]
+
+#: The domain failures this surface maps itself, and the code each one answers with. Reused
+#: classes are absent on purpose: `UnknownWorldResource` and `UnavailableAsset` already have
+#: application-wide handlers and must keep answering identically here.
+_OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
+    (InvalidObjectData, 422, "invalid_object_data"),
+    (StaleObjectBase, 409, "stale_object_base"),
+    (InvalidObjectState, 409, "invalid_object_state"),
+    (InvalidatedSourceVersion, 409, "invalidated_source_version"),
+)
+
+
+def _object_problem(exc: Exception) -> JSONResponse | None:
+    for kind, status, code in _OBJECT_PROBLEMS:
+        if isinstance(exc, kind):
+            return JSONResponse(status_code=status, content={"code": code, "detail": str(exc)})
+    return None
+
+
+def _asset_view(asset: ReviewedAssetRow) -> ReviewedAssetView:
+    return ReviewedAssetView(
+        asset_key=asset.asset_key,
+        title=asset.title,
+        summary=asset.summary,
+        media_type=asset.media_type,
+        content_sha256=asset.content_sha256,
+        byte_size=asset.byte_size,
+        licence_id=asset.licence_id,
+        licence_sha256=asset.licence_sha256,
+        availability=asset.availability,
+    )
+
+
+def _transform_view(transform: Transform) -> TransformView:
+    return TransformView(**transform.document())
+
+
+def _version_view(
+    version: AlternateVersion, assets: dict[str, ReviewedAssetRow]
+) -> AlternateVersionView:
+    return AlternateVersionView(
+        schema_version=1,
+        version_id=version.version_id,
+        world_id=version.world_id,
+        source_snapshot_id=version.source_snapshot_id,
+        parent_version_id=version.parent_version_id,
+        title=version.title,
+        origin="authored",
+        style_version_id=version.style_version_id,
+        state_sha256=version.state_sha256,
+        edit_seq=version.edit_seq,
+        source_invalidated=version.source_invalidated,
+        created_by=version.created_by,
+        created_at=version.created_at,
+        objects=[
+            AuthoredObjectView(
+                object_id=obj.object_id,
+                asset=_asset_view(assets[obj.asset_key]),
+                region_id=obj.region_id,
+                transform=_transform_view(obj.transform),
+                origin=ObjectOriginView(kind=obj.origin.kind, role=obj.origin.role),
+                behaviour=(
+                    None
+                    if obj.behaviour is None
+                    else ObjectBehaviourView(
+                        behaviour_key=obj.behaviour.behaviour_key,
+                        behaviour_version=obj.behaviour.behaviour_version,
+                        parameters=dict(obj.behaviour.parameters),
+                    )
+                ),
+                removed=obj.removed,
+            )
+            for obj in version.objects
+        ],
+        element_overrides=[
+            ElementOverrideView(
+                element_id=override.element_id,
+                suppressed=override.suppressed,
+                transform=(
+                    None if override.transform is None else _transform_view(override.transform)
+                ),
+            )
+            for override in version.element_overrides
+        ],
+        edits=[
+            VersionEditView(
+                edit_id=edit.edit_id,
+                edit_seq=edit.edit_seq,
+                kind=edit.kind,
+                object_id=edit.object_id,
+                element_id=edit.element_id,
+                undone_edit_id=edit.undone_edit_id,
+                base_state_sha256=edit.base_state_sha256,
+                result_state_sha256=edit.result_state_sha256,
+                actor=edit.actor,
+                recorded_at=edit.recorded_at,
+            )
+            for edit in version.edits
+        ],
+    )
+
+
+def _rendered(
+    repository: WorldObjectRepository, version: AlternateVersion, store: ContentAddressedStore
+) -> AlternateVersionView:
+    """One version body, with every asset's availability resolved against the actual store.
+
+    Resolved rather than assumed. A renderer holding this body must be able to tell a reviewed
+    mesh it may draw from one whose bytes are gone, and the answer to that has to come from
+    looking.
+    """
+    return _version_view(
+        version, {asset.asset_key: asset for asset in repository.reviewed_assets(store)}
+    )
+
+
+@router.get(
+    "/assets",
+    response_model=list[ReviewedAssetView],
+    summary="The reviewed CC0 asset registry, read-only, with real byte availability.",
+)
+def reviewed_asset_catalog(repository: ReadObjects, request: Request) -> list[ReviewedAssetView]:
+    store = get_services(request).store
+    return [_asset_view(asset) for asset in repository.reviewed_assets(store)]
+
+
+@router.get(
+    "/assets/{asset_key}",
+    response_model=ReviewedAssetView,
+    summary="One reviewed asset and whether its bytes are present.",
+)
+def reviewed_asset(
+    asset_key: Annotated[str, Path(max_length=200)],
+    repository: ReadObjects,
+    request: Request,
+) -> ReviewedAssetView:
+    return _asset_view(repository.reviewed_asset(asset_key, get_services(request).store))
+
+
+@router.get(
+    "/assets/{asset_key}/bytes",
+    summary="The reviewed geometry itself. Never a citation target and never evidence.",
+    responses={200: {"content": {GLB_MEDIA_TYPE: {}}}},
+)
+def reviewed_asset_bytes(
+    asset_key: Annotated[str, Path(max_length=200)],
+    repository: ReadObjects,
+    request: Request,
+) -> Response:
+    store = get_services(request).store
+    asset = repository.reviewed_asset(asset_key, store)
+    if asset.availability != "available":
+        # The same code and the same honesty as `/world/source-media`, reached through the same
+        # application handler rather than a second 424 written out here: the row survived and the
+        # bytes did not, and nothing substitutes a different mesh for the one that is gone.
+        raise UnavailableAsset("the reviewed asset row exists and its bytes do not")
+    payload = store.get(BlobId.from_hex(asset.content_sha256))
+    return Response(
+        content=payload,
+        media_type=asset.media_type,
+        headers={
+            "ETag": f'"{asset.content_sha256}"',
+            # NOT the point map's `no-store`, and the difference is the reasoning. That route
+            # serves a personal derivative a tombstone has to be able to reach, so a cached copy
+            # is a copy deletion cannot clear. A reviewed CC0 mesh is global reviewed data that
+            # holds nothing personal and is immutable under content addressing, so caching it for
+            # a year is correct rather than merely permitted.
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+            "Accept-Ranges": "none",
+        },
+    )
+
+
+@router.get(
+    "/assets/{asset_key}/licence",
+    summary="The licence text the reviewed bytes are published under.",
+    responses={200: {"content": {"text/plain": {}}}},
+)
+def reviewed_asset_licence(
+    asset_key: Annotated[str, Path(max_length=200)],
+    repository: ReadObjects,
+    request: Request,
+) -> Response:
+    store = get_services(request).store
+    asset = repository.reviewed_asset(asset_key, store)
+    licence = BlobId.from_hex(asset.licence_sha256)
+    if not store.exists(licence):
+        raise UnavailableAsset("the licence text for this asset is not in the store")
+    return Response(
+        content=store.get(licence),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "ETag": f'"{asset.licence_sha256}"',
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get(
+    "/versions",
+    response_model=list[AlternateVersionView],
+    summary="Every alternate world version in this workspace, newest first.",
+)
+def alternate_versions(repository: ReadObjects, request: Request) -> list[AlternateVersionView]:
+    store = get_services(request).store
+    assets = {asset.asset_key: asset for asset in repository.reviewed_assets(store)}
+    return [_version_view(version, assets) for version in repository.versions()]
+
+
+@router.post(
+    "/versions",
+    response_model=AlternateVersionView,
+    status_code=201,
+    summary="Create an alternate version from a source snapshot or from another version.",
+)
+def create_alternate_version(
+    body: CreateVersionBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    try:
+        version = repository.create_version(
+            source_snapshot_id=body.source_snapshot_id,
+            parent_version_id=body.parent_version_id,
+            title=body.title,
+            style_version_id=body.style_version_id,
+            created_by=session.actor,
+        )
+    except Exception as exc:
+        problem = _object_problem(exc)
+        if problem is None:
+            raise
+        return problem
+    return _rendered(repository, version, get_services(request).store)
+
+
+@router.get(
+    "/versions/{version_id}",
+    response_model=AlternateVersionView,
+    summary="One alternate version with its objects, overrides and edit history.",
+)
+def alternate_version(
+    version_id: Annotated[uuid.UUID, Path()],
+    repository: ReadObjects,
+    request: Request,
+) -> AlternateVersionView:
+    return _rendered(repository, repository.version(version_id), get_services(request).store)
+
+
+@router.post(
+    "/versions/{version_id}/objects",
+    response_model=AlternateVersionView,
+    status_code=201,
+    summary="Add one authored object against an explicit base version state.",
+)
+def add_authored_object(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: AddObjectBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    obj = AuthoredObject(
+        object_id=body.object_id,
+        asset_key=body.asset_key,
+        region_id=body.region_id,
+        transform=body.transform.domain(),
+        origin=ObjectOrigin("authored", body.origin_role),
+        behaviour=None if body.behaviour is None else body.behaviour.domain(),
+    )
+    return _edit(
+        request,
+        repository,
+        lambda: repository.add_object(
+            version_id, obj, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/objects/{object_id}/move",
+    response_model=AlternateVersionView,
+    summary="Replace one authored object's region-local transform.",
+)
+def move_authored_object(
+    version_id: Annotated[uuid.UUID, Path()],
+    object_id: Annotated[str, Path(max_length=200)],
+    body: MoveObjectBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.move_object(
+            version_id,
+            object_id,
+            body.transform.domain(),
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/objects/{object_id}/remove",
+    response_model=AlternateVersionView,
+    summary="Store a removal. POST rather than DELETE: this appends history, it destroys nothing.",
+)
+def remove_authored_object(
+    version_id: Annotated[uuid.UUID, Path()],
+    object_id: Annotated[str, Path(max_length=200)],
+    body: BaseStateBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.remove_object(
+            version_id, object_id, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/objects/undo",
+    response_model=AlternateVersionView,
+    summary="Reverse the newest object edit, from the document that edit stored.",
+)
+def undo_authored_edit(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: BaseStateBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.undo(
+            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+    )
+
+
+def _edit(
+    request: Request,
+    repository: WorldObjectRepository,
+    operation: Callable[[], AlternateVersion],
+) -> Response | AlternateVersionView:
+    """Run one mutation and answer with the whole version, or with this surface's problem shape.
+
+    The whole version rather than the changed object, because the caller needs the new
+    ``state_sha256`` to make its next edit and a second round trip to fetch it is a second chance
+    for another writer to move the base first.
+    """
+    try:
+        version = operation()
+    except Exception as exc:
+        problem = _object_problem(exc)
+        if problem is None:
+            raise
+        return problem
+    return _rendered(repository, version, get_services(request).store)
