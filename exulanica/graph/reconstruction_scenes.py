@@ -10,8 +10,10 @@ immutable scene members and exact point-map artifact rows.
 from __future__ import annotations
 
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Literal
+from threading import Lock
+from typing import Any, Literal, NamedTuple
 
 import psycopg
 
@@ -34,6 +36,7 @@ from exulanica.graph.person_regions import (
 )
 from exulanica.graph.scene_geometry import trained_geometry_row
 from exulanica.reconstruction.placement import (
+    PlacementRecord,
     PointMapInput,
     recovered_camera_records,
     validate_placement_record,
@@ -41,7 +44,123 @@ from exulanica.reconstruction.placement import (
 from exulanica.reconstruction.scene_gate import validate_scene_gate_decision
 from exulanica.store.base import ContentAddressedStore
 
-__all__ = ["reconstruction_scene_rows"]
+__all__ = [
+    "clear_placement_memo",
+    "placement_memo_members",
+    "placement_memo_size",
+    "reconstruction_scene_rows",
+]
+
+
+# -- the validated placement memo ---------------------------------------------------------------
+#
+# MEASURED 2026-09-09 against the retained reference copy: `GET /graph` took 48.0, 51.1 and 50.6
+# seconds for the 210 member volcanic scene, and 21.7, 21.5 and 21.4 seconds for the 91 member bowl
+# whose geometry is withheld anyway. Both work out at about 0.24 seconds per member. The asset-read
+# policy is not the cost: both `scene_allowed` passes together are 252 ms and every per-member
+# predicate together is 242 ms. The cost is here, in `_scene_row`, which re-reads the scene's blobs
+# and rebuilds the placement on every request: `store.get` verifies 780 MB of point maps and a
+# 108 MB pose receipt, `fit_point_map_scale` runs once per member and `validate_opm` walks all
+# 19,493,182 points in Python.
+#
+# None of that work depends on anything mutable. The pose receipt, the placement record, the gate
+# receipt and every point map are content addressed, and their digests are columns on the scene row
+# this function already read. So the rebuilt placement and the recovered cameras are memoised on
+# those digests, on the scene's member list, and on whether each point map's bytes are present. On
+# a hit the pose receipt and the point maps are not fetched at all, which is where most of the time
+# went.
+#
+# What is deliberately NOT memoised is everything that can change without a digest changing: the
+# scene's members, the person regions and review states, the artifact rows with their `purged_at`
+# and tombstone predicates, the gate agreement, and the asset-read policy the route applies
+# afterwards. Those are re-read on every request exactly as before.
+#
+# THE TRADE THIS MAKES, precisely. Before this memo every graph read pulled each point map through
+# `store.get`, which re-hashes the bytes, so a blob that had rotted on disk came back as `content=
+# None`, its member was excluded as `alignment-unavailable`, and no fetch reference was emitted for
+# it. On a memo hit the only per-request check is `store.exists`, a bare `is_file()`. So a point map
+# whose bytes are present but no longer hash to their key is now reported as placed and available,
+# with a `/geometry` reference, until the entry is evicted or `clear_placement_memo` is called. The
+# bytes themselves are still safe: `exulanica/api/routes/geometry.py` reads them through the store
+# and refuses on `IntegrityError`, so a visitor gets a refusal rather than wrong geometry. What is
+# lost is that the graph used to withhold the reference instead of advertising it. A purge IS still
+# seen, because presence is in the key, and a REPAIR is seen too, because a record built from a
+# failed digest read is never cached in the first place.
+#
+# The bound is on total members rather than on entries, because that is what tracks memory:
+# MEASURED 2026-09-09 on the 210 member volcanic scene, one entry is 639.6 KiB, or 3.05 KiB per
+# member, and holds no point-map bytes at all. 20,000 members is therefore about 60 MiB. Bounding by
+# entry count would have been the wrong unit: sixteen tiny scenes and sixteen large ones are three
+# orders of magnitude apart.
+#
+# `reconstruction_scene_rows` sweeps every scene in the workspace on a graph read, so the access
+# pattern is a cycle. A cycle longer than the bound evicts each entry before it is reused and the
+# hit rate is zero, not merely lower. The bound is sized so that does not happen for any workspace
+# this corpus has: 20,000 members is about 95 scenes the size of the volcanic one.
+
+_MEMO_MAX_MEMBERS = 20_000
+
+
+class _PointMapRef(NamedTuple):
+    capture_ref: str
+    artifact_ref: str
+    content_sha256: str
+
+
+_MemoKey = tuple[
+    str,                                # workspace
+    str,                                # scene ref
+    str,                                # pose receipt digest
+    str,                                # placement record digest
+    str,                                # gate receipt digest
+    tuple[str, ...],                    # member capture refs, in scene order
+    tuple[_PointMapRef, ...],           # the placement's point-map references, in record order
+    tuple[bool, ...],                   # whether each of those point maps' bytes are present
+]
+_MemoValue = tuple[PlacementRecord, dict[str, dict[str, object]]]
+
+_memo_lock = Lock()
+_memo: OrderedDict[_MemoKey, _MemoValue] = OrderedDict()
+
+
+def clear_placement_memo() -> None:
+    """Forget every memoised placement.
+
+    For tests, and for an operator who has replaced bytes under an existing digest, which the
+    content-addressed store is not supposed to allow.
+    """
+    with _memo_lock:
+        _memo.clear()
+
+
+def placement_memo_size() -> int:
+    """How many validated placements are currently held. For tests and for operational reporting."""
+    with _memo_lock:
+        return len(_memo)
+
+
+def placement_memo_members() -> int:
+    """How many scene members the held placements cover, which is what the bound is expressed in."""
+    with _memo_lock:
+        return sum(len(key[5]) for key in _memo)
+
+
+def _memo_get(key: _MemoKey) -> _MemoValue | None:
+    with _memo_lock:
+        value = _memo.get(key)
+        if value is not None:
+            _memo.move_to_end(key)
+        return value
+
+
+def _memo_put(key: _MemoKey, value: _MemoValue) -> None:
+    with _memo_lock:
+        _memo[key] = value
+        _memo.move_to_end(key)
+        # Never evict down to nothing: one scene larger than the whole bound should still be held,
+        # or it would be inserted and dropped on every request and the memo would be pure cost.
+        while len(_memo) > 1 and sum(len(entry[5]) for entry in _memo) > _MEMO_MAX_MEMBERS:
+            _memo.popitem(last=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,8 +283,13 @@ def _scene_row(
             "unavailable",
             "The scene receipts are not available to this graph reader.",
         )
+    pose_blob = BlobId(bytes(row["pose_sha256"]))
     try:
-        pose_bytes = store.get(BlobId(bytes(row["pose_sha256"])))
+        # The pose receipt is the largest object a scene owns and is wanted only when the memo
+        # below misses, so its presence is established here, first, and its bytes are read there.
+        # First so that a double fault still reports what the unmemoised reader reported, which
+        # fetched the pose before the other two.
+        pose_present = store.exists(pose_blob)
         placement_bytes = store.get(BlobId(bytes(row["placement_sha256"])))
         gate_bytes = store.get(BlobId(bytes(row["gate_sha256"])))
     except BlobNotFoundError:
@@ -192,23 +316,101 @@ def _scene_row(
             "invalid",
             "A durable scene receipt failed its content digest.",
         )
+    if not pose_present:
+        return _fallback(
+            scene_id,
+            bytes(row["member_digest"]).hex(),
+            claim,
+            members,
+            pose_digest,
+            placement_digest,
+            "missing",
+            "bytes_missing",
+            "A durable scene receipt is missing from object storage.",
+        )
 
     try:
         decision = validate_scene_gate_decision(gate_bytes)
         if not _gate_agrees(decision, claim, pose_digest, placement_digest, members):
             raise ValueError("the scene gate disagrees with the durable scene claim")
-        point_maps, artifacts = _point_maps_from_placement(
-            connection, workspace, scene_id, placement_bytes, store
+        # The artifact rows carry `purged_at` and the tombstone predicate, so they are read live on
+        # every request and never enter the memo.
+        references, artifacts = _point_map_references(
+            connection, workspace, scene_id, placement_bytes
         )
-        placement = validate_placement_record(
-            placement_bytes,
-            expected_scene_ref=str(scene_id),
-            pose_receipt=pose_bytes,
-            member_capture_refs=[str(member.capture_id) for member in members],
-            point_maps=point_maps,
-            allow_unavailable_bytes=True,
+        member_refs = tuple(str(member.capture_id) for member in members)
+        present = tuple(
+            store.exists(BlobId.from_hex(reference.content_sha256)) for reference in references
         )
-        cameras = recovered_camera_records(pose_bytes)
+        key: _MemoKey = (
+            str(workspace),
+            str(scene_id),
+            pose_digest,
+            placement_digest,
+            _hex(row["gate_sha256"]) or "",
+            member_refs,
+            tuple(references),
+            present,
+        )
+        memoised = _memo_get(key)
+        if memoised is None:
+            pose_bytes = store.get(pose_blob)
+            reads = {
+                reference.capture_ref: _point_map_bytes(store, reference.content_sha256)
+                for reference in references
+            }
+            point_maps = {
+                reference.capture_ref: PointMapInput(
+                    reference.capture_ref,
+                    reference.artifact_ref,
+                    reference.content_sha256,
+                    reads[reference.capture_ref].content,
+                )
+                for reference in references
+            }
+            placement = validate_placement_record(
+                placement_bytes,
+                expected_scene_ref=str(scene_id),
+                pose_receipt=pose_bytes,
+                member_capture_refs=list(member_refs),
+                point_maps=point_maps,
+                allow_unavailable_bytes=True,
+            )
+            cameras = recovered_camera_records(pose_bytes)
+            # A record built from a blob that failed its digest is not cached. `store.exists`
+            # cannot tell a rotted object from a sound one, so caching this would make the key
+            # identical before and after a repair and the degraded answer would outlive it.
+            if not any(read.digest_failed for read in reads.values()):
+                _memo_put(key, (placement, cameras))
+        else:
+            placement, cameras = memoised
+    except BlobNotFoundError:
+        # A purge between the presence check above and the read below. BlobNotFoundError is a
+        # KeyError, so without its own arm here it would reach the handler beneath and be reported
+        # as an inconsistent receipt chain rather than as the missing bytes it is.
+        return _fallback(
+            scene_id,
+            bytes(row["member_digest"]).hex(),
+            claim,
+            members,
+            pose_digest,
+            placement_digest,
+            "missing",
+            "bytes_missing",
+            "A durable scene receipt is missing from object storage.",
+        )
+    except IntegrityError:
+        return _fallback(
+            scene_id,
+            bytes(row["member_digest"]).hex(),
+            claim,
+            members,
+            pose_digest,
+            placement_digest,
+            "invalid",
+            "invalid",
+            "A durable scene receipt failed its content digest.",
+        )
     except (KeyError, TypeError, ValueError):
         return _fallback(
             scene_id,
@@ -406,20 +608,53 @@ def _gate_agrees(
     )
 
 
-def _point_maps_from_placement(
+class _PointMapBytes(NamedTuple):
+    """What one point-map read produced, and whether it failed its digest rather than being absent.
+
+    The distinction matters to the memo. `store.exists` is a bare presence test, so "present and
+    valid" and "present but rotted" build the same key while producing different correct records.
+    A result built from a failed digest is therefore never cached, so a repair under the same
+    digest is picked up on the very next read instead of surviving for the life of the process.
+    """
+
+    content: bytes | None
+    digest_failed: bool
+
+
+def _point_map_bytes(store: ContentAddressedStore, content_sha256: str) -> _PointMapBytes:
+    """The point map's bytes, or None when the object is gone or fails its digest.
+
+    Absence is not an error here: `validate_placement_record` is called with
+    `allow_unavailable_bytes`, which erases an unavailable member's geometry rather than
+    withholding the whole scene.
+    """
+    try:
+        return _PointMapBytes(store.get(BlobId.from_hex(content_sha256)), False)
+    except BlobNotFoundError:
+        return _PointMapBytes(None, False)
+    except IntegrityError:
+        return _PointMapBytes(None, True)
+
+
+def _point_map_references(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
     scene_id: uuid.UUID,
     placement_bytes: bytes,
-    store: ContentAddressedStore,
-) -> tuple[dict[str, PointMapInput], dict[str, dict[str, Any]]]:
+) -> tuple[tuple[_PointMapRef, ...], dict[str, dict[str, Any]]]:
+    """The placement's point-map references and their live artifact rows, without reading bytes.
+
+    Split from the byte read so the memo key can be built before deciding whether any object needs
+    fetching. The query is the live half and runs on every request: it is what refuses a purged,
+    superseded or tombstone-blocked artifact.
+    """
     import json
 
     raw = json.loads(placement_bytes)
     placed = raw["placement"]["point_map_inputs"]
     if not isinstance(placed, list):
         raise ValueError("the placement member list is malformed")
-    inputs: dict[str, PointMapInput] = {}
+    references: list[_PointMapRef] = []
     artifacts: dict[str, dict[str, Any]] = {}
     for item in placed:
         if not isinstance(item, dict):
@@ -443,13 +678,9 @@ def _point_maps_from_placement(
         ).fetchone()
         if row is None:
             raise ValueError(f"scene {scene_id} references an unavailable point-map artifact")
-        try:
-            content = store.get(BlobId(content_digest))
-        except (BlobNotFoundError, IntegrityError):
-            content = None
-        inputs[capture_ref] = PointMapInput(capture_ref, artifact_ref, content_sha256, content)
+        references.append(_PointMapRef(capture_ref, artifact_ref, content_sha256))
         artifacts[capture_ref] = row
-    return inputs, artifacts
+    return tuple(references), artifacts
 
 
 def _fallback(

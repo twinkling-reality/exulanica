@@ -18,6 +18,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.evidence.blob import BlobId
 from exulanica.graph import read_snapshot
 from exulanica.graph.geometry import point_map_descriptors, read_point_map
+from exulanica.graph.reconstruction_scenes import (
+    _MEMO_MAX_MEMBERS,
+    _memo,
+    _memo_get,
+    _memo_put,
+    clear_placement_memo,
+    placement_memo_members,
+    placement_memo_size,
+)
 from exulanica.ingest.operations import reconstruction_scene_metrics
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.reconstruction_scratch import (
@@ -883,3 +892,302 @@ def test_incomplete_point_maps_defer_pose_until_the_last_exact_input_arrives(rep
     assert [item["point_map_artifact_ref"] for item in placement["placed"]] == [
         str(artifact_id) for artifact_id in point_artifacts
     ]
+
+
+class _CountingStore:
+    """Delegates to a real store and records which blobs were fetched, and how often.
+
+    A proxy rather than a subclass so it stays a faithful pass-through: anything the graph reader
+    calls that is not counted here reaches the real store unchanged.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.fetched: list[str] = []
+        self.probed: list[str] = []
+
+    def get(self, blob_id):
+        self.fetched.append(blob_id.hex)
+        return self._inner.get(blob_id)
+
+    def exists(self, blob_id):
+        self.probed.append(blob_id.hex)
+        return self._inner.exists(blob_id)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _scene_receipt_digests(repository, job_id):
+    """The pose receipt digest for a scene job, as lowercase hex."""
+    row = repository.connection.execute(
+        "select a.content_sha256 from reconstruction_scene_job j "
+        "join artifact a on a.workspace_id=j.workspace_id "
+        "and a.artifact_id=j.pose_receipt_artifact_id "
+        "where j.workspace_id=%s and j.job_id=%s",
+        (repository.workspace_id, job_id),
+    ).fetchone()
+    return bytes(row["content_sha256"]).hex()
+
+
+def _point_map_digests(repository, point_artifacts):
+    return {
+        bytes(
+            repository.connection.execute(
+                "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+                (repository.workspace_id, artifact_id),
+            ).fetchone()["content_sha256"]
+        ).hex()
+        for artifact_id in point_artifacts
+    }
+
+
+def test_a_repeated_graph_read_reuses_the_validated_placement_without_refetching_bytes(
+    repository, tmp_path
+):
+    """The measured cost of `GET /graph` was re-reading and rebuilding what cannot have changed.
+
+    MEASURED 2026-09-09: 50.6 s for a 210 member scene and 21.5 s for a 91 member one whose
+    geometry is withheld anyway, both about 0.24 s per member, none of it in the asset-read policy.
+    The pose receipt and every point map are content addressed and their digests are columns on the
+    scene row, so a second read of an unchanged scene must not rebuild the placement from them.
+
+    The pose receipt is still read once per scene by `scene_inputs`, which the asset-read policy
+    calls from `trained_geometry_row`. That read is outside this memo and remains a cost.
+    """
+    clear_placement_memo()
+    store, _captures, point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-test", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    pose_digest = _scene_receipt_digests(repository, job_id)
+    point_digests = _point_map_digests(repository, point_artifacts)
+
+    first_store = _CountingStore(store)
+    first = read_snapshot(
+        repository.connection, repository.workspace_id, first_store
+    ).reconstruction_scenes[0]
+    assert first.placement_state == "available"
+    assert pose_digest in first_store.fetched
+    assert point_digests <= set(first_store.fetched)
+
+    second_store = _CountingStore(store)
+    second = read_snapshot(
+        repository.connection, repository.workspace_id, second_store
+    ).reconstruction_scenes[0]
+
+    # The point maps are the bulk of the bytes and none of them is fetched again.
+    assert point_digests.isdisjoint(second_store.fetched)
+    # The pose receipt is fetched once for the asset-read policy instead of twice.
+    assert second_store.fetched.count(pose_digest) < first_store.fetched.count(pose_digest)
+    assert len(second_store.fetched) < len(first_store.fetched)
+    # What replaces the reads is a presence check per reference, which is a stat rather than a
+    # hash. Counted so the trade is visible in the test rather than only in the comment.
+    assert point_digests <= set(second_store.probed)
+    assert pose_digest in second_store.probed
+    assert placement_memo_size() == 1
+    assert second == first
+
+
+def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(
+    repository, tmp_path
+):
+    """A memoised record must never carry the bytes it was built from.
+
+    It does not today: `build_placement_record` rebuilds its inputs as three positional arguments
+    (exulanica/reconstruction/placement.py), so `PointMapInput.content` keeps its None default and
+    the bytes live only in the caller's local mapping. This test exists because the memo makes that
+    a load-bearing property rather than an incidental one. MEASURED 2026-09-09: one entry for a 210
+    member scene is 639.6 KiB; were the inputs to start carrying content it would be 780 MB.
+    """
+    clear_placement_memo()
+    store, _captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-bytes", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    read_snapshot(repository.connection, repository.workspace_id, store)
+    assert placement_memo_size() == 1
+    held = next(iter(_memo.values()))[0]
+    assert held.point_map_inputs
+    assert all(item.content is None for item in held.point_map_inputs)
+
+
+def test_losing_a_point_map_after_a_memoised_read_is_still_seen(repository, tmp_path):
+    """Presence is part of the key, so a purge is not served from the memo."""
+    clear_placement_memo()
+    store, captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-purge", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    before = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert before.placement_state == "available"
+
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[1]),
+    ).fetchone()
+    path = store.root / store.key_for(BlobId(bytes(row["content_sha256"])))
+    path.chmod(0o644)
+    path.unlink()
+
+    after = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert after.placement_state == "partial"
+    assert after.members[1].capture_id == captures[1]
+    assert after.members[1].placement is None
+    assert after.members[1].exclusion_reason == "alignment-unavailable"
+
+
+def test_losing_the_pose_receipt_after_a_memoised_read_is_still_seen(repository, tmp_path):
+    """The pose receipt is no longer fetched on a hit, so its presence is checked instead."""
+    clear_placement_memo()
+    store, _captures, _point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-pose", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    assert (
+        read_snapshot(
+            repository.connection, repository.workspace_id, store
+        ).reconstruction_scenes[0].placement_state
+        == "available"
+    )
+
+    path = store.root / store.key_for(BlobId.from_hex(_scene_receipt_digests(repository, job_id)))
+    path.chmod(0o644)
+    path.unlink()
+
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.receipt_state == "missing"
+    assert scene.placement_state == "bytes_missing"
+    assert scene.rendering_substrate == "source_photographs"
+
+
+def _key(index, members):
+    refs = tuple(f"m{n}" for n in range(members))
+    return (str(index), "scene", "pose", "placement", "gate", refs, (), ())
+
+
+def test_the_placement_memo_is_bounded_by_members_and_clearable():
+    """The bound is on members, not entries, because that is what tracks memory.
+
+    A graph read sweeps every scene in the workspace, so the access pattern is a cycle and a bound
+    shorter than the cycle would evict each entry before it is reused, giving a zero hit rate.
+    """
+    clear_placement_memo()
+    assert placement_memo_size() == 0 and placement_memo_members() == 0
+
+    for index in range(10):
+        _memo_put(_key(index, 2_500), ("record", {}))
+    assert placement_memo_members() <= _MEMO_MAX_MEMBERS
+    # The oldest went first and the newest is still held.
+    assert _memo_get(_key(0, 2_500)) is None
+    assert _memo_get(_key(9, 2_500)) == ("record", {})
+
+    # Many small scenes are cheap, so many more of them fit than of large ones.
+    clear_placement_memo()
+    for index in range(200):
+        _memo_put(_key(index, 3), ("record", {}))
+    assert placement_memo_size() == 200
+    assert placement_memo_members() == 600
+
+    # One scene larger than the whole bound is still held, rather than inserted and dropped on
+    # every request, which would make the memo pure cost for it.
+    clear_placement_memo()
+    _memo_put(_key(0, _MEMO_MAX_MEMBERS * 2), ("record", {}))
+    assert placement_memo_size() == 1
+    assert _memo_get(_key(0, _MEMO_MAX_MEMBERS * 2)) == ("record", {})
+
+    clear_placement_memo()
+    assert placement_memo_size() == 0 and placement_memo_members() == 0
+
+
+def test_a_point_map_corrupted_after_a_memoised_read_is_advertised_until_the_memo_is_cleared(
+    repository, tmp_path
+):
+    """The one property this memo gives up, pinned so it cannot change unnoticed.
+
+    Before the memo every graph read pulled each point map through `store.get`, which re-hashes the
+    bytes, so a rotted blob became `alignment-unavailable` with no fetch reference. On a memo hit
+    the only check is `store.exists`, so the member stays advertised. The bytes are still safe:
+    `exulanica/api/routes/geometry.py` reads them through the store and refuses on IntegrityError.
+    This test asserts the behaviour as it is, and that clearing the memo restores the old answer.
+    """
+    clear_placement_memo()
+    store, _captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-corrupt", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    before = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert before.members[1].placement is not None
+
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[1]),
+    ).fetchone()
+    path = store.root / store.key_for(BlobId(bytes(row["content_sha256"])))
+    path.chmod(0o644)
+    path.write_bytes(b"corrupt OPM input")
+
+    warm = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert warm.members[1].placement is not None, "documented: the memo still advertises it"
+
+    clear_placement_memo()
+    cold = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert cold.members[1].placement is None
+    assert cold.members[1].exclusion_reason == "alignment-unavailable"
+
+
+def test_a_point_map_repaired_under_the_same_digest_is_seen_on_the_next_read(
+    repository, tmp_path
+):
+    """A record built from a failed digest read must not be cached.
+
+    `store.exists` cannot tell a rotted object from a sound one, so a degraded record cached under
+    an unchanged key would outlive the repair that fixes it: restoring correct bytes leaves every
+    key component identical. The read that produced it is therefore never memoised.
+    """
+    clear_placement_memo()
+    store, _captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-repair", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[1]),
+    ).fetchone()
+    path = store.root / store.key_for(BlobId(bytes(row["content_sha256"])))
+    path.chmod(0o644)
+    sound = path.read_bytes()
+    path.write_bytes(b"corrupt OPM input")
+
+    clear_placement_memo()
+    degraded = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert degraded.members[1].placement is None
+    assert degraded.members[1].exclusion_reason == "alignment-unavailable"
+    assert placement_memo_size() == 0, "a record built from a failed digest must not be cached"
+
+    path.write_bytes(sound)
+    repaired = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert repaired.members[1].placement is not None
+    assert placement_memo_size() == 1
