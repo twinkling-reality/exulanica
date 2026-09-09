@@ -36,9 +36,28 @@ from exulanica.reconstruction.splat import (
     _verify_dataset_sources,
     _verify_pose_receipt,
     _write_atomic,
+    masked_training_binding,
+    verify_masked_training_sources,
 )
 
 _PROCESS_STARTED = time.monotonic()
+
+
+def _read_masked_source_remap(value: Any) -> tuple[tuple[str, str, str], ...]:
+    """Read the manifest's masked-source object back into ordered tuples, or refuse it.
+
+    Every refusal here is a ``ValueError`` on purpose: ``main`` catches those and prints one
+    reason the controller records, where a ``KeyError`` out of a mapping would reach the operator
+    as a traceback in a stderr tail.
+    """
+    if not isinstance(value, dict):
+        raise ValueError("manifest masked_source_remap must be an object keyed by capture")
+    entries = []
+    for capture_ref, item in value.items():
+        if not isinstance(item, dict) or set(item) != {"source_sha256", "masked_source_sha256"}:
+            raise ValueError("a manifest masked_source_remap entry is malformed")
+        entries.append((capture_ref, item["source_sha256"], item["masked_source_sha256"]))
+    return tuple(sorted(entries))
 
 
 def read_manifest(path: Path) -> SplatBuildManifest:
@@ -60,15 +79,20 @@ def read_manifest(path: Path) -> SplatBuildManifest:
         "execution_image",
         "requested_gpu",
     )
+    parameters = {
+        **value["parameters"],
+        "heldout_source_sha256": tuple(value["parameters"]["heldout_source_sha256"]),
+    }
+    if "masked_source_remap" in parameters:
+        parameters["masked_source_remap"] = _read_masked_source_remap(
+            parameters["masked_source_remap"]
+        )
     manifest = SplatBuildManifest(
         **{key: value[key] for key in keys},
         source_sha256=tuple(value["source_sha256"]),
         gsplat_revision=implementation["revision"],
         dependency_inventory=tuple(value["dependency_inventory"]),
-        **{
-            **value["parameters"],
-            "heldout_source_sha256": tuple(value["parameters"]["heldout_source_sha256"]),
-        },
+        **parameters,
         **value["cost_rate"],
         **value["quality_thresholds"],
     )
@@ -421,6 +445,14 @@ def load_dataset(
     heldout_sources: tuple[str, ...] | None = None,
     original_dataset: Path | None = None,
 ) -> tuple[list[dict[str, Any]], Any]:
+    """Load registered views, marking held out exactly the ones the manifest predeclared.
+
+    ``original_dataset`` means *before rectification*, not *before masking*. On a scene with
+    somebody hidden in it those staged bytes are the masked derivative, and that is the intent:
+    the digests matched here, the digests in ``source_sha256`` and the pixels every metric is
+    computed against are all the same masked bytes. The manifest's remap is what records which
+    photograph each of them replaced.
+    """
     import numpy as np
     import pycolmap
 
@@ -700,6 +732,10 @@ def _train_locked(
     np.random.seed(42)
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
+    # Before rectification, not merely before the load. `prepare_dataset` decodes every staged
+    # image and writes it back into the job directory, so a leaked original checked afterwards
+    # would already have been re-encoded into retained scratch by the time anything refused it.
+    verify_masked_training_sources(manifest, dataset)
     prepared = prepare_dataset(dataset, output, selected_model)
     views, points = load_dataset(
         prepared,
@@ -719,6 +755,7 @@ def _train_locked(
         "unregistered_heldout_source_sha256": sorted(
             set(manifest.heldout_source_sha256) - {_digest_file(v["source_path"]) for v in views}
         ),
+        **masked_training_binding(manifest),
     }
     split_path = output / "split.json"
     if split_path.exists() and json.loads(split_path.read_text()) != split:

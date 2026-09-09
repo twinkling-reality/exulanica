@@ -30,6 +30,7 @@ from exulanica.ingest.scene_splat import (
 )
 from exulanica.reconstruction.gsplat_runner import read_manifest
 from exulanica.reconstruction.pose import CommandResult
+from exulanica.reconstruction.splat import masked_training_binding
 from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import CountingVisionModel, write_photo, write_point_map
@@ -104,6 +105,10 @@ class ScriptedTrainer:
                         "training_source_sha256": sorted(
                             set(manifest.source_sha256) - set(manifest.heldout_source_sha256)
                         ),
+                        # The real runner writes this block from the same helper, so what the
+                        # retained bundle binds here is the shape production binds, not a shape
+                        # the fixture invented.
+                        **masked_training_binding(manifest),
                     },
                     "training/dataset.json": {
                         "notice": "SYNTHETIC SCRIPTED TRAINER PREPARATION",
@@ -906,3 +911,473 @@ def test_withdrawal_after_publication_removes_the_whole_trained_scene(repository
         )
         is None
     )
+
+
+# --------------------------------------------------------------------------------------------
+# Masked members. Everything below concerns a scene where somebody is hidden in a photograph, so
+# the bytes pose, training and evaluation all read are a masked derivative rather than the
+# photograph itself. The held-out split is still declared over the photographs a person reviewed,
+# and the remap is the recorded, checkable statement of which derivative replaced which original.
+#
+# No masked scene has ever been trained on a GPU. These exercise the enqueue, manifest, staging
+# and receipt boundaries with the scripted trainer, and claim nothing about appearance or cost.
+# --------------------------------------------------------------------------------------------
+
+MASK_ACTOR = uuid.UUID("00000000-0000-4000-8000-000000000001")
+MASK_REGION_KEY = (b"m" * 32).hex()
+MASK_SCOPE = {"purpose": "masked scene training regression"}
+
+
+def _hide_a_person(repository, pipeline, capture_id):
+    """Add one live unresolved region and run the real mask stage over it."""
+    from exulanica.consent.regions import Silhouette
+    from exulanica.ingest.person_review import record_region_edits
+
+    record_region_edits(
+        repository,
+        capture_id=capture_id,
+        actor=MASK_ACTOR,
+        edits=[
+            {
+                "action": "add",
+                "region_key": MASK_REGION_KEY,
+                # No subject, so the region resolves "unknown" and existing policy masks it.
+                "silhouette": Silhouette(
+                    ((0, 0), (500_000, 0), (500_000, 500_000), (0, 500_000))
+                ).as_digest_input(),
+                "subject_id": None,
+            }
+        ],
+    )
+    built = pipeline.ingest_derivatives(capture_id)
+    assert built.error is None, built.error
+    assert "masked_source" in built.stages_run
+
+
+def masked_queued(repository, tmp_path, *, masked=(0, 1), heldout_index=0):
+    """A four-member scene with two hidden members, queued for training.
+
+    Every member carries a personal authorization and a human review rather than the synthetic
+    exemption ``write_point_map`` defaults to, because admission requires one corpus class and one
+    authorization scope across the set, and 0040 refuses a synthetic exemption for any capture
+    with live person regions at all.
+    """
+    from exulanica.ingest.person_review import review_list
+    from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
+
+    store = LocalContentAddressedStore(tmp_path / "store")
+    pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    captures, hashes, blobs = [], [], []
+    for index in range(4):
+        path = write_photo(
+            photos, f"{index}.jpg", when=f"2026:09:05 12:0{index}:00", size=(160 + index, 100)
+        )
+        outcome = pipeline.ingest_file(path)
+        assert outcome.error is None and outcome.capture_id is not None
+        captures.append(outcome.capture_id)
+        blob = BlobId.of_bytes(path.read_bytes())
+        blobs.append(blob)
+        hashes.append(blob.hex)
+    for index in masked:
+        _hide_a_person(repository, pipeline, captures[index])
+    screenings = []
+    for capture_id in captures:
+        authorization = authorize_personal_capture(
+            repository,
+            capture_id=capture_id,
+            actor=MASK_ACTOR,
+            account_authority_basis="Operator generated these fixture bytes; no personal media",
+            authorization_scope=dict(MASK_SCOPE),
+            purpose="masked scene training regression",
+        )
+        screening = record_human_screening(
+            repository,
+            authorization_id=authorization.authorization_id,
+            reviewed_by=MASK_ACTOR,
+            sensitive_regions=review_list(repository, capture_id),
+        )
+        assert screening.eligibility_state == "eligible", screening.eligibility_state
+        screenings.append(screening)
+    masks = {}
+    for index, blob in enumerate(blobs):
+        mask = repository.current_capture_artifacts(
+            capture_ids=[captures[index]], kind="masked_source"
+        ).get(captures[index])
+        if mask is not None:
+            masks[index] = mask
+        write_point_map(
+            repository,
+            store,
+            blob,
+            payload=_numeric_point_map(index),
+            privacy_screening_id=screenings[index].screening_id,
+            read_source_sha256=mask.content_sha256 if mask is not None else None,
+        )
+    assert set(masks) == set(masked)
+    config = request((hashes[heldout_index],))
+    selected = enqueue_exact_scene_reconstruction(
+        repository,
+        captures,
+        actor=uuid.uuid4(),
+        purpose="masked scene training regression",
+        authorized_at=dt.datetime.now(dt.UTC),
+        splat_training=config,
+    )
+    assert selected is not None
+    return store, captures, selected, config, hashes, masks
+
+
+def _pose(frames):
+    """The smallest accepted pose manifest that carries an exact frame inventory."""
+    from exulanica.reconstruction.pose import PoseBuildManifest, SourceFrame
+
+    return PoseBuildManifest(
+        scene_ref=str(uuid.uuid4()),
+        code_revision="a" * 40,
+        colmap_version="numeric scripted fixture",
+        execution_image="pose-test@sha256:" + "b" * 64,
+        frames=tuple(
+            SourceFrame(
+                capture_ref=capture_ref,
+                filename=f"{ordinal:06d}.jpg",
+                sha256=digest,
+                capture_set="masked-remap-fixture",
+            )
+            for ordinal, (capture_ref, digest) in enumerate(frames)
+        ),
+        min_registered_fraction=None,
+        max_mean_reprojection_error_px=None,
+        min_camera_translation_units=None,
+    )
+
+
+def _remap_fixture():
+    """One hidden member and three plain ones, in the two digest spaces the remap joins."""
+    captures = [str(uuid.UUID(int=index + 1)) for index in range(4)]
+    originals = [chr(ord("a") + index) * 64 for index in range(4)]
+    masked = "e" * 64
+    remap = [
+        {
+            "capture_ref": captures[0],
+            "source_sha256": originals[0],
+            "masked_source_sha256": masked,
+        }
+    ]
+    return captures, originals, masked, remap
+
+
+def test_masked_members_train_and_publish_against_the_derivative_they_were_masked_into(
+    repository, tmp_path
+):
+    """The whole point: a scene with somebody hidden in it reaches a published trained scene.
+
+    The held-out member is a masked one deliberately. Holding out a plain member would pass with
+    no remap at all, because that member's pose frame digest is already its photograph's.
+    """
+    store, captures, selected, config, hashes, masks = masked_queued(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="training-test", lease_seconds=60)
+    assert claimed is not None and claimed.job_id == selected.job_id
+
+    # What the operator asked for, and what the queue froze, differ by exactly the substitution.
+    stored = claimed.build_inputs["splat_training"]
+    assert config.heldout_source_sha256 == (hashes[0],)
+    assert stored["heldout_source_sha256"] == [masks[0].content_sha256.hex()]
+    assert stored["masked_source_remap"] == {
+        str(captures[index]): {
+            "source_sha256": hashes[index],
+            "masked_source_sha256": masks[index].content_sha256.hex(),
+        }
+        for index in (0, 1)
+    }
+
+    result = processor(repository, store, tmp_path, ScriptedTrainer()).process(claimed)
+    assert result.status == "succeeded", result.message
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.rendering_substrate == "gaussian_splats"
+    assert scene.trained_geometry is not None and scene.trained_geometry.state == "available"
+
+    receipt = json.loads(
+        store.get(
+            BlobId(
+                bytes(
+                    repository.connection.execute(
+                        "select content_sha256 from artifact where workspace_id=%s and scene_id=%s"
+                        " and kind='scene_splat_receipt'",
+                        (repository.workspace_id, scene.scene_id),
+                    ).fetchone()["content_sha256"]
+                )
+            )
+        )
+    )
+    parameters = receipt["manifest"]["parameters"]
+    assert parameters["masked_source_remap"] == stored["masked_source_remap"]
+    # The receipt withholds the derivative, and the map is what says which photograph that was.
+    assert parameters["heldout_source_sha256"] == [masks[0].content_sha256.hex()]
+    assert hashes[0] not in receipt["manifest"]["source_sha256"]
+    assert masks[0].content_sha256.hex() in receipt["manifest"]["source_sha256"]
+
+    evaluation = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and scene_id=%s "
+        "and kind='scene_splat_evaluation_bundle'",
+        (repository.workspace_id, scene.scene_id),
+    ).fetchone()
+    with zipfile.ZipFile(
+        io.BytesIO(store.get(BlobId(bytes(evaluation["content_sha256"]))))
+    ) as archive:
+        split = json.loads(archive.read("split.json"))
+        metrics = json.loads(archive.read("metrics.json"))
+    assert split["heldout_original_source_sha256"] == [hashes[0]]
+    assert {item["capture_ref"] for item in split["masked_source_remap"]} == {
+        str(captures[0]),
+        str(captures[1]),
+    }
+    assert "masked-derivative-bytes-only" in split["reference_pixels"]
+    # Not an echo of what the scripted trainer wrote: the hidden member's photograph digest
+    # labels no measured pixel anywhere in the bundle, and appears in the split receipt only
+    # inside the remap that exists to say which photograph was replaced.
+    assert hashes[0] not in json.dumps(metrics)
+    assert json.dumps(split).count(hashes[0]) == 2
+    assert masks[0].content_sha256.hex() in json.dumps(metrics["per_view"])
+
+
+def test_an_unmasked_scene_keeps_the_exact_request_and_manifest_bytes_it_had_before(
+    repository, tmp_path
+):
+    """A corpus with no people in it must not pay for this in a changed identity."""
+    store, _captures, _selected, _config = queued(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="training-test", lease_seconds=60)
+    assert "masked_source_remap" not in claimed.build_inputs["splat_training"]
+    assert "masked_sources" not in claimed.build_inputs
+    result = processor(repository, store, tmp_path, ScriptedTrainer()).process(claimed)
+    assert result.status == "succeeded", result.message
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    receipt = json.loads(
+        store.get(
+            BlobId(
+                bytes(
+                    repository.connection.execute(
+                        "select content_sha256 from artifact where workspace_id=%s and scene_id=%s"
+                        " and kind='scene_splat_receipt'",
+                        (repository.workspace_id, scene.scene_id),
+                    ).fetchone()["content_sha256"]
+                )
+            )
+        )
+    )
+    assert "masked_source_remap" not in receipt["manifest"]["parameters"]
+
+
+def test_a_mask_that_went_stale_between_enqueue_and_run_is_refused_before_any_pose_work(
+    repository, tmp_path
+):
+    """The frozen remap describes an exact derivative, and a rebuilt mask is a different one."""
+    from exulanica.consent.regions import Silhouette
+    from exulanica.ingest.person_review import record_region_edits
+
+    store, captures, selected, _config, _hashes, _masks = masked_queued(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="training-test", lease_seconds=60)
+    assert claimed is not None and claimed.job_id == selected.job_id
+    record_region_edits(
+        repository,
+        capture_id=captures[0],
+        actor=MASK_ACTOR,
+        edits=[
+            {
+                "action": "confirm",
+                "region_key": MASK_REGION_KEY,
+                "silhouette": Silhouette(
+                    ((0, 0), (900_000, 0), (900_000, 500_000), (0, 500_000))
+                ).as_digest_input(),
+                "subject_id": None,
+            }
+        ],
+    )
+    trainer = ScriptedTrainer()
+    result = processor(repository, store, tmp_path, trainer).process(claimed)
+    assert result.status == "failed"
+    assert "stale" in result.message, result.message
+    assert trainer.calls == []
+    assert not read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes
+
+
+def test_a_masked_scene_without_a_remap_still_meets_the_unrelaxed_subset_rule():
+    """The naive fix, refused. This is the control the refusal comment described.
+
+    It guards a rule this change deliberately did not touch, so it would have passed before the
+    change as well. That is the point: it fails the day somebody relaxes the subset rule to make a
+    masked scene train without a map, which is the shortcut the comment was written to prevent.
+
+    Relaxing `SplatBuildManifest`'s subset rule so an unresolved original could stand beside
+    derivative sources is what would let a partially masked scene train: `load_dataset` still
+    matches the plain members' held-out views, raises nothing, and the masked photographs the
+    split claimed to withhold end up in training. Binding the remap resolves the split instead,
+    and the subset rule is left exactly as strict as it was.
+    """
+    captures, originals, masked, _remap = _remap_fixture()
+    unbound = request((originals[0],))
+    pose = _pose(
+        [(captures[0], masked), *[(captures[i], originals[i]) for i in range(1, 4)]]
+    )
+    with pytest.raises(ValueError, match="proper subset"):
+        unbound.manifest(pose)
+
+
+def test_a_swapped_derivative_digest_is_refused_against_the_pose_frames():
+    """Two hidden members whose derivatives are exchanged. Digests alone cannot see this.
+
+    Both derivatives really are training sources and neither original is, so every rule the
+    manifest can state about hashes is satisfied. Only the capture each hash was recorded against
+    distinguishes the honest map from the one that would score a person's render against somebody
+    else's photograph, which is why the map carries a capture reference at all.
+    """
+    captures, originals, _masked, _remap = _remap_fixture()
+    first, second = "e" * 64, "f" * 64
+    bound = request((originals[0],)).bind_masked_sources(
+        [
+            {
+                "capture_ref": captures[0],
+                "source_sha256": originals[0],
+                "masked_source_sha256": second,
+            },
+            {
+                "capture_ref": captures[1],
+                "source_sha256": originals[1],
+                "masked_source_sha256": first,
+            },
+        ],
+        sources=tuple(originals),
+    )
+    pose = _pose(
+        [
+            (captures[0], first),
+            (captures[1], second),
+            (captures[2], originals[2]),
+            (captures[3], originals[3]),
+        ]
+    )
+    with pytest.raises(ValueError, match="does not bind the derivative"):
+        bound.manifest(pose)
+
+
+def test_an_original_staged_for_a_masked_capture_is_refused():
+    """A pose frame carrying the photograph of a member the mask inputs say must be hidden."""
+    captures, originals, masked, remap = _remap_fixture()
+    bound = request((originals[0],)).bind_masked_sources(remap, sources=tuple(originals))
+    honest = _pose(
+        [(captures[0], masked), *[(captures[i], originals[i]) for i in range(1, 4)]]
+    )
+    assert bound.manifest(honest).masked_source_remap == (
+        (captures[0], originals[0], masked),
+    )
+    original_frames = _pose([(captures[i], originals[i]) for i in range(4)])
+    with pytest.raises(ValueError, match="does not bind the derivative"):
+        bound.manifest(original_frames)
+
+
+def test_a_remap_is_derived_at_enqueue_and_never_declared_by_an_operator():
+    captures, originals, masked, remap = _remap_fixture()
+    bound = request((originals[0],)).bind_masked_sources(remap, sources=tuple(originals))
+    assert bound.heldout_source_sha256 == (masked,)
+    assert SceneSplatRequest.from_payload(bound.as_payload()) == bound
+    with pytest.raises(ValueError, match="never declared"):
+        bound.bind_masked_sources(remap, sources=tuple(originals))
+    with pytest.raises(ValueError, match="outside this admitted scene"):
+        request((originals[0],)).bind_masked_sources(
+            [{**remap[0], "source_sha256": "9" * 64}], sources=tuple(originals)
+        )
+    # Two hidden members whose masks produced the same bytes would silently shrink the split.
+    with pytest.raises(ValueError, match="collapses two held-out"):
+        request((originals[0], originals[1])).bind_masked_sources(
+            [
+                {**remap[0], "masked_source_sha256": masked},
+                {
+                    "capture_ref": captures[1],
+                    "source_sha256": originals[1],
+                    "masked_source_sha256": masked,
+                },
+            ],
+            sources=tuple(originals),
+        )
+
+
+def test_a_member_that_newly_needs_a_mask_after_enqueue_is_refused(repository, tmp_path):
+    """0040's matcher decides who needs hiding now, not who needed it when the job was queued."""
+    from exulanica.ingest.pipeline import PhotoIngestPipeline
+
+    store, captures, _selected, _config, _hashes, _masks = masked_queued(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="training-test", lease_seconds=60)
+    pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
+    _hide_a_person(repository, pipeline, captures[2])
+    trainer = ScriptedTrainer()
+    result = processor(repository, store, tmp_path, trainer).process(claimed)
+    assert result.status == "failed"
+    assert "require a declared masked source" in result.message, result.message
+    assert trainer.calls == []
+
+
+def test_a_derivative_rebuilt_after_enqueue_no_longer_binds_its_frozen_remap():
+    """The stage-binding check on its own, with the mask rebuilt under a frozen job.
+
+    The database-level version of this scenario above is refused earlier and harder, by
+    `verify_masked_sources`, because the job's declaration still names the superseded artifact.
+    This is the same drift arriving one layer later: if the declaration and the remap ever fell
+    out of step, the remap is the half that still knows which bytes this build was admitted with.
+    """
+    captures, originals, _masked, remap = _remap_fixture()
+    bound = request((originals[0],)).bind_masked_sources(remap, sources=tuple(originals))
+    rebuilt = "9" * 64
+    frames = _pose(
+        [(captures[0], rebuilt), *[(captures[i], originals[i]) for i in range(1, 4)]]
+    )
+    with pytest.raises(ValueError, match="rebuild the mask and re-admit"):
+        bound.manifest(frames)
+
+
+@pytest.mark.parametrize(
+    ("remap", "message"),
+    [
+        ((("not-a-capture", "a" * 64, "b" * 64),), "exact capture reference"),
+        (((str(uuid.UUID(int=1)), "a" * 64, "zz" + "b" * 62),), "exact source hashes"),
+        (((str(uuid.UUID(int=1)), 7, "b" * 64),), "exact source hashes"),
+        (((str(uuid.UUID(int=1)), "a" * 64, "a" * 64),), "cannot be the original bytes"),
+        (
+            (
+                (str(uuid.UUID(int=1)), "a" * 64, "b" * 64),
+                (str(uuid.UUID(int=1)), "c" * 64, "d" * 64),
+            ),
+            "twice",
+        ),
+        (
+            (
+                (str(uuid.UUID(int=1)), "a" * 64, "b" * 64),
+                (str(uuid.UUID(int=2)), "c" * 64, "b" * 64),
+            ),
+            "twice",
+        ),
+        (
+            (
+                (str(uuid.UUID(int=2)), "c" * 64, "d" * 64),
+                (str(uuid.UUID(int=1)), "a" * 64, "b" * 64),
+            ),
+            "ordered by capture reference",
+        ),
+        (((str(uuid.UUID(int=1)), "a" * 64),), "capture and two hashes"),
+    ],
+)
+def test_the_request_refuses_every_malformed_remap_shape(remap, message):
+    """The request validator and the manifest validator are twins by necessity, not by accident.
+
+    The layering contract forbids reconstruction from importing ingest, so the same rules are
+    written out in both places. Two copies of a rule are two places for one of them to rot, which
+    is why each copy carries its own controls rather than trusting the other's.
+    """
+    with pytest.raises(ValueError, match=message):
+        dataclasses.replace(request(("f" * 64,)), masked_source_remap=remap)

@@ -38,6 +38,7 @@ __all__ = [
     "apply_masked_sources",
     "capture_mask_is_current",
     "masked_source_declarations",
+    "masked_source_remap",
     "verify_masked_sources",
 ]
 
@@ -76,6 +77,37 @@ def masked_source_declarations(
         for capture_id in capture_ids
         if capture_id in masked
     ]
+
+
+def masked_source_remap(
+    repository: IngestRepository, declarations: list[dict[str, Any]]
+) -> list[dict[str, str]]:
+    """Each declared derivative beside the original photograph it stands in for.
+
+    A second view of one selection, never a second selection. The caller passes the list
+    :func:`masked_source_declarations` has already returned and the original digest comes from the
+    capture row, whose bytes are immutable. Two independent selection passes could straddle a
+    consent decision and produce a map naming one capture's mask beside another capture's
+    original, which is the one error in this file nothing downstream could detect.
+
+    Training needs the pair and pose does not. A held-out split is declared over the photographs a
+    person actually reviewed, while the only bytes a masked scene ever stages are derivatives; the
+    map is what lets both sentences stay true and stay checkable at the same time.
+    """
+    remap: list[dict[str, str]] = []
+    for item in declarations:
+        capture_id = uuid.UUID(str(item["capture_ref"]))
+        capture = repository.capture(capture_id)
+        if capture is None or capture.deleted_at is not None:
+            raise PrivacyAdmissionError(f"masked scene member {capture_id} is absent or deleted")
+        remap.append(
+            {
+                "capture_ref": str(capture_id),
+                "source_sha256": capture.blob_id.hex,
+                "masked_source_sha256": str(item["content_sha256"]),
+            }
+        )
+    return remap
 
 
 def verify_masked_sources(

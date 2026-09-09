@@ -14,7 +14,7 @@ rebound. A purge looking for the masked derivative would leave the original on d
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 from exulanica.errors import PrivacyAdmissionError
@@ -22,6 +22,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.ingest.masked_inputs import (
     apply_masked_sources,
     masked_source_declarations,
+    masked_source_remap,
     verify_masked_sources,
 )
 from exulanica.ingest.spine.artifacts import CaptureArtifactRow
@@ -47,6 +48,7 @@ class FakeRepository:
 
     current: dict[uuid.UUID, CaptureArtifactRow]
     exact: dict[uuid.UUID, CaptureArtifactRow]
+    captures: dict[uuid.UUID, object] = field(default_factory=dict)
 
     def current_capture_artifacts(self, *, capture_ids, kind):
         assert kind == "masked_source"
@@ -55,6 +57,9 @@ class FakeRepository:
     def exact_capture_artifacts(self, *, artifact_ids_by_capture, kind):
         assert kind == "masked_source"
         return {c: r for c, r in self.exact.items() if c in artifact_ids_by_capture}
+
+    def capture(self, capture_id):
+        return self.captures.get(capture_id)
 
 
 @pytest.fixture(autouse=True)
@@ -213,3 +218,46 @@ def test_a_job_with_no_declaration_is_returned_unchanged():
     repository = FakeRepository(current={}, exact={})
     job = _job({"profile": "exulanica.reconstruction-scene-build-input/v1"})
     assert apply_masked_sources(repository, job) is job
+
+
+@dataclass
+class FakeCapture:
+    blob_id: BlobId
+    deleted_at: object = None
+
+
+def test_the_remap_names_the_photograph_each_derivative_replaced():
+    """Training's held-out split is declared over photographs; only derivatives are ever staged.
+
+    Derived from the declaration the caller already holds rather than from a second selection, so
+    a consent decision landing between the two passes cannot produce a map that names one
+    capture's mask beside another capture's original.
+    """
+    repository = FakeRepository(
+        current={CAPTURE_A: _row(CAPTURE_A, ARTIFACT_A, MASKED_A)},
+        exact={},
+        captures={CAPTURE_A: FakeCapture(ORIGINAL_A), CAPTURE_B: FakeCapture(ORIGINAL_B)},
+    )
+    declared = masked_source_declarations(repository, [CAPTURE_A, CAPTURE_B])
+    assert masked_source_remap(repository, declared) == [
+        {
+            "capture_ref": str(CAPTURE_A),
+            "source_sha256": ORIGINAL_A.hex,
+            "masked_source_sha256": MASKED_A.hex,
+        }
+    ]
+    assert masked_source_remap(repository, []) == []
+
+
+def test_a_withdrawn_masked_member_has_no_original_to_remap_onto():
+    """A tombstoned capture is not a photograph a split may still claim to be withholding."""
+    import datetime as dt
+
+    repository = FakeRepository(
+        current={CAPTURE_A: _row(CAPTURE_A, ARTIFACT_A, MASKED_A)},
+        exact={},
+        captures={CAPTURE_A: FakeCapture(ORIGINAL_A, dt.datetime(2026, 9, 9, tzinfo=dt.UTC))},
+    )
+    declared = masked_source_declarations(repository, [CAPTURE_A])
+    with pytest.raises(PrivacyAdmissionError, match="absent or deleted"):
+        masked_source_remap(repository, declared)

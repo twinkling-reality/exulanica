@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from exulanica.ingest.masked_inputs import masked_source_declarations
+from exulanica.ingest.masked_inputs import masked_source_declarations, masked_source_remap
 from exulanica.ingest.privacy import admit_reconstruction_scene
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_splat import SceneSplatRequest
@@ -108,14 +108,10 @@ def _enqueue_capture_set(
     )
     if admission.eligibility_state != "eligible":
         return None
+    # Raises rather than returning None when a member needs a mask and no current one exists, or
+    # when a declared one has gone stale: an unready scene is not the same thing as a scene whose
+    # privacy inputs and derivatives disagree, and only the second is worth an operator's attention.
     masked_sources = masked_source_declarations(repository, capture_ids)
-    if masked_sources and splat_training is not None:
-        # Refused rather than trained on originals. `SplatBuildManifest` requires the held-out
-        # hashes to be a subset of the source hashes, and those come from the pose frames, which
-        # under masking are the derivative digests; relaxing that without a digest map would make
-        # `load_dataset` match no held-out view and silently promote the whole held-out set into
-        # training. Pose, placement and the gate run fully masked; training waits for the remap.
-        return None
     build_inputs = {
         "profile": "exulanica.reconstruction-scene-build-input/v1",
         "point_maps": [
@@ -162,6 +158,16 @@ def _enqueue_capture_set(
             admitted_manifests.append(screening.authorization_scope.get("source_manifest"))
             source_hashes.append(screening.source_sha256.hex())
         splat_training.validate_admitted_sources(tuple(source_hashes), admitted_manifests)
+        # The split above is declared over the photographs an operator reviewed. A masked scene
+        # stages only derivatives, so the split has to be resolved onto them before it can mean
+        # anything -- and resolved here, from the same current selection `masked_sources` came
+        # from, so a consent decision cannot land between choosing a mask and recording which
+        # original it replaced. The frozen map is then what `manifest` checks against the pose
+        # frames and the runner checks against the staged bytes; the manifest's rule that held-out
+        # hashes are a subset of the training sources is left exactly as strict as it was.
+        splat_training = splat_training.bind_masked_sources(
+            masked_source_remap(repository, masked_sources), sources=tuple(source_hashes)
+        )
         build_inputs["splat_training"] = splat_training.as_payload()
     return repository.enqueue_reconstruction_scene(
         capture_ids=capture_ids,

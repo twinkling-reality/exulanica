@@ -159,6 +159,7 @@ def write_point_map(
     payload: bytes = b"not a real .opm",
     *,
     privacy_screening_id=None,
+    read_source_sha256=None,
 ):
     """Put a point-map artifact of ``blob_id`` in the store and the spine, and return its row.
 
@@ -217,6 +218,10 @@ def write_point_map(
         byte_size=stored.byte_size,
         produced_by_event=None,
         privacy_screening_id=privacy_screening_id,
+        # A member whose photograph is masked must name the derivative its depth was read from;
+        # migration 0040's trigger refuses the insert otherwise, and refuses a named mask on a
+        # capture that needs none. Defaulting to None keeps every existing caller byte-identical.
+        read_source_sha256=read_source_sha256,
     )
     return artifact_id_for(key), stored.blob_id
 
