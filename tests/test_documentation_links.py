@@ -29,6 +29,7 @@ throw away the signal. They are recorded in ``docs/engineering-log.md`` instead.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -76,8 +77,16 @@ _MD_LINK = re.compile(r"\]\(([A-Za-z0-9][A-Za-z0-9/._-]*\.md)(?:#[^)]*)?\)")
 
 
 def _text_files() -> list[Path]:
+    """Every tracked text file. Tracked, not present: the gitignored working areas hold private
+    notes that name documents which never existed in this tree, and a gate that failed on a
+    scratch directory nobody committed would be measuring the author's desk, not the repository.
+    MEASURED 2026-09-09: `.orimera/` named three such paths and failed the merged suite."""
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
+    ).stdout.decode()
     found = []
-    for path in ROOT.rglob("*"):
+    for relative in filter(None, listed.split("\0")):
+        path = ROOT / relative
         if any(part in _SKIP_DIRS for part in path.parts):
             continue
         # The artifact tree is large and holds captured logs rather than references.
