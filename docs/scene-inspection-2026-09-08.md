@@ -267,3 +267,261 @@ receipts for the bill.
 - The rendering row of the stage table is the weakest. A trained region's residency cost is flat
   across proxy, coarse and full, so there is no level of detail for trained geometry. The occupancy
   fix keeps the visitor's region drawn; it does not make a larger place affordable.
+
+# 2026-09-09: the volcanic scene, rendered
+
+Executed 2026-09-09 in the same worktree, on `codex/scene-inspection` at `4ec6ead`. No retained row
+was written, no blob was written, no worker was run, no card was rented and no model was called.
+The retained database is still at 0038.
+
+Since the section above, the orchestrator worked on `exulanica_inspect_test` only. The bowl was not
+re-screened: photographs 33, 34, 35 and 43 to 51 show a partial person, so the September 5
+"no visible people" attestation would be false for them, and the bowl's trained artifact stays
+withheld. The volcanic set was re-screened under policy v2 through the ordinary reference admit
+workflow, its 210 point maps were re-derived under v2, and a pose-only exact scene job was queued
+and run with local pycolmap. Scene `45ad50b7-aea4-52b4-b6f4-2811b93deb88` is now delivered as
+`posed_point_maps` with 210 registered and placed members and 210 recovered cameras, at rung 3.
+
+## What was run
+
+The API and the volcanic web instance were not running when this work started, so both were started
+against the copy through the `EXULANICA_REFERENCE_DATABASE_URL` override. They were SIGTERMed twice
+between tool calls and had to be restarted, so the later runs start their own pair and stop it again.
+
+`scripts/capture_atlas_evidence.mjs` still cannot drive this scene. Its rung selector at line 191
+requires a status summary containing `trained Gaussian`, and `status.ts:193-195` words a
+`posed_point_maps` scene as `posed point maps`. The script therefore captured the proof lens triple
+and then timed out waiting for an inspector that was never opened. Those three frames are retained
+under `artifacts/2026-09-09-scene-inspection-rendered/capture-atlas-evidence`. Everything after that
+point was driven by a separate driver, headed and headless, at 1280 by 720.
+
+## What the volcanic scene looks like
+
+**Delivery is proven for point maps at HEAD.** Both runs report 210 placed and 210 uploaded point
+maps, 19,493,182 points and 390,141,944 authenticated bytes, no console errors, and no loader
+issues. The status row reads "Recorded rung 3; showing rung 3 from posed point maps" and the proof
+lens colours the whole region `reconstructed`.
+
+Arrival puts the camera inside the cloud rather than in front of it. A large smooth blue-grey plane
+fills the lower right, pale ribbed sheets cross the upper half, dark grey streaks run in from the
+upper left, and a small warm tan cluster sits near the top edge. It reads as being inside a stack of
+shells, not as standing in a place.
+
+From the recovered cameras the subject is clear, and so is the problem. **The reconstruction is
+mostly backdrop.** From Source camera 1 the frame is dominated by a pale grey sheet, with the rock
+present only as a small dark reddish-brown cluster low and left of centre and a darker mass at the
+upper right. From Source camera 106 the sheet fills almost the entire frame and the rock is hard to
+pick out at all. From Source camera 210 the view is a dense grey speckle with no clear subject.
+This is the turned-over, two-backdrop capture showing up as geometry: the two backdrops were
+reconstructed as scene content, they occupy most of the points, and they are what the visitor
+mostly sees.
+
+Three artifacts are visible in every camera view:
+
+- **Corrugation.** The backdrop, which was a flat surface, is reconstructed as regular parallel
+  ridges. It is a systematic depth artifact over a low-texture white surface, not a property of
+  anything that was photographed.
+- **Holes and shells.** The cloud is a set of disconnected sheets with white gaps between them
+  rather than one closed surface. At arrival the gaps are wide enough to see straight through.
+- **Aliasing.** At the last camera the point size and spacing beat against the screen grid into a
+  moire, which is a rendering artifact of drawing 19.5 million discs, not of the reconstruction.
+
+The app says the rest itself. `geometry-api.ts:136` renders the gravity failure into the status
+line: "its recovered cameras do not agree on an up direction, so no upright is claimed." The
+inspector header says "Camera inspection · fitted relative scale · physical scale unverified. These
+views do not establish a walkable surface."
+
+## Traversal, the midpoint, and click to evidence
+
+The inspector offers 419 views for this scene: 210 recovered source cameras interleaved with 209
+interpolated midpoints. The traversal held fifteen seconds at each of Source camera 1, Source
+camera 106, Between cameras 106 and 107, and Source camera 210, for sixty seconds in total.
+
+The interpolated midpoint is the honest one. It labels itself "Midpoint between consecutive
+recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route",
+and when asked for evidence it refuses rather than approximating: "This is a midpoint between two
+photographs. No camera stood here, so there is no calibrated projection to invert. Choose either
+adjacent source camera."
+
+**Click to evidence does not work on this scene.** The observation graph never loads. Across 56
+clicks in each run the evidence panel only ever reported `loading` or `failed`, with the failure
+text "Unexpected end of JSON input". `observations-api.ts:15-26` explains why this is structural
+rather than a transient: the inspector requires the whole graph in a single response, because a page
+"would silently make clicks miss recorded evidence", and the bowl's whole graph is already a
+measured 97,633,587 canonical bytes for 15,005 points and 71,214 observations. This scene has
+111,694 points and 860,160 observations, and its pose receipt artifact alone is 108,267,697 bytes.
+The response is large enough that the browser aborts mid-parse. I did not fetch the endpoint
+directly to size the response, because building it could exhaust an 18 GB machine that had already
+swapped once that day.
+
+## Frame timing
+
+Sixty seconds idle after arrival, then the sixty second camera traversal, with the application's own
+`?validation=1` measurement over sixty seconds.
+
+| | headed Chrome | headless Chrome |
+| --- | ---: | ---: |
+| Mount, including the graph read | 54,948 ms | 57,217 ms |
+| First meaningful render | 54,796.2 ms | 57,037.9 ms |
+| Geometry load | 4,518.4 ms | 4,130.2 ms |
+| Frames measured | 515 | 477 |
+| Frame p50 / p95 / p99 | 9.5 / 350 / 366.8 ms | 16.8 / 350 / 366.8 ms |
+| Frames over 16.7 ms | 241 | 287 |
+| 1% low FPS | 2.73 | 2.73 |
+| Peak JS heap | 414.82 MB | 413.58 MB |
+| Console errors | none | none |
+
+Both machines drew the same scene at a 1% low of 2.73 fps. The earlier retained measurement of the
+same 210 point maps recorded 53.02 ms mean and a 6 fps 1% low on a quieter machine; a Companion task
+was running here throughout, and that difference is not attributable to anything in this branch.
+
+## The stub result
+
+`9c01b32` was reverted in the working tree and the idle hold was repeated headed, with the inspector
+closed, because inspection bypasses residency and would mask the effect. Four runs were made on the
+unfixed tree and one on the restored tree. Drawing was measured as a texture fraction over a fixed
+canvas box, calibrated on captures already taken: 0.063 with no reconstruction drawn, which is the
+withheld bowl from the day before, and 0.105 to 0.116 with the volcanic point maps drawn.
+
+| Run | Tree | Point maps loaded | Idle | rAF frames | 60-frame windows | Texture min to max |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `unfixed` | reverted | 210 | 120 s | 129 | 2 | flat |
+| `unfixed-long` | reverted | 210 | 600 s | 3,440 | 57 | two transient near-flat frames at 25 s and 40 s |
+| `unfixed-dense` | reverted | **0** | 420 s | 2,516 | 41 | 0.058 to 0.063, geometry never loaded |
+| `unfixed-1` | reverted | 210 | 300 s | 1,662 | 27 | 0.1065 to 0.1066 |
+| `fixed-1` | restored | 210 | 300 s | 1,405 | 23 | 0.1065 to 0.1066 |
+
+**The regression did not reproduce with real geometry drawn.** On the unfixed tree, with 210 point
+maps loaded and 27 sixty-frame windows elapsed against the six needed to reach level 3, the scene
+kept drawing for the whole five minutes, and the restored tree is indistinguishable from it. The
+`unfixed-dense` run is excluded: its geometry never loaded, so it says nothing about residency.
+
+The most likely reason, which I did not confirm, is frame rate. The controller counts frames, not
+seconds. The phase-10 bowl ran at roughly 33 fps, so the six windows that reach level 3 elapsed in
+about thirteen seconds and the level held. Here the same scene runs at a 1% low of 2.73 fps with p95
+frame times of 2.2 to 2.5 seconds, so the six windows take minutes, and each stub is followed by a
+fast recovery, because five healthy windows at a high frame rate pass quickly. The two transient
+near-flat frames in the 600 second run are consistent with exactly that oscillation, but they were
+measured with an earlier camera-dependent metric and were not photographed, so they are not claimed
+as the regression.
+
+The fix is kept, on the strength of the phase-10 record and of the focused tests that fail on the
+unfixed tree and pass on the fixed one. Nothing measured here argues against it, and the planner
+change it makes is still the correct semantics: a ceiling on what may be loaded is not a reason to
+release what is under the visitor.
+
+## The graph read, measured but not fixed
+
+`GET /graph` for the volcanic workspace was timed three times: **48,013 ms, 51,066 ms and 50,622 ms**
+for a 320,775 byte response. The dominant cost is not the 0041 asset-read guard.
+
+| Component | Time |
+| --- | ---: |
+| `read_snapshot` | 54,033 ms |
+| `scene_inputs`, buffering the pose manifest | 1,232 ms |
+| `scene_allowed` pass 1 | 124 ms |
+| `scene_allowed` pass 2 under `final_check` | 128 ms |
+| `asset_point_allows`, 210 calls | 132 ms |
+| `asset_screening_allows`, 210 calls | 77 ms |
+| `privacy_inputs_at`, 210 calls | 17 ms |
+| `asset_capture_live`, 210 calls | 16 ms |
+| `asset_artifact_live`, 3 calls | 1 ms |
+
+The whole asset-read policy, both passes included, is about 252 ms of a 50 second request, and every
+per-member predicate together is 242 ms. **No predicate is slow and no index is missing.**
+
+A profile of the route body names the cost exactly. `read_snapshot` calls
+`reconstruction_scene_rows` calls `_scene_row` calls `validate_placement_record` calls
+`build_placement_record`, which runs `fit_point_map_scale` 210 times and `validate_opm` 210 times.
+Under the profiler those are 78.2 s and 41.9 s cumulative, at 0.372 s and 0.199 s per call. The
+work is a pure-Python walk of all 19,493,182 points: 19.5 million `all()` calls and 78 million
+generator evaluations at `validation.py:268`, plus 60.9 million `min` and 58.5 million `max` calls.
+
+A control confirms it. The bowl workspace, whose geometry is withheld entirely, still takes
+**21,683 ms, 21,495 ms and 21,444 ms** for a 22,832 byte response over its 91 members. That is
+0.238 s per member against the volcanic scene's 0.241 s per member. The cost tracks member count and
+nothing else, and it is paid even when the answer is then stripped.
+
+### Proposed backend follow-up
+
+Not made here; every file involved is read-only for this branch.
+
+1. **Memoise the validated placement record.** `build_placement_record` and `validate_opm` are pure
+   functions of immutable, content-addressed bytes, and the route already holds the digests that key
+   them: the placement digest, the pose receipt digest, the member digest and each point map's
+   content digest. A process-level cache on that key removes the whole per-member cost from every
+   request after the first.
+2. **Do not build what will be stripped.** `_scene_row` builds the full placement record before
+   `scene_allowed` runs, so a scene whose geometry is withheld pays for placement anyway. Evaluating
+   the guard first would make the bowl's 21.5 seconds nearly free today.
+3. **Stop walking every point in Python.** `validate_opm`'s finiteness and bounds pass is O(points)
+   per call. Over an already digest-verified container it is repeat work, and where it must run it
+   belongs in a bulk operation rather than a per-point generator.
+
+`reconstruction_scene_rows` already carries a `scene_id` filter added for the World Read API for
+this exact reason; the graph snapshot passes `None` and so pays for every scene.
+
+**No index is needed and no migration reservation is needed.** There is no slow query here: the cost
+is in-process numeric work, and the digests the cache would key on already exist in the schema.
+Persisting a validated-placement marker in the database would need a migration, but the cheaper fix
+does not.
+
+## Two corrections
+
+Recorded as successor observations in
+[2026-09-09-scene-inspection-rendered.json](evaluation/2026-09-09-scene-inspection-rendered.json).
+Neither earlier record was edited.
+
+1. **The September 5 bowl screening statement is inaccurate for twelve photographs.**
+   `2026-09-05-real-reconstruction.json` records "I, Glendon Chin, looked at every one of the 51 bowl
+   and 210 volcanic photographs and found no visible people or sensitive person regions", reviewed at
+   2026-09-05T17:26:09Z. Photographs 33, 34, 35 and 43 to 51 of the bowl set show a partial person.
+   The volcanic half of that statement stands. The consequence is that **the retained bowl Gaussian
+   scene is not deliverable under current policy**: a v2 screening for those captures would have to
+   record the regions and their masks, and no such screening exists.
+2. **The measured pipeline bottleneck on this machine is feature extraction memory.** Attempt 1 of
+   scene job `c62ddc8b-7ae4-51fc-acaf-ca4932251a19` began extracting at 21:08:56 and reached file
+   199 of 210 at 22:13:08, 63.7 minutes later, at roughly 19 seconds per 12 megapixel image, before
+   it was SIGTERMed. The orchestrator observed the process footprint growing to about 20 GB with the
+   machine swapping at 17.5 of 18.4 GB. Attempt 2 resumed from the COLMAP database at 22:30:00,
+   skipped the 199 already-extracted images, and extracted the remaining eleven in 0.748 minutes,
+   matched in 7.416 minutes and mapped in 6.623 minutes, succeeding in 14.8 minutes total. **This
+   did not appear on the rented host**, which has 70 GiB of memory and 12 vCPUs against this
+   machine's 18.0 GB, and where the whole 210 photograph COLMAP run took about 45 minutes. The
+   durable COLMAP database is what made the restart cheap and should be treated as a required
+   property of any local run, not a convenience.
+
+## Stage diagnosis, updated
+
+Only the rows that changed. Everything else in the table above still holds.
+
+- **Delivery is now proven for point maps at HEAD.** 210 placed and uploaded maps, 19,493,182 points
+  and 390,141,944 authenticated bytes reach the browser through the 0041 guard and are drawn. The
+  guard is satisfied by a current-policy screening, which is what the volcanic re-screening supplied.
+- **Trained delivery at HEAD remains unproven**, because the only trained scene in the corpus is the
+  bowl, and the bowl is withheld. Nothing here changes that, and correction 1 makes it worse rather
+  than better: the withholding is now known to be correct rather than merely conservative.
+- **Rendering is the next limit after delivery.** 2.73 fps on an object scan is not a place. The
+  trained cost model is still flat across proxy, coarse and full, and point maps still cost enough
+  that a region either fits the budget or does not.
+- **Source coverage keeps its verdict, for a new reason.** The volcanic set now has 210 current-policy
+  screenings, but the scene it produces is mostly backdrop. A place still requires a capture that was
+  planned as a place.
+
+## Limitations
+
+- `capture_atlas_evidence.mjs` cannot inspect a `posed_point_maps` scene, so the inspector, camera
+  traversal and click-to-evidence captures come from a separate driver. The script is read-only here
+  and was not changed.
+- The stub regression neither reproduced nor was refuted on the unfixed tree with real geometry. The
+  frame-rate explanation above is reasoning from the controller's own window arithmetic, not a
+  measurement of the pressure level, which the app does not expose.
+- One unfixed run loaded no geometry at all and is excluded. Two others were lost to the API being
+  SIGTERMed between tool calls. A Companion task was running on the same machine throughout, so
+  every frame timing here is an upper bound.
+- Click to evidence could not be exercised at all, so nothing here tests the hit and miss answers on
+  this scene.
+- The observation-graph response was not fetched directly and its size is inferred from the scene's
+  point and observation counts and its 108,267,697 byte pose receipt.
+- The graph-read profile was taken under cProfile, which roughly doubles wall time; the per-call
+  figures are relative, and the unprofiled component timings above are the ones to quote.
