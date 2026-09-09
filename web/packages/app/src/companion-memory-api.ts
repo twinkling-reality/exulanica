@@ -462,3 +462,61 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
     citations,
   };
 }
+
+/**
+ * A remembered answer, in the shape the surface already knows how to draw.
+ *
+ * The inverse of `answerToRemember`, and it is deliberately lossy in one direction: the clause
+ * breakdown and the per-request citation tokens are NOT stored and are not reconstructed here.
+ *
+ * Tokens could not be reconstructed even in principle. Their namespaces are drawn fresh per
+ * request, so a token from the request that produced this answer resolves in no later one; the
+ * span is what was stored and the span is what `/evidence/{span}/masked` opens, which is the
+ * only thing a chip needs. The tokens minted below are local labels for the chips and are joined
+ * to nothing.
+ *
+ * The clause breakdown is a real loss and is stated rather than hidden. A restored answer is one
+ * `historical` clause carrying the whole sentence, because what was stored is the paragraph the
+ * person read. Storing the clauses would let the restored copy be re-validated later, which
+ * nothing does today; storing the paragraph is what makes the restored answer say exactly what
+ * the original said.
+ */
+export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer {
+  const evidence = remembered.citations.map((citation) => ({
+    token: `REMEMBERED-${citation.ordinal}`,
+    // The permalink is not stored, so a restored chip is addressed by span alone. Nothing joins
+    // on this value: `EvidenceCache` opens by handle.
+    uri: `exulanica://span/${citation.spanId}`,
+    handle: citation.spanId,
+    captureId: citation.captureId,
+    capturedAt: null,
+  }));
+  return {
+    question: remembered.question,
+    clauses: [
+      { text: remembered.answerText, type: 'historical', citations: evidence.map((e) => e.token) },
+    ],
+    text: remembered.answerText,
+    abstained: remembered.abstained,
+    deterministic: remembered.deterministic,
+    repaired: remembered.repaired,
+    evidence,
+    provenance: {
+      // A correction has no composing model, and a restored one must not borrow the model that
+      // wrote the sentence it replaced. `servedModel` null is what the provenance line reads as
+      // "no model wrote this", which is true of a correction and is the honest thing to show.
+      composed: remembered.servedModel === null ? 'none' : 'model',
+      servedModel: remembered.servedModel,
+      plannedBy: remembered.plannedBy,
+      latencyMs: remembered.latencyMs,
+      // Not stored, because it is a property of the request rather than of the answer, and a
+      // restored answer made no request. False is the honest default: it claims nothing.
+      usedFallback: false,
+    },
+    promptVersion: remembered.promptVersion,
+    // Empty, and this is the one that must not be faked. `calls` is the record of what was
+    // executed, and a restored answer executed nothing. An invented entry here would put a
+    // latency and a token count into the execution block for a call that never happened.
+    calls: [],
+  };
+}

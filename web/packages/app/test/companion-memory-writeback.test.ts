@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import { buildCompanionEncounter } from '../src/ui/companion-encounter.js';
+import { rememberedAsAnswer } from '../src/companion-memory-api.js';
 import { say } from '../src/ui/copy.js';
 import type { CompanionAnswer } from '../src/companion-ask-api.js';
 
@@ -173,5 +174,72 @@ describe('an answer that was not kept says so, under itself', () => {
     panel.noteMemoryFailure('memory.notKept.refused', 'no');
     panel.askStarted('and another question?');
     expect(panel.root.textContent ?? '').not.toContain(say('memory.notKept.refused'));
+  });
+});
+
+describe('an answer put back from memory is not a new answer', () => {
+  it('renders the remembered sentence and does not ask to store it again', () => {
+    // The failure this prevents is quiet and compounding: one stored row per page load of a
+    // conversation that happened once, each claiming a latency nobody waited for.
+    const told = vi.fn();
+    const panel = opened({ onAnswerShown: told });
+    panel.restoreAnswer(answer());
+    expect(panel.root.textContent).toContain('These photographs were taken on 2026-02-01.');
+    expect(panel.showingAnswer()).toBe(true);
+    expect(told).not.toHaveBeenCalled();
+    expect(panel.root.getAttribute('data-remembered')).toBe('true');
+  });
+
+  it('stops being marked as remembered once a live answer replaces it', () => {
+    const panel = opened();
+    panel.restoreAnswer(answer());
+    panel.showAnswer(answer({ text: 'A newer answer.' }));
+    expect(panel.root.getAttribute('data-remembered')).toBeNull();
+  });
+});
+
+describe('a restored answer keeps what was stored and invents nothing', () => {
+  const remembered = {
+    answerId: 'answer-1',
+    askedAtMs: Date.UTC(2026, 8, 9, 11, 0, 0),
+    question: 'When were these photographs taken?',
+    answerText: 'These photographs were taken on 2026-02-01.',
+    abstained: null,
+    deterministic: false,
+    repaired: false,
+    servedModel: 'nvidia/Nemotron-3_5-Lightning',
+    plannedBy: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+    promptVersion: 'selection-3',
+    latencyMs: 40_208,
+    origin: 'asked' as const,
+    supersedes: null,
+    correctionNote: null,
+    citations: [{ spanId: 'span-a', captureId: 'capture-a', ordinal: 0 }],
+  };
+
+  it('carries the sentence, the model and the citations, and claims no executed calls', () => {
+    const restored = rememberedAsAnswer(remembered);
+    expect(restored.text).toBe('These photographs were taken on 2026-02-01.');
+    expect(restored.provenance.servedModel).toBe('nvidia/Nemotron-3_5-Lightning');
+    expect(restored.evidence.map((e) => e.handle)).toEqual(['span-a']);
+    expect(restored.evidence.map((e) => e.captureId)).toEqual(['capture-a']);
+    // `calls` is the record of what was EXECUTED, and a restored answer executed nothing. An
+    // invented entry would put a latency and a token count behind a call that never happened.
+    expect(restored.calls).toEqual([]);
+    expect(restored.provenance.usedFallback).toBe(false);
+  });
+
+  it('names no model for a correction, because no model wrote one', () => {
+    const correction = rememberedAsAnswer({
+      ...remembered,
+      origin: 'correction' as const,
+      supersedes: 'answer-0',
+      servedModel: null,
+      answerText: 'No, the spring ones.',
+    });
+    expect(correction.provenance.servedModel).toBeNull();
+    // The provenance line reads this as "no model wrote this", which is exactly true of a
+    // sentence the person typed themselves.
+    expect(correction.provenance.composed).toBe('none');
   });
 });

@@ -15,7 +15,7 @@
 import type { CompanionSession, PersistedMemory, Turn } from '@exulanica/companion-runtime';
 import { companionAppearanceConfiguration } from '@exulanica/presentation';
 
-import { MemoryUnavailable } from '../companion-memory-api.js';
+import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
 import type { CompanionAnswer } from '../companion-ask-api.js';
@@ -126,6 +126,8 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
    * `memoryFromPersisted` does the fold using `recordEscape` itself, so the durable path and the
    * live path cannot drift apart into two versions of the same arithmetic.
    */
+  /** A remembered answer is put back once, on the first summon. See `summon`. */
+  let restored = false;
   const persisted = deps.persistedMemory ?? null;
   if (persisted !== null) {
     deps.engine.adoptPersistedMemory(persisted, Date.now());
@@ -243,6 +245,19 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     panel.setPlacement(placement);
     controller.summon(Date.now());
     reflectTurnState(controller.current());
+    /*
+     * The reload keeps the last answer, which is the visible half of all of this.
+     *
+     * Once per mount and only before this person has asked anything, so a remembered answer never
+     * draws over a live one and never comes back after they moved on. `restoreAnswer` rather than
+     * `showAnswer` on purpose: a restored answer is not a new answer, and storing it again on
+     * every summon would write one row per page load of a conversation that happened once.
+     */
+    if (!restored && controller.answer() === null) {
+      restored = true;
+      const last = deps.engine.lastAnswer;
+      if (last !== null) panel.restoreAnswer(rememberedAsAnswer(last));
+    }
     stage.show();
     deps.reflectShell();
   }

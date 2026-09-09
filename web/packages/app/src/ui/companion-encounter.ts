@@ -63,6 +63,19 @@ export interface CompanionEncounter {
    * panel nobody has open is a notice nobody reads; this one waits for the next summon and is
    * then drawn under whichever face is showing.
    */
+  /**
+   * Put back an answer this person was already given, from durable memory.
+   *
+   * Separate from `showAnswer` for one reason and it is not stylistic: `onAnswerShown` does NOT
+   * fire here. A restored answer is not a new answer, and a host that stored it again on every
+   * mount would write one row per page load of a conversation that happened once, each of them
+   * claiming a latency nobody waited for.
+   *
+   * Everything else is identical, deliberately. A remembered answer renders through the same
+   * band, cites through the same chips and opens through the same masked route, because it is
+   * the same answer.
+   */
+  restoreAnswer(answer: CompanionAnswer): void;
   noteMemoryFailure(reasonKey: string, detail: string): void;
   /**
    * What the panel is showing. `pressNumber` and `E` are routed by it.
@@ -280,11 +293,23 @@ export function buildCompanionEncounter(
       root.setAttribute('data-answering', 'asking');
       reflect();
     },
+    restoreAnswer(remembered) {
+      answer = remembered;
+      pendingFailure = null;
+      mode = 'answer';
+      root.setAttribute('data-answering', 'answered');
+      // Marked, so the surface and a test can both tell an answer that was just composed from
+      // one that was read back. Nothing styles it differently today; what it buys is that
+      // "is this a fresh answer" stops being a guess.
+      root.setAttribute('data-remembered', 'true');
+      reflect();
+    },
     showAnswer(shown) {
       answer = shown;
       pendingFailure = null;
       mode = 'answer';
       root.setAttribute('data-answering', 'answered');
+      root.removeAttribute('data-remembered');
       // Held rather than drawn when the Companion is away. The answer is not discarded: it is
       // what the person asked for, and summoning again shows it.
       reflect();
