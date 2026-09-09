@@ -5,29 +5,32 @@ import {
 } from '@exulanica/atlas-core';
 import { mountObjects, type MountedObjects, type ObjectsDependencies } from '../src/composition/objects.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
-import type { AuthoredWorldVersion, WorldObjectsClient } from '../src/world-objects-api.js';
+import type {
+  AlternateVersion, AuthoredObject, ReviewedAsset, WorldObjectsClient,
+} from '../src/world-objects-api.js';
 
 /**
  * The authored-object surface, against a scripted authority.
  *
- * The thing under test is the ORDER: nothing reaches the client until the confirmation surface
- * has been shown and confirmed. So the client here is a script that records every call, and the
+ * The thing under test is the ORDER: nothing reaches the client until the confirmation surface has
+ * been shown and confirmed. So the client here is a script that records every call, and the
  * assertion that matters most in this file is the one that counts zero of them.
  *
- * The renderer is a script too. What the surface owes the renderer is a transform and a control
- * call; what the renderer owes the surface is a refusal it can put on the screen. Neither needs a
- * GPU to be checked, and the container decoding that does is tested where it lives, in
+ * The renderer is a script too. What the surface owes the renderer is a region-local pose and a
+ * control call; what the renderer owes the surface is a refusal it can put on the screen. Neither
+ * needs a GPU, and the container decoding that does is tested where it lives, in
  * `atlas-react/test/scene-objects.test.ts`.
  */
 
-const REGION = islandId('region-volcanic');
-const SCENE = 'scene-volcanic-01';
+const REGION = islandId('region-a');
+const SCENE = 'scene-a';
+const STATE = 'a'.repeat(64);
 
 /**
  * The region an object stands in, built the way the scene graph builds one.
  *
- * A hand-written literal is not enough here: `footprintRadiusLocal` is what decides whether the
- * visitor is standing IN this region or merely nearest to it, and a fixture missing it made every
+ * A hand-written literal is not enough: `footprintRadiusLocal` is what decides whether the visitor
+ * is standing IN this region or merely nearest to it, and a fixture missing it made every
  * placement refuse. That is the same defect in miniature that the browser check found in the
  * product, so the fixture is built by the same function the application uses.
  */
@@ -43,79 +46,100 @@ const region = (footprintRadiusLocal = 20, awayBy = 0) => makeIsland({
   layoutEntities: new Set(),
 });
 
-const VERSION: AuthoredWorldVersion = Object.freeze({
-  worldVersionId: 'current',
-  basedOnWorldVersionId: null,
-  recordedSha256: 'a'.repeat(64),
-  objects: Object.freeze([]),
+const asset = (over: Partial<ReviewedAsset> = {}): ReviewedAsset => Object.freeze({
+  assetKey: 'cc0.marker-pillar',
+  title: 'Marker pillar',
+  summary: 'A square pillar.',
+  mediaType: 'model/gltf-binary',
+  contentSha256: 'b'.repeat(64),
+  byteSize: 784,
+  licenceId: 'CC0-1.0',
+  licenceSha256: 'c'.repeat(64),
+  availability: 'available',
+  ...over,
 });
 
-function asset(over: Record<string, unknown> = {}) {
-  return {
-    assetId: 'standing-lantern',
-    label: 'Standing lantern',
-    container: 'glb/2.0',
-    reference: Object.freeze({
-      href: '/world-objects/assets/standing-lantern/bytes',
-      contentSha256: 'b'.repeat(64),
-      byteSize: 128,
-    }),
-    origin: 'fictional-source' as const,
-    footprint: Object.freeze({ radius: 0.3, height: 1.6 }),
-    supportedBehaviours: Object.freeze(['motion.bounded']),
-    ...over,
-  };
-}
+const objectRecord = (over: Partial<AuthoredObject> = {}): AuthoredObject => Object.freeze({
+  objectId: 'object:lantern',
+  asset: asset(),
+  regionId: String(REGION),
+  transform: Object.freeze({
+    coordinateSpace: 'region_local',
+    coordinateUnit: 'millimetre',
+    xMm: 1200, yMm: 0, zMm: -450, yawMicroradians: 0, scaleMilli: 1000,
+  }),
+  origin: Object.freeze({ kind: 'authored', role: 'fictional' as const }),
+  behaviour: null,
+  removed: false,
+  ...over,
+});
 
-function objectRecord(over: Record<string, unknown> = {}) {
-  return {
-    objectId: 'obj-0001',
-    assetId: 'standing-lantern',
-    regionId: String(REGION),
-    sceneId: SCENE,
-    sceneFromObject: Object.freeze([1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 1, -3, 0, 0, 0, 1]),
-    origin: 'fictional-source' as const,
-    behaviour: null,
-    basedOnWorldVersionId: 'current',
-    recordedSha256: 'c'.repeat(64),
-    ...over,
-  };
-}
+const version = (over: Partial<AlternateVersion> = {}): AlternateVersion => Object.freeze({
+  schemaVersion: 1,
+  versionId: '6f1d2c40-0000-7000-8000-000000000001',
+  worldId: 'atlas:default',
+  sourceSnapshotId: '6f1d2c40-0000-7000-8000-000000000002',
+  parentVersionId: null,
+  title: 'Lantern study',
+  origin: 'authored',
+  styleVersionId: null,
+  stateSha256: STATE,
+  editSeq: 0,
+  sourceInvalidated: false,
+  createdBy: '6f1d2c40-0000-7000-8000-000000000003',
+  createdAt: '2026-09-09T12:00:00+00:00',
+  objects: Object.freeze([]),
+  elementOverrides: Object.freeze([]),
+  edits: Object.freeze([]),
+  ...over,
+});
+
+const edit = (editSeq: number, kind: string, over: Record<string, unknown> = {}) => Object.freeze({
+  editId: `edit-${editSeq}`,
+  editSeq,
+  kind,
+  objectId: 'object:lantern',
+  elementId: null,
+  undoneEditId: null,
+  baseStateSha256: STATE,
+  resultStateSha256: STATE,
+  actor: 'actor',
+  recordedAt: '2026-09-09T12:00:00+00:00',
+  ...over,
+});
 
 /** The renderer, scripted: it records what it was told to draw and answers what it refuses. */
 function runtime() {
-  const placed = new Map<string, { transform: readonly number[]; motion: string }>();
+  const placed = new Map<string, { pose: unknown; motion: string }>();
   return {
-    calls: [] as { name: string; args: unknown[] }[],
-    notices: [] as string[],
     get objectIds() { return [...placed.keys()]; },
     motionStateOf: (id: string) => placed.get(id)?.motion ?? null,
-    place: vi.fn(async (object: { objectId: string; behaviour: unknown }, bytes: ArrayBuffer, frame: unknown) => {
-      void bytes; void frame;
-      const behaviour = object.behaviour as { behaviourId: string } | null;
-      const supported = behaviour === null || behaviour.behaviourId === 'motion.bounded';
+    place: vi.fn(async (object: { objectId: string; behaviour: unknown; transform: unknown }) => {
+      const behaviour = object.behaviour as { behaviourKey: string; behaviourVersion: number } | null;
+      const supported = behaviour === null
+        || (behaviour.behaviourKey === 'motion.bounded-path' && behaviour.behaviourVersion === 1);
       placed.set(object.objectId, {
-        transform: (object as unknown as { sceneFromObjectRowMajor: readonly number[] }).sceneFromObjectRowMajor,
+        pose: object.transform,
         motion: behaviour === null ? 'none' : supported ? 'at-rest' : 'none',
       });
       return {
         objectId: object.objectId,
         motion: behaviour !== null && supported ? 'attached' as const : 'none' as const,
-        notices: supported ? [] : [`“${behaviour!.behaviourId}” is not a supported behaviour.`],
+        notices: supported ? [] : [`“${behaviour!.behaviourKey}@${behaviour!.behaviourVersion}” is not a behaviour this build can run.`],
       };
     }),
     remove: vi.fn((id: string) => placed.delete(id)),
-    setTransform: vi.fn((id: string, transform: readonly number[]) => {
+    setTransform: vi.fn((id: string, pose: unknown) => {
       const held = placed.get(id);
       if (held === undefined) return false;
-      placed.set(id, { ...held, transform });
+      placed.set(id, { ...held, pose });
       return true;
     }),
     control: vi.fn((id: string, action: string) => {
       const held = placed.get(id);
       if (held === undefined) return { ok: false as const, reason: 'That object is not in this world.' };
       if (held.motion === 'none') {
-        return { ok: false as const, reason: 'This object carries no supported motion, so there is nothing to run.' };
+        return { ok: false as const, reason: 'This object carries no motion this build can run, so there is nothing to start.' };
       }
       placed.set(id, {
         ...held,
@@ -123,12 +147,12 @@ function runtime() {
       });
       return { ok: true as const };
     }),
-    transformOf: (id: string) => placed.get(id)?.transform ?? null,
+    poseOf: (id: string) => placed.get(id)?.pose ?? null,
   };
 }
 
 /** The authority, scripted: it records every call and answers whatever the test queued. */
-function script(initial: AuthoredWorldVersion = VERSION) {
+function script(initial: AlternateVersion = version()) {
   const calls: { name: string; args: unknown[] }[] = [];
   let current = initial;
   let answer: unknown = null;
@@ -137,41 +161,36 @@ function script(initial: AuthoredWorldVersion = VERSION) {
     if (answer instanceof Error) { const thrown = answer; answer = null; throw thrown; }
     const queued = answer;
     answer = null;
-    return Promise.resolve(queued ?? {
-      kind: 'recorded',
-      receipt: {
-        objectId: 'obj-new', worldVersionId: 'current', basedOnWorldVersionId: 'current',
-        recordedSha256: 'd'.repeat(64), alreadyRecorded: false,
-      },
-    });
+    return Promise.resolve(queued ?? { kind: 'recorded', version: current });
   };
   return {
     calls,
-    setVersion(next: AuthoredWorldVersion) { current = next; },
     answerWith(next: unknown) { answer = next; },
     client: {
-      connect: vi.fn(async (id: string) => {
-        calls.push({ name: 'connect', args: [id] });
-        return { registry: { registryVersion: 1, assets: [asset()] }, version: current };
+      connect: vi.fn(async () => {
+        calls.push({ name: 'connect', args: [] });
+        return { assets: [asset()], version: current };
       }),
-      refreshObjects: vi.fn(async () => {
-        calls.push({ name: 'refreshObjects', args: [] });
-        return current;
-      }),
+      readVersion: vi.fn(async () => current),
       place: record('place'),
       move: record('move'),
-      setBehaviour: record('setBehaviour'),
       remove: record('remove'),
+      undo: record('undo'),
     } as unknown as WorldObjectsClient,
   };
 }
 
 function harness(
-  over: Partial<ObjectsDependencies> & { readonly noClient?: true; readonly footprint?: number; readonly awayBy?: number } = {},
+  over: Partial<ObjectsDependencies> & {
+    readonly noClient?: true;
+    readonly footprint?: number;
+    readonly awayBy?: number;
+    readonly initial?: AlternateVersion;
+  } = {},
   previewMode = false,
 ) {
   const objects = runtime();
-  const authority = script();
+  const authority = script(over.initial ?? version());
   const state = {
     atlas: {
       binding: {
@@ -199,7 +218,7 @@ function harness(
     isWorldPrimary: () => true,
     hideWritePathConfirm: vi.fn(),
     ...(over.noClient === true ? {} : { client: authority.client }),
-    loadBytes: async () => new ArrayBuffer(128),
+    loadBytes: async () => new ArrayBuffer(784),
     ...over,
   });
   document.body.append(mounted.panel.root, mounted.confirm.root);
@@ -208,7 +227,6 @@ function harness(
 
 const button = (root: HTMLElement, label: string): HTMLButtonElement => {
   const all = [...root.querySelectorAll('button')];
-  // Exact first: several controls are one word and must not match a row that merely starts with it.
   const found = all.find((node) => node.textContent === label)
     ?? all.find((node) => node.textContent?.startsWith(label) === true);
   if (found === undefined) throw new Error(`no “${label}” control in ${root.className}`);
@@ -216,8 +234,12 @@ const button = (root: HTMLElement, label: string): HTMLButtonElement => {
 };
 
 const writes = (calls: { name: string }[]): string[] =>
-  calls.filter((call) => ['place', 'move', 'remove', 'setBehaviour'].includes(call.name))
+  calls.filter((call) => ['place', 'move', 'remove', 'undo'].includes(call.name))
     .map((call) => call.name);
+
+const arrow = (code: string) => {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
+};
 
 async function place(h: ReturnType<typeof harness>, motion = false): Promise<void> {
   if (motion) {
@@ -239,33 +261,29 @@ describe('nothing reaches the authority without a confirmation', () => {
     await place(h);
     expect(h.mounted.confirm.root.hidden).toBe(false);
     expect(h.mounted.confirm.root.textContent).toContain('Before anything is written');
-    expect(h.mounted.confirm.root.textContent).toContain('Standing lantern');
-    // The whole point of this file.
+    expect(h.mounted.confirm.root.textContent).toContain('Marker pillar');
     expect(writes(h.authority.calls)).toEqual([]);
   });
 
-  it('sends the placement only once confirm is pressed, and re-reads afterwards', async () => {
+  it('sends the placement only once confirm is pressed, in the contract’s own fields', async () => {
     const h = harness();
     await h.mounted.begin();
     await place(h);
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
 
-    const call = h.authority.calls.find((entry) => entry.name === 'place')!;
-    const request = call.args[1] as Record<string, unknown>;
-    expect(request['assetId']).toBe('standing-lantern');
+    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>;
+    expect(request['assetSha256']).toBe('b'.repeat(64));
     expect(request['regionId']).toBe(String(REGION));
-    expect(request['sceneId']).toBe(SCENE);
+    expect(request['originRole']).toBe('fictional');
     expect(request['behaviour']).toBeNull();
-    expect(request['sceneFromObject']).toHaveLength(16);
-    // Placed on the region's ground, a step ahead of a visitor looking down display -Z.
-    const transform = request['sceneFromObject'] as number[];
-    expect(transform[7]).toBe(0);
-    expect(transform[11]).toBeCloseTo(-2.5, 6);
-    await vi.waitFor(() => {
-      expect(h.authority.calls.some((entry) => entry.name === 'refreshObjects')).toBe(true);
-      expect(h.mounted.confirm.root.hidden).toBe(true);
-    });
+    expect(String(request['objectId'])).toMatch(/^object-/);
+    // Region-local millimetres, a step ahead of a visitor looking down region -Z.
+    const pose = request['transform'] as Record<string, number>;
+    expect(pose['yMm']).toBe(0);
+    expect(pose['zMm']).toBeCloseTo(-2500, 0);
+    expect(pose['scaleMilli']).toBe(1000);
+    for (const value of Object.values(pose)) expect(Number.isSafeInteger(value)).toBe(true);
   });
 
   it('writes nothing when the confirmation is cancelled', async () => {
@@ -275,42 +293,43 @@ describe('nothing reaches the authority without a confirmation', () => {
     button(h.mounted.confirm.root, 'Cancel').click();
     expect(h.mounted.confirm.root.hidden).toBe(true);
     expect(writes(h.authority.calls)).toEqual([]);
-
-    // And a confirm pressed afterwards has nothing staged to send.
     await new Promise((resolve) => { setTimeout(resolve, 0); });
     expect(writes(h.authority.calls)).toEqual([]);
   });
 
-  it('carries the chosen motion through the confirmation into the request', async () => {
+  it('carries the chosen motion through in the reviewed parameter names and units', async () => {
     const h = harness();
     await h.mounted.begin();
     await place(h, true);
-    expect(h.mounted.confirm.root.textContent).toContain('moving up and down');
+    expect(h.mounted.confirm.root.textContent).toContain('travelling');
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
-    const request = h.authority.calls.find((entry) => entry.name === 'place')!.args[1] as Record<string, unknown>;
+    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>;
     expect(request['behaviour']).toEqual({
-      behaviourId: 'motion.bounded',
-      parameters: { axis: 'y', amplitude: 0.35, period: 4 },
+      behaviourKey: 'motion.bounded-path',
+      behaviourVersion: 1,
+      // The registry's own defaults, in the registry's own units.
+      parameters: { axis: 'x', easing: 'smooth', travel_mm: 1000, period_milliseconds: 4000 },
     });
   });
 
-  it('says a removal cannot be undone, because re-adding is a different object', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+  it('says a removal CAN be taken back, because the authority stores it rather than executing it', async () => {
+    const h = harness({ initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
     await h.mounted.begin();
     button(h.mounted.panel.root, 'Remove').click();
-    expect(h.mounted.confirm.root.textContent).toContain('This cannot be undone.');
-    expect(writes(authority.calls)).toEqual([]);
+    // The contract keeps the row with removed = true so undo restores the same identity. Saying
+    // "this cannot be undone" here would be the false reversibility claim confirm.ts warns about.
+    expect(h.mounted.confirm.root.textContent).toContain('reversible event');
+    expect(h.mounted.confirm.root.textContent).not.toContain('This cannot be undone');
+    expect(writes(h.authority.calls)).toEqual([]);
     button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(authority.calls)).toEqual(['remove']));
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['remove']));
   });
 
   it('reports a refused write in the confirmation surface and writes nothing more', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = harness({ initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
     await h.mounted.begin();
-    authority.answerWith(new Error('the authority refused'));
+    h.authority.answerWith(new Error('the authority refused'));
     button(h.mounted.panel.root, 'Remove').click();
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() =>
@@ -319,29 +338,43 @@ describe('nothing reaches the authority without a confirmation', () => {
   });
 
   it('treats a moved base as a refusal that re-reads, never as an overwrite', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = harness({ initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
     await h.mounted.begin();
-    authority.answerWith({ kind: 'stale', current: { ...VERSION, objects: [] } });
+    h.authority.answerWith({ kind: 'stale', current: version({ objects: [] }) });
     button(h.mounted.panel.root, 'Remove').click();
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() =>
       expect(h.mounted.panel.root.textContent).toContain('This world changed while you were deciding'));
-    expect(writes(authority.calls)).toEqual(['remove']);
-    expect(h.mounted.panel.root.textContent).toContain('nothing was written');
+    expect(writes(h.authority.calls)).toEqual(['remove']);
+  });
+
+  it('refuses to add to a version whose source was deleted, before staging anything', async () => {
+    const h = harness({ initial: version({ sourceInvalidated: true }) });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Place before me').click();
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(writes(h.authority.calls)).toEqual([]);
+    expect(h.mounted.panel.root.textContent).toContain('was deleted');
+  });
+
+  it('refuses an asset whose reviewed bytes are not in storage, and still lists it', async () => {
+    const unavailable = asset({ availability: 'unavailable_asset' });
+    const h = harness();
+    (h.authority.client as unknown as { connect: unknown }).connect = vi.fn(async () => ({
+      assets: [unavailable], version: version(),
+    }));
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    // Listed, named, and unselectable: a storage failure must not become a shorter menu.
+    expect(h.mounted.panel.root.textContent).toContain('Marker pillar');
+    expect(h.mounted.panel.root.textContent).toContain('unavailable_asset');
+    expect(button(h.mounted.panel.root, 'Place before me').disabled).toBe(true);
   });
 });
 
-/**
- * The two defects the browser check found, kept fixed.
- *
- * Both were invisible to every test that existed at the time, and both produced the same symptom:
- * the interface said the placement had worked and the visitor could see nothing.
- */
 describe('a placement that cannot land honestly is refused, not faked', () => {
   it('refuses when the visitor is not standing in a region with reconstructed ground', async () => {
-    // A region far across the world is still the NEAREST reconstructed region. Reaching it would
-    // drop the object onto THAT region's ground, out of sight, and report success.
     const h = harness({ footprint: 2, awayBy: 500 });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
@@ -366,15 +399,13 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
     button(h.mounted.panel.root, 'Place before me').click();
-    // The harness supplies no display frames, so every region falls back to the identity, whose
-    // y = 0 is the scene's arbitrary origin rather than a floor anyone is standing on.
     expect(h.mounted.confirm.root.textContent).toContain('standing at your feet');
     expect(h.mounted.confirm.root.textContent).toContain('no recovered cameras');
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
-    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>;
-    // The visitor's eye is at 1.6, so their feet are at 0, which is where it lands.
-    expect((request['sceneFromObject'] as number[])[7]).toBeCloseTo(0, 6);
+    const pose = (h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>)['transform'] as Record<string, number>;
+    // Eye at 1.6 m, so feet at 0 mm.
+    expect(pose['yMm']).toBe(0);
   });
 
   it('claims measured ground only when the frame was derived from cameras', async () => {
@@ -398,56 +429,55 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
 });
 
 describe('a nudge is shown at once and written once', () => {
-  const arrow = (code: string) => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
-  };
+  const withObject = () => harness({
+    initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }),
+  });
 
   it('moves the object in the world and sends nothing until it is saved', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = withObject();
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Standing lantern').click();
+    button(h.mounted.panel.root, 'Marker pillar').click();
 
     arrow('ArrowLeft');
     arrow('ArrowLeft');
     arrow('PageUp');
     expect(h.objects.setTransform).toHaveBeenCalledTimes(3);
-    expect(writes(authority.calls)).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
     expect(h.mounted.panel.root.textContent).toContain('Not saved yet');
 
     button(h.mounted.panel.root, 'Save this position').click();
-    expect(writes(authority.calls)).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
     button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(authority.calls)).toEqual(['move']));
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['move']));
 
-    const moved = authority.calls.find((call) => call.name === 'move')!.args[2] as number[];
-    expect(moved[3]).toBeCloseTo(2 - 0.5, 6);
-    expect(moved[7]).toBeCloseTo(0.25, 6);
+    const moved = h.authority.calls.find((c) => c.name === 'move')!.args[2] as Record<string, number>;
+    // Two quarter-metre steps left and one up, in whole millimetres.
+    expect(moved['xMm']).toBe(1200 - 500);
+    expect(moved['yMm']).toBe(250);
+    for (const value of Object.values(moved)) expect(Number.isSafeInteger(value)).toBe(true);
   });
 
   it('puts the object back where it is saved when the nudge is discarded', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = withObject();
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Standing lantern').click();
+    button(h.mounted.panel.root, 'Marker pillar').click();
     arrow('ArrowRight');
     button(h.mounted.panel.root, 'Put it back').click();
-    expect(writes(authority.calls)).toEqual([]);
-    expect(h.objects.transformOf('obj-0001')).toEqual(objectRecord().sceneFromObject);
+    expect(writes(h.authority.calls)).toEqual([]);
+    expect(h.objects.poseOf('object:lantern')).toMatchObject({ xMm: 1200, yMm: 0, zMm: -450 });
     expect(h.mounted.panel.root.textContent).not.toContain('Not saved yet');
   });
 
   it('ignores the arrow keys while the surface is closed or something is being typed into', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = withObject();
     await h.mounted.begin();
     arrow('ArrowLeft');
     expect(h.objects.setTransform).not.toHaveBeenCalled();
 
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Standing lantern').click();
+    button(h.mounted.panel.root, 'Marker pillar').click();
     const input = document.createElement('input');
     document.body.append(input);
     input.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
@@ -455,8 +485,7 @@ describe('a nudge is shown at once and written once', () => {
   });
 
   it('asks for a selection rather than moving nothing', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = withObject();
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
     arrow('ArrowLeft');
@@ -475,63 +504,124 @@ describe('a nudge is shown at once and written once', () => {
   });
 });
 
+describe('undo is the authority’s, not this surface’s memory of one', () => {
+  it('offers nothing to take back on a version with no edits', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+  });
+
+  it('offers the newest edit no undo already names, and sends undo once confirmed', async () => {
+    const h = harness({
+      initial: version({
+        objects: [objectRecord()],
+        editSeq: 3,
+        edits: [
+          edit(1, 'add_object'),
+          edit(2, 'move_object'),
+          edit(3, 'undo', { editId: 'edit-3', undoneEditId: 'edit-2' }),
+        ],
+      }),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    const undo = button(h.mounted.panel.root, 'Take back the last change');
+    expect(undo.disabled).toBe(false);
+    undo.click();
+    // Edit 2 is already named by the undo at 3, and 3 is itself an undo, so 1 is next.
+    expect(h.mounted.confirm.root.textContent).toContain('an object you added');
+    expect(writes(h.authority.calls)).toEqual([]);
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['undo']));
+  });
+
+  it('disables the control when every edit has already been taken back', async () => {
+    const h = harness({
+      initial: version({
+        edits: [edit(1, 'add_object'), edit(2, 'undo', { editId: 'edit-2', undoneEditId: 'edit-1' })],
+      }),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+  });
+});
+
+describe('a removed object is kept by the authority and not drawn', () => {
+  it('draws only what is not removed, and lists only that', async () => {
+    const h = harness({
+      initial: version({
+        objects: [objectRecord(), objectRecord({ objectId: 'object:plinth', removed: true })],
+        edits: [edit(1, 'add_object')],
+      }),
+    });
+    await h.mounted.begin();
+    expect(h.objects.objectIds).toEqual(['object:lantern']);
+    expect(h.mounted.panel.root.textContent).toContain('Marker pillar');
+    expect(h.mounted.panel.root.querySelectorAll('.object-placement-item')).toHaveLength(1);
+  });
+});
+
 describe('running a motion writes nothing, and a refusal is visible', () => {
   it('triggers, stops and resets through the renderer alone', async () => {
-    const authority = script({
-      ...VERSION,
-      objects: [objectRecord({
-        behaviour: { behaviourId: 'motion.bounded', parameters: { axis: 'y', amplitude: 1, period: 4 } },
-      })],
+    const h = harness({
+      initial: version({
+        objects: [objectRecord({
+          behaviour: {
+            behaviourKey: 'motion.bounded-path',
+            behaviourVersion: 1,
+            parameters: { axis: 'y', easing: 'smooth', travel_mm: 1000, period_milliseconds: 4000 },
+          },
+        })],
+        edits: [edit(1, 'add_object')],
+      }),
     });
-    const h = harness({ client: authority.client });
     await h.mounted.begin();
 
     for (const [label, expected] of [
       ['Start', 'running'], ['Stop', 'held'], ['Reset', 'at-rest'],
     ] as const) {
       button(h.mounted.panel.root, label).click();
-      expect(h.objects.motionStateOf('obj-0001')).toBe(expected);
+      expect(h.objects.motionStateOf('object:lantern')).toBe(expected);
     }
-    expect(writes(authority.calls)).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
     expect(h.mounted.confirm.root.hidden).toBe(true);
     expect(h.mounted.panel.root.textContent).toContain('Back exactly where it was placed');
   });
 
-  it('says why an unsupported behaviour did not run, on the object and on the status line', async () => {
-    const authority = script({
-      ...VERSION,
-      objects: [objectRecord({ behaviour: { behaviourId: 'motion.orbit', parameters: {} } })],
+  it('says why a behaviour this build cannot run did not start, and keeps saying it', async () => {
+    const h = harness({
+      initial: version({
+        objects: [objectRecord({
+          behaviour: { behaviourKey: 'motion.orbit', behaviourVersion: 1, parameters: {} },
+        })],
+        edits: [edit(1, 'add_object')],
+      }),
     });
-    const h = harness({ client: authority.client });
     await h.mounted.begin();
-    // Refused at placement, and the refusal stays on the object rather than scrolling away.
-    expect(h.mounted.panel.root.textContent).toContain('motion.orbit');
-    expect(h.travel.some((entry) => entry.message.includes('motion.orbit') && entry.kind === 'failure'))
-      .toBe(true);
-    expect(h.mounted.panel.root.textContent).toContain('motion not supported here');
-
-    // And refused again when a person actually presses something.
-    const start = button(h.mounted.panel.root, 'Start');
-    expect(start.disabled).toBe(true);
+    expect(h.mounted.panel.root.textContent).toContain('motion.orbit@1');
+    expect(h.travel.some((e) => e.message.includes('motion.orbit') && e.kind === 'failure')).toBe(true);
+    expect(h.mounted.panel.root.textContent).toContain('motion this build cannot run');
+    expect(button(h.mounted.panel.root, 'Start').disabled).toBe(true);
   });
 
   it('reports an object whose bytes could not be verified without losing the rest', async () => {
-    const authority = script({
-      ...VERSION,
-      objects: [objectRecord(), objectRecord({ objectId: 'obj-0002' })],
-    });
     let first = true;
     const h = harness({
-      client: authority.client,
+      initial: version({
+        objects: [objectRecord(), objectRecord({ objectId: 'object:plinth' })],
+        edits: [edit(1, 'add_object')],
+      }),
       loadBytes: async () => {
         if (first) { first = false; throw new Error('asset SHA-256 does not match'); }
-        return new ArrayBuffer(128);
+        return new ArrayBuffer(784);
       },
     });
     await h.mounted.begin();
-    expect(h.travel.some((entry) => entry.message.includes('SHA-256'))).toBe(true);
+    expect(h.travel.some((e) => e.message.includes('SHA-256'))).toBe(true);
     // The second object is still drawn: one failed asset is not a failed world.
-    expect(h.objects.objectIds).toEqual(['obj-0002']);
+    expect(h.objects.objectIds).toEqual(['object:plinth']);
     expect(h.mounted.panel.root.textContent).toContain('SHA-256');
   });
 });
@@ -552,11 +642,12 @@ describe('the development preview draws and never sends', () => {
 
 describe('teardown', () => {
   it('stops listening for keys once disposed', async () => {
-    const authority = script({ ...VERSION, objects: [objectRecord()] });
-    const h = harness({ client: authority.client });
+    const h = harness({
+      initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }),
+    });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Standing lantern').click();
+    button(h.mounted.panel.root, 'Marker pillar').click();
     (h.mounted as MountedObjects).dispose();
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
     expect(h.objects.setTransform).not.toHaveBeenCalled();

@@ -1,45 +1,50 @@
 /**
- * Authored objects: the surface that places one, moves it, runs it, and takes it away again.
+ * Authored objects: the surface that places one, moves it, runs it, takes it away, and undoes it.
  *
  * This is product-direction.md's first milestone rows 3 and 4 assembled out of parts that each
- * refuse to do the others' job. The panel in `ui/object-placement.ts` builds elements and holds
- * no client. `world-objects-api.ts` speaks to the authority and knows nothing about a renderer.
- * `atlas-react`'s `SceneObjectRuntime` draws and animates and cannot write. This module is the
- * one place that knows all three exist, which is the same shape every other surface in
+ * refuse to do the others' job. The panel in `ui/object-placement.ts` builds elements and holds no
+ * client. `world-objects-api.ts` speaks to the `/world/versions` plane and knows nothing about a
+ * renderer. `atlas-react`'s `SceneObjectRuntime` draws and animates and cannot write. This module
+ * is the one place that knows all three exist, which is the shape every other surface in
  * `composition/` has.
  *
- * **Every write goes through the confirmation surface.** Placing, moving and removing all stop at
- * `confirm.show(...)` and are sent only from the panel's own confirm handler. That is the
+ * **Every write goes through the confirmation surface.** Placing, moving, removing and undoing all
+ * stop at `confirm.show(...)` and are sent only from the panel's own confirm handler. That is the
  * invariant `write-path.ts` states for the graph, held here for a different authority.
  *
  * **This surface builds its OWN confirmation panel, and that is deliberate.** `write-path.ts`
- * binds its panel's `onConfirm` to `session.commit`, which is the graph's mutation gate; an object
- * write is not a graph proposal and routing it through that panel would call the wrong authority
- * with an id it never staged. `buildConfirm` is a factory and the confirmation surface is
- * specified as ONE COMPONENT WITH TWO MOUNT POINTS (interaction-model.md 5.2), so a second
- * instance of the same component is the mechanically honest reading of "through the existing
- * confirmation surface". The two are never open at once: this one hides the write path's before
- * showing itself, so exactly one `#confirm-title` is ever in the document.
+ * binds its panel's `onConfirm` to `session.commit`, the graph's mutation gate; an object write is
+ * not a graph proposal and routing it through that panel would call the wrong authority with an id
+ * it never staged. `buildConfirm` is a factory and the confirmation surface is specified as ONE
+ * COMPONENT WITH TWO MOUNT POINTS (interaction-model.md 5.2), so a second instance of the same
+ * component is the mechanically honest reading of "through the existing confirmation surface". The
+ * two are never open at once: this one hides the write path's before showing itself, so exactly
+ * one `#confirm-title` is ever in the document.
+ *
+ * **Removal is reversible, and the panel says so, because the contract made it so.** A removal is
+ * stored rather than executed: the row survives with `removed: true`, and undo "restores it rather
+ * than resurrecting a new identity". An earlier draft of this file told people a removal could not
+ * be undone, which was written against a guessed contract and would now be a false reversibility
+ * claim in the one place `confirm.ts` says it is least acceptable to be wrong.
  *
  * **A nudge is not a write until it is saved.** The arrow keys move the object in the world
  * immediately, because a move nobody can see is a move nobody can judge, and they send nothing.
- * The accumulated position goes through the confirmation surface once, on a control that says so.
+ * The accumulated pose goes through the confirmation surface once, on a control that says so.
  * Confirming each keystroke would either make the interaction unusable or make the confirmation
  * meaningless, and the second failure is the worse one.
  *
- * **Trigger, stop and reset write nothing at all.** They are runtime state, and running is not a
- * property of a world. `docs/world-objects-contract.md` says so explicitly, and the object reopens
- * at the transform its author placed, at rest.
+ * **Trigger, stop and reset write nothing at all.** The contract is explicit that they are "the
+ * runtime's contract, not a stored parameter", so an object reopens at the transform its author
+ * placed, at rest.
  *
  * **Preview draws but never sends.** `?preview=1` has no authority behind it, so the surface uses
- * a small built-in catalogue and says, every time, that what it drew was not saved. The
- * alternative was to disable the surface in preview, which would have made the one path available
- * for looking at this work the one path that cannot show it.
+ * a small built-in catalogue and says, every time, that what it drew was not saved.
  */
 
 import {
   BEHAVIOUR_REGISTRY,
-  BOUNDED_MOTION_ID,
+  BOUNDED_PATH_KEY,
+  BOUNDED_PATH_VERSION,
   DISPLAY_EYE_HEIGHT,
   identityDisplayFrame,
   type AtlasScene,
@@ -50,16 +55,16 @@ import {
 import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
-  AUTHORED_OBJECT_CONTAINER,
-  DEFAULT_PLACEMENT_DISTANCE,
-  displayPointFromAtlas,
-  displayPoseOfObject,
+  AUTHORED_OBJECT_MEDIA_TYPE,
+  DEFAULT_PLACEMENT_DISTANCE_MM,
+  MM_PER_METRE,
   fetchVerifiedObjectAsset,
-  objectTransformForDisplayPose,
+  nudgedPose,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
-  type DisplayPose,
+  regionPointFromAtlas,
   type PlacedAuthoredObject,
+  type RegionPose,
 } from '@exulanica/atlas-react/playcanvas';
 
 import { buildConfirm, type ConfirmPanel } from '../ui/confirm.js';
@@ -72,28 +77,19 @@ import {
   type PlacedObjectRow,
 } from '../ui/object-placement.js';
 import {
-  OBJECT_ORIGINS,
-  OBJECT_ORIGIN_LABELS,
+  OBJECT_ROLES,
+  OBJECT_ROLE_LABELS,
   WorldObjectsClient,
   objectWriteFailure,
-  type AuthoredObjectRecord,
-  type AuthoredWorldVersion,
-  type ObjectOrigin,
-  type ReviewedObjectAsset,
+  type AlternateVersion,
+  type AuthoredObject,
+  type ObjectRole,
+  type ReviewedAsset,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
-/**
- * The world version an edit is made against, when nothing else names one.
- *
- * `docs/world-objects-contract.md` reserves `current` as the alias for the workspace's current
- * authored version. There is no version picker in this build and inventing one would be a second
- * milestone; naming the alias in one constant means the picker, when it arrives, is one edit.
- */
-export const CURRENT_WORLD_VERSION = 'current';
-
-/** How far one arrow key moves an object, in region display units. */
-const NUDGE_STEP = 0.25;
+/** How far one arrow key moves an object, in millimetres. A quarter of a step. */
+const NUDGE_STEP_MM = 250;
 /** How far one bracket key turns it, in radians. */
 const TURN_STEP = Math.PI / 12;
 
@@ -111,13 +107,12 @@ export interface ObjectsDependencies {
   /** Injectable for tests. Production builds the real authority client. */
   readonly client?: WorldObjectsClient;
   /** Injectable for tests. Production fetches the verified container bytes. */
-  readonly loadBytes?: (asset: ReviewedObjectAsset, islandId: IslandId) => Promise<ArrayBuffer>;
+  readonly loadBytes?: (asset: ReviewedAsset, islandId: IslandId) => Promise<ArrayBuffer>;
 }
 
 export interface MountedObjects {
   readonly panel: ObjectPlacementPanel;
   readonly confirm: ConfirmPanel;
-  /** Open or close the surface. Bound to a key in `main.ts`. */
   toggle(): void;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
   begin(): Promise<void>;
@@ -125,7 +120,7 @@ export interface MountedObjects {
 }
 
 interface Pending {
-  readonly kind: 'place' | 'move' | 'remove';
+  readonly kind: 'place' | 'move' | 'remove' | 'undo';
   readonly describe: string;
   readonly reversible: boolean;
   run(): Promise<void>;
@@ -134,40 +129,56 @@ interface Pending {
 export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   const { env, state } = deps;
   const listeners = new AbortController();
-  const definition = BEHAVIOUR_REGISTRY.resolve(BOUNDED_MOTION_ID);
+  const definition = BEHAVIOUR_REGISTRY.resolve(BOUNDED_PATH_KEY, BOUNDED_PATH_VERSION);
 
-  const client = deps.client
-    ?? (env.preview ? null : new WorldObjectsClient(deps.credentials));
+  const client = deps.client ?? (env.preview ? null : new WorldObjectsClient(deps.credentials));
 
-  let assets: readonly ReviewedObjectAsset[] = Object.freeze([]);
-  let version: AuthoredWorldVersion | null = null;
+  let assets: readonly ReviewedAsset[] = Object.freeze([]);
+  let version: AlternateVersion | null = null;
   let selectedId: string | null = null;
   /** Where the selected object is right now, uncommitted. Null when it is where it is saved. */
-  let nudged: DisplayPose | null = null;
+  let nudged: RegionPose | null = null;
   let pending: Pending | null = null;
   let issued = 0;
   /** Refusals and clamps the runtime reported, by object, so a row can keep showing them. */
   const notices = new Map<string, string>();
   /** Objects the preview drew for this session only. Never sent anywhere. */
-  const drawnInPreview: AuthoredObjectRecord[] = [];
+  const drawnInPreview: AuthoredObject[] = [];
 
   const confirm = buildConfirm({
     onConfirm: () => void commit(),
     onCancel: () => { pending = null; confirm.hide(); },
   });
 
+  const integerParameter = (name: string): { min: number; max: number; fallback: number } => {
+    const descriptor = definition.ok ? definition.definition.parameters[name] : undefined;
+    return descriptor !== undefined && descriptor.kind === 'integer'
+      ? { min: descriptor.minimum, max: descriptor.maximum, fallback: descriptor.default }
+      : { min: 0, max: 1, fallback: 0 };
+  };
+  const choiceParameter = (name: string): { choices: readonly string[]; fallback: string } => {
+    const descriptor = definition.ok ? definition.definition.parameters[name] : undefined;
+    return descriptor !== undefined && descriptor.kind === 'choice'
+      ? { choices: descriptor.choices, fallback: descriptor.default }
+      : { choices: [], fallback: '' };
+  };
+
   const panel = buildObjectPlacement({
     onPlace: (draft) => proposePlacement(draft),
     onSelect: (objectId) => select(objectId),
     onControl: (objectId, action) => control(objectId, action),
     onRemove: (objectId) => proposeRemoval(objectId),
+    onUndo: () => proposeUndo(),
     onSaveMove: () => proposeMove(),
     onDiscardMove: () => discardMove(),
     onClose: () => panel.setVisible(false),
   }, {
-    axes: definition.ok ? [...definition.definition.axes] as MotionAxisKey[] : ['y'],
-    amplitude: definition.ok ? definition.definition.ranges.amplitude : { min: 0, max: 1, fallback: 0.35 },
-    period: definition.ok ? definition.definition.ranges.period : { min: 0.5, max: 20, fallback: 4 },
+    axes: choiceParameter('axis').choices as readonly MotionAxisKey[],
+    axisFallback: choiceParameter('axis').fallback as MotionAxisKey,
+    easings: choiceParameter('easing').choices,
+    easingFallback: choiceParameter('easing').fallback,
+    travelMm: integerParameter('travel_mm'),
+    periodMilliseconds: integerParameter('period_milliseconds'),
   });
 
   // -- reading -----------------------------------------------------------------------------------
@@ -184,10 +195,18 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       return;
     }
     try {
-      const connected = await client.connect(CURRENT_WORLD_VERSION);
-      assets = connected.registry.assets;
+      const connected = await client.connect();
+      assets = connected.assets;
       version = connected.version;
       refresh();
+      if (version === null) {
+        panel.report(
+          'This world has no alternate version yet, so there is nowhere to add an object. '
+          + 'Create one first.',
+          'failure',
+        );
+        return;
+      }
       await drawEvery();
       deps.showTravelStatus('Press P to add an object to this world.');
     } catch (error) {
@@ -202,7 +221,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   async function drawEvery(): Promise<void> {
     const runtime = state.atlas?.binding.objects;
     if (runtime === undefined || version === null) return;
-    for (const record of version.objects) {
+    for (const record of visibleObjects()) {
       const failure = await draw(record);
       if (failure !== null) {
         notices.set(record.objectId, failure);
@@ -213,40 +232,38 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   /** Load one object's verified bytes and place it. Returns the reason it could not be drawn. */
-  async function draw(record: AuthoredObjectRecord): Promise<string | null> {
+  async function draw(record: AuthoredObject): Promise<string | null> {
     const runtime = state.atlas?.binding.objects;
     if (runtime === undefined) return 'The world is not drawn yet.';
-    const asset = assets.find((candidate) => candidate.assetId === record.assetId);
-    if (asset === undefined) return `“${record.assetId}” is not in the reviewed registry.`;
-    // The preview has no authority and therefore no stored bytes; it draws its own container.
-    // Everywhere else a null reference is exactly what an unavailable asset looks like.
-    if (asset.reference === null && !env.preview) {
-      return `The file for “${asset.label}” is not in storage, so it cannot be drawn.`;
+    // The contract embeds the whole registry row on the object, so availability is already here.
+    if (record.asset.availability !== 'available' && !env.preview) {
+      return `The reviewed bytes for “${record.asset.title}” are not in storage `
+        + `(${record.asset.availability}), so it cannot be drawn.`;
     }
     const island = regionOf(record.regionId);
     if (island === null) return 'That object names a region this world does not draw.';
     try {
-      const bytes = await loadBytes(asset, island.islandId);
+      const bytes = await loadBytes(record.asset, island.islandId);
       const placed: PlacedAuthoredObject = {
         objectId: record.objectId,
         islandId: island.islandId,
-        sceneId: record.sceneId,
         asset: {
-          assetId: asset.assetId,
-          container: AUTHORED_OBJECT_CONTAINER,
-          path: asset.reference?.href ?? `/world-objects/assets/${asset.assetId}/bytes`,
-          contentSha256: asset.reference?.contentSha256 ?? '0'.repeat(64),
-          byteSize: asset.reference?.byteSize ?? 0,
+          assetKey: record.asset.assetKey,
+          mediaType: record.asset.mediaType,
+          contentSha256: record.asset.contentSha256,
+          byteSize: record.asset.byteSize,
         },
-        sceneFromObjectRowMajor: record.sceneFromObject,
+        transform: poseOf(record),
         behaviour: record.behaviour === null ? null : {
-          behaviourId: record.behaviour.behaviourId,
+          behaviourKey: record.behaviour.behaviourKey,
+          behaviourVersion: record.behaviour.behaviourVersion,
           parameters: record.behaviour.parameters,
         },
       };
-      const outcome = await runtime.place(placed, bytes, frameFor(record.sceneId));
-      // An unsupported behaviour and a clamped parameter are both refusals the visitor is owed.
-      // They are kept on the object rather than only announced, because the status line moves on.
+      const outcome = await runtime.place(placed, bytes);
+      // A behaviour this build cannot run and a clamped parameter are both refusals the visitor is
+      // owed. They stay on the object rather than only being announced, because the status line
+      // moves on and the object stays.
       if (outcome.notices.length > 0) {
         const said = outcome.notices.join(' ');
         notices.set(record.objectId, said);
@@ -260,25 +277,29 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
   }
 
-  function loadBytes(asset: ReviewedObjectAsset, islandId: IslandId): Promise<ArrayBuffer> {
+  function loadBytes(asset: ReviewedAsset, islandId: IslandId): Promise<ArrayBuffer> {
     if (deps.loadBytes !== undefined) return deps.loadBytes(asset, islandId);
     if (env.preview) return Promise.resolve(previewContainer());
-    if (asset.reference === null) {
-      return Promise.reject(new TypeError('That asset has no bytes in storage.'));
-    }
     return fetchVerifiedObjectAsset(
       islandId,
       {
-        assetId: asset.assetId,
-        container: AUTHORED_OBJECT_CONTAINER,
-        path: asset.reference.href,
-        contentSha256: asset.reference.contentSha256,
-        byteSize: asset.reference.byteSize,
+        assetKey: asset.assetKey,
+        mediaType: asset.mediaType,
+        contentSha256: asset.contentSha256,
+        byteSize: asset.byteSize,
       },
       listeners.signal,
       { baseUrl: deps.credentials.baseUrl, token: deps.credentials.token },
     );
   }
+
+  const poseOf = (record: AuthoredObject): RegionPose => Object.freeze({
+    xMm: record.transform.xMm,
+    yMm: record.transform.yMm,
+    zMm: record.transform.zMm,
+    yawMicroradians: record.transform.yawMicroradians,
+    scaleMilli: record.transform.scaleMilli,
+  });
 
   // -- where an object goes ------------------------------------------------------------------------
 
@@ -286,17 +307,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * The region an object is placed in: the one the visitor is STANDING IN, or none.
    *
    * Nearest by ground-plane distance among the regions that actually draw reconstructed geometry,
-   * because an object placed in a region with nothing in it would stand on an absent floor. This
-   * reads an atlas position as a position, which is only legitimate inside a presentation
-   * decision; it decides where a made thing is DRAWN and answers nothing about the captured world.
+   * because an object placed in a region with nothing in it would stand on an absent floor.
    *
-   * NEAREST IS NOT ENOUGH, and the browser check is what proved it. A visitor standing in a
-   * region with no reconstruction still has a nearest reconstructed region, on the other side of
-   * the world. Placing there converts their position into that region's frame and drops the
-   * object onto THAT region's ground, so it lands at a height they are not standing at and
-   * disappears the moment the distant region falls back to a stub. The person sees nothing and is
-   * told the placement succeeded, which is the worst of the available outcomes. So a placement
-   * outside the region's own footprint is refused, and the refusal says what to do instead.
+   * NEAREST IS NOT ENOUGH, and the browser check is what proved it. A visitor standing in a region
+   * with no reconstruction still has a nearest reconstructed region, on the other side of the
+   * world. Placing there converts their position into that region's frame and drops the object
+   * onto THAT region's ground, so it lands at a height they are not standing at and disappears the
+   * moment the distant region falls back to a stub. The person sees nothing and is told the
+   * placement succeeded, which is the worst of the available outcomes.
    */
   function placementRegion(): { readonly island: Island; readonly sceneId: string } | null {
     const drawn = drawnRegions();
@@ -310,7 +328,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         candidate.island.placement.position.x - pose.position.x,
         candidate.island.placement.position.z - pose.position.z,
       );
-      // The region's own extent, in atlas units, with room to stand at its edge and place inward.
       const reach = candidate.island.footprintRadiusLocal * candidate.island.placement.scale * 1.5;
       if (distance < bestDistance && distance <= reach) {
         bestDistance = distance;
@@ -324,7 +341,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const scenes = new Map<IslandId, string>();
     for (const placed of state.placedPointMaps ?? []) scenes.set(placed.islandId, placed.sceneId);
     for (const trained of state.trainedGeometry) scenes.set(trained.islandId, trained.sceneId);
-    // The legacy unposed path synthesises the same scene id the binding does.
     for (const islandId of state.pointMaps?.keys() ?? []) {
       if (!scenes.has(islandId)) scenes.set(islandId, `legacy:${islandId}`);
     }
@@ -341,12 +357,39 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /**
    * A region's display frame, or the identity when it has none.
    *
-   * A scene with no recovered cameras gets the identity frame from `display-frame.ts` itself, so
-   * falling back to it here is the same answer rather than a substitute for one. The preview,
-   * which loads geometry from disk and computes no frames at all, lands here too.
+   * The frame is not part of an object's transform: the contract poses objects region-local and
+   * the renderer draws them there directly. It is still read HERE, for one question only, which
+   * is whether `y = 0` in that region is a measured ground or an arbitrary origin.
    */
   function frameFor(sceneId: string): SceneDisplayFrame {
     return state.displayFrames.get(sceneId) ?? identityDisplayFrame();
+  }
+
+  /** True when this region's ground was estimated from recovered cameras rather than assumed. */
+  function groundIsMeasured(sceneId: string): boolean {
+    return frameFor(sceneId).cameraCount > 0;
+  }
+
+  /**
+   * What counts as the ground in a region, in region-local millimetres.
+   *
+   * A display frame derived from recovered cameras puts the estimated ground at `y = 0`, so an
+   * object placed there stands on the same surface the geometry does. A region with no recovered
+   * cameras has the IDENTITY frame, whose origin is the scene's own arbitrary one, and placing at
+   * `y = 0` there drops the object under the floor the visitor is walking on. In that case the
+   * ground is taken to be the visitor's own feet, which is an approximation and is said to be one
+   * on the confirmation the person reads.
+   */
+  function groundMmIn(
+    island: Island,
+    sceneId: string,
+    pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number } },
+  ): number {
+    if (groundIsMeasured(sceneId)) return 0;
+    return regionPointFromAtlas(
+      island.placement,
+      [pose.position.x, pose.position.y - DISPLAY_EYE_HEIGHT, pose.position.z],
+    )[1];
   }
 
   /**
@@ -356,11 +399,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * world point, and `engageFocusedAnchor` is the one public read of what the reticle has settled
    * on. When nothing is engaged, the object goes on the ground ahead, facing the person.
    */
-  function placementPose(island: Island, frame: SceneDisplayFrame): DisplayPose | null {
+  function placementPose(island: Island, sceneId: string): RegionPose | null {
     const binding = state.atlas?.binding;
     if (binding === undefined) return null;
     const pose = binding.cameraPose();
-    const ground = groundHeightIn(island, frame, pose);
+    const ground = groundMmIn(island, sceneId, pose);
     const index = binding.engageFocusedAnchor();
     if (index !== null) {
       const at = index * 3;
@@ -374,46 +417,33 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         );
       }
     }
-    return placementPoseBeforeVisitor(island.placement, pose, DEFAULT_PLACEMENT_DISTANCE, ground);
-  }
-
-  /**
-   * What counts as the ground in a region, and whether that is a measurement.
-   *
-   * A display frame derived from recovered cameras puts the estimated ground at `y = 0`, so an
-   * object placed there stands on the same surface the geometry does. A region with no recovered
-   * cameras has the IDENTITY frame, whose origin is the scene's own arbitrary one, and placing at
-   * `y = 0` there drops the object under the floor the visitor is walking on. In that case the
-   * ground is taken to be the visitor's own feet, which is an approximation and is said to be one
-   * on the confirmation the person reads.
-   */
-  function groundHeightIn(
-    island: Island,
-    frame: SceneDisplayFrame,
-    pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number } },
-  ): number {
-    if (frame.cameraCount > 0) return 0;
-    return displayPointFromAtlas(
-      island.placement,
-      [pose.position.x, pose.position.y - DISPLAY_EYE_HEIGHT, pose.position.z],
-    )[1];
-  }
-
-  /** True when this region's ground was estimated from recovered cameras rather than assumed. */
-  function groundIsMeasured(sceneId: string): boolean {
-    return frameFor(sceneId).cameraCount > 0;
+    return placementPoseBeforeVisitor(island.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
   }
 
   // -- proposing -----------------------------------------------------------------------------------
 
   function proposePlacement(draft: ObjectPlacementDraft): void {
-    const asset = assets.find((candidate) => candidate.assetId === draft.assetId);
+    const asset = assets.find((candidate) => candidate.assetKey === draft.assetKey);
     if (asset === undefined) {
       panel.report('That object is not in the reviewed registry.', 'failure');
       return;
     }
-    if (asset.reference === null && !env.preview) {
-      panel.report(`The file for “${asset.label}” is not in storage.`, 'failure');
+    if (asset.availability !== 'available' && !env.preview) {
+      panel.report(
+        `The reviewed bytes for “${asset.title}” are not in storage, so it cannot be placed.`,
+        'failure',
+      );
+      return;
+    }
+    if (version === null) {
+      panel.report('There is no alternate world version to add this to.', 'failure');
+      return;
+    }
+    if (version.sourceInvalidated) {
+      panel.report(
+        'The place this version was built on was deleted, so nothing more can be added to it.',
+        'failure',
+      );
       return;
     }
     const region = placementRegion();
@@ -428,48 +458,44 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       );
       return;
     }
-    const frame = frameFor(region.sceneId);
-    const pose = placementPose(region.island, frame);
+    const pose = placementPose(region.island, region.sceneId);
     if (pose === null) {
       panel.report('The world is still forming. Try again in a moment.', 'failure');
       return;
     }
-    const sceneFromObject = objectTransformForDisplayPose(frame, pose);
+    const role: ObjectRole = OBJECT_ROLES.includes(draft.role as ObjectRole)
+      ? (draft.role as ObjectRole)
+      : 'fictional';
     const behaviour = draft.motion
       ? {
-          behaviourId: BOUNDED_MOTION_ID,
-          parameters: { axis: draft.axis, amplitude: draft.amplitude, period: draft.period },
+          behaviourKey: BOUNDED_PATH_KEY,
+          behaviourVersion: BOUNDED_PATH_VERSION,
+          parameters: {
+            axis: draft.axis,
+            easing: draft.easing,
+            travel_mm: draft.travelMm,
+            period_milliseconds: draft.periodMilliseconds,
+          },
         }
       : null;
-    const origin = OBJECT_ORIGINS.includes(draft.origin as ObjectOrigin)
-      ? (draft.origin as ObjectOrigin)
-      : 'fictional-source';
+    // The caller chooses the object id, and it is stable within the version. A monotonic counter
+    // beside the edit sequence keeps it unique without a clock or a random source.
+    const objectId = `object-${version.editSeq + 1}-${(issued += 1)}`;
 
     stage({
       kind: 'place',
       describe:
-        `Add “${asset.label}” to ${regionLabel(region.island.islandId)}, `
+        `Add “${asset.title}” to ${regionLabel(region.island.islandId)}, `
         + (groundIsMeasured(region.sceneId)
           ? 'standing on the ground its cameras recovered'
           : 'standing at your feet, because this region has no recovered cameras to place a '
             + 'ground from')
-        + `${behaviour === null ? '' : `, moving ${axisWords(draft.axis)}`}.`,
+        + `${behaviour === null ? '' : `, travelling ${axisWords(draft.axis)}`}.`,
       reversible: true,
       run: async () => {
-        const record: AuthoredObjectRecord = {
-          objectId: `preview-object-${(issued += 1)}`,
-          assetId: asset.assetId,
-          regionId: String(region.island.islandId),
-          sceneId: region.sceneId,
-          sceneFromObject,
-          origin,
-          behaviour,
-          basedOnWorldVersionId: version?.worldVersionId ?? null,
-          recordedSha256: '0'.repeat(64),
-        };
         if (client === null || version === null) {
-          drawnInPreview.push(record);
-          const failure = await draw(record);
+          drawnInPreview.push(previewObject(objectId, asset, region.island, pose, behaviour, role));
+          const failure = await draw(drawnInPreview.at(-1)!);
           refresh();
           panel.report(
             failure ?? 'Placed for this session only. The preview is read-only and nothing was saved.',
@@ -478,11 +504,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
           return;
         }
         const result = await client.place(version, {
-          assetId: asset.assetId,
+          objectId,
+          assetSha256: asset.contentSha256,
           regionId: String(region.island.islandId),
-          sceneId: region.sceneId,
-          sceneFromObject,
-          origin,
+          transform: pose,
+          originRole: role,
           behaviour,
         });
         await settle(result, 'Added.');
@@ -492,12 +518,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   function proposeMove(): void {
     const object = selectedRecord();
-    if (object === null || nudged === null) return;
-    const moved = objectTransformForDisplayPose(frameFor(object.sceneId), nudged);
+    if (object === null || nudged === null || version === null) return;
     const target = nudged;
     stage({
       kind: 'move',
-      describe: `Move “${labelOf(object)}” to where you have just put it${offsetWords(object, target)}.`,
+      describe: `Move “${object.asset.title}” to where you have just put it${offsetWords(object, target)}.`,
       reversible: true,
       run: async () => {
         if (client === null || version === null) {
@@ -506,7 +531,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
           panel.report('The preview is read-only, so this position was not saved.', 'failure');
           return;
         }
-        const result = await client.move(version, object.objectId, moved);
+        const result = await client.move(version, object.objectId, target);
         nudged = null;
         panel.setPendingMove(null);
         await settle(result, 'Moved.');
@@ -519,10 +544,12 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (object === null) return;
     stage({
       kind: 'remove',
-      describe: `Take “${labelOf(object)}” out of this world.`,
-      // Re-adding produces a new object with a new identity. That is not the same thing as an
-      // undo, and the confirmation surface is required to be true about which it is.
-      reversible: false,
+      describe: `Take “${object.asset.title}” out of this world.`,
+      // The contract stores a removal rather than executing it: "the row survives with
+      // removed = true, so the object id stays stable and undo restores it rather than
+      // resurrecting a new identity." So this genuinely is reversible, and saying otherwise would
+      // be the false reversibility claim `confirm.ts` calls the worst sentence to get wrong.
+      reversible: true,
       run: async () => {
         if (client === null || version === null) {
           const at = drawnInPreview.findIndex((row) => row.objectId === objectId);
@@ -534,9 +561,38 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
           return;
         }
         const result = await client.remove(version, objectId);
-        state.atlas?.binding.objects.remove(objectId);
-        if (selectedId === objectId) select(null);
-        await settle(result, 'Removed.');
+        await settle(result, 'Removed. You can take that back.');
+      },
+    });
+  }
+
+  /**
+   * Undo, which the contract owns rather than this surface.
+   *
+   * It reverses "the newest edit that no undo already names", from the document that edit stored,
+   * so three edits can be taken back one at a time. This surface therefore does not track what to
+   * undo and must not: a client's memory of an edit is exactly what `before_document` exists to
+   * replace.
+   */
+  function proposeUndo(): void {
+    if (version === null) return;
+    const last = [...version.edits].reverse()
+      .find((edit) => edit.kind !== 'undo'
+        && !version!.edits.some((other) => other.undoneEditId === edit.editId));
+    if (last === undefined) {
+      panel.report('There is nothing left to take back in this world.', 'failure');
+      return;
+    }
+    stage({
+      kind: 'undo',
+      describe: `Take back the last change to this world: ${editWords(last.kind)}.`,
+      reversible: false,
+      run: async () => {
+        if (client === null || version === null) {
+          panel.report('The preview is read-only, so there is nothing recorded to take back.', 'failure');
+          return;
+        }
+        await settle(await client.undo(version), 'Taken back.');
       },
     });
   }
@@ -554,8 +610,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (running === null) return;
     pending = null;
     if (env.preview) {
-      // The same guard `write-path.ts` states, for the same reason: the preview has no authority
-      // behind it. It still draws, and it still says the drawing was not saved.
       confirm.hide();
       panel.setBusy(true);
       try { await running.run(); } finally { panel.setBusy(false); }
@@ -573,14 +627,20 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
   }
 
-  /** What came back from the authority: recorded, or refused because the base moved. */
+  /**
+   * What came back: the whole version, or the same thing plus a refusal.
+   *
+   * Every mutation answers with `AlternateVersionView`, so a write is also the re-read and there
+   * is no second request to get out of step with.
+   */
   async function settle(
-    result: { readonly kind: 'recorded' | 'stale'; readonly current?: AuthoredWorldVersion },
+    result: { readonly kind: 'recorded' | 'stale'; readonly version?: AlternateVersion; readonly current?: AlternateVersion },
     said: string,
   ): Promise<void> {
-    if (result.kind === 'stale' && result.current !== undefined) {
-      version = result.current;
-      await redrawAll();
+    const next = result.kind === 'stale' ? result.current : result.version;
+    if (next !== undefined) version = next;
+    await redrawAll();
+    if (result.kind === 'stale') {
       panel.report(
         'This world changed while you were deciding, so nothing was written. '
         + 'What is shown is current; choose again.',
@@ -588,8 +648,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       );
       return;
     }
-    if (client !== null) version = await client.refreshObjects(CURRENT_WORLD_VERSION);
-    await redrawAll();
     panel.report(said, 'settled');
   }
 
@@ -597,6 +655,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const runtime = state.atlas?.binding.objects;
     if (runtime !== undefined) for (const objectId of runtime.objectIds) runtime.remove(objectId);
     notices.clear();
+    if (selectedId !== null && recordOf(selectedId) === null) selectedId = null;
+    nudged = null;
+    panel.setPendingMove(null);
     await drawEvery();
   }
 
@@ -608,21 +669,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     refresh();
   }
 
-  function nudge(delta: { x?: number; y?: number; z?: number; yaw?: number }): void {
+  function nudge(delta: { xMm?: number; yMm?: number; zMm?: number; yaw?: number }): void {
     const object = selectedRecord();
     const runtime = state.atlas?.binding.objects;
     if (object === null || runtime === undefined) return;
-    const frame = frameFor(object.sceneId);
-    const from = nudged ?? displayPoseOfObject(frame, object.sceneFromObject);
-    const next: DisplayPose = Object.freeze({
-      x: from.x + (delta.x ?? 0),
-      y: Math.max(0, from.y + (delta.y ?? 0)),
-      z: from.z + (delta.z ?? 0),
-      yaw: from.yaw + (delta.yaw ?? 0),
-    });
+    const next = nudgedPose(nudged ?? poseOf(object), delta);
     nudged = next;
-    runtime.setTransform(object.objectId, objectTransformForDisplayPose(frame, next), frame);
-    panel.setPendingMove(`Not saved yet: “${labelOf(object)}”${offsetWords(object, next)}.`);
+    runtime.setTransform(object.objectId, next);
+    panel.setPendingMove(`Not saved yet: “${object.asset.title}”${offsetWords(object, next)}.`);
     refresh();
   }
 
@@ -631,8 +685,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     nudged = null;
     panel.setPendingMove(null);
     if (object === null) return;
-    const frame = frameFor(object.sceneId);
-    state.atlas?.binding.objects.setTransform(object.objectId, object.sceneFromObject, frame);
+    state.atlas?.binding.objects.setTransform(object.objectId, poseOf(object));
     refresh();
   }
 
@@ -644,15 +697,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     const result = runtime.control(objectId, action);
     if (!result.ok) {
-      // The milestone requires an unsupported behaviour to fail visibly. It fails here as well as
-      // at placement, because this is where a person actually pressed something.
       panel.report(result.reason, 'failure');
       deps.showTravelStatus(result.reason, 'failure');
       refresh();
       return;
     }
     panel.report({
-      trigger: 'Moving.',
+      trigger: 'Travelling.',
       stop: 'Stopped where it is.',
       reset: 'Back exactly where it was placed.',
     }[action], 'settled');
@@ -661,20 +712,21 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   // -- rendering the panel ---------------------------------------------------------------------------
 
-  function everyRecord(): readonly AuthoredObjectRecord[] {
+  /** Removed objects are kept by the authority and are not drawn. Undo brings them back. */
+  function visibleObjects(): readonly AuthoredObject[] {
+    return everyRecord().filter((record) => !record.removed);
+  }
+
+  function everyRecord(): readonly AuthoredObject[] {
     return client === null ? drawnInPreview : version?.objects ?? [];
   }
 
-  function recordOf(objectId: string): AuthoredObjectRecord | null {
-    return everyRecord().find((row) => row.objectId === objectId) ?? null;
+  function recordOf(objectId: string): AuthoredObject | null {
+    return visibleObjects().find((row) => row.objectId === objectId) ?? null;
   }
 
-  function selectedRecord(): AuthoredObjectRecord | null {
+  function selectedRecord(): AuthoredObject | null {
     return selectedId === null ? null : recordOf(selectedId);
-  }
-
-  function labelOf(record: AuthoredObjectRecord): string {
-    return assets.find((asset) => asset.assetId === record.assetId)?.label ?? record.assetId;
   }
 
   function regionLabel(islandId: IslandId): string {
@@ -682,19 +734,26 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function axisWords(axis: MotionAxisKey): string {
-    return { x: 'side to side', y: 'up and down', z: 'forward and back' }[axis];
+    return { x: 'side to side', y: 'up and down', z: 'forward and back' }[axis] ?? String(axis);
   }
 
-  function offsetWords(record: AuthoredObjectRecord, pose: DisplayPose): string {
-    const saved = displayPoseOfObject(frameFor(record.sceneId), record.sceneFromObject);
-    const moved = Math.hypot(pose.x - saved.x, pose.y - saved.y, pose.z - saved.z);
-    return moved < 1e-6 ? '' : `, about ${moved.toFixed(2)} of a step from where it is saved`;
+  function editWords(kind: string): string {
+    return {
+      add_object: 'an object you added',
+      move_object: 'a move',
+      remove_object: 'a removal',
+    }[kind] ?? kind.replace(/_/g, ' ');
   }
 
-  function motionOf(record: AuthoredObjectRecord): PlacedObjectRow['motion'] {
+  function offsetWords(record: AuthoredObject, pose: RegionPose): string {
+    const saved = poseOf(record);
+    const moved = Math.hypot(pose.xMm - saved.xMm, pose.yMm - saved.yMm, pose.zMm - saved.zMm);
+    return moved === 0 ? '' : `, about ${(moved / MM_PER_METRE).toFixed(2)} of a step from where it is saved`;
+  }
+
+  function motionOf(record: AuthoredObject): PlacedObjectRow['motion'] {
     if (record.behaviour === null) return 'none';
-    const runtime = state.atlas?.binding.objects;
-    const held = runtime?.motionStateOf(record.objectId) ?? null;
+    const held = state.atlas?.binding.objects.motionStateOf(record.objectId) ?? null;
     if (held === null || held === 'none') return 'unsupported';
     return held as PlacedObjectRow['motion'];
   }
@@ -702,22 +761,28 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   function refresh(): void {
     panel.showAssets(
       assets.map((asset) => ({
-        assetId: asset.assetId,
-        label: asset.label,
-        available: asset.reference !== null || env.preview,
-        supportsMotion: asset.supportedBehaviours.includes(BOUNDED_MOTION_ID),
+        assetKey: asset.assetKey,
+        label: asset.title,
+        available: asset.availability === 'available' || env.preview,
+        unavailableReason: asset.availability === 'available' ? null : asset.availability,
+        licenceId: asset.licenceId,
       })),
-      OBJECT_ORIGINS.map((key) => ({ key, label: OBJECT_ORIGIN_LABELS[key] })),
+      OBJECT_ROLES.map((key) => ({ key, label: OBJECT_ROLE_LABELS[key] })),
     );
     panel.showObjects(
-      everyRecord().map((record) => ({
+      visibleObjects().map((record) => ({
         objectId: record.objectId,
-        label: labelOf(record),
+        label: record.asset.title,
         regionLabel: regionLabel(record.regionId as IslandId),
         motion: motionOf(record),
         note: notices.get(record.objectId) ?? null,
       })),
       selectedId,
+    );
+    panel.setUndoable(
+      version !== null
+      && version.edits.some((edit) => edit.kind !== 'undo'
+        && !version!.edits.some((other) => other.undoneEditId === edit.editId)),
     );
   }
 
@@ -739,9 +804,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       toneKey: ConfirmationBand['toneKey'],
       rows: ConfirmationBand['rows'],
     ): ConfirmationBand => Object.freeze({ band: id, toneKey, rows, omitted: false as const });
-    // Tier 2 for a removal: it states its own blast radius as nothing, and it earns the second
-    // control because it is the one operation here that cannot be undone.
-    const tier = next.kind === 'remove' ? 2 : 1;
+    // Tier 2 for undo, which is the one operation here that cannot itself be taken back: an undo
+    // edit is never a candidate for another undo.
+    const tier = next.kind === 'undo' ? 2 : 1;
     return Object.freeze({
       draftId: `world-object-${issued}`,
       tier,
@@ -801,12 +866,12 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     if (!panel.visible()) return;
     const move: Readonly<Record<string, Parameters<typeof nudge>[0]>> = {
-      ArrowUp: { z: -NUDGE_STEP },
-      ArrowDown: { z: NUDGE_STEP },
-      ArrowLeft: { x: -NUDGE_STEP },
-      ArrowRight: { x: NUDGE_STEP },
-      PageUp: { y: NUDGE_STEP },
-      PageDown: { y: -NUDGE_STEP },
+      ArrowUp: { zMm: -NUDGE_STEP_MM },
+      ArrowDown: { zMm: NUDGE_STEP_MM },
+      ArrowLeft: { xMm: -NUDGE_STEP_MM },
+      ArrowRight: { xMm: NUDGE_STEP_MM },
+      PageUp: { yMm: NUDGE_STEP_MM },
+      PageDown: { yMm: -NUDGE_STEP_MM },
       BracketLeft: { yaw: -TURN_STEP },
       BracketRight: { yaw: TURN_STEP },
     };
@@ -841,29 +906,70 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 /**
  * What `?preview=1` offers, and the container it draws.
  *
- * Built here rather than read from `graph-client/test/fixtures/world-objects.json`, which is the
- * fixture the CLIENT's tests read: that file describes wire responses and carries no bytes, and a
+ * Built here rather than read from `graph-client/test/fixtures/world-objects.json`, which is a
+ * real `GET /world/versions/{id}` body the CLIENT's tests parse and which carries no bytes. A
  * preview needs something to draw. This is a box, it is obviously a box, and the surface says
  * every time that nothing placed in the preview was saved.
  */
-const PREVIEW_ASSETS: readonly ReviewedObjectAsset[] = Object.freeze([
+const PREVIEW_ASSETS: readonly ReviewedAsset[] = Object.freeze([
   Object.freeze({
-    assetId: 'preview-marker',
-    label: 'Preview marker',
-    container: AUTHORED_OBJECT_CONTAINER,
-    reference: null,
-    origin: 'fictional-source' as const,
-    footprint: Object.freeze({ radius: 0.25, height: 0.5 }),
-    supportedBehaviours: Object.freeze([BOUNDED_MOTION_ID]),
+    assetKey: 'preview.marker',
+    title: 'Preview marker',
+    summary: 'A half-metre box, drawn by the development preview only.',
+    mediaType: AUTHORED_OBJECT_MEDIA_TYPE,
+    contentSha256: '0'.repeat(64),
+    byteSize: 0,
+    licenceId: 'CC0-1.0',
+    licenceSha256: '0'.repeat(64),
+    availability: 'available',
   }),
 ]);
 
-const PREVIEW_VERSION: AuthoredWorldVersion = Object.freeze({
-  worldVersionId: CURRENT_WORLD_VERSION,
-  basedOnWorldVersionId: null,
-  recordedSha256: '0'.repeat(64),
+const PREVIEW_VERSION: AlternateVersion = Object.freeze({
+  schemaVersion: 1,
+  versionId: 'preview',
+  worldId: 'preview',
+  sourceSnapshotId: 'preview',
+  parentVersionId: null,
+  title: 'Development preview',
+  origin: 'authored',
+  styleVersionId: null,
+  stateSha256: '0'.repeat(64),
+  editSeq: 0,
+  sourceInvalidated: false,
+  createdBy: 'preview',
+  createdAt: '1970-01-01T00:00:00+00:00',
   objects: Object.freeze([]),
+  elementOverrides: Object.freeze([]),
+  edits: Object.freeze([]),
 });
+
+function previewObject(
+  objectId: string,
+  asset: ReviewedAsset,
+  island: Island,
+  pose: RegionPose,
+  behaviour: {
+    readonly behaviourKey: string;
+    readonly behaviourVersion: number;
+    readonly parameters: Readonly<Record<string, unknown>>;
+  } | null,
+  role: ObjectRole,
+): AuthoredObject {
+  return Object.freeze({
+    objectId,
+    asset,
+    regionId: String(island.islandId),
+    transform: Object.freeze({
+      coordinateSpace: 'region_local',
+      coordinateUnit: 'millimetre',
+      ...pose,
+    }),
+    origin: Object.freeze({ kind: 'authored', role }),
+    behaviour,
+    removed: false,
+  });
+}
 
 /** A self-contained GLB holding one half-metre box, built rather than shipped. */
 function previewContainer(): ArrayBuffer {
