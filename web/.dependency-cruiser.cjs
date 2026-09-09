@@ -287,6 +287,36 @@ module.exports = {
       },
     },
 
+    {
+      name: 'ui-may-not-import-composition',
+      severity: 'error',
+      comment:
+        'The direction of the app is one way: `composition/` mounts a surface out of the parts in ' +
+        '`ui/`, and `ui/` is the half that knows nothing about a session. A view module that ' +
+        'imported a mount function would be reaching past its own props for the session state, ' +
+        'the credentials and the renderer binding that mount function holds, and the three UI ' +
+        'redesigns this split exists to enable would each acquire the whole application as a ' +
+        'dependency. `ui/` takes handlers and returns elements; that is the entire contract.',
+      from: { path: String.raw`^packages/app/src/ui/` },
+      to: { path: String.raw`^packages/app/src/composition/` },
+    },
+    {
+      name: 'composition-is-reached-through-main',
+      severity: 'error',
+      comment:
+        'The composition root is `packages/app/src/main.ts` and it is the only file that may ' +
+        'assemble surfaces. A sibling module that mounted one would be a second composition root ' +
+        'with a second idea of the order the mounts run in, which is precisely the coupling the ' +
+        'decomposition removed. Modules inside `composition/` may still reach each other: the ' +
+        'session load reads the world-style failure vocabulary, and the renderer recomputes the ' +
+        'rungs with the same function the geometry load used.',
+      from: {
+        path: String.raw`^packages/app/src/`,
+        pathNot: String.raw`^packages/app/src/(composition/|main\.ts$)`,
+      },
+      to: { path: String.raw`^packages/app/src/composition/` },
+    },
+
     // ---- the synthetic scene generator is a build-time tool --------------------------------
     {
       name: 'scene-synth-is-offline-only',
