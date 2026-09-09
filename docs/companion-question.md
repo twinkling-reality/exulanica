@@ -664,6 +664,36 @@ it to move: the Nano's median completion is about 1100 tokens, so the ceiling is
 observed spend and is doing no work either way. The measurement rebound it in memory for the
 duration of each call and restored it in a `finally`; no source file was touched.
 
+### 11.2 What the gates say, including the part that is not green
+
+| Gate | Result |
+| --- | --- |
+| `ruff check .` | clean |
+| `lint-imports` | 4 contracts kept, 0 broken |
+| web `typecheck` | clean |
+| web `boundaries` | 0 violations, 386 modules |
+| web `vitest` | 953 passed, 116 files |
+| backend suite, this branch | 2272 passed, 7 failed, 14 errors |
+| backend suite, unmodified `abe6040` | 2197 passed, 12 failed, 26 errors |
+
+**The backend suite is not green and it was not green before this work either.** The branch is the
+better of the two runs, and the residual failures are shared-database contention on one developer
+machine rather than regressions. Three separate observations say so rather than one: two
+consecutive full runs of the SAME commit produced DISJOINT failure sets; every file that failed on
+the branch passes when run alone; and `test_world_read_views.py` produces the identical single
+error on both commits. `tests/pg_harness.py` isolates by schema inside one shared database with
+cluster-wide roles and a shared `public`, which is what makes a full campaign contend with itself,
+and the harness says to serialize one.
+
+What would settle it is a serialized run on a quiet database, or CI. That is not done here, and
+the numbers above are offered as a comparison rather than as a pass.
+
+Two environment gaps cost a confusing detour and are recorded so the next person skips it. A fresh
+worktree needs `uv sync --extra reconstruction --extra server --extra pose`, or numpy and pycolmap
+are missing and four tests fail in a way that reads exactly like a code regression. And
+`.exulanica/` is gitignored, so a worktree has none, and the measurement scripts cannot find the
+reference workspace ids until it is symlinked.
+
 ### 12.2 Streaming would not make the first words appear early
 
 Token Factory does stream. `stream: true` returns `text/event-stream`, `stream_options:
