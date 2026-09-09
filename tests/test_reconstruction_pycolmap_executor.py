@@ -63,7 +63,8 @@ def _manifest(source: Path) -> PoseBuildManifest:
         scene_ref="glasshouse-courtyard",
         code_revision="a" * 40,
         # The version the backend reports rather than a string somebody typed, which is the gap
-        # `docs/colmap-pose-jobs.md` claims is closed and is not for the subprocess backend.
+        # `docs/scene-reconstruction-operations.md` section 12 records as open for the
+        # subprocess backend.
         colmap_version=pycolmap_version(),
         execution_image="registry.example/exulanica-colmap@sha256:" + "b" * 64,
         frames=frames,

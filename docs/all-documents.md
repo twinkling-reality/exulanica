@@ -8,13 +8,13 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**113 documents**, excluding `docs/evaluation/`.
+**112 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-58 documents.
+57 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -23,7 +23,6 @@ How the system works now. Edited as the system changes.
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [colmap-pose-jobs](colmap-pose-jobs.md) : production worker integrated and contract-tested; no authorized real dense capture run
 - [companion-question-main.patch](companion-question-main.patch) : diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
 - [companion-question](companion-question.md) : built, covered by tests, and measured once against the retained bowl workspace with real
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked

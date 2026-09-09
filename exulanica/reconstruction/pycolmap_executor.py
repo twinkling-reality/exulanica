@@ -1,13 +1,13 @@
 """COLMAP in this process, so pose recovery runs where the photographs already are.
 
 ``pose.py`` drives COLMAP through a ``CommandExecutor`` seam, and its default shells out to a
-``colmap`` binary. That binary is not installed on a developer machine and is not in the
-container image, so the pose job has never run: it is a controller with no backend, and
-``docs/colmap-pose-jobs.md`` records exactly that. This module is the backend. It recognises the
-four command shapes ``pose.py`` emits and performs each one through ``pycolmap`` in process,
-returning the same ``CommandResult`` the subprocess executor returns, so the checkpointing, the
-lock, the manifest digest, the receipt and the quality gate above it are unchanged and untested
-code paths do not multiply.
+``colmap`` binary. That binary is not installed on a developer machine and is not in the container
+image, so the pose job has never run: it is a controller with no backend, and
+``docs/scene-reconstruction-operations.md`` section 12 records exactly that. This module is the
+backend. It recognises the four command shapes ``pose.py`` emits and performs each one through
+``pycolmap`` in process, returning the same ``CommandResult`` the subprocess executor returns, so
+the checkpointing, the lock, the manifest digest, the receipt and the quality gate above it are
+unchanged and untested code paths do not multiply.
 
 **Why in process rather than a bundled binary.** ``pycolmap`` publishes a macOS arm64 wheel and
 needs no CUDA, so the same code recovers poses on the laptop that holds the library and on the
@@ -166,9 +166,10 @@ def pycolmap_version() -> str:
     """The exact version, for the manifest field the receipt is keyed by.
 
     ``PoseBuildManifest.colmap_version`` is required to be non-empty and is never checked against
-    the thing that ran, which ``docs/colmap-pose-jobs.md`` overstates as pinning an exact version.
-    A caller that builds its manifest from this function closes that gap for the in-process
-    backend, because the string then comes from the library that is about to do the work.
+    the thing that ran, which ``docs/scene-reconstruction-operations.md`` section 12 records as
+    overstated. A caller that builds its manifest from this function closes that gap for the
+    in-process backend, because the string then comes from the library that is about to do the
+    work.
     """
     return f"pycolmap {_pycolmap().__version__}"
 

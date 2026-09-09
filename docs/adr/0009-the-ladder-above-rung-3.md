@@ -10,7 +10,7 @@
 - Supersedes: nothing wholesale. It corrects two sentences in place, named in D2 and D3.
 - Related: [product-specification.md](../product-specification.md) section 5;
   [reconstruction-findings.md](../reconstruction-findings.md);
-  [colmap-pose-jobs.md](../colmap-pose-jobs.md);
+  [scene-reconstruction-operations.md](../scene-reconstruction-operations.md);
   [corridor-navigation-artifacts.md](../corridor-navigation-artifacts.md);
   [gsplat-scene-jobs.md](../gsplat-scene-jobs.md);
   [adr/0008-generated-geometry.md](0008-generated-geometry.md);
