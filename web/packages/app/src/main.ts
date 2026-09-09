@@ -46,6 +46,8 @@ import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { CompanionAskClient } from './companion-ask-api.js';
+import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
+import type { PersistedMemory } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
 import { buildStartupState } from './ui/startup-state.js';
@@ -268,12 +270,34 @@ async function mount(): Promise<void> {
   // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
   // about the library, and this is the only place holding the credential it takes to ask one.
   const companionAsk = new CompanionAskClient(currentCredentials);
+
+  // The durable half of the same conversation. Read once per mount, because a reload used to be
+  // amnesia: interaction-model.md 4.3 and 5.5 both say the Companion may never speak "within 7
+  // days of a Skip or 14 days of a Not sure on the same entity", and a window held in a page had
+  // never once survived one.
+  //
+  // A failed read is a Companion that has forgotten somebody, which is worse than one that never
+  // offered to remember, so it is said rather than swallowed. It is NOT allowed to stop the world
+  // from mounting: everything else on this page works without it.
+  const companionMemory = new CompanionMemoryClient(currentCredentials);
+  let persistedMemory: PersistedMemory | null = null;
+  let memoryLoadFailure: string | null = null;
+  try {
+    persistedMemory = await companionMemory.recent();
+  } catch (error) {
+    memoryLoadFailure = error instanceof Error ? error.message : String(error);
+  }
+
   let writePath: MountedWritePath;
   const companion = mountCompanion({
     state,
     engine: currentCompanion,
     evidence: currentEvidence,
     ask: (question) => companionAsk.ask(question),
+    persistedMemory,
+    rememberAnswer: async (answer) => {
+      await companionMemory.rememberAnswer(answerToRemember(answer));
+    },
     stageParent: stage,
     confirm: () => writePath.confirm,
     reflectShell: () => reflectShell(),
@@ -281,6 +305,10 @@ async function mount(): Promise<void> {
     isSystemSurfaceOpen: () =>
       shellState.primary === 'options' || shellState.primary === 'controls',
   });
+
+  if (memoryLoadFailure !== null) {
+    companion.panel.noteMemoryFailure('memory.notLoaded', memoryLoadFailure);
+  }
 
   writePath = mountWritePath({
     env,
