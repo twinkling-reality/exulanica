@@ -32,6 +32,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.identity import IdentityRepository, name_occurrence
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.question import PROMPT_VERSION
 from exulanica.store.local import LocalContentAddressedStore
@@ -786,7 +787,9 @@ def test_the_answer_says_which_model_answered_it_and_what_that_cost(deployment):
     assert execution["prompt_version"] == PROMPT_VERSION
     (call,) = execution["calls"]
     assert call["role"] == "reasoning_cheap"
-    assert call["requested_model"] == "nvidia/Nemotron-3_5-Lightning"
+    # From the manifest, not repeated here: this asserts that the composer asks the
+    # `reasoning_cheap` PRIMARY, which is the property, and not which model holds the role.
+    assert call["requested_model"] == load_manifest().roles["reasoning_cheap"].primary.model_id
     assert call["served_model"] == served
     assert call["used_fallback"] is False
     assert call["attempts"] == 1
