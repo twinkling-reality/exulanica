@@ -169,3 +169,44 @@ def test_each_allowed_dangling_reference_is_still_dangling(ref: str, reason: str
     assert not (ROOT / ref).exists(), (
         f"{ref} now exists, so remove it from ALLOWED_DANGLING. It was listed because: {reason}"
     )
+
+
+def test_the_generated_inventory_matches_the_tree():
+    """`docs/all-documents.md` is generated, so it can only be complete if nothing regenerates it.
+
+    MEASURED 2026-09-09: the hand-maintained table this replaced listed 45 documents against 111 in
+    the tree and never mentioned `docs/briefs/`. An index that is allowed to drift decays to
+    whatever somebody last remembered to add, which is why the exhaustive half is generated and this
+    test refuses a stale copy.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "generate_docs_index", ROOT / "scripts" / "generate_docs_index.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    target = ROOT / "docs" / "all-documents.md"
+    assert target.is_file(), "the inventory is missing; run scripts/generate_docs_index.py"
+    assert target.read_text(encoding="utf-8") == module.render(), (
+        "docs/all-documents.md is out of date. Run: uv run python scripts/generate_docs_index.py"
+    )
+
+
+def test_every_decision_record_appears_in_the_readme_table():
+    """The hand-written half of the index, which no generator can produce.
+
+    The ADR table carries what was DECIDED, one line each, and a status line extracted from the file
+    cannot say that. So it stays hand-written, and this keeps it honest: MEASURED 2026-09-09, it had
+    silently stopped at ADR-0017 while the tree held 22 records, so five decisions were invisible to
+    every reader who started from the index.
+    """
+    readme = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+    records = sorted(p.name for p in (ROOT / "docs" / "adr").glob("*.md"))
+    assert records, "no decision records found, so this rule has stopped applying"
+    missing = [name for name in records if f"](adr/{name})" not in readme]
+    assert not missing, (
+        "decision records absent from the table in docs/README.md:\n  " + "\n  ".join(missing)
+    )
