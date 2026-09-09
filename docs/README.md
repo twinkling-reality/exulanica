@@ -83,6 +83,7 @@ questions in both.
 | [demo-integrity.md](demo-integrity.md) | What is pre-seeded versus computed live and the prohibitions that follow, the hosted topology and its per-visitor reset, unattended operation, the failure modes with a fallback for each, and the pre-demonstration checklist | Mixed, DECISION with OPEN items inline |
 | [platform-findings.md](platform-findings.md) | Findings on Token Factory, AI Cloud, the NVIDIA models and Tavily, each carrying the execution or the primary source that evidences it, ending with a prioritised list | Mixed. Sections 1 to 3 executed 2026-08-27, section 4 documentation-verified 2026-08-28 |
 | [engineering-log.md](engineering-log.md) | The struggles the other documents round off: dead ends, tests that were wrong, tools that misled, assumptions a measurement overturned. Newest first. A record is for commissioned and gated work; this is for everything else worth remembering | Running, appended as work happens |
+| [engineering-log-reconstructed.md](engineering-log-reconstructed.md) | 111 struggle entries for 2026-08-27 to 2026-09-08, mined out of the retained records, findings documents and git history rather than written at the time | Reconstructed 2026-09-09, 99.6 per cent of its distinctive tokens verified against the tree |
 
 ### Decision records
 
