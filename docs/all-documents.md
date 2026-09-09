@@ -8,13 +8,13 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**112 documents**, excluding `docs/evaluation/`.
+**111 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-57 documents.
+54 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -23,7 +23,6 @@ How the system works now. Edited as the system changes.
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [companion-question-main.patch](companion-question-main.patch) : diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
 - [companion-question](companion-question.md) : built, covered by tests, and measured once against the retained bowl workspace with real
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
@@ -34,10 +33,9 @@ How the system works now. Edited as the system changes.
 - [domain-and-evidence-model](domain-and-evidence-model.md) : mixed. Every claim below carries exactly one status label, and a claim that was rewritten
 - [engineering-log-reconstructed](engineering-log-reconstructed.md) : Every entry here was reconstructed on 2026-09-09 by mining the retained evaluation records, the
 - [engineering-log](engineering-log.md) : What this is, and what it is not. The project already records findings well: numbers with their
-- [evaluation-clean-replay](evaluation-clean-replay.md) : REPLAY MECHANICS IMPLEMENTED; REAL METRIC BASELINE AND PHASE 2 GATE BLOCKED
 - [evaluation-corpus-contract](evaluation-corpus-contract.md) : IMPLEMENTED INPUT BOUNDARY; REAL OGC-1 INPUTS NOT FOUND LOCALLY 2026-08-31
+- [evaluation-harness](evaluation-harness.md) : REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
-- [evaluation-run-archive](evaluation-run-archive.md) : IMPLEMENTED; REAL OGC-1 REPLAY REMAINS BLOCKED
 - [frontier-demonstration](frontier-demonstration.md) : AUTHORIZED PERSONAL CORPUS AND PRODUCTION SIGNING KEY NOT SUPPLIED; REAL RUN PENDING
 - [frontier-roadmap](frontier-roadmap.md) : DECISION and IMPLEMENTATION PLAN. This document orders existing Exulanica decisions
 - [goal-brief-2026-09-05-unblocked-backend-program](goal-brief-2026-09-05-unblocked-backend-program.md) : Written 2026-09-05, at commit ef73866, immediately after the semantic-answers and
@@ -53,7 +51,6 @@ How the system works now. Edited as the system changes.
 - [physical-streaming-runtime](physical-streaming-runtime.md) : RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
-- [preview-handoffs-main.patch](preview-handoffs-main.patch) : +++ b/web/packages/app/src/main.ts
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
 - [product-direction](product-direction.md) : Updated 2026-09-08. This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
@@ -160,6 +157,8 @@ Closed accounts of what happened on a date. Never edited after.
 
 Integration patches referenced by records.
 
-1 documents.
+3 documents.
 
+- [companion-question-main.patch](patches/companion-question-main.patch) : diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
 - [manual-person-review-main.patch](patches/manual-person-review-main.patch) : +++ b/web/packages/app/src/main.ts
+- [preview-handoffs-main.patch](patches/preview-handoffs-main.patch) : +++ b/web/packages/app/src/main.ts

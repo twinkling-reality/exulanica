@@ -196,7 +196,7 @@ Established by execution, on this branch:
   guard stops firing. A person typing a next question beginning with a digit could otherwise
   select a tier 2 option they could not see, and the confirmation surface would open over
   "Looking through your library" for a claim about a person that nobody chose.
-* `docs/companion-question-main.patch` applies to `main.ts` at 5675b33, and section 7 is that
+* `docs/patches/companion-question-main.patch` applies to `main.ts` at 5675b33, and section 7 is that
   patch applied and driven in a browser.
 * That the planner prompt describes the form the schema actually sends. Every field the prompt
   offers `null` is nullable in the generated JSON Schema, and the one array field is offered `[]`.
