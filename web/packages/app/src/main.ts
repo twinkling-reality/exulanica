@@ -25,23 +25,14 @@ import './style.css';
 import './appearance.css';
 import './unified-interface.css';
 
-import type { OccurrenceRecord, RenderingSubstrate } from '@exulanica/graph-client';
+import type { RenderingSubstrate } from '@exulanica/graph-client';
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
-import {
-  FACET_KEYS,
-  confirmationFor,
-  decodeFacets,
-  draftEdit,
-  encodeFacets,
-  type IndexFacets,
-} from '@exulanica/world-index';
+import { FACET_KEYS, decodeFacets, encodeFacets, type IndexFacets } from '@exulanica/world-index';
 import { mountAtlas, type MountedAtlas } from './atlas.js';
 import { applicationTitle, developmentToken, sourcePresentation } from './config.js';
 import { listBatches, watchBatch, type BatchSummary } from './formation.js';
-import { toUpdateProposal } from './proposal.js';
 import { buildScene } from './scene.js';
-import { buildConfirm } from './ui/confirm.js';
 import { buildCompanionEncounter } from './ui/companion-encounter.js';
 import { resolveCompanionPlacement } from './ui/companion-placement.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
@@ -73,6 +64,7 @@ import {
   type WorldShellEvent,
 } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
+import { mountWritePath } from './composition/write-path.js';
 import {
   mountStatusAndInspector,
   type MountedStatusAndInspector,
@@ -117,8 +109,6 @@ applyDocumentAppearance(state.preferences, systemAppearance.matches);
 let mountListeners: AbortController | null = null;
 let indexFacets: IndexFacets = decodeFacets(window.location.search);
 let selected: string | null = null;
-/** Monotonic, so two proposals in one session never share an id. Not a clock and not random. */
-let issued = 0;
 document.title = applicationTitle(preview);
 applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
   state.preferences.worldArtProfile,
@@ -286,13 +276,15 @@ async function mount(): Promise<void> {
     companionStage.setState('uncertain');
   }
 
-  const confirm = buildConfirm({
-    onConfirm: (proposalId) => void commit(proposalId),
-    onCancel: (proposalId) => {
-      currentSession.discard(proposalId);
-      confirm.hide();
-    },
-    onVisibilityChange: (visible) => companionPanel.setConfirming(visible),
+  const writePath = mountWritePath({
+    env,
+    state,
+    session: currentSession,
+    snapshot: current,
+    companionStage: () => companionStage,
+    detailRoot: () => detail.root,
+    onConfirmVisibilityChange: (visible) => companionPanel.setConfirming(visible),
+    remount: () => mount(),
   });
 
   // The Companion. The controller holds the turn, the panel renders it, and the confirmation
@@ -308,7 +300,7 @@ async function mount(): Promise<void> {
     onAwaitingConfirmation: (proposalId, summary, utterance) => {
       // A staged proposal is still unconfirmed. It may not borrow the settled presentation.
       companionStage.setState('uncertain');
-      confirm.show(proposalId, summary, utterance);
+      writePath.confirm.show(proposalId, summary, utterance);
     },
   });
   function dismissCompanion(): void {
@@ -395,7 +387,7 @@ async function mount(): Promise<void> {
 
   const detail = buildDetail(currentEvidence, {
     onClose: () => dispatchShell({ type: 'close-detail' }),
-    onName: (occurrence) => propose(occurrence, confirm),
+    onName: (occurrence) => writePath.propose(occurrence),
     onEvidenceOpened: (anchorId) => {
       // 5.2: the written claim and the spatial world point at the same evidence at the same
       // moment. Focusing the anchor is the spatial half of that one gesture.
@@ -556,7 +548,7 @@ async function mount(): Promise<void> {
     detail.root,
     forming.root,
     companionPanel.root,
-    confirm.root,
+    writePath.confirm.root,
     commandBar.root,
     mapCaption,
     travelStatus,
@@ -587,7 +579,7 @@ async function mount(): Promise<void> {
       detail.root,
       forming.root,
       companionPanel.root,
-      confirm.root,
+      writePath.confirm.root,
       mapCaption,
       travelStatus,
     ];
@@ -998,60 +990,6 @@ async function mount(): Promise<void> {
     console.warn(`atlas placement disagrees with atlas-core by ${worst} atlas units`);
   }
 
-  // -- the write path, in full -----------------------------------------------------------
-  function propose(occurrence: OccurrenceRecord, panel: typeof confirm): void {
-    const form = detail.root.querySelector<HTMLFormElement>('.name-offer');
-    const input = form?.querySelector<HTMLInputElement>('input');
-    const displayName = input?.value.trim() ?? '';
-    if (displayName.length === 0) return;
-
-    issued += 1;
-    const proposalId = `proposal-${issued}`;
-    // Drafted by world-index, not here. The tier, the reversibility and the four bands all come
-    // from the one policy table both surfaces obey.
-    const draft = draftEdit(
-      current!,
-      syntheticEntityFor(occurrence),
-      displayName,
-      (kind) => `${kind}-${issued}`,
-    );
-    const translated = toUpdateProposal(draft, {
-      proposalId,
-      turnId: `turn-${issued}`,
-      stateVersion: currentSession!.stateVersion(),
-      occurrenceId: occurrence.occurrenceId,
-    });
-    if (!translated.ok) {
-      panel.reportFailure(translated.reason);
-      return;
-    }
-    currentSession!.stage(translated.proposal);
-    panel.show(proposalId, confirmationFor(draft, syntheticEntityFor(occurrence)), displayName);
-  }
-
-  async function commit(proposalId: string): Promise<void> {
-    if (preview) {
-      companionStage.setState('uncertain');
-      confirm.reportFailure('Preview mode is read-only. No change was sent.');
-      return;
-    }
-    // This state names a real pending write. It begins before the request and ends with its result.
-    companionStage.setState('working');
-    try {
-      await currentSession!.commit(proposalId);
-    } catch (error) {
-      companionStage.setState('uncertain');
-      panelFailure(confirm, error);
-      return;
-    }
-    // Only a completed account-holder confirmation earns this state.
-    companionStage.setState('settled');
-    confirm.hide();
-    // Re-read rather than patched. See the module comment.
-    state.snapshot = await currentSession!.snapshot();
-    selected = null;
-    await mount();
-  }
 }
 
 function syncIndexRoute(facets: IndexFacets): void {
@@ -1062,48 +1000,7 @@ function syncIndexRoute(facets: IndexFacets): void {
   window.history.replaceState(window.history.state, '', url);
 }
 
-function panelFailure(confirm: ReturnType<typeof buildConfirm>, error: unknown): void {
-  confirm.reportFailure(
-    error instanceof ApiError
-      ? `${error.code}: ${error.message}`
-      : error instanceof Error
-        ? error.message
-        : 'the write was refused',
-  );
-}
 
-/**
- * The entity a bare occurrence would become.
- *
- * `draftEdit` and `confirmationFor` both take an `EntityRecord`, because both were written for
- * the case where the thing already exists. Naming a detection creates the entity, so there is no
- * record to hand them yet. This builds the one the write is about to produce: no name, no
- * assertions, and the occurrence's own island. Every field is either the truth or empty, and
- * nothing here is written anywhere: it exists to be described in the confirmation panel and is
- * discarded afterwards.
- */
-function syntheticEntityFor(occurrence: OccurrenceRecord) {
-  return {
-    entityId: occurrence.entityId ?? occurrence.occurrenceId,
-    kind: occurrence.kind === 'voice' || occurrence.kind === 'conversation'
-      ? ('object' as const)
-      : (occurrence.kind as 'person' | 'place' | 'object' | 'event'),
-    displayName: null,
-    status: 'inferred_only' as const,
-    occurrenceCount: 1,
-    islandIds: [occurrence.islandId],
-    firstSeenMs: occurrence.capturedAtMs,
-    lastSeenMs: occurrence.capturedAtMs,
-    confidence: occurrence.confidence,
-    openQuestionCount: 0,
-    citingAnswerCount: 0,
-    assertions: [],
-    relations: [],
-    contradictions: [],
-    history: [],
-    mergedInto: null,
-  };
-}
 
 
 /**
