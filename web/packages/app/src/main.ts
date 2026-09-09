@@ -36,6 +36,7 @@ import '@exulanica/presentation/tokens.css';
 import './style.css';
 import './appearance.css';
 import './unified-interface.css';
+import './ui/object-placement.css';
 
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
@@ -58,6 +59,7 @@ import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
+import { mountObjects } from './composition/objects.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
@@ -292,6 +294,19 @@ async function mount(): Promise<void> {
   });
 
 
+  // Authored objects. Mounted after the write path because it hides that panel before showing
+  // its own confirmation, and before the renderer because its root enters the document below;
+  // it reads `state.atlas` late for the same reason every pre-renderer surface does.
+  const objects = mountObjects({
+    env,
+    state,
+    credentials: currentCredentials,
+    scene: built.scene,
+    showTravelStatus: (message, kind) => showTravelStatus(message, kind),
+    isWorldPrimary: () => shellState.primary === 'world',
+    hideWritePathConfirm: () => writePath.confirm.hide(),
+  });
+
   const travelStatus = el('p', {
     class: 'travel-status',
     role: 'status',
@@ -477,6 +492,8 @@ async function mount(): Promise<void> {
     formation.root,
     companion.panel.root,
     writePath.confirm.root,
+    objects.panel.root,
+    objects.confirm.root,
     commandBar.root,
     mapCaption,
     travelStatus,
@@ -600,6 +617,9 @@ async function mount(): Promise<void> {
   // world is the whole of what is on screen.
 
   renderer.reportPlacementDisagreement();
+
+  // After the renderer, because every object it draws needs a binding to draw into.
+  void objects.begin();
 
 }
 

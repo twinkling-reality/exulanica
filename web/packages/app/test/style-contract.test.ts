@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 const componentStyles = [
   readFileSync(new URL('../src/style.css', import.meta.url), 'utf8'),
   readFileSync(new URL('../src/appearance.css', import.meta.url), 'utf8'),
+  // The first per-view stylesheet in the package. Added here rather than left outside, because a
+  // file this test does not read is a file the palette and motion rules do not apply to.
+  readFileSync(new URL('../src/ui/object-placement.css', import.meta.url), 'utf8'),
 ].join('\n');
 const worldStyleAdapter = readFileSync(new URL('../src/theme.ts', import.meta.url), 'utf8');
 
