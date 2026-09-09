@@ -1,6 +1,11 @@
 import type { Turn } from '@exulanica/companion-runtime';
+import type {
+  AnswerProvenance,
+  AskUnavailable,
+  CompanionAnswer,
+} from '../companion-ask-api.js';
 import { el, replace } from './dom.js';
-import { say } from './copy.js';
+import { fill, say } from './copy.js';
 
 export interface CompanionSpeechOptions {
   readonly speakerName: string;
@@ -10,6 +15,54 @@ export interface CompanionSpeech {
   readonly root: HTMLElement;
   render(turn: Turn): void;
   reportRefusal(reasonKey: string): void;
+  /** The question is with the library. Says so, and says nothing about what it will find. */
+  renderAsking(question: string): void;
+  renderAnswer(answer: CompanionAnswer): void;
+  reportAskFailure(failure: AskUnavailable): void;
+}
+
+/**
+ * How long the answer took, as a person reads a duration.
+ *
+ * Milliseconds under a second, because the difference between 40 ms and 900 ms is the difference
+ * between a cache and a call. Seconds above it to one place, because the reasoning core has been
+ * measured at 80 s on a 24-item packet and "80412 ms" is not a duration anybody reads.
+ */
+function duration(latencyMs: number): string {
+  return latencyMs < 1000 ? `${latencyMs} ms` : `${(latencyMs / 1000).toFixed(1)} s`;
+}
+
+/**
+ * One line saying who wrote the sentence above it.
+ *
+ * The identifier is the SERVED one, out of the response body. `docs/product-direction.md` makes
+ * that the gate rather than a nicety: the executed variant is "recorded rather than inferred
+ * from configuration", and a line that named the configured model would be wrong exactly when
+ * the fallback fired.
+ */
+export function provenanceSentence(provenance: AnswerProvenance): string {
+  const spent = duration(provenance.latencyMs);
+  if (provenance.composed === 'none') return say('provenance.none');
+
+  if (provenance.composed === 'search') {
+    // A model read the question and none wrote the answer. Falling through to
+    // `provenance.none` here, which is what this function used to do whenever no composing
+    // model was named, printed "No model was asked" over every abstention the interface
+    // produced, because the browser sends no plan and the planner therefore always runs.
+    return provenance.plannedBy === null
+      ? say('provenance.none')
+      : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
+  }
+
+  if (provenance.composed === 'discarded') {
+    return provenance.servedModel === null
+      ? fill('provenance.discardedUnnamed', { duration: spent })
+      : fill('provenance.discarded', { model: provenance.servedModel, duration: spent });
+  }
+
+  if (provenance.servedModel === null) return say('provenance.none');
+  const values = { model: provenance.servedModel, duration: spent };
+  return fill(provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model', values);
 }
 
 /*
@@ -30,7 +83,15 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
     'aria-labelledby': 'companion-speaker-name',
   });
 
-  const render = (turn: Turn): void => {
+  let lastQuestion = '';
+
+  const speaker = (): HTMLElement => el('h2', {
+    id: 'companion-speaker-name',
+    class: 'companion-speaker',
+    text: options.speakerName,
+  });
+
+  const renderTurn = (turn: Turn): void => {
     const content: (Node | string)[] = [
       el('h2', {
         id: 'companion-speaker-name',
@@ -43,9 +104,83 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
     replace(root, content);
   };
 
+  /*
+   * The answer band.
+   *
+   * The sentence is the SERVER'S. Every clause was validated against the evidence packet before
+   * it left the API: a historical clause carries a citation that resolves, and a digit that no
+   * value reference covers is refused outright. Rewriting any of it here would put prose nobody
+   * checked inside the one surface whose claim is that its sentences are backed, so this renders
+   * the clauses and adds only two things the server did not write: a label for which KIND of
+   * silence an abstention is, and a line saying which model answered.
+   */
+  const renderAnswer = (answer: CompanionAnswer): void => {
+    lastQuestion = answer.question;
+    const content: (Node | string)[] = [
+      speaker(),
+      el('p', { class: 'companion-question-echo', text: answer.question }),
+    ];
+
+    for (const clause of answer.clauses) {
+      const paragraph = el('p', { class: 'companion-utterance', text: clause.text });
+      paragraph.dataset['clause'] = clause.type;
+      content.push(paragraph);
+    }
+    if (answer.clauses.length === 0) {
+      content.push(el('p', { class: 'companion-utterance', text: say('ask.emptyAnswer') }));
+    }
+
+    if (answer.abstained !== null) {
+      content.push(el('p', {
+        class: 'companion-abstention',
+        text: say(`abstention.${answer.abstained}`),
+      }));
+    }
+
+    content.push(el('p', {
+      class: 'companion-provenance',
+      text: provenanceSentence(answer.provenance),
+    }));
+
+    root.dataset['mode'] = 'answer';
+    root.toggleAttribute('data-abstained', answer.abstained !== null);
+    replace(root, content);
+  };
+
   return {
     root,
-    render,
+    render(turn) {
+      root.dataset['mode'] = 'turn';
+      root.removeAttribute('data-abstained');
+      renderTurn(turn);
+    },
+    renderAsking(question) {
+      lastQuestion = question;
+      root.dataset['mode'] = 'asking';
+      root.removeAttribute('data-abstained');
+      replace(root, [
+        speaker(),
+        el('p', { class: 'companion-question-echo', text: question }),
+        el('p', { class: 'companion-utterance', text: say('ask.working') }),
+      ]);
+    },
+    renderAnswer,
+    reportAskFailure(failure) {
+      // The working line is REPLACED rather than appended to. Leaving "Looking through your
+      // library" above "the question did not reach the library" would leave a sentence on the
+      // screen that is no longer true.
+      //
+      // The kind, then the server's own detail. Two sentences from two places, and only the
+      // first of them is this file's to write.
+      root.dataset['mode'] = 'failed';
+      root.removeAttribute('data-abstained');
+      replace(root, [
+        speaker(),
+        el('p', { class: 'companion-question-echo', text: lastQuestion }),
+        el('p', { class: 'companion-refusal', text: say(`ask.failed.${failure.kind}`) }),
+        el('p', { class: 'companion-refusal-detail', text: failure.detail }),
+      ]);
+    },
     reportRefusal(reasonKey) {
       root.append(el('p', { class: 'companion-refusal', text: say(reasonKey) }));
     },

@@ -38,6 +38,7 @@ from exulanica.selection import (
     Answer,
     AnswerClause,
     AnswerRejected,
+    CaptureWindow,
     ClauseType,
     EpistemicScope,
     Intent,
@@ -51,7 +52,7 @@ from exulanica.selection import (
     validate_answer,
 )
 from exulanica.selection.packet import MAX_PACKET_ITEMS
-from exulanica.selection.question import answer_question, compose_answer
+from exulanica.selection.question import CallLog, answer_question, compose_answer
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.resolve import resolve_original_bytes
 
@@ -529,6 +530,207 @@ def test_the_plan_is_kept_with_the_answer(answered):
     assert outcome.result.total_matched >= 1
     assert outcome.abstention is None
     assert not outcome.deterministic
+
+
+# -- what the answer actually cost, read off the response rather than the manifest ------------
+#
+# `docs/product-direction.md` makes this a delivery gate rather than telemetry: the memory
+# interaction must "record the executed model, task, latency and output", and "Nemotron use must
+# be functional in that interaction if claimed, with the actual executed variant recorded rather
+# than inferred from configuration". Every assertion below reads the executed identifier out of
+# the response body, because that is the only place it exists.
+
+
+def _usage_body(answer: Answer, *, model: str, **usage) -> HttpResponse:
+    return HttpResponse(
+        status_code=200, text=json.dumps(chat_body(answer.model_dump_json(), model=model, **usage))
+    )
+
+
+def _cited(packet, text="You were beside a waterfall.") -> Answer:
+    return Answer(
+        clauses=[
+            AnswerClause(
+                text=text, type=ClauseType.HISTORICAL, citations=[packet.items[0].token]
+            )
+        ]
+    )
+
+
+def test_the_execution_record_names_the_model_that_answered_not_the_one_asked_for(answered):
+    """The distinction the whole block exists for, and the one a manifest cannot make.
+
+    The chain sends the identifier the manifest names. The body echoes the identifier that
+    served. A record built from configuration reports the first and calls it the second, and is
+    wrong precisely when the fallback fired, which is the moment nobody is watching.
+    """
+    packet = answered.packet()
+    client = answered.client([_usage_body(_cited(packet), model="served/by-something-else")])
+    log = CallLog()
+    compose_answer(client, "where was I?", packet, log=log)
+
+    (call,) = log.calls
+    assert call.requested_model == "nvidia/Nemotron-3_5-Lightning"
+    assert call.served_model == "served/by-something-else"
+    assert call.role == "reasoning_cheap"
+    assert call.used_fallback is False
+    assert call.attempts == 1, "zero would mean a cache served it, and this client has none"
+
+
+def test_both_calls_are_listed_in_the_order_the_question_made_them(answered):
+    """Planner then composer. An unordered set would not show which half spent the time.
+
+    The composed answer is one uncited meta clause, because ``answer_question`` builds its own
+    packet and draws fresh tokens for it: an answer prepared here against an earlier packet could
+    not resolve. That is the unforgeability guarantee constraining the test rather than the
+    other way round.
+    """
+    composed = Answer(clauses=[AnswerClause(text="Some photographs match.", type=ClauseType.META)])
+    plan = SelectionPlan(intent=Intent.CAPTURES, limit=5)
+    client = answered.client(
+        [
+            HttpResponse(status_code=200, text=json.dumps(chat_body(plan.model_dump_json()))),
+            _answer_body(composed),
+        ]
+    )
+    outcome = answer_question(
+        answered.repository.connection, client, "which photographs?", answered.session
+    )
+    assert outcome.deterministic is False, "a fallback here would mean three calls, not two"
+    assert [call.role for call in outcome.calls] == ["structured_extraction", "reasoning_cheap"]
+    assert [call.requested_model for call in outcome.calls] == [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/Nemotron-3_5-Lightning",
+    ]
+
+
+def test_an_abstention_records_no_model_call_at_all(answered):
+    """The abstention guarantee as a number a reader of the response can check.
+
+    An empty packet never reaches the composer, and the list being empty says so without asking
+    anybody to believe a docstring. The plan is supplied, so the planner is not called either.
+    """
+    plan = SelectionPlan(
+        intent=Intent.CAPTURES,
+        time=[
+            CaptureWindow(
+                start=dt.datetime(1999, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(1999, 12, 31, tzinfo=dt.UTC),
+            )
+        ],
+    )
+    unused = Answer(clauses=[AnswerClause(text="Nothing.", type=ClauseType.META)])
+    client = answered.client([_answer_body(unused)])
+    outcome = answer_question(
+        answered.repository.connection, client, "was I in Antarctica?", answered.session, plan=plan
+    )
+    assert outcome.abstention is Abstention.NOT_CAPTURED
+    assert outcome.calls == ()
+    assert answered.transport.call_count == 0
+
+
+def test_a_refused_answer_and_the_repair_after_it_are_both_listed(answered):
+    """A call the validator refused was still served and still billed.
+
+    Recording only the surviving answer would report half the latency and half the tokens, and
+    the number a latency budget is set from would be the one that never happens.
+    """
+    packet = answered.packet()
+    refused = Answer(clauses=[AnswerClause(text="You were there.", type=ClauseType.HISTORICAL)])
+    client = answered.client([_answer_body(refused), _answer_body(_cited(packet))])
+    log = CallLog()
+    _, deterministic, rejections = compose_answer(client, "where was I?", packet, log=log)
+
+    assert deterministic is False and rejections
+    assert len(log.calls) == 2, "the refused attempt is a call that happened"
+    assert {call.role for call in log.calls} == {"reasoning_cheap"}
+
+
+def test_a_count_the_provider_did_not_report_is_absent_rather_than_zero(answered):
+    """An absence is not a measurement, and a stand-in zero would read as one.
+
+    ``CallUsage`` coalesces a missing count to zero, which is right for a bill and wrong for a
+    record of what was observed, so these are read from the raw body instead.
+    """
+    packet = answered.packet()
+    body = chat_body(_cited(packet).model_dump_json())
+    del body["usage"]["completion_tokens_details"]
+    del body["usage"]["prompt_tokens"]
+    client = answered.client([HttpResponse(status_code=200, text=json.dumps(body))])
+    log = CallLog()
+    compose_answer(client, "where was I?", packet, log=log)
+
+    (call,) = log.calls
+    assert call.prompt_tokens is None
+    assert call.reasoning_tokens is None
+    assert call.completion_tokens == 200, "a count that WAS reported is still reported"
+
+
+def test_a_reported_count_is_carried_through_exactly(answered):
+    packet = answered.packet()
+    client = answered.client(
+        [
+            _usage_body(
+                _cited(packet),
+                model="nvidia/Nemotron-3_5-Lightning",
+                prompt_tokens=1234,
+                completion_tokens=567,
+                reasoning_tokens=89,
+            )
+        ]
+    )
+    log = CallLog()
+    compose_answer(client, "where was I?", packet, log=log)
+
+    (call,) = log.calls
+    assert (call.prompt_tokens, call.completion_tokens, call.reasoning_tokens) == (1234, 567, 89)
+
+
+def test_latency_is_whole_milliseconds(answered):
+    """Integer, because every evaluation record in this repository refuses a float.
+
+    A float rewrites its last digits on a JSON round trip, and a latency nobody can reproduce
+    byte for byte cannot be bound into a digest-bound record.
+    """
+    packet = answered.packet()
+    client = answered.client([_answer_body(_cited(packet))])
+    log = CallLog()
+    compose_answer(client, "where was I?", packet, log=log)
+
+    (call,) = log.calls
+    assert type(call.latency_ms) is int
+    assert call.latency_ms >= 0
+
+
+def test_the_fallback_model_is_recorded_as_the_one_that_served(answered):
+    """A silent failover during a deprecation round has to be visible in the record.
+
+    The primary answers 404, the chain walks on, and the block says which identifier actually
+    produced the sentence. Without this the answer would look identical to one the primary wrote.
+    """
+    from model_fakes import model_not_found
+
+    packet = answered.packet()
+    client = answered.client([])
+    answered.transport.by_model["nvidia/Nemotron-3_5-Lightning"] = model_not_found(
+        "nvidia/Nemotron-3_5-Lightning"
+    )
+    answered.transport.by_model["nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"] = HttpResponse(
+        status_code=200,
+        text=json.dumps(
+            chat_body(
+                _cited(packet).model_dump_json(), model="nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+            )
+        ),
+    )
+    log = CallLog()
+    compose_answer(client, "where was I?", packet, log=log)
+
+    (call,) = log.calls
+    assert call.requested_model == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    assert call.served_model == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    assert call.used_fallback is True
+    assert call.attempts == 2, "the withdrawn primary cost one request before the fallback"
 
 
 # -- which model does which job, and why it is not the other way round ------------------------

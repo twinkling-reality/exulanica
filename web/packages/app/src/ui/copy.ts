@@ -131,7 +131,69 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'refused.unavailable': 'That option is not available on this question.',
   'refused.unknownOption': 'That option is not on this question.',
   'refused.useSubmit': 'Choose everything that applies, then press Submit.',
+
+  // -- what the Companion says when the words were a QUESTION rather than an answer ----------
+  //
+  // Free text on an open turn is parsed into an update proposal. When the parser finds nothing
+  // to change, or when the open turn is an acknowledgement with nothing to attach a change to,
+  // the words were a question about the library, and `POST /selection/ask` answers it. Every
+  // sentence below is about the ASKING, never about what was found: what was found is written
+  // by the server from the evidence and is rendered verbatim.
+  'ask.working': 'Looking through your library.',
+  'ask.emptyAnswer': 'The answer came back with nothing in it.',
+
+  // A question that did not reach an answer. Four different facts, said as four sentences,
+  // because "something went wrong" is the one reply that tells a person nothing they can act on.
+  // The server's own detail is shown alongside these rather than replaced by them.
+  'ask.failed.no_model': 'This instance is running without a model, so it cannot answer a question in words.',
+  'ask.failed.unauthenticated': 'This session is no longer allowed to ask.',
+  'ask.failed.refused': 'The question was refused.',
+  'ask.failed.unreachable': 'The question did not reach the library.',
+
+  // The scored abstention categories, as labels for the answer the server already wrote. They
+  // name the KIND of silence; the sentence itself stays the server's. evaluation-methodology.md
+  // M3 keeps the three apart, because merging them lets a system that always declines score well.
+  'abstention.UNANSWERABLE_NOT_CAPTURED': 'No photograph in the library matches that.',
+  'abstention.UNANSWERABLE_AMBIGUOUS': 'That could be read more than one way.',
+  'abstention.UNANSWERABLE_NOT_IN_MODALITY': 'Answering that would need something a photograph does not hold.',
+
+  // Evidence behind an answer. A chip that cannot open says so instead of opening nothing.
+  'answer.openEvidence': 'Open the photograph',
+  'answer.evidenceNotLocated': 'This citation could not be located just now.',
+  'answer.backToQuestion': 'Back to the question',
+
+  // Who wrote the sentence, which is not always a model. When the composer's output fails
+  // validation twice it is discarded and the answer is rendered from the query result instead;
+  // naming the model on that answer would credit it with a sentence it did not write.
+  'provenance.model': 'Answered by {model} in {duration}.',
+  // A model read the question and no model wrote the answer. This is every abstention asked
+  // through the interface: the browser sends no plan, so the planner always runs, and the
+  // composer is never called on an empty packet. Saying "no model was asked" here was false.
+  'provenance.search':
+    '{model} read the question in {duration}. Nothing a model wrote is below: that is what the '
+    + 'search itself found.',
+  'provenance.modelOnFallback': 'Answered by the fallback model {model} in {duration}.',
+  'provenance.discarded':
+    '{model} was asked and answered in {duration}. What it wrote was not supported by the ' +
+    'evidence, so this is the answer built from the search itself.',
+  // The same outcome, with no model to name: a composer whose reply the endpoint truncated
+  // raises before any result reaches the recorder, so the call that failed is not in the list.
+  'provenance.discardedUnnamed':
+    'A model was asked and took {duration}. What it wrote was not supported by the evidence, so '
+    + 'this is the answer built from the search itself.',
+  'provenance.none': 'No model was asked. This is what the search found.',
 });
+
+/**
+ * A sentence from the table with its placeholders filled.
+ *
+ * The template lives in the table above, so the forbidden-claim assertion in `copy.test.ts`
+ * walks it like every other string. A sentence assembled from fragments at the call site would
+ * be prose this file does not own, which is the one thing it exists to prevent.
+ */
+export function fill(key: string, values: Readonly<Record<string, string>>): string {
+  return say(key).replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole);
+}
 
 /** The sentence for a key, or the key itself when nobody has written one. */
 export function say(key: string): string {

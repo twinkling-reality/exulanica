@@ -1,4 +1,5 @@
 import type { Turn, TurnOption } from '@exulanica/companion-runtime';
+import type { CompanionAnswer } from '../companion-ask-api.js';
 import { buildCompanionComposer, type CompanionComposer } from './companion-composer.js';
 import { commandAction, el, replace } from './dom.js';
 import { say } from './copy.js';
@@ -7,13 +8,21 @@ export interface CompanionChoiceHandlers {
   readonly onSelect: (optionId: string) => void;
   readonly onSubmit: (optionIds: readonly string[]) => void;
   readonly onSay: (text: string) => void;
-  /** Open the exact photograph the current turn cites. */
+  /** Open the exact photograph the current turn, or the current answer, cites. */
   readonly onEvidence: (handleIndex: number) => void;
 }
 
 export interface CompanionChoiceRail {
   readonly root: HTMLElement;
   render(turn: Turn): void;
+  /**
+   * What a person can do with an answer: open what it cited, or ask something else.
+   *
+   * There is deliberately nothing else. An answer is a READ, and every control the rail offers
+   * a turn exists to build an update proposal; offering one here would put the answer path one
+   * click from the write path it is defined as not having.
+   */
+  renderAnswer(answer: CompanionAnswer, onBack: () => void): void;
   pressNumber(index: number): boolean;
   /** Whether the current turn cites anything, so `E` knows if it has a job. */
   openEvidence(): boolean;
@@ -166,11 +175,84 @@ export function buildCompanionChoiceRail(
     replace(root, content);
   }
 
+  /*
+   * One chip per cited photograph, in the order the answer mentions them.
+   *
+   * `E` opens the first, matching the turn rail above it, and each chip opens its own. A
+   * citation the packet could not locate is rendered UNAVAILABLE WITH ITS REASON rather than
+   * hidden, which is the availability semantics interaction-model.md 4.3 fixes for options and
+   * is the right shape here for the same reason: a chip silently missing from a cited answer
+   * reads as an answer that cited less than it did.
+   */
+  function renderAnswer(answer: CompanionAnswer, onBack: () => void): void {
+    lastTurn = null;
+    composer = buildCompanionComposer(handlers.onSay);
+    const content: (Node | string)[] = [];
+
+    if (answer.evidence.length > 0) {
+      const list = el('ul', {
+        class: 'companion-answer-evidence',
+        'aria-label': 'Photographs this answer cites',
+      });
+      for (const [index, cited] of answer.evidence.entries()) {
+        const openable = cited.handle !== null;
+        const chip = el('button', {
+          type: 'button',
+          class: 'companion-choice companion-evidence-chip',
+        }, index === 0
+          ? commandAction('E', say('answer.openEvidence'))
+          : [el('span', { class: 'command-action-label', text: say('answer.openEvidence') })]);
+        if (openable) chip.addEventListener('click', () => handlers.onEvidence(index));
+        else {
+          chip.setAttribute('disabled', '');
+          chip.setAttribute('aria-disabled', 'true');
+        }
+        const item: (Node | string)[] = [chip];
+        if (!openable) {
+          item.push(el('span', {
+            class: 'choice-unavailable-reason',
+            text: say('answer.evidenceNotLocated'),
+          }));
+        }
+        list.append(el(
+          'li',
+          { class: openable ? 'choice-item' : 'choice-item unavailable' },
+          item,
+        ));
+      }
+      content.push(list);
+    }
+
+    // The open turn did not go anywhere. A question asked mid-turn is a detour, and a detour
+    // with no way back is a dead end: without this the only route to the unanswered question is
+    // to dismiss the Companion and summon it again.
+    const back = el('button', {
+      type: 'button',
+      class: 'companion-choice companion-answer-back',
+    }, [el('span', { class: 'command-action-label', text: say('answer.backToQuestion') })]);
+    back.addEventListener('click', onBack);
+
+    // The composer stays revealed, because the natural next move after an answer is another
+    // question, and making a person reopen `Other…` to ask it would be a form. Revealed and not
+    // focused: the answer has just been written into a live region and moving focus into a text
+    // field would take a screen reader off it.
+    content.push(el('div', { class: 'companion-rail-foot companion-answer-foot' }, [
+      back,
+      composer.root,
+    ]));
+    composer.reveal();
+
+    replace(root, content);
+  }
+
   return {
     root,
     render,
+    renderAnswer,
     openEvidence() {
-      const action = root.querySelector<HTMLButtonElement>('.companion-evidence-action');
+      const action = root.querySelector<HTMLButtonElement>(
+        '.companion-evidence-action, .companion-evidence-chip:not([disabled])',
+      );
       if (action === null) return false;
       action.click();
       return true;

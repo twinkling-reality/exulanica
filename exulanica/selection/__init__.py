@@ -51,8 +51,11 @@ from exulanica.selection.plan import (
     SelectionPlan,
 )
 from exulanica.selection.question import (
+    PROMPT_VERSION,
     AnsweredQuestion,
+    CallLog,
     EntityChoice,
+    ModelCall,
     answer_question,
     compose_answer,
     entity_catalogue,
@@ -68,11 +71,13 @@ from exulanica.selection.validation import (
 )
 
 __all__ = [
+    "PROMPT_VERSION",
     "Abstention",
     "Answer",
     "AnswerClause",
     "AnswerRejected",
     "AnsweredQuestion",
+    "CallLog",
     "CaptureSelector",
     "CaptureWindow",
     "ClauseType",
@@ -83,6 +88,7 @@ __all__ = [
     "EvidenceItem",
     "EvidencePacket",
     "Intent",
+    "ModelCall",
     "PlaceSelector",
     "ProcessingState",
     "RejectionCode",
