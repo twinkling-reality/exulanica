@@ -25,19 +25,12 @@ import './style.css';
 import './appearance.css';
 import './unified-interface.css';
 
-import type {
-  GraphSnapshot,
-  OccurrenceRecord,
-  ReconstructionSceneRecord,
-  RenderingSubstrate,
-} from '@exulanica/graph-client';
+import type { OccurrenceRecord, RenderingSubstrate } from '@exulanica/graph-client';
 import { ApiError } from '@exulanica/graph-client';
 import {
   anchorId as toAnchorId,
   islandId as toIslandId,
-  localVec3,
   type IslandId,
-  type SceneDisplayFrame,
 } from '@exulanica/atlas-core';
 // A second atlas-core import, deliberately its own statement. Click-to-evidence's geometry is a
 // self-contained group, and keeping it apart from the block above leaves that block byte-identical
@@ -57,33 +50,10 @@ import {
   type IndexFacets,
 } from '@exulanica/world-index';
 import { mountAtlas, type MountedAtlas } from './atlas.js';
-import type {
-  PlacedScenePointMap,
-  PointMap,
-  SourceMediaCatalog,
-  TrainedSceneGeometry,
-  RecoveredSceneCamera,
-} from '@exulanica/atlas-react/playcanvas';
-import {
-  footprintRadiusOf,
-  scenePointMapFootprint,
-  scenePointMapForward,
-  scenePointMapViewpoint,
-  trainedSceneFootprint,
-} from '@exulanica/atlas-react/playcanvas';
-import {
-  applicationTitle,
-  credentials,
-  developmentToken,
-  isAtlasPreview,
-  previewCredentials,
-  sourcePresentation,
-} from './config.js';
-import { EvidenceCache } from './evidence.js';
+import { applicationTitle, developmentToken, sourcePresentation } from './config.js';
 import { listBatches, watchBatch, type BatchSummary } from './formation.js';
 import { toUpdateProposal } from './proposal.js';
-import { buildScene, type ReconstructedGeometry } from './scene.js';
-import { openSession, type Session } from './session.js';
+import { buildScene } from './scene.js';
 import { buildConfirm } from './ui/confirm.js';
 import { buildCompanionEncounter } from './ui/companion-encounter.js';
 import { resolveCompanionPlacement } from './ui/companion-placement.js';
@@ -94,7 +64,7 @@ import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildCompanionStage, type CompanionStage } from './ui/companion-stage.js';
 import { createCompanionController } from './companion.js';
 import { CompanionAskClient } from './companion-ask-api.js';
-import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
+import type { Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
@@ -107,11 +77,7 @@ import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidan
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
 import { buildRegionPlan } from './ui/region-plan.js';
-import {
-  buildStatus,
-  MAP_ORIENTATION_CAPTION,
-  type ReconstructionRungDisclosure,
-} from './ui/status.js';
+import { buildStatus, MAP_ORIENTATION_CAPTION } from './ui/status.js';
 // Below the status import rather than beside it: the person-consent branch adds its own imports
 // at the top of this block, and two branches inserting into one sorted list conflict over nothing.
 import { proofLensIslandColors } from './ui/proof-lens.js';
@@ -122,29 +88,9 @@ import {
   type ObservationGraph,
 } from './observations-api.js';
 import { PersonReviewApi, ReviewUnavailable } from './person-review-api.js';
-import { readPreferences, writePreferences, type AtlasPreferences } from './preferences.js';
-import {
-  WorldStyleClient,
-  WorldStyleContractError,
-  type ActiveWorldStylePreview,
-  type WorldStyleConnection,
-  type WorldStyleVersionRecord,
-} from './world-style-api.js';
-import { SourceMediaClient, type SourceMediaSession } from './source-media-api.js';
-import {
-  GeometryClient,
-  regionsByCapture,
-  type GeometryIssue,
-  type GeometryIssueState,
-  displayFrameSentence,
-  type HeldPointMaps,
-} from './geometry-api.js';
-import { browserValidation } from './browser-validation.js';
+import { writePreferences, type AtlasPreferences } from './preferences.js';
+import type { ActiveWorldStylePreview } from './world-style-api.js';
 import { worldStyleProposalInbox } from './world-style-proposals.js';
-import {
-  InteractionPolicyClient,
-  preferencesFromInteractionPolicy,
-} from './interaction-policy.js';
 import {
   applyDocumentAppearance,
   applyDocumentWorldStyle,
@@ -162,41 +108,38 @@ import {
   updateWorldShell,
   type WorldShellEvent,
 } from './world-shell.js';
+import {
+  describeWorldStyleFailure,
+  preferencesForWorldReference,
+  preferencesForWorldVersion,
+  presentWorldStyleAuthority,
+  syncWorldStyleConnection,
+  worldStylePreviewMatches,
+} from './composition/appearance.js';
+import {
+  mountSessionGeometry,
+  openAppSession,
+  reconstructionRungsFor,
+  reconstructionsOf,
+} from './composition/session-and-geometry.js';
+import { createAppEnvironment, createSessionState } from './composition/session-state.js';
 
-const shell = document.getElementById('shell');
-const canvas = document.getElementById('atlas');
-if (!(canvas instanceof HTMLCanvasElement) || shell === null) {
-  throw new Error('app: expected #atlas and #shell in the document');
-}
-const browserMeasurement = browserValidation(window.location.search);
+const env = createAppEnvironment();
+const state = createSessionState();
+const {
+  shell,
+  canvas,
+  browserMeasurement,
+  systemAppearance,
+  systemReducedMotion,
+  preview,
+  previewArtProfile,
+} = env;
 
-let credentials_: { baseUrl: string; token: string } | null = null;
-let session: Session | null = null;
-let stopWatching: (() => void) | null = null;
-let snapshot: GraphSnapshot | null = null;
 let atlas: MountedAtlas | null = null;
-let evidence: EvidenceCache | null = null;
-let companionEngine: CompanionSession | null = null;
+let stopWatching: (() => void) | null = null;
 let mountedCompanionStage: CompanionStage | null = null;
 let settingsStylePreviewId: string | null = null;
-let interactionPolicies: InteractionPolicyClient | null = null;
-let previewSourceMedia: SourceMediaCatalog | undefined;
-/**
- * The geometry the world is currently drawing, whichever side it came from.
- *
- * One variable rather than two, because `mount` must not know: production reads it from the
- * API through `geometry-api.ts` and the preview loads a reconstruction from disk, and a mount
- * that branched on which would be a second place for the two to diverge.
- */
-let pointMaps_: ReadonlyMap<IslandId, PointMap> | undefined;
-/** All maps with their shared-scene transforms. Undefined for the legacy preview path. */
-let placedPointMaps_: readonly PlacedScenePointMap[] | undefined;
-let trainedGeometry_: readonly TrainedSceneGeometry[] = Object.freeze([]);
-let recoveredCameras_: readonly RecoveredSceneCamera[] = Object.freeze([]);
-let notDrawnScenes_: ReadonlySet<string> = new Set();
-let displayFrames_: ReadonlyMap<string, SceneDisplayFrame> = new Map();
-/** What the last production load decoded, by artifact id, so a re-mount re-fetches no bytes. */
-let heldPointMaps_: HeldPointMaps | undefined;
 
 /**
  * Whether the proof lens is switched on, for this session only.
@@ -221,77 +164,13 @@ let observationGraph_: ObservationGraph | null = null;
 let observationGraphSceneId_: string | null = null;
 let observationLoad_: Promise<void> | null = null;
 
-let worldStyles: WorldStyleClient | null = null;
-let worldStyleConnection: WorldStyleConnection | null = null;
-let worldStyleFailure: string | null = null;
-let sourceMediaSession: SourceMediaSession | null = null;
-let sourceMediaNotices: readonly string[] = Object.freeze([]);
-let geometryNotices: readonly string[] = Object.freeze([]);
-let geometryIssues_: readonly GeometryIssue[] = Object.freeze([]);
-let reconstructionRungs: readonly ReconstructionRungDisclosure[] = Object.freeze([]);
 let stopWorldStyleProposalInbox: (() => void) | null = null;
 
-/**
- * What each decoded point map says about its region, for the scene graph.
- *
- * The rung and the viewpoint are read off the container rather than assumed: `rung` is fixed at
- * 3 by the format, and `viewpoint.position` is the camera the reconstruction was recovered from.
- * Reading them here keeps `scene.ts` free of the container format while still letting the scene
- * graph describe a region by the geometry it is actually holding.
- */
-function reconstructionsOf(
-  maps: ReadonlyMap<IslandId, PointMap> | undefined,
-  placedMaps: readonly PlacedScenePointMap[] | undefined,
-): ReadonlyMap<IslandId, ReconstructedGeometry> {
-  const out = new Map<IslandId, ReconstructedGeometry>();
-  const placedByIsland = new Map<IslandId, PlacedScenePointMap[]>();
-  for (const placed of placedMaps ?? []) {
-    const held = placedByIsland.get(placed.islandId);
-    if (held === undefined) placedByIsland.set(placed.islandId, [placed]);
-    else held.push(placed);
-  }
-  for (const [islandId, values] of placedByIsland) {
-    const viewpoint = scenePointMapViewpoint(values[0]!);
-    const forward = scenePointMapForward(values[0]!);
-    out.set(islandId, {
-      rung: 3,
-      viewpointLocal: localVec3(viewpoint[0], viewpoint[1], viewpoint[2]),
-      viewpointForwardLocal: localVec3(forward[0], forward[1], forward[2]),
-      footprintRadiusLocal: Math.max(scenePointMapFootprint(values), ...trainedGeometry_
-        .filter((geometry) => geometry.islandId === islandId).map(trainedSceneFootprint)),
-    });
-  }
-  for (const trained of trainedGeometry_) {
-    if (out.has(trained.islandId)) continue;
-    const camera = recoveredCameras_.find((camera) => camera.sceneId === trained.sceneId && camera.islandId === trained.islandId);
-    if (camera === undefined) continue;
-    const m = camera.sceneFromCameraRowMajor;
-    // COLMAP cameras look along their local +Z axis, the third column of the rotation.
-    out.set(trained.islandId, { rung: 3, viewpointLocal: localVec3(m[3]!, m[7]!, m[11]!),
-      viewpointForwardLocal: localVec3(m[2]!, m[6]!, m[10]!),
-      footprintRadiusLocal: trainedSceneFootprint(trained) });
-  }
-  for (const [islandId, map] of maps ?? []) {
-    if (out.has(islandId)) continue;
-    const [x, y, z] = map.header.viewpoint.position;
-    out.set(islandId, {
-      rung: map.header.rung,
-      viewpointLocal: localVec3(x, y, z),
-      // The renderer's own function, so the region's stated size and the radius its cloud
-      // dissolves at cannot drift apart.
-      footprintRadiusLocal: footprintRadiusOf(map.header),
-    });
-  }
-  return out;
-}
-window.addEventListener('pagehide', () => sourceMediaSession?.dispose(), { once: true });
-const systemAppearance = window.matchMedia('(prefers-color-scheme: dark)');
-const systemReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
   atlas?.binding.setReducedMotion(event.matches);
 });
-let preferences = readPreferences(window.localStorage);
-applyDocumentAppearance(preferences, systemAppearance.matches);
+applyDocumentAppearance(state.preferences, systemAppearance.matches);
 /**
  * Window listeners belonging to the current mount.
  *
@@ -305,28 +184,21 @@ let indexFacets: IndexFacets = decodeFacets(window.location.search);
 let selected: string | null = null;
 /** Monotonic, so two proposals in one session never share an id. Not a clock and not random. */
 let issued = 0;
-const preview = isAtlasPreview(window.location.search, import.meta.env.DEV);
 document.title = applicationTitle(preview);
-const previewArtProfileId = preview
-  ? new URLSearchParams(window.location.search).get('world-style')
-  : null;
-const previewArtProfile = previewArtProfileId === null
-  ? undefined
-  : worldArtProfile(previewArtProfileId);
 applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
-  preferences.worldArtProfile,
-  preferences.worldArtProfileVersion,
-  preferences.worldStyleParameters,
+  state.preferences.worldArtProfile,
+  state.preferences.worldArtProfileVersion,
+  state.preferences.worldStyleParameters,
 ));
 
 void boot().catch((error: unknown) => {
-  canvas!.hidden = true;
-  shell!.setAttribute('data-world-state', 'error');
-  replace(shell!, [buildStartupState(error)]);
+  canvas.hidden = true;
+  shell.setAttribute('data-world-state', 'error');
+  replace(shell, [buildStartupState(error)]);
 });
 
 async function boot(): Promise<void> {
-  replace(shell!, [buildStartupState()]);
+  replace(shell, [buildStartupState()]);
   if (preview) {
     await start('');
     return;
@@ -382,267 +254,20 @@ function askForToken(): void {
             : 'the request failed';
     });
   });
-  replace(shell!, [form]);
+  replace(shell, [form]);
   input.focus();
 }
 
 async function start(token: string): Promise<void> {
-  if (preview) {
-    previewSourceMedia = (await import('./dev/preview-media.js')).PREVIEW_SOURCE_MEDIA;
-    pointMaps_ = await (await import('./dev/preview-point-maps.js')).previewPointMaps();
-  }
-  credentials_ = preview
-    ? previewCredentials(window.location.origin)
-    : credentials(token);
-  const opened = await openSession(credentials_);
-  session = opened.session;
-  snapshot = opened.initial;
-  evidence = new EvidenceCache(opened.session.client);
-  companionEngine = opened.companion;
-  if (!preview) {
-    worldStyles = new WorldStyleClient(credentials_);
-    try {
-      worldStyleConnection = await worldStyles.connect();
-      preferences = preferencesForWorldVersion(
-        preferences,
-        worldStyleConnection.state.current,
-      );
-      worldStyleFailure = null;
-    } catch (error) {
-      worldStyleFailure = describeWorldStyleFailure(error);
-      worldStyleConnection = null;
-      worldStyles = null;
-    }
-    interactionPolicies = new InteractionPolicyClient(credentials_);
-    const startupNotices: string[] = [];
-    try {
-      const interactionState = await new InteractionPolicyClient({
-        ...credentials_, signal: AbortSignal.timeout(15_000),
-      }).current();
-      if (interactionState.current !== null) {
-        preferences = preferencesFromInteractionPolicy(preferences, interactionState.parameters);
-        try {
-          writePreferences(window.localStorage, preferences);
-        } catch {
-          // The durable server copy is authoritative; private browsing may reject its local cache.
-        }
-      }
-    } catch (error) {
-      interactionPolicies = null;
-      startupNotices.push(`Saved interaction settings unavailable: ${error instanceof Error ? error.message : 'the request failed'}`);
-    }
-    sourceMediaSession?.dispose();
-    sourceMediaSession = null;
-    try {
-      const profile = worldArtProfile(
-        preferences.worldArtProfile,
-        preferences.worldArtProfileVersion,
-        preferences.worldStyleParameters,
-      );
-      sourceMediaSession = await new SourceMediaClient(credentials_).load(
-        profile.palette.stoneShadow,
-      );
-      previewSourceMedia = sourceMediaSession.catalog;
-      sourceMediaNotices = Object.freeze([...startupNotices, ...sourceMediaSession.issues.map((issue) => {
-        const state = issue.state === 'missing_evidence'
-          ? 'Missing source evidence'
-          : issue.state === 'unavailable_asset'
-            ? 'Source asset unavailable'
-            : issue.state === 'unauthorized'
-              ? 'Source not authorized'
-              : 'Source loading error';
-        return `${state}: ${issue.reason}`;
-      })]);
-    } catch (error) {
-      previewSourceMedia = new Map();
-      sourceMediaNotices = Object.freeze([
-        ...startupNotices,
-        `Source media unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
-      ]);
-    }
-  }
+  await openAppSession(env, state, token);
   await mount();
 }
-
-/**
- * The production reconstruction load. ADR-0009 D10, from the client's side.
- *
- * **Regions are resolved from the snapshot the world is drawn from**, not from a second read.
- * The server ships capture ids and no island id, because ADR-0005 leaves what an island is to
- * the client; `regionsByCapture` puts them through the islands this snapshot already resolved,
- * so a shell lands in the region its own anchors did.
- *
- * **It runs on every mount, and that is what makes a deletion reach the renderer.** Called once
- * at start-up it would not: `mount()` re-reads the same decoded maps after every committed
- * write, so a photograph deleted in this session would keep its reconstruction on screen at full
- * fidelity for the life of the tab, and the 410 the delivery route so carefully produces would be
- * observable only during boot. The list is re-read each time and the bytes are not: a map already
- * decoded is handed back through `byArtifact`, so the recurring cost is a few hundred bytes of
- * JSON and the recurring benefit is that a region whose descriptor has gone loses its geometry.
- *
- * **A failure here is never a failure of the world.** A region with no geometry is rung 4, which
- * is a real rung with a real experience, and the whole thesis is that reconstruction quality
- * never participates in the truth guarantee. So every failure becomes a notice on the status bar
- * and the Atlas mounts either way, exactly as the development preview already behaves when a
- * fixture is missing. What previously could still take the world down was a request that never
- * settled; every one of them now carries a deadline.
- */
-async function loadGeometry(
-  where: { baseUrl: string; token: string },
-  from: GraphSnapshot,
-): Promise<void> {
-  browserMeasurement?.beginGeometryLoad();
-  try {
-    const client = new GeometryClient(where, (measurement) => {
-      browserMeasurement?.recordGeometry(measurement);
-    });
-    const regions = regionsByCapture(from.islands);
-    const scenes = from.reconstructionScenes ?? [];
-    // Regions already chose one scene each; the loader draws those and reports the rest.
-    const displayed = new Set(from.islands.flatMap((island) =>
-      island.reconstructionSceneId == null ? [] : [island.reconstructionSceneId]));
-    const sceneGeometry = await client.loadScenes(scenes, regions, heldPointMaps_, displayed);
-    notDrawnScenes_ = new Set(sceneGeometry.issues
-      .filter((issue) => issue.state === 'not_displayed' && issue.sceneId !== undefined)
-      .map((issue) => issue.sceneId!));
-    const sceneCaptures = new Set(
-      scenes.flatMap((scene) => scene.members.map((member) => member.captureId)),
-    );
-    const held = new Map([...(heldPointMaps_ ?? []), ...sceneGeometry.byArtifact]);
-    const legacyGeometry = await client.load(regions, held, sceneCaptures);
-    pointMaps_ = new Map([...legacyGeometry.pointMaps, ...sceneGeometry.pointMaps]);
-    placedPointMaps_ = sceneGeometry.placedPointMaps;
-    trainedGeometry_ = sceneGeometry.trainedGeometry;
-    recoveredCameras_ = sceneGeometry.recoveredCameras;
-    heldPointMaps_ = new Map([...legacyGeometry.byArtifact, ...sceneGeometry.byArtifact]);
-    geometryNotices = geometryNoticesFor([
-      ...sceneGeometry.issues,
-      ...legacyGeometry.issues,
-    ]);
-    geometryIssues_ = Object.freeze([
-      ...sceneGeometry.issues,
-      ...legacyGeometry.issues,
-    ]);
-    browserMeasurement?.endGeometryLoad(geometryIssues_);
-    displayFrames_ = sceneGeometry.displayFrames;
-    reconstructionRungs = reconstructionRungsFor(scenes, sceneGeometry.renderingByScene, notDrawnScenes_, displayFrames_);
-  } catch (error) {
-    pointMaps_ = undefined;
-    placedPointMaps_ = undefined;
-    trainedGeometry_ = Object.freeze([]);
-    recoveredCameras_ = Object.freeze([]);
-    heldPointMaps_ = undefined;
-    geometryNotices = Object.freeze([
-      `Reconstructions unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
-    ]);
-    geometryIssues_ = Object.freeze([]);
-    browserMeasurement?.endGeometryLoad(geometryIssues_);
-    reconstructionRungs = reconstructionRungsFor(
-      from.reconstructionScenes ?? [],
-      new Map(),
-    );
-  }
-}
-
-function reconstructionRungsFor(
-  scenes: readonly ReconstructionSceneRecord[],
-  actual: ReadonlyMap<string, RenderingSubstrate>,
-  notDrawn: ReadonlySet<string> = new Set(),
-  displayFrames: ReadonlyMap<string, SceneDisplayFrame> = new Map(),
-): readonly ReconstructionRungDisclosure[] {
-  return Object.freeze(scenes.map((scene) => {
-    const substrate = actual.get(scene.sceneId) ?? 'source_photographs';
-    const displayedRung = substrate === 'source_photographs' ? 4 : Math.max(scene.recordedRung ?? 3, 3);
-    const reasons = [...scene.displayReasons];
-    const frame = displayFrames.get(scene.sceneId);
-    if (frame !== undefined && substrate !== 'source_photographs') {
-      // The presentation frame is a layout decision and is said out loud beside the rung.
-      reasons.push(displayFrameSentence(frame));
-    }
-    if (notDrawn.has(scene.sceneId)) {
-      reasons.push('Not drawn: its region displays a more complete reconstruction of the same photographs.');
-    } else if (substrate !== scene.renderingSubstrate) {
-      reasons.push(
-        substrate === 'source_photographs'
-          ? 'This browser has no loaded reconstruction; the original source photographs remain available.'
-          : 'This browser is showing verified reconstruction geometry; its recorded quality gate is unchanged.',
-      );
-    }
-    return Object.freeze({
-      sceneId: scene.sceneId,
-      recordedRung: scene.recordedRung,
-      displayedRung: displayedRung as 1 | 2 | 3 | 4,
-      registeredMemberCount: scene.registeredMemberCount,
-      memberCount: scene.memberCount,
-      renderingSubstrate: substrate,
-      reasons: Object.freeze(reasons),
-      // What the proof lens reads. `drawn` is already decided above, and passing it rather than
-      // letting the panel infer it from the substrate is the point: a scene can have trained
-      // geometry and still be showing the visitor nothing, because its region draws another one.
-      drawn: !notDrawn.has(scene.sceneId),
-      // FALSE UNTIL SOMETHING DRAWS A GENERATION, and this is not a placeholder.
-      //
-      // The first version set this whenever a verified generation existed for the scene, which
-      // made the panel tell a visitor "A model produced this. No camera observed it" about a
-      // region drawing recorded point maps. Nothing in this renderer draws generated geometry at
-      // all, so the honest answer to "is a model surface on screen" is no. Filing a generation
-      // must not change what the world says it is showing.
-      //
-      // When a loader draws one, this becomes a fact about that region's drawn content, not about
-      // the existence of a row.
-      showingGenerated: false,
-      ...(scene.trainedGeometry?.quality === undefined ? {} : { trainingQuality: scene.trainedGeometry.quality }),
-    });
-  }));
-}
-
-/**
- * One line per kind of failure, with a count, rather than one line per photograph.
- *
- * `unplaced` is the ordinary state of a photograph in a multi-photograph region rather than an
- * anomaly, so a corpus of eighty photographs across five regions produces seventy-five identical
- * sentences. Rendered one per line they become the page. Counting them keeps the disclosure and
- * loses none of it: the count is the honest number and the first reason says what the kind means.
- */
-function geometryNoticesFor(issues: readonly GeometryIssue[]): readonly string[] {
-  const byState = new Map<GeometryIssueState, GeometryIssue[]>();
-  for (const issue of issues) {
-    const held = byState.get(issue.state);
-    if (held === undefined) byState.set(issue.state, [issue]);
-    else held.push(issue);
-  }
-  return Object.freeze(
-    [...byState].map(([state, group]) => {
-      const label = GEOMETRY_NOTICE[state];
-      const first = group[0]!.reason;
-      return group.length === 1
-        ? `${label}: ${first}`
-        : `${label}: ${group.length} reconstructions. ${first}`;
-    }),
-  );
-}
-
-/** What each geometry failure is called on screen. One phrase per state, and no state hidden. */
-const GEOMETRY_NOTICE: Record<GeometryIssueState, string> = {
-  bytes_missing: 'Reconstruction bytes unavailable',
-  unsupported_container: 'Reconstruction container unsupported',
-  verification_failed: 'Reconstruction failed its digest check',
-  unverifiable: 'Reconstruction could not be verified',
-  undecodable: 'Reconstruction could not be read',
-  unplaced: 'Reconstruction not placed',
-  no_region: 'Reconstruction has no region',
-  not_displayed: 'Reconstruction not drawn',
-  unauthorized: 'Reconstruction not authorized',
-  timed_out: 'Reconstruction timed out',
-  error: 'Reconstruction loading error',
-};
-
 async function mount(): Promise<void> {
-  const current = snapshot;
-  const currentSession = session;
-  const currentEvidence = evidence;
-  const currentCredentials = credentials_;
-  const currentCompanion = companionEngine;
+  const current = state.snapshot;
+  const currentSession = state.session;
+  const currentEvidence = state.evidence;
+  const currentCredentials = state.credentials;
+  const currentCompanion = state.companionEngine;
   if (
     current === null ||
     currentSession === null ||
@@ -656,16 +281,9 @@ async function mount(): Promise<void> {
   // Geometry, re-read here rather than once at start-up. See `loadGeometry`: the list is what
   // carries a deletion to the renderer, and the bytes are not re-fetched. The preview fills the
   // same slot from disk and must not be overwritten by a route it does not serve.
-  if (!preview) {
-    const loading = el('p', {
-      class: 'reconstruction-loading', role: 'status',
-      text: 'Loading and verifying reconstruction… Source photographs remain available if geometry cannot load.',
-    });
-    shell!.setAttribute('aria-busy', 'true');
-    shell!.append(loading);
-    try { await loadGeometry(currentCredentials, current); }
-    finally { loading.remove(); shell!.removeAttribute('aria-busy'); }
-  }
+  await mountSessionGeometry({
+    env, state, credentials: currentCredentials, snapshot: current,
+  });
 
   // The turn engine outlives a re-mount, so it is told about the new graph rather than rebuilt.
   // Rebuilding it would discard the memory of what has already been asked, and the Companion
@@ -685,20 +303,20 @@ async function mount(): Promise<void> {
     atlas?.dispose();
     atlas = null;
     settingsStylePreviewId = null;
-    canvas!.hidden = true;
-    shell!.setAttribute('data-world-state', 'empty');
-    replace(shell!, [emptyWorld]);
+    canvas.hidden = true;
+    shell.setAttribute('data-world-state', 'empty');
+    replace(shell, [emptyWorld]);
     return;
   }
-  canvas!.hidden = false;
-  shell!.removeAttribute('data-world-state');
+  canvas.hidden = false;
+  shell.removeAttribute('data-world-state');
 
   const built = buildScene(
     current,
     1,
     new Map(),
     new Map(),
-    reconstructionsOf(pointMaps_, placedPointMaps_),
+    reconstructionsOf(state, state.pointMaps, state.placedPointMaps),
   );
   // A graph write remounts every surface. Stop the previous field before replacing its node, or
   // its frame loop and observers would survive invisibly for the rest of the session.
@@ -707,9 +325,9 @@ async function mount(): Promise<void> {
   const companionStage = buildCompanionStage({ parent: stage });
   const companionAppearance = (): ReturnType<typeof companionAppearanceConfiguration> =>
     companionAppearanceConfiguration({
-      body: preferences.companionBody,
-      color: preferences.companionColor,
-      face: preferences.companionFace,
+      body: state.preferences.companionBody,
+      color: state.preferences.companionColor,
+      face: state.preferences.companionFace,
     });
   companionStage.setAppearance(companionAppearance());
   mountedCompanionStage = companionStage;
@@ -837,8 +455,8 @@ async function mount(): Promise<void> {
     }, kind === 'failure' ? 5200 : 3200);
   };
   const travelUsesReducedMotion = (): boolean =>
-    preferences.transition === 'fade' ||
-    (preferences.transition === 'system' && systemReducedMotion.matches);
+    state.preferences.transition === 'fade' ||
+    (state.preferences.transition === 'system' && systemReducedMotion.matches);
 
   const detail = buildDetail(currentEvidence, {
     onClose: () => dispatchShell({ type: 'close-detail' }),
@@ -874,7 +492,7 @@ async function mount(): Promise<void> {
     },
   }, {
     preview,
-    ...(previewSourceMedia === undefined ? {} : { sourceMedia: previewSourceMedia }),
+    ...(state.previewSourceMedia === undefined ? {} : { sourceMedia: state.previewSourceMedia }),
   });
 
   const regionPoints = built.scene.islands.map((island) => ({
@@ -931,7 +549,7 @@ async function mount(): Promise<void> {
   // the rail. The stage is the hole it shows through and the parent the anchor overlay writes
   // its nodes into, which is a different job from being the canvas.
   const forming = buildFormation();
-  const chrome = buildWorldChrome(shell!);
+  const chrome = buildWorldChrome(shell);
   const handleAtlasCommand = (command: AtlasCommand): void => {
     if (companionPanel.state() === 'open') dismissCompanion();
     if (command === 'index') dispatchShell({ type: 'toggle-index' });
@@ -950,7 +568,7 @@ async function mount(): Promise<void> {
   });
   reflectFirstUse = (): void => {
     companionPanel.setFirstUsePrompt(firstUse.prompt(inputMode));
-    shell!.dataset['firstUse'] = firstUse.phase();
+    shell.dataset['firstUse'] = firstUse.phase();
   };
   reflectFirstUse();
   const mapReturn = el('button', { type: 'button', text: 'Return  M' });
@@ -985,10 +603,10 @@ async function mount(): Promise<void> {
     origin: 'settings' | 'companion' = 'settings',
   ): boolean => {
     if (atlas === null) return false;
-    const styleChanged = candidate.worldArtProfile !== preferences.worldArtProfile ||
-      candidate.worldArtProfileVersion !== preferences.worldArtProfileVersion ||
+    const styleChanged = candidate.worldArtProfile !== state.preferences.worldArtProfile ||
+      candidate.worldArtProfileVersion !== state.preferences.worldArtProfileVersion ||
       JSON.stringify(candidate.worldStyleParameters) !==
-        JSON.stringify(preferences.worldStyleParameters);
+        JSON.stringify(state.preferences.worldStyleParameters);
     if (!styleChanged) return false;
     if (settingsStylePreviewId !== null) {
       atlas.binding.discardArtProfilePreview(settingsStylePreviewId);
@@ -1011,11 +629,11 @@ async function mount(): Promise<void> {
   };
 
   const previewOnServer = async (candidate: AtlasPreferences): Promise<ActiveWorldStylePreview | null> => {
-    const client = worldStyles;
+    const client = state.worldStyles;
     if (client === null) {
       optionsView.reportWorldLifecycle(
         'failed',
-        worldStyleFailure ?? 'World style authority is unavailable. This preview cannot be saved.',
+        state.worldStyleFailure ?? 'World style authority is unavailable. This preview cannot be saved.',
       );
       return null;
     }
@@ -1028,8 +646,8 @@ async function mount(): Promise<void> {
         parameters: candidate.worldStyleParameters,
       });
       if (sequence === previewSequence) {
-        syncWorldStyleConnection(client);
-        presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, active);
+        syncWorldStyleConnection(state, client);
+        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, active);
         optionsView.reportWorldLifecycle(
           active.recoveredFromStale ? 'stale' : 'ready',
         );
@@ -1052,7 +670,7 @@ async function mount(): Promise<void> {
   };
 
   optionsView = buildOptions({
-    preferences,
+    preferences: state.preferences,
     onChange: applyPreferences,
     /*
      * The person's own photographs, read as four control positions.
@@ -1062,7 +680,7 @@ async function mount(): Promise<void> {
      * the existing preview and Apply own the change exactly as they do for a slider.
      */
     onReadSourceLight: async () => {
-      const catalog = previewSourceMedia;
+      const catalog = state.previewSourceMedia;
       if (catalog === undefined) return null;
       const sources = [...catalog.values()]
         .filter((entry) => entry.available && entry.url !== null)
@@ -1071,10 +689,10 @@ async function mount(): Promise<void> {
       const { sampleSources } = await import('./media-sampler.js');
       const reading = readSourceLight(await sampleSources(sources));
       if (reading.sampled === 0) return null;
-      return sourceLightParameters(reading, preferences.worldStyleParameters);
+      return sourceLightParameters(reading, state.preferences.worldStyleParameters);
     },
     onPreview: (candidate) => {
-      shell!.setAttribute('data-vignette', candidate.vignette);
+      shell.setAttribute('data-vignette', candidate.vignette);
       atlas?.binding.setFieldOfView(candidate.fieldOfView);
       atlas?.binding.setSensitivityMultiplier(candidate.mouseSensitivity);
       if (reflectLocalWorldPreview(candidate)) queueServerPreview(candidate);
@@ -1094,11 +712,11 @@ async function mount(): Promise<void> {
         restored.worldArtProfileVersion,
         restored.worldStyleParameters,
       ));
-      const client = worldStyles;
+      const client = state.worldStyles;
       if (client !== null) {
         void client.discardActive().then(() => {
-          syncWorldStyleConnection(client);
-          presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, null);
+          syncWorldStyleConnection(state, client);
+          presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
           optionsView.reportWorldLifecycle('idle');
         }).catch((error) => optionsView.reportWorldLifecycle(
           'failed', describeWorldStyleFailure(error),
@@ -1110,11 +728,11 @@ async function mount(): Promise<void> {
         window.clearTimeout(serverPreviewTimer);
         serverPreviewTimer = null;
       }
-      const client = worldStyles;
+      const client = state.worldStyles;
       if (client === null) {
         optionsView.reportWorldLifecycle(
           'failed',
-          worldStyleFailure ?? 'World style authority is unavailable. No durable change was made.',
+          state.worldStyleFailure ?? 'World style authority is unavailable. No durable change was made.',
         );
         return false;
       }
@@ -1126,15 +744,15 @@ async function mount(): Promise<void> {
       optionsView.reportWorldLifecycle('checking', 'Applying the reviewed preview…');
       try {
         const result = await client.applyActive();
-        syncWorldStyleConnection(client);
+        syncWorldStyleConnection(state, client);
         if (result.kind === 'stale-recovered') {
           presentWorldStyleAuthority(
-            optionsView, worldStyleConnection, worldStyleFailure, result.preview,
+            optionsView, state.worldStyleConnection, state.worldStyleFailure, result.preview,
           );
           optionsView.reportWorldLifecycle('stale');
           return false;
         }
-        presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, null);
+        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
         optionsView.reportWorldLifecycle('saved');
         return true;
       } catch (error) {
@@ -1143,20 +761,20 @@ async function mount(): Promise<void> {
       }
     },
     onWorldRollback: async (targetVersionId) => {
-      const client = worldStyles;
+      const client = state.worldStyles;
       if (client === null) {
         optionsView.reportWorldLifecycle(
-          'failed', worldStyleFailure ?? 'World style authority is unavailable.',
+          'failed', state.worldStyleFailure ?? 'World style authority is unavailable.',
         );
         return null;
       }
       optionsView.reportWorldLifecycle('checking', 'Restoring the selected saved design…');
       try {
         const result = await client.rollback(targetVersionId);
-        syncWorldStyleConnection(client);
-        presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, null);
+        syncWorldStyleConnection(state, client);
+        presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
         if (result.kind === 'stale') {
-          const latest = preferencesForWorldVersion(preferences, result.state.current);
+          const latest = preferencesForWorldVersion(state.preferences, result.state.current);
           applyPreferences(latest);
           optionsView.reportWorldLifecycle(
             'stale',
@@ -1165,7 +783,7 @@ async function mount(): Promise<void> {
           return null;
         }
         optionsView.reportWorldLifecycle('saved', `Restored as revision ${result.version.revision}.`);
-        return preferencesForWorldVersion(preferences, result.version);
+        return preferencesForWorldVersion(state.preferences, result.version);
       } catch (error) {
         optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
         return null;
@@ -1174,14 +792,14 @@ async function mount(): Promise<void> {
     onClose: () => dispatchShell({ type: 'toggle-options' }),
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
   });
-  presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, null);
+  presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
   stopWorldStyleProposalInbox?.();
   stopWorldStyleProposalInbox = worldStyleProposalInbox.subscribe(async (proposal) => {
-    const client = worldStyles;
+    const client = state.worldStyles;
     if (client === null) {
       optionsView.reportWorldLifecycle(
         'failed',
-        worldStyleFailure ?? 'World style authority is unavailable. The proposal was not previewed.',
+        state.worldStyleFailure ?? 'World style authority is unavailable. The proposal was not previewed.',
       );
       return;
     }
@@ -1196,7 +814,7 @@ async function mount(): Promise<void> {
       optionsView.reportWorldLifecycle('checking', 'Validating the upstream proposal…');
       const active = await client.previewUpstream(proposal);
       const candidate = preferencesForWorldReference(
-        preferences,
+        state.preferences,
         active.preview.candidate.globalStyle,
       );
       optionsView.setPreferences(candidate);
@@ -1204,15 +822,15 @@ async function mount(): Promise<void> {
         candidate,
         proposal.origin === 'companion' ? 'companion' : 'settings',
       );
-      syncWorldStyleConnection(client);
-      presentWorldStyleAuthority(optionsView, worldStyleConnection, worldStyleFailure, active);
+      syncWorldStyleConnection(state, client);
+      presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, active);
       optionsView.reportWorldLifecycle(active.recoveredFromStale ? 'stale' : 'ready');
     } catch (error) {
       optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
     }
   });
   const settingsView = buildControlsGuide({
-    preferences,
+    preferences: state.preferences,
     onChange: applyPreferences,
     onClose: () => dispatchShell({ type: 'toggle-controls' }),
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
@@ -1220,44 +838,44 @@ async function mount(): Promise<void> {
 
   let latestSettingsSave = 0;
   function applyPreferences(next: AtlasPreferences): void {
-    const previous = preferences;
-    preferences = next;
+    const previous = state.preferences;
+    state.preferences = next;
     if (settingsStylePreviewId !== null && atlas !== null) {
       atlas.binding.discardArtProfilePreview(settingsStylePreviewId);
       settingsStylePreviewId = null;
     }
     try {
-      writePreferences(window.localStorage, preferences);
+      writePreferences(window.localStorage, state.preferences);
     } catch {
       // Private browsing may refuse storage. The live setting still applies for this session.
     }
-    const theme = applyDocumentAppearance(preferences, systemAppearance.matches);
+    const theme = applyDocumentAppearance(state.preferences, systemAppearance.matches);
     const profile = previewArtProfile ?? worldArtProfile(
-      preferences.worldArtProfile,
-      preferences.worldArtProfileVersion,
-      preferences.worldStyleParameters,
+      state.preferences.worldArtProfile,
+      state.preferences.worldArtProfileVersion,
+      state.preferences.worldStyleParameters,
     );
     applyDocumentWorldStyle(profile);
-    optionsView.setPreferences(preferences);
-    settingsView.setPreferences(preferences);
+    optionsView.setPreferences(state.preferences);
+    settingsView.setPreferences(state.preferences);
     companionStage.setAppearance(companionAppearance());
-    shell!.setAttribute('data-vignette', preferences.vignette);
+    shell.setAttribute('data-vignette', state.preferences.vignette);
     atlas?.binding.setTheme(theme);
     // A new theme is a new palette, so a lit lens has to be re-resolved from it. Off stays off.
     applyProofLens();
     atlas?.binding.setArtProfile(
       profile,
       'settings',
-      preferences.worldStyleParameters,
+      state.preferences.worldStyleParameters,
     );
-    atlas?.binding.setFieldOfView(preferences.fieldOfView);
-    atlas?.binding.setSensitivityMultiplier(preferences.mouseSensitivity);
-    if (interactionPolicies !== null) {
+    atlas?.binding.setFieldOfView(state.preferences.fieldOfView);
+    atlas?.binding.setSensitivityMultiplier(state.preferences.mouseSensitivity);
+    if (state.interactionPolicies !== null) {
       latestSettingsSave += 1;
       const save = latestSettingsSave;
       optionsView.reportPersistence('saving');
-      void interactionPolicies
-        .syncSettings(previous, preferences, systemReducedMotion.matches)
+      void state.interactionPolicies
+        .syncSettings(previous, state.preferences, systemReducedMotion.matches)
         .then(() => {
           if (save === latestSettingsSave) optionsView.reportPersistence('saved');
         })
@@ -1293,9 +911,9 @@ async function mount(): Promise<void> {
     atlas?.binding.setProofLens(
       proofLensEnabled
         ? proofLensIslandColors(
-            reconstructionRungs,
+            state.reconstructionRungs,
             islandOfScene,
-            themeForPreferences(preferences, systemAppearance.matches),
+            themeForPreferences(state.preferences, systemAppearance.matches),
           )
         : null,
     );
@@ -1348,7 +966,7 @@ async function mount(): Promise<void> {
    */
   const loadObservations = (sceneId: string): void => {
     if (observationGraphSceneId_ === sceneId && (observationGraph_ !== null || observationLoad_ !== null)) return;
-    const where = credentials_;
+    const where = state.credentials;
     if (where === null) {
       reconstructionInspector.showEvidence({
         kind: 'failed', reason: 'This session has no credentials to read the observation graph with.',
@@ -1401,7 +1019,7 @@ async function mount(): Promise<void> {
       reconstructionInspector.showReview(null);
       return;
     }
-    const where = credentials_;
+    const where = state.credentials;
     if (where === null) {
       reconstructionInspector.showReview(
         el('p', { text: 'This session has no credentials to read who is in this photograph.' }),
@@ -1464,12 +1082,12 @@ async function mount(): Promise<void> {
   };
 
   const sourceForCapture = (captureId: string) =>
-    [...(previewSourceMedia?.values() ?? [])].find((descriptor) =>
+    [...(state.previewSourceMedia?.values() ?? [])].find((descriptor) =>
       descriptor.captureIds?.includes(captureId))
     ?? current.occurrences
       .filter((occurrence) => occurrence.captureId === captureId)
       .flatMap((occurrence) => occurrence.evidence)
-      .map((handle) => previewSourceMedia?.get(handle))
+      .map((handle) => state.previewSourceMedia?.get(handle))
       .find((descriptor) => descriptor !== undefined) ?? null;
 
   /**
@@ -1507,7 +1125,7 @@ async function mount(): Promise<void> {
       });
       return;
     }
-    const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     const cursor = canvasToSourcePixel(
       camera.calibration,
@@ -1562,7 +1180,7 @@ async function mount(): Promise<void> {
     // The world canvas is aria-hidden, so the click has to have a real button beside it or the
     // gesture exists only for sighted mouse users.
     onResolveCentre: () => {
-      const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+      const rect = canvas.getBoundingClientRect();
       resolveEvidenceAt(rect.left + rect.width / 2, rect.top + rect.height / 2);
     },
     onViewShown: (sceneId, view) => {
@@ -1607,12 +1225,12 @@ async function mount(): Promise<void> {
       // World source IDs name topology slots, not captures. Join through the actual evidence
       // handles of this capture; matching a generated source ID to a capture ID loses every source.
       const source = member === undefined ? null :
-        [...(previewSourceMedia?.values() ?? [])].find((descriptor) =>
+        [...(state.previewSourceMedia?.values() ?? [])].find((descriptor) =>
           descriptor.captureIds?.includes(member.captureId))
         ?? current.occurrences
           .filter((occurrence) => occurrence.captureId === member.captureId)
           .flatMap((occurrence) => occurrence.evidence)
-          .map((handle) => previewSourceMedia?.get(handle))
+          .map((handle) => state.previewSourceMedia?.get(handle))
           .find((descriptor) => descriptor !== undefined) ?? null;
       return {
         id: view.id, kind: view.kind, projection: view.projection,
@@ -1636,7 +1254,7 @@ async function mount(): Promise<void> {
     const captures = new Set(record?.members.map((member) => member.captureId) ?? region?.captureIds ?? []);
     const regionId = record?.islandId ?? region?.islandId;
     const seen = new Set<string>();
-    return [...(previewSourceMedia?.values() ?? [])].filter((source) => {
+    return [...(state.previewSourceMedia?.values() ?? [])].filter((source) => {
       if (seen.has(source.evidenceRef)) return false;
       if ((regionId === undefined || source.regionId !== regionId)
         && !source.captureIds?.some((id) => captures.has(id))) return false;
@@ -1660,7 +1278,7 @@ async function mount(): Promise<void> {
   const renderedPreviewRegions = new Set<string>();
   const renderReconstructionStatus = (): HTMLElement => buildStatus({
     omittedRegionCount: built.omitted.length, undrawable: built.undrawable,
-    notices: [...sourceMediaNotices, ...geometryNotices], reconstructionScenes: reconstructionRungs,
+    notices: [...state.sourceMediaNotices, ...state.geometryNotices], reconstructionScenes: state.reconstructionRungs,
     sourceRegions: current.islands
       .filter((island) => !renderedPreviewRegions.has(island.islandId)
         && !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
@@ -1672,7 +1290,7 @@ async function mount(): Promise<void> {
     // rather than merely asserted.
     proofLens: {
       enabled: proofLensEnabled,
-      theme: themeForPreferences(preferences, systemAppearance.matches),
+      theme: themeForPreferences(state.preferences, systemAppearance.matches),
       onToggle: (enabled) => {
         proofLensEnabled = enabled;
         applyProofLens();
@@ -1689,7 +1307,7 @@ async function mount(): Promise<void> {
     } : {}),
   });
   let reconstructionStatus = renderReconstructionStatus();
-  replace(shell!, [
+  replace(shell, [
     stage,
     chrome.reticle,
     worldIndex.root,
@@ -1713,8 +1331,8 @@ async function mount(): Promise<void> {
       atlas?.binding.endSceneInspection();
       reconstructionInspector.hide();
     }
-    shell!.setAttribute('data-primary', shellState.primary);
-    shell!.setAttribute('data-camera', shellState.camera);
+    shell.setAttribute('data-primary', shellState.primary);
+    shell.setAttribute('data-camera', shellState.camera);
     chrome.setIndexOpen(shellState.primary === 'index');
     worldIndex.root.inert = shellState.primary !== 'index';
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
@@ -1742,7 +1360,7 @@ async function mount(): Promise<void> {
     // Only while traversing the ground: the Map is already the whole answer, and a plate has the
     // world behind it rather than under it.
     minimap.root.hidden =
-      !preferences.regionMinimap ||
+      !state.preferences.regionMinimap ||
       shellState.primary !== 'world' ||
       shellState.camera !== 'ground';
     detail.root.hidden = shellState.primary !== 'index' || shellState.detailId === null;
@@ -1769,7 +1387,7 @@ async function mount(): Promise<void> {
       document.exitPointerLock();
     }
   };
-  shell!.setAttribute('data-vignette', preferences.vignette);
+  shell.setAttribute('data-vignette', state.preferences.vignette);
   reflectShell();
 
   worldIndex.render(current, indexFacets, selected);
@@ -1790,18 +1408,18 @@ async function mount(): Promise<void> {
 
   atlas?.dispose();
   settingsStylePreviewId = null;
-  const activeTheme = themeForPreferences(preferences, systemAppearance.matches);
+  const activeTheme = themeForPreferences(state.preferences, systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
   const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
     text: 'Opening the Atlas and decoding its available reconstruction…' });
-  shell!.append(rendererLoading);
-  shell!.setAttribute('aria-busy', 'true');
+  shell.append(rendererLoading);
+  shell.setAttribute('aria-busy', 'true');
   try {
-    atlas = await mountAtlas(canvas as HTMLCanvasElement, stage, built.scene, (report) => {
+    atlas = await mountAtlas(canvas, stage, built.scene, (report) => {
     if (lastMoving !== report.moving) {
       lastMoving = report.moving;
-      shell!.setAttribute('data-moving', report.moving ? 'true' : 'false');
+      shell.setAttribute('data-moving', report.moving ? 'true' : 'false');
     }
     if (report.moving && firstUse.observeMovement()) reflectFirstUse();
     if (!minimap.root.hidden) {
@@ -1813,9 +1431,9 @@ async function mount(): Promise<void> {
     const anchorFocused = report.mode === 'traverse' && report.focusedIndex !== null;
     if (lastAnchorFocus !== anchorFocused) {
       lastAnchorFocus = anchorFocused;
-      shell!.toggleAttribute('data-anchor-focus', anchorFocused);
+      shell.toggleAttribute('data-anchor-focus', anchorFocused);
     }
-    shell!.setAttribute('data-spatial', report.spatial.phase);
+    shell.setAttribute('data-spatial', report.spatial.phase);
     if (report.recoveryReason !== null) {
       showTravelStatus(
         report.recoveryReason === 'outside-field'
@@ -1828,42 +1446,42 @@ async function mount(): Promise<void> {
     }
   }, {
     theme: activeTheme,
-    fieldOfView: preferences.fieldOfView,
-    mouseSensitivity: preferences.mouseSensitivity,
+    fieldOfView: state.preferences.fieldOfView,
+    mouseSensitivity: state.preferences.mouseSensitivity,
     artProfile: previewArtProfile ?? worldArtProfile(
-      preferences.worldArtProfile,
-      preferences.worldArtProfileVersion,
-      preferences.worldStyleParameters,
+      state.preferences.worldArtProfile,
+      state.preferences.worldArtProfileVersion,
+      state.preferences.worldStyleParameters,
     ),
     ...(previewArtProfile === undefined
-      ? { artProfileParameters: preferences.worldStyleParameters }
+      ? { artProfileParameters: state.preferences.worldStyleParameters }
       : {}),
-    ...(previewSourceMedia === undefined ? {} : { sourceMedia: previewSourceMedia }),
-    ...(pointMaps_ === undefined ? {} : { pointMaps: pointMaps_ }),
-    ...(placedPointMaps_ === undefined ? {} : { placedPointMaps: placedPointMaps_ }),
-    trainedGeometry: trainedGeometry_,
+    ...(state.previewSourceMedia === undefined ? {} : { sourceMedia: state.previewSourceMedia }),
+    ...(state.pointMaps === undefined ? {} : { pointMaps: state.pointMaps }),
+    ...(state.placedPointMaps === undefined ? {} : { placedPointMaps: state.placedPointMaps }),
+    trainedGeometry: state.trainedGeometry,
     sourcePresentation: sourcePresentation(),
-    recoveredCameras: recoveredCameras_,
+    recoveredCameras: state.recoveredCameras,
     reducedMotion: systemReducedMotion.matches,
   }, browserMeasurement === null ? undefined : (binding) => {
     browserMeasurement.observeBinding(binding, {
       scenes: current.reconstructionScenes ?? [],
-      placedPointMapCount: placedPointMaps_?.length ?? 0,
+      placedPointMapCount: state.placedPointMaps?.length ?? 0,
       placementMaxErrors: binding.verifyPlacements().map((check) => check.maxErrorMetres),
     });
     });
-  } finally { rendererLoading.remove(); shell!.removeAttribute('aria-busy'); }
+  } finally { rendererLoading.remove(); shell.removeAttribute('aria-busy'); }
   // Only renderer-accepted legacy preview maps suppress the source-only region notice.
   if (preview) {
     for (const visual of atlas.binding.islands) {
-      if (pointMaps_?.has(visual.island.islandId)) renderedPreviewRegions.add(visual.island.islandId);
+      if (state.pointMaps?.has(visual.island.islandId)) renderedPreviewRegions.add(visual.island.islandId);
     }
   }
   const actualRendering = new Map<string, RenderingSubstrate>();
   for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
-  reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, notDrawnScenes_, displayFrames_);
-  geometryNotices = Object.freeze([...geometryNotices, ...atlas.binding.trainedSceneFailures
+  state.reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, state.notDrawnScenes, state.displayFrames);
+  state.geometryNotices = Object.freeze([...state.geometryNotices, ...atlas.binding.trainedSceneFailures
     .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
   const refreshedStatus = renderReconstructionStatus();
   reconstructionStatus.replaceWith(refreshedStatus);
@@ -1871,7 +1489,7 @@ async function mount(): Promise<void> {
   // The lens survives a remount. It is session state, not renderer state, so a world that has just
   // been rebuilt has to be told what the visitor is currently looking through.
   applyProofLens();
-  (canvas as HTMLCanvasElement).dataset.companionRenderer = 'svg';
+  canvas.dataset.companionRenderer = 'svg';
   reflectShell();
 
   // -- the two input modes, and the one key that calls the Companion ----------------------
@@ -1930,7 +1548,7 @@ async function mount(): Promise<void> {
       // The reference deliberately treats the memory as backdrop, so it does not mirror the
       // reading order around a projected source rectangle.
       memoryBounds: null,
-      preferredSide: preferences.companionSide,
+      preferredSide: state.preferences.companionSide,
     });
     companionPanel.setPlacement(placement);
     companionController.summon(Date.now());
@@ -1985,7 +1603,7 @@ async function mount(): Promise<void> {
    * `pointerup` rather than `pointerdown`, so a drag that happens to end over the canvas is not
    * taken as a click on a surface the visitor never pointed at.
    */
-  (canvas as HTMLCanvasElement).addEventListener(
+  canvas.addEventListener(
     'pointerup',
     (event) => {
       if (event.button !== 0 || reconstructionInspector.root.hidden) return;
@@ -1993,7 +1611,7 @@ async function mount(): Promise<void> {
     },
     { signal: mountListeners.signal },
   );
-  (canvas as HTMLCanvasElement).addEventListener(
+  canvas.addEventListener(
     'webglcontextlost',
     (event) => {
       event.preventDefault();
@@ -2126,7 +1744,7 @@ async function mount(): Promise<void> {
   );
   systemAppearance.addEventListener(
     'change',
-    () => applyPreferences(preferences),
+    () => applyPreferences(state.preferences),
     { signal: mountListeners.signal },
   );
 
@@ -2190,7 +1808,7 @@ async function mount(): Promise<void> {
     companionStage.setState('settled');
     confirm.hide();
     // Re-read rather than patched. See the module comment.
-    snapshot = await currentSession!.snapshot();
+    state.snapshot = await currentSession!.snapshot();
     selected = null;
     await mount();
   }
@@ -2212,125 +1830,6 @@ function panelFailure(confirm: ReturnType<typeof buildConfirm>, error: unknown):
         ? error.message
         : 'the write was refused',
   );
-}
-
-function preferencesForWorldVersion(
-  local: AtlasPreferences,
-  version: WorldStyleVersionRecord,
-): AtlasPreferences {
-  return preferencesForWorldReference(local, version.globalStyle);
-}
-
-function preferencesForWorldReference(
-  local: AtlasPreferences,
-  reference: WorldStyleVersionRecord['globalStyle'],
-): AtlasPreferences {
-  return Object.freeze({
-    ...local,
-    worldArtProfile: reference.profileId,
-    worldArtProfileVersion: reference.profileVersion,
-    worldStyleParameters: reference.parameters,
-  });
-}
-
-function worldStylePreviewMatches(
-  active: ActiveWorldStylePreview,
-  candidate: AtlasPreferences,
-): boolean {
-  const profile = active.request.profile;
-  if (
-    active.request.scope.kind !== 'global' ||
-    profile.profileId !== candidate.worldArtProfile ||
-    profile.profileVersion !== candidate.worldArtProfileVersion
-  ) return false;
-  const keys = new Set([
-    ...Object.keys(profile.parameters),
-    ...Object.keys(candidate.worldStyleParameters),
-  ]);
-  return [...keys].every(
-    (key) => profile.parameters[key] === candidate.worldStyleParameters[key],
-  );
-}
-
-function syncWorldStyleConnection(client: WorldStyleClient): void {
-  const state = client.state();
-  if (state === null) return;
-  worldStyleConnection = Object.freeze({ state, versions: client.versions() });
-}
-
-function presentWorldStyleAuthority(
-  view: ReturnType<typeof buildOptions>,
-  connection: WorldStyleConnection | null,
-  failure: string | null,
-  active: ActiveWorldStylePreview | null,
-): void {
-  if (connection === null) {
-    view.setWorldAuthority({
-      state: failure === null ? 'unavailable' : 'failed',
-      detail: failure ?? 'World style authority is unavailable. Local previews cannot be saved.',
-    });
-    return;
-  }
-  const current = connection.state.current;
-  const provenance = current.provenance === null
-    ? 'Authored initial version'
-    : [
-        `${current.provenance.origin} by ${current.provenance.actor}`,
-        current.provenance.originReference,
-        current.modelId,
-        current.promptVersion,
-        current.refinesProposalId === null ? null : `refines ${current.refinesProposalId}`,
-      ].filter((item): item is string => item !== null).join(' · ');
-  view.setWorldAuthority({
-    state: 'ready',
-    detail: 'Connected to immutable world style history.',
-    currentVersionId: current.versionId,
-    revision: current.revision,
-    provenance,
-    warnings: current.warnings,
-    versions: connection.versions.map((version) => ({
-      versionId: version.versionId,
-      label: [
-        `Revision ${version.revision}`,
-        version.rollbackTargetVersionId === null ? null : 'rollback',
-        version.provenance?.origin ?? 'authored',
-        version.createdAt.slice(0, 10),
-      ].filter((item): item is string => item !== null).join(' · '),
-      current: version.versionId === current.versionId,
-    })),
-    ...(active === null
-      ? {}
-      : {
-          proposal: {
-            origin: active.request.origin,
-            model: active.request.modelId,
-            promptVersion: active.request.promptVersion,
-            referenceCount: active.request.referenceIds.length,
-            refinesProposalId: active.request.refinesProposalId,
-          },
-        }),
-  });
-}
-
-function describeWorldStyleFailure(error: unknown): string {
-  if (error instanceof WorldStyleContractError) return error.message;
-  if (error instanceof ApiError) {
-    if (error.isUnauthenticated) return 'This session is no longer authorized to manage world design.';
-    if (error.code === 'invalid_style_data') {
-      return 'The proposal did not match the reviewed profile, capability, or parameter contract.';
-    }
-    if (error.code === 'protected_topology_conflict') {
-      return 'The protected world layout changed. Reopen the design against the current Atlas.';
-    }
-    if (error.code === 'stale_style_version') {
-      return 'The saved world changed elsewhere. Refresh and review a new preview.';
-    }
-    if (error.code === 'invalid_preview_state') {
-      return 'That preview is already closed. Create and review a new preview.';
-    }
-    return `${error.code}: ${error.message.replace(`${error.code}: `, '')}`;
-  }
-  return error instanceof Error ? error.message : 'The world style request failed.';
 }
 
 /**
