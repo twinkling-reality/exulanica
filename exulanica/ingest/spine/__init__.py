@@ -48,7 +48,7 @@ The modules, and the question each one answers:
 
 **Every public function here takes a** :class:`~exulanica.ingest.spine.scope.WorkspaceScope`
 **as its first parameter**, and there is deliberately no way to build one without declaring a
-workspace on the connection it wraps. 66 tables are under FORCE row-level security keyed on
+workspace on the connection it wraps. 69 tables are under FORCE row-level security keyed on
 ``current_workspace()``, and the tombstone and epistemic guards do not merely read that setting,
 they ``assert_workspace_context()`` and raise when it is absent. A module reachable with a bare
 ``psycopg.Connection`` would be a module reachable with an undeclared one. There is no type

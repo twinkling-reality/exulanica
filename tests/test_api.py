@@ -82,6 +82,22 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},
     ("POST", "/selection/plan"): {"json": {"question": "where was I?"}},
     ("POST", "/selection/ask"): {"json": {"question": "where was I?"}},
+    ("GET", "/companion/memory/recent"): {},
+    ("POST", "/companion/memory/answers"): {
+        "json": {
+            "question": "when were these taken?",
+            "answer_text": "on 2026-02-01",
+            "prompt_version": "selection-3",
+            "latency_ms": 1,
+        }
+    },
+    ("POST", "/companion/memory/escapes"): {
+        "json": {"escape": "skip", "intent": "confirm_continuity", "turn_id": "turn-1"}
+    },
+    ("POST", "/companion/memory/answers/{answer_id}/corrections"): {
+        "json": {"answer_text": "no, it was 2026-03-04"}
+    },
+    ("DELETE", "/companion/memory/answers/{answer_id}"): {},
     ("GET", "/evidence"): {"params": {"uri": "exulanica://blob/x/img#t=0,1"}},
     ("GET", "/evidence/{span_id}"): {},
     ("GET", "/evidence/{span_id}/region"): {},
@@ -249,6 +265,11 @@ class Deployment:
             # without a place in the fixture; leaving the literal placeholder in the path would
             # ask the uuid parser about it instead of asking the route about the session.
             .replace("{place_id}", str(uuid.uuid4()))
+            # A memory nobody recorded, for the same reason as the two above: the sweep asks who
+            # may reach the route, and an id that resolves to nothing answers that without
+            # putting a conversation in the fixture. Leaving the literal placeholder here would
+            # ask the uuid parser about it and report a 422 the sweep would read as a refusal.
+            .replace("{answer_id}", str(uuid.uuid4()))
         )
 
 
