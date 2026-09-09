@@ -22,8 +22,22 @@ const ANSWER: CompanionAnswer = {
   deterministic: false,
   repaired: false,
   evidence: [
-    { token: 'TOKENAAAA1', uri: 'exulanica://blob/ni:///sha-256;aaaa', handle: 'span-a', capturedAt: null },
-    { token: 'TOKENBBBB2', uri: 'exulanica://blob/ni:///sha-256;bbbb', handle: null, capturedAt: null },
+    {
+      token: 'TOKENAAAA1',
+      uri: 'exulanica://blob/ni:///sha-256;aaaa',
+      handle: 'span-a',
+      captureId: 'capture-a',
+      capturedAt: null,
+    },
+    // The packet located neither the span nor the capture for this one, so it renders as a
+    // chip that cannot open and it is not something a stored answer may claim to have quoted.
+    {
+      token: 'TOKENBBBB2',
+      uri: 'exulanica://blob/ni:///sha-256;bbbb',
+      handle: null,
+      captureId: null,
+      capturedAt: null,
+    },
   ],
   provenance: {
     composed: 'model',

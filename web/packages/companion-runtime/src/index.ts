@@ -53,19 +53,35 @@ export { TurnValidationError, allOptions, findOption, validateTurn } from './tur
 
 export { ESCAPE_ORDER, escapeDraft, escapeOption, escapeOptions } from './escapes.js';
 
-export type { CompanionMemory, EscapeRecord, QuestionKey, SuppressionReason, TranscriptEntry } from './memory.js';
+export type {
+  AbstentionCode,
+  AnswerOrigin,
+  CompanionMemory,
+  EscapeRecord,
+  PersistedAnswer,
+  PersistedCitation,
+  PersistedEscape,
+  PersistedMemory,
+  QuestionKey,
+  SuppressionReason,
+  TranscriptEntry,
+} from './memory.js';
 export {
   DAY_MS,
   EMPTY_MEMORY,
+  EMPTY_PERSISTED_MEMORY,
   NOT_SURE_COOLDOWN_MS,
   SKIP_COOLDOWN_MS,
   hardSuppression,
+  latestAnswer,
+  memoryFromPersisted,
   priorityPenalty,
   questionKey,
   recordAsked,
   recordEscape,
   recordSpontaneousSpeech,
   recordTranscript,
+  standingAnswers,
 } from './memory.js';
 
 export type { RankedEntity } from './value.js';

@@ -12,8 +12,10 @@
  * that function calls, exactly as it is the only place that constructs the write gate.
  */
 
-import type { CompanionSession, Turn } from '@exulanica/companion-runtime';
+import type { CompanionSession, PersistedMemory, Turn } from '@exulanica/companion-runtime';
 import { companionAppearanceConfiguration } from '@exulanica/presentation';
+
+import { MemoryUnavailable } from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
 import type { CompanionAnswer } from '../companion-ask-api.js';
@@ -31,6 +33,38 @@ export interface CompanionDependencies {
   readonly evidence: EvidenceCache;
   /** The read half of the conversation. The root holds the credential this needs. */
   readonly ask: (question: string) => Promise<CompanionAnswer>;
+  /**
+   * What this person has already been asked and told, from `/companion/memory`.
+   *
+   * Null is a fact rather than an absence to paper over: either nothing is stored, or the read
+   * failed. The root knows which and says which; what this file does with null is the same
+   * either way, which is start with an empty memory rather than pretend.
+   *
+   * Passed in already resolved rather than as a loader, because the engine is built before this
+   * mount runs and a mount that awaited would leave the stage empty while it did. The root loads
+   * it beside `GET /graph` and hands over whatever arrived.
+   *
+   * **Optional, and undefined is not the same as null.** `main.ts` is the composition root and is
+   * owned by several concurrent branches at once, so this one ships the wiring for it as
+   * `docs/patches/companion-memory-main.patch` rather than editing it, exactly as
+   * `companion-question-main.patch` did before it. Until that patch is applied the host has not
+   * opted in, and a host that has not opted in gets the behaviour it had: an empty memory and no
+   * write-back. Not a silent default that half works.
+   */
+  readonly persistedMemory?: PersistedMemory | null;
+  /**
+   * Keep an answer that has just been drawn. Resolves when it is stored, rejects when it is not.
+   *
+   * The rejection is not swallowed here and it does not reach the answer either: it is drawn
+   * under the answer as its own sentence. A durability failure is not an answer failure, and the
+   * answer on the screen is still correct and still cited.
+   *
+   * Absent on a host that has not opted in, and absent means the write-back hook is never
+   * REGISTERED rather than registered and doing nothing. The difference matters: a registered
+   * no-op would make "this answer was not kept" unreportable, because there would be nothing to
+   * fail.
+   */
+  readonly rememberAnswer?: (answer: CompanionAnswer) => Promise<void>;
   /** The element the presence draws into. Created by the root, because the world shows through it. */
   readonly stageParent: HTMLElement;
   /**
@@ -77,6 +111,25 @@ export function disposeCompanionStage(state: SessionState): void {
 
 export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   const { state } = deps;
+
+  /*
+   * The reload stops being amnesia here, and this is the whole of it.
+   *
+   * `interaction-model.md` 4.3 and 5.5 both say the Companion may never speak "within 7 days of a
+   * Skip or 14 days of a Not sure on the same entity". Until this line those windows were held in
+   * a page, so a fourteen-day window had never once survived a reload: the person who said "not
+   * sure" and came back the next day was asked again, by a system whose own contract said it
+   * would not.
+   *
+   * Folded against the mount's clock rather than a stored expiry, because a cooldown is a
+   * duration from when the escape was taken and the browser is the only clock in this process.
+   * `memoryFromPersisted` does the fold using `recordEscape` itself, so the durable path and the
+   * live path cannot drift apart into two versions of the same arithmetic.
+   */
+  const persisted = deps.persistedMemory ?? null;
+  if (persisted !== null) {
+    deps.engine.adoptPersistedMemory(persisted, Date.now());
+  }
 
   const stage = buildCompanionStage({ parent: deps.stageParent });
   const appearance = (): ReturnType<typeof companionAppearanceConfiguration> =>
@@ -139,6 +192,38 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       controller.say(text);
       reflectTurnState(controller.current());
       deps.onAnswered();
+    },
+    },
+    {
+    /*
+     * The write-back, and the ordering is the point rather than a detail.
+     *
+     * `companion-encounter.ts` fires this AFTER the answer is drawn and fires it unconditionally,
+     * so keeping an answer cannot delay one reaching the screen and a host that refused to keep
+     * one could not stop it arriving. That is why the hook is in the file that renders instead of
+     * a microtask queued around `ask`: "after it is on the screen" is a fact at that call site
+     * and would be an assumption about scheduling anywhere else.
+     *
+     * Not awaited, for the same reason. The person has their answer; storing it is this session's
+     * problem and not theirs to wait on.
+     */
+    onAnswerShown: (answer) => {
+      const remember = deps.rememberAnswer;
+      if (remember === undefined) return;
+      void remember(answer).catch((error: unknown) => {
+        // Said under the answer rather than in place of it. A durability failure is not an
+        // answer failure: what is on the screen is still correct and still cited, and what is
+        // wrong is that the Companion will not have it next time. Both sentences are true and
+        // the person is owed both.
+        const failure =
+          error instanceof MemoryUnavailable
+            ? error
+            : new MemoryUnavailable(
+                'unreachable',
+                error instanceof Error ? error.message : String(error),
+              );
+        panel.noteMemoryFailure(`memory.notKept.${failure.kind}`, failure.detail);
+      });
     },
   });
   controller.attach(panel);

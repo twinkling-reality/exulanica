@@ -68,6 +68,21 @@ export interface AnswerEvidence {
   readonly uri: string;
   /** Null when the packet did not name a span for this permalink. The chip then says so. */
   readonly handle: EvidenceHandle | null;
+  /**
+   * The photograph the span's bytes belong to, which is the join a WITHDRAWAL travels along.
+   *
+   * Nothing on the screen uses it: a chip opens by span, through `/evidence/{span}/masked`. It is
+   * carried because an answer kept across sessions has to record what it quoted.
+   * `domain-and-evidence-model.md` 6.4 states the failure in its own words: "a generated title
+   * naming a person can be invalidated when that person is deleted. Without the recorded set, the
+   * name survives its own deletion inside a caption." An answer is a generated title with a
+   * longer sentence, and a stored one whose citations named no capture would be a description of
+   * a withdrawn photograph in a table no withdrawal reaches.
+   *
+   * Null on the same terms as `handle`: the packet did not name this permalink. An answer with a
+   * null here is not stored at all, rather than stored with a hole in its citation set.
+   */
+  readonly captureId: string | null;
   readonly capturedAt: string | null;
 }
 
@@ -185,11 +200,19 @@ interface WirePacketItem {
   readonly token: string;
   readonly uri: string;
   readonly span_id: string;
+  readonly capture_id: string;
   readonly captured_at: string | null;
 }
 
 interface WirePacket {
   readonly items: readonly WirePacketItem[];
+}
+
+/** What the packet said about one permalink: how to open it, and what it belongs to. */
+interface LocatedEvidence {
+  readonly handle: EvidenceHandle;
+  readonly captureId: string | null;
+  readonly capturedAt: string | null;
 }
 
 const CLAUSE_TYPES: readonly string[] = ['historical', 'uncertain', 'meta'];
@@ -259,9 +282,7 @@ export class CompanionAskClient {
     // photograph to locate, and asking the packet route what it points at would be a query
     // whose answer is already known.
     const cited = clauses.some((clause) => clause.citations.length > 0);
-    const spans = cited
-      ? await this.#spansByUri(body.plan)
-      : new Map<string, { handle: EvidenceHandle; capturedAt: string | null }>();
+    const spans = cited ? await this.#spansByUri(body.plan) : new Map<string, LocatedEvidence>();
 
     /*
      * Only what the answer actually CITED, and one chip per photograph.
@@ -287,6 +308,7 @@ export class CompanionAskClient {
         token,
         uri,
         handle: span?.handle ?? null,
+        captureId: span?.captureId ?? null,
         capturedAt: span?.capturedAt ?? null,
       });
     }
@@ -331,10 +353,8 @@ export class CompanionAskClient {
    * same validator and the same executor, so this asks the server what the answer's own
    * Selection resolved to rather than reconstructing it here.
    */
-  async #spansByUri(
-    plan: unknown,
-  ): Promise<ReadonlyMap<string, { handle: EvidenceHandle; capturedAt: string | null }>> {
-    const located = new Map<string, { handle: EvidenceHandle; capturedAt: string | null }>();
+  async #spansByUri(plan: unknown): Promise<ReadonlyMap<string, LocatedEvidence>> {
+    const located = new Map<string, LocatedEvidence>();
     if (plan === null || typeof plan !== 'object') return located;
     try {
       const packet = await this.#transport(PACKET_TIMEOUT_MS).postJson<WirePacket>(
@@ -343,7 +363,11 @@ export class CompanionAskClient {
       );
       for (const item of packet.items ?? []) {
         if (!located.has(item.uri)) {
-          located.set(item.uri, { handle: item.span_id, capturedAt: item.captured_at });
+          located.set(item.uri, {
+            handle: item.span_id,
+            captureId: item.capture_id ?? null,
+            capturedAt: item.captured_at,
+          });
         }
       }
     } catch {
