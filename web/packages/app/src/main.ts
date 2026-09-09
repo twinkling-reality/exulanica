@@ -33,14 +33,9 @@ import { mountAtlas, type MountedAtlas } from './atlas.js';
 import { applicationTitle, developmentToken, sourcePresentation } from './config.js';
 import { listBatches, watchBatch, type BatchSummary } from './formation.js';
 import { buildScene } from './scene.js';
-import { buildCompanionEncounter } from './ui/companion-encounter.js';
-import { resolveCompanionPlacement } from './ui/companion-placement.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
-import { buildCompanionStage, type CompanionStage } from './ui/companion-stage.js';
-import { createCompanionController } from './companion.js';
 import { CompanionAskClient } from './companion-ask-api.js';
-import type { Turn } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
 import { buildFormation } from './ui/formation.js';
 import { buildEmptyWorld } from './ui/empty-world.js';
@@ -56,7 +51,7 @@ import {
   applyDocumentWorldStyle,
   themeForPreferences,
 } from './theme.js';
-import { companionAppearanceConfiguration, worldArtProfile } from '@exulanica/presentation';
+import { worldArtProfile } from '@exulanica/presentation';
 import {
   commandForKeystroke,
   initialWorldShell,
@@ -64,7 +59,8 @@ import {
   type WorldShellEvent,
 } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
-import { mountWritePath } from './composition/write-path.js';
+import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
+import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
 import {
   mountStatusAndInspector,
   type MountedStatusAndInspector,
@@ -91,7 +87,6 @@ const {
 
 let atlas: MountedAtlas | null = null;
 let stopWatching: (() => void) | null = null;
-let mountedCompanionStage: CompanionStage | null = null;
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
@@ -219,8 +214,7 @@ async function mount(): Promise<void> {
   if (emptyWorld !== null) {
     // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
     // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
-    mountedCompanionStage?.dispose();
-    mountedCompanionStage = null;
+    disposeCompanionStage(state);
     stopWatching?.();
     stopWatching = null;
     mountListeners?.abort();
@@ -245,92 +239,12 @@ async function mount(): Promise<void> {
   );
   // A graph write remounts every surface. Stop the previous field before replacing its node, or
   // its frame loop and observers would survive invisibly for the rest of the session.
-  mountedCompanionStage?.dispose();
+  disposeCompanionStage(state);
+  // The canvas stays where the document put it: fixed, behind everything, outside the shell.
+  // Moving it into the shell would put it in the shell's stacking context, where it paints over
+  // the rail. The stage is the hole it shows through and the parent the anchor overlay writes
+  // its nodes into, which is a different job from being the canvas.
   const stage = el('div', { class: 'stage' });
-  const companionStage = buildCompanionStage({ parent: stage });
-  const companionAppearance = (): ReturnType<typeof companionAppearanceConfiguration> =>
-    companionAppearanceConfiguration({
-      body: state.preferences.companionBody,
-      color: state.preferences.companionColor,
-      face: state.preferences.companionFace,
-    });
-  companionStage.setAppearance(companionAppearance());
-  mountedCompanionStage = companionStage;
-  const firstUse = createFirstUseGuidance(window.localStorage);
-  let inputMode: FirstUseMode = 'converse';
-  let reflectFirstUse = (): void => undefined;
-  const finishFirstUse = (): void => {
-    if (firstUse.complete()) reflectFirstUse();
-  };
-
-  function reflectTurnState(turn: Turn | null): void {
-    if (turn === null || turn.intent === 'acknowledge') {
-      companionStage.setState('resting');
-      return;
-    }
-    if (turn.intent === 'enrich_relation') {
-      companionStage.setState('attending');
-      return;
-    }
-    // Identity, continuity, and contradiction turns all exist because the graph is unresolved.
-    companionStage.setState('uncertain');
-  }
-
-  const writePath = mountWritePath({
-    env,
-    state,
-    session: currentSession,
-    snapshot: current,
-    companionStage: () => companionStage,
-    detailRoot: () => detail.root,
-    onConfirmVisibilityChange: (visible) => companionPanel.setConfirming(visible),
-    remount: () => mount(),
-  });
-
-  // The Companion. The controller holds the turn, the panel renders it, and the confirmation
-  // surface built above is the only thing either of them can reach that writes.
-  //
-  // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
-  // about the library, and this is the only place holding the credential it takes to ask one.
-  const companionAsk = new CompanionAskClient(currentCredentials);
-  const companionController = createCompanionController({
-    companion: currentCompanion,
-    askQuestion: (question) => companionAsk.ask(question),
-    onWorking: (working) => companionStage.setState(working ? 'working' : 'attending'),
-    onAwaitingConfirmation: (proposalId, summary, utterance) => {
-      // A staged proposal is still unconfirmed. It may not borrow the settled presentation.
-      companionStage.setState('uncertain');
-      writePath.confirm.show(proposalId, summary, utterance);
-    },
-  });
-  function dismissCompanion(): void {
-    companionController.dismiss();
-    companionStage.setState('resting');
-    companionStage.hide();
-    reflectShell();
-  }
-  const companionPanel = buildCompanionEncounter({
-    onSelect: (optionId) => {
-      companionController.select(optionId);
-      reflectTurnState(companionController.current());
-      finishFirstUse();
-    },
-    onSubmit: (optionIds) => {
-      companionController.submit(optionIds);
-      reflectTurnState(companionController.current());
-      finishFirstUse();
-    },
-    onEvidence: (index) => {
-      const handle = companionController.evidenceAt(index);
-      if (handle !== null) void currentEvidence.open(handle);
-    },
-    onSay: (text) => {
-      companionController.say(text);
-      reflectTurnState(companionController.current());
-      finishFirstUse();
-    },
-  });
-  companionController.attach(companionPanel);
 
   let shellState = initialWorldShell();
   const returnFocus: Array<HTMLElement | null> = [];
@@ -363,6 +277,45 @@ async function mount(): Promise<void> {
       });
     }
   };
+
+  const firstUse = createFirstUseGuidance(window.localStorage);
+  let inputMode: FirstUseMode = 'converse';
+  let reflectFirstUse = (): void => undefined;
+  const finishFirstUse = (): void => {
+    if (firstUse.complete()) reflectFirstUse();
+  };
+
+  // The Companion. The controller holds the turn, the panel renders it, and the confirmation
+  // surface the write path builds is the only thing either of them can reach that writes.
+  //
+  // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
+  // about the library, and this is the only place holding the credential it takes to ask one.
+  const companionAsk = new CompanionAskClient(currentCredentials);
+  let writePath: MountedWritePath;
+  const companion = mountCompanion({
+    state,
+    engine: currentCompanion,
+    evidence: currentEvidence,
+    ask: (question) => companionAsk.ask(question),
+    stageParent: stage,
+    confirm: () => writePath.confirm,
+    reflectShell: () => reflectShell(),
+    onAnswered: finishFirstUse,
+    isSystemSurfaceOpen: () =>
+      shellState.primary === 'options' || shellState.primary === 'controls',
+  });
+
+  writePath = mountWritePath({
+    env,
+    state,
+    session: currentSession,
+    snapshot: current,
+    companionStage: () => companion.stage,
+    detailRoot: () => detail.root,
+    onConfirmVisibilityChange: (visible) => companion.panel.setConfirming(visible),
+    remount: () => mount(),
+  });
+
 
   const travelStatus = el('p', {
     class: 'travel-status',
@@ -478,7 +431,7 @@ async function mount(): Promise<void> {
   const forming = buildFormation();
   const chrome = buildWorldChrome(shell);
   const handleAtlasCommand = (command: AtlasCommand): void => {
-    if (companionPanel.state() === 'open') dismissCompanion();
+    if (companion.panel.state() === 'open') companion.dismiss();
     if (command === 'index') dispatchShell({ type: 'toggle-index' });
     else if (command === 'map') dispatchShell({ type: 'toggle-map' });
     else if (command === 'options') dispatchShell({ type: 'toggle-options' });
@@ -494,7 +447,7 @@ async function mount(): Promise<void> {
     cancel: (handle) => window.clearTimeout(handle),
   });
   reflectFirstUse = (): void => {
-    companionPanel.setFirstUsePrompt(firstUse.prompt(inputMode));
+    companion.panel.setFirstUsePrompt(firstUse.prompt(inputMode));
     shell.dataset['firstUse'] = firstUse.phase();
   };
   reflectFirstUse();
@@ -526,7 +479,7 @@ async function mount(): Promise<void> {
     env,
     state,
     applyProofLens: () => status.applyProofLens(),
-    setCompanionAppearance: () => companionStage.setAppearance(companionAppearance()),
+    setCompanionAppearance: () => companion.applyAppearance(),
     onCloseOptions: () => dispatchShell({ type: 'toggle-options' }),
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
     onCloseControls: () => dispatchShell({ type: 'toggle-controls' }),
@@ -547,7 +500,7 @@ async function mount(): Promise<void> {
     worldIndex.root,
     detail.root,
     forming.root,
-    companionPanel.root,
+    companion.panel.root,
     writePath.confirm.root,
     commandBar.root,
     mapCaption,
@@ -578,7 +531,7 @@ async function mount(): Promise<void> {
       worldIndex.root,
       detail.root,
       forming.root,
-      companionPanel.root,
+      companion.panel.root,
       writePath.confirm.root,
       mapCaption,
       travelStatus,
@@ -612,7 +565,7 @@ async function mount(): Promise<void> {
     atlas?.binding.setControlsEnabled(shellState.camera === 'ground');
     // Every surface here takes the cursor. None of them should take your feet with it.
     atlas?.binding.setFreeCursorActive(
-      companionPanel.state() === 'open' || shellState.primary !== 'world',
+      companion.panel.state() === 'open' || shellState.primary !== 'world',
     );
     if (
       (shellState.primary !== 'world' || shellState.camera === 'map') &&
@@ -760,47 +713,15 @@ async function mount(): Promise<void> {
     // The prompt says what is true right now. With the mouse free the useful instruction is how
     // to get into the world; once inside it is how to call the Companion. An open conversation
     // outranks both and is left alone.
-    if (companionPanel.state() === 'open') return;
-    companionPanel.setState(next === 'traverse' ? 'summon' : 'enter');
+    if (companion.panel.state() === 'open') return;
+    companion.panel.setState(next === 'traverse' ? 'summon' : 'enter');
     firstUse.observeMode(next);
     reflectFirstUse();
   }
   mounted.binding.controls.onModeChange = reflectMode;
   reflectMode(mounted.binding.controls.mode);
 
-  /** Open the fixed visual-novel composition over the current memory backdrop. */
-  // X and right click reach this through the renderer controls, so the verb observes the same
-  // enabled/disabled boundary as movement and interaction instead of bypassing system surfaces.
-  function summonCompanion(): void {
-    // Pointer Lock freezes clientX/clientY by specification. The SVG Companion follows the free
-    // page pointer, so summoning releases the real browser lock instead of fabricating a cursor.
-    if (document.pointerLockElement !== null) document.exitPointerLock();
-    const placement = resolveCompanionPlacement({
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      // The reference deliberately treats the memory as backdrop, so it does not mirror the
-      // reading order around a projected source rectangle.
-      memoryBounds: null,
-      preferredSide: state.preferences.companionSide,
-    });
-    companionPanel.setPlacement(placement);
-    companionController.summon(Date.now());
-    reflectTurnState(companionController.current());
-    companionStage.show();
-    reflectShell();
-  }
-
-  function toggleCompanion(): void {
-    // A system surface must not summon the Companion out from behind itself. This used to fall
-    // out of disabling the controls wholesale; it is now stated where the policy actually lives.
-    if (shellState.primary === 'options' || shellState.primary === 'controls') return;
-    if (companionPanel.state() === 'open') {
-      dismissCompanion();
-      return;
-    }
-    summonCompanion();
-  }
-
-  mounted.binding.controls.onSummon = toggleCompanion;
+  mounted.binding.controls.onSummon = () => companion.toggle();
   mounted.binding.controls.onInteract = () => {
     const index = mounted.binding.engageFocusedAnchor();
     if (index === null) return;
@@ -879,9 +800,9 @@ async function mount(): Promise<void> {
           event.preventDefault();
           return;
         }
-        if (companionPanel.state() === 'open') {
+        if (companion.panel.state() === 'open') {
           event.preventDefault();
-          dismissCompanion();
+          companion.dismiss();
           return;
         }
         if (shellState.detailId !== null) {
@@ -902,10 +823,10 @@ async function mount(): Promise<void> {
         typing,
       });
       if (
-        !typing && companionPanel.state() === 'open' &&
+        !typing && companion.panel.state() === 'open' &&
         !event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyE'
       ) {
-        if (companionPanel.openEvidence()) {
+        if (companion.panel.openEvidence()) {
           event.preventDefault();
           return;
         }
@@ -951,7 +872,7 @@ async function mount(): Promise<void> {
       // for every question. Unavailable options return null and the key does nothing, rather than
       // selecting the next one along and committing something nobody chose.
       if (/^Digit[1-9]$/.test(event.code)) {
-        if (companionPanel.pressNumber(Number(event.code.slice(5)))) event.preventDefault();
+        if (companion.panel.pressNumber(Number(event.code.slice(5)))) event.preventDefault();
         return;
       }
     },
