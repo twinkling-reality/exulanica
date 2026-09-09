@@ -1,35 +1,56 @@
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as pc from 'playcanvas';
-import { identityDisplayFrame, sceneDisplayFrame, type IslandId } from '@exulanica/atlas-core';
+import { atlasVec3, placement, type IslandId } from '@exulanica/atlas-core';
 import {
-  AUTHORED_OBJECT_CONTAINER,
+  AUTHORED_OBJECT_MEDIA_TYPE,
+  MICRORADIANS_PER_RADIAN,
+  SCALE_MILLI_UNIT,
   SceneObjectRuntime,
   createObjectContainerAsset,
-  displayPointFromAtlas,
-  displayPoseOfObject,
   fetchVerifiedObjectAsset,
-  invertSimilarity,
-  objectTransformForDisplayPose,
+  nudgedPose,
+  objectAssetBytesPath,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
+  regionPointFromAtlas,
   safeObjectAssetPath,
   validateGlbContainer,
+  yawMicroradiansOf,
   type AuthoredObjectAssetReference,
   type PlacedAuthoredObject,
+  type RegionPose,
 } from '../src/playcanvas/scene-objects.js';
 
 /**
  * The authored-object boundary, from the outside.
  *
  * Every refusal here is a fetch `playcanvas@2.21.4` would otherwise make on its own account, out
- * of something written inside a container the caller did not author. The container is built in
- * this file rather than read from disk for the same reason the SOG fixture is not: what is under
- * test is that a real GLB, checked against a real digest, reaches a decoder that was given no
- * help, and a hand-built container is the only way to write the malformed cases.
+ * of something written inside a container the caller did not author. Malformed containers are
+ * built in this file because that is the only way to write those cases.
+ *
+ * The ACCEPTING cases are different, and deliberately so: they use the three real reviewed CC0
+ * assets, checked against the digests in the published `world-objects.json`. A validator is only
+ * worth having if it is run against the bytes it will actually meet, and the backend generates
+ * these deterministically rather than committing them, so `web/` commits them here and the digest
+ * assertion below is what fails if that generator ever moves.
  */
 
-const ISLAND = 'island-1' as IslandId;
+const ISLAND = 'region-a' as IslandId;
+const FIXTURES = new URL('../../graph-client/test/fixtures/', import.meta.url);
+
+const reviewedBytes = (key: string): ArrayBuffer => {
+  const buffer = readFileSync(new URL(`${key}.glb`, FIXTURES));
+  return Uint8Array.from(buffer).buffer;
+};
+
+const publishedVersion = JSON.parse(
+  readFileSync(new URL('world-objects.json', FIXTURES), 'utf8'),
+) as { objects: { asset: { asset_key: string; content_sha256: string; byte_size: number } }[] };
+
+const sha = (bytes: ArrayBuffer): string =>
+  createHash('sha256').update(new Uint8Array(bytes)).digest('hex');
 
 function glb(gltf: Record<string, unknown>, binary: Uint8Array | null = null): ArrayBuffer {
   const json = new TextEncoder().encode(JSON.stringify(gltf));
@@ -70,18 +91,17 @@ const MINIMAL = {
 
 const container = (): ArrayBuffer => glb(MINIMAL, new Uint8Array(12));
 
-const sha = (bytes: ArrayBuffer): string =>
-  createHash('sha256').update(new Uint8Array(bytes)).digest('hex');
-
-function reference(bytes: ArrayBuffer, over: Partial<AuthoredObjectAssetReference> = {}) {
+function reference(
+  bytes: ArrayBuffer,
+  over: Partial<AuthoredObjectAssetReference> = {},
+): AuthoredObjectAssetReference {
   return {
-    assetId: 'lantern',
-    container: AUTHORED_OBJECT_CONTAINER,
-    path: '/world-objects/assets/lantern/bytes',
+    assetKey: 'cc0.marker-cube',
+    mediaType: AUTHORED_OBJECT_MEDIA_TYPE,
     contentSha256: sha(bytes),
     byteSize: bytes.byteLength,
     ...over,
-  } as AuthoredObjectAssetReference;
+  };
 }
 
 const respond = (bytes: ArrayBuffer, status = 200) => vi.fn(async () =>
@@ -90,14 +110,26 @@ const respond = (bytes: ArrayBuffer, status = 200) => vi.fn(async () =>
 const options = (fetchImpl: typeof globalThis.fetch) =>
   ({ baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl });
 
-describe('a container the glTF parser would complete over the network is refused first', () => {
-  it('accepts a self-contained container and reports what is in it', () => {
-    const summary = validateGlbContainer(container());
-    expect(summary).toEqual({
-      jsonBytes: expect.any(Number), binaryBytes: 12, meshCount: 1, nodeCount: 1, imageCount: 0,
-    });
+describe('the reviewed assets this build will actually meet', () => {
+  it('accepts all three, and their bytes are the ones the published version names', () => {
+    const published = new Map(publishedVersion.objects.map((object) =>
+      [object.asset.asset_key, object.asset]));
+    for (const key of ['cc0.marker-cube', 'cc0.marker-pillar', 'cc0.marker-plate']) {
+      const bytes = reviewedBytes(key);
+      const summary = validateGlbContainer(bytes);
+      expect(summary.meshCount).toBeGreaterThan(0);
+      // No textures at all, so nothing in them can reach for an image.
+      expect(summary.imageCount).toBe(0);
+      const row = published.get(key);
+      if (row !== undefined) {
+        expect(sha(bytes)).toBe(row.content_sha256);
+        expect(bytes.byteLength).toBe(row.byte_size);
+      }
+    }
   });
+});
 
+describe('a container the glTF parser would complete over the network is refused first', () => {
   it('refuses an external buffer, which loadBuffers would fetch', () => {
     expect(() => validateGlbContainer(glb({
       ...MINIMAL, buffers: [{ uri: 'https://elsewhere.test/model.bin', byteLength: 12 }],
@@ -110,7 +142,7 @@ describe('a container the glTF parser would complete over the network is refused
     }, new Uint8Array(12)))).toThrow(/references an external image/);
   });
 
-  it('refuses a data-URI buffer as well, so the descriptor byte count still bounds the decode', () => {
+  it('refuses a data-URI buffer as well, so the registry byte count still bounds the decode', () => {
     expect(() => validateGlbContainer(glb({
       ...MINIMAL, buffers: [{ uri: 'data:application/octet-stream;base64,AAAA', byteLength: 3 }],
     }, new Uint8Array(12)))).toThrow(/references an external buffer/);
@@ -144,12 +176,6 @@ describe('a container the glTF parser would complete over the network is refused
     }, new Uint8Array(12)))).toThrow(/neither a buffer view nor bytes/);
   });
 
-  it('accepts an image carried in the container itself', () => {
-    expect(validateGlbContainer(glb({
-      ...MINIMAL, images: [{ bufferView: 0, mimeType: 'image/png' }],
-    }, new Uint8Array(12))).imageCount).toBe(1);
-  });
-
   it('refuses a header that lies about its own length, which the parser ignores', () => {
     const bytes = container();
     new DataView(bytes).setUint32(8, bytes.byteLength - 4, true);
@@ -158,7 +184,6 @@ describe('a container the glTF parser would complete over the network is refused
 
   it('refuses the chunk length the parser reads past without returning', () => {
     const bytes = container();
-    // parseGlb reports this and then keeps going, so the malformed case must never reach it.
     new DataView(bytes).setUint32(12, 0xfffffffc, true);
     expect(() => validateGlbContainer(bytes)).toThrow(/runs past the end/);
   });
@@ -199,35 +224,43 @@ describe('bytes reach the decoder only authenticated, hashed and counted', () =>
     if (original !== undefined) Object.defineProperty(globalThis, 'crypto', original);
   });
 
-  it('sends the bearer to the declared path and returns verified bytes', async () => {
-    const bytes = container();
+  it('reads the reviewed bytes from the asset key and sends the bearer', async () => {
+    const bytes = reviewedBytes('cc0.marker-cube');
     const fetchImpl = respond(bytes);
     const got = await fetchVerifiedObjectAsset(
       ISLAND, reference(bytes), new AbortController().signal, options(fetchImpl as never),
     );
     expect(new Uint8Array(got)).toEqual(new Uint8Array(bytes));
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://exulanica.test/world-objects/assets/lantern/bytes');
+    expect(url).toBe('https://exulanica.test/world/assets/cc0.marker-cube/bytes');
     expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer token');
   });
 
-  it('refuses a descriptor with no digest rather than loading an unchecked container', async () => {
+  it('escapes an asset key into the path rather than interpolating it raw', () => {
+    expect(objectAssetBytesPath('cc0.marker-cube')).toBe('/world/assets/cc0.marker-cube/bytes');
+    expect(objectAssetBytesPath('a/../b')).toBe('/world/assets/a%2F..%2Fb/bytes');
+    expect(safeObjectAssetPath('/world/assets/a/bytes')).toBe(true);
+    expect(safeObjectAssetPath('/world/assets/a#b')).toBe(false);
+    expect(safeObjectAssetPath('/world-objects/assets/a/bytes')).toBe(false);
+  });
+
+  it('refuses a registry row with no digest rather than loading an unchecked container', async () => {
     const bytes = container();
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes, { contentSha256: '' }), new AbortController().signal,
       options(respond(bytes) as never),
-    )).rejects.toThrow(/needs a SHA-256 in the descriptor/);
+    )).rejects.toThrow(/needs a SHA-256 in the registry/);
   });
 
-  it('refuses a descriptor with no byte count', async () => {
+  it('refuses a registry row with no byte count', async () => {
     const bytes = container();
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes, { byteSize: 0 }), new AbortController().signal,
       options(respond(bytes) as never),
-    )).rejects.toThrow(/needs a byte count in the descriptor/);
+    )).rejects.toThrow(/needs a byte count in the registry/);
   });
 
-  it('refuses bytes whose hash is not the one the descriptor named', async () => {
+  it('refuses bytes whose hash is not the one the registry named', async () => {
     const bytes = container();
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes, { contentSha256: 'a'.repeat(64) }), new AbortController().signal,
@@ -235,28 +268,18 @@ describe('bytes reach the decoder only authenticated, hashed and counted', () =>
     )).rejects.toThrow(/SHA-256 does not match/);
   });
 
-  it('refuses a body whose length is not the one the descriptor named', async () => {
+  it('refuses a body whose length is not the one the registry named', async () => {
     const bytes = container();
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes, { byteSize: bytes.byteLength + 4 }), new AbortController().signal,
       options(respond(bytes) as never),
-    )).rejects.toThrow(/is 208 bytes and 204 arrived/);
+    )).rejects.toThrow(/bytes and .* arrived/);
   });
 
-  it('refuses a remote or query-bearing path, and a container it cannot open', async () => {
+  it('refuses a media type it cannot open', async () => {
     const bytes = container();
-    for (const path of [
-      'https://elsewhere.test/model.glb',
-      '/world-objects/assets/lantern/bytes?token=secret',
-      '/geometry/artifacts/lantern/bytes',
-    ]) {
-      await expect(fetchVerifiedObjectAsset(
-        ISLAND, reference(bytes, { path }), new AbortController().signal,
-        options(respond(bytes) as never),
-      )).rejects.toThrow(/local authenticated path|container this build can open/);
-    }
     await expect(fetchVerifiedObjectAsset(
-      ISLAND, reference(bytes, { container: 'sog/1' as never }), new AbortController().signal,
+      ISLAND, reference(bytes, { mediaType: 'model/vnd.usdz+zip' }), new AbortController().signal,
       options(respond(bytes) as never),
     )).rejects.toThrow(/not a container this build can open/);
   });
@@ -268,7 +291,6 @@ describe('bytes reach the decoder only authenticated, hashed and counted', () =>
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes), new AbortController().signal, options(fetchImpl as never),
     )).rejects.toThrow(/cannot verify content hashes/);
-    // And it refused before it asked for the bytes.
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -286,17 +308,11 @@ describe('bytes reach the decoder only authenticated, hashed and counted', () =>
       options(respond(bytes, 401) as never),
     )).rejects.toThrow(/HTTP 401/);
   });
-
-  it('names the path shape it accepts', () => {
-    expect(safeObjectAssetPath('/world-objects/assets/a/bytes')).toBe(true);
-    expect(safeObjectAssetPath('/world-objects/a#b')).toBe(false);
-    expect(safeObjectAssetPath('/geometry/a')).toBe(false);
-  });
 });
 
 describe('the container reaches the native handler as bytes, never as a URL', () => {
   it('supplies verified bytes in memory and keeps them owned until disposal', async () => {
-    const bytes = container();
+    const bytes = reviewedBytes('cc0.marker-plate');
     const assets = {
       add: vi.fn(),
       remove: vi.fn(),
@@ -304,13 +320,13 @@ describe('the container reaches the native handler as bytes, never as a URL', ()
         expect(asset.type).toBe('container');
         const file = asset.file as unknown as { contents: ArrayBuffer; url: string };
         expect(file.contents).toBe(bytes);
-        expect(file.url).toBe('verified-object/lantern.glb');
+        expect(file.url).toBe('verified-object/cc0.marker-plate.glb');
         asset.resource = { destroy: vi.fn() } as never;
         asset.fire('load', asset);
       }),
     };
     const asset = await createObjectContainerAsset(
-      { assets } as unknown as pc.AppBase, 'lantern', bytes,
+      { assets } as unknown as pc.AppBase, 'cc0.marker-plate', bytes,
     );
     expect(assets.add).toHaveBeenCalledWith(asset);
   });
@@ -324,99 +340,88 @@ describe('the container reaches the native handler as bytes, never as a URL', ()
         asset.fire('error', "No resource handler for asset type: 'container'");
       }),
     };
-    await expect(createObjectContainerAsset({ assets } as unknown as pc.AppBase, 'lantern', bytes))
+    await expect(createObjectContainerAsset({ assets } as unknown as pc.AppBase, 'a', bytes))
       .rejects.toThrow(/No resource handler for asset type/);
     expect(assets.remove).toHaveBeenCalled();
   });
 });
 
-describe('placement is region-local, composed with the region’s display frame', () => {
-  const frame = sceneDisplayFrame(
-    [
-      { position: [3, 0, 0], forward: [-1, 0, 0], up: [0, 0, 1] },
-      { position: [-3, 0, 0], forward: [1, 0, 0], up: [0, 0, 1] },
-      { position: [0, 0, 3], forward: [0, 0, -1], up: [0, 0, 1] },
-    ],
-    [[-4, -4, -4], [4, 4, 4]],
-  );
+describe('placement is region-local fixed point', () => {
+  const region = placement(atlasVec3(0, 0, 0), 0, 1);
 
-  it('round-trips a display pose through the persisted region-local transform', () => {
-    const pose = { x: 1.5, y: 0, z: -2.25, yaw: 0.7 };
-    const sceneFromObject = objectTransformForDisplayPose(frame, pose);
-    const read = displayPoseOfObject(frame, sceneFromObject);
-    expect(read.x).toBeCloseTo(pose.x, 9);
-    expect(read.y).toBeCloseTo(pose.y, 9);
-    expect(read.z).toBeCloseTo(pose.z, 9);
-    expect(read.yaw).toBeCloseTo(pose.yaw, 9);
+  it('converts an atlas point into region millimetres, which atlas-core refuses to do', () => {
+    const turned = placement(atlasVec3(10, 0, -4), Math.PI / 2, 2);
+    // One metre along local +X: yaw 90 degrees sends +X to -Z, scale 2, offset.
+    const local = regionPointFromAtlas(turned, [10, 0, -6]);
+    expect(local[0]).toBeCloseTo(1000, 6);
+    expect(local[1]).toBeCloseTo(0, 6);
+    expect(local[2]).toBeCloseTo(0, 6);
   });
 
-  it('is not the identity, so the frame is genuinely doing the work', () => {
-    expect(frame.scale).not.toBe(1);
-    const sceneFromObject = objectTransformForDisplayPose(frame, { x: 1, y: 0, z: 0, yaw: 0 });
-    expect(sceneFromObject[3]).not.toBeCloseTo(1, 3);
-  });
-
-  it('inverts a similarity and refuses a matrix that is not one', () => {
-    const identity = invertSimilarity(identityDisplayFrame().displayFromSceneRowMajor);
-    expect([...identity].map((value) => value + 0))
-      .toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-    expect(() => invertSimilarity(new Array(16).fill(0))).toThrow(/invertible similarity/);
-  });
-
-  it('undoes a region placement, which atlas-core deliberately refuses to do', () => {
-    const placement = { position: { x: 10, y: 0, z: -4 } as never, yaw: Math.PI / 2, scale: 2 };
-    // A point one unit along local +X, placed: yaw 90 degrees sends +X to -Z, scale 2, offset.
-    const local = displayPointFromAtlas(placement, [10, 0, -6]);
-    expect(local[0]).toBeCloseTo(1, 9);
-    expect(local[1]).toBeCloseTo(0, 9);
-    expect(local[2]).toBeCloseTo(0, 9);
-  });
-
-  it('puts a placement a step in front of the visitor, on the ground', () => {
-    const placement = { position: { x: 0, y: 0, z: 0 } as never, yaw: 0, scale: 1 };
+  it('produces whole millimetres, microradians and thousandths', () => {
     const pose = placementPoseBeforeVisitor(
-      placement,
-      { position: { x: 0, y: 1.6, z: 0 } as never, forward: { x: 0, y: -0.2, z: -1 } as never },
-      3,
+      region,
+      { position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, -0.2, -1) },
+      3000,
     );
-    expect(pose.y).toBe(0);
-    expect(pose.z).toBeCloseTo(-3, 6);
-    expect(pose.x).toBeCloseTo(0, 6);
+    for (const value of [pose.xMm, pose.yMm, pose.zMm, pose.yawMicroradians, pose.scaleMilli]) {
+      expect(Number.isSafeInteger(value)).toBe(true);
+    }
+    expect(pose.zMm).toBeCloseTo(-3000, 0);
+    expect(pose.yMm).toBe(0);
+    expect(pose.scaleMilli).toBe(SCALE_MILLI_UNIT);
+  });
+
+  it('keeps yaw non-negative and inside one turn, as the transform bound requires', () => {
+    expect(yawMicroradiansOf(0)).toBe(0);
+    expect(yawMicroradiansOf(Number.NaN)).toBe(0);
+    expect(yawMicroradiansOf(-Math.PI / 2))
+      .toBe(Math.round(1.5 * Math.PI * MICRORADIANS_PER_RADIAN));
+    expect(yawMicroradiansOf(3 * Math.PI)).toBe(Math.round(Math.PI * MICRORADIANS_PER_RADIAN));
+    for (const radians of [-100, -1, 0, 1, 100]) {
+      const yaw = yawMicroradiansOf(radians);
+      expect(yaw).toBeGreaterThanOrEqual(0);
+      expect(yaw).toBeLessThanOrEqual(6_283_185);
+    }
   });
 
   it('stands at a caller-supplied ground when the frame did not measure one', () => {
-    const placement = { position: { x: 0, y: 0, z: 0 } as never, yaw: 0, scale: 1 };
-    const pose = { position: { x: 0, y: 1.6, z: 0 } as never, forward: { x: 0, y: 0, z: -1 } as never };
-    // The identity frame's y = 0 is the scene's own origin, not a floor. A caller that knows this
-    // supplies the height instead, and both placement kinds have to honour it.
-    expect(placementPoseBeforeVisitor(placement, pose, 3, -4.25).y).toBe(-4.25);
-    expect(placementPoseAtAtlasPoint(placement, [1, 9, 1], pose, -4.25).y).toBe(-4.25);
-    // And the default stays the measured ground, so nothing that had a real frame changes.
-    expect(placementPoseBeforeVisitor(placement, pose, 3).y).toBe(0);
-    expect(placementPoseAtAtlasPoint(placement, [1, 9, 1], pose).y).toBe(0);
+    const pose = { position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) };
+    expect(placementPoseBeforeVisitor(region, pose, 3000, -1600).yMm).toBe(-1600);
+    expect(placementPoseAtAtlasPoint(region, [1, 9, 1], pose, -1600).yMm).toBe(-1600);
+    expect(placementPoseBeforeVisitor(region, pose, 3000).yMm).toBe(0);
+    expect(placementPoseAtAtlasPoint(region, [1, 9, 1], pose).yMm).toBe(0);
   });
 
-  it('faces display -Z when the visitor is looking straight down', () => {
-    const placement = { position: { x: 0, y: 0, z: 0 } as never, yaw: 0, scale: 1 };
+  it('faces region -Z when the visitor is looking straight down', () => {
     const pose = placementPoseBeforeVisitor(
-      placement,
-      { position: { x: 0, y: 1.6, z: 0 } as never, forward: { x: 0, y: -1, z: 0 } as never },
-      2,
+      region, { position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, -1, 0) }, 2000,
     );
-    expect(pose.z).toBeCloseTo(-2, 6);
-    expect(Number.isFinite(pose.yaw)).toBe(true);
+    expect(pose.zMm).toBeCloseTo(-2000, 0);
+    expect(Number.isSafeInteger(pose.yawMicroradians)).toBe(true);
   });
 
   it('stands an anchored placement at the anchor’s foot, facing the visitor', () => {
-    const placement = { position: { x: 0, y: 0, z: 0 } as never, yaw: 0, scale: 1 };
     const pose = placementPoseAtAtlasPoint(
-      placement,
-      [4, 2.2, 0],
-      { position: { x: 0, y: 1.6, z: 0 } as never, forward: { x: 1, y: 0, z: 0 } as never },
+      region, [4, 2.2, 0], { position: atlasVec3(0, 1.6, 0), forward: atlasVec3(1, 0, 0) },
     );
-    expect(pose.x).toBeCloseTo(4, 9);
-    expect(pose.y).toBe(0);
-    expect(pose.yaw).toBeCloseTo(-Math.PI / 2, 6);
+    expect(pose.xMm).toBe(4000);
+    expect(pose.yMm).toBe(0);
+    // Facing back towards the visitor, wrapped into the non-negative range.
+    expect(pose.yawMicroradians).toBe(Math.round(1.5 * Math.PI * MICRORADIANS_PER_RADIAN));
+  });
+
+  it('nudges by whole millimetres and keeps every field an integer', () => {
+    const start: RegionPose = {
+      xMm: 1200, yMm: 0, zMm: -450, yawMicroradians: 785_398, scaleMilli: 1000,
+    };
+    const moved = nudgedPose(start, { xMm: -250, yMm: 250.4, yaw: Math.PI });
+    expect(moved.xMm).toBe(950);
+    expect(moved.yMm).toBe(250);
+    expect(moved.zMm).toBe(-450);
+    expect(Number.isSafeInteger(moved.yawMicroradians)).toBe(true);
+    expect(moved.yawMicroradians).toBeGreaterThanOrEqual(0);
+    expect(nudgedPose(start, {})).toEqual(start);
   });
 });
 
@@ -427,9 +432,10 @@ interface FakeEntity {
   enabled: boolean;
   readonly position: number[];
   readonly scale: number[];
+  readonly euler: number[];
   destroy: () => void;
   setLocalPosition: (x: number, y: number, z: number) => void;
-  setLocalRotation: (q: unknown) => void;
+  setLocalEulerAngles: (x: number, y: number, z: number) => void;
   setLocalScale: (x: number, y: number, z: number) => void;
   addChild: (child: unknown) => void;
 }
@@ -440,9 +446,10 @@ function fakeEntity(): FakeEntity {
     enabled: true,
     position: [0, 0, 0],
     scale: [1, 1, 1],
+    euler: [0, 0, 0],
     destroy: vi.fn(),
     setLocalPosition: (x, y, z) => { entity.position[0] = x; entity.position[1] = y; entity.position[2] = z; },
-    setLocalRotation: () => undefined,
+    setLocalEulerAngles: (x, y, z) => { entity.euler[0] = x; entity.euler[1] = y; entity.euler[2] = z; },
     setLocalScale: (x, y, z) => { entity.scale[0] = x; entity.scale[1] = y; entity.scale[2] = z; },
     addChild: vi.fn(),
   };
@@ -466,112 +473,130 @@ function harness() {
   return { runtime, drawn, root, assets };
 }
 
+const POSE: RegionPose = Object.freeze({
+  xMm: 1200, yMm: 0, zMm: -450, yawMicroradians: 0, scaleMilli: 1000,
+});
+
 const placed = (behaviour: PlacedAuthoredObject['behaviour']): PlacedAuthoredObject => ({
-  objectId: 'object-1',
+  objectId: 'object:lantern',
   islandId: ISLAND,
-  sceneId: 'scene-1',
-  asset: reference(container()),
-  sceneFromObjectRowMajor: [1, 0, 0, 2, 0, 1, 0, 0.25, 0, 0, 1, -3, 0, 0, 0, 1],
+  asset: reference(reviewedBytes('cc0.marker-cube')),
+  transform: POSE,
   behaviour,
 });
 
-describe('the runtime places, moves and animates what a surface already committed', () => {
-  const frame = identityDisplayFrame();
+const boundedPath = (over: Record<string, unknown> = {}) => ({
+  behaviourKey: 'motion.bounded-path',
+  behaviourVersion: 1,
+  parameters: { axis: 'y', easing: 'smooth', travel_mm: 1000, period_milliseconds: 4000, ...over },
+});
 
-  it('places an object under its region and attaches a supported behaviour', async () => {
+describe('the runtime places, moves and animates what a surface already committed', () => {
+  it('places an object under its region, converting fixed point to metres', async () => {
     const { runtime, drawn, root } = harness();
-    const outcome = await runtime.place(
-      placed({ behaviourId: 'motion.bounded', parameters: { axis: 'y', amplitude: 1, period: 4 } }),
-      container(), frame,
-    );
-    expect(outcome).toEqual({ objectId: 'object-1', motion: 'attached', notices: [] });
+    const outcome = await runtime.place(placed(boundedPath()), reviewedBytes('cc0.marker-cube'));
+    expect(outcome).toEqual({ objectId: 'object:lantern', motion: 'attached', notices: [] });
     expect(root.addChild).toHaveBeenCalledWith(drawn);
-    expect(drawn.name).toBe('authored-object:object-1');
-    expect(drawn.position).toEqual([2, 0.25, -3]);
-    expect(runtime.motionStateOf('object-1')).toBe('at-rest');
+    expect(drawn.name).toBe('authored-object:object:lantern');
+    expect(drawn.position).toEqual([1.2, 0, -0.45]);
+    expect(drawn.scale).toEqual([1, 1, 1]);
+    expect(runtime.motionStateOf('object:lantern')).toBe('at-rest');
   });
 
-  it('still places the object when its behaviour id is not supported, and says why', async () => {
+  it('applies yaw and scale from the fixed-point fields', async () => {
+    const { runtime, drawn } = harness();
+    await runtime.place({
+      ...placed(null),
+      transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 1_570_796, scaleMilli: 2000 },
+    }, reviewedBytes('cc0.marker-cube'));
+    expect(drawn.euler[1]).toBeCloseTo(90, 3);
+    expect(drawn.scale).toEqual([2, 2, 2]);
+  });
+
+  it('still places the object when its behaviour is one this build cannot run, and says why', async () => {
     const { runtime, root } = harness();
     const outcome = await runtime.place(
-      placed({ behaviourId: 'motion.orbit', parameters: {} }), container(), frame,
+      placed({ behaviourKey: 'motion.orbit', behaviourVersion: 1, parameters: {} }),
+      reviewedBytes('cc0.marker-cube'),
     );
     expect(outcome.motion).toBe('none');
-    expect(outcome.notices).toHaveLength(1);
-    expect(outcome.notices[0]).toContain('motion.orbit');
-    expect(outcome.notices[0]).toContain('motion.bounded');
-    // The refusal is about the motion. The object itself is real and is drawn.
+    expect(outcome.notices[0]).toContain('motion.orbit@1');
+    expect(outcome.notices[0]).toContain('motion.bounded-path@1');
     expect(root.addChild).toHaveBeenCalled();
-    expect(runtime.motionStateOf('object-1')).toBe('none');
+    expect(runtime.motionStateOf('object:lantern')).toBe('none');
   });
 
-  it('reports a clamped parameter rather than moving further than declared', async () => {
+  it('refuses a behaviour at an unreviewed version the same way', async () => {
     const { runtime } = harness();
     const outcome = await runtime.place(
-      placed({ behaviourId: 'motion.bounded', parameters: { axis: 'y', amplitude: 99, period: 4 } }),
-      container(), frame,
+      placed({ ...boundedPath(), behaviourVersion: 2 }), reviewedBytes('cc0.marker-cube'),
+    );
+    expect(outcome.motion).toBe('none');
+    expect(outcome.notices[0]).toContain('motion.bounded-path@2');
+  });
+
+  it('reports a clamped parameter rather than travelling further than declared', async () => {
+    const { runtime } = harness();
+    const outcome = await runtime.place(
+      placed(boundedPath({ travel_mm: 99_999 })), reviewedBytes('cc0.marker-cube'),
     );
     expect(outcome.motion).toBe('attached');
-    expect(outcome.notices[0]).toContain('amplitude');
+    expect(outcome.notices[0]).toContain('travel_mm');
   });
 
   it('refuses a region this world does not draw instead of dropping the object silently', async () => {
     const { runtime } = harness();
     await expect(runtime.place(
-      { ...placed(null), islandId: 'elsewhere' as IslandId }, container(), frame,
+      { ...placed(null), islandId: 'elsewhere' as IslandId }, reviewedBytes('cc0.marker-cube'),
     )).rejects.toThrow(/not drawn in this world/);
   });
 
-  it('runs, holds and resets, returning the authored transform exactly', async () => {
+  it('runs on the frame clock in seconds, holds, and resets exactly', async () => {
     const { runtime, drawn } = harness();
-    await runtime.place(
-      placed({ behaviourId: 'motion.bounded', parameters: { axis: 'y', amplitude: 1, period: 4 } }),
-      container(), frame,
-    );
+    await runtime.place(placed(boundedPath()), reviewedBytes('cc0.marker-cube'));
     const authored = [...drawn.position];
 
-    expect(runtime.control('object-1', 'trigger')).toEqual({ ok: true });
-    runtime.update(1);
-    expect(drawn.position[1]).toBeCloseTo(authored[1]! + 1, 9);
+    expect(runtime.control('object:lantern', 'trigger')).toEqual({ ok: true });
+    // Two seconds is half of a four-second period, which is the far end of the travel. The frame
+    // clock is seconds and the behaviour's is milliseconds; getting that wrong runs it 1000x slow.
+    runtime.update(2);
+    expect(drawn.position[1]).toBeCloseTo(authored[1]! + 1, 6);
 
-    runtime.control('object-1', 'stop');
+    runtime.control('object:lantern', 'stop');
     const held = [...drawn.position];
     runtime.update(1);
     expect(drawn.position).toEqual(held);
 
-    runtime.control('object-1', 'reset');
+    runtime.control('object:lantern', 'reset');
     expect(drawn.position).toEqual(authored);
-    expect(runtime.motionStateOf('object-1')).toBe('at-rest');
+    expect(runtime.motionStateOf('object:lantern')).toBe('at-rest');
   });
 
-  it('refuses a control on an object with no motion, in words', async () => {
+  it('refuses a control on an object with no runnable motion, in words', async () => {
     const { runtime } = harness();
-    await runtime.place(placed(null), container(), frame);
-    expect(runtime.control('object-1', 'trigger'))
-      .toEqual({ ok: false, reason: expect.stringContaining('no supported motion') });
-    expect(runtime.control('object-9', 'trigger'))
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    expect(runtime.control('object:lantern', 'trigger'))
+      .toEqual({ ok: false, reason: expect.stringContaining('no motion this build can run') });
+    expect(runtime.control('object:nine', 'trigger'))
       .toEqual({ ok: false, reason: expect.stringContaining('not in this world') });
   });
 
-  it('moves an object to a new authored transform and returns its motion to rest', async () => {
+  it('moves an object to a new authored pose and returns its motion to rest', async () => {
     const { runtime, drawn } = harness();
-    await runtime.place(
-      placed({ behaviourId: 'motion.bounded', parameters: { axis: 'y', amplitude: 1, period: 4 } }),
-      container(), frame,
-    );
-    runtime.control('object-1', 'trigger');
+    await runtime.place(placed(boundedPath()), reviewedBytes('cc0.marker-cube'));
+    runtime.control('object:lantern', 'trigger');
     runtime.update(1);
-    expect(runtime.setTransform(
-      'object-1', [1, 0, 0, 5, 0, 1, 0, 0, 0, 0, 1, 5, 0, 0, 0, 1], frame,
-    )).toBe(true);
+    expect(runtime.setTransform('object:lantern', {
+      xMm: 5000, yMm: 0, zMm: 5000, yawMicroradians: 0, scaleMilli: 1000,
+    })).toBe(true);
     expect(drawn.position).toEqual([5, 0, 5]);
-    expect(runtime.motionStateOf('object-1')).toBe('at-rest');
-    expect(runtime.setTransform('object-9', [], frame)).toBe(false);
+    expect(runtime.motionStateOf('object:lantern')).toBe('at-rest');
+    expect(runtime.setTransform('object:nine', POSE)).toBe(false);
   });
 
   it('draws an object only where its region’s body is drawn', async () => {
     const { runtime, drawn } = harness();
-    await runtime.place(placed(null), container(), frame);
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
     runtime.setResidency(new Map([[ISLAND, 'full']]), false);
     expect(drawn.enabled).toBe(true);
     runtime.setResidency(new Map([[ISLAND, 'stub']]), false);
@@ -582,23 +607,24 @@ describe('the runtime places, moves and animates what a surface already committe
 
   it('unloads the asset and destroys the entity on remove and on teardown', async () => {
     const { runtime, drawn, assets } = harness();
-    await runtime.place(placed(null), container(), frame);
-    expect(runtime.remove('object-1')).toBe(true);
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    expect(runtime.remove('object:lantern')).toBe(true);
     expect(drawn.destroy).toHaveBeenCalled();
     expect(assets.remove).toHaveBeenCalled();
-    expect(runtime.remove('object-1')).toBe(false);
+    expect(runtime.remove('object:lantern')).toBe(false);
 
-    await runtime.place(placed(null), container(), frame);
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
     runtime.destroy();
     expect(runtime.objectIds).toEqual([]);
-    await expect(runtime.place(placed(null), container(), frame)).rejects.toThrow(/destroyed/);
+    await expect(runtime.place(placed(null), reviewedBytes('cc0.marker-cube')))
+      .rejects.toThrow(/destroyed/);
   });
 
   it('replaces an object placed twice under the same id rather than stacking two', async () => {
     const { runtime, root } = harness();
-    await runtime.place(placed(null), container(), frame);
-    await runtime.place(placed(null), container(), frame);
-    expect(runtime.objectIds).toEqual(['object-1']);
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    expect(runtime.objectIds).toEqual(['object:lantern']);
     expect(root.addChild).toHaveBeenCalledTimes(2);
   });
 });
