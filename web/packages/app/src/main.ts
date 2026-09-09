@@ -25,12 +25,10 @@ import './style.css';
 import './appearance.css';
 import './unified-interface.css';
 
-import type { RenderingSubstrate } from '@exulanica/graph-client';
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
 import { FACET_KEYS, decodeFacets, encodeFacets, type IndexFacets } from '@exulanica/world-index';
-import { mountAtlas, type MountedAtlas } from './atlas.js';
-import { applicationTitle, developmentToken, sourcePresentation } from './config.js';
+import { applicationTitle, developmentToken } from './config.js';
 import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
@@ -44,11 +42,7 @@ import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
 import { buildRegionPlan } from './ui/region-plan.js';
 import { MAP_ORIENTATION_CAPTION } from './ui/status.js';
-import {
-  applyDocumentAppearance,
-  applyDocumentWorldStyle,
-  themeForPreferences,
-} from './theme.js';
+import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import {
   commandForKeystroke,
@@ -60,6 +54,7 @@ import { mountAppearance } from './composition/appearance.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
+import { disposeRenderer, mountRenderer } from './composition/renderer.js';
 import {
   mountStatusAndInspector,
   type MountedStatusAndInspector,
@@ -67,28 +62,18 @@ import {
 import {
   mountSessionGeometry,
   openAppSession,
-  reconstructionRungsFor,
   reconstructionsOf,
 } from './composition/session-and-geometry.js';
 import { createAppEnvironment, createSessionState } from './composition/session-state.js';
 
 const env = createAppEnvironment();
 const state = createSessionState();
-const {
-  shell,
-  canvas,
-  browserMeasurement,
-  systemAppearance,
-  systemReducedMotion,
-  preview,
-  previewArtProfile,
-} = env;
+const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewArtProfile } = env;
 
-let atlas: MountedAtlas | null = null;
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
-  atlas?.binding.setReducedMotion(event.matches);
+  state.atlas?.binding.setReducedMotion(event.matches);
 });
 applyDocumentAppearance(state.preferences, systemAppearance.matches);
 /**
@@ -216,9 +201,7 @@ async function mount(): Promise<void> {
     disposeFormationWatch(state);
     mountListeners?.abort();
     mountListeners = null;
-    atlas?.dispose();
-    atlas = null;
-    state.settingsStylePreviewId = null;
+    disposeRenderer(state);
     canvas.hidden = true;
     shell.setAttribute('data-world-state', 'empty');
     replace(shell, [emptyWorld]);
@@ -341,12 +324,12 @@ async function mount(): Promise<void> {
     onEvidenceOpened: (anchorId) => {
       // 5.2: the written claim and the spatial world point at the same evidence at the same
       // moment. Focusing the anchor is the spatial half of that one gesture.
-      if (anchorId === null || atlas === null) return;
-      const index = atlas.binding.table.indexOf.get(anchorId as never);
-      if (index !== undefined) atlas.binding.focusAnchor(index);
+      if (anchorId === null || state.atlas === null) return;
+      const index = state.atlas.binding.table.indexOf.get(anchorId as never);
+      if (index !== undefined) state.atlas.binding.focusAnchor(index);
     },
     onLocate: (targetAnchorId, targetIslandId) => {
-      const binding = atlas?.binding;
+      const binding = state.atlas?.binding;
       if (binding === undefined) {
         showTravelStatus('The Atlas is still forming. Try again in a moment.', 'failure');
         return;
@@ -512,7 +495,7 @@ async function mount(): Promise<void> {
 
   reflectShell = (): void => {
     if (shellState.primary !== 'world') {
-      atlas?.binding.endSceneInspection();
+      state.atlas?.binding.endSceneInspection();
       status.hideInspector();
     }
     shell.setAttribute('data-primary', shellState.primary);
@@ -548,7 +531,7 @@ async function mount(): Promise<void> {
       shellState.primary !== 'world' ||
       shellState.camera !== 'ground';
     detail.root.hidden = shellState.primary !== 'index' || shellState.detailId === null;
-    atlas?.binding.setMapMode(shellState.camera === 'map');
+    state.atlas?.binding.setMapMode(shellState.camera === 'map');
     /*
      * A plate stands in front of the world; it does not replace it. Movement therefore tracks the
      * CAMERA MODE and nothing else: Map and direct travel own the camera, so they stop you, but
@@ -559,9 +542,9 @@ async function mount(): Promise<void> {
      * Summon keeps its own guard below, so a system surface still cannot call the Companion out
      * from behind itself.
      */
-    atlas?.binding.setControlsEnabled(shellState.camera === 'ground');
+    state.atlas?.binding.setControlsEnabled(shellState.camera === 'ground');
     // Every surface here takes the cursor. None of them should take your feet with it.
-    atlas?.binding.setFreeCursorActive(
+    state.atlas?.binding.setFreeCursorActive(
       companion.panel.state() === 'open' || shellState.primary !== 'world',
     );
     if (
@@ -577,96 +560,26 @@ async function mount(): Promise<void> {
   worldIndex.render(current, indexFacets, selected);
   formation.begin();
 
-  atlas?.dispose();
-  state.settingsStylePreviewId = null;
-  const activeTheme = themeForPreferences(state.preferences, systemAppearance.matches);
-  let lastMoving: boolean | null = null;
-  let lastAnchorFocus: boolean | null = null;
-  const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
-    text: 'Opening the Atlas and decoding its available reconstruction…' });
-  shell.append(rendererLoading);
-  shell.setAttribute('aria-busy', 'true');
-  try {
-    atlas = await mountAtlas(canvas, stage, built.scene, (report) => {
-    if (lastMoving !== report.moving) {
-      lastMoving = report.moving;
-      shell.setAttribute('data-moving', report.moving ? 'true' : 'false');
-    }
-    if (report.moving && firstUse.observeMovement()) reflectFirstUse();
-    if (!minimap.root.hidden) {
-      const camera = atlas?.binding.controls.state;
-      minimap.setViewer(
-        camera === undefined ? null : { x: camera.x, z: camera.z, yaw: camera.yaw },
-      );
-    }
-    const anchorFocused = report.mode === 'traverse' && report.focusedIndex !== null;
-    if (lastAnchorFocus !== anchorFocused) {
-      lastAnchorFocus = anchorFocused;
-      shell.toggleAttribute('data-anchor-focus', anchorFocused);
-    }
-    shell.setAttribute('data-spatial', report.spatial.phase);
-    if (report.recoveryReason !== null) {
-      showTravelStatus(
-        report.recoveryReason === 'outside-field'
-          ? 'Returned to the nearest safe place; the resident field ended here.'
-          : report.recoveryReason === 'no-surface'
-            ? 'Returned to the nearest safe place; there is no walkable surface here.'
-            : 'Returned to the nearest safe place; the surface ahead is too steep or discontinuous.',
-        'failure',
-      );
-    }
-  }, {
-    theme: activeTheme,
-    fieldOfView: state.preferences.fieldOfView,
-    mouseSensitivity: state.preferences.mouseSensitivity,
-    artProfile: previewArtProfile ?? worldArtProfile(
-      state.preferences.worldArtProfile,
-      state.preferences.worldArtProfileVersion,
-      state.preferences.worldStyleParameters,
-    ),
-    ...(previewArtProfile === undefined
-      ? { artProfileParameters: state.preferences.worldStyleParameters }
-      : {}),
-    ...(state.previewSourceMedia === undefined ? {} : { sourceMedia: state.previewSourceMedia }),
-    ...(state.pointMaps === undefined ? {} : { pointMaps: state.pointMaps }),
-    ...(state.placedPointMaps === undefined ? {} : { placedPointMaps: state.placedPointMaps }),
-    trainedGeometry: state.trainedGeometry,
-    sourcePresentation: sourcePresentation(),
-    recoveredCameras: state.recoveredCameras,
-    reducedMotion: systemReducedMotion.matches,
-  }, browserMeasurement === null ? undefined : (binding) => {
-    browserMeasurement.observeBinding(binding, {
-      scenes: current.reconstructionScenes ?? [],
-      placedPointMapCount: state.placedPointMaps?.length ?? 0,
-      placementMaxErrors: binding.verifyPlacements().map((check) => check.maxErrorMetres),
-    });
-    });
-  } finally { rendererLoading.remove(); shell.removeAttribute('aria-busy'); }
-  // Only renderer-accepted legacy preview maps suppress the source-only region notice.
-  if (preview) {
-    for (const visual of atlas.binding.islands) {
-      if (state.pointMaps?.has(visual.island.islandId)) status.noteRenderedPreviewRegion(visual.island.islandId);
-    }
-  }
-  const actualRendering = new Map<string, RenderingSubstrate>();
-  for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
-  for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
-  state.reconstructionRungs = reconstructionRungsFor(current.reconstructionScenes ?? [], actualRendering, state.notDrawnScenes, state.displayFrames);
-  state.geometryNotices = Object.freeze([...state.geometryNotices, ...atlas.binding.trainedSceneFailures
-    .map((failure) => `Trained reconstruction unavailable: ${failure.reason}`)]);
-  status.refreshStatus();
-  // The lens survives a remount. It is session state, not renderer state, so a world that has just
-  // been rebuilt has to be told what the visitor is currently looking through.
-  status.applyProofLens();
-  canvas.dataset.companionRenderer = 'svg';
-  reflectShell();
+  const renderer = await mountRenderer({
+    env,
+    state,
+    snapshot: current,
+    scene: built.scene,
+    stage,
+    minimap,
+    status,
+    firstUse,
+    reflectFirstUse: () => reflectFirstUse(),
+    reflectShell: () => reflectShell(),
+    showTravelStatus,
+  });
 
   // -- the two input modes, and the one key that calls the Companion ----------------------
   //
   // The mode follows the browser's pointer lock state and is never guessed at: the browser drops
   // the lock on Escape and on focus loss without telling the application first, so a mode the
   // application tracked itself would be wrong within seconds of the user tabbing away.
-  const mounted = atlas;
+  const mounted = renderer.atlas;
   mounted.binding.onInspectionChange = (view) => {
     if (view === null) status.hideInspector();
   };
@@ -888,12 +801,7 @@ async function mount(): Promise<void> {
   // Nothing is asked unprompted. The Companion arrives when it is called, and until then the
   // world is the whole of what is on screen.
 
-  // Reported rather than trusted. A placement that does not reproduce atlas-core's own transform
-  // is a region turned the wrong way, which is invisible until somebody walks behind it.
-  const worst = Math.max(0, ...atlas.placements.map((check) => check.maxErrorMetres));
-  if (worst > 1e-3) {
-    console.warn(`atlas placement disagrees with atlas-core by ${worst} atlas units`);
-  }
+  renderer.reportPlacementDisagreement();
 
 }
 
