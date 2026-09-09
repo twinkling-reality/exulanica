@@ -256,7 +256,10 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     if (!restored && controller.answer() === null) {
       restored = true;
       const last = deps.engine.lastAnswer;
-      if (last !== null) panel.restoreAnswer(rememberedAsAnswer(last));
+      // Through the controller, never straight at the panel: `evidenceAt` resolves a chip
+      // against the controller's own held answer, so a restored answer the controller does
+      // not know about renders chips that open nothing.
+      if (last !== null) controller.restoreAnswer(rememberedAsAnswer(last));
     }
     stage.show();
     deps.reflectShell();
