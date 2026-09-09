@@ -31,6 +31,10 @@ from exulanica.world import (
 )
 from exulanica.world.objects import validate_object, validate_object_id, validate_transform
 
+#: The reviewed cube's content digest. Objects name an asset by its bytes, not by its key,
+#: so this is what a request body and the digested object document both carry.
+CUBE = "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+
 REGISTRY = {
     ("motion.bounded-path", 1): {
         "travel_mm": {"kind": "integer", "minimum": 100, "maximum": 10_000, "default": 1_000},
@@ -67,7 +71,7 @@ def transform(**overrides):
 def authored(object_id="object:lantern", **overrides):
     values = {
         "object_id": object_id,
-        "asset_key": "cc0.marker-cube",
+        "asset_sha256": CUBE,
         "region_id": "region-a",
         "transform": transform(),
         "origin": ObjectOrigin("authored", "fictional"),
@@ -103,7 +107,19 @@ def test_an_acceptable_object_id_is_accepted(object_id):
 
 @pytest.mark.parametrize(
     "object_id",
-    ["", "Object:Lantern", "object lantern", "-lead", "trail-", ":colon", "объект", "a" * 201],
+    [
+        "",
+        "Object:Lantern",
+        "object lantern",
+        "-lead",
+        "trail-",
+        ":colon",
+        "объект",
+        "a" * 201,
+        # Python's ``$`` matches before a trailing newline; PostgreSQL's does not.
+        "object:lantern\n",
+        "ab\n",
+    ],
 )
 def test_an_object_id_the_schema_would_refuse_is_refused_first(object_id):
     """The negative control, and the one that matters: every id Python accepts must be an id the
@@ -196,7 +212,7 @@ def test_the_person_chooses_either_role(role):
     validate_object(
         authored(origin=ObjectOrigin("authored", role)),
         region_ids=frozenset({"region-a"}),
-        asset_keys=frozenset({"cc0.marker-cube"}),
+        asset_digests=frozenset({CUBE}),
         registry=REGISTRY,
     )
 
@@ -207,7 +223,7 @@ def test_an_unchosen_or_invented_role_is_refused():
             validate_object(
                 authored(origin=ObjectOrigin("authored", role)),
                 region_ids=frozenset({"region-a"}),
-                asset_keys=frozenset({"cc0.marker-cube"}),
+                asset_digests=frozenset({CUBE}),
                 registry=REGISTRY,
             )
 
@@ -217,7 +233,7 @@ def test_origin_kind_cannot_claim_anything_but_authored():
         validate_object(
             authored(origin=ObjectOrigin("captured", "personal")),
             region_ids=frozenset({"region-a"}),
-            asset_keys=frozenset({"cc0.marker-cube"}),
+            asset_digests=frozenset({CUBE}),
             registry=REGISTRY,
         )
 
@@ -229,7 +245,7 @@ def test_a_known_region_and_asset_are_accepted():
     validate_object(
         authored(),
         region_ids=frozenset({"region-a"}),
-        asset_keys=frozenset({"cc0.marker-cube"}),
+        asset_digests=frozenset({CUBE}),
         registry=REGISTRY,
     )
 
@@ -239,7 +255,7 @@ def test_an_unknown_region_is_refused():
         validate_object(
             authored(region_id="region-nowhere"),
             region_ids=frozenset({"region-a"}),
-            asset_keys=frozenset({"cc0.marker-cube"}),
+            asset_digests=frozenset({CUBE}),
             registry=REGISTRY,
         )
 
@@ -247,9 +263,9 @@ def test_an_unknown_region_is_refused():
 def test_an_unreviewed_asset_is_refused():
     with pytest.raises(InvalidObjectData, match="reviewed asset"):
         validate_object(
-            authored(asset_key="something.downloaded"),
+            authored(asset_sha256="0" * 64),
             region_ids=frozenset({"region-a"}),
-            asset_keys=frozenset({"cc0.marker-cube"}),
+            asset_digests=frozenset({CUBE}),
             registry=REGISTRY,
         )
 
@@ -407,6 +423,20 @@ def test_every_solid_face_is_wound_outward():
             assert sum(normal[i] * outward[i] for i in range(3)) > 0, asset.asset_key
 
 
+def test_the_runtime_role_cannot_write_the_reviewed_catalogs():
+    """Migration 0042 revokes write on both registries, and that revoke is not sufficient alone.
+
+    ``provision_runtime_role`` grants ``select, insert, update`` on every table in the schema and
+    then revokes insert and update on ``READ_ONLY_TABLES``. A reviewed catalog absent from that
+    tuple has its migration-time revoke handed straight back on the next deployment, which is how
+    a table the contract calls read-only becomes writable from any workspace's runtime
+    connection."""
+    from exulanica.db.roles import READ_ONLY_TABLES
+
+    assert "world_reviewed_asset" in READ_ONLY_TABLES
+    assert "world_object_behaviour_registry" in READ_ONLY_TABLES
+
+
 def test_the_licence_names_the_dedication_it_claims():
     for asset in reviewed_assets():
         assert asset.licence_id == "CC0-1.0"
@@ -440,7 +470,7 @@ def test_the_fixture_state_digest_recomputes_from_its_own_delta(published_fixtur
     objects = tuple(
         AuthoredObject(
             object_id=o["object_id"],
-            asset_key=o["asset"]["asset_key"],
+            asset_sha256=o["asset"]["content_sha256"],
             region_id=o["region_id"],
             transform=Transform(
                 o["transform"]["x_mm"],

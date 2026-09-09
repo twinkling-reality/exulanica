@@ -42,6 +42,10 @@ from world_structure_fixtures import structural_candidate
 
 pytestmark = pytest.mark.postgres
 
+#: The reviewed cube's content digest. Objects name an asset by its bytes, not by its key,
+#: so this is what a request body and the digested object document both carry.
+CUBE = "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+
 PARAMETERS = {
     "travel_mm": 2_000,
     "period_milliseconds": 4_000,
@@ -65,7 +69,7 @@ def transform(**overrides):
 def authored(object_id="object:lantern", **overrides):
     values = {
         "object_id": object_id,
-        "asset_key": "cc0.marker-cube",
+        "asset_sha256": CUBE,
         "region_id": "region-a",
         "transform": transform(),
         "origin": ObjectOrigin("authored", "fictional"),
@@ -366,7 +370,7 @@ def test_undo_with_nothing_to_undo_is_refused(world):
         objects.undo(version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4())
 
 
-def test_undo_of_an_undo_is_refused_rather_than_treated_as_a_redo(world):
+def test_undo_is_not_redo_and_stops_when_every_edit_is_reversed(world):
     objects, snapshot, _ = world
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
@@ -375,8 +379,108 @@ def test_undo_of_an_undo_is_refused_rather_than_treated_as_a_redo(world):
     version = objects.undo(
         version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
     )
+    # The only edit is reversed, so there is nothing left. A second undo is not a redo.
     with pytest.raises(InvalidObjectState):
         objects.undo(version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4())
+    assert objects.version(version.version_id).objects == ()
+
+
+def test_undo_steps_back_through_more_than_one_edit(world):
+    """A control that works once is not an undo. This is the regression for that."""
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    empty = version.state_sha256
+    version = add(objects, version, authored("object:first"))
+    after_first = version.state_sha256
+    version = add(objects, version, authored("object:second"))
+    version = objects.move_object(
+        version.version_id,
+        "object:second",
+        transform(x_mm=8_000),
+        base_state_sha256=version.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    assert [o.object_id for o in version.objects] == ["object:first", "object:second"]
+
+    for _ in range(3):
+        version = objects.undo(
+            version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+        )
+    assert version.objects == ()
+    assert version.state_sha256 == empty
+    # History is appended throughout; nothing was rewritten.
+    assert [e.kind for e in version.edits] == [
+        "add_object",
+        "add_object",
+        "move_object",
+        "undo",
+        "undo",
+        "undo",
+    ]
+    # Each undo named a distinct edit, walking backwards.
+    undone = [e.undone_edit_id for e in version.edits if e.kind == "undo"]
+    assert len(set(undone)) == 3
+    assert undone == [version.edits[2].edit_id, version.edits[1].edit_id, version.edits[0].edit_id]
+    # And the intermediate state is reachable on the way back.
+    assert after_first != empty
+
+
+def test_an_element_override_is_undoable_and_does_not_strand_undo(world):
+    """An override used to sit at the head of the log and block undo for the whole version."""
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    version = add(objects, version)
+    with_object = version.state_sha256
+    version = objects.set_element_override(
+        version.version_id,
+        ElementOverride("element:region-b:root", suppressed=True),
+        base_state_sha256=version.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    assert len(version.element_overrides) == 1
+
+    version = objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    assert version.element_overrides == ()
+    assert version.state_sha256 == with_object
+    # The object edit behind it is still reachable, which is what "does not strand" means.
+    version = objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    assert version.objects == ()
+
+
+def test_undo_of_a_replaced_override_restores_the_previous_override(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    element_id = "element:region-b:root"
+    version = objects.set_element_override(
+        version.version_id,
+        ElementOverride(element_id, suppressed=True),
+        base_state_sha256=version.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    suppressed = version.state_sha256
+    version = objects.set_element_override(
+        version.version_id,
+        ElementOverride(element_id, suppressed=False, transform=transform(x_mm=5_000)),
+        base_state_sha256=version.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    assert version.element_overrides[0].transform.x_mm == 5_000
+    version = objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    assert version.element_overrides[0].suppressed is True
+    assert version.element_overrides[0].transform is None
+    assert version.state_sha256 == suppressed
 
 
 def test_a_removed_object_cannot_be_moved_or_removed_again(world):

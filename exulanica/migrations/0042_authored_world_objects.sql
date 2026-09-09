@@ -120,7 +120,10 @@ create table world_alternate_object (
   -- promises a 422.
   object_id           text not null
                         check (object_id ~ '^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$'),
-  asset_key           text not null references world_reviewed_asset(asset_key),
+  -- BY CONTENT DIGEST, not by name.  A reviewed key is a pointer that could later be
+  -- repointed at other bytes; the digest is the bytes.  object_document() hashes this
+  -- column, so state_sha256 covers the geometry a version actually renders.
+  asset_sha256        text not null references world_reviewed_asset(content_sha256),
   region_id           text not null check (length(region_id) between 1 and 500),
   x_mm                bigint not null,
   y_mm                bigint not null,
@@ -238,12 +241,15 @@ create trigger tg_world_alternate_version_edit_append_only
   before update or delete on world_alternate_version_edit
   for each row execute function tg_world_alternate_append_only();
 
--- A version's identity, source and lineage are fixed at creation.  Only the state token, the
--- edit counter and the appearance reference move, and they move together with an appended edit.
+-- A version's identity, source, lineage and appearance reference are fixed at creation.  Only
+-- the state token and the edit counter move, and an edit row is appended whenever they do.
+-- style_version_id was briefly excluded here too, which would have let the appearance reference
+-- change with no edit, no audit and no change to the digest that is supposed to summarise the
+-- version.  Nothing writes it after the insert, so nothing needs the exemption.
 create function tg_world_alternate_version_state_only() returns trigger language plpgsql as $fn$
 begin
-  if (to_jsonb(new) - 'state_sha256' - 'edit_seq' - 'style_version_id') is distinct from
-     (to_jsonb(old) - 'state_sha256' - 'edit_seq' - 'style_version_id') then
+  if (to_jsonb(new) - 'state_sha256' - 'edit_seq') is distinct from
+     (to_jsonb(old) - 'state_sha256' - 'edit_seq') then
     raise exception 'alternate version identity, source and lineage are immutable'
       using errcode = 'integrity_constraint_violation';
   end if;

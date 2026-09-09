@@ -627,7 +627,9 @@ class AddObjectBody(BaseModel):
 
     base_state_sha256: str = Field(min_length=64, max_length=64)
     object_id: str = Field(min_length=1, max_length=200)
-    asset_key: str = Field(min_length=1, max_length=200)
+    #: By content digest, not by reviewed name. A key is a pointer that could be repointed; the
+    #: digest is the bytes, and it is what the version's state digest covers.
+    asset_sha256: str = Field(min_length=64, max_length=64)
     region_id: str = Field(min_length=1, max_length=500)
     transform: TransformBody
     #: The person chooses. Product direction is explicit that the first slice asks rather than
@@ -797,9 +799,10 @@ def _transform_view(transform: Transform) -> TransformView:
     return TransformView(**transform.document())
 
 
-def _version_view(
+def _alternate_version_view(
     version: AlternateVersion, assets: dict[str, ReviewedAssetRow]
 ) -> AlternateVersionView:
+    """``assets`` is keyed by content digest, which is how an object names one."""
     return AlternateVersionView(
         schema_version=1,
         version_id=version.version_id,
@@ -817,7 +820,7 @@ def _version_view(
         objects=[
             AuthoredObjectView(
                 object_id=obj.object_id,
-                asset=_asset_view(assets[obj.asset_key]),
+                asset=_asset_view(assets[obj.asset_sha256]),
                 region_id=obj.region_id,
                 transform=_transform_view(obj.transform),
                 origin=ObjectOriginView(kind=obj.origin.kind, role=obj.origin.role),
@@ -871,8 +874,8 @@ def _rendered(
     mesh it may draw from one whose bytes are gone, and the answer to that has to come from
     looking.
     """
-    return _version_view(
-        version, {asset.asset_key: asset for asset in repository.reviewed_assets(store)}
+    return _alternate_version_view(
+        version, {asset.content_sha256: asset for asset in repository.reviewed_assets(store)}
     )
 
 
@@ -925,9 +928,13 @@ def reviewed_asset_bytes(
             # NOT the point map's `no-store`, and the difference is the reasoning. That route
             # serves a personal derivative a tombstone has to be able to reach, so a cached copy
             # is a copy deletion cannot clear. A reviewed CC0 mesh is global reviewed data that
-            # holds nothing personal and is immutable under content addressing, so caching it for
-            # a year is correct rather than merely permitted.
-            "Cache-Control": "private, max-age=31536000, immutable",
+            # holds nothing personal, so it is cacheable.
+            #
+            # Cacheable, but NOT `immutable`. The bytes are immutable under content addressing;
+            # this URL is not, because it is keyed by `asset_key` and a migration could point
+            # that key at a different digest. `immutable` tells the browser never to revalidate,
+            # which would make the ETag below unable to correct it. An hour, and a validator.
+            "Cache-Control": "private, max-age=3600",
             "X-Content-Type-Options": "nosniff",
             "Accept-Ranges": "none",
         },
@@ -954,8 +961,9 @@ def reviewed_asset_licence(
         media_type="text/plain; charset=utf-8",
         headers={
             "ETag": f'"{asset.licence_sha256}"',
-            "Cache-Control": "private, max-age=31536000, immutable",
+            "Cache-Control": "private, max-age=3600",
             "X-Content-Type-Options": "nosniff",
+            "Accept-Ranges": "none",
         },
     )
 
@@ -967,8 +975,8 @@ def reviewed_asset_licence(
 )
 def alternate_versions(repository: ReadObjects, request: Request) -> list[AlternateVersionView]:
     store = get_services(request).store
-    assets = {asset.asset_key: asset for asset in repository.reviewed_assets(store)}
-    return [_version_view(version, assets) for version in repository.versions()]
+    assets = {asset.content_sha256: asset for asset in repository.reviewed_assets(store)}
+    return [_alternate_version_view(version, assets) for version in repository.versions()]
 
 
 @router.post(
@@ -1027,7 +1035,7 @@ def add_authored_object(
 ) -> Response | AlternateVersionView:
     obj = AuthoredObject(
         object_id=body.object_id,
-        asset_key=body.asset_key,
+        asset_sha256=body.asset_sha256,
         region_id=body.region_id,
         transform=body.transform.domain(),
         origin=ObjectOrigin("authored", body.origin_role),

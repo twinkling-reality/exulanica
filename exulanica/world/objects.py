@@ -120,7 +120,7 @@ class ObjectBehaviour:
 @dataclass(frozen=True, slots=True)
 class AuthoredObject:
     object_id: str
-    asset_key: str
+    asset_sha256: str
     region_id: str
     transform: Transform
     origin: ObjectOrigin
@@ -176,7 +176,7 @@ def object_document(obj: AuthoredObject) -> dict[str, Any]:
     rather than replaying an intention.
     """
     return {
-        "asset_key": obj.asset_key,
+        "asset_sha256": obj.asset_sha256,
         "behaviour": None if obj.behaviour is None else obj.behaviour.document(),
         "object_id": obj.object_id,
         "origin": obj.origin.document(),
@@ -224,7 +224,11 @@ def delta_sha256(objects: Sequence[AuthoredObject], overrides: Sequence[ElementO
 def validate_object_id(object_id: str) -> str:
     if not isinstance(object_id, str) or not 1 <= len(object_id) <= _OBJECT_ID_MAX:
         raise InvalidObjectData(f"object_id must be 1 to {_OBJECT_ID_MAX} characters")
-    if not _OBJECT_ID.match(object_id):
+    # fullmatch, not match. Python's ``$`` also matches immediately before a trailing newline
+    # and PostgreSQL's POSIX ``$`` does not, so "object:lantern\n" passed here and then violated
+    # the identical CHECK, which is a 500 where this surface promises a 422. fullmatch is what
+    # makes one literal mean the same thing in both languages.
+    if not _OBJECT_ID.fullmatch(object_id):
         raise InvalidObjectData(
             "object_id must be lowercase letters, digits, colon, dot, underscore or hyphen, "
             "starting and ending with a letter or digit"
@@ -321,7 +325,11 @@ def _validate_parameter(key: str, value: Any, bound: Mapping[str, Any]) -> None:
     elif kind == "toggle":
         if not isinstance(value, bool):
             raise InvalidObjectData(f"behaviour parameter {key} must be true or false")
-    else:  # pragma: no cover - the registry check constraint forbids reaching this
+    else:  # pragma: no cover - only a migration can seed a kind, and none seeds another
+        # NOT guarded by a constraint. world_object_behaviour_registry checks only that
+        # `parameters` is a JSON object; unlike 0021, it does not constrain each descriptor's
+        # shape. Reaching this branch would mean a migration seeded a kind this validator does
+        # not know, so it fails closed rather than treating the parameter as unbounded.
         raise InvalidObjectData(f"behaviour parameter {key} has an unreviewed kind")
 
 
@@ -329,13 +337,17 @@ def validate_object(
     obj: AuthoredObject,
     *,
     region_ids: frozenset[str],
-    asset_keys: frozenset[str],
+    asset_digests: frozenset[str],
     registry: Mapping[tuple[str, int], Mapping[str, Any]],
 ) -> AuthoredObject:
     """Everything about one object that can be checked without writing it."""
     validate_object_id(obj.object_id)
-    if obj.asset_key not in asset_keys:
-        raise InvalidObjectData(f"{obj.asset_key} is not a reviewed asset")
+    if obj.removed:
+        # A removal is a stored edit against an object that exists, not a state to arrive in.
+        # An object created already removed could never be moved, removed, or added again.
+        raise InvalidObjectData("an object cannot be created already removed")
+    if obj.asset_sha256 not in asset_digests:
+        raise InvalidObjectData(f"{obj.asset_sha256} is not a reviewed asset")
     if obj.region_id not in region_ids:
         raise InvalidObjectData(f"{obj.region_id} is not a region of the source snapshot")
     return replace(

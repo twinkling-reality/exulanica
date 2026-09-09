@@ -87,6 +87,7 @@ its bounds discipline and its read-only grants, and does not copy its rows or it
 ## 2. An alternate version
 
 An alternate version has a stable id, names the source it was created from, and stores the delta.
+It is one row in `world_alternate_version`:
 
 ```text
 version_id            uuid, stable for the life of the version
@@ -118,7 +119,7 @@ The delta has four parts, and the version stores all four:
 | Additions | `world_alternate_object` rows with `removed = false` | Yes |
 | Removals | authored objects with `removed = true`; source elements in `world_alternate_element_override` with `suppressed = true` | Authored objects yes; source elements no |
 | Transforms | the fixed-point transform on an authored object; a replacement transform on a source element override | Authored objects yes; source elements no |
-| Appearance references | `style_version_id` on the version | No |
+| Appearance references | `style_version_id` on the version | At creation only |
 
 Source-element suppression and source-element transform are stored, digested, read back and
 tested, because the World state contract requires an alternate version to store removals and
@@ -131,7 +132,7 @@ writes them.
 ## 3. A created object
 
 ```text
-object_id             stable within the version, chosen by the caller
+object_id             stable within the version, lowercase, chosen by the caller
 asset_sha256          reviewed asset reference, by content digest
 region_id             the source snapshot region the transform is local to
 transform             x_mm, y_mm, z_mm, yaw_microradians, scale_milli
@@ -142,6 +143,10 @@ removed               whether a removal is currently in force
 created_edit_id       the edit that added it
 last_edit_id          the edit that last changed it
 ```
+
+That is the stored row. The last two are not on the wire: an edit id means little without the log
+that explains it, and `edits[]` in section 7 is that log. The base version an edit was made against
+is a property of the edit rather than of the object, and it lives on the edit row; section 5 has it.
 
 The asset reference is a content digest, never a name and never a URL. `region_id` must be a region
 of the source snapshot's topology, and the transform is **region-local**.
@@ -215,7 +220,7 @@ source world.
 
 | Key | Geometry |
 | --- | --- |
-| `cc0.marker-cube` | A unit cube |
+| `cc0.marker-cube` | A half-metre cube |
 | `cc0.marker-pillar` | A square pillar |
 | `cc0.marker-plate` | A flat square plate |
 
@@ -223,10 +228,22 @@ source world.
 The registry row is the reviewed decision; the store holds the bytes; the two are separate because
 a migration cannot write to an object store and should not pretend to.
 
-Reads report two states and never invent the third:
+**That call is not yet on a deployment path**, and until it is, a deployment that has run migration
+0042 holds three registry rows whose bytes nothing wrote, so every asset read honestly answers
+`unavailable_asset`. It belongs beside the store's construction in `exulanica/api/services.py`
+(`build_services`) or in the `exulanica-db` command that already runs migrations and role grants,
+and it is idempotent, so running it on every start costs three hashes of about 800 bytes each.
+Neither of those files is writable by the task that wrote this document, which is why the wiring is
+named here rather than done.
+
+The HTTP routes report two states and never invent a third:
 
 - `available`: the registry row exists and the bytes are present in the store;
 - `unavailable_asset`: the registry row exists and the bytes are not.
+
+`WorldObjectRepository.reviewed_assets` also answers `unknown`, and only when it was called
+without a store. That is not a third product state; it is the repository refusing to say
+"present" about bytes nobody looked for. Every route passes the store, so no response carries it.
 
 An unavailable asset yields no geometry, no placeholder mesh and no substitute imagery. This is the
 same rule the source-media contract states, for the same reason: a fallback that looks like the
@@ -247,18 +264,30 @@ compare-and-swap both existing world planes use.
 Every applied edit appends one immutable row to `world_alternate_version_edit`:
 
 ```text
-edit_id, edit_seq, kind, object_id or element_id,
-base_state_sha256, result_state_sha256, before, after, actor, recorded_at
+edit_id, edit_seq, kind, object_id, element_id, undone_edit_id,
+base_state_sha256, result_state_sha256, before_document, after_document, actor, recorded_at
 ```
 
-`before` and `after` are the canonical object documents on either side of the edit, which is what
-makes undo a stored fact rather than a client's memory of one.
+`before_document` and `after_document` are the canonical documents on either side of the edit,
+which is what makes undo a stored fact rather than a client's memory of one.
 
-**Undo** appends a new edit of kind `undo` that names the edit it reverses and restores that
-edit's `before` document. It never deletes a row and never rewrites history, matching appearance
-rollback. Undo is refused with `invalid_object_state` when the newest edit is already an undo of
-the only remaining edit, or when there is nothing to undo. Undo of an undo is not a redo; it is
-refused, because a stack with two meanings is a stack nobody can reason about.
+**Undo** appends a new edit of kind `undo` naming the edit it reverses, and restores that edit's
+`before_document`. History is never rewritten.
+
+It reverses **the newest edit that no undo already names**, so a person who made three edits can
+take all three back. Reversing "the newest edit" instead would refuse the second undo, because by
+then the newest edit is an undo, and a control that works once is not an undo. Every edit kind is
+reversible, including the two element-override kinds; an earlier version reversed object edits
+only, which let one override sit at the head of the log and block undo for the whole version
+permanently.
+
+Undo is still not redo. An undo edit is never itself a candidate. When every edit has been
+reversed, a further undo is refused with `invalid_object_state`, as it is on a version with no
+edits at all.
+
+One case does remove a row: undoing an `add_object` deletes the `world_alternate_object` row,
+because the state that edit was made against did not contain the object. The **edit log** is
+append-only and enforced so by trigger; the materialised delta is current state and is not.
 
 **Reopening** is a read. Every value in this contract is a database row, so closing the session,
 reconnecting, and reading `GET /world/versions/{id}` returns the same objects, the same transforms
@@ -279,7 +308,7 @@ snake_case, and this fixture matches them.
 
 | Method | Route | Result |
 | --- | --- | --- |
-| `GET` | `/world/versions` | Every alternate version in the workspace, newest first |
+| `GET` | `/world/versions` | Every alternate version of this world, newest first |
 | `POST` | `/world/versions` | Create an alternate from a source snapshot or another version |
 | `GET` | `/world/versions/{version_id}` | One version with its objects, overrides and edit history |
 | `POST` | `/world/versions/{version_id}/objects` | Add one authored object |
@@ -315,7 +344,7 @@ The problem codes are distinct, because the recovery differs:
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |
 
 `unknown_reference` and `unavailable_asset` reuse the existing application error classes and their
-existing handlers. The three new codes are mapped inside `exulanica/api/routes/world.py`, following
+existing handlers. The four new codes are mapped inside `exulanica/api/routes/world.py`, following
 the local `_problem` helper that `world_write.py` already uses, so registering this surface adds no
 new global exception handler.
 
@@ -326,26 +355,30 @@ new global exception handler.
 published: fields may be added, and no field in it may be renamed, retyped or removed.
 
 ```text
-schema_version            1
-version.version_id        uuid
-version.world_id          text
-version.source_snapshot_id        uuid
-version.source_snapshot_sha256    64 lowercase hex
-version.parent_version_id uuid or null
-version.title             text
-version.origin            "authored"
-version.style_version_id  uuid or null
-version.state_sha256      64 lowercase hex, the base token for the next edit
-version.edit_seq          integer
-version.source_invalidated boolean
-version.created_at        RFC 3339
-objects[]                 object_id, asset{...}, region_id, transform{...},
-                          origin{kind,role}, behaviour or null, removed,
-                          created_edit_id, last_edit_id
-element_overrides[]       element_id, suppressed, transform or null
-edits[]                   edit_id, edit_seq, kind, object_id, element_id,
-                          base_state_sha256, result_state_sha256, actor, recorded_at
+schema_version        1
+version_id            uuid
+world_id              text
+source_snapshot_id    uuid
+parent_version_id     uuid or null
+title                 text
+origin                "authored"
+style_version_id      uuid or null
+state_sha256          64 lowercase hex, the base token for the next edit
+edit_seq              integer
+source_invalidated    boolean
+created_by            uuid
+created_at            RFC 3339
+objects[]             object_id, asset{...}, region_id, transform{...},
+                      origin{kind,role}, behaviour or null, removed
+element_overrides[]   element_id, suppressed, transform or null
+edits[]               edit_id, edit_seq, kind, object_id, element_id, undone_edit_id,
+                      base_state_sha256, result_state_sha256, actor, recorded_at
 ```
+
+Those sixteen names are the top level of the body. They are not nested under a `version` key, and
+an object carries no `created_edit_id` or `last_edit_id`: those two are columns the repository
+keeps and does not publish, because an edit id is only meaningful beside the log that explains it,
+which `edits[]` already is.
 
 `transform` always carries its own units, so a reader never has to know them from context:
 
@@ -357,17 +390,21 @@ yaw_microradians  integer
 scale_milli       integer, 1000 is unscaled
 ```
 
-`asset` embeds the registry row and its availability, so a renderer holding one version body knows
-what it may draw without a second call:
+`asset` embeds the whole registry row and its availability, so a renderer holding one version body
+knows what it may draw, and under what licence, without a second call:
 
 ```text
-asset_key, content_sha256, media_type, byte_size,
+asset_key, title, summary, media_type, content_sha256, byte_size,
 licence_id, licence_sha256, availability
 ```
 
-`objects[]` is sorted by `object_id`, `element_overrides[]` by `element_id`, and `edits[]` by
-`edit_seq` ascending. The order is part of the contract, because the state digest is computed over
-it.
+`content_sha256` is the object's actual reference. There is no separate `asset_sha256` on the wire
+object, because it would be that same value written twice.
+
+`objects[]` is sorted by `object_id` and `element_overrides[]` by `element_id`. Those two orders
+are load-bearing: `canonical_delta_document` sorts by the same keys, so the state digest is
+computed over exactly that sequence. `edits[]` is sorted by `edit_seq` ascending, which the digest
+does not cover at all; it is ordered because a log read backwards is a log misread.
 
 ## 8. What a later package extension would need
 
@@ -394,18 +431,29 @@ package must not claim to carry it.
 
 ## 9. Verification
 
-`tests/test_world_objects.py` covers the pure delta document: canonical ordering, fixed-point
-refusal of floats, behaviour bounds, unknown region and unknown asset.
+`tests/test_world_objects.py` needs no database. It covers the object id contract, including the
+proof that the Python regex and the schema's CHECK are the same string and refuse the same inputs;
+the canonical delta and its order independence; fixed-point refusal of floats and of booleans;
+every behaviour bound; unknown region and unreviewed asset; that the generated GLB assets are
+readable glTF 2.0 with outward-wound faces and reproduce the digests migration 0042 pinned; that
+both registries are in `READ_ONLY_TABLES`; and that the published fixture's `state_sha256`
+recomputes from the fixture's own delta.
 
 `tests/test_world_objects_postgres.py` covers lineage from a source snapshot and from another
-version, stale-base refusal, undo restoring the previous document, reopening a version on a new
-connection, cross-workspace isolation, and a tombstoned source scene invalidating every dependent
-version. It also runs the existing appearance preview, apply and rollback cycle against the same
-structural version that carries an authored object, proving the two families coexist without
-either writing the other's tables.
+version, stale-base refusal under one connection and under two, multi-level undo, undo of an
+element override, reopening a version on a genuinely new connection with its behaviour still
+attached, cross-workspace invisibility on both the read and the write path, and a committed
+tombstone invalidating every version derived from the covered snapshot. It also runs the existing
+appearance preview, apply and rollback cycle against the same structural version that carries an
+authored object, and counts the other planes' rows across an object edit to show neither family
+writes the other's tables.
 
 `tests/test_world_objects_api.py` covers the full add, move, remove and undo cycle over HTTP, the
-reviewed asset registry, and every problem code above.
+reviewed asset registry including byte and licence delivery, and all six problem codes in the
+table above.
 
-Each invariant carries a negative control: a test that the guard actually refuses the thing it
-claims to refuse, rather than passing because the operation never ran.
+Each invariant carries a negative control: a test that the guard refuses the thing it claims to
+refuse, rather than passing because the operation never ran. Two of them are regressions with a
+recorded cause. An object id that Python accepted and the schema refused reached the caller as a
+500 rather than a 422, twice: once because the two regexes differed, and once because Python's
+`$` also matches before a trailing newline where PostgreSQL's does not. Both are pinned.

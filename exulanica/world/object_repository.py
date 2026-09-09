@@ -179,6 +179,7 @@ class WorldObjectRepository:
             else:
                 objects, overrides = (), ()
             self._require_snapshot(source_snapshot_id)
+            self._require_style_version(style_version_id)
             version_id = uuid.uuid4()
             state = delta_sha256(objects, overrides)
             self.connection.execute(
@@ -217,6 +218,21 @@ class WorldObjectRepository:
         return tuple(self.version(row["version_id"]) for row in rows)
 
     def version(self, version_id: uuid.UUID) -> AlternateVersion:
+        """One version, with the returned token guaranteed to describe the returned delta.
+
+        The digest is recomputed from the object and override rows this call actually read,
+        rather than copied from the version row. Under READ COMMITTED each statement takes its
+        own snapshot, so a concurrent writer between two of the reads below would otherwise let a
+        body carry a ``state_sha256`` digested over a delta that is not the one beside it, and a
+        renderer holding that body would be looking at a token for something it cannot see.
+
+        Recomputing does not weaken the compare-and-swap. The stored digest remains the sole
+        authority at edit time, and a caller whose read raced a writer simply presents a token
+        that no longer matches and is told to read again, which is the behaviour a stale base has
+        anyway.
+        """
+        objects = self._objects(version_id)
+        overrides = self._overrides(version_id)
         row = self._version_row(version_id)
         return AlternateVersion(
             version_id=row["version_id"],
@@ -225,13 +241,13 @@ class WorldObjectRepository:
             parent_version_id=row["parent_version_id"],
             title=row["title"],
             style_version_id=row["style_version_id"],
-            state_sha256=row["state_sha256"],
+            state_sha256=delta_sha256(objects, overrides),
             edit_seq=row["edit_seq"],
             source_invalidated=self._source_invalidated(row["source_snapshot_id"]),
             created_by=row["created_by"],
             created_at=row["created_at"].isoformat(),
-            objects=self._objects(version_id),
-            element_overrides=self._overrides(version_id),
+            objects=objects,
+            element_overrides=overrides,
             edits=self._edits(version_id),
         )
 
@@ -250,7 +266,7 @@ class WorldObjectRepository:
             checked = validate_object(
                 obj,
                 region_ids=self._source_region_ids(row["source_snapshot_id"]),
-                asset_keys=frozenset(a.asset_key for a in self.reviewed_assets()),
+                asset_digests=frozenset(a.content_sha256 for a in self.reviewed_assets()),
                 registry=self.behaviour_registry(),
             )
             existing = {o.object_id for o in self._objects(version_id)}
@@ -346,48 +362,100 @@ class WorldObjectRepository:
     def undo(
         self, version_id: uuid.UUID, *, base_state_sha256: str, actor: uuid.UUID
     ) -> AlternateVersion:
-        """Reverse the newest edit by restoring the document it recorded on its own way in."""
+        """Reverse the newest edit that has not already been reversed.
+
+        Two properties are worth naming, because the obvious implementation has neither.
+
+        **It steps back through history rather than one step.** The candidate is the newest edit
+        that no undo names, so a person who added three objects can take all three back. Choosing
+        "the newest edit" instead would refuse the second undo, because by then the newest edit is
+        an undo, and a control that works once is not an undo.
+
+        **Every edit kind is reversible.** An earlier version reversed only object edits, so one
+        element override sat at the head of the log and blocked undo for the whole version
+        permanently: the override was newest, it was not an object edit, and nothing could ever
+        move past it.
+
+        Undo is still not redo. An undo edit is never itself a candidate, and undoing an undo
+        would be a redo, which is a second meaning for one control.
+        """
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             newest = self.connection.execute(
-                "select edit_id,kind,object_id,before_document from world_alternate_version_edit "
-                "where workspace_id=%s and world_id=%s and version_id=%s "
-                "order by edit_seq desc limit 1",
+                "select edit_id,kind,object_id,element_id,before_document "
+                "from world_alternate_version_edit e "
+                "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
+                "and e.kind <> 'undo' "
+                "and not exists (select 1 from world_alternate_version_edit u "
+                " where u.workspace_id=e.workspace_id and u.world_id=e.world_id "
+                " and u.version_id=e.version_id and u.undone_edit_id=e.edit_id) "
+                "order by e.edit_seq desc limit 1",
                 (self.workspace_id, self.world_id, version_id),
             ).fetchone()
             if newest is None:
-                raise InvalidObjectState("this version has no edit to undo")
-            if newest["kind"] == "undo":
-                # Undo of an undo would be a redo, and a stack whose one control means two things
-                # is a stack nobody can reason about. Refused rather than guessed.
-                raise InvalidObjectState("the newest edit is already an undo")
-            if newest["kind"] not in {"add_object", "move_object", "remove_object"}:
-                raise InvalidObjectState("only object edits can be undone")
+                raise InvalidObjectState("this version has no edit left to undo")
             edit_id = uuid.uuid4()
-            object_id = newest["object_id"]
             before = newest["before_document"]
-            current = self._require_object(version_id, object_id)
-            if before is None:
-                self.connection.execute(
-                    "delete from world_alternate_object where workspace_id=%s and world_id=%s "
-                    "and version_id=%s and object_id=%s",
-                    (self.workspace_id, self.world_id, version_id, object_id),
-                )
-                after = None
+            if newest["kind"] in {"add_object", "move_object", "remove_object"}:
+                subject, after = self._undo_object(version_id, newest["object_id"], before, edit_id)
             else:
-                self._restore_object(version_id, before, edit_id)
-                after = object_document(self._require_object(version_id, object_id))
+                subject, after = self._undo_override(
+                    version_id, newest["element_id"], before, edit_id
+                )
             self._append_edit(
                 row,
                 edit_id=edit_id,
                 kind="undo",
-                object_id=None,
-                before=object_document(current),
+                object_id=newest["object_id"],
+                element_id=newest["element_id"],
+                before=subject,
                 after=after,
                 actor=actor,
                 undone_edit_id=newest["edit_id"],
             )
         return self.version(version_id)
+
+    def _undo_object(
+        self,
+        version_id: uuid.UUID,
+        object_id: str,
+        before: Mapping[str, Any] | None,
+        edit_id: uuid.UUID,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        current = self._require_object(version_id, object_id)
+        if before is None:
+            self.connection.execute(
+                "delete from world_alternate_object where workspace_id=%s and world_id=%s "
+                "and version_id=%s and object_id=%s",
+                (self.workspace_id, self.world_id, version_id, object_id),
+            )
+            return object_document(current), None
+        self._restore_object(version_id, before, edit_id)
+        return object_document(current), object_document(
+            self._require_object(version_id, object_id)
+        )
+
+    def _undo_override(
+        self,
+        version_id: uuid.UUID,
+        element_id: str,
+        before: Mapping[str, Any] | None,
+        edit_id: uuid.UUID,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        existing = {o.element_id: o for o in self._overrides(version_id)}
+        current = existing.get(element_id)
+        self.connection.execute(
+            "delete from world_alternate_element_override where workspace_id=%s "
+            "and world_id=%s and version_id=%s and element_id=%s",
+            (self.workspace_id, self.world_id, version_id, element_id),
+        )
+        if before is None:
+            return (None if current is None else override_document(current)), None
+        self._insert_override(version_id, _override_from_document(before), edit_id)
+        return (
+            None if current is None else override_document(current),
+            override_document({o.element_id: o for o in self._overrides(version_id)}[element_id]),
+        )
 
     # -- element overrides ------------------------------------------------------------------
 
@@ -509,7 +577,7 @@ class WorldObjectRepository:
         behaviour = obj.behaviour
         self.connection.execute(
             "insert into world_alternate_object (workspace_id,world_id,version_id,object_id,"
-            "asset_key,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,"
+            "asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,"
             "origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed,"
             "created_edit_id,last_edit_id) "
             "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -518,7 +586,7 @@ class WorldObjectRepository:
                 self.world_id,
                 version_id,
                 obj.object_id,
-                obj.asset_key,
+                obj.asset_sha256,
                 obj.region_id,
                 obj.transform.x_mm,
                 obj.transform.y_mm,
@@ -551,12 +619,12 @@ class WorldObjectRepository:
             return
         behaviour = obj.behaviour
         self.connection.execute(
-            "update world_alternate_object set asset_key=%s,region_id=%s,x_mm=%s,y_mm=%s,"
+            "update world_alternate_object set asset_sha256=%s,region_id=%s,x_mm=%s,y_mm=%s,"
             "z_mm=%s,yaw_microradians=%s,scale_milli=%s,origin_role=%s,behaviour_key=%s,"
             "behaviour_version=%s,behaviour_parameters=%s,removed=%s,last_edit_id=%s "
             "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
             (
-                obj.asset_key,
+                obj.asset_sha256,
                 obj.region_id,
                 obj.transform.x_mm,
                 obj.transform.y_mm,
@@ -618,7 +686,7 @@ class WorldObjectRepository:
 
     def _objects(self, version_id: uuid.UUID) -> tuple[AuthoredObject, ...]:
         rows = self.connection.execute(
-            "select object_id,asset_key,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,"
+            "select object_id,asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,"
             "origin_kind,origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed "
             "from world_alternate_object where workspace_id=%s and world_id=%s and version_id=%s "
             "order by object_id",
@@ -627,7 +695,7 @@ class WorldObjectRepository:
         return tuple(
             AuthoredObject(
                 object_id=r["object_id"],
-                asset_key=r["asset_key"],
+                asset_sha256=r["asset_sha256"],
                 region_id=r["region_id"],
                 transform=Transform(
                     r["x_mm"],
@@ -724,6 +792,25 @@ class WorldObjectRepository:
 
     # -- the source snapshot ----------------------------------------------------------------
 
+    def _require_style_version(self, style_version_id: uuid.UUID | None) -> None:
+        """Check the appearance reference before the foreign key does.
+
+        The composite key on (workspace_id, world_id, style_version_id) already refuses an
+        unknown or cross-workspace value, but it refuses it as a ForeignKeyViolation, which no
+        handler on this surface recognises and which therefore reaches the caller as a 500. An
+        id the caller supplied is an input, and a bad input is a 404 here like every other
+        unknown reference.
+        """
+        if style_version_id is None:
+            return
+        row = self.connection.execute(
+            "select 1 from world_style_version "
+            "where workspace_id=%s and world_id=%s and version_id=%s",
+            (self.workspace_id, self.world_id, style_version_id),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such style version")
+
     def _require_snapshot(self, snapshot_id: uuid.UUID | None) -> Mapping[str, Any]:
         row = self.connection.execute(
             "select snapshot_id,topology from world_structure_snapshot "
@@ -775,12 +862,31 @@ class WorldObjectRepository:
         )
 
 
+def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:
+    transform = document["transform"]
+    return ElementOverride(
+        element_id=document["element_id"],
+        suppressed=document["suppressed"],
+        transform=(
+            None
+            if transform is None
+            else Transform(
+                transform["x_mm"],
+                transform["y_mm"],
+                transform["z_mm"],
+                transform["yaw_microradians"],
+                transform["scale_milli"],
+            )
+        ),
+    )
+
+
 def _object_from_document(document: Mapping[str, Any]) -> AuthoredObject:
     transform = document["transform"]
     behaviour = document["behaviour"]
     return AuthoredObject(
         object_id=document["object_id"],
-        asset_key=document["asset_key"],
+        asset_sha256=document["asset_sha256"],
         region_id=document["region_id"],
         transform=Transform(
             transform["x_mm"],

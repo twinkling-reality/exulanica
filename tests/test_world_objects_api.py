@@ -32,6 +32,10 @@ pytestmark = pytest.mark.postgres
 TOKEN = "objects-owner-token-long-enough-for-tests"
 STRANGER_TOKEN = "objects-stranger-token-long-enough-for-tests"
 
+#: The reviewed cube's content digest. Objects name an asset by its bytes, not by its key,
+#: so this is what a request body and the digested object document both carry.
+CUBE = "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+
 PARAMETERS = {
     "travel_mm": 2_000,
     "period_milliseconds": 4_000,
@@ -88,7 +92,7 @@ class ObjectsApi:
         body = {
             "base_state_sha256": version["state_sha256"],
             "object_id": "object:lantern",
-            "asset_key": "cc0.marker-cube",
+            "asset_sha256": CUBE,
             "region_id": "region-a",
             "transform": transform(),
             "origin_role": "fictional",
@@ -173,6 +177,10 @@ def test_the_licence_text_is_served_beside_the_bytes(objects_api):
     assert response.status_code == 200
     assert "CC0 1.0 Universal" in response.text
     assert "creativecommons.org/publicdomain/zero/1.0" in response.text
+    # Both byte routes carry the same headers, which is what the contract states.
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["accept-ranges"] == "none"
+    assert response.headers["etag"].strip('"') != ""
 
 
 def test_the_registry_is_read_only(objects_api):
@@ -289,6 +297,7 @@ def test_the_whole_authored_object_cycle_over_http(objects_api):
     assert obj["behaviour"]["parameters"] == PARAMETERS
     # The renderer is told what it may draw without a second call.
     assert obj["asset"]["asset_key"] == "cc0.marker-cube"
+    assert obj["asset"]["content_sha256"] == CUBE
     assert obj["asset"]["availability"] == "available"
     assert obj["asset"]["licence_id"] == "CC0-1.0"
 
@@ -373,7 +382,7 @@ def test_adding_the_same_object_id_twice_is_an_invalid_state(objects_api):
 
 def test_an_unreviewed_asset_or_unknown_region_is_invalid_object_data(objects_api):
     version = objects_api.version()
-    for overrides in ({"asset_key": "something.downloaded"}, {"region_id": "region-nowhere"}):
+    for overrides in ({"asset_sha256": "0" * 64}, {"region_id": "region-nowhere"}):
         response = objects_api.add(version, **overrides)
         assert response.status_code == 422, overrides
         assert response.json()["code"] == "invalid_object_data"
@@ -414,7 +423,7 @@ def test_an_unchosen_origin_role_is_refused(objects_api):
     body = {
         "base_state_sha256": version["state_sha256"],
         "object_id": "object:lantern",
-        "asset_key": "cc0.marker-cube",
+        "asset_sha256": CUBE,
         "region_id": "region-a",
         "transform": transform(),
     }
@@ -467,6 +476,61 @@ def test_an_unknown_version_or_object_is_an_unknown_reference(objects_api):
     )
     assert response.status_code == 404
     assert response.json()["code"] == "unknown_reference"
+
+
+def test_an_unknown_style_version_is_a_404_and_not_a_500(objects_api):
+    """The composite foreign key already refuses it, but as a ForeignKeyViolation that no
+    handler catches. An id the caller supplied is an input, and a bad input is a 404."""
+    response = objects_api.post(
+        "/world/versions",
+        {
+            "title": "Borrowed appearance",
+            "source_snapshot_id": str(objects_api.snapshot_id),
+            "style_version_id": str(uuid.uuid4()),
+        },
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "unknown_reference"
+
+
+def test_a_known_style_version_is_accepted_as_the_appearance_reference(objects_api, repository):
+    """The negative control for the test above: the field does work when it names a real one."""
+    from exulanica.world import WorldStyleRepository
+
+    current = WorldStyleRepository(repository.connection, repository.workspace_id).current()
+    response = objects_api.post(
+        "/world/versions",
+        {
+            "title": "Styled",
+            "source_snapshot_id": str(objects_api.snapshot_id),
+            "style_version_id": str(current.version_id),
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["style_version_id"] == str(current.version_id)
+
+
+def test_a_deleted_source_refuses_further_edits_over_http(objects_api, repository):
+    """The sixth problem code, which had no HTTP test."""
+    version = objects_api.add(objects_api.version()).json()
+    repository.insert_tombstone(
+        scope="workspace", requested_by=uuid.uuid4(), reason="the person deleted their world"
+    )
+    repository.connection.commit()
+
+    read = objects_api.get(f"/world/versions/{version['version_id']}")
+    assert read.status_code == 200
+    body = read.json()
+    assert body["source_invalidated"] is True
+    # The authored work survives the deletion of the source it was placed against.
+    assert [o["object_id"] for o in body["objects"]] == ["object:lantern"]
+
+    response = objects_api.post(
+        f"/world/versions/{version['version_id']}/objects/object:lantern/move",
+        {"base_state_sha256": body["state_sha256"], "transform": transform(x_mm=99)},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "invalidated_source_version"
 
 
 # -- authorisation and isolation -----------------------------------------------------------------
