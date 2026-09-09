@@ -446,25 +446,31 @@ export {
 
 export type {
   BehaviourDefinition,
+  BehaviourParameterDescriptor,
   BehaviourParameterResolution,
-  BehaviourRange,
+  BehaviourParameters,
   BehaviourResolution,
-  BoundedMotionParameters,
-  BoundedMotionRanges,
-  MotionAxis,
 } from './behaviour/registry.js';
 export {
   BEHAVIOUR_REGISTRY,
-  BOUNDED_MOTION_ID,
+  BOUNDED_PATH_KEY,
+  BOUNDED_PATH_VERSION,
   BehaviourRegistry,
-  MOTION_AXES,
 } from './behaviour/registry.js';
 
-export type { MotionOffset, MotionState } from './behaviour/bounded-motion.js';
+export type {
+  BoundedPath,
+  MotionAxis,
+  MotionEasing,
+  MotionOffset,
+  MotionState,
+} from './behaviour/bounded-motion.js';
 export {
   BoundedMotion,
   NO_MOTION_OFFSET,
+  boundedPathOf,
   isAtAuthoredOffset,
   motionOffsetAt,
   motionTransform,
+  travelFraction,
 } from './behaviour/bounded-motion.js';

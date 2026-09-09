@@ -1,65 +1,56 @@
 /**
- * The behaviour registry: what an authored object is allowed to do, declared once.
+ * The behaviour registry, as the renderer's mirror of a reviewed server catalog.
  *
- * product-direction.md's first milestone asks for "one interaction": trigger, stop and reset a
- * supported motion, with "unsupported behaviour fails visibly". Subsequent milestone 3 names the
- * general shape as "an explicit behavior registry, triggers, runtime state, restart rules, and
- * supported motion".
+ * `docs/world-objects-contract.md` section 3 puts the authority in migration 0042's
+ * `world_object_behaviour_registry`: a behaviour is a `behaviour_key` plus a `behaviour_version`
+ * plus parameters, and "an unknown key, an unknown version, an unknown parameter, a missing
+ * parameter, a wrong kind, and an out-of-range value all fail closed with `invalid_object_data`".
  *
- * So this is a registry with EXACTLY ONE ENTRY, and that is the point rather than a shortcut. A
- * registry with one behaviour and a refusal path for every other id is an honest statement about
- * what the runtime supports. A registry with a permissive fallback would let an object carry
- * `behaviourId: "walk"` and render as motionless while the interface said nothing, which is the
- * failure the milestone names. `resolve` therefore returns a REFUSAL rather than throwing or
- * substituting: the caller has a status line to write it into, and a thrown error at load time
- * would take the object's geometry down with its behaviour.
+ * So this file is NOT a second authority. It is the list of behaviours this renderer can actually
+ * run, declared in the same vocabulary the server declares its own, and it exists because the
+ * server can admit a behaviour a browser build has not shipped the code for. The contract draws
+ * the line in one sentence: "the registry bounds the path, and the renderer owns the controls."
+ * The bounds below are therefore copied from the seeded row and must not drift from it; the
+ * trigger, stop and reset that act on them live in `bounded-motion.ts` and are not stored at all.
  *
- * Parameters are clamped to DECLARED ranges rather than validated against a hard-coded constant
- * buried in an evaluator. The range is part of the definition, the clamp reports what it changed,
- * and a value that is not a finite number is refused rather than silently corrected to a bound:
- * clamping `NaN` to `max` would invent an amplitude the author never wrote.
+ * **Everything fails closed, and the refusal carries words.** product-direction.md's first
+ * milestone requires that unsupported behaviour "fails visibly", so `resolve` and `readParameters`
+ * return a reason a status line can print rather than throwing or substituting a default. An
+ * object whose behaviour this build cannot run is still a real object with verified geometry: the
+ * caller is expected to draw it and report the refusal, not to hide the object behind it.
  *
- * Nothing here is metric. The amplitude is expressed in the region's display units, which
- * `display-frame.ts` places at walking scale and explicitly marks `metric: false`.
+ * **Parameter kinds mirror the server's three.** The contract says a parameter is "`integer` with
+ * an inclusive minimum and maximum, `choice` over at least two values, or `toggle`". All three are
+ * modelled here even though the one seeded behaviour uses only the first two, because a registry
+ * that could not express the third would quietly reinterpret it the day one arrives.
  */
 
-/** The declared axes. A behaviour parameter naming anything else is unsupported, not clamped. */
-export type MotionAxis = 'x' | 'y' | 'z';
+/** The parameter kinds migration 0042's registry rows may declare. */
+export type BehaviourParameterDescriptor =
+  | {
+      readonly kind: 'integer';
+      readonly minimum: number;
+      readonly maximum: number;
+      readonly default: number;
+    }
+  | {
+      readonly kind: 'choice';
+      readonly choices: readonly string[];
+      readonly default: string;
+    }
+  | { readonly kind: 'toggle'; readonly default: boolean };
 
-export const MOTION_AXES: readonly MotionAxis[] = Object.freeze(['x', 'y', 'z']);
-
-/** A closed interval and the value used when an author supplies none. */
-export interface BehaviourRange {
-  readonly min: number;
-  readonly max: number;
-  readonly fallback: number;
-}
-
-export interface BoundedMotionRanges {
-  /** Peak displacement from the authored position, in region display units. */
-  readonly amplitude: BehaviourRange;
-  /** Seconds for one full there-and-back cycle. */
-  readonly period: BehaviourRange;
-}
+export type BehaviourParameters = Readonly<Record<string, number | string | boolean>>;
 
 export interface BehaviourDefinition {
-  readonly behaviourId: string;
-  readonly version: number;
-  /** Stable copy key. The surface owns the words; the registry owns the identity. */
-  readonly labelKey: string;
-  readonly axes: readonly MotionAxis[];
-  readonly ranges: BoundedMotionRanges;
-  /** Trigger, stop and reset. Named here so a surface cannot offer a control the runtime lacks. */
+  readonly behaviourKey: string;
+  readonly behaviourVersion: number;
+  readonly summary: string;
+  readonly parameters: Readonly<Record<string, BehaviourParameterDescriptor>>;
+  /** Trigger, stop and reset. Owned by the runtime, named here so a surface cannot invent a fourth. */
   readonly controls: readonly ['trigger', 'stop', 'reset'];
   /** Reset returns the object to the transform its author placed, bit for bit. */
   readonly resetIsExact: true;
-}
-
-/** The parameters an authored object carries for the one supported behaviour. */
-export interface BoundedMotionParameters {
-  readonly axis: MotionAxis;
-  readonly amplitude: number;
-  readonly period: number;
 }
 
 export type BehaviourResolution =
@@ -69,118 +60,130 @@ export type BehaviourResolution =
 export type BehaviourParameterResolution =
   | {
       readonly ok: true;
-      readonly parameters: BoundedMotionParameters;
+      readonly parameters: BehaviourParameters;
       /** Parameter names moved onto a declared bound, in declaration order. Empty when none were. */
       readonly clamped: readonly string[];
     }
   | { readonly ok: false; readonly reason: string };
 
-/** The one supported behaviour. Its id is what a persisted object stores. */
-export const BOUNDED_MOTION_ID = 'motion.bounded';
+/** The one behaviour the first milestone names, and the one this renderer implements. */
+export const BOUNDED_PATH_KEY = 'motion.bounded-path';
+export const BOUNDED_PATH_VERSION = 1;
 
-const BEHAVIOUR_ID = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
+const KEY = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 
-function assertRange(range: BehaviourRange, label: string): void {
-  if (![range.min, range.max, range.fallback].every((value) => Number.isFinite(value))) {
-    throw new TypeError(`${label} range must be finite`);
+function assertDescriptor(name: string, descriptor: BehaviourParameterDescriptor, label: string): void {
+  if (descriptor.kind === 'integer') {
+    if (![descriptor.minimum, descriptor.maximum, descriptor.default].every(Number.isSafeInteger)) {
+      throw new TypeError(`${label}.${name} bounds must be safe integers`);
+    }
+    if (descriptor.minimum > descriptor.maximum) throw new TypeError(`${label}.${name} range is inverted`);
+    if (descriptor.default < descriptor.minimum || descriptor.default > descriptor.maximum) {
+      throw new TypeError(`${label}.${name} default lies outside its own range`);
+    }
+    return;
   }
-  if (range.min > range.max) throw new TypeError(`${label} range is inverted`);
-  if (range.fallback < range.min || range.fallback > range.max) {
-    throw new TypeError(`${label} fallback lies outside its own range`);
+  if (descriptor.kind === 'choice') {
+    // "choice over AT LEAST TWO values": a one-value choice is a constant wearing a control.
+    if (descriptor.choices.length < 2 || new Set(descriptor.choices).size !== descriptor.choices.length) {
+      throw new TypeError(`${label}.${name} must offer at least two distinct choices`);
+    }
+    if (!descriptor.choices.includes(descriptor.default)) {
+      throw new TypeError(`${label}.${name} default is not one of its choices`);
+    }
   }
 }
 
 function assertDefinition(definition: BehaviourDefinition): void {
-  if (!BEHAVIOUR_ID.test(definition.behaviourId)) {
-    throw new TypeError(`behaviour id must be a stable dotted key: ${definition.behaviourId}`);
+  const label = `${definition.behaviourKey}@${definition.behaviourVersion}`;
+  if (!KEY.test(definition.behaviourKey)) {
+    throw new TypeError(`behaviour key must be a stable dotted key: ${definition.behaviourKey}`);
   }
-  if (!Number.isSafeInteger(definition.version) || definition.version < 1) {
-    throw new TypeError(`behaviour version must be a positive safe integer: ${definition.behaviourId}`);
+  if (!Number.isSafeInteger(definition.behaviourVersion) || definition.behaviourVersion < 1) {
+    throw new TypeError(`behaviour version must be a positive safe integer: ${label}`);
   }
-  if (definition.labelKey.length === 0) {
-    throw new TypeError(`behaviour ${definition.behaviourId} must carry a copy key`);
-  }
-  if (definition.axes.length === 0 || new Set(definition.axes).size !== definition.axes.length) {
-    throw new TypeError(`behaviour ${definition.behaviourId} declares no distinct axes`);
-  }
-  assertRange(definition.ranges.amplitude, `${definition.behaviourId} amplitude`);
-  assertRange(definition.ranges.period, `${definition.behaviourId} period`);
-  if (definition.ranges.period.min <= 0) {
-    throw new TypeError(`behaviour ${definition.behaviourId} must declare a positive minimum period`);
-  }
+  const names = Object.keys(definition.parameters);
+  if (names.length === 0) throw new TypeError(`behaviour ${label} declares no parameters`);
+  for (const name of names) assertDescriptor(name, definition.parameters[name]!, label);
 }
 
-function freezeDefinition(source: BehaviourDefinition): BehaviourDefinition {
+function freeze(source: BehaviourDefinition): BehaviourDefinition {
   return Object.freeze({
     ...source,
-    axes: Object.freeze([...source.axes]),
     controls: Object.freeze([...source.controls]) as BehaviourDefinition['controls'],
-    ranges: Object.freeze({
-      amplitude: Object.freeze({ ...source.ranges.amplitude }),
-      period: Object.freeze({ ...source.ranges.period }),
-    }),
+    parameters: Object.freeze(Object.fromEntries(
+      Object.entries(source.parameters).map(([name, descriptor]) => [
+        name,
+        Object.freeze(descriptor.kind === 'choice'
+          ? { ...descriptor, choices: Object.freeze([...descriptor.choices]) }
+          : { ...descriptor }),
+      ]),
+    )),
   });
 }
 
-function clampTo(range: BehaviourRange, value: number): number {
-  return Math.min(range.max, Math.max(range.min, value));
-}
+const identify = (key: string, version: number): string => `${key}@${version}`;
 
-/** Immutable versioned catalog of supported behaviours, with a refusal for everything else. */
+/** Immutable catalog of the behaviours this build can run, with a refusal for everything else. */
 export class BehaviourRegistry {
-  readonly version: number;
   readonly definitions: readonly BehaviourDefinition[];
-  readonly #byId: ReadonlyMap<string, BehaviourDefinition>;
+  readonly #byKey: ReadonlyMap<string, BehaviourDefinition>;
 
-  constructor(version: number, definitions: readonly BehaviourDefinition[]) {
-    if (!Number.isSafeInteger(version) || version < 1) {
-      throw new TypeError('behaviour catalog version must be a positive safe integer');
-    }
-    const byId = new Map<string, BehaviourDefinition>();
+  constructor(definitions: readonly BehaviourDefinition[]) {
+    const byKey = new Map<string, BehaviourDefinition>();
     for (const source of definitions) {
       assertDefinition(source);
-      if (byId.has(source.behaviourId)) {
-        throw new TypeError(`duplicate behaviour id: ${source.behaviourId}`);
-      }
-      byId.set(source.behaviourId, freezeDefinition(source));
+      const id = identify(source.behaviourKey, source.behaviourVersion);
+      if (byKey.has(id)) throw new TypeError(`duplicate behaviour: ${id}`);
+      byKey.set(id, freeze(source));
     }
-    this.version = version;
-    this.definitions = Object.freeze([...byId.values()]);
-    this.#byId = byId;
+    this.definitions = Object.freeze([...byKey.values()]);
+    this.#byKey = byKey;
     Object.freeze(this);
   }
 
-  has(behaviourId: string): boolean {
-    return this.#byId.has(behaviourId);
+  has(behaviourKey: string, behaviourVersion: number): boolean {
+    return this.#byKey.has(identify(behaviourKey, behaviourVersion));
   }
 
   /**
-   * Look an id up, and say why when it is not there.
+   * Look one up, and say why when this build cannot run it.
    *
-   * The refusal names the supported ids because the alternative sentence a status line could
-   * write is "that behaviour is not supported", which tells a person nothing about what is.
+   * The key and the VERSION are both part of the identity, because the server's registry is keyed
+   * on both and a version bump is how a reviewed behaviour changes its parameters. Resolving
+   * `motion.bounded-path@2` against the version 1 implementation would run yesterday's motion on
+   * today's numbers.
    */
-  resolve(behaviourId: string): BehaviourResolution {
-    const definition = this.#byId.get(behaviourId);
+  resolve(behaviourKey: string, behaviourVersion: number): BehaviourResolution {
+    const definition = this.#byKey.get(identify(behaviourKey, behaviourVersion));
     if (definition !== undefined) return Object.freeze({ ok: true, definition });
-    const supported = this.definitions.map((value) => value.behaviourId).join(', ');
+    const supported = this.definitions
+      .map((value) => identify(value.behaviourKey, value.behaviourVersion))
+      .join(', ');
     return Object.freeze({
       ok: false,
       reason:
-        `“${behaviourId}” is not a supported behaviour. This build supports ${supported || 'no behaviours'}.`,
+        `“${identify(behaviourKey, behaviourVersion)}” is not a behaviour this build can run. `
+        + `It runs ${supported || 'no behaviours'}.`,
     });
   }
 
   /**
-   * Read authored parameters against a definition's declared ranges.
+   * Read authored parameters against a definition's declared descriptors.
    *
-   * An unknown axis is a refusal, not a substitution: a bob the author wrote as vertical must
-   * never quietly become horizontal. A number outside a declared bound IS clamped, and the names
-   * of the clamped parameters come back so the confirmation surface can say what it changed
-   * before anything is written.
+   * An unknown parameter name, a wrong kind and an unknown choice are REFUSALS, matching the
+   * server's own fail-closed list: a motion the author wrote as vertical must never quietly become
+   * horizontal, and a parameter this build ignores is a parameter whose effect nobody can see. An
+   * integer outside its declared bound is CLAMPED instead, and the names of what moved come back
+   * so the confirmation surface can say what it changed before anything is written. A missing
+   * parameter takes the declared default, which is what the registry rows carry them for.
    */
-  readParameters(behaviourId: string, source: unknown): BehaviourParameterResolution {
-    const resolved = this.resolve(behaviourId);
+  readParameters(
+    behaviourKey: string,
+    behaviourVersion: number,
+    source: unknown,
+  ): BehaviourParameterResolution {
+    const resolved = this.resolve(behaviourKey, behaviourVersion);
     if (!resolved.ok) return Object.freeze({ ok: false, reason: resolved.reason });
     const definition = resolved.definition;
     if (typeof source !== 'object' || source === null || Array.isArray(source)) {
@@ -188,61 +191,79 @@ export class BehaviourRegistry {
     }
     const record = source as Record<string, unknown>;
 
-    const axis = record['axis'];
-    if (typeof axis !== 'string' || !definition.axes.includes(axis as MotionAxis)) {
-      return Object.freeze({
-        ok: false,
-        reason:
-          `“${String(axis)}” is not a supported motion axis. ` +
-          `${definition.behaviourId} moves along ${definition.axes.join(', ')}.`,
-      });
+    for (const name of Object.keys(record)) {
+      if (!(name in definition.parameters)) {
+        return Object.freeze({
+          ok: false,
+          reason: `“${name}” is not a parameter of ${identify(behaviourKey, behaviourVersion)}.`,
+        });
+      }
     }
 
     const clamped: string[] = [];
-    const read = (key: 'amplitude' | 'period', range: BehaviourRange): number | null => {
-      const raw = record[key];
-      if (raw === undefined || raw === null) return range.fallback;
-      if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
-      const value = clampTo(range, raw);
-      if (value !== raw) clamped.push(key);
-      return value;
-    };
-
-    const amplitude = read('amplitude', definition.ranges.amplitude);
-    if (amplitude === null) {
-      return Object.freeze({ ok: false, reason: 'Behaviour amplitude must be a finite number.' });
-    }
-    const period = read('period', definition.ranges.period);
-    if (period === null) {
-      return Object.freeze({ ok: false, reason: 'Behaviour period must be a finite number.' });
+    const parameters: Record<string, number | string | boolean> = {};
+    for (const [name, descriptor] of Object.entries(definition.parameters)) {
+      const raw = record[name];
+      if (raw === undefined || raw === null) {
+        parameters[name] = descriptor.default;
+        continue;
+      }
+      if (descriptor.kind === 'integer') {
+        if (typeof raw !== 'number' || !Number.isSafeInteger(raw)) {
+          return Object.freeze({ ok: false, reason: `“${name}” must be a whole number.` });
+        }
+        const value = Math.min(descriptor.maximum, Math.max(descriptor.minimum, raw));
+        if (value !== raw) clamped.push(name);
+        parameters[name] = value;
+      } else if (descriptor.kind === 'choice') {
+        if (typeof raw !== 'string' || !descriptor.choices.includes(raw)) {
+          return Object.freeze({
+            ok: false,
+            reason: `“${String(raw)}” is not a supported ${name}. `
+              + `${identify(behaviourKey, behaviourVersion)} offers ${descriptor.choices.join(', ')}.`,
+          });
+        }
+        parameters[name] = raw;
+      } else {
+        if (typeof raw !== 'boolean') {
+          return Object.freeze({ ok: false, reason: `“${name}” must be true or false.` });
+        }
+        parameters[name] = raw;
+      }
     }
 
     return Object.freeze({
       ok: true,
-      parameters: Object.freeze({ axis: axis as MotionAxis, amplitude, period }),
+      parameters: Object.freeze(parameters),
       clamped: Object.freeze(clamped),
     });
   }
 }
 
 /**
- * The shipped catalog. One behaviour, and the bounds it is allowed inside.
+ * What this build can run, copied from migration 0042's seeded row.
  *
- * The numbers are DECISIONS and they are here rather than in the evaluator so that changing what
- * an object may do is one edit to a declaration a test can read. A 2-unit amplitude is about the
- * reach of a standing person at the display frame's walking scale; half a second is the shortest
- * period that still reads as motion rather than a flicker, and twenty seconds the longest that
- * still reads as motion rather than as drift.
+ * The numbers are NOT decisions made here. They are the reviewed bounds, and the comment is the
+ * whole reason this constant is allowed to exist: the server refuses anything outside them with
+ * `invalid_object_data`, so a browser that offered a wider range would be building a control whose
+ * every extreme is a round trip to a refusal.
+ *
+ *   travel_mm            integer 100 to 10000, default 1000
+ *   period_milliseconds  integer 500 to 60000, default 4000
+ *   axis                 choice x | y | z, default x
+ *   easing               choice linear | smooth, default smooth
  */
-export const BEHAVIOUR_REGISTRY = new BehaviourRegistry(1, [
+export const BEHAVIOUR_REGISTRY = new BehaviourRegistry([
   {
-    behaviourId: BOUNDED_MOTION_ID,
-    version: 1,
-    labelKey: 'behaviour.motion.bounded',
-    axes: MOTION_AXES,
-    ranges: {
-      amplitude: { min: 0, max: 2, fallback: 0.35 },
-      period: { min: 0.5, max: 20, fallback: 4 },
+    behaviourKey: BOUNDED_PATH_KEY,
+    behaviourVersion: BOUNDED_PATH_VERSION,
+    summary:
+      'Bounded reversing travel along one axis, with renderer trigger, stop and reset controls.',
+    parameters: {
+      travel_mm: { kind: 'integer', minimum: 100, maximum: 10_000, default: 1000 },
+      period_milliseconds: { kind: 'integer', minimum: 500, maximum: 60_000, default: 4000 },
+      axis: { kind: 'choice', choices: ['x', 'y', 'z'], default: 'x' },
+      easing: { kind: 'choice', choices: ['linear', 'smooth'], default: 'smooth' },
     },
     controls: ['trigger', 'stop', 'reset'],
     resetIsExact: true,
