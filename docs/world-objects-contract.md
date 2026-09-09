@@ -253,7 +253,7 @@ thing it replaces is a lie the renderer cannot take back.
 
 Every mutation names the base it was made against: the version id and that version's
 `state_sha256` at the moment the caller read it. The repository takes the same per-workspace
-advisory lock the structural plane uses, `pg_advisory_xact_lock(hashtextextended(workspace_id,
+advisory lock the structural plane uses, `pg_advisory_xact_lock(hashtextextended(workspace_id::text,
 880024))`, re-reads the version row `for update`, and compares. Sharing that seed rather than
 minting a new one is what makes an object edit serialize against a structural commit and against
 `tg_world_structure_invalidate_on_tombstone`, closing the same check-then-commit race deletion
