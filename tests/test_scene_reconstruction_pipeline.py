@@ -1044,9 +1044,7 @@ def test_a_repeated_graph_read_reuses_the_validated_placement_without_refetching
     assert second == first
 
 
-def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(
-    repository, tmp_path
-):
+def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(repository, tmp_path):
     """A memoised entry must never carry the bytes it was built from.
 
     MEASURED 2026-09-09: one entry for a 210 member scene was 639.6 KiB; were the point maps to
@@ -1111,9 +1109,9 @@ def test_losing_the_pose_receipt_after_a_memoised_read_is_still_seen(repository,
     assert _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
 
     assert (
-        read_snapshot(
-            repository.connection, repository.workspace_id, store
-        ).reconstruction_scenes[0].placement_state
+        read_snapshot(repository.connection, repository.workspace_id, store)
+        .reconstruction_scenes[0]
+        .placement_state
         == "available"
     )
 
@@ -1211,9 +1209,7 @@ def test_a_point_map_corrupted_after_a_memoised_read_is_advertised_until_the_mem
     assert cold.members[1].exclusion_reason == "alignment-unavailable"
 
 
-def test_a_point_map_repaired_under_the_same_digest_is_seen_on_the_next_read(
-    repository, tmp_path
-):
+def test_a_point_map_repaired_under_the_same_digest_is_seen_on_the_next_read(repository, tmp_path):
     """A record built from a failed digest read must not be cached.
 
     `store.exists` cannot tell a rotted object from a sound one, so a degraded record cached under
@@ -1567,9 +1563,7 @@ def _scene(repository, store):
     ).reconstruction_scenes[0]
 
 
-def test_publishing_a_scene_writes_a_projection_bound_to_its_three_receipts(
-    repository, tmp_path
-):
+def test_publishing_a_scene_writes_a_projection_bound_to_its_three_receipts(repository, tmp_path):
     """The projection publishes with the scene, inside the same atomic acceptance."""
     store, captures, point_artifacts, job_id, scene_id = _published_scene(
         repository, tmp_path, "projection-publish"
@@ -1620,12 +1614,8 @@ def test_a_cold_graph_read_serves_the_projection_without_rebuilding_the_placemen
     def refuse(*args, **kwargs):
         raise AssertionError("the cold read rebuilt the placement instead of reading it")
 
-    monkeypatch.setattr(
-        "exulanica.graph.reconstruction_scenes.validate_placement_record", refuse
-    )
-    monkeypatch.setattr(
-        "exulanica.graph.reconstruction_scenes.recovered_camera_records", refuse
-    )
+    monkeypatch.setattr("exulanica.graph.reconstruction_scenes.validate_placement_record", refuse)
+    monkeypatch.setattr("exulanica.graph.reconstruction_scenes.recovered_camera_records", refuse)
     assert _scene(repository, store) == expected
 
 
@@ -1959,3 +1949,232 @@ def test_a_head_that_looks_right_but_is_truncated_is_refused_rather_than_half_re
     """A misread head must not become a manifest. It cannot: the caller checks the digest."""
     with pytest.raises(ValueError):
         _manifest_and_digest(b'{"manifest":{"scene_ref":"x"')
+
+
+# -- what a bad projection may not do ------------------------------------------------------------
+#
+# A refused projection costs the rebuild and nothing else. These pin the cases where an earlier
+# draft would have raised instead, turning one bad projection into a 500 for the whole snapshot,
+# which is the one way a projection could be worse than not having one.
+
+
+def _refuses(repository, store, scene_id, mutate):
+    """Apply `mutate` to the published projection payload and read the scene back."""
+    payload = _projection_payload(repository, store, scene_id)
+    mutate(payload)
+    _retarget_projection(repository, store, scene_id, _seal(payload))
+    return _scene(repository, store)
+
+
+def test_a_projection_placing_a_member_with_no_point_map_is_refused_not_raised(
+    repository, tmp_path
+):
+    """`artifacts[capture_ref]`, `BlobId.from_hex` and `uuid.UUID` all run outside the handlers.
+
+    So a placed member that is not one of the projection's own bound point-map references has to
+    be refused while the projection is being read. The rebuild cannot produce one:
+    `build_placement_record` emits a placed member only for a capture that has a `PointMapInput`.
+    """
+    store, captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-unbound"
+    )
+    expected = _scene(repository, store)
+
+    def place_an_unbound_member(payload):
+        payload["excluded"] = [
+            item for item in payload["excluded"] if item["capture_ref"] != str(captures[2])
+        ]
+        payload["placed"].append(
+            {
+                **payload["placed"][0],
+                "capture_ref": str(captures[2]),
+                "point_map_artifact_ref": str(uuid.uuid4()),
+            }
+        )
+
+    assert (
+        _refuses(repository, store, scene_id, place_an_unbound_member).model_dump_json()
+        == expected.model_dump_json()
+    )
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(
+            lambda p: p["placed"][0].__setitem__("point_map_content_sha256", "z" * 64),
+            id="digest-not-hex",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0].__setitem__("point_map_artifact_ref", "not-a-uuid"),
+            id="artifact-ref-not-a-uuid",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0].__setitem__("scale_status", "invented"),
+            id="unsupported-scale-status",
+        ),
+        pytest.param(
+            lambda p: p["excluded"][0].__setitem__("reason", "invented") if p["excluded"] else None,
+            id="unsupported-exclusion-reason",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0]["scene_from_opm_row_major"].__setitem__(0, 10**400),
+            id="integer-too-large-for-a-double",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0].__setitem__("local_units_to_scene_units", 10**400),
+            id="scale-too-large-for-a-double",
+        ),
+    ],
+)
+def test_a_malformed_projection_falls_back_instead_of_raising(repository, tmp_path, mutate):
+    """Every one of these reaches code outside the fallback handlers, or did before it was refused.
+
+    The integer cases matter separately: `float(10**400)` raises OverflowError, which is not a
+    ValueError, so it would escape every handler on this path. `json` writes a large integer back
+    verbatim, so such a payload digests like any other and the envelope check does not catch it.
+    """
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-malformed"
+    )
+    expected = _scene(repository, store)
+    assert expected.placement_state == "available"
+
+    after = _refuses(repository, store, scene_id, mutate)
+
+    assert after.model_dump_json() == expected.model_dump_json()
+
+
+def test_a_projection_row_whose_content_digest_is_malformed_does_not_invalidate_the_scene(
+    repository, tmp_path
+):
+    """`artifact.content_sha256` is a bare bytea. A short one must not indict the receipts.
+
+    `BlobId` raises `InvalidAddressError`, a ValueError, and outside the candidate loop's guard it
+    would reach `_scene_row` and report a scene whose pose, placement and gate are perfectly sound
+    as an inconsistent receipt chain, dropping its geometry and its person regions with it.
+    """
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-shortdigest"
+    )
+    expected = _scene(repository, store)
+
+    repository.connection.execute(
+        "update artifact set content_sha256=%s where workspace_id=%s and scene_id=%s "
+        "and kind='scene_projection'",
+        (b"\x01\x02\x03", repository.workspace_id, scene_id),
+    )
+    after = _scene(repository, store)
+
+    assert after.receipt_state == "available"
+    assert after.model_dump_json() == expected.model_dump_json()
+
+
+def test_revoking_a_projection_revokes_the_memo_entry_it_filled(repository, tmp_path):
+    """The memo key carries the offered projections, so a revocation is not outlived.
+
+    An operator who finds a projection wrong marks it `needs_repair` or `purged_at`. That stops it
+    being offered, so a fresh process rebuilds. Without the projections in the key, every already
+    running worker would keep serving the value that projection produced, under an otherwise
+    identical key, for the life of the process: there is no TTL and nothing outside tests calls
+    `clear_placement_memo`.
+    """
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-revoke"
+    )
+    read_snapshot(repository.connection, repository.workspace_id, store)
+    assert placement_memo_size() == 1
+    filled = dict(_memo)
+
+    repository.connection.execute(
+        "update artifact set needs_repair=true where workspace_id=%s and scene_id=%s "
+        "and kind='scene_projection'",
+        (repository.workspace_id, scene_id),
+    )
+    # No memo clear: this is the running worker, not a fresh process.
+    read_snapshot(repository.connection, repository.workspace_id, store)
+
+    assert set(_memo) != set(filled), "revoking the projection must not leave its entry reachable"
+    assert placement_memo_size() == 2
+
+
+def test_publication_survives_a_projection_that_cannot_be_built(repository, tmp_path, monkeypatch):
+    """A projection is an optimisation. Failing one must not discard a completed reconstruction.
+
+    Failing the job here would throw away a finished pose, placement and gate, destroy the
+    scratch, and retry deterministically until the claim budget is spent: three full COLMAP runs
+    to end with no scene at all, where the pre-change behaviour was a published scene with a slow
+    cold read. The refusal is not silent either way, because the stage records it.
+    """
+    store, _captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="projection-refused", lease_seconds=60)
+    assert claimed is not None
+
+    def refuse(**kwargs):
+        raise ValueError("a recovered camera calibration is malformed")
+
+    monkeypatch.setattr("exulanica.ingest.scene_reconstruction.build_scene_projection", refuse)
+    outcome = _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+
+    assert outcome.status == "succeeded"
+    kinds = {
+        row["kind"]
+        for row in repository.connection.execute(
+            "select kind from artifact where workspace_id=%s and scene_id=%s",
+            (repository.workspace_id, outcome.scene_id),
+        ).fetchall()
+    }
+    assert kinds == {"pose_receipt", "point_map_placement", "scene_gate_receipt"}
+
+    # The refusal is recorded against its own stage rather than swallowed.
+    failed = repository.connection.execute(
+        "select type,stage_key,error_class,error_message from pipeline_event "
+        "where stage_key='scene_projection' and type='stage_failed'",
+    ).fetchall()
+    assert len(failed) == 1
+    assert failed[0]["error_class"] == "_ProjectionRefused"
+    assert "calibration is malformed" in failed[0]["error_message"]
+
+    # And the scene reads correctly, by the rebuild, exactly as it did before projections existed.
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.placement_state == "available"
+
+
+def test_a_receipt_with_a_duplicate_manifest_key_is_read_the_way_every_other_reader_reads_it():
+    """JSON permits a duplicate key and `json.loads` keeps the LAST.
+
+    Both halves of the pair the head parse returns come from the head, so a receipt carrying two
+    `manifest` pairs would digest against itself and the split would be silent: `scene_allowed`
+    would authorise against one manifest while `recovered_camera_records`, which still uses
+    `json.loads`, built geometry from the other. The head parse refuses when the key after
+    `manifest_digest` does not sort strictly after it, and falls back.
+    """
+    first = {"scene_ref": str(uuid.uuid4()), "frames": [{"capture_ref": "a", "sha256": "a" * 64}]}
+    second = {"scene_ref": str(uuid.uuid4()), "frames": [{"capture_ref": "b", "sha256": "b" * 64}]}
+
+    def digest(manifest):
+        return hashlib.sha256(
+            json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+
+    compact = json.dumps
+    duplicated = (
+        b'{"manifest":'
+        + compact(first, separators=(",", ":")).encode()
+        + b',"manifest_digest":"'
+        + digest(first).encode()
+        + b'","manifest":'
+        + compact(second, separators=(",", ":")).encode()
+        + b',"manifest_digest":"'
+        + digest(second).encode()
+        + b'","quality":{}}'
+    )
+
+    manifest, claimed = _manifest_and_digest(duplicated)
+
+    assert manifest == json.loads(duplicated)["manifest"] == second
+    assert claimed == json.loads(duplicated)["manifest_digest"] == digest(second)

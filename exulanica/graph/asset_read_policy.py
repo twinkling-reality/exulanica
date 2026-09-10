@@ -235,10 +235,25 @@ def _manifest_and_digest(data: bytes) -> tuple[Any, Any]:
         try:
             text = data.decode()
             manifest, end = json.JSONDecoder().raw_decode(text, len(_RECEIPT_HEAD))
-            tail = text[end : end + len(_DIGEST_KEY) + 65]
+            # Long enough to hold the digest key, a 64 character digest, its closing quote, and
+            # the first ten characters of whatever key comes next, which is what the duplicate
+            # check below reads.
+            tail = text[end : end + len(_DIGEST_KEY) + 75]
             if tail.startswith(_DIGEST_KEY):
                 closing = tail.index('"', len(_DIGEST_KEY))
-                return manifest, tail[len(_DIGEST_KEY) : closing]
+                # The key that follows must sort strictly after `manifest_digest`. JSON permits a
+                # duplicate key and `json.loads` keeps the LAST, so without this a receipt
+                # carrying two `manifest` pairs would be read as its first here and as its second
+                # by `_read_pose_receipt` and `recovered_camera_records`, which still use
+                # `json.loads`. Both halves of the pair returned here come from the head, so the
+                # caller's digest check would agree with itself and the split would be silent:
+                # `scene_allowed` would authorise against one manifest while the geometry came
+                # from the other. Our own writer sorts its keys and cannot emit a duplicate, so
+                # this only ever fires on a receipt from somewhere else, and it falls back to the
+                # whole-object parse, which agrees with every other reader.
+                after = tail[closing + 1 :]
+                if after.startswith(',"') and after[2:10] > "manifest":
+                    return manifest, tail[len(_DIGEST_KEY) : closing]
         except (UnicodeDecodeError, ValueError):
             pass
     receipt = json.loads(data)

@@ -59,6 +59,11 @@ from exulanica.store.local import LocalContentAddressedStore
 
 PROFILE = "exulanica.scene-projection-backfill/v1"
 
+
+class _Disagrees(Exception):
+    """An existing projection row disagrees with the bytes recomputed from the same receipts."""
+
+
 #: Every published scene in the workspace, with the three receipt digests of its CURRENT job.
 #: Modelled on `_SCENES` in `exulanica/graph/reconstruction_scenes.py`, and narrowed the same way:
 #: a job that is not the scene's current one is not selected at all, rather than selected and
@@ -157,6 +162,37 @@ def _project_one(repository, store, row) -> dict:
     if not members:
         return {**outcome, "action": "skipped", "reason": "the scene has no durable members"}
 
+    # Asked BEFORE the expensive work, not after. The identity key is a pure function of the
+    # scene and the three receipt digests, all of which are already in `row`, so a scene that
+    # already has its projection can be answered without reading its pose receipt or hashing
+    # 780 MB of point maps. That is what makes a run resumable: an operator whose 40 scene
+    # backfill died at scene 12 re-runs it and pays for scenes 12 to 40, not 1 to 40.
+    spec = stage(SCENE_PROJECTION_STAGE)
+    input_digest = input_digest_of(
+        [
+            bytes(row["pose_sha256"]),
+            bytes(row["placement_sha256"]),
+            bytes(row["gate_sha256"]),
+        ]
+    )
+    key = _scene_key(scene_id, spec.key, input_digest)
+    artifact_id = artifact_id_for(key)
+    existing = repository.find_artifact(key)
+    if existing is not None and existing.artifact_id == artifact_id:
+        stored = bytes(existing.content_sha256).hex()
+        if store.exists(BlobId.from_hex(stored)):
+            return {
+                **outcome,
+                "action": "already-present",
+                "artifact_id": str(artifact_id),
+                "projection_sha256": stored,
+            }
+        # The row is live but its bytes are not there, which is what a run killed between the
+        # row commit and the byte flush leaves behind. The graph offers that row, fails to read
+        # it and rebuilds, so this is the case the backfill most needs to heal rather than
+        # report as done. Fall through and rewrite the bytes.
+        outcome["repaired_missing_bytes"] = True
+
     try:
         pose_bytes = store.get(BlobId(bytes(row["pose_sha256"])))
         placement_bytes = store.get(BlobId(bytes(row["placement_sha256"])))
@@ -253,16 +289,6 @@ def _project_one(repository, store, row) -> dict:
         point_map_inputs=projection_point_map_inputs(placement),
     )
 
-    spec = stage(SCENE_PROJECTION_STAGE)
-    input_digest = input_digest_of(
-        [
-            bytes(row["pose_sha256"]),
-            bytes(row["placement_sha256"]),
-            bytes(row["gate_sha256"]),
-        ]
-    )
-    key = _scene_key(scene_id, spec.key, input_digest)
-    artifact_id = artifact_id_for(key)
     content_id = BlobId.of_bytes(payload)
     outcome |= {
         "artifact_id": str(artifact_id),
@@ -296,12 +322,37 @@ def _project_one(repository, store, row) -> dict:
                 byte_size=len(payload),
                 produced_by_event=recorder.stage_started_event,
             )
+            # Appended unconditionally, which is what `SceneReconstructionProcessor._accept` does
+            # and for the same reason. `insert_scene_artifact` is `on conflict do nothing` and
+            # `committed_writes` commits the ROW and then flushes the BYTES, so a run killed in
+            # that window leaves a live artifact row with nothing behind it. The graph then offers
+            # that row as a candidate forever, fails to read it, and rebuilds. Appending only when
+            # `inserted` would make the re-run that should heal it report "already-present"
+            # instead, which is a false claim that the scene has its projection.
+            pending.append(payload)
             if inserted:
-                pending.append(payload)
                 recorder.record_output(artifact_id)
+            else:
+                # The row already existed. It must agree with what was just recomputed, or this
+                # stage is not the deterministic function it declares itself to be, and that is
+                # worth refusing rather than reporting as an ordinary no-op. Same check
+                # `SceneReconstructionProcessor._accept` makes.
+                existing = repository.find_artifact(key)
+                if (
+                    existing is None
+                    or existing.artifact_id != artifact_id
+                    or existing.content_sha256 != content_id.digest
+                ):
+                    raise _Disagrees(
+                        "an existing projection disagrees with the bytes recomputed from this "
+                        "scene's receipts"
+                    )
     except TombstonedError as error:
         ledger.finish("failed")
         return {**outcome, "action": "skipped", "reason": f"deletion reaches this scene: {error}"}
+    except _Disagrees as error:
+        ledger.finish("failed")
+        return {**outcome, "action": "refused", "reason": str(error)}
     except BaseException:
         ledger.finish("failed")
         raise
@@ -349,9 +400,21 @@ def main() -> int:
             print(f"{workspace_id}: {len(rows)} published scenes", file=sys.stderr, flush=True)
             for row in rows:
                 print(f"  {row['scene_id']}", file=sys.stderr, flush=True)
-                scenes.append(
-                    {"workspace_id": str(workspace_id), **_project_one(repository, store, row)}
-                )
+                # A scene that raises must not take the record of everything already written
+                # down with it. Each `Database.session` is autocommit and each `committed_writes`
+                # is its own transaction, so the scenes before this one stay committed either
+                # way; what would be lost is the only document naming them, which is exactly the
+                # case where an operator most needs it.
+                try:
+                    outcome = _project_one(repository, store, row)
+                except Exception as error:
+                    outcome = {
+                        "scene_id": str(row["scene_id"]),
+                        "job_id": str(row["job_id"]),
+                        "action": "failed",
+                        "reason": f"{type(error).__name__}: {error}",
+                    }
+                scenes.append({"workspace_id": str(workspace_id), **outcome})
 
     actions: dict[str, int] = {}
     for scene in scenes:
@@ -368,7 +431,7 @@ def main() -> int:
     if args.output is not None:
         args.output.write_text(text)
     print(text, end="")
-    # A skip is a recorded outcome, not a failure: a scene whose point maps are gone genuinely
+    # A skip or a refusal is a recorded outcome, not a process failure: a scene whose point maps are gone genuinely
     # cannot be projected, and the graph reads it exactly as it did before. Only an unhandled
     # exception, which propagates, is a failure.
     return 0

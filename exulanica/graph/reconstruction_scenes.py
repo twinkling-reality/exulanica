@@ -177,6 +177,7 @@ _MemoKey = tuple[
     tuple[str, ...],  # member capture refs, in scene order
     tuple[_PointMapRef, ...],  # the placement's point-map references, in record order
     tuple[bool, ...],  # whether each of those point maps' bytes are present
+    tuple[str, ...],  # the projections offered, so revoking one revokes the entry it filled
 ]
 
 
@@ -468,6 +469,17 @@ def _scene_row(
         present = tuple(
             store.exists(BlobId.from_hex(reference.content_sha256)) for reference in references
         )
+        # The offered projections are part of the key, and this is not decoration. Without them,
+        # an operator who purges a projection or flags it `needs_repair` because it is wrong stops
+        # it being OFFERED, so a fresh process rebuilds, while every already running worker keeps
+        # serving the value it filed under an otherwise identical key. There is no TTL and nothing
+        # outside tests calls `clear_placement_memo`, so the entry would outlive the revocation for
+        # the life of the process. With them, revoking a projection changes the key and the next
+        # read misses and rebuilds. A scene with no projection has an empty tuple here, so this
+        # costs a rebuild-derived entry nothing.
+        # Hex rather than raw bytes, like the three receipt digests above it. The memo is asserted
+        # to hold no `bytes` anywhere, which is how it is kept from ever holding a point map.
+        offered = tuple(bytes(item).hex() for item in (row["projection_digests"] or ()))
         key: _MemoKey = (
             str(workspace),
             str(scene_id),
@@ -477,6 +489,7 @@ def _scene_row(
             member_refs,
             tuple(references),
             present,
+            offered,
         )
         memoised = _memo_get(key)
         if memoised is not None:
@@ -502,7 +515,11 @@ def _scene_row(
             # WITH a projection whose bindings fail does pay that double read, which is the right
             # way round: it is the rare case, and it is the one where being sure is worth a second.
             projected = None
-            if row["projection_digests"] and _point_maps_verify(store, references):
+            if (
+                row["projection_digests"]
+                and _verifies(store, pose_blob)
+                and _point_maps_verify(store, references)
+            ):
                 projected = _projected(
                     store,
                     row["projection_digests"],
@@ -787,6 +804,24 @@ def _outcome_from_record(placement: PlacementRecord) -> _Outcome:
     )
 
 
+def _verifies(store: ContentAddressedStore, blob: BlobId) -> bool:
+    """Whether one object is present and reproduces its content address.
+
+    For the pose receipt on the projection path. The presence check at the top of `_scene_row` is
+    a bare `is_file()`, and the rebuild is what used to re-hash the receipt, so without this a
+    receipt that had rotted would be reported `receipt_state="available"` where it used to be
+    reported `"invalid"`. The route withholds the geometry either way, because `scene_inputs` does
+    its own verified read, but the scene row would have been saying something untrue about the
+    receipt chain. MEASURED 2026-09-10 on the 108,267,697 byte volcanic receipt: reading it is
+    0.094 s and hashing it 0.047 s, which is what this costs.
+    """
+    try:
+        store.get(blob)
+    except (BlobNotFoundError, IntegrityError):
+        return False
+    return True
+
+
 def _point_maps_verify(store: ContentAddressedStore, references: tuple[_PointMapRef, ...]) -> bool:
     """Whether every referenced point map is present and reproduces its content digest.
 
@@ -824,8 +859,14 @@ def _projected(
     """
     for candidate in projection_digests or ():
         try:
+            # `BlobId` is constructed inside the guard, not before it. `artifact.content_sha256` is
+            # a bare `bytea` with no length constraint, and a value that is not 32 bytes raises
+            # `InvalidAddressError`, which is a ValueError. Outside the guard it would reach
+            # `_scene_row` and report a scene whose three receipts are perfectly sound as an
+            # inconsistent receipt chain, dropping its geometry, its person regions and its
+            # generated geometry. A projection must never make a scene worse than no projection.
             data = store.get(BlobId(bytes(candidate)))
-        except (BlobNotFoundError, IntegrityError):
+        except (BlobNotFoundError, IntegrityError, TypeError, ValueError):
             continue
         try:
             projected = _read_projection(
@@ -895,10 +936,31 @@ def _read_projection(
         ) != tuple(reference):
             return None
 
+    # A placed member must name one of the point-map references this projection is bound to, and
+    # exactly. The rebuild cannot produce anything else: `build_placement_record` emits a placed
+    # member only for a capture that has a `PointMapInput` and copies both refs straight off it.
+    #
+    # This is also where the reader's OWN safety comes from, and it is the reason the check is a
+    # set membership rather than a shape test. Three of these values are consumed further down
+    # `_scene_row` and OUTSIDE its fallback handlers: `artifacts[capture_ref]`,
+    # `BlobId.from_hex(point_map_content_sha256)` and `uuid.UUID(point_map_artifact_ref)`. Every
+    # triple in `references` has already been through `uuid.UUID` and `bytes.fromhex` in
+    # `_point_map_references`, so matching one proves all three are well formed. Without this a
+    # projection naming a capture with no point map, or a malformed digest, would be a 500 for the
+    # whole snapshot rather than a fallback, which is the one way a bad projection could be worse
+    # than no projection.
+    bound_triples = {tuple(reference) for reference in references}
     placed: dict[str, _PlacedMember] = {}
     for raw in payload["placed"]:
         matrix = raw["scene_from_opm_row_major"]
         if not isinstance(matrix, list) or len(matrix) != 16:
+            return None
+        triple = (
+            raw["capture_ref"],
+            raw["point_map_artifact_ref"],
+            raw["point_map_content_sha256"],
+        )
+        if triple not in bound_triples or raw["scale_status"] != _SCALE_STATUS:
             return None
         placed[str(raw["capture_ref"])] = _PlacedMember(
             point_map_artifact_ref=str(raw["point_map_artifact_ref"]),
@@ -907,7 +969,11 @@ def _read_projection(
             local_units_to_scene_units=_number(raw["local_units_to_scene_units"]),
             scale_status=str(raw["scale_status"]),
         )
-    excluded = {str(raw["capture_ref"]): str(raw["reason"]) for raw in payload["excluded"]}
+    excluded: dict[str, str] = {}
+    for raw in payload["excluded"]:
+        if raw["reason"] not in _EXCLUSION_REASONS:
+            return None
+        excluded[str(raw["capture_ref"])] = str(raw["reason"])
     # Exactly one outcome per member, which is what makes `excluded[capture_ref]` below safe for
     # every member the placement did not place.
     if len(placed) + len(excluded) != len(member_refs) or set(placed) | set(excluded) != set(
@@ -927,6 +993,21 @@ def _read_projection(
 _CAMERA_FIELDS: Final = ("calibration", "projection", "scene_from_camera_row_major")
 _CALIBRATION_FIELDS: Final = ("cx", "cy", "fx", "fy", "height", "model", "parameters", "width")
 _CAMERA_PROJECTIONS: Final = ("pinhole", "pinhole-approximation")
+
+#: The only scale status `ScenePointMapPlacementRow` accepts, and the five reasons
+#: `ExcludedPlacementMember` can carry. Spelled here because the reader may not import either
+#: producer, and because `ReconstructionSceneMemberRow.exclusion_reason` is a bare `str | None`:
+#: without this a projection could put any string on the wire where the rebuild can emit only
+#: these five, and a client switching on it would meet a state that does not exist. A test pins
+#: both tuples against the producers.
+_SCALE_STATUS: Final = "colmap-correspondence-fit"
+_EXCLUSION_REASONS: Final = (
+    "alignment-inconsistent",
+    "alignment-insufficient-correspondences",
+    "alignment-unavailable",
+    "point-map-unavailable",
+    "pose-not-registered",
+)
 
 
 def _cameras(value: object) -> dict[str, dict[str, object]] | None:
@@ -966,7 +1047,15 @@ def _number(value: object) -> float:
     """A finite float, or a refusal. Guards the transforms a renderer will be handed."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError("a projected number is not numeric")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as error:
+        # An integer literal too large for a double. `float()` raises OverflowError, which is NOT
+        # a ValueError, so without this it would escape `_read_projection`, `_projected` and every
+        # handler in `_scene_row` and turn one bad projection into a 500 for the whole snapshot.
+        # `json.loads` turns 1e400 into inf, which the finiteness check below already refuses; it
+        # is only the integer literal that reaches here, and its digest verifies like any other.
+        raise ValueError("a projected number is out of range") from error
     if not math.isfinite(number):
         raise ValueError("a projected number is not finite")
     return number
