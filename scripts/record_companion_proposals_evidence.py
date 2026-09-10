@@ -176,11 +176,25 @@ def main() -> int:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout.strip()
+    # What `head` actually promises. A count quoted against a commit whose tree is not the tree
+    # the gates ran on is a count about nothing, and an uncommitted working tree is exactly that
+    # case: the first assembly of this record ran its gates over changes that were still
+    # uncommitted, so its `head` named a commit that did not contain them.
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    outstanding = [
+        line
+        for line in dirty
+        if artifacts.name not in line and output.name not in line
+    ]
 
     record = {
         "profile": "exulanica.companion-proposals/v1",
         "completed_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat(),
         "head": head,
+        "head_is_what_ran": not outstanding,
+        "uncommitted_when_the_gates_ran": outstanding,
         "predecessor_record": {
             "path": predecessor.relative_to(ROOT).as_posix(),
             "record_sha256": prior["record_sha256"],
