@@ -1082,6 +1082,17 @@ There is a second-order lesson in how that quiet was reached. Three sessions wer
 the database to go quiet with a shell loop matching `pytest` in the process table, and every one
 of those loops matched the other two. Nothing was running and nobody could tell.
 
+**One imprecision in the record itself, named here rather than edited out of it.** Its `head`
+field says `3853523`, and the gates ran over that tree plus the review fixes in section 13.7a,
+which were still uncommitted at the time. So `head` names a commit that does not contain
+everything that was measured. The artifacts and the logs are exactly what those commands
+produced; it is the one-word answer to "measured at what" that is loose. `docs/README.md` says a
+record is closed and this one is: the fix is forward, in
+`scripts/record_companion_proposals_evidence.py`, which now records
+`head_is_what_ran` and lists anything uncommitted when the gates ran, so the next record cannot
+be vague about it. Nothing in the counts changes: the same tree, once committed, produced the
+same 2550.
+
 Two failures were caused by this work and both are fixed rather than explained: `POST
 /selection/appearance` had to be added to the route sweep in `tests/test_api.py`, which fails
 closed on any route it does not cover, and the documentation inventory had to be regenerated after
