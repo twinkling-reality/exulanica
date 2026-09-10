@@ -18,8 +18,14 @@ import { companionAppearanceConfiguration } from '@exulanica/presentation';
 import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.js';
 
 import { createCompanionController, type CompanionController } from '../companion.js';
-import type { CompanionAnswer } from '../companion-ask-api.js';
+import type { CompanionAnswer, CompanionProposal, ModelCall } from '../companion-ask-api.js';
 import type { EvidenceCache } from '../evidence.js';
+import { say } from '../ui/copy.js';
+import {
+  worldStyleProposalInbox,
+  worldStyleProposalOutcomes,
+  type WorldStyleProposalOutcome,
+} from '../world-style-proposals.js';
 import { buildCompanionEncounter, type CompanionEncounter } from '../ui/companion-encounter.js';
 import { resolveCompanionPlacement } from '../ui/companion-placement.js';
 import { buildCompanionStage, type CompanionStage } from '../ui/companion-stage.js';
@@ -65,6 +71,19 @@ export interface CompanionDependencies {
    * fail.
    */
   readonly rememberAnswer?: (answer: CompanionAnswer) => Promise<void>;
+  /**
+   * Read one utterance as a request to change how the world looks, before asking about it.
+   *
+   * The read half of the conversation could already answer a question. This is the one thing
+   * the Companion may DO, and it arrives here as a function for exactly the reason `ask` does:
+   * the composition root is the only place that holds a credential.
+   *
+   * **Optional, and a host that has not opted in behaves as it did.** Absent means every
+   * utterance goes straight to `ask`, which is what happened before this path existed. Not a
+   * registered function that returns "question" for everything: that would make "this build
+   * cannot propose" and "this sentence was a question" the same observation.
+   */
+  readonly proposeAppearance?: (utterance: string) => Promise<CompanionProposal>;
   /** The element the presence draws into. Created by the root, because the world shows through it. */
   readonly stageParent: HTMLElement;
   /**
@@ -157,9 +176,84 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     stage.setState('uncertain');
   }
 
+  /*
+   * Asking for the world to look different, at the seam where asking already happens.
+   *
+   * `askQuestion` is reached only when the turn engine has already decided this free text is
+   * not an answer to an open question, which is exactly the gate a proposal needs: a person
+   * typing "not sure" at a question about a photograph must never have that read as a request
+   * to redecorate. So the classifier sits here and nowhere earlier.
+   *
+   * What comes back is a `CompanionAnswer` in every branch, because the encounter renders one
+   * and because a proposal IS an answer to what was typed: a model wrote the sentence, the
+   * provenance line says which model wrote it, and `onAnswerShown` keeps it, so a proposal is
+   * recorded through the write-back that already exists rather than through a second one.
+   */
+  const proposalUtterances = new Map<string, string>();
+
+  async function askOrPropose(utterance: string): Promise<CompanionAnswer> {
+    const propose = deps.proposeAppearance;
+    if (propose === undefined) return deps.ask(utterance);
+    const outcome = await propose(utterance);
+    if (outcome.classification === 'question') return deps.ask(utterance);
+    if (outcome.proposal === null) return refusalAnswer(outcome);
+
+    const originReference = `companion-utterance:${crypto.randomUUID()}`;
+    proposalUtterances.set(originReference, utterance);
+    const reached = worldStyleProposalInbox.submit({
+      origin: 'companion',
+      originReference,
+      scope: { kind: 'global' },
+      profile: {
+        profileId: outcome.proposal.profileId,
+        profileVersion: outcome.proposal.profileVersion,
+        parameters: outcome.proposal.parameters,
+      },
+      referenceIds: outcome.proposal.referenceIds,
+      modelId: outcome.proposal.modelId,
+      promptVersion: outcome.proposal.promptVersion,
+    });
+    // No Atlas integration was mounted to receive it, which is a real state on the empty-world
+    // path. Said out loud rather than left as a sentence describing a change nobody can find.
+    if (!reached) {
+      proposalUtterances.delete(originReference);
+      return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.unavailable')], 'model');
+    }
+    return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.staged')], 'model');
+  }
+
+  /*
+   * What became of a proposal, kept through the write-back that already exists.
+   *
+   * A second remembered answer rather than a correction of the first, and the reason is the
+   * wiring rather than the meaning: `rememberAnswer` resolves to nothing, so this module never
+   * learns the id a correction would have to name, and `main.ts` is what holds the client. Two
+   * rows is also the more honest record of two things that happened at two times.
+   */
+  const stopOutcomes = worldStyleProposalOutcomes.subscribe((outcome) => {
+    const utterance = proposalUtterances.get(outcome.originReference);
+    if (utterance === undefined) return;
+    // 'previewed' is the state the proposal was already recorded in. Keeping it again would
+    // write one row per stale-base recovery for a proposal nobody has decided about yet.
+    if (outcome.kind === 'previewed') return;
+    proposalUtterances.delete(outcome.originReference);
+    const remember = deps.rememberAnswer;
+    if (remember === undefined) return;
+    void remember(outcomeAnswer(utterance, outcome)).catch((error: unknown) => {
+      const failure =
+        error instanceof MemoryUnavailable
+          ? error
+          : new MemoryUnavailable(
+              'unreachable',
+              error instanceof Error ? error.message : String(error),
+            );
+      panel.noteMemoryFailure(`memory.notKept.${failure.kind}`, failure.detail);
+    });
+  });
+
   const controller = createCompanionController({
     companion: deps.engine,
-    askQuestion: (question) => deps.ask(question),
+    askQuestion: (question) => askOrPropose(question),
     onWorking: (working) => stage.setState(working ? 'working' : 'attending'),
     onAwaitingConfirmation: (proposalId, summary, utterance) => {
       // A staged proposal is still unconfirmed. It may not borrow the settled presentation.
@@ -287,6 +381,118 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     summon,
     dismiss,
     toggle,
-    dispose: () => disposeCompanionStage(state),
+    dispose: () => {
+      stopOutcomes();
+      disposeCompanionStage(state);
+    },
   };
+}
+
+/**
+ * A proposal, an outcome, or a refusal, shaped as the answer the encounter renders.
+ *
+ * **Every field below is what actually happened, and three of them are deliberately empty.**
+ *
+ * `evidence` is empty. The proposal names topology source slots, and a chip opens an EVIDENCE
+ * SPAN through `/evidence/{span}/masked`: the two are joined on the server and turning one into
+ * the other is a second authorized request. An answer that offered chips resolving to nothing
+ * would be worse than one that offers none, so this offers none.
+ *
+ * `abstained` is null because nothing was abstained from. A refusal here is not an abstention:
+ * an abstention says the library cannot answer, and this says the reviewed design cannot make
+ * the change. Reporting one as the other would score a refusal under M3 as though a question had
+ * gone unanswered.
+ *
+ * `deterministic` and `repaired` are false because neither concept applies. The answer validator
+ * does not run on this path: there is no packet to check a claim against, because no claim about
+ * the library is being made.
+ */
+function spokenAnswer(
+  outcome: CompanionProposal,
+  sentences: readonly string[],
+  composed: 'model' | 'discarded',
+): CompanionAnswer {
+  const calls = outcome.calls;
+  return {
+    question: outcome.utterance,
+    clauses: sentences
+      .filter((text) => text.trim().length > 0)
+      .map((text) => ({ text, type: 'meta' as const, citations: [] })),
+    text: sentences.filter((text) => text.trim().length > 0).join(' '),
+    abstained: null,
+    deterministic: false,
+    repaired: false,
+    evidence: [],
+    provenance: {
+      composed,
+      // The identifier that DREW it, out of the response body. Null when no draft call
+      // returned, which is the case a configuration-derived value would report wrongly.
+      servedModel: draftingModel(calls),
+      plannedBy: calls[0]?.servedModel ?? null,
+      latencyMs: calls.reduce((total, call) => total + call.latencyMs, 0),
+      usedFallback: calls.some((call) => call.usedFallback),
+    },
+    promptVersion: outcome.promptVersion,
+    calls,
+  };
+}
+
+/**
+ * The refusal, in reviewed words, with the server's own detail under it where it has one.
+ *
+ * The reviewed sentence is chosen by code and comes first, because it is the one this product
+ * is accountable for. `not_in_catalogue` is the exception worth naming: its detail is the
+ * model's own short account of what was asked for and could not be done, which is more useful
+ * to the person than any general sentence, so it is shown too.
+ *
+ * `composed` distinguishes the two honestly. When the sentence on the screen is a reviewed one,
+ * the model's output was discarded and the provenance line says so; naming the model over words
+ * it did not write would attribute a sentence to something that did not write it.
+ */
+function refusalAnswer(outcome: CompanionProposal): CompanionAnswer {
+  const refusal = outcome.refusal;
+  if (refusal === null) {
+    return spokenAnswer(outcome, [say('proposal.refused.not_drafted')], 'discarded');
+  }
+  const spoken = say(`proposal.refused.${refusal.code}`);
+  const detail = refusal.code === 'not_in_catalogue' ? refusal.detail : '';
+  return spokenAnswer(outcome, [spoken, detail], 'discarded');
+}
+
+/** What became of a proposal, as a remembered answer to the sentence that asked for it. */
+function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): CompanionAnswer {
+  const spoken = say(`proposal.outcome.${outcome.kind}`);
+  return {
+    question: utterance,
+    clauses: [{ text: spoken, type: 'meta', citations: [] }],
+    text: `${spoken} ${outcome.detail}`.trim(),
+    abstained: null,
+    deterministic: false,
+    repaired: false,
+    evidence: [],
+    // No model decided this. A person did, or the authority refused it, and a provenance line
+    // naming a model over either would be naming the wrong author.
+    provenance: {
+      composed: 'none',
+      servedModel: null,
+      plannedBy: null,
+      latencyMs: 0,
+      usedFallback: false,
+    },
+    // The write-back requires one and the server bounds it to 64 characters. This says which
+    // path recorded the row, which is the question somebody reading the table will have.
+    promptVersion: 'proposal-outcome',
+    calls: [],
+  };
+}
+
+/**
+ * The call that DREW the proposal, which is the last one rather than the first.
+ *
+ * The classifier goes first and the drafter second, and a refused draft is retried once, so the
+ * last recorded call is the one whose output reached the person. Reading the first would name
+ * the classifier, which decided what the sentence was and wrote none of it.
+ */
+function draftingModel(calls: readonly ModelCall[]): string | null {
+  return calls.length > 1 ? (calls.at(-1)?.servedModel ?? null) : null;
 }
