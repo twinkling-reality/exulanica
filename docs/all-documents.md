@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**115 documents**, excluding `docs/evaluation/`.
+**116 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -160,9 +160,10 @@ Closed accounts of what happened on a date. Never edited after.
 
 Integration patches referenced by records.
 
-4 documents.
+5 documents.
 
 - [companion-memory-main.patch](patches/companion-memory-main.patch) : The Companion memory wiring for the composition root
+- [companion-proposals-main.patch](patches/companion-proposals-main.patch) : The Companion appearance-proposal wiring for the composition root
 - [companion-question-main.patch](patches/companion-question-main.patch) : diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
 - [manual-person-review-main.patch](patches/manual-person-review-main.patch) : +++ b/web/packages/app/src/main.ts
 - [preview-handoffs-main.patch](patches/preview-handoffs-main.patch) : +++ b/web/packages/app/src/main.ts
