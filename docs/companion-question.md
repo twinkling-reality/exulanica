@@ -1,15 +1,16 @@
 # The Companion question path
 
-Status: built, covered by tests, and measured three times with real models. Section 6 has what the
-first run measured against the retained bowl workspace and the record is
+Status: built, covered by tests, and measured with real models on three passes. Section 6
+has what the first run measured against the retained bowl workspace and the record is
 `docs/evaluation/2026-09-09-companion-question.json`. Sections 9 to 12 are the second pass: the
 Companion's memory of all this is now durable, and the composer swap section 6.1 offered as a
 proposal has been measured again and made. That record is
 `docs/evaluation/2026-09-09-companion-memory.json`. Section 13 is the third pass and the first one
 that is not a read: the Companion can now PROPOSE a change to how the world looks, drawn from the
 reviewed style registry and applied by nobody but the person it is shown to. It was measured
-against the retained volcanic workspace and that record is
-`docs/evaluation/2026-09-10-companion-proposals.json`.
+against the retained volcanic workspace, twice on two schemas, and those records are
+`docs/evaluation/2026-09-10-companion-proposals.json` and
+`docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json`.
 
 `product-direction.md` makes this a delivery gate: "Ask about the selected place through the
 actual Companion; ground the answer in available evidence and show missing information
@@ -734,8 +735,12 @@ Everything above is a READ. The Companion answered a question about a library an
 remembered the answer; it could not act. This section is one act, and the shape of it is chosen so
 that "one act" is enforced by a schema rather than promised by a prompt.
 
-The record is `docs/evaluation/2026-09-10-companion-proposals.json`, and its predecessor is the
-memory record above.
+There are two records and the second is a replication rather than a correction.
+`docs/evaluation/2026-09-10-companion-proposals.json` is the first, and its predecessor is the
+memory record above. `docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json` is the
+same five utterances replayed against the isolated migrated copy at schema 0043, and it cites the
+first as its predecessor. Section 13.5a says why there are two and what agreeing twice does and
+does not establish.
 
 **What a person can now do:** type "could the horizon sit a bit softer in here" to the Companion,
 and get back a change to the world's appearance, drawn from the reviewed style catalogue, sitting
@@ -846,6 +851,42 @@ owning module named, a reference id from the catalogue, and a sentence that name
 and no number. `typeface` is the case the path exists against, and it refused in the model's own
 words: "Typography and button shape are not part of the adjustable parameters in this design
 system."
+
+### 13.5a The same five, twice, on two schemas
+
+The first run measured against the retained spine at schema **0038**. That was a compromise
+rather than a preference: the brief asked for the isolated migrated copy, and at the time
+`exulanica_inspect_test` was held open by another session, so it could neither be used nor
+cloned. The retained spine carries the world style tables from 0017 and 0023, so the route reads
+what it needs there, and the run wrote nothing to it: revision 0 before and after, zero proposal
+rows.
+
+The copy came free later and the five were replayed against it at schema **0043**, which is
+where the brief wanted them. Every outcome matched:
+
+| Key | 0038 | 0043 |
+| --- | --- | --- |
+| `soften` | proposed, `horizon-softness` 0.46 to 0.50 | the same |
+| `warmer` | proposed, five controls | the same five, the same values |
+| `typeface` | refused `not_in_catalogue` | the same |
+| `who` | question, one call | the same |
+| `injection` | question, one call | the same |
+
+Total cost 2508 and 2505 micro-dollars. The copy is unwritten after it too: zero proposals, zero
+previews, one style version, zero companion answers.
+
+**What that agreement establishes is narrow and worth stating narrowly.** The route reads
+`world_style_state` and `world_topology_source`, both present at 0038, and everything else it
+does is a model call against a registry that lives in a file. So the two schemas were never
+likely to differ, and the replication confirms that rather than discovering it. What it does
+settle is the thing a record should not have to assume: that the measurement was not quietly
+dependent on the older schema. One difference is real and is not about the route. `GET /readyz`
+reports `ready: true` on the copy and `false` on the retained spine, because the code expects
+0043 and the spine stops at 0038.
+
+**It is also five utterances twice, not ten.** The same prompts, the same models and the same
+temperature: agreement between two runs of one experiment is not two experiments, and section
+13.9 already says that five is not an evaluation set.
 
 ### 13.6 What three live runs cost to get one right, and the finding in between
 
@@ -1090,8 +1131,9 @@ produced; it is the one-word answer to "measured at what" that is loose. `docs/R
 record is closed and this one is: the fix is forward, in
 `scripts/record_companion_proposals_evidence.py`, which now records
 `head_is_what_ran` and lists anything uncommitted when the gates ran, so the next record cannot
-be vague about it. Nothing in the counts changes: the same tree, once committed, produced the
-same 2550.
+be vague about it. The replication record carries `head_is_what_ran: true` and names the commit
+whose tree its gates actually ran over, which is the fix working rather than the fix promised.
+Nothing in the counts changes: the same tree, once committed, produced the same 2550.
 
 Two failures were caused by this work and both are fixed rather than explained: `POST
 /selection/appearance` had to be added to the route sweep in `tests/test_api.py`, which fails
