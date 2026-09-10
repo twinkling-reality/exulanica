@@ -73,16 +73,22 @@ __all__ = [
 #     superseded build is a different artifact rather than a stale answer.
 # *   The member capture refs, in scene order. This is the one input no digest covers: withdrawing
 #     a member leaves all three receipts byte-identical, and the projection must stop answering.
-# *   The placement's point-map references, in record order, which is how a superseded or
-#     re-pointed point-map artifact row is seen.
+# *   The placement's point-map references, in record order. This one is a self-check rather
+#     than an independent fact: both sides derive from the placement bytes, which the digest
+#     above already pins, so it cannot refuse a projection that binding accepts. It is kept
+#     because it makes the artifact auditable on its own and because the producer checks its
+#     own output against it. What actually sees a superseded, re-pointed or purged point-map
+#     ARTIFACT ROW is `_point_map_references`, which raises before any projection is read.
 # *   That every one of those point maps is present AND reproduces its content digest. A
 #     projection asserts geometry for the members it placed, so the bytes behind those members are
 #     read through the store, which re-hashes them, and dropped. If one is gone or has rotted the
 #     honest answer is the rebuild's, which erases that member's geometry and reports
-#     `alignment-unavailable`. MEASURED 2026-09-10: reading and hashing all 780.3 MB of the
-#     volcanic scene's point maps takes 1.031 s, so this is affordable and is kept. Hashing was
-#     never what made the cold read 48 s; the 19,493,182 point Python walk in `validate_opm` and
-#     the per-member scale fit were, and those are what a projection replaces.
+#     `alignment-unavailable`. MEASURED 2026-09-10: 0.385 s of a 0.889 s cold route body under
+#     cProfile, and 1.031 s standalone for all 780.3 MB when the page cache is cold. Hashing
+#     was never what made the cold read 48 s; the 19,493,182 point Python walk in
+#     `validate_opm` and the per-member scale fit were, and those are what a projection
+#     replaces. Keeping the verification is what lets three existing tests about a rotted
+#     point map go on passing unchanged.
 #
 # ANY of those failing falls back to the rebuild, which is the behaviour this reader had before the
 # projection existed. So does a projection that is absent, purged, flagged for repair, unparseable
@@ -96,10 +102,20 @@ __all__ = [
 # permission or liveness.
 #
 # The bytes are parsed here rather than by calling into `exulanica/ingest/scene_projection.py`,
-# which is the producer. That is the layers contract in `pyproject.toml`, where `graph`, `selection`
-# and `ingest` are siblings and none may import another. `POINT_MAP_KIND` and
-# `GENERATED_SCENE_KIND` are spelled twice for the same reason. A reader parsing the producer's
-# bytes defensively is anyway what this module does everywhere else.
+# which is the producer, because the layers contract in `pyproject.toml` makes `graph`, `selection`
+# and `ingest` siblings and none may import another. `POINT_MAP_KIND` is spelled twice for the same
+# reason, in `exulanica/graph/geometry.py` and in the stage registry, pinned by a test.
+#
+# BUT THAT IS NOT THE ONLY SHAPE AVAILABLE, and the honest note is that it is not the best one.
+# `GENERATED_SCENE_KIND` is spelled ONCE, in `exulanica/reconstruction/generated.py`, and imported
+# by both siblings, because `exulanica.reconstruction` sits BELOW both of them and its forbidden
+# contract bans only evidence, store, db, ingest, identity and selection. `scene_projection.py`
+# imports nothing but the standard library and `exulanica.reconstruction.placement`, so it would be
+# legal there today, unmoved, and this module already imports `validate_placement_record` and
+# `validate_scene_gate_decision` from that layer for the other three scene artifacts. Putting it
+# there would delete this reader's copy of the parser outright. The brief that asked for this work
+# named `exulanica/ingest/scene_projection.py`, so that is where it is; the duplication below is a
+# consequence of that placement rather than of the layering.
 
 #: Spelled here as well as in `exulanica/ingest/scene_projection.py`. A test pins them together.
 SCENE_PROJECTION_KIND: Final = "scene_projection"
@@ -477,9 +493,11 @@ def _scene_row(
         # the life of the process. With them, revoking a projection changes the key and the next
         # read misses and rebuilds. A scene with no projection has an empty tuple here, so this
         # costs a rebuild-derived entry nothing.
-        # Hex rather than raw bytes, like the three receipt digests above it. The memo is asserted
-        # to hold no `bytes` anywhere, which is how it is kept from ever holding a point map.
-        offered = tuple(bytes(item).hex() for item in (row["projection_digests"] or ()))
+        # Hex rather than raw bytes, like the three receipt digests above it: the memo is asserted
+        # to hold no `bytes` anywhere, which is how it is kept from ever holding a point map. And
+        # SORTED, because `array_agg` over an ordered subquery fixes the set but not the array
+        # order, and a key that moved with the planner would miss for no reason.
+        offered = tuple(sorted(bytes(item).hex() for item in (row["projection_digests"] or ())))
         key: _MemoKey = (
             str(workspace),
             str(scene_id),
@@ -500,36 +518,38 @@ def _scene_row(
             # the bytes through the store, which re-hashes them.
             #
             # MEASURED 2026-09-10 on the 210 member volcanic scene: reading and hashing all
-            # 780.3 MB takes 1.031 s, while `json.loads` of the 108 MB pose receipt alone takes
-            # 1.129 s. Hashing was never what made the cold read 48 seconds. `validate_opm`
-            # walking 19,493,182 points in Python and `fit_point_map_scale` running once per
-            # member were, and those are exactly what a projection replaces. So the verification
-            # is kept: it costs about a second of a three second budget, and giving it up would
-            # mean the graph advertising a `/geometry` reference for bytes it never checked.
+            # 780.3 MB is 0.385 s of a 0.889 s cold route body, and `json.loads` of its
+            # 107,742,795 byte pose receipt alone is 1.439 s. Hashing was never what made the
+            # cold read 48 seconds. `validate_opm` walking 19,493,182 points in Python and
+            # `fit_point_map_scale` running once per member were, and those are exactly what a
+            # projection replaces. So the verification is kept: giving it up would buy about
+            # four tenths of a second and would mean the graph advertising a `/geometry`
+            # reference for bytes it never checked.
             #
             # The bytes are read and dropped rather than kept, because the projection path has no
             # use for them. Peak memory here is one point map instead of all of them.
             #
-            # Guarded on there being a candidate at all, so a scene with no projection does not
-            # read every point map here and then read them all again in the rebuild below. A scene
-            # WITH a projection whose bindings fail does pay that double read, which is the right
-            # way round: it is the rare case, and it is the one where being sure is worth a second.
-            projected = None
-            if (
-                row["projection_digests"]
-                and _verifies(store, pose_blob)
-                and _point_maps_verify(store, references)
+            # The bindings are proved FIRST and the bytes verified only afterwards. The two are
+            # independent: `_projected` reads the projection object and the scene row, never a
+            # point map. Verifying first would mean a scene whose projection fails its bindings
+            # read and hashed all 780.3 MB for a verdict that was then thrown away, and the
+            # rebuild read them again. This way a refused projection costs one small object read,
+            # so the module's claim above, that a refused projection is never worse than no
+            # projection, is true rather than nearly true.
+            projected = _projected(
+                store,
+                row["projection_digests"],
+                scene_id=scene_id,
+                pose_digest=pose_digest,
+                placement_digest=placement_digest,
+                gate_digest=_hex(row["gate_sha256"]) or "",
+                member_refs=member_refs,
+                references=references,
+            )
+            if projected is not None and not (
+                _verifies(store, pose_blob) and _point_maps_verify(store, references)
             ):
-                projected = _projected(
-                    store,
-                    row["projection_digests"],
-                    scene_id=scene_id,
-                    pose_digest=pose_digest,
-                    placement_digest=placement_digest,
-                    gate_digest=_hex(row["gate_sha256"]) or "",
-                    member_refs=member_refs,
-                    references=references,
-                )
+                projected = None
             if projected is not None:
                 outcome, cameras = projected
                 _memo_put(key, projected)
@@ -854,8 +874,10 @@ def _projected(
     would reach the fallback handlers in `_scene_row` and report a scene as having an inconsistent
     receipt chain, which would be a false statement about the pose, placement and gate records.
 
-    The candidates arrive newest first. Each is proved independently, so an older one still
-    answering for the current scene state is used when a newer one does not.
+    The candidates are the newest four the lateral found. `array_agg` over an ordered subquery
+    fixes which four, not the order they arrive in, so this makes no assumption about order:
+    each is proved independently and any that passes every binding answers for the same scene
+    state as any other that would.
     """
     for candidate in projection_digests or ():
         try:
@@ -962,11 +984,15 @@ def _read_projection(
         )
         if triple not in bound_triples or raw["scale_status"] != _SCALE_STATUS:
             return None
+        transform = tuple(_number(value) for value in matrix)
+        scale = _number(raw["local_units_to_scene_units"])
+        if not _valid_transform(transform, scale):
+            return None
         placed[str(raw["capture_ref"])] = _PlacedMember(
             point_map_artifact_ref=str(raw["point_map_artifact_ref"]),
             point_map_content_sha256=str(raw["point_map_content_sha256"]),
-            scene_from_opm=tuple(_number(value) for value in matrix),
-            local_units_to_scene_units=_number(raw["local_units_to_scene_units"]),
+            scene_from_opm=transform,
+            local_units_to_scene_units=scale,
             scale_status=str(raw["scale_status"]),
         )
     excluded: dict[str, str] = {}
@@ -1041,6 +1067,35 @@ def _cameras(value: object) -> dict[str, dict[str, object]] | None:
         ]:
             _number(number)
     return value
+
+
+def _valid_transform(matrix: tuple[float, ...], scale: float) -> bool:
+    """Whether a projected transform is one a renderer may be handed.
+
+    The same conditions `_validate_matrix` in `exulanica/reconstruction/placement.py` applies to
+    every placed member of a REBUILT record: affine last row, a positive finite scale, an
+    orthonormal rotation once the scale is divided out, and a proper rotation rather than a
+    reflection. Without them the reader would be less strict than the rebuild about the one value
+    it hands to a renderer, so a projection carrying a negative scale or a mirrored rotation would
+    be drawn where the rebuild refuses the whole record. Spelled here rather than imported because
+    `_validate_matrix` is private to that module and raises where this must return a verdict.
+    """
+    if scale <= 0 or matrix[12:] != (0.0, 0.0, 0.0, 1.0):
+        return False
+    rotation = tuple(
+        tuple(matrix[row * 4 + column] / scale for column in range(3)) for row in range(3)
+    )
+    for left in range(3):
+        for right in range(3):
+            dot = sum(rotation[row][left] * rotation[row][right] for row in range(3))
+            if not math.isclose(dot, 1.0 if left == right else 0.0, rel_tol=1e-6, abs_tol=1e-6):
+                return False
+    determinant = (
+        rotation[0][0] * (rotation[1][1] * rotation[2][2] - rotation[1][2] * rotation[2][1])
+        - rotation[0][1] * (rotation[1][0] * rotation[2][2] - rotation[1][2] * rotation[2][0])
+        + rotation[0][2] * (rotation[1][0] * rotation[2][1] - rotation[1][1] * rotation[2][0])
+    )
+    return math.isclose(determinant, 1.0, rel_tol=1e-6, abs_tol=1e-6)
 
 
 def _number(value: object) -> float:

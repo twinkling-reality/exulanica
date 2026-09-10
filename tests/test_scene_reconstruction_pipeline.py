@@ -971,6 +971,17 @@ def _binary_values(value, path="memo"):
             for name in fields
             for found in _binary_values(getattr(value, name), f"{path}.{name}")
         ]
+    # `dataclasses.fields` BEFORE `__dict__`, and this is the whole difference between a test that
+    # can fail and one that cannot. Every dataclass on this path is `slots=True`, so it has no
+    # `__dict__` and no `_fields`. An earlier version of this walker fell through both and returned
+    # [], which meant it would have passed against the exact regression it names: a memo holding a
+    # `PlacementRecord` whose `PointMapInput.content` carried 780 MB of point maps.
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return [
+            found
+            for field in dataclasses.fields(value)
+            for found in _binary_values(getattr(value, field.name), f"{path}.{field.name}")
+        ]
     contents = getattr(value, "__dict__", None)
     if contents is not None:
         return [
@@ -978,7 +989,9 @@ def _binary_values(value, path="memo"):
             for name, item in contents.items()
             for found in _binary_values(item, f"{path}.{name}")
         ]
-    return []
+    # Never silently. An unrecognised container is a hole in the walk, and a hole is exactly what
+    # made the earlier version unable to fail.
+    raise AssertionError(f"{path} is a {type(value).__name__}, which this walk cannot see into")
 
 
 def _point_map_digests(repository, point_artifacts):
@@ -2024,6 +2037,20 @@ def test_a_projection_placing_a_member_with_no_point_map_is_refused_not_raised(
         pytest.param(
             lambda p: p["placed"][0].__setitem__("local_units_to_scene_units", 10**400),
             id="scale-too-large-for-a-double",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0].__setitem__("local_units_to_scene_units", -1.0),
+            id="negative-scale",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0]["scene_from_opm_row_major"].__setitem__(15, 2.0),
+            id="not-an-affine-transform",
+        ),
+        pytest.param(
+            lambda p: p["placed"][0]["scene_from_opm_row_major"].__setitem__(
+                0, -p["placed"][0]["scene_from_opm_row_major"][0]
+            ),
+            id="reflecting-rotation",
         ),
     ],
 )

@@ -218,11 +218,12 @@ def _manifest_and_digest(data: bytes) -> tuple[Any, Any]:
     The memo below spared the SECOND parse of a pose receipt in a process. This spares most of the
     first, which is what a fresh process and therefore a first visitor pays.
 
-    MEASURED 2026-09-10 on the volcanic scene's 108,267,697 byte receipt: reading it is 0.094 s,
-    re-hashing it inside `store.get` is 0.047 s, and `json.loads` of the whole object is 1.129 s
-    and builds about 258 MB in Python. The manifest is 50,034 bytes of that; the rest is
-    `quality`, which nothing on this path reads. Decoding the object and `raw_decode`-ing only the
-    manifest out of its head is 0.011 s, or a hundredth of the whole parse.
+    MEASURED 2026-09-10 on the volcanic scene's CURRENT pose receipt, 107,742,795 bytes at
+    f44362e2: reading it is 0.018 s, re-hashing it inside `store.get` is 0.045 s, and
+    `json.loads` of the whole object is 1.439 s. The manifest is 44,130 canonical bytes of
+    that, 210 frames; the rest is `quality`, which nothing on this path reads. Decoding the
+    object and `raw_decode`-ing only the manifest out of its head is 0.017 s, eighty times
+    cheaper, and produces a manifest equal to the whole parse's.
 
     Structural rather than a substring search: the head prefix is checked exactly, the manifest is
     decoded as a JSON value from a known offset, and `manifest_digest` is taken from the bytes

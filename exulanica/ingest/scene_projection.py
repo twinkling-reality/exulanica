@@ -2,8 +2,9 @@
 
 A cold ``GET /graph`` used to rebuild the same answer in every fresh process. It re-fetched and
 re-verified every point map, parsed the pose receipt, refitted each member's scale and walked
-every retained point in Python, all to reach a placement outcome and a set of recovered cameras
-the worker had already computed and verified minutes earlier. MEASURED 2026-09-09 and recorded in
+every retained point in Python, all to reach a placement outcome the worker had already
+computed and verified minutes earlier, and a set of recovered cameras that are a pure function
+of a pose receipt which by then could not change. MEASURED 2026-09-09 and recorded in
 ``docs/evaluation/2026-09-09-graph-read-memo.json``: 48 seconds for the 210 member volcanic scene,
 780 MB of point maps and a 108 MB pose receipt, none of it depending on anything mutable. The
 in-process memo added that day fixed the second request and left the first exactly as it was.
@@ -19,9 +20,12 @@ map or a pose receipt, that this projection still answers for the scene in front
 *   ``member_capture_refs`` is the scene's member list, in scene order. It is bound because it is
     the one input to the placement that no digest covers: withdrawing a member leaves all three
     receipts byte-identical, and the projection has to stop answering.
-*   ``point_map_inputs`` is the placement's point-map references, in record order. Bound so that
-    an artifact row superseded, re-pointed or purged under an otherwise unchanged placement is
-    seen as the change it is.
+*   ``point_map_inputs`` is the placement's point-map references, in record order. This one is
+    a self-check rather than an independent fact: a reader derives its side from the placement
+    bytes, which the digest above already pins, so it cannot refuse a projection that digest
+    accepts. It is carried because it makes the artifact auditable on its own and because this
+    module checks its own output against it before publishing. What sees a superseded,
+    re-pointed or purged point-map ARTIFACT ROW is the reader's live query, not this.
 
 WHAT IS DELIBERATELY NOT BOUND. Whether a point map's bytes are still in the store is a live
 fact, not a property of any digest, so presence is checked per request by the reader and is
@@ -44,10 +48,17 @@ reader from recomputing a conclusion those two already stand behind. A reader th
 projection loses time and nothing else, which is why every check below fails closed.
 
 The reader half lives in ``exulanica/graph/reconstruction_scenes.py`` and parses these bytes
-independently rather than calling into this module. That is the layering contract, not an
-oversight: ``graph`` and ``ingest`` are siblings in the ``pyproject.toml`` layers contract and
-neither may import the other. ``POINT_MAP_KIND`` and ``GENERATED_SCENE_KIND`` are spelled twice
-for the same reason, and as with those, a test pins the two spellings together.
+independently rather than calling into this module, because ``graph`` and ``ingest`` are
+siblings in the ``pyproject.toml`` layers contract and neither may import the other.
+``POINT_MAP_KIND`` is spelled twice for the same reason and a test pins those spellings, and a
+test pins these.
+
+That is not the only shape available and it is not the best one. ``GENERATED_SCENE_KIND`` is
+spelled ONCE, in ``exulanica/reconstruction/generated.py``, and imported by both siblings,
+because ``exulanica.reconstruction`` sits below both. This module imports nothing but the
+standard library and ``exulanica.reconstruction.placement``, so it would be legal there today,
+unmoved, and putting it there would delete the reader's copy of the parser outright. The brief
+that asked for this work named this path, so this is where it is.
 """
 
 from __future__ import annotations
@@ -78,8 +89,9 @@ SCENE_PROJECTION_PROFILE: Final = "exulanica.scene-graph-projection/v1"
 SCENE_PROJECTION_ENVELOPE: Final = "exulanica.scene-graph-projection-envelope/v1"
 
 #: Spelled here and again in ``exulanica/graph/reconstruction_scenes.py``, for the same reason
-#: ``POINT_MAP_KIND`` is spelled twice: the layers contract forbids ``graph`` and ``ingest`` from
-#: importing each other, and a test pins the two spellings together.
+#: ``POINT_MAP_KIND`` is spelled twice: the layers contract forbids ``graph`` and ``ingest``
+#: from importing each other, and a test pins the two spellings together.
+#:
 #: The stage itself is declared in ``exulanica/ingest/stages/__init__.py`` with every other
 #: stage, so ``pipeline_digest`` covers it and ``stage_definition`` records it. A test pins that
 #: entry's ``output_kind`` to the constant above.
@@ -183,8 +195,15 @@ def build_scene_projection(
     """Project one published scene into the bytes a graph reader can serve without rebuilding.
 
     ``placement`` must already have been validated against ``pose_receipt`` and the point maps.
-    This function derives nothing and checks nothing about the geometry itself: it is a
-    transcription, and transcribing an unvalidated record would be laundering it.
+    The placement half of the payload is a transcription and nothing more; transcribing an
+    unvalidated record would be laundering it.
+
+    The cameras are NOT a transcription. ``recovered_camera_records`` parses the whole pose
+    receipt and derives each 4x4 from a quaternion and a translation, and before this stage
+    existed no ingest path called it at all: its only callers were in ``exulanica.graph``. So
+    this is the first time the worker computes them, which is why the caller treats a raise
+    here as a refusal of the projection alone rather than as a disagreement between records it
+    has already checked.
     """
     _require_digest(pose_receipt_sha256, "pose receipt digest")
     _require_digest(placement_receipt_sha256, "placement receipt digest")
