@@ -5,7 +5,11 @@ import {
   WORLD_STYLE_RECIPES,
   worldStyleRecipe,
 } from '@exulanica/presentation';
-import { CompanionProposalClient } from '../src/companion-ask-api.js';
+import {
+  CompanionProposalClient,
+  PROPOSAL_OUTCOMES,
+  REFUSAL_CODES,
+} from '../src/companion-ask-api.js';
 import { mountAppearance } from '../src/composition/appearance.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { DEFAULT_PREFERENCES } from '../src/preferences.js';
@@ -296,6 +300,13 @@ async function harness(over: { previewStatus?: number; previewBody?: unknown } =
           preview_id: 'preview-1',
           proposal_id: String(body['proposalId']),
           candidate: version('candidate-1', 0, 0.8, {
+            // Echoed from the body. A candidate that ignored what was posted made every
+            // assertion about what reached the panel an assertion about this fixture.
+            global_style: {
+              profile_id: PROFILE.profileId,
+              profile_version: PROFILE.profileVersion,
+              parameters: (body['profile'] as Record<string, unknown>)['parameters'],
+            },
             model_id: body['modelId'],
             prompt_version: body['promptVersion'],
             reference_ids: body['referenceIds'],
@@ -328,9 +339,17 @@ async function harness(over: { previewStatus?: number; previewBody?: unknown } =
     ids: () => 'proposal-1',
   });
   const connection = await client.connect();
+  const binding = {
+    discardArtProfilePreview: vi.fn(),
+    previewArtProfile: vi.fn(() => ({ sessionId: 'preview-session', validation: { ok: true } })),
+    setArtProfile: vi.fn(),
+    setFieldOfView: vi.fn(),
+    setSensitivityMultiplier: vi.fn(),
+    setTheme: vi.fn(),
+  };
   const state = {
     preferences: DEFAULT_PREFERENCES,
-    atlas: null,
+    atlas: { binding },
     worldStyles: client,
     worldStyleConnection: connection,
     worldStyleFailure: null,
@@ -494,16 +513,107 @@ describe('a Companion proposal through the appearance surface', () => {
   });
 
   it('says nothing on the channel about a Settings change, which nobody is waiting to hear', async () => {
-    const { outcomes, mounted } = await harness();
+    const { bodies, outcomes, mounted } = await harness();
 
     const softness = mounted.options.root.querySelector<HTMLInputElement>(
       '[aria-label="Horizon softness"]',
     )!;
     softness.value = '0.6';
     softness.dispatchEvent(new Event('input', { bubbles: true }));
+    // Waited for the SETTINGS PREVIEW to exist, not for a fixed number of microtasks. The panel
+    // debounces its server preview by 220 ms, so an assertion taken before that fired proved
+    // only that nothing had happened yet, which would have been true of a broken channel too.
+    await vi.waitFor(() => {
+      expect(bodies.some((body) => body['origin'] === 'settings')).toBe(true);
+    }, { timeout: 2000 });
     await settle();
 
     expect(outcomes).toEqual([]);
+  });
+
+  it('says a staged proposal was discarded when a Settings change replaces it', async () => {
+    const { bodies, outcomes, mounted } = await harness();
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed']);
+
+    const vitality = mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Color vitality"]',
+    )!;
+    vitality.value = '0.3';
+    vitality.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(bodies.some((body) => body['origin'] === 'settings')).toBe(true);
+    }, { timeout: 2000 });
+    await settle();
+
+    // The proposal is gone and the Companion is told, so its memory does not hold a proposal
+    // with no outcome for ever.
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['previewed', 'discarded']);
+    expect(outcomes.at(-1)).toMatchObject({ originReference: 'companion-utterance:0f2c' });
+  });
+
+  it('stages every control a proposal moves, not just the first', async () => {
+    // The panel re-renders on each reported change and rewrites every style input from its own
+    // draft, so writing all the values and dispatching afterwards staged exactly one control and
+    // silently dropped the rest. The live run proposed five at once.
+    const { bodies, mounted } = await harness();
+    worldStyleProposalInbox.submit({
+      ...COMPANION,
+      profile: {
+        ...PROFILE,
+        parameters: {
+          ...PARAMETERS,
+          'horizon-softness': 0.8,
+          vitality: 0.3,
+          glass: 0.4,
+        },
+      },
+    });
+    await settle();
+
+    expect(bodies).toHaveLength(1);
+    const value = (label: string): string =>
+      mounted.options.root.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!.value;
+    expect(value('Horizon softness')).toBe('0.8');
+    expect(value('Color vitality')).toBe('0.3');
+    expect(value('Veil clarity')).toBe('0.4');
+    const apply = mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!;
+    expect(apply.disabled).toBe(false);
+  });
+
+  it('refuses rather than applying a value the control would silently rewrite', async () => {
+    /*
+     * A real range input rounds its value to the declared step: 0.51 on a step of 0.05 becomes
+     * 0.50, and the person would apply a value the authority never validated. happy-dom clamps
+     * to min and max but does NOT snap to step, so the DOM behaviour this guards against cannot
+     * be produced here. The guard's own logic is what is tested: a control that reports back
+     * something other than what it was given refuses the staging rather than proceeding.
+     *
+     * The other half of the pair is enforced where it can be: the drafter's generated schema
+     * carries each control's step, so an off-step value cannot be proposed at all. That is
+     * asserted in tests/test_selection_proposal.py.
+     */
+    const { outcomes, mounted } = await harness();
+    const softness = mounted.options.root.querySelector<HTMLInputElement>(
+      '[aria-label="Horizon softness"]',
+    )!;
+    Object.defineProperty(softness, 'value', {
+      configurable: true,
+      get: () => '0.5',
+      set: () => undefined,
+    });
+
+    worldStyleProposalInbox.submit(COMPANION);
+    await settle();
+
+    // No 'previewed' at all: the reviewed preview is discarded before anybody is told there is
+    // something to confirm, so the Companion never says "nothing has changed yet" about a
+    // change the panel could not show.
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['refused']);
+    expect(outcomes.at(-1)?.detail).toContain('cannot be shown on this panel');
+    const apply = mounted.options.root.querySelector<HTMLButtonElement>('.world-style-apply')!;
+    expect(apply.disabled).toBe(true);
   });
 });
 
@@ -511,19 +621,20 @@ describe('a Companion proposal through the appearance surface', () => {
 
 describe('the words a refusal is said in', () => {
   it('has a reviewed sentence for every refusal code the client can produce', () => {
-    const codes = [
-      'not_in_catalogue',
-      'unregistered',
-      'out_of_range',
-      'no_change',
-      'unsupported_reference',
-      'not_drafted',
-      'no_world',
-    ];
-    for (const code of codes) {
+    // The CLIENT's own list, not a copy of it. Enumerating a copy passed while a code added to
+    // the client reached a person as a raw key, which is what an unmapped key renders as.
+    expect(REFUSAL_CODES.length).toBeGreaterThan(0);
+    for (const code of REFUSAL_CODES) {
       const sentence = say(`proposal.refused.${code}`);
       expect(sentence, code).not.toBe(`proposal.refused.${code}`);
       expect(sentence.endsWith('.'), code).toBe(true);
+    }
+  });
+
+  it('has a reviewed sentence for every outcome a staged proposal can reach', () => {
+    for (const kind of PROPOSAL_OUTCOMES) {
+      const sentence = say(`proposal.outcome.${kind}`);
+      expect(sentence, kind).not.toBe(`proposal.outcome.${kind}`);
     }
   });
 

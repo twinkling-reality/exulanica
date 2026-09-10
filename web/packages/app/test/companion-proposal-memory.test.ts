@@ -61,12 +61,21 @@ const ANSWER: CompanionAnswer = {
 };
 
 const DRAFTER = 'Qwen/Qwen3-235B-A22B-Instruct-2507';
+/**
+ * A DIFFERENT identifier for the call that classified.
+ *
+ * Both calls take the same role and normally the same model, so a fixture that gave them one
+ * identifier could not tell "name the drafter" from "name the classifier": inverting the code
+ * under test left every assertion green. They differ here so the assertion means something. A
+ * chain whose primary was withdrawn serves exactly this shape.
+ */
+const CLASSIFIER = 'deepseek-ai/DeepSeek-V4-Flash-0731';
 
-const call = (latency: number) => ({
+const call = (latency: number, servedModel: string = DRAFTER) => ({
   role: 'structured_extraction',
   requestedModel: DRAFTER,
-  servedModel: DRAFTER,
-  usedFallback: false,
+  servedModel,
+  usedFallback: servedModel !== DRAFTER,
   attempts: 1,
   latencyMs: latency,
   promptTokens: 900,
@@ -90,7 +99,7 @@ const PROPOSAL: CompanionProposal = {
   },
   refusal: null,
   promptVersion: 'proposal-1',
-  calls: [call(1200), call(2300)],
+  calls: [call(1200, CLASSIFIER), call(2300, DRAFTER)],
 };
 
 const REFUSED: CompanionProposal = {
@@ -99,7 +108,7 @@ const REFUSED: CompanionProposal = {
   proposal: null,
   refusal: { code: 'not_in_catalogue', detail: 'a different typeface for the menus' },
   promptVersion: 'proposal-1',
-  calls: [call(1100), call(1900)],
+  calls: [call(1100, CLASSIFIER), call(1900, DRAFTER)],
 };
 
 const QUESTION: CompanionProposal = {
@@ -233,9 +242,15 @@ describe('a sentence that turns out to be a request to change the world', () => 
     const spoken = mounted.panel.root.textContent ?? '';
     expect(spoken).toContain(PROPOSAL.proposal!.spoken);
     expect(spoken).toContain('Nothing has changed yet');
-    // The model that drew it, out of the response body rather than off any manifest.
+    // The model that drew it, out of the response body rather than off any manifest, and a
+    // provenance line that says a change was DRAWN rather than that a question was answered.
+    // The DRAFTER, which is the last call, not the classifier that ran first. The two carry
+    // different identifiers in this fixture precisely so that distinction can fail.
     expect(mounted.controller.answer()?.provenance.servedModel).toBe(DRAFTER);
+    expect(mounted.controller.answer()?.provenance.plannedBy).toBe(CLASSIFIER);
+    expect(mounted.controller.answer()?.provenance.composed).toBe('proposed');
     expect(mounted.controller.answer()?.promptVersion).toBe('proposal-1');
+    expect(spoken).toContain('Nothing is applied until you apply it.');
   });
 
   it('keeps the proposal through the write-back that already existed', async () => {
@@ -315,6 +330,58 @@ describe('a sentence that turns out to be a request to change the world', () => 
     expect(remembered).toHaveLength(1);
   });
 
+  it('keeps a retried Apply, because a refused one was not the end of the proposal', async () => {
+    // `applyActive` rethrows without clearing the active preview and the panel re-enables
+    // Apply, so a refusal is not terminal. Forgetting the utterance on the first non-preview
+    // outcome meant a person who pressed Apply again got an acceptance the Companion could not
+    // attach to anything, and its memory kept only the failure.
+    const { mounted, remembered, received } = harness([PROPOSAL]);
+    mounted.summon();
+    mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+    const originReference = (received[0] as { readonly originReference: string }).originReference;
+
+    worldStyleProposalOutcomes.report({
+      originReference, kind: 'refused', detail: 'The world changed elsewhere.',
+    });
+    await settle();
+    worldStyleProposalOutcomes.report({
+      originReference, kind: 'accepted', detail: 'Applied as revision 2.',
+    });
+    await settle();
+
+    expect(remembered).toHaveLength(3);
+    expect(remembered[1]?.text).toContain(say('proposal.outcome.refused'));
+    expect(remembered[2]?.text).toContain(say('proposal.outcome.accepted'));
+  });
+
+  it('does not record one outcome once per remount', async () => {
+    // `mountCompanion` runs again on every graph mount and the root's teardown only disposes the
+    // stage, so each mount used to add another listener to a module singleton: three remounts
+    // wrote three identical rows for one accepted proposal.
+    const first = harness([PROPOSAL]);
+    first.mounted.summon();
+    first.mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+    const originReference =
+      (first.received[0] as { readonly originReference: string }).originReference;
+
+    const second = harness([PROPOSAL]);
+    second.mounted.summon();
+    second.mounted.controller.say(PROPOSAL.utterance);
+    await settle();
+
+    worldStyleProposalOutcomes.report({
+      originReference, kind: 'accepted', detail: 'Applied as revision 1.',
+    });
+    await settle();
+
+    // The first mount's listener is gone, so its utterance map is unreachable and nothing is
+    // written for it. What matters is that no row is written TWICE.
+    expect(first.remembered.filter((a) => a.promptVersion === 'proposal-outcome')).toHaveLength(0);
+    expect(second.remembered.filter((a) => a.promptVersion === 'proposal-outcome')).toHaveLength(0);
+  });
+
   it('ignores an outcome for a proposal this Companion never made', async () => {
     const { mounted, remembered } = harness([PROPOSAL]);
     mounted.summon();
@@ -374,14 +441,19 @@ describe('a request the reviewed design cannot express', () => {
     expect(asked).toEqual([]);
   });
 
-  it('does not attribute a reviewed sentence to the model that did not write it', async () => {
+  it('does not describe a refusal as an answer the evidence did not support', async () => {
     const { mounted } = harness([REFUSED]);
     mounted.summon();
 
     mounted.controller.say(REFUSED.utterance);
     await settle();
 
-    expect(mounted.controller.answer()?.provenance.composed).toBe('discarded');
+    // Not 'discarded', whose sentence says "what it wrote was not supported by the evidence".
+    // No evidence was read and no search was run, and saying so would be false.
+    expect(mounted.controller.answer()?.provenance.composed).toBe('refused');
+    const spoken = mounted.panel.root.textContent ?? '';
+    expect(spoken).not.toContain('not supported by the evidence');
+    expect(spoken).toContain('The reviewed design has no way to make that change.');
   });
 
   it('keeps the refusal, so the Companion does not offer the same impossible thing twice', async () => {

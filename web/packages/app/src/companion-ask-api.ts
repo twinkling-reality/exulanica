@@ -114,6 +114,21 @@ export type Composed =
   | 'search'
   /** A model was asked and could not turn the question into a search. Nothing was looked at. */
   | 'unreadable'
+  /**
+   * A model DREW A CHANGE to the world, and nothing has been applied.
+   *
+   * Not `model`. "Answered by" is a sentence about an answer, and this is a proposal: no
+   * question was asked, no evidence was read, and the thing on the screen is waiting for a
+   * decision rather than reporting one.
+   */
+  | 'proposed'
+  /**
+   * A model read a request to change the world and the reviewed design could not express it.
+   *
+   * Not `discarded`. That one says "what it wrote was not supported by the evidence", and there
+   * was no evidence and no search: what happened is that the catalogue has no such control.
+   */
+  | 'refused'
   | 'none';
 
 export interface AnswerProvenance {
@@ -499,7 +514,13 @@ export type ProposalRefusalCode =
   | 'not_drafted'
   | 'no_world';
 
-const REFUSAL_CODES: readonly string[] = [
+/**
+ * Every code this client will pass through, exported so a test can walk the real list.
+ *
+ * A test that enumerated its own copy of these would pass while a code added here reached a
+ * person as a raw copy key, which is exactly what an unmapped key renders as.
+ */
+export const REFUSAL_CODES: readonly ProposalRefusalCode[] = [
   'not_in_catalogue',
   'unregistered',
   'out_of_range',
@@ -507,6 +528,14 @@ const REFUSAL_CODES: readonly string[] = [
   'unsupported_reference',
   'not_drafted',
   'no_world',
+];
+
+/** Every kind of outcome a staged proposal can reach, for the same reason. */
+export const PROPOSAL_OUTCOMES: readonly string[] = [
+  'previewed',
+  'accepted',
+  'discarded',
+  'refused',
 ];
 
 /** The complete reference a preview would be created from, plus what actually moved. */
@@ -640,15 +669,18 @@ export class CompanionProposalClient {
         refusal === null || refusal === undefined
           ? null
           : {
-              code: (REFUSAL_CODES.includes(refusal.code)
-                ? refusal.code
-                : 'not_drafted') as ProposalRefusalCode,
+              code: knownRefusal(refusal.code),
               detail: refusal.detail,
             },
       promptVersion,
       calls,
     };
   }
+}
+
+/** A code this build has words for, or the most general true thing it can say instead. */
+function knownRefusal(code: string): ProposalRefusalCode {
+  return REFUSAL_CODES.find((known) => known === code) ?? 'not_drafted';
 }
 
 function asQuestion(utterance: string): CompanionProposal {

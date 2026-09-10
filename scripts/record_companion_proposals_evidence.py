@@ -47,6 +47,31 @@ from exulanica.canonical import canonical_json  # noqa: E402
 DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
 
 
+#: Style parameter values are decimals with a declared step of 0.05 or 0.1, so a thousandth is an
+#: exact integer for every value the registry can hold. `canonical_json` refuses a float outright:
+#: "floats may never enter a digest input", because a float rewrites its own last digits on a JSON
+#: round trip and a digest over one stops reproducing. The raw measurement keeps its decimals and
+#: is bound by sha256 as bytes; what the record RESTATES is quantised.
+MILLI = 1000
+
+
+def quantise(value):
+    """Every float in a nested structure, as an integer of thousandths. Ints and strings pass."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        scaled = value * MILLI
+        rounded = round(scaled)
+        if abs(scaled - rounded) > 1e-9:
+            raise SystemExit(f"{value!r} is not a whole thousandth; the record cannot state it")
+        return rounded
+    if isinstance(value, dict):
+        return {key: quantise(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [quantise(item) for item in value]
+    return value
+
+
 def file_record(path: Path) -> dict:
     return {
         "path": path.relative_to(ROOT).as_posix(),
@@ -109,8 +134,13 @@ def main() -> int:
             (row for row in reversed(log.splitlines()) if " passed" in row or " failed" in row),
             "",
         )
-        found = dict(re.findall(r"(\d+) (passed|failed|skipped|error|errors|warnings)", line))
-        return {key: int(value) for value, key in ((v, k) for k, v in found.items())}
+        counts = {
+            word: int(number)
+            for number, word in re.findall(
+                r"(\d+) (passed|failed|skipped|error|errors|warnings)", line
+            )
+        }
+        return {"summary_line": line.strip(), **counts}
 
     focused = run(
         "focused-backend",
@@ -179,7 +209,39 @@ def main() -> int:
             ),
         },
         "corpus_class": "retained reference, CC0",
-        "live_measurement": measurement,
+        "the_defect_the_first_live_run_found": {
+            "what": (
+                "The drafter proposed 0.51 for 'a bit softer' on a control whose declared step "
+                "is 0.05. A range input snaps its value to that step, so the panel that shows a "
+                "proposal would have applied 0.50: a value the authority never validated."
+            ),
+            "first_attempt_at_a_fix": (
+                "Constraining the drafting schema with `multipleOf`. Measured and REJECTED: the "
+                "endpoint does not enforce it, so the local validator refused the reply instead "
+                "and two of the five utterances came back `not_drafted` for asking to move a "
+                "control by an amount the model had no way to know was illegal. The registry "
+                "does not respect that grid either: this control ships a default of 0.46."
+            ),
+            "what_ships": (
+                "The value is expressed at the control's own resolution before it becomes a "
+                "proposal, and a control restated at the world's current value is compared at "
+                "that same resolution so it still reads as no change. A value outside the "
+                "declared RANGE is still refused rather than brought to the bound."
+            ),
+            "artifacts": [
+                "measurement-first-run-measurement.json: the run that found it",
+                "measurement-step-constrained-measurement.json: the rejected fix, measured",
+                "measurement-measurement.json: what ships",
+            ],
+        },
+        "live_measurement": {
+            "units": (
+                "Every style parameter value in this record is an integer of THOUSANDTHS: 820 is "
+                "0.82. The raw decimals are in the bound measurement artifact; a digest input "
+                "may not contain a float."
+            ),
+            **quantise(measurement),
+        },
         "browser_check": {
             "what_ran": (
                 "The product, in a browser, against a throwaway schema at HEAD with six observed "
@@ -200,12 +262,12 @@ def main() -> int:
                 "look at it, then Apply it or throw it away."
             ),
             "provenance_line_shown": "Answered by Qwen/Qwen3-235B-A22B-Instruct-2507 in 2.4 s.",
-            "http_lifecycle": lifecycle,
-            "after_browser_reload": after_reload,
+            "http_lifecycle": quantise(lifecycle),
+            "after_browser_reload": quantise(after_reload),
         },
         "counts": {
-            "backend_tests_added": 66,
-            "web_tests_added": 29,
+            "backend_tests_added": 61,
+            "web_tests_added": 35,
             "focused_backend": tally(focused),
             "backend_suite": tally(suite),
             "web_vitest_tail": scrub(vitest).strip().splitlines()[-6:],

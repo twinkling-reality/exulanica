@@ -25,6 +25,7 @@ from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.repository import IngestRepository
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.transport import HttpResponse
@@ -56,6 +57,8 @@ class ProposalApi:
     transport: FakeTransport
     actor: uuid.UUID
     source_ids: tuple[str, ...]
+    #: A source slot that exists, in a workspace this session is not in.
+    stranger_source_id: str
 
     @property
     def headers(self) -> dict[str, str]:
@@ -174,6 +177,34 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
     from tests_support_api import scratch_database
 
     database = scratch_database(scratch)
+    # The stranger's own world, with its own evidence-bound slot. A test that named an id
+    # belonging to nobody would prove the enum holds; this proves the catalogue is scoped.
+    stranger_source = uuid.uuid4()
+    with database.session(stranger) as connection:
+        stranger_repository = IngestRepository(connection, stranger)
+        stranger_outcome = PhotoIngestPipeline(
+            stranger_repository, store, vision=None
+        ).ingest_file(write_photo(photo_dir, "stranger-source.jpg", size=(200, 120)))
+        assert stranger_outcome.error is None, stranger_outcome.error
+        stranger_span = connection.execute(
+            "select span_id from evidence_span where workspace_id=%s order by span_id limit 1",
+            (stranger,),
+        ).fetchone()["span_id"]
+        WorldStyleRepository(connection, stranger).register_topology(
+            TopologyContract(
+                "stranger-topology",
+                ("region-a",),
+                (
+                    TopologySourceSlot(
+                        source_id=stranger_source,
+                        slot_key="slot-stranger",
+                        region_id="region-a",
+                        evidence_span_id=stranger_span,
+                        missing_reason=None,
+                    ),
+                ),
+            )
+        )
     transport = FakeTransport()
     services = Services(
         database=database,
@@ -188,7 +219,13 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
         ),
     )
     with TestClient(create_app(services, verify=False)) as client:
-        yield ProposalApi(client, transport, actor, tuple(str(value) for value in source_ids))
+        yield ProposalApi(
+            client,
+            transport,
+            actor,
+            tuple(str(value) for value in source_ids),
+            str(stranger_source),
+        )
 
 
 # -- the proposal route -----------------------------------------------------------------------
@@ -285,6 +322,75 @@ def test_a_value_outside_the_declared_range_never_comes_back_as_a_clamped_propos
     assert "1.0" not in response.text
 
 
+def test_a_value_the_schema_admits_and_the_registry_does_not_comes_back_as_out_of_range(
+    proposal_api,
+):
+    """The refusal code that says a VALUE was wrong, produced through the real route.
+
+    The drafting schema and the registry agree today, so the only way to reach the registry's
+    own refusal is to make them disagree, which is what a narrowed registry does. It is narrowed
+    in the running app rather than on disk: `propose_appearance` reads the registry it is given
+    and the route passes the module default, so this rebinds that one name for the request and
+    restores it afterwards. No file moves and the function under test is the shipped one.
+    """
+    import json as _json
+    import pathlib as _pathlib
+
+    from exulanica.world.registry import StyleRegistry
+
+    document = _json.loads(
+        _pathlib.Path("exulanica/world/style-registry.v1.json").read_text(encoding="utf-8")
+    )
+    for profile in document["profiles"]:
+        for control in profile.get("controls", []):
+            if control["key"] == "horizon-softness":
+                control["max"] = 0.5
+    for capability in document["capabilities"]:
+        if capability["capability"] == "atmosphere.softness":
+            capability["max"] = 0.5
+    narrowed = StyleRegistry(document)
+
+    proposal_api.script(reply({"kind": "appearance"}), reply(proposal_api.draft()))
+    with _narrowed_registry(narrowed):
+        body = proposal_api.utter("as soft as it goes").json()
+
+    assert body["proposal"] is None
+    assert body["refusal"]["code"] == "out_of_range"
+    assert "horizon-softness" in body["refusal"]["detail"]
+
+
+def _narrowed_registry(registry):
+    """Narrow the registry the VALIDATOR uses, leaving the one the schema is built from alone.
+
+    Both halves normally read the same registry, so narrowing it narrows the schema too and the
+    endpoint refuses the value before the registry ever sees it, which is `not_drafted` and a
+    different guarantee. What has to be exercised here is the authority's own answer about a
+    value, so only `_validate_draft` is bound: the drafter is still offered the wide bound, and
+    what refuses the reply is the registry.
+    """
+    import contextlib
+    import functools
+
+    from exulanica.selection import proposal as module
+
+    @contextlib.contextmanager
+    def bound():
+        original = module._validate_draft
+        module._validate_draft = functools.partial(_forced, original, registry)
+        try:
+            yield
+        finally:
+            module._validate_draft = original
+
+    return bound()
+
+
+def _forced(original, narrowed, draft, current, catalogue, *, registry=None):
+    """Ignore the registry the caller passed and use the narrowed one."""
+    del registry
+    return original(draft, current, catalogue, registry=narrowed)
+
+
 def test_an_unregistered_control_is_refused_rather_than_dropped_from_the_proposal(proposal_api):
     """`contour-density` belongs to the experimental profile. Naming it here is a refusal.
 
@@ -303,13 +409,30 @@ def test_an_unregistered_control_is_refused_rather_than_dropped_from_the_proposa
 def test_evidence_from_another_workspace_is_not_in_the_catalogue_and_cannot_be_named(
     proposal_api,
 ):
-    draft = proposal_api.draft(references=[str(uuid.uuid4())])
-    proposal_api.script(reply({"kind": "appearance"}), reply(draft), reply(draft))
+    """A real id, belonging to a real slot, in somebody else's workspace.
 
+    An id belonging to no workspace at all would prove only that the enum holds. What has to be
+    true is that the catalogue is scoped: this session cannot name another workspace's evidence
+    even when that evidence exists and its id is known.
+    """
+    stranger_source = proposal_api.stranger_source_id
+    assert stranger_source not in proposal_api.source_ids
+
+    draft = proposal_api.draft(references=[stranger_source])
+    proposal_api.script(reply({"kind": "appearance"}), reply(draft), reply(draft))
     body = proposal_api.utter("softer horizon").json()
 
     assert body["proposal"] is None
     assert body["refusal"]["code"] == "not_drafted"
+
+    # And the drafter was never SHOWN it, which is the half a refusal cannot establish. The
+    # first drafting request is the one that carries the catalogue; the repair after it quotes
+    # the value the schema refused, so the id appears there by construction.
+    drafting = proposal_api.transport.requests[1]["payload"]
+    sent = json.dumps(drafting)
+    assert stranger_source not in sent
+    for known in proposal_api.source_ids:
+        assert known in sent
 
 
 def test_the_route_needs_a_bearer_token_like_every_other(proposal_api):

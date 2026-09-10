@@ -52,9 +52,23 @@ from exulanica.world import WorldStyleRepository as Styles
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
 from model_fakes import FakeTransport, chat_body
 
-#: The extraction chain's primary, read from the manifest rather than repeated as a literal, on
-#: the same argument `test_selection_answer.py` makes: a manifest change must move these tests.
-DRAFTER = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+
+def _structured_extraction() -> tuple[str, str]:
+    """The extraction chain, from the manifest. Read rather than repeated as a literal.
+
+    The same argument `test_selection_answer.py` makes for the composer chain: a manifest change
+    must move these tests rather than leave them asserting a model nothing routes to. An earlier
+    version of this file said exactly that in a comment and then wrote the identifier out by
+    hand eleven times, which is the failure the comment describes.
+    """
+    from exulanica.models.manifest import load_manifest
+
+    role = load_manifest().roles["structured_extraction"]
+    assert role.fallback is not None, "this role's fallback is what the failover cases drive"
+    return role.primary.model_id, role.fallback.model_id
+
+
+DRAFTER, DRAFTER_FALLBACK = _structured_extraction()
 
 PROFILE = _proposable_profiles(STYLE_REGISTRY)[0]
 PROFILE_KEY = f"{PROFILE.profile_id}@{PROFILE.profile_version}"
@@ -659,3 +673,202 @@ def _seed_world(repository, tmp_path, photo_dir, *, slots: int = 3) -> tuple[uui
         )
     )
     return tuple(spans)
+
+
+# -- what the review found, and what now fails when it comes back -----------------------------
+
+
+def test_a_world_on_another_profile_does_not_make_every_request_fail_forever():
+    """The merge is bounded by the DRAFTED profile, not by whatever the world is on now.
+
+    Reachable today: `POST /world/styles/previews` gates on `validate_reference`, which admits an
+    experimental profile, so a workspace's current global style can be `survey-relief@1` while
+    the only profile a NEW proposal may name is `origin-landscape@1`. Copying the current
+    profile's keys into a reference for the drafted one made `validate_reference` refuse the lot
+    as unknown parameters, which was reported as a range failure: every appearance request on
+    that workspace refused forever, and the person told a value was out of range when none was.
+    """
+    elsewhere = STYLE_REGISTRY.validate_reference(StyleReference("survey-relief", 1, {}))
+    outcome = validated(draft(), current=elsewhere)
+
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.changed == ("horizon-softness",)
+    assert set(outcome.profile.parameters) == set(PROFILE.controls)
+    assert "contour-density" not in outcome.profile.parameters
+
+
+def test_a_stray_key_on_the_current_style_is_dropped_rather_than_turned_into_a_refusal():
+    """The world's current style is data, and a proposal is not the place to litigate it.
+
+    A parameter the profile no longer declares can sit on an immutable historical row, and
+    `resolve_reference` exists precisely so such a row still renders. Carrying it into a NEW
+    proposal made `validate_reference` refuse the whole thing; dropping it proposes what was
+    asked for and leaves the historical row alone.
+
+    This is also why the UNREGISTERED arm of the InvalidStyleData mapping below is now
+    unreachable from here: the merge is filtered and every changed key was already checked
+    against `profile.controls`. It is kept as a floor rather than removed, and this test is what
+    says the floor is not the thing doing the work.
+    """
+    outcome = _validate_draft(
+        draft(),
+        StyleReference(PROFILE.profile_id, PROFILE.profile_version, {"invented-control": 1}),
+        catalogue(),
+        registry=STYLE_REGISTRY,
+    )
+
+    assert isinstance(outcome, AppearanceProposal)
+    assert "invented-control" not in outcome.profile.parameters
+    assert outcome.changed == ("horizon-softness",)
+
+
+def test_a_module_whose_only_control_was_restated_is_not_named_as_touched():
+    """`modules` and `changed` may not contradict each other.
+
+    The draft names two modules and moves one control belonging to each, but restates the tempo
+    at the value the world already has. One control moved, so one module was touched.
+    """
+    outcome = validated(
+        draft(
+            modules=["aeroheart-optics-v1", "bounded-tempo-v1"],
+            parameters={"world_tempo": current_reference().parameters["world-tempo"]},
+        )
+    )
+
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.changed == ("horizon-softness",)
+    assert outcome.modules == ("aeroheart-optics-v1",)
+
+
+def test_a_control_restated_beside_one_that_moved_is_left_out_of_what_changed():
+    outcome = validated(
+        draft(parameters={"vitality": current_reference().parameters["vitality"]})
+    )
+
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.changed == ("horizon-softness",)
+    assert outcome.profile.parameters["vitality"] == current_reference().parameters["vitality"]
+
+
+def test_a_value_is_expressed_at_the_resolution_its_control_actually_has():
+    """0.51 on a control whose step is 0.05 is not a value that control can hold.
+
+    Not the clamp this module refuses to do: a request outside the declared RANGE is refused,
+    because answering it with the bound would put a change nobody asked for in front of somebody.
+    Rounding to the control's own grid invents nothing, and the panel that shows a proposal is a
+    slider with that step, so an off-grid number changes when the person looks at it.
+
+    Measured against the live endpoint: the drafter proposed 0.51 for "a bit softer" twice, and
+    an earlier attempt at this constrained the SCHEMA instead, which turned two ordinary
+    requests into `not_drafted` refusals. The registry does not respect that grid either: this
+    control's own shipped default is 0.46.
+    """
+    outcome = validated(draft(parameters={"horizon_softness": 0.51}))
+
+    assert isinstance(outcome, AppearanceProposal)
+    assert outcome.profile.parameters["horizon-softness"] == 0.5
+    assert outcome.changed == ("horizon-softness",)
+
+
+def test_a_value_outside_the_range_is_still_refused_rather_than_brought_to_the_bound():
+    """The line between the two, asserted side by side so neither can drift into the other."""
+    outcome = validated(draft(parameters={"horizon_softness": 1.4}))
+
+    assert isinstance(outcome, ProposalRefusal)
+    assert outcome.code is RefusalCode.OUT_OF_RANGE
+    assert "1.0" not in outcome.detail
+
+
+def test_a_value_that_rounds_onto_the_world_as_it_is_changes_nothing():
+    """0.44 on a world at 0.45 is the same world, and a proposal that says otherwise is noise."""
+    world = STYLE_REGISTRY.validate_reference(
+        StyleReference(PROFILE.profile_id, PROFILE.profile_version, {"horizon-softness": 0.45})
+    )
+    outcome = validated(draft(parameters={"horizon_softness": 0.44}), current=world)
+
+    assert isinstance(outcome, ProposalRefusal)
+    assert outcome.code is RefusalCode.NO_CHANGE
+
+
+def test_the_schema_states_the_bounds_and_not_the_grid():
+    """Measured: `multipleOf` is not enforced by the endpoint, so it only refused good drafts."""
+    schema = strict_json_schema(_draft_model(_proposable_profiles(STYLE_REGISTRY), catalogue()))
+    controls = schema["$defs"]["AppearanceParameters"]["properties"]
+    for key, definition in PROFILE.controls.items():
+        if definition.kind != "range":
+            continue
+        bound = controls[key.replace("-", "_")]["anyOf"][0]
+        assert (bound["minimum"], bound["maximum"]) == (definition.minimum, definition.maximum)
+        assert "multipleOf" not in bound
+
+
+def test_the_module_lookup_uses_the_registry_it_was_given():
+    """A narrowed registry must narrow the answer, or the injection point is decoration."""
+    document = json.loads(
+        (
+            __import__("pathlib").Path("exulanica/world/style-registry.v1.json")
+        ).read_text(encoding="utf-8")
+    )
+    for profile in document["profiles"]:
+        if profile["profile_id"] == "origin-landscape":
+            profile["recipe"]["modules"] = ["aeroheart-optics-v1", "registered-surface-v1"]
+            profile["controls"] = [
+                control
+                for control in profile["controls"]
+                if control["capability"] != "motion.tempo"
+            ]
+    narrowed = _registry(document)
+
+    # `bounded-tempo-v1` is no longer in this profile's recipe, so naming it is unregistered.
+    outcome = _validate_draft(
+        draft(modules=["aeroheart-optics-v1", "bounded-tempo-v1"]),
+        narrowed.validate_reference(StyleReference(PROFILE.profile_id, 1, {})),
+        catalogue(),
+        registry=narrowed,
+    )
+
+    assert isinstance(outcome, ProposalRefusal)
+    assert outcome.code is RefusalCode.UNREGISTERED
+    assert "bounded-tempo-v1" in outcome.detail
+
+
+def test_the_evidence_catalogue_offers_only_the_current_topologys_slots(
+    repository, tmp_path, photo_dir
+):
+    """The join is the whole reason this reads `world_style_state` rather than the newest row.
+
+    A superseded topology's slots name evidence this world is no longer drawn over, and a
+    proposal citing one would be reviewed against something that is not there.
+    """
+    spans = _seed_world(repository, tmp_path, photo_dir, slots=2)
+    offered = lambda: {  # noqa: E731
+        choice.slot_key
+        for choice in source_catalogue(repository.connection, repository.workspace_id)
+    }
+    before = offered()
+
+    Styles(repository.connection, repository.workspace_id).register_topology(
+        TopologyContract(
+            "later-topology",
+            ("region-a",),
+            (
+                TopologySourceSlot(
+                    source_id=uuid.UUID(int=900),
+                    slot_key="slot-later",
+                    region_id="region-a",
+                    evidence_span_id=spans[0],
+                    missing_reason=None,
+                ),
+            ),
+        )
+    )
+    after = offered()
+
+    assert before == {"slot-00", "slot-01"}
+    assert after == {"slot-later"}
+
+
+def _registry(document):
+    from exulanica.world.registry import StyleRegistry
+
+    return StyleRegistry(document)

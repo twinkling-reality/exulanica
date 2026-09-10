@@ -48,6 +48,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 from typing import Annotated, Any, Final, Literal
 
@@ -232,7 +233,10 @@ def source_catalogue(
         "  and t.world_id = s.world_id "
         "  and t.current_topology_digest = s.topology_digest "
         "where s.workspace_id = %s and s.world_id = %s and s.evidence_span_id is not null "
-        "order by s.slot_key limit %s",
+        # `slot_key` is unique only within a region, and the topology contract explicitly
+        # permits the same key under two regions, so ordering by it alone makes the bound an
+        # arbitrary cut between two rows that compare equal. `source_id` is the primary key.
+        "order by s.slot_key, s.source_id limit %s",
         (workspace_id, world_id, limit),
     ).fetchall()
     return tuple(
@@ -377,7 +381,7 @@ def draft_appearance(
         {
             "role": "user",
             "content": (
-                f"{_render_catalogue(proposable, current, catalogue)}\n\n"
+                f"{_render_catalogue(proposable, current, catalogue, registry)}\n\n"
                 f'The request:\n"""{utterance}"""'
             ),
         },
@@ -441,6 +445,19 @@ def propose_appearance(
             refusal=ProposalRefusal(
                 RefusalCode.NO_WORLD,
                 "this workspace has no reviewed world appearance to propose against",
+            ),
+            classified_by=classified_by,
+            calls=log.calls,
+        )
+    if not _proposable_profiles(registry):
+        # `Literal[()]` is not a type and `create_model` refuses it with a bare AssertionError.
+        # A registry with nothing a new proposal may name is a real state, and the person who
+        # asked is owed the same sentence as any other request the catalogue cannot express.
+        return AppearanceOutcome(
+            kind=kind,
+            refusal=ProposalRefusal(
+                RefusalCode.NOT_IN_CATALOGUE,
+                "no reviewed profile currently accepts a new proposal",
             ),
             classified_by=classified_by,
             calls=log.calls,
@@ -600,7 +617,10 @@ def _parameter_model(proposable: Sequence[ProfileDefinition]) -> type[BaseModel]
     fields: dict[str, Any] = {}
     for profile in proposable:
         for key, definition in profile.controls.items():
-            if key in fields:
+            # Keyed by the FIELD name, which is what the dict holds. Guarding on the control key
+            # made this dead for every hyphenated control, which is all of them, so a second
+            # profile silently overwrote the first profile's bounds for a shared control.
+            if _field_name(key) in fields:
                 continue
             fields[_field_name(key)] = (
                 _control_type(definition) | None,
@@ -624,6 +644,13 @@ def _control_type(definition: ParameterDefinition) -> Any:
     """
     if definition.kind == "range":
         assert definition.minimum is not None and definition.maximum is not None
+        # The bounds only. The step is NOT expressed as `multipleOf`, and that was measured
+        # rather than assumed: the endpoint does not enforce it, so the local validator refused
+        # the reply instead, and two of the five recorded utterances came back `not_drafted`
+        # for asking to move a control by an amount the model had no way to know was illegal.
+        # The registry's own default for that control is 0.46, which is not on its 0.05 grid
+        # either, so the grid was never a constraint the world itself respected. It is applied
+        # to the VALUE below instead, where it belongs.
         return Annotated[float, Field(ge=definition.minimum, le=definition.maximum)]
     if definition.kind == "choice":
         return Literal[tuple(definition.options)]  # type: ignore[valid-type]
@@ -652,6 +679,7 @@ def _render_catalogue(
     proposable: Sequence[ProfileDefinition],
     current: StyleReference,
     catalogue: Sequence[SourceChoice],
+    registry: StyleRegistry,
 ) -> str:
     """The catalogue as text for the drafter, with what the world looks like NOW.
 
@@ -671,7 +699,7 @@ def _render_catalogue(
                 (
                     module
                     for module in profile.modules
-                    if definition.capability in _module_capabilities(module)
+                    if definition.capability in _module_capabilities(registry, module)
                 ),
                 "unknown",
             )
@@ -704,8 +732,14 @@ def _render_catalogue(
     return "\n".join(lines)
 
 
-def _module_capabilities(module_id: str) -> frozenset[str]:
-    module = STYLE_REGISTRY.modules.get(module_id)
+def _module_capabilities(registry: StyleRegistry, module_id: str) -> frozenset[str]:
+    """The capabilities one reviewed module owns, from the registry that was passed in.
+
+    The registry is threaded rather than read off the module-level singleton because every other
+    function here takes one, and a test that injects a narrowed registry to prove a control is
+    refused would otherwise have been answered by the shipped one.
+    """
+    module = registry.modules.get(module_id)
     return frozenset() if module is None else frozenset(module.capabilities)
 
 
@@ -748,8 +782,11 @@ def _validate_draft(
     if not isinstance(supplied, Mapping):
         return ProposalRefusal(RefusalCode.UNREGISTERED, "draft parameters are not an object")
 
-    owned = frozenset().union(*(_module_capabilities(module) for module in named_modules)) \
-        if named_modules else frozenset()
+    owned = (
+        frozenset().union(*(_module_capabilities(registry, module) for module in named_modules))
+        if named_modules
+        else frozenset()
+    )
     changed: dict[str, Any] = {}
     for field_name, value in supplied.items():
         if value is None:
@@ -777,8 +814,40 @@ def _validate_draft(
             RefusalCode.NO_CHANGE, "draft moved no control, so there is nothing to review"
         )
 
-    merged = dict(current.parameters)
-    merged.update(changed)
+    # **Bounded by the DRAFTED profile, and this is the line the whole merge turns on.**
+    #
+    # `current` is the world's current global style, which need not be the profile the draft
+    # names: a workspace whose current style is the experimental profile is reachable today,
+    # because the preview route gates on `validate_reference` and that admits an experimental
+    # profile. Copying its keys wholesale into a reference for a different profile made
+    # `validate_reference` refuse the lot as "unknown parameters", which this function then
+    # reported as OUT_OF_RANGE: a person told a value fell outside its range when none had, on
+    # a workspace where every appearance request would fail forever.
+    #
+    # Filtering is the honest merge. A control the drafted profile declares and the current
+    # style does not carry is filled from its registry default by `validate_reference`, and
+    # `changed` names it below so the surface can say it moved.
+    carried = {
+        key: value for key, value in current.parameters.items() if key in profile.controls
+    }
+    changed = {
+        key: _at_control_resolution(profile.controls[key], value)
+        for key, value in changed.items()
+    }
+    # **Compared on the control's own grid, and dropped from the merge when it matches.**
+    #
+    # A control the draft restated at the value the world already has has not moved, and saying
+    # so has to survive quantisation: `vitality` ships at 0.82 on a step of 0.05, so a draft
+    # that echoed 0.82 became 0.80 and read as a change nobody asked for. Comparing the two at
+    # the same resolution catches that, and leaving the key out of `merged` keeps the world's
+    # own off-grid value rather than nudging it onto the grid on the way past.
+    unmoved = [
+        key
+        for key, value in changed.items()
+        if key in carried and _at_control_resolution(profile.controls[key], carried[key]) == value
+    ]
+    merged = dict(carried)
+    merged.update({key: value for key, value in changed.items() if key not in unmoved})
     try:
         # **The registry, again, and this is the refusal that must not become a clamp.** The
         # endpoint already enforced the bounds through the JSON Schema and the local validator
@@ -789,9 +858,16 @@ def _validate_draft(
             StyleReference(profile.profile_id, profile.profile_version, merged)
         )
     except InvalidStyleData as refused:
-        return ProposalRefusal(RefusalCode.OUT_OF_RANGE, str(refused))
+        # Two different facts share one exception type. "unknown parameters" is a name the
+        # registry does not have; everything else this raises is a value it will not accept.
+        # They are different things to say and they are said differently.
+        code = (
+            RefusalCode.UNREGISTERED
+            if "unknown parameters" in str(refused) or "unknown world profile" in str(refused)
+            else RefusalCode.OUT_OF_RANGE
+        )
+        return ProposalRefusal(code, str(refused))
 
-    unmoved = [key for key, value in changed.items() if current.parameters.get(key) == value]
     if len(unmoved) == len(changed):
         return ProposalRefusal(
             RefusalCode.NO_CHANGE,
@@ -815,13 +891,56 @@ def _validate_draft(
             RefusalCode.NOT_DRAFTED, "draft said nothing about the change it proposes"
         )
 
+    # Only the modules that own a control which actually MOVED. A module whose sole control the
+    # draft restated at the value it already had owns nothing that changed, and naming it would
+    # make the field say something the `changed` list beside it contradicts.
+    moved = tuple(sorted(key for key in changed if key not in unmoved))
+    moved_capabilities = {profile.controls[key].capability for key in moved}
     return AppearanceProposal(
         profile=validated,
-        modules=named_modules,
-        changed=tuple(sorted(key for key in changed if key not in unmoved)),
+        modules=tuple(
+            module
+            for module in named_modules
+            if _module_capabilities(registry, module) & moved_capabilities
+        ),
+        changed=moved,
         reference_ids=references,
         spoken=spoken,
     )
+
+
+def _at_control_resolution(definition: ParameterDefinition, value: Any) -> Any:
+    """One value, expressed at the resolution its control actually has.
+
+    **This is not the clamp the module refuses to do, and the difference is worth being exact
+    about.** Refusing to clamp is about never inventing a value outside what was declared: a
+    request for 1.4 on a 0-to-1 control is a request the registry will not accept, and answering
+    it with 1.0 would put a change nobody asked for in front of somebody as though they had.
+    Rounding 0.51 to 0.50 on a control whose step is 0.05 invents nothing. The control has no
+    way to hold 0.51, the panel that shows a proposal is a slider with that step, and a real
+    browser rewrites an off-grid value on assignment. So the choice is between saying the value
+    at the resolution the control has and handing the person a proposal whose number changes
+    when they look at it.
+
+    Measured: the drafter proposed 0.51 for "a bit softer" on a control sitting at 0.46, twice,
+    and the value the panel would have applied was 0.50. Constraining the schema instead turned
+    that into a refusal, which told a person their perfectly ordinary request could not be
+    drafted. The grid is not something the registry itself respects either: `origin-landscape@1`
+    ships `horizon-softness` at a default of 0.46 on a step of 0.05.
+
+    Anything that is not a bounded number is returned untouched: a choice is one of a closed set
+    and a toggle is a boolean, and neither has a resolution to express.
+    """
+    if definition.kind != "range" or definition.step is None:
+        return value
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return value
+    minimum = Decimal(str(definition.minimum))
+    step = Decimal(str(definition.step))
+    if step <= 0:
+        return value
+    steps = ((Decimal(str(value)) - minimum) / step).to_integral_value(rounding=ROUND_HALF_UP)
+    return float(minimum + steps * step)
 
 
 def _resolve_profile(key: str, registry: StyleRegistry) -> ProfileDefinition | None:

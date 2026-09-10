@@ -23,7 +23,7 @@ How the system works now. Edited as the system changes.
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [companion-question](companion-question.md) : built, covered by tests, and measured twice against the retained bowl workspace with real
+- [companion-question](companion-question.md) : built, covered by tests, and measured three times with real models. Section 6 has what the
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
 - [demo-runbook](demo-runbook.md) : mixed, labelled per item. Buildability audited against the repository on 2026-08-28

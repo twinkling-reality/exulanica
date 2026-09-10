@@ -252,6 +252,14 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.discardedUnnamed':
     'A model was asked and took {duration}. What it wrote was not supported by the evidence, so '
     + 'this is the answer built from the search itself.',
+  // A model drew a change to the world. Deliberately NOT "answered by": no question was asked
+  // and nothing was looked at, and the second sentence is the one a person needs.
+  'provenance.proposed':
+    '{model} drew this change in {duration}. Nothing is applied until you apply it.',
+  // A model read the request and the reviewed design has no way to make that change. Saying
+  // anything about evidence here would be false, because none was read.
+  'provenance.refused':
+    '{model} read that in {duration}. The reviewed design has no way to make that change.',
   'provenance.none': 'No model was asked. This is what the search found.',
   // A model WAS asked and gave back something unusable. Saying "no model was asked" here would
   // be false, and saying anything about the search would be false too, because there was none.

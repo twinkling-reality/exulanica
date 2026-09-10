@@ -128,6 +128,16 @@ export function disposeCompanionStage(state: SessionState): void {
   state.mountedCompanionStage = null;
 }
 
+/**
+ * The live outcome subscription, at module scope because its lifetime is the application's.
+ *
+ * `SessionState` would be the tidier home and this module may not add a field to it. A module
+ * binding is exactly as correct here: `mountCompanion` is called from one place, once per graph
+ * mount, and what has to be true is that the previous mount's listener is gone before the next
+ * one is added.
+ */
+let stopPreviousOutcomes: (() => void) | null = null;
+
 export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   const { state } = deps;
 
@@ -217,9 +227,11 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     // path. Said out loud rather than left as a sentence describing a change nobody can find.
     if (!reached) {
       proposalUtterances.delete(originReference);
-      return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.unavailable')], 'model');
+      return spokenAnswer(
+      outcome, [outcome.proposal.spoken, say('proposal.unavailable')], 'proposed',
+    );
     }
-    return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.staged')], 'model');
+    return spokenAnswer(outcome, [outcome.proposal.spoken, say('proposal.staged')], 'proposed');
   }
 
   /*
@@ -230,13 +242,30 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
    * learns the id a correction would have to name, and `main.ts` is what holds the client. Two
    * rows is also the more honest record of two things that happened at two times.
    */
+  /*
+   * The previous mount's subscription, stopped here rather than in `dispose`.
+   *
+   * `mountCompanion` runs again on every graph mount, and the composition root's teardown is
+   * `disposeCompanionStage`, which stops the stage and nothing else. So a `dispose` that nobody
+   * calls is not a teardown: each mount added another listener to a module singleton, and after
+   * three remounts one accepted proposal wrote three identical rows into durable memory. The
+   * inbox in `appearance.ts` has the same shape and stops the previous one for the same reason.
+   */
+  stopPreviousOutcomes?.();
   const stopOutcomes = worldStyleProposalOutcomes.subscribe((outcome) => {
     const utterance = proposalUtterances.get(outcome.originReference);
     if (utterance === undefined) return;
     // 'previewed' is the state the proposal was already recorded in. Keeping it again would
     // write one row per stale-base recovery for a proposal nobody has decided about yet.
     if (outcome.kind === 'previewed') return;
-    proposalUtterances.delete(outcome.originReference);
+    /*
+     * Forgotten only when the decision is FINAL. A refused Apply is not final: the preview is
+     * still open, the panel re-enables Apply, and a person who presses it again gets an
+     * acceptance that this listener would otherwise have had no utterance to attach to. So a
+     * refusal is recorded and remembered, and a later acceptance is recorded too, because two
+     * things happened.
+     */
+    if (outcome.kind !== 'refused') proposalUtterances.delete(outcome.originReference);
     const remember = deps.rememberAnswer;
     if (remember === undefined) return;
     void remember(outcomeAnswer(utterance, outcome)).catch((error: unknown) => {
@@ -250,6 +279,8 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       panel.noteMemoryFailure(`memory.notKept.${failure.kind}`, failure.detail);
     });
   });
+
+  stopPreviousOutcomes = stopOutcomes;
 
   const controller = createCompanionController({
     companion: deps.engine,
@@ -383,6 +414,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     toggle,
     dispose: () => {
       stopOutcomes();
+      if (stopPreviousOutcomes === stopOutcomes) stopPreviousOutcomes = null;
       disposeCompanionStage(state);
     },
   };
@@ -410,7 +442,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
 function spokenAnswer(
   outcome: CompanionProposal,
   sentences: readonly string[],
-  composed: 'model' | 'discarded',
+  composed: 'proposed' | 'refused',
 ): CompanionAnswer {
   const calls = outcome.calls;
   return {
@@ -445,18 +477,19 @@ function spokenAnswer(
  * model's own short account of what was asked for and could not be done, which is more useful
  * to the person than any general sentence, so it is shown too.
  *
- * `composed` distinguishes the two honestly. When the sentence on the screen is a reviewed one,
- * the model's output was discarded and the provenance line says so; naming the model over words
- * it did not write would attribute a sentence to something that did not write it.
+ * `composed` is `refused` rather than `discarded`, and the difference is not pedantry: the
+ * `discarded` sentence says "what it wrote was not supported by the evidence", and on this path
+ * there is no evidence and no search. What happened is that the reviewed design has no such
+ * control, and the model that read the request is named for having read it.
  */
 function refusalAnswer(outcome: CompanionProposal): CompanionAnswer {
   const refusal = outcome.refusal;
   if (refusal === null) {
-    return spokenAnswer(outcome, [say('proposal.refused.not_drafted')], 'discarded');
+    return spokenAnswer(outcome, [say('proposal.refused.not_drafted')], 'refused');
   }
   const spoken = say(`proposal.refused.${refusal.code}`);
   const detail = refusal.code === 'not_in_catalogue' ? refusal.detail : '';
-  return spokenAnswer(outcome, [spoken, detail], 'discarded');
+  return spokenAnswer(outcome, [spoken, detail], 'refused');
 }
 
 /** What became of a proposal, as a remembered answer to the sentence that asked for it. */

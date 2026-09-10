@@ -75,6 +75,17 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
       : fill('provenance.search', { model: provenance.plannedBy, duration: spent });
   }
 
+  if (provenance.composed === 'proposed' || provenance.composed === 'refused') {
+    // Both name the model that read the request, and neither mentions evidence or a search,
+    // because a proposal is not an answer and nothing was looked at to make one.
+    return provenance.servedModel === null
+      ? say('provenance.none')
+      : fill(`provenance.${provenance.composed}`, {
+          model: provenance.servedModel,
+          duration: spent,
+        });
+  }
+
   if (provenance.composed === 'discarded') {
     return provenance.servedModel === null
       ? fill('provenance.discardedUnnamed', { duration: spent })

@@ -123,6 +123,18 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       return null;
     }
     const sequence = ++previewSequence;
+    /*
+     * A settings preview REPLACES whatever the client currently holds, so a person who moves a
+     * slider while a Companion proposal is staged throws that proposal away. That is the right
+     * behaviour and it was silent: the Companion had proposed something and would never learn
+     * what became of it, so its memory kept the proposal and no outcome for ever.
+     */
+    const replaced = client.activePreview();
+    if (replaced !== null && replaced.request.origin !== 'settings') {
+      reportProposalOutcome(
+        replaced, 'discarded', 'A change made on this panel replaced the proposed design.',
+      );
+    }
     optionsView.reportWorldLifecycle('checking');
     try {
       const active = await client.previewSettings({
@@ -254,9 +266,26 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         return false;
       }
       const existing = client.activePreview();
-      const active = existing !== null && worldStylePreviewMatches(existing, candidate)
-        ? existing
-        : await previewOnServer(candidate);
+      const matches = existing !== null && worldStylePreviewMatches(existing, candidate);
+      /*
+       * **A proposal is never quietly re-previewed as a Settings change.**
+       *
+       * `previewOnServer` posts `origin: settings` with no model, no prompt version and no
+       * reference ids. Reaching it with a companion preview staged would discard that preview
+       * and write a version whose provenance says a person moved a slider, which is the one
+       * sentence about this path that must not be able to become false. It can only happen when
+       * the panel's draft and the reviewed candidate have drifted apart, and the honest answer
+       * to that is to say so.
+       */
+      if (existing !== null && existing.request.origin !== 'settings' && !matches) {
+        const detail =
+          'The proposed design no longer matches what is on this panel. Discard it and ask '
+          + 'again, or make the change yourself.';
+        optionsView.reportWorldLifecycle('failed', detail);
+        reportProposalOutcome(existing, 'refused', detail);
+        return false;
+      }
+      const active = matches ? existing : await previewOnServer(candidate);
       if (active === null) return false;
       optionsView.reportWorldLifecycle('checking', 'Applying the reviewed preview…');
       try {
@@ -373,7 +402,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       stagingProposal = true;
       let staged = false;
       try {
-        staged = stageWorldProposal(optionsView, candidate);
+        staged = stageWorldProposal(optionsView, candidate, state.preferences);
       } finally {
         stagingProposal = false;
       }
@@ -512,8 +541,12 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
 function stageWorldProposal(
   view: ReturnType<typeof buildOptions>,
   candidate: AtlasPreferences,
+  applied: AtlasPreferences,
 ): boolean {
-  const applied = view.preferences();
+  // `applied` is the session's applied preferences, passed in rather than read off the panel.
+  // `view.preferences()` returns the panel's live DRAFT, so a control the person had already
+  // previewed by hand to the proposed value was skipped as "unchanged" and never dispatched,
+  // and a proposal every one of whose controls they had touched staged nothing at all.
   if (
     candidate.worldArtProfile !== applied.worldArtProfile ||
     candidate.worldArtProfileVersion !== applied.worldArtProfileVersion
@@ -522,25 +555,53 @@ function stageWorldProposal(
     candidate.worldArtProfile,
     candidate.worldArtProfileVersion,
   );
-  const moves: { readonly node: HTMLInputElement | HTMLSelectElement; readonly event: string }[] =
-    [];
+  let moved = 0;
   for (const definition of definitions) {
     const wanted = candidate.worldStyleParameters[definition.key];
     if (wanted === undefined || wanted === applied.worldStyleParameters[definition.key]) continue;
     const node = view.root.querySelector<HTMLInputElement | HTMLSelectElement>(
-      `[aria-label="${CSS.escape(definition.label)}"]`,
+      `[aria-label="${escapeAttribute(definition.label)}"]`,
     );
     if (node === null) return false;
-    if (definition.kind === 'toggle') (node as HTMLInputElement).checked = wanted === true;
-    else node.value = String(wanted);
-    moves.push({
-      node,
-      event: definition.kind === 'range' || definition.kind === 'color' ? 'input' : 'change',
-    });
+    if (definition.kind === 'toggle') {
+      (node as HTMLInputElement).checked = wanted === true;
+    } else {
+      node.value = String(wanted);
+      /*
+       * **Read back, because the DOM sanitises.** A range input snaps its value to the declared
+       * step and a colour input rewrites the text it was given, so a value off the control's
+       * grid becomes a DIFFERENT value silently, and the person would then apply something the
+       * authority never validated. Measured: a drafted 0.51 on a control whose step is 0.05
+       * becomes 0.50 here. The drafter's schema now carries the step so this should not fire;
+       * it is a refusal rather than an assertion because "should not" is not "cannot".
+       */
+      if (node.value !== String(wanted)) return false;
+    }
+    /*
+     * Dispatched immediately, one control at a time, and that ORDER is the whole fix. The panel
+     * re-renders on every reported change and rewrites every style input from its own draft, so
+     * writing all the values first and dispatching afterwards meant the second and later
+     * controls were overwritten before their event was sent: a five-control proposal staged
+     * exactly one of them, and the other four were silently dropped.
+     */
+    node.dispatchEvent(new Event(
+      definition.kind === 'range' || definition.kind === 'color' ? 'input' : 'change',
+      { bubbles: true },
+    ));
+    moved += 1;
   }
-  if (moves.length === 0) return false;
-  for (const move of moves) move.node.dispatchEvent(new Event(move.event, { bubbles: true }));
-  return true;
+  return moved > 0;
+}
+
+/**
+ * One attribute value, safe inside a `[aria-label="..."]` selector.
+ *
+ * `CSS.escape` is the obvious call and is not universally present: happy-dom, which is what the
+ * tests run in, does not define `CSS` at all, and a missing global here throws inside an inbox
+ * listener whose caller does not await it, so the proposal vanished with nothing on the screen.
+ */
+function escapeAttribute(value: string): string {
+  return value.replace(/["\\]/g, (match) => `\\${match}`);
 }
 
 export function preferencesForWorldVersion(
