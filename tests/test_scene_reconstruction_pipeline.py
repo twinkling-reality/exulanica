@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import math
 import os
@@ -1484,3 +1485,416 @@ def test_the_final_check_still_re_evaluates_permission_at_the_locked_time(reposi
         for scene in after.reconstruction_scenes
         if scene.scene_id == scene_id and scene.placement_state == "available"
     ], "a retracted rung assertion must not leave a memoised manifest delivering geometry"
+
+
+# -- the persisted scene projection ------------------------------------------------------------
+#
+# The memo above fixes the second graph read in a process. These fix the first, which is the one a
+# visitor arriving at a freshly started API actually pays. Every test here clears both memos first,
+# because a memo hit would answer before the projection is ever consulted and would prove nothing.
+
+
+def _published_scene(repository, tmp_path, worker):
+    """One published scene with a projection, and the pieces its bindings are made of."""
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    store, captures, point_artifacts, job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker=worker, lease_seconds=60)
+    assert claimed is not None
+    outcome = _processor(repository, store, tmp_path, FakeColmap(registered=3)).process(claimed)
+    assert outcome.status == "succeeded"
+    return store, captures, point_artifacts, job_id, outcome.scene_id
+
+
+def _projection_rows(repository, scene_id):
+    return repository.connection.execute(
+        "select artifact_id,content_sha256,byte_size,purged_at from artifact "
+        "where workspace_id=%s and scene_id=%s and kind='scene_projection' "
+        "order by created_at desc,artifact_id desc",
+        (repository.workspace_id, scene_id),
+    ).fetchall()
+
+
+def _projection_payload(repository, store, scene_id):
+    row = _projection_rows(repository, scene_id)[0]
+    return json.loads(store.get(BlobId(bytes(row["content_sha256"]))))["projection"]
+
+
+def _seal(payload):
+    """Re-envelope an edited payload, so the reader's binding checks are what refuses it.
+
+    The payload digest is recomputed rather than left stale, deliberately: a stale one would be
+    caught by the envelope check and the binding check underneath it would never run.
+    """
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    envelope = {
+        "profile": "exulanica.scene-graph-projection-envelope/v1",
+        "payload_sha256": hashlib.sha256(canonical).hexdigest(),
+        "projection": payload,
+    }
+    return (
+        json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        + b"\n"
+    )
+
+
+def _retarget_projection(repository, store, scene_id, data):
+    """Point the scene's newest projection row at these bytes, as a tampered publisher would."""
+    written = store.put_bytes(data)
+    row = _projection_rows(repository, scene_id)[0]
+    repository.connection.execute(
+        "update artifact set content_sha256=%s,storage_key=%s,byte_size=%s "
+        "where workspace_id=%s and artifact_id=%s",
+        (
+            written.blob_id.digest,
+            store.key_for(written.blob_id),
+            written.byte_size,
+            repository.workspace_id,
+            row["artifact_id"],
+        ),
+    )
+    clear_placement_memo()
+
+
+def _scene(repository, store):
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    return read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+
+
+def test_publishing_a_scene_writes_a_projection_bound_to_its_three_receipts(
+    repository, tmp_path
+):
+    """The projection publishes with the scene, inside the same atomic acceptance."""
+    store, captures, point_artifacts, job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-publish"
+    )
+    rows = _projection_rows(repository, scene_id)
+    assert len(rows) == 1
+    payload = _projection_payload(repository, store, scene_id)
+
+    assert payload["profile"] == "exulanica.scene-graph-projection/v1"
+    assert payload["scene_ref"] == str(scene_id)
+    receipts = repository.connection.execute(
+        "select a.kind,a.content_sha256 from reconstruction_scene_job j "
+        "join artifact a on a.workspace_id=j.workspace_id and a.artifact_id in "
+        "(j.pose_receipt_artifact_id,j.placement_artifact_id,j.gate_artifact_id) "
+        "where j.workspace_id=%s and j.job_id=%s",
+        (repository.workspace_id, job_id),
+    ).fetchall()
+    digests = {row["kind"]: bytes(row["content_sha256"]).hex() for row in receipts}
+    assert payload["bindings"]["pose_receipt_sha256"] == digests["pose_receipt"]
+    assert payload["bindings"]["placement_receipt_sha256"] == digests["point_map_placement"]
+    assert payload["bindings"]["gate_receipt_sha256"] == digests["scene_gate_receipt"]
+    assert payload["bindings"]["member_capture_refs"] == [str(item) for item in captures]
+    assert [item["artifact_ref"] for item in payload["bindings"]["point_map_inputs"]] == [
+        str(item) for item in point_artifacts
+    ]
+    # Every member has exactly one outcome, which is what makes the reader's lookup total.
+    assert {item["capture_ref"] for item in payload["placed"]} | {
+        item["capture_ref"] for item in payload["excluded"]
+    } == {str(item) for item in captures}
+
+
+def test_a_cold_graph_read_serves_the_projection_without_rebuilding_the_placement(
+    repository, tmp_path, monkeypatch
+):
+    """The acceptance criterion, proved by making the rebuild impossible rather than by timing.
+
+    MEASURED 2026-09-09: a cold `GET /graph` for the 210 member volcanic scene was 47.9 s, all of
+    it in the rebuild this test forbids. A stopwatch here would measure a three member fixture and
+    prove nothing, so `validate_placement_record` is made to raise instead: if the read still
+    produces the same scene, it did not go through the rebuild.
+    """
+    store, _captures, _point_artifacts, _job_id, _scene_id = _published_scene(
+        repository, tmp_path, "projection-cold"
+    )
+    expected = _scene(repository, store)
+    assert expected.placement_state == "available"
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the cold read rebuilt the placement instead of reading it")
+
+    monkeypatch.setattr(
+        "exulanica.graph.reconstruction_scenes.validate_placement_record", refuse
+    )
+    monkeypatch.setattr(
+        "exulanica.graph.reconstruction_scenes.recovered_camera_records", refuse
+    )
+    assert _scene(repository, store) == expected
+
+
+def test_the_projection_and_the_rebuild_produce_the_same_scene_row(repository, tmp_path):
+    """Byte-identical, which is the acceptance criterion, checked on the serialised payload."""
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-identity"
+    )
+    projected = _scene(repository, store)
+
+    repository.connection.execute(
+        "update artifact set purged_at=now() where workspace_id=%s and scene_id=%s "
+        "and kind='scene_projection'",
+        (repository.workspace_id, scene_id),
+    )
+    rebuilt = _scene(repository, store)
+
+    assert rebuilt.model_dump_json() == projected.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "binding",
+    ["pose_receipt_sha256", "placement_receipt_sha256", "gate_receipt_sha256"],
+)
+def test_a_projection_bound_to_another_digest_is_refused(repository, tmp_path, binding):
+    """A projection belonging to another build must not answer for this one."""
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, f"projection-{binding}"
+    )
+    expected = _scene(repository, store)
+
+    payload = _projection_payload(repository, store, scene_id)
+    payload["bindings"][binding] = "f" * 64
+    _retarget_projection(repository, store, scene_id, _seal(payload))
+
+    # Refused, and the scene is still served correctly by the rebuild it falls back to.
+    assert _scene(repository, store).model_dump_json() == expected.model_dump_json()
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("unreachable")
+
+    # And proved to be the rebuild rather than a second acceptance of the same bytes.
+    with pytest.raises(AssertionError):
+        import exulanica.graph.reconstruction_scenes as module
+
+        original = module.validate_placement_record
+        module.validate_placement_record = refuse
+        try:
+            _scene(repository, store)
+        finally:
+            module.validate_placement_record = original
+
+
+def test_withdrawing_a_member_refuses_the_projection(repository, tmp_path):
+    """The member list is the one binding no digest covers, checked on both of its paths.
+
+    Withdrawing a member for real is a capture tombstone, and `tombstone_blocks_scene` then takes
+    the whole scene out of the graph, so the projection is never consulted at all. That is the
+    first assertion, and it is the one a person's withdrawal actually travels down.
+
+    The binding is still carried and still checked, because the two lists are not the same object:
+    the projection is bound to the list the graph resolves from
+    `reconstruction_scene_build_member`, and nothing about the three receipt digests would change
+    if that list did. `reconstruction_scene_build_member` is append-only, so the disagreement
+    cannot be staged through the database; it is exercised directly against the reader instead.
+    """
+    store, captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-member"
+    )
+    payload = _projection_payload(repository, store, scene_id)
+    assert payload["bindings"]["member_capture_refs"] == [str(item) for item in captures]
+    assert _scene(repository, store).placement_state == "available"
+
+    from exulanica.graph.reconstruction_scenes import _PointMapRef, _projected
+
+    rows = _projection_rows(repository, scene_id)
+    references = tuple(
+        _PointMapRef(item["capture_ref"], item["artifact_ref"], item["content_sha256"])
+        for item in payload["bindings"]["point_map_inputs"]
+    )
+
+    def read(member_refs):
+        return _projected(
+            store,
+            [bytes(rows[0]["content_sha256"])],
+            scene_id=scene_id,
+            pose_digest=payload["bindings"]["pose_receipt_sha256"],
+            placement_digest=payload["bindings"]["placement_receipt_sha256"],
+            gate_digest=payload["bindings"]["gate_receipt_sha256"],
+            member_refs=member_refs,
+            references=references,
+        )
+
+    assert read(tuple(str(item) for item in captures)) is not None, "the fixture must be readable"
+    assert read((str(captures[0]), str(captures[1]))) is None, "a member gone must refuse it"
+    assert read(tuple(str(item) for item in reversed(captures))) is None, "so must a reordering"
+
+    # And the path a withdrawal really takes: the scene leaves the graph, projection or not.
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=captures[2],
+        requested_by=uuid.uuid4(),
+        reason="withdraw one member of a projected scene",
+    )
+    after = read_snapshot(repository.connection, repository.workspace_id, store)
+    assert after.reconstruction_scenes == []
+
+
+def test_purging_a_point_map_refuses_the_projection(repository, tmp_path):
+    """A projection asserts geometry for the members it placed. Losing one's bytes refuses it."""
+    store, captures, point_artifacts, _job_id, _scene_id = _published_scene(
+        repository, tmp_path, "projection-purge"
+    )
+    assert _scene(repository, store).placement_state == "available"
+
+    row = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+        (repository.workspace_id, point_artifacts[1]),
+    ).fetchone()
+    path = store.root / store.key_for(BlobId(bytes(row["content_sha256"])))
+    path.chmod(0o644)
+    path.unlink()
+
+    after = _scene(repository, store)
+    assert after.placement_state == "partial"
+    assert after.members[1].capture_id == captures[1]
+    assert after.members[1].placement is None
+    assert after.members[1].exclusion_reason == "alignment-unavailable"
+
+
+def test_a_projection_whose_recovered_camera_is_malformed_is_refused_not_raised(
+    repository, tmp_path
+):
+    """`SceneRecoveredCameraRow` forbids an extra key and is built outside the fallback handlers.
+
+    So a camera the row would reject has to be refused while the projection is being read, or the
+    graph raises where it used to fall back, and a bad projection becomes worse than no projection.
+    """
+    store, captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-camera"
+    )
+    expected = _scene(repository, store)
+
+    payload = _projection_payload(repository, store, scene_id)
+    payload["recovered_cameras"][str(captures[0])] = {
+        "scene_from_camera_row_major": [0.0] * 16,
+        "calibration": {
+            "model": "PINHOLE",
+            "width": 160,
+            "height": 100,
+            "fx": 1.0,
+            "fy": 1.0,
+            "cx": 1.0,
+            "cy": 1.0,
+            "parameters": [],
+        },
+        "projection": "pinhole",
+        "unexpected": True,
+    }
+    _retarget_projection(repository, store, scene_id, _seal(payload))
+
+    assert _scene(repository, store).model_dump_json() == expected.model_dump_json()
+
+
+def test_an_older_projection_still_answers_when_a_newer_one_does_not(repository, tmp_path):
+    """Nothing sets `artifact.superseded_by`, so every projection a scene has had stays live.
+
+    A backfill run after a rebuild would write the superseded build's projection, which would be
+    the newest by `created_at` and would fail every binding. Offering only the newest would cost
+    that scene its fast path permanently. The reader is handed several and proves each.
+    """
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-stale"
+    )
+    expected = _scene(repository, store)
+    sound = _projection_rows(repository, scene_id)[0]
+
+    stale = _projection_payload(repository, store, scene_id)
+    stale["bindings"]["pose_receipt_sha256"] = "a" * 64
+    written = store.put_bytes(_seal(stale))
+    repository.connection.execute(
+        "insert into artifact (artifact_id,workspace_id,kind,scene_id,stage_key,stage_version,"
+        "params_digest,input_digest,idempotency_key,content_sha256,storage_key,byte_size) "
+        "values (%s,%s,'scene_projection',%s,'scene_projection',1,%s,%s,%s,%s,%s,%s)",
+        (
+            uuid.uuid4(),
+            repository.workspace_id,
+            scene_id,
+            b"\x01" * 32,
+            b"\x02" * 32,
+            f"test:stale-projection:{uuid.uuid4()}",
+            written.blob_id.digest,
+            store.key_for(written.blob_id),
+            written.byte_size,
+        ),
+    )
+    assert len(_projection_rows(repository, scene_id)) == 2
+    assert _projection_rows(repository, scene_id)[0]["artifact_id"] != sound["artifact_id"]
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("a stale projection hid the sound one and forced a rebuild")
+
+    import exulanica.graph.reconstruction_scenes as module
+
+    original = module.validate_placement_record
+    module.validate_placement_record = refuse
+    try:
+        assert _scene(repository, store).model_dump_json() == expected.model_dump_json()
+    finally:
+        module.validate_placement_record = original
+
+
+def test_the_projection_carries_nothing_privacy_bearing(repository, tmp_path):
+    """It carries what the response already carries, and none of what it deliberately does not.
+
+    The source photograph digests matter most. `scene_allowed` denies a scene by comparing the pose
+    manifest's frame digest against the live artifact row, and re-masking a withdrawn person moves
+    `read_source_sha256`. A copy of those digests in a durable artifact would be a second, stale
+    answer to a question the asset-read policy exists to ask fresh.
+    """
+    store, _captures, _point_artifacts, _job_id, scene_id = _published_scene(
+        repository, tmp_path, "projection-privacy"
+    )
+    row = _projection_rows(repository, scene_id)[0]
+    raw = store.get(BlobId(bytes(row["content_sha256"])))
+    payload = json.loads(raw)["projection"]
+
+    sources = {
+        bytes(item["blob_sha256"]).hex()
+        for item in repository.connection.execute(
+            "select blob_sha256 from capture where workspace_id=%s", (repository.workspace_id,)
+        ).fetchall()
+    }
+    assert sources, "the fixture must have source photographs for this to prove anything"
+    assert not [digest for digest in sources if digest.encode() in raw], (
+        "a source photograph digest reached the projection"
+    )
+
+    assert set(payload) == {
+        "profile",
+        "scene_ref",
+        "bindings",
+        "placed",
+        "excluded",
+        "recovered_cameras",
+    }
+    assert set(payload["bindings"]) == {
+        "pose_receipt_sha256",
+        "placement_receipt_sha256",
+        "gate_receipt_sha256",
+        "member_capture_refs",
+        "point_map_inputs",
+    }
+    for field in ("frames", "quality", "manifest", "person", "region", "review", "silhouette"):
+        assert field.encode() not in raw, f"{field} reached the projection"
+
+
+def test_the_scene_projection_kind_is_spelled_the_same_in_all_three_places(repository):
+    """The producer, the reader and the stage registry, which may not import each other.
+
+    `exulanica.graph` and `exulanica.ingest` are siblings in the layers contract, so the reader
+    cannot import the producer's constant. `POINT_MAP_KIND` is spelled twice for the same reason
+    and pinned by `tests/test_geometry_delivery.py`; this is that test for this kind.
+    """
+    from exulanica.graph.reconstruction_scenes import SCENE_PROJECTION_KIND as reader_kind
+    from exulanica.ingest.scene_projection import SCENE_PROJECTION_KIND as producer_kind
+    from exulanica.ingest.scene_projection import SCENE_PROJECTION_STAGE
+
+    assert reader_kind == producer_kind
+    assert stage(SCENE_PROJECTION_STAGE).output_kind == producer_kind
+    assert stage(SCENE_PROJECTION_STAGE).deterministic is True
