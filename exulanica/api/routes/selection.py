@@ -20,7 +20,7 @@ logic:
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,7 +37,10 @@ from exulanica.selection import (
     execute,
     validate,
 )
+from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
+from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import PROMPT_VERSION, ModelCall, answer_question, propose_plan
+from exulanica.world import StyleReference, WorldNotConfigured, WorldStyleRepository
 
 router = APIRouter(prefix="/selection", tags=["selection"])
 
@@ -286,9 +289,22 @@ def packet(
     }
 
 
-def _execution(calls: tuple[ModelCall, ...], rejections: tuple[str, ...]) -> ExecutionView:
+def _execution(
+    calls: tuple[ModelCall, ...],
+    rejections: tuple[str, ...],
+    *,
+    prompt_version: str = PROMPT_VERSION,
+) -> ExecutionView:
+    """The executed half of one request, whichever path made it.
+
+    ``prompt_version`` is a parameter rather than the module constant because two paths now
+    share this block and they are versioned separately. An appearance proposal composed under
+    ``proposal-1`` reported as ``selection-3`` would be a record naming a prompt that had
+    nothing to do with it, and both constants are inputs to the response cache key, so the two
+    are not interchangeable even when they happen to move together.
+    """
     return ExecutionView(
-        prompt_version=PROMPT_VERSION,
+        prompt_version=prompt_version,
         rejections=list(rejections),
         calls=[
             ModelCallView(
@@ -351,4 +367,158 @@ def _view(result: SelectionResult) -> SelectionView:
         total_matched=result.total_matched,
         truncated=result.truncated,
         includes_proposals=result.includes_proposals,
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Asking for the world to look different.
+#
+# On the same router as the two read routes above, because it is the same seam: a person types
+# one sentence into one place, and what happens next depends on what the sentence turns out to
+# be. Splitting it across two prefixes would make the browser decide that, and the browser
+# cannot: deciding is the first model call.
+#
+# It is a READ route in the only sense that matters here. It opens the same read-only connection
+# the other three do, it returns a proposal rather than applying one, and there is no code path
+# from it to a write. The world style lifecycle is where a proposal becomes a preview, and that
+# is `POST /world/styles/previews`, which the browser posts to itself with the provenance this
+# route hands it. Two requests rather than one, deliberately: the proposal reaches the person's
+# own confirmation surface between them, which is the whole guarantee.
+# --------------------------------------------------------------------------------------------
+
+
+class AppearanceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: The same bound the question route uses, because it is the same text box.
+    utterance: Annotated[str, Field(min_length=1, max_length=1000)]
+
+
+class AppearanceProfileView(BaseModel):
+    """The complete reference a preview would be created from.
+
+    Complete rather than a diff: `POST /world/styles/previews` takes a whole reference and the
+    registry fills any control the body omits from its DEFAULT, not from the current value. A
+    diff posted there would silently reset every control the request did not mention.
+    ``changed`` is what a surface says out loud; ``parameters`` is what it sends.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str
+    profile_version: int
+    parameters: dict[str, Any]
+    #: The reviewed modules that own the changed controls. Named by the draft, checked here.
+    modules: list[str]
+    #: Only the controls whose value moved.
+    changed: list[str]
+
+
+class AppearanceProposalView(BaseModel):
+    """A proposal the browser may post to the world style lifecycle, with its provenance.
+
+    ``model_id`` and ``prompt_version`` are the two fields that make this a Companion proposal
+    rather than a Settings one, and the world repository refuses an origin of ``companion``
+    without both plus at least one reference id. They are returned here so the browser sends
+    back what actually happened rather than what it assumed: ``model_id`` is the identifier the
+    response body echoed, which differs from the configured one exactly when the fallback served.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile: AppearanceProfileView
+    #: Opaque ids naming the topology source slots that motivated the change. Never bytes.
+    reference_ids: list[str]
+    #: The EXECUTED identifier that drew this, read off the response and never off the manifest.
+    model_id: str
+    prompt_version: str
+    #: What the Companion says about the change. Model output, rendered as speech, never stored
+    #: as style data and never interpreted as one.
+    spoken: str
+
+
+class AppearanceRefusalView(BaseModel):
+    """Why an appearance request produced no proposal, in a code a surface branches on.
+
+    ``detail`` is this system's own words about its own validation. It never carries the
+    utterance and never carries corpus content, so returning it is not a channel out of the
+    workspace. What the person reads is a reviewed sentence the client chooses from ``code``;
+    ``detail`` is for the record and for whoever has to fix it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    detail: str
+
+
+class AppearanceView(BaseModel):
+    """What one utterance produced.
+
+    ``classification`` is ``question`` far more often than it is anything else, and that case
+    carries no proposal and NO REFUSAL. A question is not a failure of this path: it is the
+    path declining to take one, and the browser's next move is `POST /selection/ask`, exactly
+    as before this route existed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    classification: Literal["question", "appearance"]
+    proposal: AppearanceProposalView | None
+    refusal: AppearanceRefusalView | None
+    #: Which models were asked, how long they took and what they spent. The same block the
+    #: answer route returns, from the same recorder, so one measurement can read both.
+    execution: ExecutionView
+
+
+@router.post(
+    "/appearance",
+    summary="Read one utterance as a bounded appearance proposal, or decline to.",
+)
+def appearance(
+    body: AppearanceRequest,
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+) -> AppearanceView:
+    client = _require_model(request)
+    current: StyleReference | None = None
+    try:
+        current = WorldStyleRepository(connection, session.workspace_id).current().global_style
+    except WorldNotConfigured:
+        # Left as None and refused inside `propose_appearance`, rather than raised as a 409.
+        # A person who asked for a warmer world on a workspace with no reviewed world is owed a
+        # sentence, and `world_not_configured` on a route they did not know they were calling
+        # is not one. The classifier still runs, so the answer path still gets its utterance.
+        current = None
+    outcome = propose_appearance(connection, client, body.utterance, session, current=current)
+    return AppearanceView(
+        classification=outcome.kind.value,
+        proposal=(
+            None
+            if outcome.proposal is None
+            else AppearanceProposalView(
+                profile=AppearanceProfileView(
+                    profile_id=outcome.proposal.profile.profile_id,
+                    profile_version=outcome.proposal.profile.profile_version,
+                    parameters=dict(outcome.proposal.profile.parameters),
+                    modules=list(outcome.proposal.modules),
+                    changed=list(outcome.proposal.changed),
+                ),
+                reference_ids=list(outcome.proposal.reference_ids),
+                # Never null on this branch: a proposal exists only because a draft call
+                # returned, and a returned call carries the identifier that served it.
+                model_id=outcome.model_id or "",
+                prompt_version=PROPOSAL_PROMPT_VERSION,
+                spoken=outcome.proposal.spoken,
+            )
+        ),
+        refusal=(
+            None
+            if outcome.refusal is None
+            else AppearanceRefusalView(
+                code=outcome.refusal.code.value, detail=outcome.refusal.detail
+            )
+        ),
+        execution=_execution(outcome.calls, (), prompt_version=PROPOSAL_PROMPT_VERSION),
     )
