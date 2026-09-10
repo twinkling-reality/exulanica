@@ -247,12 +247,15 @@ def test_scene_group_pose_placement_gate_and_assertion_commit_together(repositor
         "pose_receipt",
         "point_map_placement",
         "scene_gate_receipt",
+        "scene_projection",
     }
+    # The projection is the one scene artifact with no column on the job row. It is found by the
+    # graph through its bindings instead, which is why the job still names exactly three.
     assert {
         job["pose_receipt_artifact_id"],
         job["placement_artifact_id"],
         job["gate_artifact_id"],
-    } == {row["artifact_id"] for row in artifacts}
+    } == {row["artifact_id"] for row in artifacts if row["kind"] != "scene_projection"}
     members = repository.reconstruction_scene_members(outcome.scene_id)
     assert [(member.capture_id, member.registered) for member in members] == [
         (captures[0], True),
@@ -292,7 +295,7 @@ def test_scene_group_pose_placement_gate_and_assertion_commit_together(repositor
             "select count(*) as count from artifact where workspace_id=%s and scene_id=%s",
             (repository.workspace_id, outcome.scene_id),
         ).fetchone()["count"]
-        == 3
+        == 4
     )
 
 
@@ -936,6 +939,46 @@ def _scene_receipt_digests(repository, job_id):
     return bytes(row["content_sha256"]).hex()
 
 
+def _binary_values(value, path="memo"):
+    """Every `bytes` reachable from a value, as the path that reaches it.
+
+    Walks tuples, lists, dicts and any object with `_fields` or `__dict__`, so it keeps working
+    when the memo's value shape changes. Returns paths rather than a bool so a failure names what
+    is being held.
+    """
+    if isinstance(value, bytes | bytearray | memoryview):
+        return [path]
+    if isinstance(value, str | int | float | bool | type(None)):
+        return []
+    if isinstance(value, dict):
+        return [
+            found
+            for key, item in value.items()
+            for found in _binary_values(key, f"{path}.<key>") + _binary_values(item, f"{path}[…]")
+        ]
+    if isinstance(value, list | tuple | set | frozenset):
+        return [
+            found
+            for index, item in enumerate(value)
+            for found in _binary_values(item, f"{path}[{index}]")
+        ]
+    fields = getattr(value, "_fields", None)
+    if fields is not None:
+        return [
+            found
+            for name in fields
+            for found in _binary_values(getattr(value, name), f"{path}.{name}")
+        ]
+    contents = getattr(value, "__dict__", None)
+    if contents is not None:
+        return [
+            found
+            for name, item in contents.items()
+            for found in _binary_values(item, f"{path}.{name}")
+        ]
+    return []
+
+
 def _point_map_digests(repository, point_artifacts):
     return {
         bytes(
@@ -1002,13 +1045,17 @@ def test_a_repeated_graph_read_reuses_the_validated_placement_without_refetching
 def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(
     repository, tmp_path
 ):
-    """A memoised record must never carry the bytes it was built from.
+    """A memoised entry must never carry the bytes it was built from.
 
-    It does not today: `build_placement_record` rebuilds its inputs as three positional arguments
-    (exulanica/reconstruction/placement.py), so `PointMapInput.content` keeps its None default and
-    the bytes live only in the caller's local mapping. This test exists because the memo makes that
-    a load-bearing property rather than an incidental one. MEASURED 2026-09-09: one entry for a 210
-    member scene is 639.6 KiB; were the inputs to start carrying content it would be 780 MB.
+    MEASURED 2026-09-09: one entry for a 210 member scene was 639.6 KiB; were the point maps to
+    start being held it would be 780 MB. The memo used to hold a whole `PlacementRecord`, whose
+    `point_map_inputs` kept their `content=None` default only because `build_placement_record`
+    happened to rebuild them positionally. It now holds `_Outcome`, whose fields are strings and
+    floats and which structurally cannot hold bytes at all.
+
+    The assertion is therefore about the value rather than about one field of it: nothing
+    reachable from a memo entry is a `bytes`. That survives the shape changing again, which the
+    field-level version did not.
     """
     clear_placement_memo()
     store, _captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
@@ -1018,9 +1065,9 @@ def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(
 
     read_snapshot(repository.connection, repository.workspace_id, store)
     assert placement_memo_size() == 1
-    held = next(iter(_memo.values()))[0]
-    assert held.point_map_inputs
-    assert all(item.content is None for item in held.point_map_inputs)
+    outcome, _cameras = next(iter(_memo.values()))
+    assert outcome.placed, "the fixture places every member, so an empty outcome proves nothing"
+    assert _binary_values(_memo) == []
 
 
 def test_losing_a_point_map_after_a_memoised_read_is_still_seen(repository, tmp_path):
