@@ -904,9 +904,15 @@ def test_the_drafter_prompt_is_the_wording_that_was_measured():
     """`proposal-2` changed the classifier and left the drafter alone, on purpose.
 
     Three edits to the drafter were tried against two reproducible defects and every one of them
-    is recorded in `docs/evaluation/2026-09-10-companion-prompts.json` as measured and NOT made.
-    This pins the two passages they would have replaced, so a later edit to either is a decision
-    somebody makes rather than a diff that slips through under a version bump.
+    is recorded, in the prompt-comparison record section 14 of `docs/companion-question.md`
+    names, as measured and NOT made. This pins the two passages they would have replaced, so a
+    later edit to either is a decision somebody makes rather than a diff that slips through under
+    a version bump.
+
+    The record is named by that document rather than by this docstring on purpose: every
+    `docs/...json` string in a tracked file has to resolve, and the evidence script runs the
+    whole suite BEFORE it writes its own output, so a test naming the record it is about to
+    produce fails the run whose result the record reports.
     """
     from exulanica.selection.proposal import _DRAFTER_SYSTEM
 
