@@ -94,6 +94,11 @@ def main() -> int:
     parser.add_argument("--predecessor", type=Path, required=True)
     parser.add_argument("--measurement", type=Path, required=True)
     parser.add_argument("--browser", type=Path, required=True)
+    parser.add_argument(
+        "--scope-note",
+        default="",
+        help="Appended to `scope`. Use it when a record is a replication rather than the first.",
+    )
     args = parser.parse_args()
 
     output = args.output.resolve()
@@ -206,6 +211,7 @@ def main() -> int:
             "through the confirmation surface that already existed, and applied only by them. "
             "Nothing here writes a style value; the world style authority does that, from a "
             "proposal it validates again against its own closed registry."
+            + (f" {args.scope_note}" if args.scope_note else "")
         ),
         "corpus": {
             "database_schema": "0038",

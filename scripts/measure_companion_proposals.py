@@ -246,6 +246,11 @@ def measure() -> int:
     parser.add_argument("--max-calls", required=True, type=int)
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--scene", default="volcanic")
+    parser.add_argument(
+        "--database",
+        default="postgresql://localhost:5433/exulanica_spine_test",
+        help="Named for the record only. The API is what reads it; this script never connects.",
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument(
         "--skip-live",
@@ -260,11 +265,18 @@ def measure() -> int:
     manifest = load_manifest()
 
     runs: list[dict[str, Any]] = []
+    schema_level = "unknown"
     with httpx.Client(
         base_url=args.api, headers={"authorization": f"Bearer {token}"}, timeout=300.0
     ) as http:
         health = http.get("/readyz")
         (args.out / "readyz.json").write_text(json.dumps(health.json(), indent=2) + "\n")
+        # Read off the server rather than typed into this file. An earlier version carried the
+        # schema level as a literal "0038", which was true of the database it was written
+        # against and silently false of the next one. `/readyz` lists what is applied, so the
+        # record states what the instance actually had rather than what somebody remembered.
+        applied = (health.json().get("checks", {}).get("schema", {}) or {}).get("applied") or []
+        schema_level = applied[-1] if applied else "unknown"
 
         # The world this would be proposed against, read first and always. It spends nothing and
         # it is what says the measurement had a base at all: a refusal with `no_world` on a
@@ -327,8 +339,9 @@ def measure() -> int:
         "profile": "exulanica.companion-proposal-measurement/v1",
         "live": not args.skip_live,
         "workspace": f"retained local reference, scene={args.scene}",
+        "database": args.database,
         "workspace_id": workspace_id,
-        "database_schema": "0038",
+        "database_schema": schema_level,
         "prompt_version": PROMPT_VERSION,
         "pipeline_version": manifest.pipeline_version,
         "max_reference_catalogue": MAX_REFERENCE_CATALOGUE,
