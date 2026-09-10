@@ -293,9 +293,7 @@ def test_what_the_backfill_writes_validates_against_the_scene_it_names(repositor
         ],
     )
     assert projection.scene_ref == str(scene_id)
-    assert {member.capture_ref for member in projection.placed} == {
-        str(item) for item in captures
-    }
+    assert {member.capture_ref for member in projection.placed} == {str(item) for item in captures}
     assert [item[1] for item in projection.point_map_inputs] == [
         str(item) for item in point_artifacts
     ]
