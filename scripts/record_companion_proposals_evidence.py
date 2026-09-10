@@ -95,6 +95,13 @@ def main() -> int:
     parser.add_argument("--measurement", type=Path, required=True)
     parser.add_argument("--browser", type=Path, required=True)
     parser.add_argument(
+        "--prompts",
+        type=Path,
+        action="append",
+        default=[],
+        help="A prompt-comparison output directory. Repeatable; each is copied and bound.",
+    )
+    parser.add_argument(
         "--scope-note",
         default="",
         help="Appended to `scope`. Use it when a record is a replication rather than the first.",
@@ -174,6 +181,14 @@ def main() -> int:
     for source in sorted(args.browser.resolve().iterdir()):
         if source.is_file():
             shutil.copy2(source, artifacts / f"browser-{source.name}")
+    prompt_records: list[dict] = []
+    for directory in args.prompts:
+        resolved = directory.resolve()
+        for source in sorted(resolved.iterdir()):
+            if source.is_file():
+                shutil.copy2(source, artifacts / f"prompts-{resolved.name}-{source.name}")
+        loaded = json.loads((resolved / "measurement.json").read_bytes())
+        prompt_records.append({"directory": resolved.name, **quantise(loaded)})
 
     measurement = json.loads((artifacts / "measurement-measurement.json").read_bytes())
     lifecycle = json.loads((artifacts / "browser-lifecycle.json").read_bytes())
@@ -262,6 +277,7 @@ def main() -> int:
             ),
             **quantise(measurement),
         },
+        "prompt_comparison": prompt_records,
         "browser_check": {
             "what_ran": (
                 "The product, in a browser, against a throwaway schema at HEAD with six observed "
