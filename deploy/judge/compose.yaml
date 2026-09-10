@@ -1,0 +1,136 @@
+# The judge deployment: four services, read-mostly, seeded from an archive.
+#
+# Standalone rather than an override of the repository's `compose.yaml`, and the reason is not
+# style. That file's worker services declare `${EXULANICA_CODE_REVISION:?}` and
+# `${EXULANICA_POSE_RUNTIME_IMAGE:?}`, and Compose interpolates every service in a file whether or
+# not it is selected, so a judge stack layered on top would have to supply a digest-pinned pose
+# runtime for a worker it never starts. Inventing one would be writing down a provenance claim
+# that is not true, and `docs/deployment.md` invariant 10 is about exactly that kind of wording.
+#
+# Read `docs/judge-access.md` before changing anything here. The two facts that are load bearing:
+#
+#   1. `api` connects as `exulanica_judge`, NOT as `exulanica_app`. That role holds SELECT on
+#      every table, INSERT and UPDATE on thirteen, and DELETE on none. It is the only place the
+#      sentence "a judge cannot touch sources or deletion" is enforced rather than intended: the
+#      bearer token carries no permissions at all, so nothing above the database can enforce it.
+#   2. `web` and `api` are one origin. The browser client calls `window.location.origin + '/api'`
+#      and the API installs no CORS middleware, so a second origin does not work and cannot be
+#      made to work from the client side.
+#
+# NO derivative worker and NO scene worker. Reconstruction never runs in the live path, and the
+# seed is already reconstructed. A judge stack with a worker in it would be a judge stack that
+# can queue GPU work.
+
+name: exulanica-judge
+
+services:
+  postgres:
+    # The same tag as the repository's `compose.yaml`, matched exactly rather than approximately.
+    # `tests/test_judge_deployment.py` asserts the two agree, because a judge stack proving the
+    # product on a different PostgreSQL from the one the suite verifies proves less than it looks.
+    image: pgvector/pgvector:0.8.6-pg18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-exulanica}
+      POSTGRES_USER: ${POSTGRES_USER:-exulanica}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD; there is no default}
+    volumes:
+      # PostgreSQL 18 moved PGDATA and the image's VOLUME with it. Mounting the old
+      # /var/lib/postgresql/data would give a volume the server does not write to.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-exulanica} -d ${POSTGRES_DB:-exulanica}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Runs once to completion: migrations, then the three runtime roles, in the one correct order.
+  migrate:
+    # One image name across migrate, seed and api. Without it Compose builds the same recipe
+    # three times and stores three copies: MEASURED 2026-09-10, 3 x 451 MB where one will do.
+    # The three differ only in the command they run.
+    image: exulanica-judge-backend
+    build: &backend
+      context: ../..
+      args:
+        # The judge API serves and answers. It recovers no camera poses, so it does not need
+        # pycolmap, and leaving it out is also what lets this image build natively on arm64,
+        # where that wheel does not exist.
+        EXULANICA_SYNC_EXTRAS: "--extra server"
+    command: ["exulanica-db"]
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_APP_ROLE_PASSWORD: ${EXULANICA_APP_ROLE_PASSWORD:?set EXULANICA_APP_ROLE_PASSWORD; the runtime must not use the owner}
+      EXULANICA_EXECUTOR_ROLE_PASSWORD: ${EXULANICA_EXECUTOR_ROLE_PASSWORD:?set EXULANICA_EXECUTOR_ROLE_PASSWORD; the executor has its own read-only role}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # The seeding job. Runs after `migrate` and before `api`: it provisions the judge role, loads
+  # the archive, and byte-verifies what landed. It exits, and `api` starts only if it exited 0,
+  # so an API that is up is an API whose data was verified rather than merely written.
+  seed:
+    image: exulanica-judge-backend
+    build: *backend
+    command: ["/bin/sh", "-c", "exulanica-seed role && exulanica-seed restore --archive /seed"]
+    environment:
+      # The owner, because the load writes tables no runtime role may write and creates the
+      # workspace's embedding partition.
+      EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_JUDGE_ROLE_PASSWORD: ${EXULANICA_JUDGE_ROLE_PASSWORD:?set EXULANICA_JUDGE_ROLE_PASSWORD; the judge stack has its own role}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+    volumes:
+      - media:/var/lib/exulanica
+      # Read only. The seeding job reads the archive and never writes back to it, so an operator
+      # can hand the same directory to two stacks and still have one artifact afterwards.
+      - ${EXULANICA_SEED_ARCHIVE:?set EXULANICA_SEED_ARCHIVE to the seed archive directory}:/seed:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    image: exulanica-judge-backend
+    build: *backend
+    environment:
+      # THE JUDGE ROLE. Not exulanica_app. See the header.
+      EXULANICA_DATABASE_URL: postgresql://exulanica_judge:${EXULANICA_JUDGE_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # The Selection executor keeps its own read-only role, unchanged. A judge asking the
+      # Companion runs a plan derived from model output, and that step holds SELECT and nothing
+      # else here for the same reason it does everywhere else.
+      EXULANICA_READONLY_DATABASE_URL: postgresql://exulanica_ro:${EXULANICA_EXECUTOR_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_API_TOKENS: ${EXULANICA_API_TOKENS:?set EXULANICA_API_TOKENS; there is no default}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_DERIVATIVE_WORKER: "off"
+      # Optional. Without it `POST /selection/ask` answers 503 and says so; every read path and
+      # both edit surfaces work unchanged. An unset key is a degraded demonstration, not a
+      # broken one, and it is better than a key sitting in a judge's environment.
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+    volumes:
+      - media:/var/lib/exulanica
+    expose:
+      - "8000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  # The browser client, and the only port published. It serves the built bundle at the origin
+  # root and proxies /api to the API, which is what keeps the two on one origin.
+  web:
+    build:
+      context: ../../web
+      dockerfile: ../deploy/judge/web.Dockerfile
+    ports:
+      # 127.0.0.1 on purpose, and not only for exposure. The client refuses every region when
+      # `crypto.subtle` is absent, and a browser gives SubtleCrypto to a secure context only:
+      # 127.0.0.1 is one, a LAN address over plain http is not. Publishing on 0.0.0.0 here would
+      # produce a judge who sees the world without geometry and reads that as a broken
+      # reconstruction. A remote judge needs TLS in front, not a wider bind.
+      - "127.0.0.1:${EXULANICA_JUDGE_PORT:-8080}:8080"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  # The content-addressed store. Append-only by policy: nothing in the runtime deletes from it,
+  # and a reset deliberately does not touch it, because its keys are the evidence every citation
+  # resolves to. Not immutable and not write-once; a docker volume provides neither.
+  media:

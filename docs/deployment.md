@@ -34,6 +34,7 @@ The shape of the deployment is decided. The concrete target is not.
 | Who performs the weekly check through the unattended window | **OPEN**, section 9 |
 | Whether the health endpoint exists | **DECIDED and implemented.** `/healthz` and `/readyz`, section 6 |
 | Whether the redeploy command exists | **OPEN.** Specified in section 9 and not implemented |
+| Whether a seedable, read-mostly deployment for a reviewer exists | **EXECUTED locally 2026-09-10**, and unprovisioned. [judge-access.md](judge-access.md) |
 | Whether there is a connection pool, a subscriber bound, `blob` reference counting or a decode semaphore | **DECIDED against, on measurement.** Section 12, with the condition that would flip each one |
 | How large a host one API process needs, and what it runs out of first | **MEASURED**, section 5.4 |
 
@@ -800,6 +801,29 @@ for a single tenant demonstration with a sub-gigabyte database and a fixed 3.7 m
 | Reconstruction GPU time, one time ahead of deployment | Bounded by scene count, and the line with the highest variance if the controls in 8.2 are not in place |
 | Token Factory inference | Under a dollar for the corpus, capped by a prepaid balance |
 | Static client hosting | Zero on the free tier |
+
+---
+
+## 8.5 A seeded deployment for a reviewer
+
+Separate from everything above, and deliberately narrower. `deploy/judge/compose.yaml` is a
+standalone four-service composition that starts from a versioned seed archive rather than from an
+empty database: PostgreSQL, the one-shot migration, a one-shot seeding job that byte-verifies what
+it loaded, the API, and the browser client behind a same-origin proxy. It runs no derivative worker
+and no scene worker, because the seed is already reconstructed and reconstruction never runs in the
+live path.
+
+Two things about it belong here rather than only in its own document. **Its API connects as
+`exulanica_judge`, not `exulanica_app`**, because a bearer token in this system carries no
+permissions at all and a database role is the only place "may read, may not write a source or a
+deletion" can be enforced rather than intended. And **a reset never touches the object store**,
+which is the rule [demo-integrity.md](demo-integrity.md) section 2.2 set before there was code to
+set it in.
+
+The steps, the measured footprint, and two list-price quotes read on one day are in
+[judge-access.md](judge-access.md). Nothing there is provisioned either: it moves the redeploy
+question in section 9.4 from "specified and not implemented" to "implemented and rehearsed for one
+audience on one machine", and it does not settle section 10.
 
 ---
 
