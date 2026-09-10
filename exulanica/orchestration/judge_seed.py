@@ -968,6 +968,31 @@ def _load_blobs(archive: Path, store: ContentAddressedStore, manifest: SeedManif
     return written
 
 
+def _assert_only_this_workspace(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, consequence: str
+) -> None:
+    """Refuse a database holding any workspace other than the seed's.
+
+    Both the restore and the reset need this and for related reasons. A reset TRUNCATES, which
+    ignores the workspace policy and would empty a stranger's rows. A restore counts whole tables
+    in :func:`verify_restored`, so a second workspace's rows would make every count disagree with
+    the manifest and produce a confusing failure after a load that actually worked.
+
+    A judge stack holds exactly one workspace. This is what makes that a checked property rather
+    than an assumption written in a comment.
+    """
+    intruders = connection.execute(
+        "select distinct workspace_id from capture where workspace_id <> %s",
+        (str(workspace_id),),
+    ).fetchall()
+    if intruders:
+        names = ", ".join(str(row["workspace_id"]) for row in intruders)
+        raise SeedRefused(
+            f"this database holds captures for {names} as well as the seed's {workspace_id}. "
+            + consequence
+        )
+
+
 def restore_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -1003,6 +1028,12 @@ def restore_seed(
             f"workspace {manifest.workspace_id} already holds captures in this database. Use "
             "reset_to_seed to return a used stack to the archive."
         )
+    _assert_only_this_workspace(
+        connection,
+        manifest.workspace_id,
+        "The landed row counts are compared against the manifest over whole tables, so a second "
+        "workspace here would make every count disagree after a load that worked.",
+    )
 
     provision_workspace(connection, manifest.workspace_id)
     grant_workspace_partition(connection, f"embedding_ws_{manifest.workspace_id.hex}")
@@ -1040,17 +1071,12 @@ def reset_to_seed(
     manifest = verify_seed(archive) if verify else read_manifest(archive)
     files = _row_files(manifest)
 
-    intruders = connection.execute(
-        "select distinct workspace_id from capture where workspace_id <> %s",
-        (str(manifest.workspace_id),),
-    ).fetchall()
-    if intruders:
-        raise SeedRefused(
-            "this database holds captures for "
-            f"{', '.join(str(row['workspace_id']) for row in intruders)} as well as the seed's "
-            f"{manifest.workspace_id}. A reset truncates, which ignores the workspace policy, so "
-            "it is refused here rather than emptying somebody else's workspace."
-        )
+    _assert_only_this_workspace(
+        connection,
+        manifest.workspace_id,
+        "A reset truncates, which ignores the workspace policy, so it is refused here rather "
+        "than emptying somebody else's workspace.",
+    )
     carried = [
         table
         for name, table in files

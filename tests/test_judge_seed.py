@@ -358,6 +358,29 @@ def test_a_restore_lands_every_row_and_every_byte(seeded, store, tmp_path):
             assert len(target.get(_blob(digest))) == recorded["bytes"]
 
 
+def test_a_restore_into_a_database_holding_a_stranger_is_refused(seeded, store, tmp_path):
+    """A judge stack holds one workspace, and both restore and reset check it rather than assume.
+
+    The restore counts whole tables against the manifest, so a second workspace's rows would make
+    every count disagree after a load that actually worked. The reset truncates, which ignores the
+    workspace policy entirely.
+    """
+    destination, _manifest = _exported(seeded, store, tmp_path)
+    with migrated_schema() as (_psycopg, admin):
+        admin.row_factory = dict_row
+        stranger = uuid.uuid4()
+        admin.execute("select set_config('exulanica.workspace_id', %s, false)", (str(stranger),))
+        provision_workspace(admin, stranger)
+        _populate(admin, stranger, 3)
+        admin.commit()
+        target = LocalContentAddressedStore(tmp_path / "stranger-store")
+        with pytest.raises(SeedRefused) as refusal:
+            restore_seed(admin, target, archive=destination, verify=False)
+        assert "as well as the seed's" in str(refusal.value)
+        with pytest.raises(SeedRefused):
+            reset_to_seed(admin, archive=destination, verify=False)
+
+
 def test_a_restore_into_an_occupied_workspace_is_refused(seeded, store, tmp_path):
     destination, _manifest = _exported(seeded, store, tmp_path)
     with pytest.raises(SeedRefused) as refusal:
