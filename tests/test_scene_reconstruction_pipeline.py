@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.evidence.blob import BlobId
 from exulanica.graph import read_snapshot
 from exulanica.graph.asset_read_policy import (
+    _manifest_and_digest,
     clear_scene_inputs_memo,
     scene_inputs,
     scene_inputs_memo_frames,
@@ -1898,3 +1899,63 @@ def test_the_scene_projection_kind_is_spelled_the_same_in_all_three_places(repos
     assert reader_kind == producer_kind
     assert stage(SCENE_PROJECTION_STAGE).output_kind == producer_kind
     assert stage(SCENE_PROJECTION_STAGE).deterministic is True
+
+
+# -- the pose receipt head parse -----------------------------------------------------------------
+#
+# The memo above spares the second parse of a pose receipt in a process. This spares most of the
+# first, which is the one a fresh process and therefore a first visitor pays.
+
+
+def test_the_manifest_is_taken_from_the_receipt_head_without_parsing_the_whole_object():
+    """MEASURED 2026-09-10 on the volcanic scene's 108,267,697 byte receipt: `json.loads` of the
+    whole object is 1.129 s and the manifest is 50,034 bytes of it. Decoding and `raw_decode`-ing
+    only the head is 0.011 s. The two must agree exactly, or the digest check that follows would
+    deny a sound scene.
+    """
+    manifest = {"scene_ref": str(uuid.uuid4()), "frames": [{"capture_ref": "a", "sha256": "b"}]}
+    receipt = {
+        "manifest": manifest,
+        "manifest_digest": "d" * 64,
+        "profile": "exulanica.colmap-pose-receipt/v2",
+        # The half the fast path exists to skip. Large and irrelevant, as `quality` is.
+        "quality": {"registered_images": [f"{index:04d}.jpg" for index in range(2000)]},
+        "quality_digest": "e" * 64,
+    }
+    canonical = json.dumps(
+        receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    assert canonical.startswith(b'{"manifest":'), "the fast path's precondition"
+
+    assert _manifest_and_digest(canonical) == (manifest, "d" * 64)
+    assert _manifest_and_digest(canonical) == (
+        json.loads(canonical)["manifest"],
+        json.loads(canonical)["manifest_digest"],
+    )
+
+
+def test_a_receipt_the_head_parse_cannot_read_falls_back_to_the_whole_object():
+    """Anything not written the way `exulanica/reconstruction/pose.py` writes one still reads.
+
+    The fast path is a shortcut through a known layout, not a new format. A receipt that is
+    pretty-printed, or whose keys are in another order, must still produce the same pair, slowly.
+    """
+    manifest = {"scene_ref": str(uuid.uuid4()), "frames": []}
+    receipt = {"manifest": manifest, "manifest_digest": "f" * 64, "quality": {"n": 1}}
+
+    indented = json.dumps(receipt, indent=2).encode()
+    assert not indented.startswith(b'{"manifest":')
+    assert _manifest_and_digest(indented) == (manifest, "f" * 64)
+
+    reordered = json.dumps(
+        {"quality": {"n": 1}, "manifest": manifest, "manifest_digest": "f" * 64},
+        separators=(",", ":"),
+    ).encode()
+    assert not reordered.startswith(b'{"manifest":')
+    assert _manifest_and_digest(reordered) == (manifest, "f" * 64)
+
+
+def test_a_head_that_looks_right_but_is_truncated_is_refused_rather_than_half_read():
+    """A misread head must not become a manifest. It cannot: the caller checks the digest."""
+    with pytest.raises(ValueError):
+        _manifest_and_digest(b'{"manifest":{"scene_ref":"x"')

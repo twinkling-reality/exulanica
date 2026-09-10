@@ -496,8 +496,14 @@ def _scene_row(
             #
             # The bytes are read and dropped rather than kept, because the projection path has no
             # use for them. Peak memory here is one point map instead of all of them.
-            projected = (
-                _projected(
+            #
+            # Guarded on there being a candidate at all, so a scene with no projection does not
+            # read every point map here and then read them all again in the rebuild below. A scene
+            # WITH a projection whose bindings fail does pay that double read, which is the right
+            # way round: it is the rare case, and it is the one where being sure is worth a second.
+            projected = None
+            if row["projection_digests"] and _point_maps_verify(store, references):
+                projected = _projected(
                     store,
                     row["projection_digests"],
                     scene_id=scene_id,
@@ -507,9 +513,6 @@ def _scene_row(
                     member_refs=member_refs,
                     references=references,
                 )
-                if _point_maps_verify(store, references)
-                else None
-            )
             if projected is not None:
                 outcome, cameras = projected
                 _memo_put(key, projected)

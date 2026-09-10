@@ -71,6 +71,47 @@ trained scene therefore remains at its supported recorded rung. Training quality
 the normal fitted point-map scene and the evaluation receipt. A missing or corrupted SOG falls
 back to those verified point maps without rewriting the durable recorded claim.
 
+## The graph projection
+
+A fourth deterministic artifact, `scene_projection`, publishes inside the same atomic acceptance as
+the pose receipt, the placement and the gate. It carries what a graph reader would otherwise
+rebuild: each placed member's `scene_from_opm` transform, scale and point-map references, each
+excluded member's reason, and the recovered cameras. It exists because rebuilding those is what a
+cold `GET /graph` used to cost. MEASURED 2026-09-09: 47.9 s for the 210 member volcanic scene in
+every fresh process, none of it depending on anything mutable.
+
+It is bound to five things, and a reader proves all five before using one. Three are the pose,
+placement and gate content digests, so a projection belonging to a superseded build cannot answer
+for the current one. The fourth is the scene's member capture refs in scene order, which is the one
+input no digest covers: withdrawing a member leaves all three receipts byte-identical. The fifth is
+the placement's point-map references in record order, which is how a superseded or re-pointed
+point-map artifact row is seen. The reader also establishes that every one of those point maps is
+present and reproduces its content digest, by reading the bytes through the store and dropping
+them; that is a live fact rather than a binding and cannot be carried in an artifact.
+
+Any of those failing falls back to the rebuild, and so does a projection that is absent, purged,
+flagged for repair, unparseable or failing its own payload digest. A refused projection therefore
+costs the read exactly what it cost before projections existed, and nothing else. The artifact rows
+with their `purged_at` and tombstone predicates, the scene's members, the gate agreement, the person
+regions and review states, and the asset-read policy the route applies afterwards are all re-read on
+every request, unchanged. A projection shortens one computation and answers no question about
+permission or liveness.
+
+Nothing privacy-bearing enters it. It carries no person region, no review state, no source
+photograph digest and no pose manifest frame. The source digests are the reason that is a rule
+rather than an observation: `scene_allowed` denies a scene by comparing the pose manifest's frame
+digest against the live artifact row, and re-masking a withdrawn person moves `read_source_sha256`.
+A copy of those digests in a durable artifact would be a second, stale answer to a question the
+asset-read policy exists to ask fresh.
+
+The projection has no column on the job row, unlike the three receipts. The graph finds it by
+selecting the newest few live projections for the scene and proving each from its own bindings.
+Several rather than one because nothing sets `artifact.superseded_by` on a scene artifact, so every
+projection a scene has ever had stays live. `scripts/backfill_scene_projections.py` gives an
+already published scene the projection it was published without; it projects only a scene's current
+job, for the same reason, and records what it wrote as JSON. It is idempotent, because the artifact
+id is derived from the three receipt digests.
+
 ## Delivery and recovery
 
 `GET /scene-geometry/{artifact_id}` requires the ordinary workspace bearer token and exact current
