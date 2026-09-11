@@ -122,6 +122,45 @@ already published scene the projection it was published without; it projects onl
 job, for the same reason, and records what it wrote as JSON. It is idempotent, because the artifact
 id is derived from the three receipt digests.
 
+### Replacing a projection that can no longer answer
+
+That derivation used to make a dead projection permanent. `artifact` is unique on the identity key
+over every row, purged or not, and `insert_scene_artifact` is `on conflict do nothing`, so a purged
+projection kept its id and absorbed the insert of its replacement. OBSERVED 2026-09-11: three
+purged projection rows whose bytes were gone still held their ids, the backfill refused with "an
+existing projection disagrees with the bytes recomputed from this scene's receipts", and the scene
+rebuilt its placement on every cold read with nothing in the response saying so.
+
+The projection's identity therefore has generations. `projection_identity_key` in
+`exulanica/ingest/scene_projection.py` returns the receipt-derived key unchanged for generation 0,
+which is the only one the worker writes and the one every existing projection already has, and a
+length-prefixed digest of that key and the generation number after it. The backfill walks the
+generations from 0 before it does any expensive work, and what it finds decides what it does:
+
+| At the first generation that is not spent | What the backfill does |
+| --- | --- |
+| No row | Writes the projection there. |
+| A live row whose bytes are present | Nothing; reports `already-present`. |
+| A live row whose bytes are gone, reproduced by the receipts | Writes the bytes back under the same id and reports `repaired_missing_bytes`. |
+| A live row naming content the receipts do not reproduce | Refuses. The stage has disagreed with itself, and moving past it would absorb that. |
+
+A generation is spent when the graph would never offer its row to a reader: purged, flagged
+`needs_repair`, or recording no content. That is the reader's own candidate predicate, so the
+backfill can never pass over a row a reader would still try, nor stop at one a reader would skip.
+Every generation passed over is named in the record, with its artifact id and why.
+
+Purge semantics are unchanged by this. A purged row is never deleted, un-purged, rewritten or
+reused: it keeps its id, its content digest and its null `storage_key`, and stays the record that
+those bytes were destroyed. The replacement is a new row under a new id, and carries the same bytes
+only because the stage is deterministic. Nor can passing over a purged row undo a deletion. The
+deletion queue purges a scene's projection only when a deletion reaches the scene, and then
+`tombstone_blocks_scene` keeps the backfill from selecting it and the artifact insert guard
+`tg_tombstone_guard_artifact`, whose scene branch migration 0024 added, refuses every generation
+alike; `tests/test_scene_projection_backfill.py` pins both. A refused
+disagreement is resolved by finding out why the stage produced other bytes, then flagging the row
+`needs_repair`, which the pipeline already sets on bytes that are gone and cannot be reproduced;
+the next run passes over it. Nothing is ever deleted to make room.
+
 ## Delivery and recovery
 
 `GET /scene-geometry/{artifact_id}` requires the ordinary workspace bearer token and exact current

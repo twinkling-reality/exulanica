@@ -47,6 +47,15 @@ placement record remains the durable statement of where each point map sits; thi
 reader from recomputing a conclusion those two already stand behind. A reader that refuses a
 projection loses time and nothing else, which is why every check below fails closed.
 
+ITS IDENTITY HAS GENERATIONS. The artifact id is ``uuid5`` over an identity key derived from the
+scene and the three receipt digests, and ``artifact`` is unique on that key over EVERY row,
+purged or not. So a purged projection occupies its id forever: the insert that would replace it is
+``on conflict do nothing``, and removing or un-purging the row to make room would erase the record
+that its bytes were destroyed. ``projection_identity_key`` gives the replacement the next
+generation of the same key instead. Generation 0 is the key itself, so every projection written
+before generations existed keeps its identity, and the worker, which writes a set of receipts'
+projection in the same acceptance that publishes those receipts, never needs any other.
+
 The reader half lives in ``exulanica/graph/reconstruction_scenes.py`` and parses these bytes
 independently rather than calling into this module, because ``graph`` and ``ingest`` are
 siblings in the ``pyproject.toml`` layers contract and neither may import the other.
@@ -79,6 +88,7 @@ __all__ = [
     "SCENE_PROJECTION_STAGE",
     "SceneProjection",
     "build_scene_projection",
+    "projection_identity_key",
     "projection_point_map_inputs",
     "validate_scene_projection",
 ]
@@ -110,6 +120,32 @@ def _canonical(value: object) -> bytes:
 
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def projection_identity_key(base_key: str, generation: int) -> str:
+    """The identity key of the ``generation``-th projection written under ``base_key``.
+
+    ``base_key`` is the scene artifact key the worker derives from the scene and the three
+    receipt digests, and generation 0 returns it unchanged. A later generation exists only
+    because every one before it can no longer answer a reader, which a writer establishes from the
+    rows before it takes one; this function only names it. Length-prefixed like the base key, so
+    no generation of one key can be spelled as a generation of another.
+    """
+    _require_digest(base_key, "projection base key")
+    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 0:
+        raise ValueError("a projection generation is a non-negative integer")
+    if generation == 0:
+        return base_key
+    hasher = hashlib.sha256()
+    for part in (
+        b"exulanica/scene-projection-generation",
+        b"1",
+        base_key.encode("ascii"),
+        str(generation).encode("ascii"),
+    ):
+        hasher.update(len(part).to_bytes(8, "big"))
+        hasher.update(part)
+    return hasher.hexdigest()
 
 
 def _require_digest(value: str, field: str) -> None:
