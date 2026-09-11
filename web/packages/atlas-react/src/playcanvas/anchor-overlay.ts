@@ -163,7 +163,9 @@ export class AnchorOverlay {
     this.photographLabel.root.setAttribute('aria-label', 'Press E to open this photograph');
     this.photographLabel.root.replaceChildren(
       Object.assign(document.createElement('span'), { className: 'ov-focus-key', textContent: 'E' }),
-      Object.assign(document.createElement('span'), { className: 'ov-focus-verb', textContent: 'Open photograph' }),
+      // One short verb: the label stage reveals at most 5.5rem of it (style.css), sized for
+      // "Interact". The visitor is already looking at the photograph; the accessible name says it.
+      Object.assign(document.createElement('span'), { className: 'ov-focus-verb', textContent: 'Open' }),
     );
     this.callouts = Array.from({ length: MAX_CAPTIONS }, () => makeNode('ov-callout', this.root));
     this.chevrons = Array.from({ length: MAX_EDGE_CHEVRONS }, () =>

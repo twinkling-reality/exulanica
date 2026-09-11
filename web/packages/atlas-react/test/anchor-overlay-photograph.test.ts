@@ -24,7 +24,7 @@ function frame(overrides: { photographPrompt?: boolean; traversalActive?: boolea
 }
 
 const prompt = (overlay: AnchorOverlay) =>
-  [...overlay.root.querySelectorAll<HTMLElement>('.ov-focus')].find((node) => node.textContent === 'EOpen photograph')!;
+  [...overlay.root.querySelectorAll<HTMLElement>('.ov-focus')].find((node) => node.textContent === 'EOpen')!;
 
 describe('the open-photograph prompt', () => {
   it('offers E beside the reticle while the visitor looks into a photograph, and says what E does', () => {
