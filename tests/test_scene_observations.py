@@ -10,11 +10,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import uuid
 
 import pytest
 from exulanica.evidence.blob import BlobId
-from exulanica.graph.observations import OBSERVATIONS_PROFILE, scene_observations
+from exulanica.graph.observations import (
+    OBSERVATION_RESOLVE_PROFILE,
+    OBSERVATION_SUMMARY_PROFILE,
+    OBSERVATIONS_PROFILE,
+    ViewNotResolvable,
+    clear_observation_index_memo,
+    observation_index_memo_size,
+    resolve_observation,
+    scene_observation_summary,
+    scene_observations,
+)
 from exulanica.ingest.repository import IngestRepository
 
 from test_world_read_bundle import _published_scene
@@ -389,3 +400,159 @@ def test_an_exhausted_cursor_does_not_claim_the_scene_observed_nothing(repositor
     assert page["bounds"]["point_count_not_returned"] == whole["point_count"]
     assert page["bounds"]["observations_returned"] == 0
     assert page["bounds"]["observations_total"] == whole["bounds"]["observations_total"]
+
+
+# -- one click, resolved on the server ------------------------------------------------------------
+
+
+def _resolve(repository, store, scene_id, capture_id, u, v, **options):
+    return resolve_observation(
+        repository.connection,
+        repository.workspace_id,
+        scene_id,
+        store,
+        capture_id=capture_id,
+        u=u,
+        v=v,
+        **options,
+    )
+
+
+def test_the_summary_counts_what_the_whole_graph_holds(repository, tmp_path):
+    """The inspector's idle sentence, without the graph it used to count them from."""
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    summary = scene_observation_summary(
+        repository.connection, repository.workspace_id, scene_id, store
+    )
+    assert whole is not None and summary is not None
+    assert summary["profile"] == OBSERVATION_SUMMARY_PROFILE
+    assert summary["point_count_total"] == whole["bounds"]["point_count_total"]
+    assert summary["observations_total"] == whole["bounds"]["observations_total"]
+    assert summary["retained_per_image"] == whole["retained_per_image"] == 4096
+    assert (summary["method"], summary["sampling"]) == (whole["method"], whole["sampling"])
+    assert "points" not in summary
+
+
+def test_clicking_where_a_photograph_recorded_a_point_resolves_to_that_point(repository, tmp_path):
+    """Parity with the whole graph, for every recorded observation in the scene.
+
+    The fixture's cameras are exact pinholes, so the pixel a photograph recorded for a point is
+    where the recovered camera projects it. A click there, with a tolerance under the spacing
+    between points, has exactly one right answer, and it must be the whole graph's own entry for
+    that point, consent included, rather than something assembled differently. A projection with
+    a flipped axis or the wrong camera fails this on the first observation it meets.
+    """
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    whole = scene_observations(repository.connection, repository.workspace_id, scene_id, store)
+    assert whole is not None
+    resolved = 0
+    for point in whole["points"]:
+        for item in point["observations"]:
+            answer = _resolve(
+                repository,
+                store,
+                scene_id,
+                uuid.UUID(item["capture_id"]),
+                float(item["x"]),
+                float(item["y"]),
+                tolerance_px=1.0,
+                occlusion_band_px=0.0,
+            )
+            assert answer is not None
+            assert answer["profile"] == OBSERVATION_RESOLVE_PROFILE
+            assert answer["state"] == "hit", (point["point_id"], item["capture_id"])
+            picked = answer["point"]
+            assert picked["point_id"] == point["point_id"]
+            assert float(picked["pixel_distance"]) < 1e-6
+            for key in ("world_xyz", "track_length", "observations_retained", "observations"):
+                assert picked[key] == point[key], key
+            resolved += 1
+    assert resolved > len(whole["points"]), "a multi-view scene has more observations than points"
+
+
+def test_a_click_on_nothing_recorded_is_a_miss_that_says_so(repository, tmp_path):
+    """A null pick is an answer, and it must not read as a scene that observed nothing."""
+    store, captures, scene_id = _scene(repository, tmp_path)
+    answer = _resolve(repository, store, scene_id, captures[0], -5000.0, -5000.0)
+    assert answer is not None
+    assert answer["state"] == "miss"
+    assert answer["point"] is None
+    assert answer["point_count_total"] > 0
+    assert "not a page of the observation graph" in answer["note"]
+    assert "geometric and is not provenance" in answer["selection"]
+
+
+def test_a_photograph_the_scene_holds_no_camera_for_is_not_resolved_through(repository, tmp_path):
+    """The scene is readable and the question was wrong, which is not the same as no graph."""
+    store, _captures, scene_id = _scene(repository, tmp_path)
+    with pytest.raises(ViewNotResolvable):
+        _resolve(repository, store, scene_id, uuid.uuid4(), 80.0, 50.0)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"u": math.nan},
+        {"v": math.inf},
+        {"tolerance_px": 0.0},
+        {"tolerance_px": 5000.0},
+        {"occlusion_band_px": -1.0},
+        {"occlusion_band_px": math.nan},
+    ],
+)
+def test_a_cursor_or_tolerance_that_cannot_be_answered_honestly_is_refused(repository, options):
+    """Refused before anything is read: a NaN compares false against every tolerance and would
+    otherwise select nothing and report it as a plain surface."""
+    arguments = {"u": 80.0, "v": 50.0} | options
+    with pytest.raises(ValueError):
+        _resolve(repository, None, uuid.uuid4(), uuid.uuid4(), **arguments)
+
+
+def test_withdrawing_a_member_withdraws_the_summary_and_every_resolve(repository, tmp_path):
+    """Scene-scoped, like the graph, and a held index must not outlive the withdrawal."""
+    store, captures, scene_id = _scene(repository, tmp_path)
+    assert _resolve(repository, store, scene_id, captures[1], 80.0, 50.0) is not None
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=captures[0],
+        requested_by=uuid.uuid4(),
+        reason="observation resolve withdrawal test",
+    )
+    assert (
+        scene_observation_summary(repository.connection, repository.workspace_id, scene_id, store)
+        is None
+    )
+    assert _resolve(repository, store, scene_id, captures[1], 80.0, 50.0) is None
+
+
+def test_a_second_click_does_not_read_the_receipt_again(repository, tmp_path, monkeypatch):
+    """The work bound. Every click re-reading the receipt is the volcanic scene's 6 s per click."""
+    store, captures, scene_id = _scene(repository, tmp_path)
+    clear_observation_index_memo()
+    reads: list[BlobId] = []
+    original = store.get
+    monkeypatch.setattr(store, "get", lambda blob: reads.append(blob) or original(blob))
+    for u in (80.0, 20.0, 140.0):
+        assert _resolve(repository, store, scene_id, captures[0], u, 50.0) is not None
+    assert (
+        scene_observation_summary(repository.connection, repository.workspace_id, scene_id, store)
+        is not None
+    )
+    assert len(reads) == 1
+    assert observation_index_memo_size() == 1
+
+
+def test_a_held_index_is_not_served_once_its_receipt_bytes_are_gone(repository, tmp_path):
+    """Presence is checked on every hit, so a purge of the bytes is seen without a restart."""
+    store, captures, scene_id = _scene(repository, tmp_path)
+    assert _resolve(repository, store, scene_id, captures[0], 80.0, 50.0) is not None
+    (
+        store.root
+        / store.key_for(BlobId.of_bytes(_pose_receipt_bytes(repository, scene_id, store)))
+    ).unlink()
+    assert (
+        scene_observation_summary(repository.connection, repository.workspace_id, scene_id, store)
+        is None
+    )
+    assert _resolve(repository, store, scene_id, captures[0], 80.0, 50.0) is None

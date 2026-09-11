@@ -66,6 +66,10 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/scene-geometry/{artifact_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}/observations"): {},
+    ("GET", "/world-read/scenes/{scene_id}/observations/summary"): {},
+    ("GET", "/world-read/scenes/{scene_id}/observations/resolve"): {
+        "params": {"capture_id": str(uuid.uuid4()), "u": "10", "v": "20"}
+    },
     ("GET", "/world-read/places/{place_id}"): {},
     ("POST", "/world-write/scenes/{scene_id}/generated"): {
         "json": {

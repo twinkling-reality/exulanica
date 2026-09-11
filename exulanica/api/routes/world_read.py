@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Query
@@ -41,7 +42,15 @@ from exulanica.graph.asset_read_policy import (
     scene_allowed,
     scene_inputs,
 )
-from exulanica.graph.observations import scene_observations
+from exulanica.graph.observations import (
+    DEFAULT_OCCLUSION_BAND_PX,
+    DEFAULT_TOLERANCE_PX,
+    MAX_TOLERANCE_PX,
+    ViewNotResolvable,
+    resolve_observation,
+    scene_observation_summary,
+    scene_observations,
+)
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
 from exulanica.graph.world_read_views import views_current
 
@@ -243,31 +252,146 @@ def scene_observation_graph(
     scene's graph is 97,633,587 canonical bytes and the volcanic scene's is 1,179,240,157, so a
     caller who wants a page has to be able to ask for one, and a caller who gets a page has to be
     told so.
+
+    The inspector no longer reads this. It resolves one click at a time through ``/resolve``
+    below, because the volcanic scene's whole graph is more than a browser can hold as one string.
     """
+    return _observation_read(
+        connection,
+        session.workspace_id,
+        scene_id,
+        services,
+        lambda: scene_observations(
+            connection,
+            session.workspace_id,
+            scene_id,
+            services.store,
+            limit=limit,
+            after_point_id=after_point_id,
+        ),
+    )
+
+
+@router.get(
+    "/scenes/{scene_id}/observations/summary",
+    summary="How many recorded points and observations a click in this scene resolves against.",
+)
+def scene_observation_counts(
+    scene_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> JSONResponse:
+    """Counts only, for the inspector to show before anyone clicks. Hundreds of bytes."""
+    return _observation_read(
+        connection,
+        session.workspace_id,
+        scene_id,
+        services,
+        lambda: scene_observation_summary(
+            connection, session.workspace_id, scene_id, services.store
+        ),
+    )
+
+
+@router.get(
+    "/scenes/{scene_id}/observations/resolve",
+    summary="The one recorded point a cursor selects in one photograph, and who observed it.",
+)
+def scene_observation_resolve(
+    scene_id: Annotated[uuid.UUID, Path()],
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+    capture_id: Annotated[
+        uuid.UUID,
+        Query(description="The photograph whose recovered camera the cursor is in."),
+    ],
+    u: Annotated[
+        float,
+        Query(ge=-1e9, le=1e9, description="Cursor, in that photograph's pixels, +u right."),
+    ],
+    v: Annotated[
+        float,
+        Query(ge=-1e9, le=1e9, description="Cursor, in that photograph's pixels, +v down."),
+    ],
+    tolerance_px: Annotated[
+        float,
+        Query(gt=0, le=MAX_TOLERANCE_PX, description="How far a point may project from it."),
+    ] = DEFAULT_TOLERANCE_PX,
+    occlusion_band_px: Annotated[
+        float,
+        Query(ge=0, le=MAX_TOLERANCE_PX, description="Within this of the nearest, nearer wins."),
+    ] = DEFAULT_OCCLUSION_BAND_PX,
+) -> JSONResponse:
+    """Click-to-evidence, resolved here rather than by downloading the graph to the browser.
+
+    The answer holds at most one point and that point's retained observations, so it is bounded
+    by the scene's member count and not by its point count. MEASURED 2026-09-11 on the volcanic
+    scene: a hit is 5,474 bytes where the whole graph the inspector used to read is 1,015,016,928.
+    A miss is a 200 whose ``state`` says so, because nothing recorded near a click is an answer.
+    ``exulanica/graph/observations.py`` holds the rest of the argument.
+    """
+    return _observation_read(
+        connection,
+        session.workspace_id,
+        scene_id,
+        services,
+        lambda: resolve_observation(
+            connection,
+            session.workspace_id,
+            scene_id,
+            services.store,
+            capture_id=capture_id,
+            u=u,
+            v=v,
+            tolerance_px=tolerance_px,
+            occlusion_band_px=occlusion_band_px,
+        ),
+    )
+
+
+def _observation_read(
+    connection: Any,
+    workspace: uuid.UUID,
+    scene_id: uuid.UUID,
+    services: Services,
+    read: Callable[[], dict[str, Any] | None],
+) -> JSONResponse:
+    """The asset-read policy every observation route applies, once, in the order it must run.
+
+    The read runs first, inside a repeatable-read snapshot, and a scene it cannot read is 410 if
+    it was withdrawn and 404 otherwise. Then the scene's current inputs are buffered and checked,
+    and checked again under the final asset-read lock, and only a scene that passes both leaves.
+
+    A resolve that names a photograph with no recovered camera is held until the policy has passed
+    rather than answered on the spot. Answering it first would let a scene whose inputs are no
+    longer current say something more specific than the 404 every other unavailable scene gets.
+    """
+    refusal: JSONResponse | None = None
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
         try:
-            records = scene_observations(
-                connection,
-                session.workspace_id,
-                scene_id,
-                services.store,
-                limit=limit,
-                after_point_id=after_point_id,
-            )
+            records = read()
         except CanonicalisationError as error:
             return _problem(424, "unreadable_scene", str(error))
+        except ViewNotResolvable as error:
+            records, refusal = {}, _problem(404, "unknown_view", str(error))
         if records is None:
-            if _withdrawn(connection, session.workspace_id, scene_id):
+            if _withdrawn(connection, workspace, scene_id):
                 return _problem(410, "tombstoned", "this reconstructed scene was withdrawn")
             return _problem(404, "unknown_reference", "no observation graph for this scene")
-        buffered = scene_inputs(connection, session.workspace_id, scene_id, services.store)
+        buffered = scene_inputs(connection, workspace, scene_id, services.store)
         if not scene_allowed(
-            connection, session.workspace_id, scene_id, buffered, evaluation_time(connection)
+            connection, workspace, scene_id, buffered, evaluation_time(connection)
         ):
             return _problem(404, "unknown_reference", "current observation inputs are unavailable")
-        response = JSONResponse(content=records, headers={"Cache-Control": "private, no-store"})
+        response = (
+            refusal
+            if refusal is not None
+            else JSONResponse(content=records, headers={"Cache-Control": "private, no-store"})
+        )
     with final_check(connection) as at_time:
-        if not scene_allowed(connection, session.workspace_id, scene_id, buffered, at_time):
+        if not scene_allowed(connection, workspace, scene_id, buffered, at_time):
             return _problem(404, "unknown_reference", "current observation inputs are unavailable")
     return response

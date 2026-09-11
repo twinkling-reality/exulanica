@@ -462,13 +462,20 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
     response = d.get(path)
     assert response.status_code == 200, response.text
     assert hashlib.sha256(response.content).hexdigest() == trained["sha256"]
-    for route in ("/world-read/scenes/" + scene, "/world-read/scenes/" + scene + "/observations"):
-        assert d.get(route).status_code == 200
+    capture = uuid.UUID(materials[0]["capture_id"])
+    # The inspector's two reads carry the same recorded inputs as the graph they summarise, so
+    # they must refuse with it, including the resolve, which projects through those inputs.
+    observations = "/world-read/scenes/" + scene + "/observations"
+    inspector_reads = (
+        observations + "/summary",
+        observations + f"/resolve?capture_id={capture}&u=80&v=50",
+    )
+    for route in ("/world-read/scenes/" + scene, observations, *inspector_reads):
+        assert d.get(route).status_code == 200, route
     # Add a region to one real recorded source. The scene's persisted original frames
     # cannot become masked frames merely because a current mask is subsequently built.
     from exulanica.ingest.person_review import record_region_edits
 
-    capture = uuid.UUID(materials[0]["capture_id"])
     record_region_edits(
         c.repo,
         capture_id=capture,
@@ -487,6 +494,8 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
     assert d.get(path).status_code == 404
     assert d.get("/world-read/scenes/" + scene).status_code == 404
     assert d.get("/world-read/scenes/" + scene + "/observations").status_code == 404
+    for route in inspector_reads:
+        assert d.get(route).status_code == 404, route
     graph = d.get("/graph").json()
     selected = next(s for s in graph["reconstruction_scenes"] if s["scene_id"] == scene)
     assert selected["trained_geometry"] is None
@@ -520,6 +529,8 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
     assert result.error is None, result.error
     assert d.get(path).status_code == 404
     assert d.get("/world-read/scenes/" + scene + "/observations").status_code == 404
+    for route in inspector_reads:
+        assert d.get(route).status_code == 404, route
 
 
 def test_expiry_is_evaluated_after_a_waiting_read_acquires_the_lock(delivery, ingest_spine):
