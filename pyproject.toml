@@ -133,6 +133,10 @@ exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"
 # `uv run exulanica-wmp project ...` creates a signed, independently verifiable World Memory
 # Package; verify, inspect, and diff never open PostgreSQL.
 exulanica-wmp = "exulanica.world_package.cli:main"
+# `uv run exulanica-seed export --workspace <uuid> --into <dir>`. Produces the judge seed, restores
+# a fresh stack to it, returns a used one to it, and provisions the judge role and token. Read
+# docs/judge-access.md; it never prints a bearer token.
+exulanica-seed = "exulanica.orchestration.judge_seed_cli:main"
 # `uv run exulanica-frontier demonstrate ...` is the Phase 8 source-to-package acceptance path.
 # It composes the existing boundaries and requires explicit confirmation for its one durable
 # source tombstone.

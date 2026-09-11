@@ -14,7 +14,7 @@ rule about where a new document goes.
 
 How the system works now. Edited as the system changes.
 
-55 documents.
+56 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -44,6 +44,7 @@ How the system works now. Edited as the system changes.
 - [infrastructure-backlog](infrastructure-backlog.md) : Product priority: product-direction.md defines the creative-world
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
+- [judge-access](judge-access.md) : EXECUTED locally on 2026-09-10, unprovisioned everywhere else. A judge stack was seeded, torn down, restored, opened, edited and reset on...
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
