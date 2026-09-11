@@ -36,7 +36,7 @@ import { isAtlasPreview } from '../config.js';
 import type { EvidenceCache } from '../evidence.js';
 import type { GeometryIssue, HeldPointMaps } from '../geometry-api.js';
 import type { InteractionPolicyClient } from '../interaction-policy.js';
-import type { ObservationGraph } from '../observations-api.js';
+import type { ObservationSummary } from '../observations-api.js';
 import { readPreferences, type AtlasPreferences } from '../preferences.js';
 import type { Session } from '../session.js';
 import type { SourceMediaSession } from '../source-media-api.js';
@@ -121,16 +121,19 @@ export interface SessionState {
   /**
    * Which photograph the review panel is currently about, so a late answer cannot land on another.
    *
-   * Not cached, unlike the observation graph below. An accepted pose receipt is immutable and
+   * Not cached, unlike the observation summary below. An accepted pose receipt is immutable and
    * re-reading it says nothing new; a review is the opposite, since every button in it writes a
    * receipt that changes what the next read returns.
    */
   reviewCaptureId: string | null;
 
-  /** One scene's recorded observation graph, cached for the session. See `observations-api.ts`. */
-  observationGraph: ObservationGraph | null;
-  observationGraphSceneId: string | null;
-  observationLoad: Promise<void> | null;
+  /**
+   * One scene's recorded observation counts, cached for the session. See `observations-api.ts`.
+   * Clicks are not cached: each is resolved by the server, and holds nothing here once shown.
+   */
+  observationSummary: ObservationSummary | null;
+  observationSummarySceneId: string | null;
+  observationSummaryLoad: Promise<void> | null;
 
   // -- the authorities a session connected to -------------------------------------------------
   worldStyles: WorldStyleClient | null;
@@ -209,9 +212,9 @@ export function createSessionState(): SessionState {
 
     proofLensEnabled: false,
     reviewCaptureId: null,
-    observationGraph: null,
-    observationGraphSceneId: null,
-    observationLoad: null,
+    observationSummary: null,
+    observationSummarySceneId: null,
+    observationSummaryLoad: null,
 
     worldStyles: null,
     worldStyleConnection: null,

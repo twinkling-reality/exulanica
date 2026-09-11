@@ -30,6 +30,7 @@ __all__ = [
     "PlacementRecord",
     "PointMapInput",
     "build_placement_record",
+    "observations_and_cameras",
     "recovered_camera_records",
     "validate_placement_record",
     "validated_receipt_cameras",
@@ -429,6 +430,10 @@ def sparse_observation_records(pose_receipt: bytes) -> dict[str, object]:
     receipt = _read_pose_receipt(pose_receipt)
     if json.loads(pose_receipt)["quality"].get("accepted") is not True:
         return {}
+    return _grouped_observations(receipt)
+
+
+def _grouped_observations(receipt: _PoseReceipt) -> dict[str, object]:
     captures = {filename: capture for capture, filename in receipt.frames}
 
     points: dict[int, dict[str, object]] = {}
@@ -487,6 +492,27 @@ def recovered_camera_records(pose_receipt: bytes) -> dict[str, dict[str, object]
     receipt = _read_pose_receipt(pose_receipt)
     if json.loads(pose_receipt)["quality"].get("accepted") is not True:
         return {}
+    return _recovered_cameras(receipt)
+
+
+def observations_and_cameras(
+    pose_receipt: bytes,
+) -> tuple[dict[str, object], dict[str, dict[str, object]]]:
+    """:func:`sparse_observation_records` and :func:`recovered_camera_records` from one parse.
+
+    For a reader that needs both together, which is a reader that projects the retained points
+    through a recovered camera. Each of the two parses and validates the whole receipt on its own.
+    MEASURED 2026-09-11, twice, on the volcanic scene's 107,742,795 byte pose receipt: 5.4 and
+    5.0 s for the first, 6.0 and 5.5 s for the second, so calling them in turn spends both. Each
+    half equals what its own function returns, including ``({}, {})`` for an unaccepted receipt.
+    """
+    receipt = _read_pose_receipt(pose_receipt)
+    if json.loads(pose_receipt)["quality"].get("accepted") is not True:
+        return {}, {}
+    return _grouped_observations(receipt), _recovered_cameras(receipt)
+
+
+def _recovered_cameras(receipt: _PoseReceipt) -> dict[str, dict[str, object]]:
     captures = {filename: capture for capture, filename in receipt.frames}
     return {
         captures[camera.image_name]: {

@@ -346,3 +346,186 @@ def test_a_bounded_observation_request_says_it_was_bounded_and_what_it_left(
     assert [point["point_id"] for point in walked] == [
         point["point_id"] for point in complete["points"]
     ]
+
+
+# -- the inspector's reads: a summary and one resolved click -----------------------------------
+
+#: What one resolved click may weigh on the wire, as a header plus at most one observation per
+#: scene photograph, each carrying that photograph's consent record. The answer holds one point,
+#: so the point count is absent from the bound on purpose. MEASURED 2026-09-11 on the frozen
+#: volcanic copy: a miss is 1,784 bytes and a hit adds 1,160 to 1,190 per observation it lists
+#: (11,277 bytes for eight, 92,547 for seventy-eight).
+_RESOLVE_HEADER_BUDGET = 2_560
+_RESOLVE_PER_PHOTOGRAPH_BUDGET = 1_536
+#: Counts and three sentences. MEASURED 2026-09-11 on the same copy: 781 bytes.
+_SUMMARY_BUDGET = 1_024
+
+
+def _members(repository, scene_id) -> list[uuid.UUID]:
+    return [
+        row["capture_id"]
+        for row in repository.connection.execute(
+            "select capture_id from reconstruction_scene_member "
+            "where workspace_id=%s and scene_id=%s order by ordinal",
+            (repository.workspace_id, scene_id),
+        ).fetchall()
+    ]
+
+
+def test_what_the_inspector_reads_stays_within_budget_however_many_points_the_scene_holds(
+    deployment, repository, tmp_path
+):
+    """The size budget, held on the wire, on a synthetic scene inflated until its graph is large.
+
+    The fixture's receipt is rewritten so every photograph holds its full retained sample of 4096
+    observations, and every added point is observed by every photograph, which is the heaviest a
+    single point's answer can be. One of them sits straight ahead of the first camera, nearer than
+    anything else, so a click on the principal point has exactly one right answer.
+
+    The whole graph grows with the points and a resolved click does not. That is the property the
+    inspector needed: on the volcanic scene the graph is 1,015,016,928 bytes, more than a browser
+    can hold as one string, and the answer to one click is kilobytes.
+    """
+    from test_scene_observations import _pose_receipt_bytes, _replace_pose_receipt
+
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    route = f"/world-read/scenes/{scene_id}/observations"
+    before = deployment.as_owner("GET", route)
+    assert before.status_code == 200, before.text
+
+    receipt = json.loads(_pose_receipt_bytes(repository, scene_id, deployment.store))
+    frames = {frame["filename"]: frame["capture_ref"] for frame in receipt["manifest"]["frames"]}
+    cameras = receipt["quality"]["cameras"]
+    first = cameras[0]
+    # FakeColmap poses every camera with the identity rotation, which is what lets the probe be
+    # placed by hand. Asserted, so a fixture that changes cannot silently move the probe.
+    assert first["quaternion_wxyz"] == [1, 0, 0, 0]
+    assert first["calibration"]["model"] == "PINHOLE"
+    tx, ty, tz = first["translation_xyz"]
+    _fx, _fy, cx, cy = first["calibration"]["parameters"]
+    room = 4096 - max(len(camera["sparse_observations"]) for camera in cameras) - 1
+    added = [(10_000_000 + k, (k * 0.01, 1.0, 400.0)) for k in range(room)]
+    # COLMAP maps world to camera as x + t here, so this is ten units straight ahead of camera 1.
+    probe = (9_999_999, (-tx, -ty, -tz + 10.0))
+    for camera in cameras:
+        camera["sparse_observations"].extend(
+            [point_id, 1.0, 1.0, *world, 0.4, len(cameras)] for point_id, world in [probe, *added]
+        )
+    receipt["quality_digest"] = hashlib.sha256(
+        json.dumps(
+            receipt["quality"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+    _replace_pose_receipt(repository, scene_id, deployment.store, receipt)
+
+    members = len(frames)
+    budget = _RESOLVE_HEADER_BUDGET + _RESOLVE_PER_PHOTOGRAPH_BUDGET * members
+    whole = deployment.as_owner("GET", route)
+    assert whole.status_code == 200, whole.text
+    assert whole.json()["bounds"]["point_count_total"] >= room
+    assert len(whole.content) > 10 * len(before.content)
+    assert len(whole.content) > 100 * budget, (len(whole.content), budget)
+
+    summary = deployment.as_owner("GET", f"{route}/summary")
+    assert summary.status_code == 200, summary.text
+    assert len(summary.content) <= _SUMMARY_BUDGET, len(summary.content)
+    assert summary.json()["point_count_total"] == whole.json()["bounds"]["point_count_total"]
+    assert summary.headers["cache-control"] == "private, no-store"
+
+    capture = frames[first["image_name"]]
+    hit = deployment.as_owner(
+        "GET",
+        f"{route}/resolve",
+        params={
+            "capture_id": capture,
+            "u": cx,
+            "v": cy,
+            "tolerance_px": 0.5,
+            "occlusion_band_px": 0,
+        },
+    )
+    assert hit.status_code == 200, hit.text
+    answer = hit.json()
+    assert answer["state"] == "hit"
+    assert answer["point"]["point_id"] == probe[0]
+    assert answer["point"]["observations_retained"] == members
+    assert len(hit.content) <= budget, (len(hit.content), budget)
+    assert hit.headers["cache-control"] == "private, no-store"
+
+    miss = deployment.as_owner(
+        "GET", f"{route}/resolve", params={"capture_id": capture, "u": -5000, "v": -5000}
+    )
+    assert miss.status_code == 200, miss.text
+    assert miss.json()["state"] == "miss"
+    assert len(miss.content) <= _RESOLVE_HEADER_BUDGET, len(miss.content)
+
+
+def test_a_stranger_learns_nothing_from_the_inspectors_reads(deployment, repository, tmp_path):
+    """M10 on both new addresses: a real scene and an invented one answer the same 404."""
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    capture = str(_members(repository, scene_id)[0])
+    for suffix, params in (("summary", {}), ("resolve", {"capture_id": capture, "u": 80, "v": 50})):
+        owner = deployment.as_owner(
+            "GET", f"/world-read/scenes/{scene_id}/observations/{suffix}", params=params
+        )
+        assert owner.status_code == 200, owner.text
+        real = deployment.as_stranger(
+            "GET", f"/world-read/scenes/{scene_id}/observations/{suffix}", params=params
+        )
+        invented = deployment.as_stranger(
+            "GET", f"/world-read/scenes/{uuid.uuid4()}/observations/{suffix}", params=params
+        )
+        assert real.status_code == invented.status_code == 404
+        assert real.json() == invented.json()
+
+
+def test_a_photograph_outside_the_scene_is_named_as_the_problem(deployment, repository, tmp_path):
+    """The scene is the caller's and readable, so "no observation graph" would be the wrong 404."""
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    response = deployment.as_owner(
+        "GET",
+        f"/world-read/scenes/{scene_id}/observations/resolve",
+        params={"capture_id": str(uuid.uuid4()), "u": 80, "v": 50},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "unknown_view"
+
+
+def test_a_cursor_the_resolve_cannot_honestly_answer_is_refused(deployment, repository, tmp_path):
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    capture = str(_members(repository, scene_id)[0])
+    for params in (
+        {"u": "nan", "v": 50},
+        {"u": 80, "v": "inf"},
+        {"u": 80, "v": 50, "tolerance_px": 0},
+        {"u": 80, "v": 50, "tolerance_px": 5000},
+        {"u": 80, "v": 50, "occlusion_band_px": -1},
+    ):
+        response = deployment.as_owner(
+            "GET",
+            f"/world-read/scenes/{scene_id}/observations/resolve",
+            params={"capture_id": capture} | params,
+        )
+        assert response.status_code == 422, (params, response.text)
+
+
+def test_a_withdrawn_scene_answers_410_to_the_inspectors_reads_too(
+    deployment, repository, tmp_path
+):
+    scene_id = _scene_in(deployment, repository, tmp_path)
+    members = _members(repository, scene_id)
+    route = f"/world-read/scenes/{scene_id}/observations"
+    params = {"capture_id": str(members[1]), "u": 80, "v": 50}
+    assert deployment.as_owner("GET", f"{route}/resolve", params=params).status_code == 200
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=members[0],
+        requested_by=uuid.uuid4(),
+        reason="inspector reads withdrawal test",
+    )
+    for response in (
+        deployment.as_owner("GET", f"{route}/summary"),
+        deployment.as_owner("GET", f"{route}/resolve", params=params),
+    ):
+        assert response.status_code == 410, response.text
+        assert response.json()["code"] == "tombstoned"
