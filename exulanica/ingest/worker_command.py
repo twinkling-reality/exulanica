@@ -218,10 +218,6 @@ def main(
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(main())
-
-
 def _build_detector(environ: Mapping[str, str]) -> Any:
     """Resolve the person detector, defaulting to none configured.
 
@@ -240,3 +236,11 @@ def _build_detector(environ: Mapping[str, str]) -> Any:
     from exulanica.ingest.person_detectors import RecordedObservationDetector
 
     return RecordedObservationDetector()
+
+
+# Last, after every definition. `python -m` runs this module top to bottom as `__main__`, so a
+# function defined below this line does not exist yet when `main()` calls it: `_build_detector`
+# once sat below it, and every `python -m` start failed with NameError while the console script,
+# which imports the whole module first, worked.
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

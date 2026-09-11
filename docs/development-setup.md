@@ -67,12 +67,27 @@ EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv 
 Port 5433 is this project's local example. Use your server's actual port in both `createdb`
 and the connection URL; starting PostgreSQL does not automatically select 5433.
 
-Three things to know about that harness:
+Four things to know about that harness:
 
 - **The database name must contain "test".** It refuses to touch anything else. All work happens
   inside throwaway schemas that are dropped afterwards, because each migration carries its own
   `commit;` and cannot be undone by a rollback. Extension setup and some role provisioning are
   database-wide or cluster-wide, so use a dedicated development server and coordinate test runs.
+- **A brand-new database needs only `createdb`, and two tests need the documented name.** The
+  harness creates `vector`, `pgcrypto`, `pg_trgm` and `btree_gist` in `public` on first use, and
+  every test that needs a runtime role provisions it, so the role in the URL must be allowed to
+  create extensions and roles; the superuser a Homebrew install gives you is. MEASURED 2026-09-11
+  against `exulanica_fresh_test`, created with `createdb` minutes before: 2643 passed, 3 skipped,
+  3 failed. Two of those failures are a deliberate prerequisite, not a defect: `test_frontier_preflight.py::test_preflight_checks_real_schema_without_ingesting_or_creating_outputs`
+  and `test_frontier_demonstration.py::test_frontier_demonstration_names_the_capture_only_and_source_first_fallbacks`
+  run the frontier preflight, and `exulanica/orchestration/preflight.py` refuses every database
+  except `postgresql://localhost:5433/exulanica_spine_test`, so they pass only there. The third,
+  `test_screening_currency.py::test_shared_stale_screening_end_to_end`, spells that URL out
+  instead of reading `EXULANICA_TEST_DATABASE_URL`, so on any other database its search path
+  names a schema that is not there and falls through to `exulanica_spine_test`'s `public`. That
+  is a defect in the test. Two read-only fixtures had the same one, 43 failures on a fresh
+  database, until they were given `scratch_role_database` in `tests/conftest.py`; build any new
+  scratch connection from the configured URL the same way.
 - **A server that cannot run the schema is a loud failure, not a silent substitution.** An earlier
   version of the harness swapped `gen_random_uuid()` for `uuidv7()` and `bytea` for
   `halfvec(4096)` so the suite could run on PostgreSQL 14. Everything passed and the vector path

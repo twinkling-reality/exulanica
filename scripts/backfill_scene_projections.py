@@ -11,6 +11,18 @@ same bytes. It is idempotent, because the artifact id is derived from the three 
 `insert_scene_artifact` is `on conflict do nothing`; running it twice writes nothing the second
 time and says so.
 
+WHAT IT REPLACES. That same `on conflict do nothing` is why a projection that can no longer answer
+used to be unreplaceable. `artifact` is unique on the identity key over every row, purged or not,
+so a purged projection kept its id, the insert of its replacement was absorbed, and the run refused
+with "an existing projection disagrees" while the scene rebuilt on every cold read (observed
+2026-09-11, three purged rows). The identity now has generations
+(`projection_identity_key` in `exulanica/ingest/scene_projection.py`), and the backfill walks
+them from 0, passing over every row the graph would never offer: purged, flagged `needs_repair`, or
+recording no content. Those rows are left exactly as they are, because each is the record of what
+happened to that id; the replacement takes the first generation nobody holds. A live row whose
+bytes are gone is healed in place when the receipts reproduce it, which is what a run killed
+between the row commit and the byte flush leaves behind.
+
 WHAT IT REFUSES, and why each refusal is a refusal rather than a warning:
 
 *   A scene whose job is not `reconstruction_scene.current_job_id`. This is the important one.
@@ -25,7 +37,13 @@ WHAT IT REFUSES, and why each refusal is a refusal rather than a warning:
     maps. The projection transcribes a validated record; transcribing an unvalidated one would be
     laundering it. This is the slow part, and it is the same work the graph read used to do on
     every cold process, done once here instead.
-*   A tombstone-blocked scene, which the database refuses outright. That is a normal skip.
+*   A tombstone-blocked scene, which the database refuses outright. That is a normal skip. It is
+    also why passing over a purged row cannot undo a deletion: a deletion that purges a scene's
+    projection reaches the scene, and the insert trigger refuses every generation of it alike.
+*   A live projection the receipts do not reproduce. The stage is deterministic, so a live row
+    naming other content under the same identity is the stage disagreeing with itself, and
+    writing past it would absorb that. After finding out why, an operator who flags the row
+    `needs_repair` makes it one the next run passes over; nothing is ever deleted to make room.
 
 It records what it wrote: one JSON document on stdout, and to `--output` if given, naming every
 scene it considered and what happened to it.
@@ -49,6 +67,7 @@ from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_projection import (
     SCENE_PROJECTION_STAGE,
     build_scene_projection,
+    projection_identity_key,
     projection_point_map_inputs,
     validate_scene_projection,
 )
@@ -131,6 +150,51 @@ select a.artifact_id
 """
 
 
+#: Every row under one identity key, purged or not. `IngestRepository.find_artifact` answers only
+#: for live rows, and a purged row is exactly the one the walk below has to see: it still holds
+#: its key and its id, so an insert under that generation would be absorbed without a word.
+_IDENTITY = """
+select artifact_id, content_sha256, byte_size, purged_at, needs_repair
+  from artifact
+ where workspace_id = %s and idempotency_key = %s
+"""
+
+
+def _open_generation(repository, base_key: str):
+    """The first generation of a projection's identity that is live or free, and its row.
+
+    A generation is spent when the graph would never offer its row to a reader again, which is
+    the candidate predicate in `exulanica/graph/reconstruction_scenes.py`: not purged, not flagged
+    `needs_repair`, content recorded. A spent row is passed over and left exactly as it is. The walk
+    stops at the first generation nobody holds, which is where a replacement goes, or at the first
+    live row, which is either this scene's projection or a disagreement with it; neither of those
+    is settled by moving past it.
+
+    Returns the generation, its live row or None, and what was passed over on the way.
+    """
+    passed_over = []
+    generation = 0
+    while True:
+        row = repository.connection.execute(
+            _IDENTITY,
+            (repository.workspace_id, projection_identity_key(base_key, generation)),
+        ).fetchone()
+        if row is None:
+            return generation, None, passed_over
+        if row["purged_at"] is not None:
+            state = "purged"
+        elif row["needs_repair"]:
+            state = "needs_repair"
+        elif row["content_sha256"] is None or row["byte_size"] is None:
+            state = "no_content"
+        else:
+            return generation, row, passed_over
+        passed_over.append(
+            {"generation": generation, "artifact_id": str(row["artifact_id"]), "state": state}
+        )
+        generation += 1
+
+
 def _placement_inputs(placement_bytes: bytes):
     """The placement's point-map references, in record order."""
     raw = json.loads(placement_bytes)["placement"]["point_map_inputs"]
@@ -166,7 +230,8 @@ def _project_one(repository, store, row) -> dict:
     # scene and the three receipt digests, all of which are already in `row`, so a scene that
     # already has its projection can be answered without reading its pose receipt or hashing
     # 780 MB of point maps. That is what makes a run resumable: an operator whose 40 scene
-    # backfill died at scene 12 re-runs it and pays for scenes 12 to 40, not 1 to 40.
+    # backfill died at scene 12 re-runs it and pays for scenes 12 to 40, not 1 to 40. The walk
+    # over spent generations is one indexed lookup each, and a scene has one in practice.
     spec = stage(SCENE_PROJECTION_STAGE)
     input_digest = input_digest_of(
         [
@@ -175,11 +240,15 @@ def _project_one(repository, store, row) -> dict:
             bytes(row["gate_sha256"]),
         ]
     )
-    key = _scene_key(scene_id, spec.key, input_digest)
+    base_key = _scene_key(scene_id, spec.key, input_digest)
+    generation, live, passed_over = _open_generation(repository, base_key)
+    key = projection_identity_key(base_key, generation)
     artifact_id = artifact_id_for(key)
-    existing = repository.find_artifact(key)
-    if existing is not None and existing.artifact_id == artifact_id:
-        stored = bytes(existing.content_sha256).hex()
+    outcome["generation"] = generation
+    if passed_over:
+        outcome["passed_over"] = passed_over
+    if live is not None and live["artifact_id"] == artifact_id:
+        stored = bytes(live["content_sha256"]).hex()
         if store.exists(BlobId.from_hex(stored)):
             return {
                 **outcome,
@@ -333,10 +402,12 @@ def _project_one(repository, store, row) -> dict:
             if inserted:
                 recorder.record_output(artifact_id)
             else:
-                # The row already existed. It must agree with what was just recomputed, or this
-                # stage is not the deterministic function it declares itself to be, and that is
-                # worth refusing rather than reporting as an ordinary no-op. Same check
-                # `SceneReconstructionProcessor._accept` makes.
+                # The row already existed: the live row the walk stopped at, or one a concurrent
+                # writer put in the free generation since. It must agree with what was just
+                # recomputed, or this stage is not the deterministic function it declares itself
+                # to be, and that is worth refusing rather than reporting as an ordinary no-op.
+                # Same check `SceneReconstructionProcessor._accept` makes. A row purged since the
+                # walk is not live, `find_artifact` returns None, and that refuses too.
                 existing = repository.find_artifact(key)
                 if (
                     existing is None
