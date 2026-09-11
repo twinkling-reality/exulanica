@@ -292,6 +292,143 @@ STAGES: Final[dict[str, StageSpec]] = {
             "container": "opm/2",
         },
     ),
+    "segmentation": StageSpec(
+        key="segmentation",
+        version=1,
+        output_kind="object_mask_list",
+        # A neural forward pass differs across accelerators and library versions, so a content
+        # difference here is not a fault (ADR-0017). No `model_role`, for the reason
+        # `person_regions` gives for its detector: the checkpoints are pinned by revision in the
+        # manifest's local section and their identity goes into the INPUT digest per photograph,
+        # which re-keys on a swap without adding a model-backed stage to the digest-pinned
+        # `docs/evaluation/2026-09-05-unblocked-goal-d.json`. `docs/domain-and-evidence-model.md`
+        # section 6 names this stage as not exactly recomputable, and a test holds that list.
+        deterministic=False,
+        params={
+            "profile": "exulanica.object-mask-list/v1",
+            # The contract, not a checkpoint. See `exulanica/ingest/stages/segmentation.py`.
+            "segmenter_contract": "exulanica.object-segmenter/v1",
+            "prompt_policy": "hosted-vision-boxes-else-local-detector",
+            # The masked derivative whenever anybody in the photograph is hidden, as depth reads.
+            "reads": "masked-derivative-when-anybody-is-hidden",
+            # UNVALIDATED DEFAULTS, in the parameters so that tuning them re-keys every mask.
+            # SAM 2.1 resizes to 1024 square internally, so a larger input buys nothing but decode
+            # time; the outline is in ppm of the unit square and does not depend on this size.
+            "max_edge_px": 1024,
+            # Things, never stuff: sky, ground and water are not entities a person names, and a
+            # segment over the sky would lift onto no geometry at all because depth masks it.
+            # No person term, ever, which a test checks against the vision stage's own filter.
+            # Landscape features are here because the first measured corpus is a volcanic walk.
+            "detector_vocabulary": [
+                "rock",
+                "boulder",
+                "crater",
+                "cliff",
+                "tree",
+                "bush",
+                "flower",
+                "sign",
+                "fence",
+                "railing",
+                "bench",
+                "table",
+                "chair",
+                "building",
+                "house",
+                "car",
+                "bicycle",
+                "boat",
+                "bridge",
+                "statue",
+                "lamp",
+                "bottle",
+                "cup",
+                "bowl",
+                "plate",
+                "bag",
+                "umbrella",
+                "dog",
+                "cat",
+                "bird",
+            ],
+            "detector_box_threshold_millionths": 300_000,
+            "detector_text_threshold_millionths": 250_000,
+            "fallback_detector_threshold_millionths": 200_000,
+            "max_prompts": 24,
+            "duplicate_box_iou_millionths": 700_000,
+            # Half a thousandth of the frame. A smaller mask is a speck, and a speck lifted into a
+            # scene votes for nothing it could be told apart from.
+            "min_mask_area_millionths": 500,
+            # A mask that is half or more inside any person region is dropped: an object outline
+            # must never become a second, unreviewed outline of somebody.
+            "person_overlap_drop_millionths": 500_000,
+            "outline": {
+                "method": "largest-external-contour",
+                "simplify_millionths_of_diagonal": 1_500,
+                "max_vertices": 256,
+            },
+            "coordinate_units": "ppm-of-upright-unit-square",
+            "coordinate_space": "upright-display",
+            "span": "frame_region-bounding-rect",
+            "assertion": "object_present",
+        },
+    ),
+    "scene_segments": StageSpec(
+        key="scene_segments",
+        version=1,
+        output_kind="scene_segments",
+        # Deterministic in the sense the flag carries and nothing more: elementwise arithmetic
+        # over content-addressed inputs and no model, so a differing result for the same inputs
+        # is a fault worth an event. Like `scene_projection`, it promotes no rung and is not a
+        # citation target.
+        deterministic=True,
+        params={
+            "profile": "exulanica.scene-segments/v1",
+            "envelope": "exulanica.scene-segments-envelope/v1",
+            # The masked-geometry check's projector, exposed from
+            # `exulanica/ingest/masked_geometry.py` rather than written a second time, with no
+            # margin: that check grows regions because over-reporting is its safe direction, and
+            # a segment grown past its object would vote for its neighbours.
+            "projector": "exulanica.masked-geometry-check/v1",
+            "region_margin_ppm": 0,
+            # UNVALIDATED DEFAULTS, in the parameters so that tuning them re-keys the artifact.
+            "point_map_samples_per_member": 1024,
+            "gaussian_samples_max": 200_000,
+            # A sample counts as seen by a view only where that view's own placed point map does
+            # not put a surface clearly in front of it. Without this a background sample votes
+            # for whatever foreground object hides it in that view.
+            "visibility": "own-point-map-depth-test",
+            "occlusion_grid_cells": 96,
+            "occlusion_relative_tolerance_millionths": 150_000,
+            "region_raster_cells": 512,
+            # A sample belongs to an entity when at least this many views put it inside one of
+            # the entity's regions AND those views are a majority of the views that saw it at all.
+            # Two, because one view is a projection and not a vote. A majority, because a
+            # synthetic wall behind a cube leaked into it at two views of five with no depth test,
+            # and the depth test is absent wherever a view has no placed point map of its own.
+            "min_votes": 2,
+            "vote_threshold_millionths": 500_000,
+            "voxel_grid_cells": 128,
+            # Instances are linked on a grid this many voxels coarse, so a sparsely sampled
+            # object is one component rather than a scatter of them. The output voxels stay fine.
+            "instance_link_voxels": 2,
+            "min_segment_samples": 8,
+            "object_instances": "26-connected-components-per-label-on-the-link-grid",
+            "person_segments": "reviewed-region-with-subject-and-shown-consent-only",
+            "bindings": [
+                "pose_receipt_sha256",
+                "placement_receipt_sha256",
+                "gate_receipt_sha256",
+                "member_capture_refs",
+                "point_map_inputs",
+                "object_mask_inputs",
+                "person_regions",
+                "gaussian_source",
+            ],
+            "promotes_rung": False,
+            "citable": False,
+        },
+    ),
     "scene_group": StageSpec(
         key="scene_group",
         version=1,

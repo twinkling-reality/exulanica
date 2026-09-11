@@ -94,6 +94,26 @@ reconstruction = [
 pose = [
   "pycolmap==4.2.0",
 ]
+# Object segmentation, its own extra for the reason `pose` is: an instance can run depth without
+# it, and this one must not be entangled with anything the depth stack cannot install.
+#
+# SAM 2.1 masks objects and Grounding DINO, with OWLv2 behind it, proposes boxes when the hosted
+# vision pass has none, all three locally (docs/scene-segments.md). transformers is pinned exactly
+# rather than lower-bounded because its processors decide the pixels a model reads, and the stage
+# records the version beside the checkpoint revisions it loaded.
+#
+# torchvision is deliberately NOT here. transformers 5.17 imports it at module level in the SAM 2
+# image processor and in the fast Grounding DINO and OWLv2 processors, and adding it would mean a
+# second platform-forked source beside torch's below. The stage drives `Sam2Model` from the
+# checkpoint's own preprocessor configuration and uses the PIL processors for the two detectors,
+# so no module this extra loads imports torchvision. VERIFIED 2026-09-11 against the wheel.
+segmentation = [
+  "torch>=2.5",
+  "numpy>=1.26",
+  "opencv-python-headless>=4.10",
+  "huggingface_hub>=0.26",
+  "transformers==5.17.0",
+]
 
 [project.scripts]
 # Scene-specific Gaussian training uses the manifest's digest-pinned CUDA container.

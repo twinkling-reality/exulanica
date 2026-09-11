@@ -21,6 +21,7 @@ from exulanica.evidence.region import Rect
 from exulanica.ingest.masked_geometry import (
     GaussianView,
     count_masked_gaussians,
+    gaussian_centre_array,
     masked_geometry_is_clean,
     read_gaussian_centres,
 )
@@ -245,3 +246,24 @@ def test_a_ply_whose_bytes_disagree_with_its_header_is_refused():
 def test_a_nonfinite_gaussian_is_refused_rather_than_skipped():
     with pytest.raises(ValueError, match="nonfinite"):
         read_gaussian_centres(_ply([(float("nan"), 0.0, 1.0, 1.0)]))
+
+
+def test_the_array_reader_returns_the_tuple_readers_centres_and_refuses_what_it_refuses():
+    """The scene segment lift reads a trained scene through the array reader. It must agree with
+    the check's own reader value for value, and share every refusal, because it shares the walk."""
+    vertices = [(0.25, -1.5, 3.0, 0.1), (1e-7, 2.5, -4.75, 0.9), (-3.0, 0.0, 1.0, -2.0)]
+    array = gaussian_centre_array(_ply(vertices))
+    centres, _opacity = read_gaussian_centres(_ply(vertices))
+    assert array.shape == (3, 3) and array.tolist() == [list(centre) for centre in centres]
+
+    good = _ply([(0.0, 0.0, 1.0, 1.0)])
+    for data, message in (
+        (b"ply\nformat ascii 1.0\nelement vertex 1\nend_header\n", "binary little endian"),
+        (good[:-4], "disagree with its header"),
+        (_ply([(float("nan"), 0.0, 1.0, 1.0)]), "nonfinite"),
+        (_ply([(0.0, float("inf"), 1.0, 1.0)]), "nonfinite"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            gaussian_centre_array(data)
+        with pytest.raises(ValueError, match=message):
+            read_gaussian_centres(data)

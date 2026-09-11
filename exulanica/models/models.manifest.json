@@ -1,6 +1,6 @@
 {
   "manifest_version": "1",
-  "pipeline_version": 2,
+  "pipeline_version": 3,
   "base_url": "https://api.tokenfactory.nebius.com/v1",
   "catalog_url": "https://tokenfactory.nebius.com/api/public/models_info",
   "api_key_env": "NEBIUS_API_KEY",
@@ -134,6 +134,51 @@
       "catalog_license": "Apache 2.0 License",
       "region_informational": "eu-north1",
       "note": "Runtime-verified 2026-08-27 to return 4096 dimensions, not the 1024 the schema document assumed."
+    }
+  },
+
+  "local_models_note": "Checkpoints this codebase runs on its own hardware, pinned by HuggingFace revision SHA. Nothing here is a Token Factory identifier, so the preflight neither reads nor checks this section, and parse_manifest ignores it. license is read from the raw README.md YAML frontmatter at the pinned revision, never from the catalog, a model card's prose or the family name, and exulanica/ingest/stages/segmentation.py re-reads that frontmatter before it loads any weights and refuses on drift. readme_sha256 is the digest of those README bytes as retrieved on retrieved_at. pipeline_version moved from 2 to 3 when these entries were added.",
+  "local_models": {
+    "facebook/sam2.1-hiera-tiny": {
+      "revision": "de431c4043854a71d8101e17995dfe596bf101a5",
+      "license": "apache-2.0",
+      "readme_sha256": "dfa401b1b9358b9650ae487dd2f2bb336fd745c3609e3244adf2e97a22343857",
+      "retrieved_at": "2026-09-11",
+      "library": "transformers",
+      "task": "mask-generation",
+      "note": "SAM 2.1, the smallest checkpoint. Loaded as Sam2Model from a sam2_video configuration, which transformers warns about and which returned predicted IoU above 0.99 on the first measured volcanic photograph. Never SAM 3: the SAM License is gated and CUDA 12.6 only, see docs/license-matrix.md section 3.4."
+    },
+    "IDEA-Research/grounding-dino-tiny": {
+      "revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+      "license": "apache-2.0",
+      "readme_sha256": "cf46f74c7b6850f1d5cbe406028324d8798148726016d46a69a365b4a2d3e89f",
+      "retrieved_at": "2026-09-11",
+      "library": "transformers",
+      "task": "zero-shot-object-detection",
+      "provenance_caveat": "Trained in part on Cap4M, an undisclosed web-crawled caption set whose terms IDEA-Research has not published. The Apache-2.0 grant covers the grantor's own rights and cannot cure third-party rights in scraped data; docs/license-matrix.md section 7 records the same residual.",
+      "note": "Open-vocabulary boxes for photographs the hosted vision pass did not locate objects in."
+    },
+    "google/owlv2-base-patch16-ensemble": {
+      "revision": "cfd3195ba4ea9592eec887ded089f4c08eff231d",
+      "license": "apache-2.0",
+      "readme_sha256": "7c7426bc5ec939a42d1f96fb093031b6263400cceac4129ebb941a0c8c11b9b9",
+      "retrieved_at": "2026-09-11",
+      "library": "transformers",
+      "task": "zero-shot-object-detection",
+      "note": "The card's research-output framing is a norm, not a licence term (docs/license-matrix.md section 3.4)."
+    }
+  },
+
+  "local_roles": {
+    "object_segmentation": {
+      "primary": "facebook/sam2.1-hiera-tiny",
+      "fallback": null,
+      "rationale": "Masks from boxes, locally, so a photograph with a person in it never leaves the machine to be segmented. No fallback: the licence matrix clears no other promptable segmenter, and a stage with no segmenter reports itself unavailable rather than substituting one."
+    },
+    "open_vocabulary_detection": {
+      "primary": "IDEA-Research/grounding-dino-tiny",
+      "fallback": "google/owlv2-base-patch16-ensemble",
+      "rationale": "Boxes for SAM when the hosted vision pass supplied none. The fallback is tried when the primary cannot be loaded or raises, and the artifact records which one ran."
     }
   },
 

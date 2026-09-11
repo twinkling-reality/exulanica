@@ -8,6 +8,7 @@ import json
 import subprocess
 import sys
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -78,6 +79,101 @@ def test_depth_configuration_is_explicit_and_passes_the_pinned_model_binding(mon
                 worker_command.DEPTH_MODEL_REVISION_ENV: "main",
             }
         )
+
+
+class _RecordingSegmenter:
+    """Stands in for `LocalObjectSegmenter`, which would load SAM 2.1 and torch in this process."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+def test_segmentation_is_off_unless_an_operator_names_the_local_segmenter(monkeypatch):
+    from exulanica.ingest.stages import segmentation
+
+    monkeypatch.setattr(segmentation, "LocalObjectSegmenter", _RecordingSegmenter)
+    model = worker_command.SEGMENTATION_MODEL_ENV
+    device = worker_command.SEGMENTATION_DEVICE_ENV
+
+    assert worker_command._build_segmenter({}) is None
+    assert worker_command._build_segmenter({model: " Unavailable "}) is None
+    # A device alone turns nothing on: the model switch is the only switch.
+    assert worker_command._build_segmenter({device: "cpu"}) is None
+
+    automatic = worker_command._build_segmenter({model: "local"})
+    assert isinstance(automatic, _RecordingSegmenter)
+    assert automatic.kwargs == {"device": None}
+    pinned = worker_command._build_segmenter({model: "LOCAL", device: "cpu"})
+    assert pinned.kwargs == {"device": "cpu"}
+
+    with pytest.raises(ValueError, match="must be 'local' or 'unavailable'"):
+        worker_command._build_segmenter({model: "sam2"})
+
+
+def test_the_worker_hands_the_configured_segmenter_to_its_jobs(monkeypatch, tmp_path):
+    """The gap this closes: the environment built depth and a detector and never a segmenter."""
+    from exulanica.ingest.stages import segmentation
+
+    monkeypatch.setattr(segmentation, "LocalObjectSegmenter", _RecordingSegmenter)
+
+    class Database:
+        @classmethod
+        def from_env(cls, environ):
+            return cls()
+
+        @contextmanager
+        def unscoped(self):
+            yield None
+
+    built = {}
+    monkeypatch.setattr(worker_command, "Database", Database)
+    monkeypatch.setattr(worker_command, "verify_schema", lambda database: None)
+    monkeypatch.setattr(worker_command, "assert_runtime_role", lambda connection: None)
+    monkeypatch.setattr(
+        worker_command, "DerivativeWorker", lambda *args, **kwargs: built.update(kwargs)
+    )
+    args = SimpleNamespace(workspace=[str(uuid.uuid4())], name="segmenting", poll_seconds=2.0)
+    environ = {worker_command.DATA_DIR_ENV: str(tmp_path)}
+
+    worker_command._build_worker(args, environ)
+    assert built["segmenter"] is None
+
+    worker_command._build_worker(
+        args,
+        {
+            **environ,
+            worker_command.SEGMENTATION_MODEL_ENV: "local",
+            worker_command.SEGMENTATION_DEVICE_ENV: "mps",
+        },
+    )
+    assert isinstance(built["segmenter"], _RecordingSegmenter)
+    assert built["segmenter"].kwargs == {"device": "mps"}
+
+
+def test_neither_worker_imports_the_native_runtime_the_other_one_loads():
+    """pycolmap and torch abort one process on macOS (`pycolmap_executor.py`). The scene worker
+    now lifts segments, and its lift imports the segmentation stage's module for two constants,
+    so this holds that importing the scene worker still pulls in no torch, no transformers and
+    no model, and that the derivative worker, which builds the segmenter, pulls in no pycolmap.
+    Each in a child process, because this one's `sys.modules` belongs to the whole suite."""
+    probes = {
+        "exulanica.ingest.scene_worker_command": ("torch", "transformers"),
+        "exulanica.ingest.worker_command": ("pycolmap",),
+    }
+    for module, forbidden in probes.items():
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import sys, {module}; "
+                f"print(sorted(name for name in {forbidden!r} if name in sys.modules))",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout.strip() == "[]", (module, completed.stdout)
 
 
 def test_once_mode_uses_observed_lifecycle_and_reports_terminal_counts(monkeypatch):

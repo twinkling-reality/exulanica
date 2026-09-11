@@ -1,0 +1,749 @@
+{
+  "schema_version": 1,
+  "scene_id": "c4850fcc-ef96-5a53-88f5-4fe276e33395",
+  "state": "available",
+  "reason": null,
+  "artifact": {
+    "artifact_id": "2a6b6e72-8f87-5b3c-b0fe-c338fb9a8470",
+    "content_sha256": "dc208e3bf9962442a56d2b08d688ded1f0ef8d077cf67d096e570df07e57fefd",
+    "byte_size": 8038
+  },
+  "pose_receipt_sha256": "3841893fdff30d8324fbc894d1591190134d96ac763da3945090f3fe9fd949a6",
+  "placement_receipt_sha256": "cd19d8672da97bab560aa4ba4c33faf2d5af00729ff7d732e581b2c3e65c07c1",
+  "gate_receipt_sha256": "02b76a887a3683a48f5f6799acb9892ad3007db3035214634f21ec19ca6f3ef8",
+  "grid": {
+    "frame": "scene",
+    "voxel_size_microunits": 459682
+  },
+  "policy": {
+    "gaussian_samples_max": 200000,
+    "instance_link_voxels": 2,
+    "min_segment_samples": 8,
+    "min_votes": 2,
+    "object_instances": "26-connected-components-per-label-on-the-link-grid",
+    "occlusion_grid_cells": 96,
+    "occlusion_relative_tolerance_millionths": 150000,
+    "person_segments": "reviewed-region-with-subject-and-shown-consent-only",
+    "point_map_samples_per_member": 1024,
+    "projector": "exulanica.masked-geometry-check/v1",
+    "region_margin_ppm": 0,
+    "region_raster_cells": 512,
+    "visibility": "own-point-map-depth-test",
+    "vote_threshold_millionths": 500000,
+    "voxel_grid_cells": 128
+  },
+  "segments": [
+    {
+      "segment_id": "96dbf64ab9f644a260992dd68411ab70",
+      "kind": "person",
+      "label": null,
+      "subject_id": "41b05518-0fd9-48aa-95b3-73a2dd31d8e4",
+      "display_name": null,
+      "voxel_count": 45,
+      "voxels": [
+        [
+          37,
+          -8,
+          65
+        ],
+        [
+          37,
+          -5,
+          65
+        ],
+        [
+          37,
+          -2,
+          65
+        ],
+        [
+          37,
+          1,
+          65
+        ],
+        [
+          37,
+          4,
+          65
+        ],
+        [
+          37,
+          8,
+          65
+        ],
+        [
+          38,
+          -5,
+          65
+        ],
+        [
+          38,
+          -2,
+          65
+        ],
+        [
+          38,
+          1,
+          65
+        ],
+        [
+          38,
+          7,
+          65
+        ],
+        [
+          39,
+          -8,
+          65
+        ],
+        [
+          39,
+          -5,
+          65
+        ],
+        [
+          39,
+          -2,
+          65
+        ],
+        [
+          39,
+          1,
+          65
+        ],
+        [
+          39,
+          4,
+          65
+        ],
+        [
+          39,
+          7,
+          65
+        ],
+        [
+          40,
+          -8,
+          65
+        ],
+        [
+          40,
+          -5,
+          65
+        ],
+        [
+          40,
+          -2,
+          65
+        ],
+        [
+          40,
+          1,
+          65
+        ],
+        [
+          40,
+          4,
+          65
+        ],
+        [
+          41,
+          -5,
+          65
+        ],
+        [
+          41,
+          -2,
+          65
+        ],
+        [
+          41,
+          1,
+          65
+        ],
+        [
+          41,
+          4,
+          65
+        ],
+        [
+          41,
+          7,
+          65
+        ],
+        [
+          42,
+          -9,
+          65
+        ],
+        [
+          42,
+          -6,
+          65
+        ],
+        [
+          42,
+          -3,
+          65
+        ],
+        [
+          42,
+          0,
+          65
+        ],
+        [
+          42,
+          1,
+          65
+        ],
+        [
+          42,
+          4,
+          65
+        ],
+        [
+          42,
+          7,
+          65
+        ],
+        [
+          43,
+          -9,
+          65
+        ],
+        [
+          43,
+          -6,
+          65
+        ],
+        [
+          43,
+          -3,
+          65
+        ],
+        [
+          43,
+          3,
+          65
+        ],
+        [
+          44,
+          -3,
+          65
+        ],
+        [
+          44,
+          0,
+          65
+        ],
+        [
+          44,
+          3,
+          65
+        ],
+        [
+          44,
+          6,
+          65
+        ],
+        [
+          45,
+          -7,
+          65
+        ],
+        [
+          45,
+          0,
+          65
+        ],
+        [
+          45,
+          3,
+          65
+        ],
+        [
+          45,
+          6,
+          65
+        ]
+      ],
+      "bounds_microunits": {
+        "min": [
+          17252222,
+          -3984701,
+          29986968
+        ],
+        "max": [
+          20754816,
+          3981986,
+          30007409
+        ]
+      },
+      "centroid_microunits": [
+        18931080,
+        -44134,
+        29997988
+      ],
+      "samples": {
+        "point_map": 51,
+        "gaussian": 0
+      },
+      "votes": {
+        "views": 3,
+        "min": 2,
+        "median": 3,
+        "max": 3,
+        "fraction_min_millionths": 666666,
+        "fraction_median_millionths": 1000000
+      },
+      "regions": [
+        {
+          "capture_id": "01a090cd-a734-7810-8ecb-23408feecbb1",
+          "kind": "person_region",
+          "span_id": null,
+          "region_key": "da67a907448bade0ef0a6d5d850e3eb141fc501f33e708c6635565ecd388a9ae",
+          "samples": 51
+        },
+        {
+          "capture_id": "01a090cd-a762-75a3-be7f-87e65745a4f7",
+          "kind": "person_region",
+          "span_id": null,
+          "region_key": "ff0c424a1e31e9c350785e7d13aedbcef0aa3b9d75d3732a288e99938e7ab8c0",
+          "samples": 51
+        },
+        {
+          "capture_id": "01a090cd-a780-725e-93ab-10de726e60a1",
+          "kind": "person_region",
+          "span_id": null,
+          "region_key": "764ed45f280fd469d55c60a887fec5e9999795f6f0875863cab5e31d172b00bb",
+          "samples": 47
+        }
+      ],
+      "occurrence_ids": []
+    },
+    {
+      "segment_id": "91bc70d6ac5c88834393e8306eb45d7b",
+      "kind": "object",
+      "label": "trail sign",
+      "subject_id": null,
+      "display_name": null,
+      "voxel_count": 71,
+      "voxels": [
+        [
+          15,
+          -8,
+          65
+        ],
+        [
+          15,
+          -5,
+          65
+        ],
+        [
+          15,
+          -2,
+          65
+        ],
+        [
+          15,
+          1,
+          65
+        ],
+        [
+          15,
+          4,
+          65
+        ],
+        [
+          15,
+          7,
+          65
+        ],
+        [
+          16,
+          -5,
+          65
+        ],
+        [
+          16,
+          1,
+          65
+        ],
+        [
+          16,
+          7,
+          65
+        ],
+        [
+          17,
+          -9,
+          65
+        ],
+        [
+          17,
+          -8,
+          65
+        ],
+        [
+          17,
+          -5,
+          65
+        ],
+        [
+          17,
+          -2,
+          65
+        ],
+        [
+          17,
+          1,
+          65
+        ],
+        [
+          17,
+          4,
+          65
+        ],
+        [
+          17,
+          7,
+          65
+        ],
+        [
+          18,
+          -9,
+          65
+        ],
+        [
+          18,
+          -6,
+          65
+        ],
+        [
+          18,
+          -3,
+          65
+        ],
+        [
+          18,
+          -2,
+          65
+        ],
+        [
+          18,
+          1,
+          65
+        ],
+        [
+          18,
+          4,
+          65
+        ],
+        [
+          18,
+          7,
+          65
+        ],
+        [
+          19,
+          -9,
+          65
+        ],
+        [
+          19,
+          -6,
+          65
+        ],
+        [
+          19,
+          -3,
+          65
+        ],
+        [
+          19,
+          0,
+          65
+        ],
+        [
+          19,
+          3,
+          65
+        ],
+        [
+          19,
+          7,
+          65
+        ],
+        [
+          20,
+          -7,
+          65
+        ],
+        [
+          20,
+          -6,
+          65
+        ],
+        [
+          20,
+          0,
+          65
+        ],
+        [
+          20,
+          6,
+          65
+        ],
+        [
+          21,
+          -4,
+          65
+        ],
+        [
+          21,
+          -3,
+          65
+        ],
+        [
+          21,
+          0,
+          65
+        ],
+        [
+          21,
+          3,
+          65
+        ],
+        [
+          21,
+          6,
+          65
+        ],
+        [
+          22,
+          -7,
+          65
+        ],
+        [
+          22,
+          -4,
+          65
+        ],
+        [
+          22,
+          -1,
+          65
+        ],
+        [
+          22,
+          2,
+          65
+        ],
+        [
+          22,
+          6,
+          65
+        ],
+        [
+          23,
+          -8,
+          65
+        ],
+        [
+          23,
+          -7,
+          65
+        ],
+        [
+          23,
+          -4,
+          65
+        ],
+        [
+          23,
+          -1,
+          65
+        ],
+        [
+          23,
+          5,
+          65
+        ],
+        [
+          23,
+          8,
+          65
+        ],
+        [
+          24,
+          -8,
+          65
+        ],
+        [
+          24,
+          -5,
+          65
+        ],
+        [
+          24,
+          -2,
+          65
+        ],
+        [
+          24,
+          -1,
+          65
+        ],
+        [
+          24,
+          2,
+          65
+        ],
+        [
+          24,
+          5,
+          65
+        ],
+        [
+          24,
+          8,
+          65
+        ],
+        [
+          25,
+          -5,
+          65
+        ],
+        [
+          25,
+          1,
+          65
+        ],
+        [
+          25,
+          8,
+          65
+        ],
+        [
+          26,
+          -8,
+          65
+        ],
+        [
+          26,
+          -5,
+          65
+        ],
+        [
+          26,
+          -2,
+          65
+        ],
+        [
+          26,
+          1,
+          65
+        ],
+        [
+          26,
+          4,
+          65
+        ],
+        [
+          26,
+          7,
+          65
+        ],
+        [
+          27,
+          -8,
+          65
+        ],
+        [
+          27,
+          -5,
+          65
+        ],
+        [
+          27,
+          -2,
+          65
+        ],
+        [
+          27,
+          1,
+          65
+        ],
+        [
+          27,
+          4,
+          65
+        ],
+        [
+          27,
+          7,
+          65
+        ]
+      ],
+      "bounds_microunits": {
+        "min": [
+          7203846,
+          -3984701,
+          29986968
+        ],
+        "max": [
+          12790843,
+          3984701,
+          30007409
+        ]
+      },
+      "centroid_microunits": [
+        9985542,
+        -27,
+        29998388
+      ],
+      "samples": {
+        "point_map": 78,
+        "gaussian": 0
+      },
+      "votes": {
+        "views": 3,
+        "min": 2,
+        "median": 3,
+        "max": 3,
+        "fraction_min_millionths": 666666,
+        "fraction_median_millionths": 1000000
+      },
+      "regions": [
+        {
+          "capture_id": "01a090cd-a734-7810-8ecb-23408feecbb1",
+          "kind": "object_mask",
+          "span_id": "01a090cd-a854-75e8-ba46-de68d526c9e5",
+          "region_key": null,
+          "samples": 78
+        },
+        {
+          "capture_id": "01a090cd-a762-75a3-be7f-87e65745a4f7",
+          "kind": "object_mask",
+          "span_id": "01a090cd-a85f-7beb-a9e0-dd765fa48432",
+          "region_key": null,
+          "samples": 78
+        },
+        {
+          "capture_id": "01a090cd-a780-725e-93ab-10de726e60a1",
+          "kind": "object_mask",
+          "span_id": "01a090cd-a869-7eeb-a60d-6f276179dac5",
+          "region_key": null,
+          "samples": 72
+        }
+      ],
+      "occurrence_ids": [
+        "01a090cd-a855-700a-8e77-ae1699deed47",
+        "01a090cd-a860-744f-bb2e-045541c405be",
+        "01a090cd-a86a-76f7-bafc-f27e4dfa013a"
+      ]
+    }
+  ],
+  "withheld_segment_count": 0,
+  "stale_inputs": []
+}

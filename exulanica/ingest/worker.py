@@ -61,6 +61,7 @@ from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.ledger import Ledger
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.stages.segmentation import ObjectSegmenter
 from exulanica.ingest.vision import VisionModel
 from exulanica.reconstruction import DepthModel
 from exulanica.store.base import ContentAddressedStore
@@ -232,6 +233,7 @@ class DerivativeWorker:
         vision: VisionModel | None = None,
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
+        segmenter: ObjectSegmenter | None = None,
         name: str = "derivatives",
         poll_seconds: float = _POLL_SECONDS,
         lease_seconds: float = MINIMUM_LEASE_SECONDS,
@@ -256,6 +258,9 @@ class DerivativeWorker:
         self._vision = vision
         self._depth = depth
         self._detector = detector
+        # Loaded once per worker and handed to every job's pipeline, like the depth model: SAM
+        # 2.1 and a detector are seconds to load and fractions of a second per photograph.
+        self._segmenter = segmenter
         self._name = name
         self._poll_seconds = poll_seconds
         self._lease_seconds = lease_seconds
@@ -593,6 +598,7 @@ class DerivativeWorker:
             vision=self._vision,
             depth=self._depth,
             detector=self._detector,
+            segmenter=self._segmenter,
         )
         total = len(claimed.capture_ids)
         for capture_id in claimed.capture_ids:

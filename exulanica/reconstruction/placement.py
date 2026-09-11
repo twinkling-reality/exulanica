@@ -19,7 +19,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY, fit_point_map_scale
 
@@ -32,6 +32,7 @@ __all__ = [
     "build_placement_record",
     "recovered_camera_records",
     "validate_placement_record",
+    "validated_receipt_cameras",
 ]
 
 PLACEMENT_PROFILE: Final = "exulanica.posed-point-map-placement/v2"
@@ -260,7 +261,22 @@ def _read_pose_receipt(data: bytes) -> _PoseReceipt:
         raise ValueError("the pose manifest disagrees with its digest")
     if not isinstance(quality_digest, str) or _digest(_canonical(quality)) != quality_digest:
         raise ValueError("the pose quality disagrees with its digest")
+    return _pose_receipt_from(manifest, quality, manifest_digest, observations=True)
 
+
+def _pose_receipt_from(
+    manifest: dict[str, Any],
+    quality: dict[str, Any],
+    manifest_digest: str,
+    *,
+    observations: bool,
+) -> _PoseReceipt:
+    """The frame and camera checks every reader of a pose receipt applies, in one place.
+
+    ``observations=False`` is for ``validated_receipt_cameras`` alone: it leaves each camera's
+    sparse observations unread, which is the only difference, so the two readers cannot come to
+    disagree about a frame, a pose or a calibration.
+    """
     raw_frames = manifest.get("frames")
     if not isinstance(raw_frames, list):
         raise ValueError("the pose manifest has no frame list")
@@ -309,20 +325,22 @@ def _read_pose_receipt(data: bytes) -> _PoseReceipt:
             ):
                 raise ValueError("camera image dimensions are malformed")
             size = (raw_size[0], raw_size[1])
-        raw_observations = raw.get("sparse_observations", [])
-        if (
-            not isinstance(raw_observations, list)
-            or len(raw_observations) > _MAX_SPARSE_OBSERVATIONS
-        ):
-            raise ValueError("camera sparse observations are malformed")
-        observations = tuple(_numbers(item, 8, "sparse observation") for item in raw_observations)
-        if len({item[0] for item in observations}) != len(observations):
-            raise ValueError("camera sparse observations contain duplicate points")
+        sparse: tuple[tuple[float, ...], ...] = ()
+        if observations:
+            raw_observations = raw.get("sparse_observations", [])
+            if (
+                not isinstance(raw_observations, list)
+                or len(raw_observations) > _MAX_SPARSE_OBSERVATIONS
+            ):
+                raise ValueError("camera sparse observations are malformed")
+            sparse = tuple(_numbers(item, 8, "sparse observation") for item in raw_observations)
+            if len({item[0] for item in sparse}) != len(sparse):
+                raise ValueError("camera sparse observations contain duplicate points")
         cameras.append(
             _PoseCamera(
                 image_name=raw["image_name"],
                 image_size=size,
-                sparse_observations=observations,
+                sparse_observations=sparse,
                 calibration=_calibration(raw.get("calibration"), size),
                 quaternion_wxyz=quaternion,  # type: ignore[arg-type]
                 translation_xyz=_numbers(raw.get("translation_xyz"), 3, "camera translation"),  # type: ignore[arg-type]
@@ -481,6 +499,60 @@ def recovered_camera_records(pose_receipt: bytes) -> dict[str, dict[str, object]
             ),
         }
         for camera in receipt.cameras
+        if camera.calibration is not None
+    }
+
+
+def validated_receipt_cameras(pose_receipt: bytes) -> dict[str, dict[str, object]]:
+    """The accepted, calibrated cameras of a pose receipt its caller has ALREADY validated.
+
+    Each record carries the camera's image name, its camera-from-world quaternion and translation
+    as recorded, its calibration and its projection kind, keyed by capture. Every field it returns
+    passes the checks ``_read_pose_receipt`` applies to it, through the same code. What it does not
+    do is verify the manifest and quality digests, because recomputing the quality digest means
+    materialising every sparse observation, and the observations are dropped here as each camera is
+    parsed instead. MEASURED 2026-09-11 on the volcanic scene: they are about 99.9 per cent of a
+    107,742,795 byte receipt, and reading it through ``recovered_camera_records`` peaked at 599
+    MiB.
+
+    So the caller must have validated these exact bytes already, as ``build_placement_record`` and
+    ``validate_placement_record`` do, and must know they are the bytes it validated: the scene
+    segment lift is the caller this exists for, and it checks their digest against the one its
+    placement is bound to. Everything else keeps ``recovered_camera_records``.
+    """
+
+    def without_observations(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        # Last value wins for a repeated key, exactly as a plain `json.loads` keeps it.
+        return {key: value for key, value in pairs if key != "sparse_observations"}
+
+    try:
+        receipt = json.loads(pose_receipt, object_pairs_hook=without_observations)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("the pose receipt is not canonical JSON") from error
+    if not isinstance(receipt, dict) or receipt.get("profile") != _POSE_PROFILE:
+        raise ValueError("the pose receipt profile is unsupported")
+    manifest, quality = receipt.get("manifest"), receipt.get("quality")
+    if not isinstance(manifest, dict) or not isinstance(quality, dict):
+        raise ValueError("the pose receipt must carry its manifest and quality")
+    parsed = _pose_receipt_from(
+        manifest, quality, str(receipt.get("manifest_digest")), observations=False
+    )
+    if quality.get("accepted") is not True:
+        return {}
+    captures = {filename: capture for capture, filename in parsed.frames}
+    return {
+        captures[camera.image_name]: {
+            "image_name": camera.image_name,
+            "quaternion_wxyz": list(camera.quaternion_wxyz),
+            "translation_xyz": list(camera.translation_xyz),
+            "calibration": camera.calibration,
+            "projection": (
+                "pinhole"
+                if camera.calibration["model"] in {"PINHOLE", "SIMPLE_PINHOLE"}
+                else "pinhole-approximation"
+            ),
+        }
+        for camera in parsed.cameras
         if camera.calibration is not None
     }
 

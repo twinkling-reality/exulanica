@@ -341,15 +341,18 @@ def test_ingest_without_a_vision_model_records_capture_facts_and_says_vision_did
     # person_regions being UNAVAILABLE rather than absent is the point. "Nobody looked for people"
     # and "somebody looked and found none" are different facts, and only the second one may let a
     # photograph through; a stage that vanished silently from this list would collapse them.
-    assert outcome.stages_skipped == ["vision", "person_regions", "depth"]
-    assert outcome.stages_unavailable == ["vision", "person_regions", "depth"]
+    # segmentation joins them for the same reason: no segmenter is configured, so no object was
+    # looked for, and that is reported rather than left to read as a photograph with none in it.
+    expected = ["vision", "person_regions", "depth", "segmentation"]
+    assert outcome.stages_skipped == expected
+    assert outcome.stages_unavailable == expected
     assert outcome.model_calls == 0
     unavailable = repository.connection.execute(
         "select stage_key, duration_ms, cost, error_class from pipeline_event "
         "where run_id = %s and type = 'stage_unavailable' order by seq",
         (outcome.run_id,),
     ).fetchall()
-    assert [row["stage_key"] for row in unavailable] == ["vision", "person_regions", "depth"]
+    assert [row["stage_key"] for row in unavailable] == expected
     assert all(row["duration_ms"] is None and row["cost"] is None for row in unavailable)
     assert all(row["error_class"] == "unavailable" for row in unavailable)
     kinds = [

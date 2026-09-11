@@ -42,8 +42,12 @@ from exulanica.evidence.region import PPM
 
 __all__ = [
     "GaussianView",
+    "camera_point",
     "count_masked_gaussians",
+    "gaussian_centre_array",
+    "image_point",
     "masked_geometry_is_clean",
+    "ppm_point",
     "read_gaussian_centres",
 ]
 
@@ -63,16 +67,11 @@ class GaussianView:
     projection: str = "exact"
 
 
-def read_gaussian_centres(
-    data: bytes,
-) -> tuple[list[tuple[float, float, float]], list[float] | None]:
-    """Centres and, when the exporter wrote one, an opacity per Gaussian.
+def _ply_vertices(data: bytes) -> tuple[int, list[str], bytes]:
+    """A Gaussian PLY's vertex count, float property names and vertex bytes, refused if malformed.
 
-    The header walk is deliberately the same shape as ``gaussian_ply_bounds`` in
-    ``exulanica.ingest.scene_splat``, because the two read the same file and a second, looser
-    parser would accept bytes the first refuses. Opacity is returned as ``None`` rather than
-    defaulted: whether the pinned exporter writes it, and whether it writes a logit or a
-    probability, is not something this function may guess.
+    The one header walk both readers below use, so the array reader cannot accept a file the
+    tuple reader refuses.
     """
     terminator = b"end_header\n"
     end = data.find(terminator)
@@ -102,6 +101,39 @@ def read_gaussian_centres(
     stride = len(properties) * 4
     if len(payload) != count * stride:
         raise ValueError("Gaussian PLY vertex bytes disagree with its header")
+    return count, properties, payload
+
+
+def gaussian_centre_array(data: bytes) -> Any:
+    """Every Gaussian centre as an (N, 3) float64 array, for a caller that needs no opacity.
+
+    The same file and the same refusals as ``read_gaussian_centres``, read in one vectorised pass
+    rather than one Python tuple per Gaussian: the scene segment lift reads a trained scene of about
+    a million Gaussians and keeps a fraction of them. The values are the exact float32 values the
+    file holds, widened, which is what the tuple reader returns too.
+    """
+    import numpy as np
+
+    count, properties, payload = _ply_vertices(data)
+    vertices = np.frombuffer(payload, dtype="<f4").reshape(count, len(properties))
+    centres = vertices[:, [properties.index(key) for key in ("x", "y", "z")]].astype(np.float64)
+    if not np.isfinite(centres).all():
+        raise ValueError("Gaussian PLY contains nonfinite geometry")
+    return centres
+
+
+def read_gaussian_centres(
+    data: bytes,
+) -> tuple[list[tuple[float, float, float]], list[float] | None]:
+    """Centres and, when the exporter wrote one, an opacity per Gaussian.
+
+    The header walk is deliberately the same shape as ``gaussian_ply_bounds`` in
+    ``exulanica.ingest.scene_splat``, because the two read the same file and a second, looser
+    parser would accept bytes the first refuses. Opacity is returned as ``None`` rather than
+    defaulted: whether the pinned exporter writes it, and whether it writes a logit or a
+    probability, is not something this function may guess.
+    """
+    _count, properties, payload = _ply_vertices(data)
     axes = [properties.index(key) for key in ("x", "y", "z")]
     opacity_index = properties.index("opacity") if "opacity" in properties else None
     centres: list[tuple[float, float, float]] = []
@@ -124,7 +156,7 @@ def read_gaussian_centres(
     return centres, (opacities if opacity_index is not None else None)
 
 
-def _rotate(quaternion: Sequence[float], point: Sequence[float]) -> tuple[float, float, float]:
+def _rotate(quaternion: Sequence[float], point: Sequence[Any]) -> tuple[Any, Any, Any]:
     """Rotate a world point into camera axes with a unit quaternion, w first."""
     w, x, y, z = quaternion
     xx, yy, zz = x * x, y * y, z * z
@@ -136,6 +168,49 @@ def _rotate(quaternion: Sequence[float], point: Sequence[float]) -> tuple[float,
         px * 2 * (xy + wz) + py * (1 - 2 * (xx + zz)) + pz * 2 * (yz - wx),
         px * 2 * (xz - wy) + py * 2 * (yz + wx) + pz * (1 - 2 * (xx + yy)),
     )
+
+
+# -- the projector ------------------------------------------------------------------------------
+#
+# Exposed so that the scene segment lift in `exulanica/ingest/scene_segments.py` projects through
+# exactly the arithmetic this check counts with, rather than through a second projector that would
+# one day disagree with it about which side of an outline a point lands on.
+#
+# Every step is plain arithmetic with no branch, so each accepts either a single coordinate or
+# three equal-length numpy arrays of them. The check below calls them one Gaussian at a time with
+# floats, exactly as it computed before they were split out; the lift calls them once per camera
+# over every sample. The order of operations is the order the check always used, so a float in is
+# bit-for-bit the value the inline expression produced.
+
+
+def camera_point(view: GaussianView, point: Sequence[Any]) -> tuple[Any, Any, Any]:
+    """A world point in the view's camera axes: rotated, then translated. The last is depth."""
+    camera = _rotate(view.quaternion_wxyz, point)
+    return (
+        camera[0] + view.translation_xyz[0],
+        camera[1] + view.translation_xyz[1],
+        camera[2] + view.translation_xyz[2],
+    )
+
+
+def image_point(view: GaussianView, camera: Sequence[Any]) -> tuple[Any, Any]:
+    """Pixel coordinates of a camera-axis point. The caller must have refused depth <= 0 first."""
+    focal_x, focal_y = view.focal_xy
+    principal_x, principal_y = view.principal_xy
+    return (
+        focal_x * camera[0] / camera[2] + principal_x,
+        focal_y * camera[1] / camera[2] + principal_y,
+    )
+
+
+def ppm_point(view: GaussianView, u: Any, v: Any) -> tuple[Any, Any]:
+    """Pixel coordinates in parts per million of the view's frame, floored, as the outlines are.
+
+    Floored rather than truncated to an int here, so an array stays an array; a scalar caller
+    wraps each in ``int``. The caller must have refused a pixel outside the frame first.
+    """
+    width, height = view.image_size
+    return u * PPM // width, v * PPM // height
 
 
 def _grown(silhouette: Silhouette, margin_ppm: int) -> Silhouette:
@@ -172,8 +247,6 @@ def count_masked_gaussians(
     over_confirmed = 0
     for view in views:
         width, height = view.image_size
-        focal_x, focal_y = view.focal_xy
-        principal_x, principal_y = view.principal_xy
         masked = tuple(_grown(outline, margin_ppm) for outline in view.masked)
         confirmed = tuple(_grown(outline, margin_ppm) for outline in view.confirmed)
         view_masked = 0
@@ -181,16 +254,13 @@ def count_masked_gaussians(
         for index, centre in enumerate(centres if masked or confirmed else ()):
             if opacities is not None and _probability(opacities[index]) < threshold:
                 continue
-            camera = _rotate(view.quaternion_wxyz, centre)
-            depth = camera[2] + view.translation_xyz[2]
-            if depth <= 0:
+            camera = camera_point(view, centre)
+            if camera[2] <= 0:
                 continue
-            u = focal_x * (camera[0] + view.translation_xyz[0]) / depth + principal_x
-            v = focal_y * (camera[1] + view.translation_xyz[1]) / depth + principal_y
+            u, v = image_point(view, camera)
             if not (0 <= u < width and 0 <= v < height):
                 continue
-            x_ppm = int(u * PPM // width)
-            y_ppm = int(v * PPM // height)
+            x_ppm, y_ppm = (int(value) for value in ppm_point(view, u, v))
             if any(outline.contains(x_ppm, y_ppm) for outline in masked):
                 view_masked += 1
             if any(outline.contains(x_ppm, y_ppm) for outline in confirmed):

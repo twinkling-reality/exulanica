@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from exulanica.db.session import Database
 from exulanica.ingest.reconstruction_scratch import cleanup_abandoned_scene_scratch
@@ -15,7 +16,9 @@ from exulanica.ingest.scene_reconstruction import (
     SceneBuildOutcome,
     SceneReconstructionProcessor,
 )
+from exulanica.ingest.scene_segments import publish_scene_segments, scenes_due_segments
 from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
+from exulanica.ingest.stages import STAGES
 from exulanica.store import ContentAddressedStore
 
 __all__ = ["SceneReconstructionWorker"]
@@ -103,6 +106,9 @@ class SceneReconstructionWorker:
         self._job_ids = job_ids
         self._compressor_gpu = compressor_gpu
         self._stop = threading.Event()
+        # The state each scene was last lifted again for, by `refresh_scene_segments`, whatever
+        # became of it. One entry per scene, so a long-lived worker holds no more than it has.
+        self._segments_attempted: dict[uuid.UUID, object] = {}
 
     def request_stop(self) -> None:
         self._stop.set()
@@ -146,6 +152,70 @@ class SceneReconstructionWorker:
             if not claimed_any:
                 return outcomes
         return outcomes
+
+    def refresh_scene_segments(self) -> list[dict[str, Any]]:
+        """Lift again every published scene whose members' masks are complete and not yet lifted.
+
+        A scene lifts at publication with the masks its members had then (see
+        `SceneReconstructionProcessor._lift_segments`). This is for the masks that arrive after it,
+        and `scenes_due_segments` says when a scene is due. Each lift opens its own `reprocess`
+        run, and a failure is recorded there and reported here rather than raised: one scene that
+        cannot be lifted must not stop the rest or the worker.
+
+        A scene is attempted at most once for each state it is due in, so a lift that fails the
+        same way every time is not repeated on every pass; a new mask or a new build is a new
+        state, and a restarted worker tries once more. A job-scoped worker does none of this,
+        because it was started for its named jobs and nothing else.
+        """
+        if self._job_ids is not None:
+            return []
+        results: list[dict[str, Any]] = []
+        for workspace_id in sorted(self._workspaces, key=str):
+            if self._stop.is_set():
+                break
+            with self._database.session(workspace_id) as connection:
+                repository = IngestRepository(connection, workspace_id)
+                due = [
+                    item
+                    for item in scenes_due_segments(repository, self._store)
+                    if self._segments_attempted.get(item.scene_id) != item.state
+                ]
+                if due:
+                    repository.register_stages(STAGES)
+                for item in due:
+                    if self._stop.is_set():
+                        break
+                    self._segments_attempted[item.scene_id] = item.state
+                    if item.over_gaussians:
+                        # Lifting again from point maps alone would replace segments that follow
+                        # the trained surface with ones that follow the stacked per-photograph
+                        # maps. The accepted PLY is not retained, so this is the command's to do.
+                        results.append(
+                            {
+                                "scene_id": str(item.scene_id),
+                                "action": "skipped",
+                                "reason": (
+                                    "its segments were lifted over trained Gaussians, and this "
+                                    "worker holds no PLY to lift it again with; run the command "
+                                    "with --gaussian-ply"
+                                ),
+                                "due": item.reason,
+                            }
+                        )
+                        continue
+                    try:
+                        result = publish_scene_segments(
+                            repository, self._store, item.scene_id, trigger="reprocess"
+                        )
+                    except Exception as error:
+                        result = {
+                            "scene_id": str(item.scene_id),
+                            "action": "failed",
+                            "failure_class": type(error).__name__,
+                            "message": str(error),
+                        }
+                    results.append({**result, "due": item.reason})
+        return results
 
     def _claim_one(self, workspace_id: uuid.UUID) -> SceneBuildOutcome | None:
         with self._database.session(workspace_id) as connection:

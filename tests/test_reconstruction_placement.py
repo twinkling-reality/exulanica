@@ -13,6 +13,7 @@ from exulanica.reconstruction.placement import (
     build_placement_record,
     recovered_camera_records,
     validate_placement_record,
+    validated_receipt_cameras,
 )
 from exulanica.reconstruction.pointmap import PointMap, Segment
 
@@ -480,3 +481,62 @@ def test_recovered_camera_keeps_calibrated_projection_and_unscaled_renderer_pose
     quality["accepted"] = False
     value["quality_digest"] = hashlib.sha256(_canonical(quality)).hexdigest()
     assert recovered_camera_records(_canonical(value)) == {}
+
+
+def _calibrated_receipt() -> dict:
+    value = json.loads(_receipt())
+    quality = value["quality"]
+    quality["accepted"] = True
+    quality["cameras"][0]["quaternion_wxyz"] = [math.sqrt(0.5), 0, math.sqrt(0.5), 0]
+    quality["cameras"][0]["translation_xyz"] = [-1, -2, -3]
+    quality["cameras"][0]["calibration"] = {"model": "PINHOLE", "parameters": [300, 280, 151, 119]}
+    quality["cameras"][1]["calibration"] = {
+        "model": "SIMPLE_RADIAL",
+        "parameters": [260, 160, 120, 0.03],
+    }
+    value["quality_digest"] = hashlib.sha256(_canonical(quality)).hexdigest()
+    return value
+
+
+def test_the_light_camera_reader_agrees_with_the_full_one_field_for_field():
+    """The scene segment lift reads cameras without the sparse observations, which are about 99.9
+    per cent of a real receipt. It must resolve every pose and calibration exactly as the reader
+    that validates the whole receipt does, because the two share the code that checks them."""
+    value = _calibrated_receipt()
+    data = _canonical(value)
+    light = validated_receipt_cameras(data)
+    full = recovered_camera_records(data)
+    assert set(light) == set(full) == {"capture-a", "capture-c"}
+    for capture, record in light.items():
+        assert record["calibration"] == full[capture]["calibration"]
+        assert record["projection"] == full[capture]["projection"]
+        [camera] = [
+            item
+            for item in value["quality"]["cameras"]
+            if item["image_name"] == record["image_name"]
+        ]
+        assert record["quaternion_wxyz"] == [float(v) for v in camera["quaternion_wxyz"]]
+        assert record["translation_xyz"] == [float(v) for v in camera["translation_xyz"]]
+    assert light["capture-a"]["image_name"] == "0000.jpg"
+
+    value["quality"]["accepted"] = False
+    assert validated_receipt_cameras(_canonical(value)) == {}
+
+
+@pytest.mark.parametrize(
+    ("damage", "message"),
+    [
+        (lambda quality: quality["cameras"][0].update(quaternion_wxyz=[1, 1, 0, 0]), "unit length"),
+        (lambda quality: quality["cameras"][0].update(convention={"mapping": "x"}), "convention"),
+        (lambda quality: quality["cameras"][1].update(image_size=[0, 240]), "dimensions"),
+        (lambda quality: quality.update(registered_images=["0000.jpg"]), "disagree"),
+    ],
+)
+def test_the_light_camera_reader_refuses_what_the_full_one_refuses(damage, message):
+    value = _calibrated_receipt()
+    damage(value["quality"])
+    value["quality_digest"] = hashlib.sha256(_canonical(value["quality"])).hexdigest()
+    with pytest.raises(ValueError, match=message):
+        recovered_camera_records(_canonical(value))
+    with pytest.raises(ValueError, match=message):
+        validated_receipt_cameras(_canonical(value))

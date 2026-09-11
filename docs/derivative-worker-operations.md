@@ -36,6 +36,19 @@ included in the model identity stored with each point map. `EXULANICA_DEPTH_DEVI
 runtime availability. Compose persists `HF_HOME` under the media volume so a restart does not
 download the reviewed checkpoint again.
 
+`EXULANICA_SEGMENTATION_MODEL` accepts only `local` or `unavailable` and defaults to the latter
+everywhere, Compose included. `local` loads the object segmenter the manifest's `local_roles` pin
+(SAM 2.1, with Grounding DINO and OWLv2 for boxes) and re-reads each pinned licence before any
+weights load; there is no checkpoint override, because swapping one re-keys every mask.
+`EXULANICA_SEGMENTATION_DEVICE` may pin `mps`, `cuda`, or `cpu`; when absent the segmenter selects
+MPS, then the CPU. It needs the `segmentation` extra (`uv run --extra reconstruction --extra
+segmentation exulanica-derivative-worker`), and a worker without it refuses to start rather than
+segmenting nothing. The Compose derivative image is built with `--extra reconstruction` alone, so
+turning it on there means adding the extra to that build and the variable to that service. Only
+this worker builds a segmenter: it already holds torch, and pycolmap and torch cannot share a
+process on macOS, so nothing that runs in the scene worker may load one. See
+[scene-segments.md](scene-segments.md) section 4.
+
 ## Delivery contract
 
 PostgreSQL is the queue and the delivery ledger. There is no message broker and no
