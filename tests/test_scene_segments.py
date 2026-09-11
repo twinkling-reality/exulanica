@@ -180,6 +180,24 @@ def _samples(*clouds):
     return lift._Samples(points, np.zeros(len(points), dtype=np.int64), (("m", "a", "0" * 64),))
 
 
+def _wall_in_front_of(view, distance=3.0):
+    """A dense plane square to a camera's axis, ``distance`` in front of it: its own point map."""
+    from scipy.spatial.transform import Rotation
+
+    w, x, y, z = view.quaternion_wxyz
+    rotation = Rotation.from_quat([x, y, z, w]).as_matrix()
+    centre = -rotation.T @ np.asarray(view.translation_xyz)
+    # Dense enough that every occlusion cell holds a point, as a real per-pixel map does.
+    grid = np.linspace(-3, 3, 240)
+    across, down = np.meshgrid(grid, grid)
+    return (
+        centre
+        + distance * rotation[2]
+        + across.reshape(-1, 1) * rotation[0]
+        + down.reshape(-1, 1) * rotation[1]
+    )
+
+
 def test_an_object_every_view_outlines_is_one_segment_and_the_wall_behind_it_is_not():
     pytest.importorskip("scipy")
     views = _views()
@@ -206,13 +224,17 @@ def test_an_object_every_view_outlines_is_one_segment_and_the_wall_behind_it_is_
 
 
 def test_one_view_is_a_projection_and_not_a_vote():
+    """Isolated from the majority rule: the other four views have a wall in front of the cube in
+    their own maps, so the one view that outlines it is the only view that saw it, one of one. The
+    minimum vote count is then the only thing that can refuse it, and it must."""
     pytest.importorskip("scipy")
     views = _views()
-    cube = _cube((0.0, 0.0, 0.0))
-    name, view = next(iter(views.items()))
-    regions = [_region(name, _outline_of(view, _corners((0, 0, 0))))]
-    segments, _summary = lift._lift(_samples(cube), views, {}, regions, PARAMS)
+    names = list(views)
+    regions = [_region(names[0], _outline_of(views[names[0]], _corners((0, 0, 0))))]
+    walls = {name: _wall_in_front_of(views[name]) for name in names[1:]}
+    segments, summary = lift._lift(_samples(_cube((0.0, 0.0, 0.0))), views, walls, regions, PARAMS)
     assert segments == []
+    assert summary["assigned"] == 0
 
 
 def test_two_objects_that_do_not_touch_are_two_segments_of_one_label():
@@ -244,24 +266,6 @@ def test_a_reviewed_person_takes_a_sample_an_object_ties_for():
     [segment] = segments
     assert segment["kind"] == "person" and segment["label"] is None
     assert segment["subject_ref"] == "11111111-1111-1111-1111-111111111111"
-
-
-def _wall_in_front_of(view, distance=3.0):
-    """A dense plane square to a camera's axis, ``distance`` in front of it: its own point map."""
-    from scipy.spatial.transform import Rotation
-
-    w, x, y, z = view.quaternion_wxyz
-    rotation = Rotation.from_quat([x, y, z, w]).as_matrix()
-    centre = -rotation.T @ np.asarray(view.translation_xyz)
-    # Dense enough that every occlusion cell holds a point, as a real per-pixel map does.
-    grid = np.linspace(-3, 3, 240)
-    across, down = np.meshgrid(grid, grid)
-    return (
-        centre
-        + distance * rotation[2]
-        + across.reshape(-1, 1) * rotation[0]
-        + down.reshape(-1, 1) * rotation[1]
-    )
 
 
 def test_a_view_whose_own_map_puts_a_surface_in_front_does_not_count_as_seeing():
