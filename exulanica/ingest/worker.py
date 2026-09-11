@@ -59,6 +59,7 @@ from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.person_detectors import RecordedObservationDetector
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages.segmentation import ObjectSegmenter
@@ -617,14 +618,31 @@ class DerivativeWorker:
                 progress_total=total,
             ):
                 raise _LeaseLost
-            # The capture's current eligible receipt, resolved here rather than assumed. Both
-            # paid stages need it: depth has always refused without one, and vision now does too
-            # because it sends the photograph to a hosted model. A capture nobody has screened
-            # gets neither, and the stages record themselves unavailable with the reason, which
-            # is the honest outcome rather than an error: nothing went wrong, nobody authorized
-            # sending it anywhere.
+            # Prefer current geometry permission. Otherwise offer observation only under an
+            # explicit, current detection receipt. The SQL predicate owns expiry and source checks.
             screening = repository.latest_privacy_screening(capture_id)
-            result = pipeline.ingest_derivatives(
+            capture_pipeline = pipeline
+            if screening is None:
+                row = repository.connection.execute(
+                    "select screening_id from reconstruction_privacy_screening "
+                    "where workspace_id=%s and capture_id=%s "
+                    "and screening_method='person_detection_only' "
+                    "and privacy_screening_allows_observation("
+                    "workspace_id,capture_id,screening_id) "
+                    "order by screened_at desc,screening_id desc limit 1",
+                    (repository.workspace_id, capture_id),
+                ).fetchone()
+                if row is not None:
+                    screening = repository.privacy_screening(row["screening_id"])
+                    capture_pipeline = PhotoIngestPipeline(
+                        repository,
+                        self._store,
+                        vision=self._vision,
+                        detector=self._detector or RecordedObservationDetector(),
+                        # Detection permission cannot supply geometry models, even when this
+                        # worker also serves captures with eligible human screenings.
+                    )
+            result = capture_pipeline.ingest_derivatives(
                 capture_id,
                 batch_id=claimed.batch_id,
                 delivery_job_id=claimed.job_id,

@@ -1,5 +1,67 @@
 # Personal admission and re-screening
 
+## Ordinary API batch path
+
+`POST /intake` returns exact capture IDs and original digests. Send those captures to
+`POST /personal-admission` as one `members` inventory. The route uses the ordinary API connection,
+including its public schema, authenticated workspace and actor. It does not provision or migrate
+schemas. The CLI below retains its isolated-schema restriction.
+
+The JSON body contains `operation` (`detect` or `review`), `purpose`, `authority` (the same three
+fields as the command), `recorded_at`, and `members`. Each member contains `capture_id`, `sha256`,
+and `bytes`. Unknown fields and coerced scalar types are refused. The server validates the complete
+inventory, stored original bytes, authority interval, and time before writing any receipt; duplicate
+captures, future times and expired authority are refused. Receipt writes and queue admission are
+atomic across the batch. The request cannot choose an actor or workspace.
+
+For `detect`, each member has `review: "not-reviewed"` and no edits (both are defaults). No human
+review is claimed. The response contains a batch ID, queued job ID and one personal authority and
+`person_detection_only` receipt per member. The queued worker prefers current eligible screening;
+otherwise it checks the SQL observation predicate for an explicit detection-only receipt. It offers
+vision and the recorded-observation person detector under that receipt. This path supplies neither
+a depth model nor a geometry segmenter. Hosted vision still requires the deployment's configured
+model client and spending guard; admission does not create a spending authorization.
+
+For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
+on every member. The attestation must exactly read:
+
+> I personally inspected every exact photograph in this inventory and reviewed all people and sensitive person regions, including any missed by the detector.
+
+The caller supplies that statement; the server never supplies it for them. A no-person review is
+refused when regions remain. A confirmed-regions review requires every proposal to have been
+confirmed or explicitly removed. Optional `edits` use the command's existing format. The named
+review and statement are retained in the authorization scope, which is digest-bound into the same
+human-screening receipt that the command writes. The response's `eligibility_state` is authoritative:
+a recorded review can remain blocked until current masks exist. Account authority and review do
+not establish a subject's likeness consent.
+
+`POST /identity/subjects/link` accepts `regions: [{capture_id, region_key}, ...]` and an optional
+`subject_id`. Omitting the subject creates one subject for the whole selected set. Supplying the
+returned ID links further photographs to the same person. Each region gets an immutable human
+confirmation; the transaction refuses unknown subjects or regions without applying a partial set.
+`POST /identity/subjects/unlink` requires the current `subject_id` and selected regions and appends
+confirmations with no linked subject. Existing consents and previous edits remain historical.
+`POST /person-subjects/{subject_id}/consents` continues to record the account holder's consent
+statement. Ordinary outline confirmations preserve an existing subject when `subject_id` is omitted;
+explicit null unlinks it. An edit request names each region at most once; duplicate keys are
+refused before any edit is written. Changed links invalidate screenings through the existing currency policy.
+
+The API path and worker change do not yet deliver HEIC conversion or a fresh workspace's source
+inspector. Those require extensions outside the current writable set, including a distinct decoded
+source permission in SQL. No migration has been applied or reserved for this work. No hosted calls
+have been authorized in this task.
+
+The final focused run passed 89 PostgreSQL tests on scratch schemas in `exulanica_inspect_test`.
+The fresh public-copy rehearsal then refused all three predecessor JPEGs at `/intake`, before the
+new admission route: `artifact_pkey` collides when another workspace already holds the same bytes.
+`artifact_id_for` derives a global ID from a key without workspace identity, while artifact lookup
+is workspace-scoped. The first-place workspace and bytes were preserved. This is an additional
+release blocker, not a successful acceptance run. The digest-bound attempt is recorded in
+[evaluation/2026-09-11-personal-path.json](evaluation/2026-09-11-personal-path.json).
+The integration coordinator owns the deferred single full-backend suite and document index update.
+
+## Historical isolated command and evidence
+
 This is an operator command for exact capture bytes. It composes existing intake, personal
 account authority, privacy screenings, person review receipts and mask stages. It writes no
 benchmark provenance, creates no new receipt table and applies no migration. Migration 0039
