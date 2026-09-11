@@ -206,6 +206,59 @@ def _wall_in_front_of(view, distance=3.0):
     )
 
 
+def _walled(views, names):
+    """The occlusion grid of each named view, whose own map is a wall in front of the cube."""
+    return {
+        name: lift._depth_buffer(
+            views[name], _wall_in_front_of(views[name]), PARAMS["occlusion_grid_cells"]
+        )
+        for name in names
+    }
+
+
+def test_each_view_keeps_a_coarse_occlusion_grid_and_not_its_whole_map():
+    """A member's placed map is needed once, for its own view's depth test. The grid built from it
+    as it is placed is the grid built from the whole map later, and a view with no recovered camera
+    keeps nothing. MEASURED on the volcanic scene: holding every placed map peaked at 1,052 MiB."""
+    from types import SimpleNamespace
+
+    from test_scene_reconstruction_pipeline import _numeric_point_map
+
+    views = _views()
+    names = list(views)
+    identity = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 1.0)
+    refs = [names[0], names[1], "no-camera"]
+    placement = SimpleNamespace(
+        placed=[
+            SimpleNamespace(
+                capture_ref=ref,
+                scene_from_opm=identity,
+                point_map_artifact_ref=f"artifact-{index}",
+                point_map_content_sha256=f"{index}" * 64,
+            )
+            for index, ref in enumerate(refs)
+        ]
+    )
+    maps = {ref: _numeric_point_map(index) for index, ref in enumerate(refs)}
+
+    samples, occlusion = lift._samples(placement, maps, None, PARAMS, views)
+
+    assert set(occlusion) == {names[0], names[1]}
+    for name in names[:2]:
+        whole = lift._placed(identity, lift._opm_positions(maps[name]))
+        grid, width, height = occlusion[name]
+        expected, expected_width, expected_height = lift._depth_buffer(
+            views[name], whole, PARAMS["occlusion_grid_cells"]
+        )
+        assert (width, height) == (expected_width, expected_height)
+        assert np.array_equal(grid, expected)
+        assert np.isfinite(grid).any(), "the map lies in front of this view, so some cells hold it"
+        # Sized by the grid parameter and the frame, never by the map it was built from.
+        assert grid.shape == (height, width)
+        assert max(width, height) == PARAMS["occlusion_grid_cells"]
+    assert len(samples.points) == 3 * PARAMS["point_map_samples_per_member"]
+
+
 def test_an_object_every_view_outlines_is_one_segment_and_the_wall_behind_it_is_not():
     pytest.importorskip("scipy")
     views = _views()
@@ -239,7 +292,7 @@ def test_one_view_is_a_projection_and_not_a_vote():
     views = _views()
     names = list(views)
     regions = [_region(names[0], _outline_of(views[names[0]], _corners((0, 0, 0))))]
-    walls = {name: _wall_in_front_of(views[name]) for name in names[1:]}
+    walls = _walled(views, names[1:])
     segments, summary = lift._lift(_samples(_cube((0.0, 0.0, 0.0))), views, walls, regions, PARAMS)
     assert segments == []
     assert summary["assigned"] == 0
@@ -286,7 +339,7 @@ def test_a_view_whose_own_map_puts_a_surface_in_front_does_not_count_as_seeing()
     regions = [_region(name, _outline_of(views[name], _corners((0, 0, 0)))) for name in names[:2]]
     samples = _samples(_cube((0, 0, 0)))
     assert lift._lift(samples, views, {}, regions, PARAMS)[0] == []
-    walls = {name: _wall_in_front_of(views[name]) for name in names[2:]}
+    walls = _walled(views, names[2:])
     [segment] = lift._lift(samples, views, walls, regions, PARAMS)[0]
     assert segment["votes"]["views"] == 2
     assert segment["votes"]["fraction_min_millionths"] == 1_000_000

@@ -251,10 +251,16 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   from the sweep or the command.
 * **The automatic lifts use point maps alone.** Lifting over trained Gaussians needs a decoded PLY
   (below) and stays the command's.
-* **Not measured in the scene worker.** Section 7's numbers are the command's, standalone. At
-  publication the lift skips the placement validation that was most of that time but runs in the
-  same process as the build, beside the pose receipt and point maps the build still holds; no
-  wall time or peak memory has been measured there on a real scene.
+* **The lift's peak is now the pose receipt.** MEASURED 2026-09-11 on the volcanic scene, loading
+  what the scene worker hands the lift at publication from the frozen copy and timing
+  `build_scene_segments` alone: 9.8 s, and a peak of 599 MiB of traced allocations (numpy's arrays
+  included), all of it `recovered_camera_records` parsing the 107,742,795 byte pose receipt. About
+  99.9 per cent of that receipt is sparse observations the lift never reads; a reader that skipped
+  them is the next cut, and it belongs in `exulanica/reconstruction/placement.py`. Holding every
+  placed point map until the vote had cost another 453 MiB (1,052 MiB before), and each view's
+  occlusion grid is now built as its map is placed; the artifact was byte for byte the stored one
+  both times. Placement validation, which publication skips, took 36 to 40 s of the command's run.
+  None of this was measured inside a running scene worker.
 * **The polygon is not on the span.** Section 2 says what that would cost.
 * **A detector-prompted segment offers nothing to name.** Only hosted-prompted masks have vision
   occurrences behind them. Creating occurrences in this stage would give every object two

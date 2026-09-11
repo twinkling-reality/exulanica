@@ -352,26 +352,41 @@ class _Samples:
     members: tuple[tuple[str, str, str], ...]  # (capture_ref, artifact_ref, content_sha256)
 
 
+#: A view's occlusion grid: the nearest depth per cell, and the grid's width and height.
+_Occlusion = tuple["np.ndarray", int, int]
+
+
 def _samples(
     placement: PlacementRecord,
     point_maps: Mapping[str, bytes],
     gaussian_centres: Sequence[Sequence[float]] | None,
     params: Mapping[str, Any],
-) -> tuple[_Samples, dict[str, np.ndarray]]:
-    """Every sample the lift votes over, and each member's full placed map for its depth test."""
+    cameras: Mapping[str, GaussianView],
+) -> tuple[_Samples, dict[str, _Occlusion]]:
+    """Every sample the lift votes over, and each recovered view's occlusion grid.
+
+    A member's whole placed map is needed once, for its own view's depth test, so the grid is built
+    the moment the map is placed and the map is dropped with it. MEASURED 2026-09-11 on the
+    volcanic scene: keeping all 210 placed maps until the vote peaked the build at 1,052 MiB of
+    traced allocations, and this is arithmetic on the same arrays in the same order, so the grids
+    and the artifact are byte for byte what they were.
+    """
     import numpy as np
 
     budget = int(params["point_map_samples_per_member"])
+    grid = int(params["occlusion_grid_cells"])
     chunks: list[np.ndarray] = []
     sources: list[np.ndarray] = []
     members: list[tuple[str, str, str]] = []
-    own: dict[str, np.ndarray] = {}
+    occlusion: dict[str, _Occlusion] = {}
     for member in placement.placed:
         data = point_maps.get(member.capture_ref)
         if data is None:
             continue
         placed = _placed(member.scene_from_opm, _opm_positions(data))
-        own[member.capture_ref] = placed
+        view = cameras.get(member.capture_ref)
+        if view is not None:
+            occlusion[member.capture_ref] = _depth_buffer(view, placed, grid)
         chosen = placed[_evenly(len(placed), budget)]
         chunks.append(chosen)
         sources.append(np.full(len(chosen), len(members), dtype=np.int64))
@@ -385,17 +400,21 @@ def _samples(
         sources.append(np.full(len(centres), -1, dtype=np.int64))
     points = np.concatenate(chunks) if chunks else np.zeros((0, 3))
     source = np.concatenate(sources) if sources else np.zeros(0, dtype=np.int64)
-    return _Samples(points, source, tuple(members)), own
+    return _Samples(points, source, tuple(members)), occlusion
 
 
 def _lift(
     samples: _Samples,
     cameras: Mapping[str, GaussianView],
-    own: Mapping[str, np.ndarray],
+    occlusion: Mapping[str, _Occlusion],
     regions: Sequence[LiftRegion],
     params: Mapping[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Vote every sample into at most one entity, then cut entities into segments."""
+    """Vote every sample into at most one entity, then cut entities into segments.
+
+    ``occlusion`` holds a depth grid for each view that has a placed map of its own, from
+    ``_depth_buffer``; a view without one counts every sample in its frame as seen.
+    """
     import numpy as np
 
     count = len(samples.points)
@@ -408,7 +427,6 @@ def _lift(
         by_capture.setdefault(region.capture_ref, []).append(position)
 
     cells = int(params["region_raster_cells"])
-    grid = int(params["occlusion_grid_cells"])
     tolerance = 1 + int(params["occlusion_relative_tolerance_millionths"]) / 1_000_000
     for capture_ref in sorted(cameras):
         view = cameras[capture_ref]
@@ -416,8 +434,8 @@ def _lift(
         front, u, v, depth = _project(view, samples.points)
         frame = (u >= 0) & (u < width) & (v >= 0) & (v < height)
         index, u, v, depth = front[frame], u[frame], v[frame], depth[frame]
-        if capture_ref in own:
-            buffer, grid_w, grid_h = _depth_buffer(view, own[capture_ref], grid)
+        if capture_ref in occlusion:
+            buffer, grid_w, grid_h = occlusion[capture_ref]
             column = np.minimum((u * grid_w / width).astype(np.int64), grid_w - 1)
             row = np.minimum((v * grid_h / height).astype(np.int64), grid_h - 1)
             nearest = buffer[row, column]
@@ -684,9 +702,9 @@ def build_scene_segments(
     ):
         raise ValueError("the declared Gaussian source is not these bytes")
     centres = None if gaussian_ply is None else read_gaussian_centres(gaussian_ply)[0]
-    samples, own = _samples(placement, point_maps, centres, params)
     cameras = _cameras(pose_receipt)
-    segments, summary = _lift(samples, cameras, own, regions, params)
+    samples, occlusion = _samples(placement, point_maps, centres, params, cameras)
+    segments, summary = _lift(samples, cameras, occlusion, regions, params)
     payload = {
         "profile": SCENE_SEGMENTS_PROFILE,
         "scene_ref": scene_ref,
@@ -947,9 +965,10 @@ class ValidatedBuild:
     """A build its caller has just validated, so that the lift need not validate it again.
 
     The scene worker builds the placement from the pose receipt and every point map and checks the
-    stored bytes against it before it publishes, and doing that a second time is most of a lift:
-    48.6 s on the volcanic scene, most of it re-validating the placement against 210 point maps
-    and a 107,742,795 byte pose receipt (``docs/scene-segments.md`` section 7).
+    stored bytes against it before it publishes, and doing that a second time is most of a lift.
+    MEASURED 2026-09-11 on the volcanic scene: validating the placement against 210 point maps and
+    a 107,742,795 byte pose receipt took 36 to 40 s, and the build that follows it 10 s
+    (``docs/scene-segments.md`` sections 7 and 8).
     ``publish_scene_segments`` still reads the scene's current build from the database, uses these
     only when they are that build's own receipts byte for byte, and otherwise reads and validates
     the stored ones as the command does. ``placement`` is the record ``build_placement_record``
