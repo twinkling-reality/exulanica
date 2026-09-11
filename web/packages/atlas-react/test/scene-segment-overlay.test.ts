@@ -94,6 +94,10 @@ function pointVisual(region: Island, artifactId: string, positions: Float32Array
     uIsland: new Float32Array(4),
     uPoint: new Float32Array(4),
     uLens: new Float32Array(4),
+    // A placed, multi-view point map: no single-view print and no relief parallax to hold.
+    singleViewLocal: null,
+    printLocal: null,
+    parallaxPerUnit: 0,
   };
 }
 
