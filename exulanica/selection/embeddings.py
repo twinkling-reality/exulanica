@@ -1,8 +1,10 @@
 """Capture text vectors and deterministic retrieval over the existing permission boundary.
 
-Vectors reference the whole-photograph span so the existing tombstone closure and purge worker
-can destroy them. Assertions remain the source text; text_chunk requires an artifact and is not
-a second copy of assertions. A content fingerprint excludes stale vectors after a correction.
+Vectors reference the whole-photograph span, so tombstones block reads and reinsertion.
+Physical purge for ordinary caption vectors is not integrated: the existing worker only queues
+person-dependent vectors. Do not enable live indexing until that acceptance failure is fixed.
+Assertions remain the source text; text_chunk requires an artifact and is not a second copy of
+assertions. A content fingerprint excludes stale vectors after a correction.
 No model identifiers or prices are duplicated here. Callers supply a budgeted ModelClient.
 """
 

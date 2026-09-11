@@ -1418,6 +1418,10 @@ This is a candidate, not completed semantic acceptance. Do not enable live index
 - The ingest worker exposes an injected pass, avoiding an import from ingest into selection,
   which the import contract prohibits. The application wiring requires an authorized edit to
   `exulanica/api/services.py`; it is not wired on this branch.
+- The web decoder currently types served model and attempt count as non-nullable, although
+  its runtime mapping passes values through and provenance selects only reasoning/extraction
+  calls. The new vector-call shape violates that declared TypeScript contract. Web was read-only
+  for this task; updating that contract is also required before enabling live vector calls.
 - No live-call budget was authorized in this task. Scripted pgvector tests verify mechanics,
   not embedding quality or the planner's response to the new wording.
 - The inspected first-place workspace has three active captions. The volcanic workspace has
@@ -1436,3 +1440,16 @@ The full backend suite is deferred to the integration coordinator's serialized r
 particular, `tests/test_frontier_dry_run.py` must not be run here: it contains retained-database
 writes despite a test database override. Focused PostgreSQL tests use scratch schemas on
 `exulanica_inspect_test`; reference measurements use a read-only connection to that copy.
+
+### Focused gate results
+
+The final broad focused run covered 417 tests: 415 passed and two failed. One failure was a
+test-only comparison of equivalent Decimal strings (`2.0E-7` and `0.00000020`); it now compares
+decimal values. The matching-file recheck passed 19 tests and retained one failure, physical
+purge. No skip or expected-failure marker hides it. Ruff and all four import contracts passed.
+
+On the real first-place captions, declared queries `people wearing` and `snow mountain` each
+return all three photographs; `icy landscape` returns two, `reflective strips clothes` one, and
+`penguin beach` none. `cold weather clothing` and `protective headgear` also return none: those
+are observed lexical misses, not evidence that live embeddings would recover them. All ten
+visual queries return zero on the volcanic workspace with no captions.

@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 
 import psycopg
+from exulanica.canonical import canonical_json
 from exulanica.db.session import set_workspace
 from exulanica.selection import Intent, SelectionPlan, Session, execute, validate
 from exulanica.selection.packet import build_packet
@@ -137,6 +138,19 @@ def main() -> None:
     out = root / "docs/evaluation/2026-09-11-companion-matching.json"
     out.write_text(json.dumps(record, indent=2, default=str) + "\n")
     print(out)
+
+
+def seal_record(path: Path, additions: dict) -> str:
+    """Bind measured output and retained gate logs without repeating any database work."""
+    document = json.loads(path.read_text())
+    record = document.get("record", document)
+    record.update(additions)
+    digest = hashlib.sha256(canonical_json(record)).hexdigest()
+    path.write_text(json.dumps({
+        "profile": "exulanica.digest-bound-record/v1", "record": record,
+        "record_sha256": digest,
+    }, indent=2) + "\n")
+    return digest
 
 
 if __name__ == "__main__":
