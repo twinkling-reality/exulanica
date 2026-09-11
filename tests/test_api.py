@@ -117,6 +117,17 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/person-subjects/{subject_id}/consents"): {
         "json": {"consent_scope": "likeness", "decision": "granted"}
     },
+    ("POST", "/identity/subjects/link"): {
+        "json": {"regions": [{"capture_id": str(uuid.uuid4()), "region_key": "aa" * 32}]}
+    },
+    ("POST", "/identity/subjects/unlink"): {
+        "json": {
+            "regions": [{"capture_id": str(uuid.uuid4()), "region_key": "aa" * 32}],
+            "subject_id": str(uuid.uuid4()),
+        }
+    },
+    # Authentication must precede validation of personal authority or review receipts.
+    ("POST", "/personal-admission"): {"json": {}},
     ("GET", "/identity/events"): {},
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
@@ -135,6 +146,9 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/world/versions/{version_id}"): {},
     ("POST", "/world/versions"): {
         "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())}
+    },
+    ("POST", "/world/versions/bootstrap"): {
+        "json": {"base_topology_digest": "0" * 64}
     },
     ("POST", "/world/versions/{version_id}/objects"): {
         "json": {
