@@ -416,6 +416,14 @@ export {
   resolveWorldStyleVersion,
 } from './world/customization.js';
 
+export type { FanVec3, UnmeasuredFanInput } from './unmeasured-fan.js';
+export {
+  UNMEASURED_FAN_GAP_DEG,
+  UNMEASURED_FAN_MAX_SWEEP_DEG,
+  horizontalFovDeg,
+  unmeasuredFan,
+} from './unmeasured-fan.js';
+
 export type { CameraPoseSample, SceneDisplayFrame, UpMethod } from './display-frame.js';
 export {
   DISPLAY_EYE_HEIGHT,

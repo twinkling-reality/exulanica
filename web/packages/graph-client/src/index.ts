@@ -93,6 +93,7 @@ export type {
   OccurrenceKind,
   OccurrenceRecord,
   ReconstructionPointMapRecord,
+  UnposedPointMapRecord,
   RecoveredCameraCalibration,
   RecoveredCameraRecord,
   ReconstructionRungRef,

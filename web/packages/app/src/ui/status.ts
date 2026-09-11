@@ -192,7 +192,9 @@ export function buildStatus(input: StatusInput): HTMLElement {
     const recorded = scene.recordedRung === null ? 'unreadable' : String(scene.recordedRung);
     const substrate = scene.renderingSubstrate === 'posed_point_maps'
       ? 'posed point maps'
-      : scene.renderingSubstrate === 'gaussian_splats' ? 'trained Gaussian reconstruction' : 'source photographs';
+      : scene.renderingSubstrate === 'unposed_point_maps'
+        ? 'each photograph\u2019s own depth, in an unmeasured arrangement'
+        : scene.renderingSubstrate === 'gaussian_splats' ? 'trained Gaussian reconstruction' : 'source photographs';
     details.append(
       el('summary', {
         text: `Recorded rung ${recorded}; showing rung ${scene.displayedRung} from ${substrate}.`,

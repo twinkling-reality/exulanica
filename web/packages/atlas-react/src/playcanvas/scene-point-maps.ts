@@ -10,6 +10,12 @@ export interface PlacedScenePointMap {
   readonly map: PointMap;
   readonly sceneFromOpmRowMajor: readonly number[];
   readonly localUnitsToSceneUnits: number;
+  /**
+   * How the transform was obtained. `recovered` (the default when absent) is a placement fitted
+   * to recovered cameras; `unmeasured-fan` is an arrangement the client derived because pose
+   * recovered no photograph, and nothing about it is a position anyone stood at.
+   */
+  readonly arrangement?: 'recovered' | 'unmeasured-fan';
 }
 
 /** Refuse matrices whose producer-side affine and finite guarantees were lost on the wire. */

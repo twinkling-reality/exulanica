@@ -250,6 +250,22 @@ export function adaptSnapshot(
           // Absent reads as unscreened, which draws nothing. An older server that does not send
           // this field must not thereby be treated as having screened the photograph.
           personReviewState: member.person_review_state ?? 'unscreened',
+          unposedPointMap: member.unposed_point_map == null
+            ? null
+            : {
+                artifactId: member.unposed_point_map.artifact_id,
+                contentSha256: member.unposed_point_map.content_sha256,
+                container: member.unposed_point_map.container,
+                state: member.unposed_point_map.state,
+                reference: member.unposed_point_map.reference === null
+                  ? null
+                  : {
+                      href: member.unposed_point_map.reference.href,
+                      authorization: member.unposed_point_map.reference.authorization,
+                      contentSha256: member.unposed_point_map.reference.content_sha256,
+                      byteSize: member.unposed_point_map.reference.byte_size,
+                    },
+              },
           placement: member.placement === null
             ? null
             : {

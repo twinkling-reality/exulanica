@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -16,6 +17,7 @@ from pathlib import Path
 import psycopg
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from exulanica.api.routes.graph import withhold_scene_geometry
 from exulanica.evidence.blob import BlobId
 from exulanica.graph import read_snapshot
 from exulanica.graph.asset_read_policy import (
@@ -28,6 +30,7 @@ from exulanica.graph.asset_read_policy import (
 from exulanica.graph.geometry import point_map_descriptors, read_point_map
 from exulanica.graph.reconstruction_scenes import (
     _MEMO_MAX_MEMBERS,
+    _POSED_RUNG_THREE_WITHHELD,
     _memo,
     _memo_get,
     _memo_put,
@@ -54,6 +57,7 @@ from exulanica.ingest.stages import (
     scene_pose_quality_thresholds,
     stage,
 )
+from exulanica.reconstruction import scene_gate
 from exulanica.reconstruction.opm import Viewpoint, encode_opm
 from exulanica.reconstruction.pointmap import PointMap, Segment
 from exulanica.reconstruction.pose import CommandResult
@@ -614,6 +618,126 @@ def test_graph_delivers_the_validated_scene_and_exact_placed_maps(repository, tm
         if member.placement is not None and member.placement.reference is not None
     )
     assert scene.members[2].exclusion_reason == "pose-not-registered"
+
+
+def test_a_scene_that_placed_nothing_shows_each_members_own_depth_at_rung_three(
+    repository, tmp_path
+):
+    """The first personal place: three photographs from one spot, no pose, three point maps.
+
+    Before this, the graph recorded rung 4, reported the placement as ``bytes_missing`` and
+    offered nothing to draw, although every point map was present and verified.
+    """
+    store, captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
+    assert claimed is not None
+    _processor(repository, store, tmp_path, FakeColmap(registered=0)).process(claimed)
+
+    for read in ("warm", "cold"):
+        if read == "cold":
+            clear_placement_memo()
+        scene = read_snapshot(
+            repository.connection, repository.workspace_id, store
+        ).reconstruction_scenes[0]
+        assert scene.registered_member_count == 0
+        assert scene.recorded_rung == 4
+        assert _POSED_RUNG_THREE_WITHHELD in scene.recorded_reasons
+        assert scene.displayed_rung == 3
+        assert scene.rendering_substrate == "unposed_point_maps"
+        assert scene.placement_state == "none_placed"
+        assert _POSED_RUNG_THREE_WITHHELD not in scene.display_reasons
+        assert any("rung 3 needs no pose" in reason for reason in scene.display_reasons)
+        assert not any("bytes are available" in reason for reason in scene.display_reasons)
+        assert [member.capture_id for member in scene.members] == captures
+        for member, artifact in zip(scene.members, point_artifacts, strict=True):
+            assert member.placement is None and member.recovered_camera is None
+            unposed = member.unposed_point_map
+            assert unposed is not None and unposed.artifact_id == artifact
+            assert unposed.state == "available" and unposed.reference is not None
+            assert unposed.reference.href == f"/geometry/{artifact}"
+            assert unposed.reference.content_sha256 == unposed.content_sha256
+            assert (
+                read_point_map(
+                    repository.connection, repository.workspace_id, artifact, store
+                ).content_sha256
+                == unposed.content_sha256
+            )
+
+
+def test_the_gate_sentence_restated_beside_unposed_depth_is_the_one_the_gate_writes():
+    decision_reasons = inspect.getsource(scene_gate)
+    assert repr(_POSED_RUNG_THREE_WITHHELD)[1:-1] in decision_reasons
+
+
+def test_a_scene_that_placed_some_members_keeps_the_rest_as_photographs(repository, tmp_path):
+    """Mixing measured and unmeasured panels in one frame would lend the second the first's
+    authority, so a partly placed scene offers no unposed depth at all."""
+    store, _captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
+    assert claimed is not None
+    _processor(repository, store, tmp_path, FakeColmap(registered=2)).process(claimed)
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert scene.rendering_substrate == "posed_point_maps"
+    assert all(member.unposed_point_map is None for member in scene.members)
+    assert scene.members[2].placement is None
+
+
+def test_unposed_depth_whose_bytes_are_gone_is_recorded_and_not_advertised(repository, tmp_path):
+    store, _captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
+    assert claimed is not None
+    _processor(repository, store, tmp_path, FakeColmap(registered=0)).process(claimed)
+    lost = BlobId(
+        bytes(
+            repository.connection.execute(
+                "select content_sha256 from artifact where workspace_id=%s and artifact_id=%s",
+                (repository.workspace_id, point_artifacts[0]),
+            ).fetchone()["content_sha256"]
+        )
+    )
+    path = store.root / store.key_for(lost)
+    path.chmod(0o644)
+    path.unlink()
+    clear_placement_memo()
+
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    first, *rest = scene.members
+    assert first.unposed_point_map is not None
+    assert first.unposed_point_map.state == "bytes_missing"
+    assert first.unposed_point_map.reference is None
+    assert all(
+        member.unposed_point_map is not None and member.unposed_point_map.state == "available"
+        for member in rest
+    )
+    assert scene.rendering_substrate == "unposed_point_maps" and scene.displayed_rung == 3
+
+
+def test_a_withheld_scene_loses_its_unposed_depth_with_the_rest_of_its_geometry(
+    repository, tmp_path
+):
+    store, _captures, _point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="test", lease_seconds=60)
+    assert claimed is not None
+    _processor(repository, store, tmp_path, FakeColmap(registered=0)).process(claimed)
+    scene = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert any(member.unposed_point_map is not None for member in scene.members)
+
+    withheld = withhold_scene_geometry(scene)
+
+    assert withheld.displayed_rung == 4
+    assert withheld.rendering_substrate == "source_photographs"
+    assert all(
+        member.placement is None
+        and member.unposed_point_map is None
+        and member.recovered_camera is None
+        for member in withheld.members
+    )
 
 
 @pytest.mark.parametrize("damage", ["missing", "corrupt"])

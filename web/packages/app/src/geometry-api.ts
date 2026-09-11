@@ -37,7 +37,7 @@
 import type { IslandId, SceneDisplayFrame } from '@exulanica/atlas-core';
 import {
   colmapCameraSample, composeDisplayFrame, displayCameraTransform, opmCameraSample, sceneDisplayFrame,
-  transformedBoxCorners,
+  transformedBoxCorners, unmeasuredFan,
 } from '@exulanica/atlas-core';
 import type { PlacedScenePointMap, PointMap, TrainedSceneGeometry, RecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
 import { decodeOpm, validateScenePointMapPlacement, validateSogBundle, validateTrainedSceneGeometry, validateRecoveredSceneCamera } from '@exulanica/atlas-react/playcanvas';
@@ -411,6 +411,64 @@ export class GeometryClient {
     const recoveredCameras: RecoveredSceneCamera[] = [];
     const displayFrames = new Map<string, SceneDisplayFrame>();
 
+    /**
+     * Held, or fetched, digest-verified and decoded: the one path every scene point map takes,
+     * placed or not. Reports its own failure and answers null, so no caller can draw bytes that
+     * failed their check.
+     */
+    const obtain = async (
+      sceneId: string,
+      captureId: string,
+      artifactId: string,
+      reference: { readonly href: string; readonly contentSha256: string; readonly byteSize: number },
+      report: (state: GeometryIssueState, reason: string) => void,
+    ): Promise<{ map: PointMap; measurement: GeometryLoadMeasurement | null } | null> => {
+      const kept = held?.get(artifactId);
+      if (kept !== undefined) return { map: kept, measurement: null };
+      if (digest === undefined) {
+        report('unverifiable', 'This page has no SubtleCrypto, so scene geometry is not loaded unchecked.');
+        return null;
+      }
+      try {
+        const fetchStarted = monotonicNow();
+        const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(reference.href);
+        const bytes = await response.arrayBuffer();
+        const fetchMs = monotonicNow() - fetchStarted;
+        const verifyStarted = monotonicNow();
+        const failure = await verify(digest, bytes, reference.contentSha256, reference.byteSize);
+        const verifyMs = monotonicNow() - verifyStarted;
+        if (failure !== null) {
+          report('verification_failed', failure);
+          return null;
+        }
+        const decodeStarted = monotonicNow();
+        const map = decodeOpm(bytes);
+        return {
+          map,
+          measurement: Object.freeze({
+            sceneId,
+            captureId,
+            artifactId,
+            expectedBytes: reference.byteSize,
+            receivedBytes: bytes.byteLength,
+            fetchMs,
+            verifyMs,
+            decodeMs: monotonicNow() - decodeStarted,
+            reused: false,
+          }),
+        };
+      } catch (error) {
+        if (error instanceof ApiError) {
+          report(error.isUnauthenticated ? 'unauthorized' : 'error', geometryFailure(error));
+        } else if (error instanceof DOMException && error.name === 'TimeoutError') {
+          report('timed_out', 'The reconstruction did not arrive in time.');
+        } else {
+          report('undecodable', error instanceof Error ? error.message : 'The container did not decode.');
+        }
+        return null;
+      }
+    };
+
     for (const scene of scenes) {
       let loadedForScene = 0;
       const sceneCameras: RecoveredSceneCamera[] = [];
@@ -493,65 +551,9 @@ export class GeometryClient {
           continue;
         }
 
-        let map = held?.get(placement.artifactId);
-        let measurement: GeometryLoadMeasurement | null = null;
-        if (map === undefined) {
-          if (digest === undefined) {
-            report(
-              'unverifiable',
-              'This page has no SubtleCrypto, so scene geometry is not loaded unchecked.',
-            );
-            continue;
-          }
-          try {
-            const fetchStarted = monotonicNow();
-            const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(reference.href);
-            const bytes = await response.arrayBuffer();
-            const fetchMs = monotonicNow() - fetchStarted;
-            const verifyStarted = monotonicNow();
-            const failure = await verify(
-              digest,
-              bytes,
-              reference.contentSha256,
-              reference.byteSize,
-            );
-            const verifyMs = monotonicNow() - verifyStarted;
-            if (failure !== null) {
-              report('verification_failed', failure);
-              continue;
-            }
-            const decodeStarted = monotonicNow();
-            map = decodeOpm(bytes);
-            measurement = Object.freeze({
-              sceneId: scene.sceneId,
-              captureId: member.captureId,
-              artifactId: placement.artifactId,
-              expectedBytes: reference.byteSize,
-              receivedBytes: bytes.byteLength,
-              fetchMs,
-              verifyMs,
-              decodeMs: monotonicNow() - decodeStarted,
-              reused: false,
-            });
-          } catch (error) {
-            if (error instanceof ApiError) {
-              report(
-                error.isUnauthenticated ? 'unauthorized' : 'error',
-                geometryFailure(error),
-              );
-              continue;
-            }
-            if (error instanceof DOMException && error.name === 'TimeoutError') {
-              report('timed_out', 'The reconstruction did not arrive in time.');
-              continue;
-            }
-            report(
-              'undecodable',
-              error instanceof Error ? error.message : 'The container did not decode.',
-            );
-            continue;
-          }
-        }
+        const obtained = await obtain(scene.sceneId, member.captureId, placement.artifactId, reference, report);
+        if (obtained === null) continue;
+        const { map, measurement } = obtained;
         const placed: PlacedScenePointMap = {
           sceneId: scene.sceneId,
           artifactId: placement.artifactId,
@@ -583,9 +585,88 @@ export class GeometryClient {
         if (!pointMaps.has(islandId)) pointMaps.set(islandId, map);
         loadedForScene += 1;
       }
+      // Rung 3 with no pose: each photograph's own depth, in an arrangement this client derives
+      // and labels as unmeasured. Only when the scene placed nothing, which is the only time the
+      // server sends these; a scene that placed anything keeps its excluded members as photographs.
+      let loadedUnposed = 0;
+      const unposedMembers = scene.members.every((member) => member.placement === null)
+        ? [...scene.members].sort((a, b) => a.ordinal - b.ordinal)
+          .filter((member) => member.unposedPointMap != null)
+        : [];
+      const unposedLoaded: { captureId: string; artifactId: string; map: PointMap;
+        measurement: GeometryLoadMeasurement | null; byteSize: number;
+        report: (state: GeometryIssueState, reason: string) => void }[] = [];
+      for (const member of unposedMembers) {
+        const unposed = member.unposedPointMap!;
+        const report = (state: GeometryIssueState, reason: string): void => {
+          issues.push(Object.freeze({ sceneId: scene.sceneId, captureId: member.captureId, islandId, state, reason }));
+        };
+        if (islandId === null || scene.islandId !== islandId) {
+          report('no_region', 'The reconstruction scene no longer resolves to one complete region in this graph.');
+          continue;
+        }
+        if (unposed.state !== 'available' || unposed.reference === null) {
+          report('bytes_missing', 'This photograph\u2019s depth is recorded and its bytes are unavailable.');
+          continue;
+        }
+        if (unposed.container !== null && unposed.container !== SUPPORTED_CONTAINER) {
+          report('unsupported_container', `This build reads ${SUPPORTED_CONTAINER} and the reconstruction is ${unposed.container}.`);
+          continue;
+        }
+        const reference = unposed.reference;
+        if (
+          reference.authorization !== 'workspace-bearer'
+          || reference.href !== `/geometry/${unposed.artifactId}`
+          || !safeGeometryPath(reference.href)
+          || reference.contentSha256 !== unposed.contentSha256
+        ) {
+          report('error', 'The scene geometry reference failed its provenance check.');
+          continue;
+        }
+        const obtained = await obtain(scene.sceneId, member.captureId, unposed.artifactId, reference, report);
+        if (obtained === null) continue;
+        unposedLoaded.push({ captureId: member.captureId, artifactId: unposed.artifactId, ...obtained,
+          byteSize: reference.byteSize, report });
+      }
+      const fan = unmeasuredFan(unposedLoaded.map(({ map }) => ({
+        position: map.header.viewpoint.position,
+        fovYDeg: map.header.viewpoint.fovYDeg,
+        aspect: map.header.viewpoint.aspect,
+      })));
+      unposedLoaded.forEach((loaded, index) => {
+        const sceneFromOpm = fan[index] ?? null;
+        if (sceneFromOpm === null || islandId === null) {
+          loaded.report('unplaced', 'More photographs than one unmeasured arrangement holds; this one opens as a photograph.');
+          return;
+        }
+        const placed: PlacedScenePointMap = {
+          sceneId: scene.sceneId,
+          artifactId: loaded.artifactId,
+          captureId: loaded.captureId,
+          islandId,
+          map: loaded.map,
+          sceneFromOpmRowMajor: sceneFromOpm,
+          localUnitsToSceneUnits: 1,
+          arrangement: 'unmeasured-fan',
+        };
+        try {
+          validateScenePointMapPlacement(placed);
+        } catch (error) {
+          loaded.report('error', error instanceof Error ? error.message : 'The arrangement is invalid.');
+          return;
+        }
+        this.#observer?.(loaded.measurement ?? Object.freeze({
+          sceneId: scene.sceneId, captureId: loaded.captureId, artifactId: loaded.artifactId,
+          expectedBytes: loaded.byteSize, receivedBytes: 0, fetchMs: 0, verifyMs: 0, decodeMs: 0, reused: true,
+        }));
+        scenePlaced.push(placed);
+        byArtifact.set(loaded.artifactId, loaded.map);
+        if (!pointMaps.has(islandId)) pointMaps.set(islandId, loaded.map);
+        loadedUnposed += 1;
+      });
       renderingByScene.set(
         scene.sceneId,
-        loadedForScene > 0 ? 'posed_point_maps' : 'source_photographs',
+        loadedForScene > 0 ? 'posed_point_maps' : loadedUnposed > 0 ? 'unposed_point_maps' : 'source_photographs',
       );
       const trained = scene.trainedGeometry;
       if (trained != null) {

@@ -147,7 +147,12 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
     }
   }
   const actualRendering = new Map<string, RenderingSubstrate>();
-  for (const visual of atlas.binding.islands) actualRendering.set(visual.pointMap.sceneId, 'posed_point_maps');
+  for (const visual of atlas.binding.islands) {
+    actualRendering.set(
+      visual.pointMap.sceneId,
+      visual.pointMap.arrangement === 'unmeasured-fan' ? 'unposed_point_maps' : 'posed_point_maps',
+    );
+  }
   for (const visual of atlas.binding.trainedScenes) actualRendering.set(visual.geometry.sceneId, 'gaussian_splats');
   state.reconstructionRungs = reconstructionRungsFor(
     current.reconstructionScenes ?? [], actualRendering, state.notDrawnScenes, state.displayFrames,

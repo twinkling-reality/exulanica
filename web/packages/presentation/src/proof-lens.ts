@@ -156,7 +156,8 @@ export function proofLensSwatch(theme: PresentationTheme, tier: ProofTier): stri
 /** Everything the lens needs to know about one region, and nothing it does not. */
 export interface ProofLensInput {
   /** What the region is actually drawing right now, from the scene's rendering substrate. */
-  readonly substrate: 'posed_point_maps' | 'gaussian_splats' | 'source_photographs' | null;
+  readonly substrate:
+    'posed_point_maps' | 'unposed_point_maps' | 'gaussian_splats' | 'source_photographs' | null;
   /**
    * Whether this region is drawing its scene at all. False for a region whose area displays a
    * different, more complete scene over the same photographs, and for one whose bytes failed.
@@ -178,6 +179,9 @@ export function proofTierOf(input: ProofLensInput): ProofTier {
   if (!input.drawn || input.substrate === null) return 'unavailable';
   if (input.showingGenerated) return 'generated';
   if (input.substrate === 'source_photographs') return 'photographed';
+  // Posed or not, a point map is derived from a photograph by a reviewed depth stage. What an
+  // unposed one lacks is a measured position, and the status line says that; the surface itself
+  // is reconstructed.
   return 'reconstructed';
 }
 

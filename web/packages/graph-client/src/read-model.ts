@@ -311,7 +311,8 @@ export interface OccurrenceRecord {
  */
 export type ReconstructionRungRef = 1 | 2 | 3 | 4;
 
-export type RenderingSubstrate = 'posed_point_maps' | 'gaussian_splats' | 'source_photographs';
+export type RenderingSubstrate =
+  'posed_point_maps' | 'unposed_point_maps' | 'gaussian_splats' | 'source_photographs';
 
 export interface TrainedGeometryRecord {
   readonly artifactId: string;
@@ -362,6 +363,23 @@ export interface ReconstructionPointMapRecord {
   } | null;
 }
 
+/**
+ * A member's own point map when its scene placed nothing. No transform: no position was recovered,
+ * and whatever arrangement a client draws it in is the client's, and unmeasured.
+ */
+export interface UnposedPointMapRecord {
+  readonly artifactId: string;
+  readonly contentSha256: string;
+  readonly container: string | null;
+  readonly state: 'available' | 'bytes_missing';
+  readonly reference: {
+    readonly href: string;
+    readonly authorization: 'workspace-bearer';
+    readonly contentSha256: string;
+    readonly byteSize: number;
+  } | null;
+}
+
 export interface RecoveredCameraCalibration {
   readonly model: string;
   readonly width: number;
@@ -394,6 +412,8 @@ export interface ReconstructionSceneMemberRecord {
   readonly registered: boolean;
   readonly recoveredCamera?: RecoveredCameraRecord | null;
   readonly placement: ReconstructionPointMapRecord | null;
+  /** Present only when the scene placed nothing; see `UnposedPointMapRecord`. */
+  readonly unposedPointMap?: UnposedPointMapRecord | null;
   readonly exclusionReason: string | null;
   readonly personRegions: readonly PersonRegionRecord[];
   /**
@@ -422,7 +442,8 @@ export interface ReconstructionSceneRecord {
   readonly memberCount: number;
   readonly registeredMemberCount: number;
   readonly receiptState: 'available' | 'missing' | 'invalid';
-  readonly placementState: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
+  readonly placementState:
+    'available' | 'partial' | 'none_placed' | 'bytes_missing' | 'unavailable' | 'invalid';
   readonly renderingSubstrate: RenderingSubstrate;
   /** Counted by the server, so a client that failed to load regions cannot report zero. */
   readonly hiddenPersonCount: number;

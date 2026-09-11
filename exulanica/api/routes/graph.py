@@ -20,8 +20,32 @@ from exulanica.graph.asset_read_policy import (
     scene_allowed,
     scene_inputs,
 )
+from exulanica.graph.payload import ReconstructionSceneRow
 
 router = APIRouter(prefix="/graph", tags=["graph"])
+
+
+def withhold_scene_geometry(scene: ReconstructionSceneRow) -> ReconstructionSceneRow:
+    """A denied scene keeps its review identity and loses every piece of geometry it carried.
+
+    Three member fields carry geometry: a measured placement, an unposed point map offered when
+    nothing was placed, and a recovered camera. All three go, together with the trained scene.
+    """
+    return scene.model_copy(
+        update={
+            "members": [
+                member.model_copy(
+                    update={"placement": None, "unposed_point_map": None, "recovered_camera": None}
+                )
+                for member in scene.members
+            ],
+            "trained_geometry": None,
+            "placement_state": "unavailable",
+            "rendering_substrate": "source_photographs",
+            "displayed_rung": 4,
+            "display_reasons": ["Current permission or persisted geometry lineage is unavailable."],
+        }
+    )
 
 
 @router.get("", summary="The entity graph, as one snapshot at one state version.")
@@ -55,26 +79,8 @@ def snapshot(
             for key in allowed
             if scene_allowed(connection, session.workspace_id, key, buffered[key], at)
         }
-    scenes = []
-    for scene in payload.reconstruction_scenes:
-        if scene.scene_id in allowed:
-            scenes.append(scene)
-        else:
-            scenes.append(
-                scene.model_copy(
-                    update={
-                        "members": [
-                            member.model_copy(update={"placement": None, "recovered_camera": None})
-                            for member in scene.members
-                        ],
-                        "trained_geometry": None,
-                        "placement_state": "unavailable",
-                        "rendering_substrate": "source_photographs",
-                        "displayed_rung": 4,
-                        "display_reasons": [
-                            "Current permission or persisted geometry lineage is unavailable."
-                        ],
-                    }
-                )
-            )
+    scenes = [
+        scene if scene.scene_id in allowed else withhold_scene_geometry(scene)
+        for scene in payload.reconstruction_scenes
+    ]
     return payload.model_copy(update={"reconstruction_scenes": scenes})

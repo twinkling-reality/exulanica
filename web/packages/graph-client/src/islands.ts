@@ -222,8 +222,9 @@ export function displayedScene(
       && captureIds.includes(member.capture_id)),
   );
   const substrateRank = (scene: GraphPayload['reconstruction_scenes'][number]): number =>
-    scene.rendering_substrate === 'gaussian_splats' ? 2
-      : scene.rendering_substrate === 'posed_point_maps' ? 1 : 0;
+    scene.rendering_substrate === 'gaussian_splats' ? 3
+      : scene.rendering_substrate === 'posed_point_maps' ? 2
+        : scene.rendering_substrate === 'unposed_point_maps' ? 1 : 0;
   return candidates.sort((a, b) =>
     b.members.length - a.members.length
     || substrateRank(b) - substrateRank(a)

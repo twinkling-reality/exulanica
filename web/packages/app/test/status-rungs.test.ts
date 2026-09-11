@@ -30,6 +30,17 @@ describe('reconstruction rung disclosure', () => {
     expect(scene.recordedRung).toBe(3);
   });
 
+  it('says unposed depth is each photograph\u2019s own, unmeasured, and clears the no-reconstruction notice', () => {
+    const scene = { sceneId: 'scene-1', recordedRung: 4 as const, displayedRung: 3 as const,
+      registeredMemberCount: 0, memberCount: 3, renderingSubstrate: 'unposed_point_maps' as const,
+      reasons: ['No photograph\u2019s position was recovered, so the recorded rung stays 4.'] };
+    const status = buildStatus({ omittedRegionCount: 0, undrawable: new Map(), reconstructionScenes: [scene],
+      reconstructionFocus: { collections: [{ sceneId: scene.sceneId, sourceCount: 3 }] } });
+    expect(status.querySelector('.reconstruction-rung summary')!.textContent).toBe(
+      'Recorded rung 4; showing rung 3 from each photograph\u2019s own depth, in an unmeasured arrangement.');
+    expect(status.querySelector('.reconstruction-availability')).toBeNull();
+  });
+
   it('leaves ordinary world presentation unchanged and never invents missing originals', () => {
     const base = { omittedRegionCount: 0, undrawable: new Map() };
     expect(buildStatus(base).querySelector('.reconstruction-availability')).toBeNull();
