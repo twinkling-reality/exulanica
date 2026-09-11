@@ -1,0 +1,105 @@
+{
+  "generated_by": "exulanica.world_package at 90edb49, before the authored-world extension existed",
+  "import_check_declared": {
+    "compatible": false,
+    "manifest_sha256": "4a4405ac87eed8a382031dacb39872c44f74dcca633454aed8eaca9550804e26",
+    "merkle_root_sha256": "f30c27c3f3d521189b00b50e3dc6fd4b83fe2dd2e170a7c7434a82c059b8c761",
+    "missing_interaction_capabilities": [
+      "comfort.camera-bob@1",
+      "comfort.field-of-view-degrees@1",
+      "comfort.look-sensitivity-milli@1",
+      "disclosure.provenance-detail@1",
+      "initiative.mode@1",
+      "navigation.transition-style@1",
+      "navigation.turn-mode@1"
+    ],
+    "missing_style_profiles": [],
+    "mutated": false,
+    "required_interaction_capabilities": [
+      "comfort.camera-bob@1",
+      "comfort.field-of-view-degrees@1",
+      "comfort.look-sensitivity-milli@1",
+      "comfort.vignette@1",
+      "disclosure.provenance-detail@1",
+      "initiative.mode@1",
+      "navigation.transition-style@1",
+      "navigation.turn-mode@1"
+    ],
+    "required_style_profiles": [
+      "origin-landscape@1"
+    ],
+    "warnings": []
+  },
+  "import_check_undeclared": {
+    "compatible": null,
+    "manifest_sha256": "4a4405ac87eed8a382031dacb39872c44f74dcca633454aed8eaca9550804e26",
+    "merkle_root_sha256": "f30c27c3f3d521189b00b50e3dc6fd4b83fe2dd2e170a7c7434a82c059b8c761",
+    "missing_interaction_capabilities": [
+      "comfort.camera-bob@1",
+      "comfort.field-of-view-degrees@1",
+      "comfort.look-sensitivity-milli@1",
+      "comfort.vignette@1",
+      "disclosure.provenance-detail@1",
+      "initiative.mode@1",
+      "navigation.transition-style@1",
+      "navigation.turn-mode@1"
+    ],
+    "missing_style_profiles": [
+      "origin-landscape@1"
+    ],
+    "mutated": false,
+    "required_interaction_capabilities": [
+      "comfort.camera-bob@1",
+      "comfort.field-of-view-degrees@1",
+      "comfort.look-sensitivity-milli@1",
+      "comfort.vignette@1",
+      "disclosure.provenance-detail@1",
+      "initiative.mode@1",
+      "navigation.transition-style@1",
+      "navigation.turn-mode@1"
+    ],
+    "required_style_profiles": [
+      "origin-landscape@1"
+    ],
+    "warnings": [
+      "receiver capabilities were not declared; compatibility is indeterminate"
+    ]
+  },
+  "inspect": {
+    "components": {
+      "appearance/style.json": "current",
+      "deletion/tombstones.json": {
+        "items": 0
+      },
+      "evaluation/results.json": {
+        "items": 0
+      },
+      "external/fetch.json": {
+        "items": 1
+      },
+      "interaction/policy.json": "current",
+      "memory/graph.json": null,
+      "provenance/events.json": {
+        "items": 0
+      },
+      "reconstruction/artifacts.json": {
+        "items": 0
+      },
+      "world/structure.json": "current"
+    },
+    "file_count": 18,
+    "manifest_sha256": "4a4405ac87eed8a382031dacb39872c44f74dcca633454aed8eaca9550804e26",
+    "merkle_root_sha256": "f30c27c3f3d521189b00b50e3dc6fd4b83fe2dd2e170a7c7434a82c059b8c761",
+    "profile_version": "exulanica-wmp-1.0",
+    "signing_public_key_sha256": "c7127af0062bb9e9de492a457a9274e0eba8cb47b789c54ee3c67339069c82d0",
+    "verified": true
+  },
+  "verify": {
+    "file_count": 18,
+    "manifest_sha256": "4a4405ac87eed8a382031dacb39872c44f74dcca633454aed8eaca9550804e26",
+    "merkle_root_sha256": "f30c27c3f3d521189b00b50e3dc6fd4b83fe2dd2e170a7c7434a82c059b8c761",
+    "profile_version": "exulanica-wmp-1.0",
+    "signing_public_key_sha256": "c7127af0062bb9e9de492a457a9274e0eba8cb47b789c54ee3c67339069c82d0",
+    "verified": true
+  }
+}

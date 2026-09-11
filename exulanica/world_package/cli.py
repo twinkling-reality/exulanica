@@ -12,6 +12,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from exulanica.world_package.authored import EXTENSION_KEY
 from exulanica.world_package.diff import diff_packages
 from exulanica.world_package.package import (
     PackageError,
@@ -36,6 +37,13 @@ def _parser() -> argparse.ArgumentParser:
     project.add_argument("--world", default="atlas:default")
     project.add_argument("--parent-root")
     project.add_argument("--evaluation-report", action="append", default=[], type=Path)
+    project.add_argument(
+        "--extension",
+        action="append",
+        default=[],
+        choices=[EXTENSION_KEY],
+        help="add an optional, separately versioned extension; 1.0 payloads are unchanged",
+    )
 
     decision = commands.add_parser(
         "training-consent", help="record an account-holder training attestation"
@@ -66,7 +74,8 @@ def _parser() -> argparse.ArgumentParser:
     ledger.add_argument("--workspace", type=uuid.UUID, required=True)
 
     verify = commands.add_parser(
-        "verify", help="verify bytes, inventory, policy, Merkle root, and signature"
+        "verify",
+        help="verify bytes, inventory, policy, Merkle root, and signature; never loads a world",
     )
     verify.add_argument("package", type=Path)
 
@@ -83,6 +92,13 @@ def _parser() -> argparse.ArgumentParser:
     import_check.add_argument("package", type=Path)
     import_check.add_argument("--supported-style-profile", action="append", default=[])
     import_check.add_argument("--supported-interaction-capability", action="append", default=[])
+    import_check.add_argument(
+        "--loader-capability",
+        action="append",
+        default=[],
+        help="one capability the receiving loader declares, for example "
+        "wmp-extension:exulanica-wmp-ext-authored-world@1.0 or behaviour:motion.bounded-path@1",
+    )
 
     keygen = commands.add_parser(
         "keygen-test",
@@ -111,6 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     world_id=args.world,
                     parent_merkle_root_sha256=args.parent_root,
                     evaluation_reports=args.evaluation_report,
+                    extensions=args.extension,
                 )
             _print(result.as_dict())
         elif args.command in {"training-consent", "training-export", "training-ledger"}:
@@ -129,6 +146,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     supported_interaction_capabilities=frozenset(
                         args.supported_interaction_capability
                     ),
+                    loader_capabilities=frozenset(args.loader_capability),
                 )
             )
         elif args.command == "keygen-test":

@@ -2,9 +2,12 @@
 
 Status: **BUILT AND EXIT-GATED**. The implementation profile is `exulanica-wmp-1.0`.
 
-**Creative-world roadmap:** [product-direction.md](product-direction.md#package-and-api-boundaries)
-plans future authored state and behavior references. These are not capabilities of the existing
-profile; this document remains the current package contract.
+**Creative-world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
+asks for authored state and behaviour references without changing the 1.0 profile. They are
+carried by an optional, separately versioned extension, `exulanica-wmp-ext-authored-world` 1.0,
+specified in [its own section below](#authored-world-extension-10). The 1.0 profile, its eighteen
+required paths and its signature payload are unchanged, and a package written without the
+extension is byte for byte what the projector wrote before the extension existed.
 
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
 live store, a backup, a consent grant, or an executable world. An exported copy cannot be recalled.
@@ -88,10 +91,13 @@ explicitly.
 
 ```text
 exulanica-wmp project --workspace UUID --actor UUID --private-key KEY --output DIRECTORY
+                      [--extension authored-world-1.0]
 exulanica-wmp verify DIRECTORY
 exulanica-wmp inspect DIRECTORY
 exulanica-wmp diff BEFORE_DIRECTORY AFTER_DIRECTORY
-exulanica-wmp import-check DIRECTORY [receiver capability declarations]
+exulanica-wmp import-check DIRECTORY [--loader-capability CAPABILITY ...]
+                           [--supported-style-profile ID@VERSION ...]
+                           [--supported-interaction-capability KEY@VERSION ...]
 ```
 
 `verify`, `inspect`, `diff`, and `import-check` do not open PostgreSQL. Diff output reports semantic
@@ -99,6 +105,14 @@ JSON pointers and before/after value hashes, not the values themselves. `import-
 a live world; absent receiver capability declarations produce `indeterminate`, not a fabricated
 compatibility pass. Import remains a later explicit transaction and is not implemented as a side
 effect of inspection.
+
+**Verification is not loading, and the output says so.** `verify` reports `verified: true` together
+with `runtime_loadability: "not assessed: verify never loads a world..."` and a `summary` sentence
+naming exactly what was checked: bytes, inventory, canonical JSON, profile, prohibited-content
+boundary, the rules of every extension this verifier knows, the Merkle root and the Ed25519
+signature. It names any extension it does not know as not checked, and `uninterpreted_paths` lists
+any optional payload outside `extensions/`. Only `import-check`, given what a receiving loader
+declares, says anything about loading.
 
 ## Exit evidence
 
@@ -108,6 +122,156 @@ mutation after the repeatable-read snapshot begins, immutable audit receipts, de
 unchanged re-export, and deletion followed by a new root and semantic removed-state diff. The full
 backend PostgreSQL suite, Ruff, migration count, and import boundaries are run before the phase
 commit; those command results, not this status sentence alone, are the exit gate.
+
+## Authored-world extension 1.0
+
+Status: **BUILT**, opt-in. Implementation: `exulanica/world_package/authored.py` (sections,
+verifier rules, loader report), `projector.py` (`_authored_world`), `package.py` (extension
+discovery and `import-check`). It carries the state [world-objects-contract.md](world-objects-contract.md)
+defines: alternate versions, their authored objects and source-element overrides, and the reviewed
+asset and behaviour references those objects make.
+
+### Why an extension and not a 1.1 profile
+
+Section 8 of the objects contract sketched a 1.1 profile with new required paths. Two facts rule
+that out without a migration, and this change has none. `REQUIRED_PAYLOAD_PATHS` is checked before
+the signature, so a new required path makes every already-signed 1.0 package unverifiable while its
+bytes are sound (`tests/test_world_package_verifier.py` holds this). Migration 0028 checks
+`world_package_export.profile_version = 'exulanica-wmp-1.0'`, so the projector cannot receipt a
+1.1 export. An optional directory breaks neither: the manifest inventories it, the Merkle root and
+signature cover it, the prohibited-content scanner reads it, and a verifier that predates it still
+verifies the package. The profile version in the manifest and the signature stays `exulanica-wmp-1.0`.
+
+### Layout
+
+Exactly four canonical JSON files under `extensions/authored-world-1.0/`; any other file there is
+refused, which is what keeps asset bytes from riding along unchecked.
+
+| File | Holds |
+| --- | --- |
+| `extension.json` | Name `exulanica-wmp-ext-authored-world`, version `1.0`, base profile `exulanica-wmp-1.0`, section paths, counts, `required_loader_capabilities`, and the fixed statements that asset bytes are not embedded and runtime code is not carried |
+| `versions.json` | Every exported alternate version: pseudonymous `version_id`, `parent_version_id`, `source_snapshot_id` and `style_version_id` URNs, title, `origin`, `state_sha256`, `edit_seq`, `created_at`, the canonical `delta`, and the edit chain; plus `source_snapshots` (URN, `snapshot_sha256`, `current`, region and element ids) and a `withheld` count |
+| `assets.json` | The reviewed assets the objects name: key, title, summary, media type, `content_sha256`, byte size, licence id and licence digest, an RFC 6920 `ni` URI, and `retrieval: "requires an authorized content-addressed resolver"`. No URL and no bytes |
+| `behaviours.json` | The reviewed behaviours the objects name: key, version, summary and parameter bounds |
+
+`delta` is the document `exulanica.world.objects.canonical_delta_document` builds, so its SHA-256
+over the canonical JSON rule is the version's `state_sha256`, the same token `GET /world/versions`
+returns and every edit names as its base. Objects keep their region-local fixed-point transforms,
+their `origin` (`authored`, with the role the person chose) and their behaviour key, version and
+parameters. Ids are pseudonymised with the same `urn:exulanica:wmp:<kind>:<sha256>` rule as the 1.0
+components, so `version_id` is `sha256("alternate-version:" + uuid)`: a holder of the version id
+can match it, and the package alone does not reveal it.
+
+The extension is added only when `project` is given `--extension authored-world-1.0`. With it, the
+eighteen 1.0 payloads are unchanged except `ro-crate-metadata.json`, which gains the four files in
+`hasPart`, one `Profile` node for the extension, and a `conformsTo` on `extension.json`. The crate
+root still conforms to the 1.0 profile alone, because a 1.0 verifier requires exactly that value.
+The export receipt's `export_policy` records the extension; the package root does not depend on it.
+
+### What is not exported
+
+- **Actors.** `created_by` and each edit's `actor` are omitted, as tombstones omit the requesting
+  actor. The digests that make the edit chain checkable are kept.
+- **Versions whose source was deleted.** This is the decision section 8 left open. A version is
+  invalid exactly when its source snapshot carries a `world_structure_invalidation` row. The
+  projector already withdraws a scene when one member is deleted, and an authored delta posed in the
+  regions of withdrawn structure is the same kind of claim, so such a version is withheld and only
+  counted (`withheld.invalidated_source_versions`), never named. The authored work survives in the
+  database and in `GET /world/versions`. Invalidation is per source snapshot and a branch shares its
+  parent's source, so no exported version names a withheld parent.
+- **Asset bytes and runtime code.** An asset is a digest an authorized resolver supplies; a
+  behaviour is an identifier with bounded parameters. Embedding reviewed CC0 bytes would be a new,
+  separately versioned opt-in, and this version refuses any file it does not name.
+
+### Verifier rules
+
+A verifier that knows the extension refuses the package, even though its signature is sound, when:
+the directory does not hold exactly the four files; a section has an unknown profile, a missing or
+extra field, or items out of sorted order; a `state_sha256` does not re-derive from its `delta`; an
+object names an asset or behaviour the sections do not list, a region its source snapshot lacks, a
+non-authored origin, a transform outside the fixed-point contract, or a parameter outside its
+reviewed bound; an override names an element its source lacks; a parent is missing, on another
+source, or cyclic; the edit chain is not contiguous, an edit's base is not the previous result, a
+source-created version's first base is not the empty delta's digest, or the chain does not end at
+the exported state; the source snapshot marked `current` disagrees with `world/structure.json` or
+`world/topology.json`; the sections list assets, behaviours or snapshots nothing references; or
+`extension.json` does not match what the sections require. The digest is re-derived with the
+canonical JSON rule alone, not with the product's domain code, and a test holds the two equal.
+
+Any other directory under `extensions/` must carry an `extension.json` naming its extension,
+version, base profile and required loader capabilities, or the package is refused. An extension
+this verifier does not know is verified for integrity only and reported as not checked.
+
+### Loader capabilities and `import-check`
+
+A loader declares capabilities in one vocabulary. The existing flags are the same declarations
+without their prefix and are merged in.
+
+| Capability | Required when |
+| --- | --- |
+| `style-profile:<id>@<version>` | the appearance is current (unchanged 1.0 rule) |
+| `interaction:<key>@<version>` | the interaction policy is current (unchanged 1.0 rule) |
+| `wmp-extension:exulanica-wmp-ext-authored-world@1.0` | the extension is present |
+| `asset-resolution:sha256-content-address` | any object that is not removed exists |
+| `asset-media:model/gltf-binary` | such an object's asset has that media type |
+| `behaviour:motion.bounded-path@1` | such an object carries that behaviour |
+
+A removed object requires nothing, because it is part of the state digest and is not drawn.
+`import-check` keeps every 1.0 field with its 1.0 meaning, including `compatible` for the base
+world, and adds `declared_loader_capabilities`, `unsupported_capabilities`, a per-extension report
+and `loadability`:
+
+| `loadability` | Meaning |
+| --- | --- |
+| `indeterminate` | The loader declared nothing, so nothing is called supported or unsupported |
+| `refused` | A base style profile or interaction capability is unsupported |
+| `partial` | The base loads; an extension, an asset path or a behaviour is unsupported and is named |
+| `complete` | Every capability the signed content requires was declared |
+
+A loader without extension support gets `load: "not loaded"` and a warning naming how many alternate
+versions and present objects it leaves behind, which it must say rather than present the source
+world as the whole package. A loader with the extension but not a behaviour gets the objects listed
+under `objects_with_unsupported_behaviour`, to be shown present with the behaviour marked
+unsupported, the milestone's "unsupported behavior fails visibly". `import-check` runs no loader: a
+declared capability is the loader's claim, and the answer is a comparison of that claim with the
+signed content.
+
+### What a signed package does and does not guarantee
+
+It guarantees that the bytes are the ones the key holder signed, that the inventory is complete, that
+no prohibited class of content is present, and, for a verifier that knows the extension, that the
+authored state is internally consistent: every state token re-derives, every edit chain closes, and
+every reference resolves inside the package.
+
+It does not guarantee that the signer was authorized to export, which needs the issuer's trusted key
+fingerprint and is outside the package. It does not guarantee historical truth: an authored object is
+authored, and `origin.role` is what a person chose, never a claim the source world supports. It does
+not guarantee that the assets can be fetched, since only their digests travel, or that any renderer
+will execute a behaviour, or execute it identically: the registry bounds parameters and the runtime
+owns trigger, stop and reset. It does not reveal authored work that was withheld because its source
+was deleted, and it cannot recall a copy already handed out.
+
+One limit is structural rather than a gap to close. A verifier or `import-check` written before this
+extension verifies an extended package and reports `compatible` without mentioning the authored
+state, because it cannot know the directory exists. That is the price of not breaking it. A loader
+that must never drop authored state silently needs a verifier that knows the `extensions/`
+convention; every verifier from this version on names each extension it finds, known or not.
+
+### Compatibility evidence
+
+`tests/fixtures/wmp-1.0-before-authored-world` is a package the unmodified projector wrote at
+90edb49, beside what that commit's verifier said about it. `tests/test_world_package_extension.py`
+verifies it unchanged, rebuilds it byte for byte from its own components and key (Ed25519 signing is
+deterministic), and shows the extension changes only `ro-crate-metadata.json` among the 1.0 files.
+`tests/test_world_package_extension_postgres.py` round-trips one alternate version holding one object
+from live PostgreSQL through a signed package and reads it back with a loader that lacks the
+extension and one that has it, and shows a version whose source was deleted is withheld.
+
+[evaluation/2026-09-11-developer-proof.json](evaluation/2026-09-11-developer-proof.json) retains the
+same proof on the reference copy: a package projected from the version the second client edited,
+verified by this code and by the verifier at 90edb49, checked against four loader declarations, and
+the same snapshot projected without the extension by this code and by the 90edb49 projector,
+byte-identical in every file including the signature.
 
 ## Explicit training dataset profile
 

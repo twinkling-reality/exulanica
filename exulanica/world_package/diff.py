@@ -30,6 +30,12 @@ _IDENTITY_KEYS = (
     "occurrence_id",
     "scene_id",
     "tombstone_id",
+    # The authored-world extension. Appended rather than interleaved, and none of them is a key
+    # of any 1.0 list item, so a diff between two 1.0 packages reads exactly as it did.
+    "version_id",
+    "edit_id",
+    "object_id",
+    "snapshot_id",
 )
 
 
