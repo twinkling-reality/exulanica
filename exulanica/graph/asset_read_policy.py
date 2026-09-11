@@ -16,7 +16,7 @@ from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager
 from threading import Lock
-from typing import Any
+from typing import Any, Final
 
 import psycopg
 
@@ -205,6 +205,62 @@ def _memo_put(key: _MemoKey, manifest: dict[str, Any]) -> None:
             _memo.popitem(last=False)
 
 
+#: What `exulanica/reconstruction/pose.py` writes a receipt as: canonical JSON, sorted keys, no
+#: whitespace. Of its five top-level keys `manifest` sorts first, so a sound receipt begins with
+#: exactly these bytes. Checked rather than assumed, with a fallback for anything that does not.
+_RECEIPT_HEAD: Final = b'{"manifest":'
+_DIGEST_KEY: Final = ',"manifest_digest":"'
+
+
+def _manifest_and_digest(data: bytes) -> tuple[Any, Any]:
+    """The receipt's manifest and the digest it claims for it, parsing as little as possible.
+
+    The memo below spared the SECOND parse of a pose receipt in a process. This spares most of the
+    first, which is what a fresh process and therefore a first visitor pays.
+
+    MEASURED 2026-09-10 on the volcanic scene's CURRENT pose receipt, 107,742,795 bytes at
+    f44362e2: reading it is 0.018 s, re-hashing it inside `store.get` is 0.045 s, and
+    `json.loads` of the whole object is 1.439 s. The manifest is 44,130 canonical bytes of
+    that, 210 frames; the rest is `quality`, which nothing on this path reads. Decoding the
+    object and `raw_decode`-ing only the manifest out of its head is 0.017 s, eighty times
+    cheaper, and produces a manifest equal to the whole parse's.
+
+    Structural rather than a substring search: the head prefix is checked exactly, the manifest is
+    decoded as a JSON value from a known offset, and `manifest_digest` is taken from the bytes
+    that must immediately follow it. Anything else about the receipt falls back to parsing the
+    whole object, so a receipt written by some other producer still reads correctly and merely
+    slowly. A head this function misread cannot be served either way: the caller verifies the
+    manifest against the digest returned beside it, and a mismatch denies the scene.
+    """
+    if data.startswith(_RECEIPT_HEAD):
+        try:
+            text = data.decode()
+            manifest, end = json.JSONDecoder().raw_decode(text, len(_RECEIPT_HEAD))
+            # Long enough to hold the digest key, a 64 character digest, its closing quote, and
+            # the first ten characters of whatever key comes next, which is what the duplicate
+            # check below reads.
+            tail = text[end : end + len(_DIGEST_KEY) + 75]
+            if tail.startswith(_DIGEST_KEY):
+                closing = tail.index('"', len(_DIGEST_KEY))
+                # The key that follows must sort strictly after `manifest_digest`. JSON permits a
+                # duplicate key and `json.loads` keeps the LAST, so without this a receipt
+                # carrying two `manifest` pairs would be read as its first here and as its second
+                # by `_read_pose_receipt` and `recovered_camera_records`, which still use
+                # `json.loads`. Both halves of the pair returned here come from the head, so the
+                # caller's digest check would agree with itself and the split would be silent:
+                # `scene_allowed` would authorise against one manifest while the geometry came
+                # from the other. Our own writer sorts its keys and cannot emit a duplicate, so
+                # this only ever fires on a receipt from somewhere else, and it falls back to the
+                # whole-object parse, which agrees with every other reader.
+                after = tail[closing + 1 :]
+                if after.startswith(',"') and after[2:10] > "manifest":
+                    return manifest, tail[len(_DIGEST_KEY) : closing]
+        except (UnicodeDecodeError, ValueError):
+            pass
+    receipt = json.loads(data)
+    return receipt["manifest"], receipt["manifest_digest"]
+
+
 def scene_inputs(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
@@ -224,12 +280,11 @@ def scene_inputs(
         # `store.get` did. What is no longer re-checked per request is the digest of the bytes.
         return (row, copy.deepcopy(memoised)) if store.exists(blob) else None
     try:
-        receipt = json.loads(store.get(blob))
-        manifest = receipt["manifest"]
+        manifest, claimed_digest = _manifest_and_digest(store.get(blob))
         digest = hashlib.sha256(
             json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
         ).hexdigest()
-        if receipt["manifest_digest"] != digest or manifest["scene_ref"] != str(scene_id):
+        if claimed_digest != digest or manifest["scene_ref"] != str(scene_id):
             return None
         # Only a read that returned verified bytes fills the memo. A BlobNotFoundError or an
         # IntegrityError falls through to the handler below and caches nothing, so a receipt

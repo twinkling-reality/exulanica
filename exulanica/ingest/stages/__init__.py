@@ -471,6 +471,36 @@ STAGES: Final[dict[str, StageSpec]] = {
             "policy": "highest-complete-accepted-receipt-chain",
         },
     ),
+    "scene_projection": StageSpec(
+        key="scene_projection",
+        version=1,
+        output_kind="scene_projection",
+        # Deterministic in the sense the flag actually carries. This stage transcribes a
+        # placement record that is already fixed and a pose receipt that is already content
+        # addressed, so two runs producing different bytes would be a fault worth an event.
+        # Unlike `scene_pose`, nothing here calls out to a solver, so the reservation
+        # `pycolmap_executor` records about RANSAC threading does not apply.
+        deterministic=True,
+        params={
+            "profile": "exulanica.scene-graph-projection/v1",
+            "envelope": "exulanica.scene-graph-projection-envelope/v1",
+            # Named here because a reader that quietly stopped checking one of these would still
+            # produce a valid-looking artifact, and the registry is where "what this stage
+            # promised" is answerable without reading the source.
+            "bindings": [
+                "pose_receipt_sha256",
+                "placement_receipt_sha256",
+                "gate_receipt_sha256",
+                "member_capture_refs",
+                "point_map_inputs",
+            ],
+            # A projection is a faster route to an answer the gate already stands behind. It
+            # carries no evidence, promotes no rung and is not a citation target.
+            "promotes_rung": False,
+            "citable": False,
+            "carries_no_privacy_bearing_field": True,
+        },
+    ),
     "person_regions": StageSpec(
         key="person_regions",
         version=1,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Callable
-from contextlib import ExitStack
+from contextlib import ExitStack, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -24,6 +24,12 @@ from exulanica.ingest.reconstruction_scratch import (
     stage_scene_sources,
 )
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.scene_projection import (
+    SCENE_PROJECTION_STAGE,
+    build_scene_projection,
+    projection_point_map_inputs,
+    validate_scene_projection,
+)
 from exulanica.ingest.scene_rung import record_scene_rung
 from exulanica.ingest.scene_splat import (
     ContainerCleanupUnconfirmed,
@@ -87,6 +93,14 @@ class _SplatCheckpointed(RuntimeError):
 
 class _ClaimLost(RuntimeError):
     pass
+
+
+class _ProjectionRefused(RuntimeError):
+    """A projection could not be built. Fails its own stage and nothing else.
+
+    Raised into an open `scene_projection` stage and immediately suppressed, so the ledger
+    writes `stage_failed` naming the cause and the scene still publishes its receipts.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,19 +414,108 @@ class SceneReconstructionProcessor:
                         )
                         for member in claimed.members
                     ]
-                    self._accept(
-                        claimed,
-                        manifest,
-                        decision,
-                        registrations,
-                        (
-                            (pose_artifact, pose_recorder),
-                            (placement_artifact, placement_recorder),
-                            (gate_artifact, gate_recorder),
-                            *extras,
-                        ),
-                        ledger,
+                    # The projection is written last because it binds all three receipts, and
+                    # inside the gate stage because `_accept` needs every recorder still open.
+                    #
+                    # A projection that cannot be built does NOT take the scene down with it.
+                    # `build_scene_projection` transcribes a placement this worker has already
+                    # validated against this pose receipt and these point maps, so it should
+                    # never raise on real output, and every guard it applies is one
+                    # `_validate_matrix` and `_calibration` have already made. But if it ever did,
+                    # failing the job here would discard a completed pose, placement and gate,
+                    # set `should_cleanup` on a non-splat scene and destroy the scratch, and the
+                    # retry would be deterministic: three full COLMAP runs, measured in tens of
+                    # minutes on 210 photographs, to end with no scene at all. The pre-change
+                    # behaviour in that situation was a published scene with a slow cold read.
+                    #
+                    # `_verify_build_inputs` was moved to the top of this function for exactly
+                    # this reason, so a refusal would not cost thirty minutes of matching. It
+                    # would be strange to add a new refusal at the very end of the same pipeline.
+                    #
+                    # The failure is not silent: the stage is opened either way, so a refusal is
+                    # written as `stage_failed` on `scene_projection` naming its error class and
+                    # message, and `scripts/backfill_scene_projections.py` can fill the artifact
+                    # in afterwards.
+                    projection_spec = stage(SCENE_PROJECTION_STAGE)
+                    published = (
+                        (pose_artifact, pose_recorder),
+                        (placement_artifact, placement_recorder),
+                        (gate_artifact, gate_recorder),
+                        *extras,
                     )
+                    try:
+                        projection_bytes = build_scene_projection(
+                            scene_ref=str(claimed.scene_id),
+                            pose_receipt=pose_bytes,
+                            pose_receipt_sha256=pose_artifact.content_id.hex,
+                            placement_receipt_sha256=placement_artifact.content_id.hex,
+                            gate_receipt_sha256=gate_artifact.content_id.hex,
+                            member_capture_refs=member_refs,
+                            placement=placement,
+                        )
+                        # Checked here rather than trusted, so that the bytes a reader will
+                        # refuse are never published in the first place.
+                        validate_scene_projection(
+                            projection_bytes,
+                            expected_scene_ref=str(claimed.scene_id),
+                            pose_receipt_sha256=pose_artifact.content_id.hex,
+                            placement_receipt_sha256=placement_artifact.content_id.hex,
+                            gate_receipt_sha256=gate_artifact.content_id.hex,
+                            member_capture_refs=member_refs,
+                            point_map_inputs=projection_point_map_inputs(placement),
+                        )
+                    except (KeyError, TypeError, ValueError) as error:
+                        with (
+                            suppress(_ProjectionRefused),
+                            ledger.stage(
+                                projection_spec,
+                                input_artifact_ids=[
+                                    pose_artifact.artifact_id,
+                                    placement_artifact.artifact_id,
+                                    gate_artifact.artifact_id,
+                                ],
+                            ),
+                        ):
+                            raise _ProjectionRefused(str(error)) from error
+                        self._accept(claimed, manifest, decision, registrations, published, ledger)
+                        return SceneBuildOutcome(
+                            claimed.job_id,
+                            claimed.scene_id,
+                            "succeeded",
+                            rung=decision.rung,
+                            registered_member_count=registered_count,
+                        )
+                    with ledger.stage(
+                        projection_spec,
+                        input_artifact_ids=[
+                            pose_artifact.artifact_id,
+                            placement_artifact.artifact_id,
+                            gate_artifact.artifact_id,
+                        ],
+                    ) as projection_recorder:
+                        projection_artifact = self._pending(
+                            claimed.scene_id,
+                            projection_spec.key,
+                            projection_bytes,
+                            input_digest_of(
+                                [
+                                    pose_artifact.content_id.digest,
+                                    placement_artifact.content_id.digest,
+                                    gate_artifact.content_id.digest,
+                                ]
+                            ),
+                        )
+                        self._accept(
+                            claimed,
+                            manifest,
+                            decision,
+                            registrations,
+                            (
+                                *published,
+                                (projection_artifact, projection_recorder),
+                            ),
+                            ledger,
+                        )
         return SceneBuildOutcome(
             claimed.job_id,
             claimed.scene_id,
