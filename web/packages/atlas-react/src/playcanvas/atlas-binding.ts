@@ -1881,7 +1881,7 @@ export interface SegmentOverlayAsset {
   readonly artifactId: string;
   readonly kind: 'gaussians' | 'points';
   readonly sampleCount: number;
-  /** Tinted sample indices, ascending. */
+  /** Tinted sample indices in the asset's own numbering: ascending, or grouped by slot for a map. */
   readonly indices: Uint32Array;
   /** The slot of each tinted sample, parallel to `indices`. */
   readonly slots: Uint8Array;
@@ -2015,7 +2015,7 @@ export function segmentPointGroups(slots: Uint8Array): {
   readonly groups: readonly SegmentPointGroup[];
 } {
   const counts = new Uint32Array(SEGMENT_SLOT_LIMIT + 1);
-  for (const slot of slots) counts[slot]! += 1;
+  for (let index = 0; index < slots.length; index += 1) counts[slots[index]!]! += 1;
   const starts = new Uint32Array(SEGMENT_SLOT_LIMIT + 1);
   const groups: SegmentPointGroup[] = [];
   let base = 0;
@@ -2031,7 +2031,7 @@ export function segmentPointGroups(slots: Uint8Array): {
 
 function tintedSamples(slots: Uint8Array): { readonly indices: Uint32Array; readonly slots: Uint8Array } {
   let count = 0;
-  for (const slot of slots) if (slot !== 0) count += 1;
+  for (let index = 0; index < slots.length; index += 1) if (slots[index] !== 0) count += 1;
   const indices = new Uint32Array(count);
   const tinted = new Uint8Array(count);
   let at = 0;
@@ -2051,7 +2051,15 @@ function splatCentres(visual: TrainedSceneVisual): Float32Array | null {
   return centres instanceof Float32Array && centres.length >= length ? centres.subarray(0, length) : null;
 }
 
-/** Atlas positions of the given samples, through the scene transform and the region placement. */
+/**
+ * Atlas positions of the given samples, through the scene transform and the region placement.
+ *
+ * `localToAtlas` is a yaw, a uniform scale and a translation, so it composes with the scene
+ * transform into one affine, built once here rather than through an allocated vector per sample.
+ * MEASURED 2026-09-11 in the browser on 2.9 million tinted samples over 38 placed maps: the
+ * per-sample call took about 257 ms of the overlay's first frame, and the whole `apply` about 370 ms.
+ * Composed, and with the tinted list read from the draw order, `apply` takes about 130 ms.
+ */
 function atlasPositions(
   island: Island,
   sceneFromLocal: readonly number[],
@@ -2059,20 +2067,24 @@ function atlasPositions(
   indices: Uint32Array,
 ): Float32Array {
   const m = sceneFromLocal;
+  const { position, yaw, scale } = island.placement;
+  const c = Math.cos(yaw) * scale;
+  const s = Math.sin(yaw) * scale;
+  // Rows of atlas-from-local: placement (x' = c x + s z, y' = scale y, z' = -s x + c z) after m.
+  const a = [
+    c * m[0]! + s * m[8]!, c * m[1]! + s * m[9]!, c * m[2]! + s * m[10]!, c * m[3]! + s * m[11]! + position.x,
+    scale * m[4]!, scale * m[5]!, scale * m[6]!, scale * m[7]! + position.y,
+    -s * m[0]! + c * m[8]!, -s * m[1]! + c * m[9]!, -s * m[2]! + c * m[10]!, -s * m[3]! + c * m[11]! + position.z,
+  ] as const;
   const out = new Float32Array(indices.length * 3);
   for (let k = 0; k < indices.length; k += 1) {
     const i = indices[k]! * 3;
     const x = local[i]!;
     const y = local[i + 1]!;
     const z = local[i + 2]!;
-    const atlas = localToAtlas(island.placement, localVec3(
-      m[0]! * x + m[1]! * y + m[2]! * z + m[3]!,
-      m[4]! * x + m[5]! * y + m[6]! * z + m[7]!,
-      m[8]! * x + m[9]! * y + m[10]! * z + m[11]!,
-    ));
-    out[k * 3] = atlas.x;
-    out[k * 3 + 1] = atlas.y;
-    out[k * 3 + 2] = atlas.z;
+    out[k * 3] = a[0] * x + a[1] * y + a[2] * z + a[3];
+    out[k * 3 + 1] = a[4] * x + a[5] * y + a[6] * z + a[7];
+    out[k * 3 + 2] = a[8] * x + a[9] * y + a[10] * z + a[11];
   }
   return out;
 }
@@ -2217,7 +2229,12 @@ export class SegmentOverlayRuntime {
       const sampleCount = visual.cloud.pointCount;
       const { slots, refused: problems } = segmentSlotsFor(sampleCount, tints);
       for (const reason of problems) refused.push({ artifactId, reason });
-      const tinted = tintedSamples(slots);
+      const { order, groups } = segmentPointGroups(slots);
+      // The draw order already lists every tinted sample after the untinted rest, grouped by slot,
+      // so the report is read from it rather than from another pass over every sample's byte.
+      const rest = groups[0]?.slot === 0 ? groups[0].count : 0;
+      const tinted = { indices: order.subarray(rest), slots: new Uint8Array(order.length - rest) };
+      for (const group of groups) if (group.slot !== 0) tinted.slots.fill(group.slot, group.base - rest, group.base - rest + group.count);
       if (tinted.indices.length === 0) continue;
       // Taken down before the replacement goes up: its teardown shows the original draw again,
       // and doing that after would draw every sample twice.
@@ -2226,7 +2243,6 @@ export class SegmentOverlayRuntime {
         previous.overlay.destroy();
         this.#points.delete(visual);
       }
-      const { order, groups } = segmentPointGroups(slots);
       const pointOverlay = engine.pointGroups(visual, order, groups);
       const used = groups.filter((group) => group.slot !== 0).map((group) => group.slot);
       for (const slot of used) pointOverlay.setLens(slot, overlay.palette.get(slot) ?? PROOF_LENS_OFF);

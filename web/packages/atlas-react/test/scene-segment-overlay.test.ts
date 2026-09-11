@@ -243,11 +243,14 @@ describe('the segment overlay is exactly nothing when it is off', () => {
     const { engine, overlays } = fakeEngine();
     const runtime = new SegmentOverlayRuntime([points], [], () => engine, host());
 
-    runtime.apply({
+    const report = runtime.apply({
       islandId: REGION_A,
       tints: [tint(1, 'points-a', [0, 2]), tint(2, 'points-a', [5])],
       palette: new Map([[1, RED], [2, BLUE]]),
     });
+    // Read from the draw order: grouped by slot, and every index beside its own slot.
+    expect([...report.assets[0]!.indices]).toEqual([0, 2, 5]);
+    expect([...report.assets[0]!.slots]).toEqual([1, 1, 2]);
     const overlay = overlays[0]!;
     expect([...overlay.order]).toEqual([1, 3, 4, 0, 2, 5]);
     expect(overlay.groups).toEqual([{ slot: 0, base: 0, count: 3 }, { slot: 1, base: 3, count: 2 }, { slot: 2, base: 5, count: 1 }]);

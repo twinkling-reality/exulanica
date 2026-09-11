@@ -186,35 +186,79 @@ export function projectToCanvas(
   canvas: { readonly width: number; readonly height: number },
   point: readonly [number, number, number],
 ): { readonly x: number; readonly y: number; readonly depth: number } | null {
+  const k = canvasProjection(camera, canvas);
+  if (k === null) return null;
+  const dx = point[0] - k.origin[0];
+  const dy = point[1] - k.origin[1];
+  const dz = point[2] - k.origin[2];
+  const depth = -(dx * k.z[0] + dy * k.z[1] + dz * k.z[2]);
+  if (!(depth > NEAR_CLIP)) return null;
+  return {
+    x: k.sx * ((dx * k.x[0] + dy * k.x[1] + dz * k.x[2]) / depth) + k.ox,
+    y: k.sy * ((dx * k.y[0] + dy * k.y[1] + dz * k.y[2]) / depth) + k.oy,
+    depth,
+  };
+}
+
+/** The camera's basis, and the affine from a view-space slope to a canvas pixel on each axis. */
+interface CanvasProjection {
+  readonly origin: readonly [number, number, number];
+  readonly x: Rgb;
+  readonly y: Rgb;
+  readonly z: Rgb;
+  /** Canvas x is `sx * (view x / depth) + ox`, and canvas y the same with `sy` and `oy`. */
+  readonly sx: number;
+  readonly ox: number;
+  readonly sy: number;
+  readonly oy: number;
+}
+
+/**
+ * Everything about the projection that does not depend on the point, worked out once per click.
+ *
+ * MEASURED 2026-09-11 in the browser: re-deriving the basis and allocating a result for each of 2.9
+ * million tinted samples made one click in the inspector take about 380 ms; hoisted, about 30 ms.
+ * The arithmetic per sample is the same either way; only where it is done changed.
+ */
+function canvasProjection(
+  camera: SegmentPickCamera,
+  canvas: { readonly width: number; readonly height: number },
+): CanvasProjection | null {
   const [fx, fy, fz] = camera.forward;
   const forwardLength = Math.hypot(fx, fy, fz);
+  if (forwardLength < 1e-9) return null;
   const z: Rgb = [-fx / forwardLength, -fy / forwardLength, -fz / forwardLength];
   const [ux, uy, uz] = camera.up;
-  let x: Rgb = [uy * z[2] - uz * z[1], uz * z[0] - ux * z[2], ux * z[1] - uy * z[0]];
-  const xLength = Math.hypot(...x);
-  if (xLength < 1e-9 || forwardLength < 1e-9) return null;
-  x = [x[0] / xLength, x[1] / xLength, x[2] / xLength];
+  const across = [uy * z[2] - uz * z[1], uz * z[0] - ux * z[2], ux * z[1] - uy * z[0]] as const;
+  const acrossLength = Math.hypot(...across);
+  if (acrossLength < 1e-9) return null;
+  const x: Rgb = [across[0] / acrossLength, across[1] / acrossLength, across[2] / acrossLength];
   const y: Rgb = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
-  const dx = point[0] - camera.position[0];
-  const dy = point[1] - camera.position[1];
-  const dz = point[2] - camera.position[2];
-  const depth = -(dx * z[0] + dy * z[1] + dz * z[2]);
-  if (!(depth > NEAR_CLIP)) return null;
-  const tx = (dx * x[0] + dy * x[1] + dz * x[2]) / depth;
-  const ty = (dx * y[0] + dy * y[1] + dz * y[2]) / depth;
   const aspect = canvas.width / canvas.height;
-  let ndcX: number;
-  let ndcY: number;
+  // Normalised device coordinates are `a * slope + b` on each axis.
+  let ax: number;
+  let bx = 0;
+  let ay: number;
+  let by = 0;
   if (camera.calibration === null) {
     const focal = 1 / Math.tan((camera.fovYDeg * Math.PI) / 360);
-    ndcX = (focal / aspect) * tx;
-    ndcY = focal * ty;
+    ax = focal / aspect;
+    ay = focal;
   } else {
     const f = calibratedCameraFrustum(camera.calibration, aspect, 1);
-    ndcX = (2 / (f.right - f.left)) * tx - (f.right + f.left) / (f.right - f.left);
-    ndcY = (2 / (f.top - f.bottom)) * ty - (f.top + f.bottom) / (f.top - f.bottom);
+    ax = 2 / (f.right - f.left);
+    bx = -(f.right + f.left) / (f.right - f.left);
+    ay = 2 / (f.top - f.bottom);
+    by = -(f.top + f.bottom) / (f.top - f.bottom);
   }
-  return { x: ((ndcX + 1) / 2) * canvas.width, y: ((1 - ndcY) / 2) * canvas.height, depth };
+  return {
+    origin: camera.position,
+    x, y, z,
+    sx: (canvas.width / 2) * ax,
+    ox: (canvas.width / 2) * (bx + 1),
+    sy: -(canvas.height / 2) * ay,
+    oy: (canvas.height / 2) * (1 - by),
+  };
 }
 
 export interface SegmentPick {
@@ -241,19 +285,30 @@ export function pickSegmentSample(
 ): SegmentPick | null {
   const tolerance = options.tolerancePx ?? SEGMENT_PICK_TOLERANCE_CANVAS_PX;
   const band = options.bandPx ?? SEGMENT_PICK_BAND_CANVAS_PX;
+  const k = canvasProjection(camera, canvas);
+  if (k === null) return null;
+  const [cx, cy, cz] = k.origin;
+  const [x0, x1, x2] = k.x;
+  const [y0, y1, y2] = k.y;
+  const [z0, z1, z2] = k.z;
+  const reach = tolerance * tolerance;
   const candidates: SegmentPick[] = [];
   for (const asset of assets) {
     const positions = asset.positions;
     if (positions === null) continue;
-    for (let k = 0; k < asset.indices.length; k += 1) {
-      const projected = projectToCanvas(camera, canvas,
-        [positions[k * 3]!, positions[k * 3 + 1]!, positions[k * 3 + 2]!]);
-      if (projected === null) continue;
-      const pixelDistance = Math.hypot(projected.x - cursor.x, projected.y - cursor.y);
-      if (pixelDistance > tolerance) continue;
+    for (let at = 0; at < asset.indices.length; at += 1) {
+      const dx = positions[at * 3]! - cx;
+      const dy = positions[at * 3 + 1]! - cy;
+      const dz = positions[at * 3 + 2]! - cz;
+      const depth = -(dx * z0 + dy * z1 + dz * z2);
+      if (!(depth > NEAR_CLIP)) continue;
+      const offsetX = k.sx * ((dx * x0 + dy * x1 + dz * x2) / depth) + k.ox - cursor.x;
+      const offsetY = k.sy * ((dx * y0 + dy * y1 + dz * y2) / depth) + k.oy - cursor.y;
+      const squared = offsetX * offsetX + offsetY * offsetY;
+      if (squared > reach) continue;
       candidates.push({
-        artifactId: asset.artifactId, slot: asset.slots[k]!, sampleIndex: asset.indices[k]!,
-        pixelDistance, depth: projected.depth,
+        artifactId: asset.artifactId, slot: asset.slots[at]!, sampleIndex: asset.indices[at]!,
+        pixelDistance: Math.sqrt(squared), depth,
       });
     }
   }
@@ -536,7 +591,7 @@ export function planSegmentTints(
     slotOf.set(segment.segmentId, slotOf.size + 1);
   }
   const grid = segments.voxelSizeMicrounits === null ? null : segmentGrid(ordered, slotOf, segments.voxelSizeMicrounits);
-  const perSlot = new Map<number, Map<string, number[]>>();
+  const perSlot = new Map<number, SegmentOverlayTint[]>();
   const unread: string[] = [];
   let tintedSamples = 0;
   for (const { asset, sceneFromLocal } of grid === null ? [] : binding.assets) {
@@ -546,29 +601,41 @@ export function planSegmentTints(
       continue;
     }
     const slots = classifySamples(positions, sceneFromLocal, grid!);
+    // Counted, then filled: two passes over bytes and no lookup per sample. MEASURED 2026-09-11 at
+    // 7.2 million drawn samples, pushing each index through a map of growing arrays made planning
+    // about 186 ms; this takes it to about 112, of which the voxel lookup itself is about 62.
+    const counts = new Uint32Array(SLOT_LIMIT + 1);
+    for (let index = 0; index < slots.length; index += 1) counts[slots[index]!]! += 1;
+    const lists: (Uint32Array | undefined)[] = [];
+    for (let slot = 1; slot <= SLOT_LIMIT; slot += 1) {
+      if (counts[slot] === 0) continue;
+      tintedSamples += counts[slot]!;
+      lists[slot] = new Uint32Array(counts[slot]!);
+    }
+    const filled = new Uint32Array(SLOT_LIMIT + 1);
     for (let index = 0; index < slots.length; index += 1) {
       const slot = slots[index]!;
-      if (slot === 0) continue;
-      tintedSamples += 1;
-      const byAsset = perSlot.get(slot) ?? new Map<string, number[]>();
-      perSlot.set(slot, byAsset);
-      const indices = byAsset.get(asset.artifactId) ?? [];
-      byAsset.set(asset.artifactId, indices);
-      indices.push(index);
+      if (slot !== 0) lists[slot]![filled[slot]!++] = index;
     }
+    lists.forEach((indices, slot) => {
+      if (indices === undefined) return;
+      const held = perSlot.get(slot) ?? [];
+      perSlot.set(slot, held);
+      held.push({ slot, artifactId: asset.artifactId, indices });
+    });
   }
   const tints: SegmentOverlayTint[] = [];
   for (const segment of ordered) {
     const slot = slotOf.get(segment.segmentId);
     if (slot === undefined) continue;
-    const byAsset = perSlot.get(slot);
-    if (byAsset === undefined) {
+    const held = perSlot.get(slot);
+    if (held === undefined) {
       slotOf.delete(segment.segmentId);
       untinted.set(segment.segmentId, 'Not tinted: no sample drawn here falls in any of its voxels.');
       continue;
     }
     segmentOfSlot.set(slot, segment);
-    for (const [artifactId, indices] of byAsset) tints.push({ slot, artifactId, indices: Uint32Array.from(indices) });
+    tints.push(...held);
   }
   return { ordered, slotOf, segmentOfSlot, untinted, tints, contested: grid?.contested ?? 0, tintedSamples, unread };
 }
