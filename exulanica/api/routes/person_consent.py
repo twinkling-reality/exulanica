@@ -115,11 +115,28 @@ def edit_regions(
     """Confirm, correct or delete proposed regions. Each edit is its own receipt."""
     try:
         with connection.transaction():
+            if len({edit.region_key for edit in body.edits}) != len(body.edits):
+                raise PrivacyAdmissionError("name each region exactly once per edit request")
+            repository = IngestRepository(connection, session.workspace_id)
+            connection.execute(
+                "select current_privacy_inputs(%s,%s)", (session.workspace_id, capture_id)
+            )
+            previous = {row["region_key"]: row for row in review_list(repository, capture_id)}
+            edits = []
+            for edit in body.edits:
+                value = edit.model_dump(exclude_unset=True)
+                prior = previous.get(edit.region_key)
+                if prior is not None:
+                    # Confirming an outline retains an existing subject. Explicit null is an
+                    # unlink; omission is not permission to discard the person's identity.
+                    value.setdefault("subject_id", prior["subject_id"])
+                    value.setdefault("shape", prior["shape"])
+                edits.append(value)
             written = record_region_edits(
-                IngestRepository(connection, session.workspace_id),
+                repository,
                 capture_id=capture_id,
                 actor=session.actor,
-                edits=[edit.model_dump() for edit in body.edits],
+                edits=edits,
             )
     except PrivacyAdmissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -170,3 +187,106 @@ def add_consent(
         # Echoed so a caller cannot believe it recorded the subject's own decision.
         "actor_role": "owner",
     }
+
+
+class SubjectRegion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capture_id: uuid.UUID
+    region_key: RegionKey
+
+
+class LinkSubject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    regions: list[SubjectRegion] = Field(min_length=1, max_length=200)
+    subject_id: uuid.UUID | None = None
+
+
+class UnlinkSubject(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    regions: list[SubjectRegion] = Field(min_length=1, max_length=200)
+    subject_id: uuid.UUID
+
+
+def _link_regions(
+    connection: ScopedConnection,
+    session: CurrentSession,
+    selected: list[SubjectRegion],
+    subject_id: uuid.UUID | None,
+    *,
+    unlink: bool,
+) -> dict[str, Any]:
+    repository = IngestRepository(connection, session.workspace_id)
+    try:
+        with connection.transaction():
+            if len({(item.capture_id, item.region_key) for item in selected}) != len(selected):
+                raise PrivacyAdmissionError("name each region exactly once")
+            # current_privacy_inputs holds the same workspace lock as region/consent writes.
+            connection.execute(
+                "select current_privacy_inputs(%s,%s)",
+                (session.workspace_id, selected[0].capture_id),
+            )
+            if (
+                subject_id is not None
+                and connection.execute(
+                    "select 1 from person_subject where workspace_id=%s and subject_id=%s",
+                    (session.workspace_id, subject_id),
+                ).fetchone()
+                is None
+            ):
+                raise PrivacyAdmissionError("the subject is unavailable in this workspace")
+            found = []
+            for item in selected:
+                row = next(
+                    (
+                        r
+                        for r in review_list(repository, item.capture_id)
+                        if r["region_key"] == item.region_key
+                    ),
+                    None,
+                )
+                if row is None:
+                    raise PrivacyAdmissionError("a selected region is unavailable")
+                if unlink and row["subject_id"] != str(subject_id):
+                    raise PrivacyAdmissionError("the region no longer links to that subject")
+                found.append((item, row))
+            if subject_id is None:
+                subject_id = create_subject(repository, actor=session.actor)
+            written = []
+            for item, row in found:
+                written.extend(
+                    record_region_edits(
+                        repository,
+                        capture_id=item.capture_id,
+                        actor=session.actor,
+                        edits=[
+                            {
+                                "action": "confirm",
+                                "region_key": item.region_key,
+                                "shape": row["shape"],
+                                "subject_id": None if unlink else subject_id,
+                            }
+                        ],
+                    )
+                )
+    except PrivacyAdmissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"subject_id": str(subject_id), "recorded": written, "linked": not unlink}
+
+
+@router.post("/identity/subjects/link", status_code=201, tags=["identity"])
+def link_subject_regions(
+    body: LinkSubject, connection: ScopedConnection, session: CurrentSession
+) -> dict[str, Any]:
+    """Confirm that regions across photographs show one person, creating one subject if needed."""
+    return _link_regions(connection, session, body.regions, body.subject_id, unlink=False)
+
+
+@router.post("/identity/subjects/unlink", status_code=201, tags=["identity"])
+def unlink_subject_regions(
+    body: UnlinkSubject, connection: ScopedConnection, session: CurrentSession
+) -> dict[str, Any]:
+    """Withdraw region-to-subject links, retaining every earlier edit and consent receipt."""
+    return _link_regions(connection, session, body.regions, body.subject_id, unlink=True)
