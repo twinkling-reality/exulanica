@@ -31,6 +31,8 @@ __all__ = [
     "DATA_DIR_ENV",
     "DEPTH_MODEL_ENV",
     "PERSON_DETECTOR_ENV",
+    "SEGMENTATION_DEVICE_ENV",
+    "SEGMENTATION_MODEL_ENV",
     "WORKSPACES_ENV",
     "main",
     "parse_workspaces",
@@ -44,6 +46,8 @@ PERSON_DETECTOR_ENV: Final = env_name("PERSON_DETECTOR")
 DEPTH_MODEL_ID_ENV: Final = env_name("DEPTH_MODEL_ID")
 DEPTH_MODEL_REVISION_ENV: Final = env_name("DEPTH_MODEL_REVISION")
 DEPTH_DEVICE_ENV: Final = env_name("DEPTH_DEVICE")
+SEGMENTATION_MODEL_ENV: Final = env_name("SEGMENTATION_MODEL")
+SEGMENTATION_DEVICE_ENV: Final = env_name("SEGMENTATION_DEVICE")
 
 
 def parse_workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset[uuid.UUID]:
@@ -91,6 +95,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
     vision = NebiusVisionModel(client) if client is not None else None
     depth = _build_depth(environ)
     detector = _build_detector(environ)
+    segmenter = _build_segmenter(environ)
     lease_seconds = lease_seconds_for(
         client.worst_case_seconds(Role.VISION) if client is not None else None
     )
@@ -102,6 +107,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         vision=vision,
         depth=depth,
         detector=detector,
+        segmenter=segmenter,
         name=_worker_name(args.name),
         poll_seconds=args.poll_seconds,
         lease_seconds=lease_seconds,
@@ -131,6 +137,28 @@ def _build_depth(environ: Mapping[str, str]) -> Any:
         max_edge_px=int(stage("depth").params["max_edge_px"]),
         device=env_get("DEPTH_DEVICE", environ) or None,
     )
+
+
+def _build_segmenter(environ: Mapping[str, str]) -> Any:
+    """Resolve the local object segmenter, defaulting to none configured.
+
+    ``local`` loads SAM 2.1 and its detectors from the manifest's ``local_roles``, re-reading each
+    pinned licence first; there is no model or revision override here, because the checkpoints are
+    manifest data and a swap re-keys every mask. A missing ``segmentation`` extra or a licence
+    drift is a startup failure, not a worker that quietly segments nothing.
+
+    It is built here and nowhere else. This is the process that already holds torch for depth,
+    and pycolmap and torch cannot share a process on macOS (``pycolmap_executor.py``), so the scene
+    worker never loads a segmenter: it lifts the masks this one wrote, with numpy alone.
+    """
+    mode = (env_get("SEGMENTATION_MODEL", environ) or "unavailable").strip().lower()
+    if mode == "unavailable":
+        return None
+    if mode != "local":
+        raise ValueError(f"{SEGMENTATION_MODEL_ENV} must be 'local' or 'unavailable', not {mode!r}")
+    from exulanica.ingest.stages.segmentation import LocalObjectSegmenter
+
+    return LocalObjectSegmenter(device=env_get("SEGMENTATION_DEVICE", environ) or None)
 
 
 def main(

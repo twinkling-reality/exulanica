@@ -1,8 +1,9 @@
 # Scene segments
 
-Status: implemented 2026-09-11 on branch `codex/segments-backend`, backend half. The frontend
-half (tinting, the segment list, click resolution) is a separate task that consumes the wire shape
-in section 6.
+Status: implemented 2026-09-11 on branch `codex/segments-backend`, backend half. The derivative
+worker's environment switch for the segmenter (section 4) followed the same day. The frontend half
+(tinting, the segment list, click resolution) is a separate task that consumes the wire shape in
+section 6.
 
 The brief is [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md). Recognition
 used to stop at the photograph: the vision pass returns boxes, people get reviewed outlines, and
@@ -96,8 +97,15 @@ before it settled.
   exact-recomputation sentence in [domain-and-evidence-model.md](domain-and-evidence-model.md)
   section 6 names it.
 
-Wiring: `PhotoIngestPipeline(..., segmenter=...)` and `DerivativeWorker(..., segmenter=...)`.
-`exulanica/ingest/worker_command.py` does not yet build one from the environment; see section 8.
+Wiring: `PhotoIngestPipeline(..., segmenter=...)` and `DerivativeWorker(..., segmenter=...)`. The
+production derivative worker (`exulanica/ingest/worker_command.py`) builds a
+`LocalObjectSegmenter` when `EXULANICA_SEGMENTATION_MODEL=local`, and none when the variable is
+absent or `unavailable`, which is the default. `EXULANICA_SEGMENTATION_DEVICE` pins `mps`, `cuda` or
+`cpu`; without it the segmenter picks MPS, then the CPU. There is no checkpoint or revision
+override, because the checkpoints are the manifest's. A missing `segmentation` extra or a licence
+drift is a startup failure. The segmenter is built there and nowhere else: that process already
+holds torch for depth, and pycolmap and torch cannot share a process on macOS
+(`exulanica/reconstruction/pycolmap_executor.py`), so the scene worker never loads one.
 
 ## 5. The lift
 
@@ -205,9 +213,7 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 ## 8. Limitations and open decisions
 
 * **Nothing publishes segments automatically.** The lift runs from the command above. A scene
-  worker hook, which would lift at publication beside the projection, was not writable here, and
-  neither was `worker_command.py`, so a production derivative worker has no environment switch for
-  the segmenter yet.
+  worker hook, which would lift at publication beside the projection, was not writable here.
 * **The polygon is not on the span.** Section 2 says what that would cost.
 * **A detector-prompted segment offers nothing to name.** Only hosted-prompted masks have vision
   occurrences behind them. Creating occurrences in this stage would give every object two

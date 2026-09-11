@@ -64,7 +64,7 @@ How the system works now. Edited as the system changes.
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
 - [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
-- [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The frontend
+- [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The derivative
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
