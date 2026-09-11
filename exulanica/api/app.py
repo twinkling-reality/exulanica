@@ -56,6 +56,7 @@ from exulanica.api.routes import (
     operations,
     person_consent,
     reconstruction_admission,
+    scene_segments,
     selection,
     world,
     world_read,
@@ -172,6 +173,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(graph.router)
     app.include_router(geometry.router)
     app.include_router(geometry.scene_router)
+    app.include_router(scene_segments.router)
     app.include_router(selection.router)
     app.include_router(companion.router)
     app.include_router(identity.router)

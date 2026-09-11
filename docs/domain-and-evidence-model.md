@@ -1641,7 +1641,8 @@ supplied per generation rather than routed through the reviewed model manifest, 
 travels in the generation receipt. `segmentation` runs local checkpoints whose forward pass differs
 across accelerators and library versions; it carries no `model_role` because those checkpoints are
 pinned by revision in the manifest's local section and their identity enters its input digest per
-photograph, as `person_regions` does for its detector (added 2026-09-11, `docs/scene-segments.md`).
+photograph, as the person-region stage does for its detector (added 2026-09-11, see
+[scene-segments.md](scene-segments.md)).
 `StageSpec` now refuses to construct a stage that names a model role and declares itself
 deterministic, so the exclusion cannot be lost by editing a flag.
 

@@ -64,6 +64,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/geometry"): {},
     ("GET", "/geometry/{artifact_id}"): {},
     ("GET", "/scene-geometry/{artifact_id}"): {},
+    ("GET", "/scene-segments/{scene_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}"): {},
     ("GET", "/world-read/scenes/{scene_id}/observations"): {},
     ("GET", "/world-read/places/{place_id}"): {},
