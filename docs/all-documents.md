@@ -49,7 +49,7 @@ How the system works now. Edited as the system changes.
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
-- [personal-admission](personal-admission.md) : This is an operator command for exact capture bytes. It composes existing intake, personal
+- [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
 - [phase-10-tickets](phase-10-tickets.md) : PLAN AND PROGRESS, reconciled 2026-09-08. This turns frontier-roadmap.md
 - [physical-streaming-runtime](physical-streaming-runtime.md) : RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
