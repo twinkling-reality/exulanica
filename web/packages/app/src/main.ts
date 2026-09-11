@@ -37,6 +37,7 @@ import './style.css';
 import './appearance.css';
 import './unified-interface.css';
 import './ui/object-placement.css';
+import './ui/scene-segments.css';
 
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
@@ -62,6 +63,7 @@ import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
+import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
@@ -80,6 +82,7 @@ import { createAppEnvironment, createSessionState } from './composition/session-
 
 const env = createAppEnvironment();
 const state = createSessionState();
+const segmentSession = createSegmentSession();
 const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewArtProfile } = env;
 
 window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
@@ -343,6 +346,22 @@ async function mount(): Promise<void> {
     hideWritePathConfirm: () => writePath.confirm.hide(),
   });
 
+  // Scene segments. Mounted after the write path because naming a segment stages on that path and
+  // shows its confirmation panel; it reads `state.atlas` late and applies its overlay in `begin`.
+  const segments = mountSegments({
+    env,
+    state,
+    snapshot: current,
+    segmentSession,
+    session: currentSession,
+    confirm: writePath.confirm,
+    hideOtherConfirms: () => objects.confirm.hide(),
+    inspect: (sceneId) => status.inspectReconstruction(sceneId),
+    showWorld: () => dispatchShell({ type: 'show-world' }),
+    showTravelStatus: (message, kind) => showTravelStatus(message, kind),
+    travelUsesReducedMotion: () => travelUsesReducedMotion(),
+  });
+
   const travelStatus = el('p', {
     class: 'travel-status',
     role: 'status',
@@ -539,6 +558,7 @@ async function mount(): Promise<void> {
     viewportBoundary,
     status.inspectorRoot,
     status.statusElement,
+    segments.root,
   ]);
 
   reflectShell = (): void => {
@@ -633,7 +653,8 @@ async function mount(): Promise<void> {
     snapshot: current,
     atlas: renderer.atlas,
     companion,
-    status,
+    // A click in the inspector asks for a segment before it asks for evidence.
+    status: segmentsFirst(status, (clientX, clientY) => segments.resolveAt(clientX, clientY)),
     chrome,
     worldIndex,
     detail,
@@ -656,6 +677,7 @@ async function mount(): Promise<void> {
 
   // After the renderer, because every object it draws needs a binding to draw into.
   void objects.begin();
+  void segments.begin();
 
 }
 
