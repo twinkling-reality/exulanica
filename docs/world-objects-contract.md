@@ -468,3 +468,47 @@ refuse, rather than passing because the operation never ran. Two of them are reg
 recorded cause. An object id that Python accepted and the schema refused reached the caller as a
 500 rather than a 422, twice: once because the two regexes differed, and once because Python's
 `$` also matches before a trailing newline where PostgreSQL's does not. Both are pinned.
+
+## 10. Opening the first alternate from composed sources
+
+`POST /world/versions/bootstrap` accepts `base_topology_digest` (the value returned by
+`GET /world/styles/current`) and an optional `title`. It accepts no source slots, evidence,
+placements or replacement topology from the caller. The existing object placement button offers
+this action when no alternate exists, and sends it only after the person confirms. Opening a
+version does not place the selected object; the person then confirms that separate edit.
+
+`bootstrap_world` is shared by this route and `prepare_sandbox_world`. Under the structural
+workspace lock it checks the caller's digest, reads only that world's current composed contract,
+and opens the first snapshot through structural preview/apply. Every source gets an element with
+its original slot key and evidence binding, including missing evidence and world-owned slots.
+Source IDs, region membership, missing reasons and compatibility are preserved exactly. Historical
+contracts and other worlds do not contribute slots. Composition takes the same lock.
+
+The snapshot's foreign key requires a contract keyed by the structural topology digest. Bootstrap
+registers that derived contract with the exact original source rows through the shared immutable
+`register_topology_history` writer. It never activates the derived contract or writes appearance
+state. Ordinary composition still uses `register_topology` to register and activate a contract. The structural digest and composed digest
+are different identities; neither is substituted for the other. `/world/source-media` and the
+current composed digest remain unchanged, including across a retry with the original caller token.
+The preservation option on structural apply refuses any candidate other than the exact plain
+composition of the current contract and refuses a non-initial snapshot.
+
+This is authored gallery layout, not reconstruction. Regions and their destinations are ten metres
+apart along x; each region's source cards share its x coordinate and are spaced two metres along z.
+World-owned sources start at the world origin. Cards claim no collision geometry. The layout adds
+no measured or semantic fact about a photograph. Authored objects remain region-local deltas against
+the immutable snapshot, so a subsequent source re-compose leaves them intact.
+
+The response contains `snapshot` (`applied` or `reused`), `snapshot_id`, `regions`, `version`
+(`created` or `reused`), `version_id` and `state_sha256`. An existing current snapshot is never
+replaced. If versions already exist, the newest is returned, matching the client's default; the
+confirmation action explicitly reconnects to the returned ID. If only the snapshot exists, the
+first alternate is created from it. Invalidated current snapshots or selected versions refuse with
+`409 invalidated_source_version`. A stale composed digest always refuses with
+`409 protected_topology_conflict`, even when a snapshot already exists. Repeating a successful
+request creates no snapshots, previews, versions, topology contracts or audit events. A failure
+opening the alternate rolls back the snapshot and its preview as well.
+
+Verification is in `tests/test_world_bootstrap.py`, using PostgreSQL and the HTTP surface. No
+migration is required. UI scope: only `web/packages/app/src/composition/objects.ts` changes, reusing
+the existing placement button and confirmation surface.

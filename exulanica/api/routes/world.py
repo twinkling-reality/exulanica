@@ -46,12 +46,14 @@ from exulanica.world import (
     InvalidatedSourceVersion,
     InvalidObjectData,
     InvalidObjectState,
+    InvalidStructuralData,
     ObjectBehaviour,
     ObjectOrigin,
     ProposalOrigin,
     ProposalProvenance,
     ReviewedAssetRow,
     StaleObjectBase,
+    StaleStructuralBase,
     StyleProposal,
     StyleProposalRecord,
     StyleReference,
@@ -63,6 +65,7 @@ from exulanica.world import (
     WorldSourceMedia,
     WorldStyleRepository,
 )
+from exulanica.world.bootstrap import bootstrap_world
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -613,6 +616,22 @@ class BehaviourBody(BaseModel):
         return ObjectBehaviour(self.behaviour_key, self.behaviour_version, self.parameters)
 
 
+class BootstrapWorldBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_topology_digest: str = Field(min_length=1, max_length=256)
+    title: str = Field(default="My alternate world", min_length=1, max_length=200)
+
+
+class BootstrapWorldView(BaseModel):
+    snapshot: Literal["applied", "reused"]
+    snapshot_id: uuid.UUID
+    regions: list[str]
+    version: Literal["created", "reused"]
+    version_id: uuid.UUID
+    state_sha256: str
+
+
 class CreateVersionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -768,6 +787,8 @@ WriteObjects = Annotated[WorldObjectRepository, Depends(object_write_repository)
 #: application-wide handlers and must keep answering identically here.
 _OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (InvalidObjectData, 422, "invalid_object_data"),
+    (InvalidStructuralData, 422, "invalid_structural_data"),
+    (StaleStructuralBase, 409, "stale_structural_base"),
     (StaleObjectBase, 409, "stale_object_base"),
     (InvalidObjectState, 409, "invalid_object_state"),
     (InvalidatedSourceVersion, 409, "invalidated_source_version"),
@@ -1005,6 +1026,33 @@ def create_alternate_version(
             raise
         return problem
     return _rendered(repository, version, get_services(request).store)
+
+
+@router.post(
+    "/versions/bootstrap",
+    response_model=BootstrapWorldView,
+    summary="Open the first snapshot and alternate from the current composed sources.",
+)
+def bootstrap_alternate_version(
+    body: BootstrapWorldBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+) -> Response | BootstrapWorldView:
+    try:
+        return BootstrapWorldView(
+            **bootstrap_world(
+                connection,
+                workspace_id=session.workspace_id,
+                actor=session.actor,
+                base_topology_digest=body.base_topology_digest,
+                title=body.title,
+            )
+        )
+    except Exception as exc:
+        problem = _object_problem(exc)
+        if problem is None:
+            raise
+        return problem
 
 
 @router.get(

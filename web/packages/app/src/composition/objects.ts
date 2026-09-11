@@ -120,7 +120,7 @@ export interface MountedObjects {
 }
 
 interface Pending {
-  readonly kind: 'place' | 'move' | 'remove' | 'undo';
+  readonly kind: 'place' | 'move' | 'remove' | 'undo' | 'bootstrap';
   readonly describe: string;
   readonly reversible: boolean;
   run(): Promise<void>;
@@ -183,7 +183,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   // -- reading -----------------------------------------------------------------------------------
 
-  async function begin(): Promise<void> {
+  async function begin(versionId?: string): Promise<void> {
     if (client === null) {
       assets = PREVIEW_ASSETS;
       version = PREVIEW_VERSION;
@@ -195,15 +195,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       return;
     }
     try {
-      const connected = await client.connect();
+      const connected = await client.connect(versionId);
       assets = connected.assets;
       version = connected.version;
       refresh();
       if (version === null) {
         panel.report(
-          'This world has no alternate version yet, so there is nowhere to add an object. '
-          + 'Create one first.',
-          'failure',
+          'Choose an object and select “Place before me” to open an alternate version first.',
         );
         return;
       }
@@ -422,6 +420,39 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   // -- proposing -----------------------------------------------------------------------------------
 
+  async function proposeBootstrap(): Promise<void> {
+    const headers = { Authorization: `Bearer ${deps.credentials.token}`, 'Content-Type': 'application/json' };
+    const base = deps.credentials.baseUrl.replace(/\/$/, '');
+    try {
+      const current = await fetch(`${base}/world/styles/current`, { headers });
+      if (!current.ok) throw new Error('Could not read this world. Try again.');
+      const { current_topology_digest } = await current.json();
+      stage({
+        kind: 'bootstrap',
+        describe: 'Open an alternate version of this world so you can add objects, keeping every source photograph.',
+        reversible: false,
+        run: async () => {
+          const result = await fetch(`${base}/world/versions/bootstrap`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ base_topology_digest: current_topology_digest }),
+          });
+          if (!result.ok) throw new Error(result.status === 409
+            ? 'This world changed. Choose “Place before me” again to review its current version.'
+            : 'Could not open an alternate version. Try again.');
+          const opened = await result.json();
+          await begin(opened.version_id);
+          if (version?.versionId !== opened.version_id) {
+            panel.report('The alternate version opened, but could not be read. Reload to try again.', 'failure');
+            return;
+          }
+          panel.report('Alternate version opened. Choose “Place before me” again to place your object.', 'settled');
+        },
+      });
+    } catch (error) {
+      panel.report(objectWriteFailure(error), 'failure');
+    }
+  }
+
   function proposePlacement(draft: ObjectPlacementDraft): void {
     const asset = assets.find((candidate) => candidate.assetKey === draft.assetKey);
     if (asset === undefined) {
@@ -436,7 +467,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       return;
     }
     if (version === null) {
-      panel.report('There is no alternate world version to add this to.', 'failure');
+      void proposeBootstrap();
       return;
     }
     if (version.sourceInvalidated) {
@@ -804,9 +835,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       toneKey: ConfirmationBand['toneKey'],
       rows: ConfirmationBand['rows'],
     ): ConfirmationBand => Object.freeze({ band: id, toneKey, rows, omitted: false as const });
-    // Tier 2 for undo, which is the one operation here that cannot itself be taken back: an undo
-    // edit is never a candidate for another undo.
-    const tier = next.kind === 'undo' ? 2 : 1;
+    // Opening an alternate and undo have no inverse on this surface.
+    const tier = next.reversible ? 1 : 2;
     return Object.freeze({
       draftId: `world-object-${issued}`,
       tier,
