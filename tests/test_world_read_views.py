@@ -767,9 +767,12 @@ def test_absent_legacy_screening_binding_refuses_actual_routes(deployment, repos
             "where workspace_id=%s and artifact_id=%s",
             (repository.workspace_id, point["artifact_id"]),
         )
-    assert repository.connection.execute("show session_replication_role").fetchone()[
-        "session_replication_role"
-    ] == "origin"
+    assert (
+        repository.connection.execute("show session_replication_role").fetchone()[
+            "session_replication_role"
+        ]
+        == "origin"
+    )
     response = deployment.as_owner("GET", view["photo_bytes"]["fetch"])
     assert response.status_code == 409, response.text
     assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404

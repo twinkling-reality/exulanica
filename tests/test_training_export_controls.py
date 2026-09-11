@@ -11,7 +11,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
+from exulanica.env import env_get, env_name
+
 CONTROLS = (
     (
         "empty-log-default-deny",
@@ -72,6 +73,11 @@ CONTROLS = (
 
 
 def run_controls(output: Path) -> dict:
+    # Read before the environment is scrubbed below, so the isolated suite migrates into the
+    # database the operator configured rather than a fixed one.
+    database = env_get("TEST_DATABASE_URL")
+    if database is None:
+        raise RuntimeError(f"set {env_name('TEST_DATABASE_URL')} to a scratch PostgreSQL database")
     root = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory(prefix="exulanica-training-controls-") as directory:
         work = Path(directory)
@@ -83,7 +89,7 @@ def run_controls(output: Path) -> dict:
         env.update(
             PYTHONPATH=str(work),
             PYTHONDONTWRITEBYTECODE="1",
-            EXULANICA_TEST_DATABASE_URL=DATABASE,
+            EXULANICA_TEST_DATABASE_URL=database,
             EXULANICA_REQUIRE_POSTGRES="1",
         )
         imported = subprocess.run(
