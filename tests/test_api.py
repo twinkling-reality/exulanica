@@ -83,6 +83,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},
     ("POST", "/selection/plan"): {"json": {"question": "where was I?"}},
     ("POST", "/selection/ask"): {"json": {"question": "where was I?"}},
+    ("POST", "/selection/appearance"): {"json": {"utterance": "could it be softer in here?"}},
     ("GET", "/companion/memory/recent"): {},
     ("POST", "/companion/memory/answers"): {
         "json": {

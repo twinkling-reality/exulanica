@@ -114,6 +114,21 @@ export type Composed =
   | 'search'
   /** A model was asked and could not turn the question into a search. Nothing was looked at. */
   | 'unreadable'
+  /**
+   * A model DREW A CHANGE to the world, and nothing has been applied.
+   *
+   * Not `model`. "Answered by" is a sentence about an answer, and this is a proposal: no
+   * question was asked, no evidence was read, and the thing on the screen is waiting for a
+   * decision rather than reporting one.
+   */
+  | 'proposed'
+  /**
+   * A model read a request to change the world and the reviewed design could not express it.
+   *
+   * Not `discarded`. That one says "what it wrote was not supported by the evidence", and there
+   * was no evidence and no search: what happened is that the catalogue has no such control.
+   */
+  | 'refused'
   | 'none';
 
 export interface AnswerProvenance {
@@ -455,4 +470,226 @@ function asAskFailure(error: unknown): AskUnavailable {
   // A timeout, a dropped connection, or a proxy that answered with nothing. The distinction the
   // person needs is that the question did not arrive, not which layer dropped it.
   return new AskUnavailable('unreachable', error instanceof Error ? error.message : String(error));
+}
+
+/**
+ * Asking the world to look different in words, and getting back a bounded proposal.
+ *
+ * The second thing the Companion can do, and the first one that is not a read. It is still not a
+ * write: what comes back is an argument for a change, and the reviewed appearance surface is
+ * the only thing that commits one. `POST /world/styles/previews` is a separate request the
+ * browser makes with the provenance this one hands it, and the person is what sits between them.
+ *
+ * **Every utterance goes here first, and most of them come straight back as `question`.** The
+ * classifier is one call with a two-value answer and no sight of the style catalogue, so a
+ * question about photographs is never shown the vocabulary of a change nobody asked for. What
+ * that costs is one extraction call per question, which is stated here rather than hidden: it is
+ * a real cost and it buys the guarantee that the browser is not the thing deciding what a
+ * sentence meant.
+ *
+ * **A failure here is not a failure of the question.** Anything that goes wrong resolves to
+ * `question`, because that is where the utterance was going before this route existed, and the
+ * answer path reports its own failures in its own words. A network that is down will say so
+ * once, from `ask`, rather than twice from two clients about one sentence.
+ */
+
+/** Long enough for two extraction calls and a repair. No reasoning core is on this path. */
+const PROPOSE_TIMEOUT_MS = 90_000;
+
+/**
+ * Why an appearance request produced no proposal.
+ *
+ * Carried through rather than collapsed into one "refused", for the same reason the three
+ * abstention codes are: they are different things to say to a person. "Nothing in the reviewed
+ * design can express that" and "the model filled the form with a value the registry refuses"
+ * are the same silence and completely different facts, and only one of them is worth rephrasing
+ * the request over.
+ */
+export type ProposalRefusalCode =
+  | 'not_in_catalogue'
+  | 'unregistered'
+  | 'out_of_range'
+  | 'no_change'
+  | 'unsupported_reference'
+  | 'not_drafted'
+  | 'no_world';
+
+/**
+ * Every code this client will pass through, exported so a test can walk the real list.
+ *
+ * A test that enumerated its own copy of these would pass while a code added here reached a
+ * person as a raw copy key, which is exactly what an unmapped key renders as.
+ */
+export const REFUSAL_CODES: readonly ProposalRefusalCode[] = [
+  'not_in_catalogue',
+  'unregistered',
+  'out_of_range',
+  'no_change',
+  'unsupported_reference',
+  'not_drafted',
+  'no_world',
+];
+
+/** Every kind of outcome a staged proposal can reach, for the same reason. */
+export const PROPOSAL_OUTCOMES: readonly string[] = [
+  'previewed',
+  'accepted',
+  'discarded',
+  'refused',
+];
+
+/** The complete reference a preview would be created from, plus what actually moved. */
+export interface ProposedAppearance {
+  readonly profileId: string;
+  readonly profileVersion: number;
+  /**
+   * COMPLETE, never a diff.
+   *
+   * `POST /world/styles/previews` fills a control the body omits from its DEFAULT rather than
+   * from the current value, so a diff posted there would quietly reset every control the request
+   * never mentioned. `changed` is what a surface says out loud; this is what it sends.
+   */
+  readonly parameters: Readonly<Record<string, unknown>>;
+  readonly modules: readonly string[];
+  readonly changed: readonly string[];
+  /** Opaque ids naming the topology source slots that motivated it. Never bytes. */
+  readonly referenceIds: readonly string[];
+  /** The EXECUTED identifier that drew it, from the response body. Never the configured one. */
+  readonly modelId: string;
+  readonly promptVersion: string;
+  /** What the Companion says about the change. Never sent back as style data. */
+  readonly spoken: string;
+}
+
+export interface ProposalRefusal {
+  readonly code: ProposalRefusalCode;
+  /** The server's own words about its own validation. Shown under the reviewed sentence. */
+  readonly detail: string;
+}
+
+export interface CompanionProposal {
+  readonly utterance: string;
+  readonly classification: 'question' | 'appearance';
+  readonly proposal: ProposedAppearance | null;
+  readonly refusal: ProposalRefusal | null;
+  readonly promptVersion: string;
+  readonly calls: readonly ModelCall[];
+}
+
+interface WireProposal {
+  readonly classification: string;
+  readonly proposal: {
+    readonly profile: {
+      readonly profile_id: string;
+      readonly profile_version: number;
+      readonly parameters: Readonly<Record<string, unknown>>;
+      readonly modules: readonly string[];
+      readonly changed: readonly string[];
+    };
+    readonly reference_ids: readonly string[];
+    readonly model_id: string;
+    readonly prompt_version: string;
+    readonly spoken: string;
+  } | null;
+  readonly refusal: { readonly code: string; readonly detail: string } | null;
+  readonly execution: { readonly prompt_version: string; readonly calls: readonly WireCall[] };
+}
+
+/** A sentence the person did not get a proposal for, but did not ask a question either. */
+export function proposalWasRefused(outcome: CompanionProposal): outcome is CompanionProposal & {
+  readonly refusal: ProposalRefusal;
+} {
+  return outcome.refusal !== null;
+}
+
+export class CompanionProposalClient {
+  readonly #where: TransportOptions;
+
+  constructor(options: TransportOptions) {
+    this.#where = options;
+  }
+
+  /**
+   * Read one utterance as a request to change how the world looks, or decline to.
+   *
+   * Never throws. Every failure resolves to `question`, so this client cannot be the reason a
+   * question goes unanswered, and cannot report a network failure the answer path is about to
+   * report properly.
+   */
+  async propose(utterance: string): Promise<CompanionProposal> {
+    let body: WireProposal;
+    try {
+      body = await new Transport({
+        ...this.#where,
+        signal: AbortSignal.timeout(PROPOSE_TIMEOUT_MS),
+      }).postJson<WireProposal>('/selection/appearance', { utterance });
+    } catch {
+      return asQuestion(utterance);
+    }
+    if (body.classification !== 'appearance') return asQuestion(utterance);
+
+    const calls = (body.execution?.calls ?? []).map(
+      (call): ModelCall => ({
+        role: call.role,
+        requestedModel: call.requested_model,
+        servedModel: call.served_model,
+        usedFallback: call.used_fallback,
+        attempts: call.attempts,
+        latencyMs: call.latency_ms,
+        promptTokens: call.prompt_tokens,
+        completionTokens: call.completion_tokens,
+        reasoningTokens: call.reasoning_tokens,
+      }),
+    );
+    const promptVersion = body.execution?.prompt_version ?? '';
+    const wire = body.proposal;
+    const refusal = body.refusal;
+    return {
+      utterance,
+      classification: 'appearance',
+      proposal:
+        wire === null || wire === undefined
+          ? null
+          : {
+              profileId: wire.profile.profile_id,
+              profileVersion: wire.profile.profile_version,
+              parameters: { ...wire.profile.parameters },
+              modules: [...wire.profile.modules],
+              changed: [...wire.profile.changed],
+              referenceIds: [...wire.reference_ids],
+              modelId: wire.model_id,
+              promptVersion: wire.prompt_version,
+              spoken: wire.spoken,
+            },
+      // An unrecognised code becomes `not_drafted` rather than being passed through, because
+      // the surface picks a reviewed sentence by this value and a key nobody wrote renders as
+      // the key. A newer server naming a refusal this build has no words for should say the
+      // most general true thing, not print an identifier at somebody.
+      refusal:
+        refusal === null || refusal === undefined
+          ? null
+          : {
+              code: knownRefusal(refusal.code),
+              detail: refusal.detail,
+            },
+      promptVersion,
+      calls,
+    };
+  }
+}
+
+/** A code this build has words for, or the most general true thing it can say instead. */
+function knownRefusal(code: string): ProposalRefusalCode {
+  return REFUSAL_CODES.find((known) => known === code) ?? 'not_drafted';
+}
+
+function asQuestion(utterance: string): CompanionProposal {
+  return {
+    utterance,
+    classification: 'question',
+    proposal: null,
+    refusal: null,
+    promptVersion: '',
+    calls: [],
+  };
 }

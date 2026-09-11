@@ -168,6 +168,51 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'This answer is not kept, because one of the photographs it cites could not be located and a '
     + 'later deletion of that photograph could not have reached it.',
 
+  // Asking the world to look different. What the Companion says ABOUT a proposal, never the
+  // proposal itself: the sentence describing the change is written by the model from the
+  // reviewed catalogue and arrives as `spoken`, and this table does not get to improve it.
+  //
+  // The two sentences below frame it, and they carry the one fact a person needs and cannot see
+  // from the sentence alone: nothing has happened yet, and where to go to make it happen or make
+  // it stop.
+  'proposal.staged':
+    'Nothing has changed yet. Open Customize to look at it, then Apply it or throw it away.',
+  'proposal.unavailable':
+    'That change could not be put in front of you, so nothing was proposed and nothing changed.',
+
+  // A request to change how the world looks that produced no proposal. Seven different facts,
+  // and none of them is silence: somebody asked for something and the reply has to say what
+  // happened to it. Only the first is a limit of the design rather than a failure, which is why
+  // it is the only one phrased as a thing the product does not do rather than a thing that went
+  // wrong.
+  //
+  // The server's own detail is shown alongside these rather than replaced by them, exactly as
+  // it is for a question that did not reach an answer.
+  'proposal.refused.not_in_catalogue':
+    'The reviewed design does not have a way to change that, so nothing was proposed.',
+  'proposal.refused.unregistered':
+    'The proposed change named a design, a part, or a control that is not in the reviewed set, '
+    + 'so it was refused and nothing changed.',
+  'proposal.refused.out_of_range':
+    'The proposed change fell outside what that control is allowed to be, so it was refused '
+    + 'rather than moved to the nearest value it could have had.',
+  'proposal.refused.no_change':
+    'That would leave the world exactly as it is, so there is nothing to show you.',
+  'proposal.refused.unsupported_reference':
+    'The proposed change did not name any of the photographs this world is drawn over, so there '
+    + 'is nothing to review it against.',
+  'proposal.refused.not_drafted':
+    'That could not be turned into a change to this world, so nothing was proposed.',
+  'proposal.refused.no_world':
+    'There is no reviewed world design here yet, so there is nothing to propose a change to.',
+
+  // What became of one, said the next time the Companion speaks and kept in its memory. The
+  // world is what shows an applied change; these say which decision was recorded.
+  'proposal.outcome.accepted': 'The change was applied to your world.',
+  'proposal.outcome.discarded': 'The change was thrown away and your world is as it was.',
+  'proposal.outcome.refused': 'The change was refused and your world is as it was.',
+  'proposal.outcome.previewed': 'The change is waiting to be confirmed in Customize.',
+
   // The read half, which fails differently and costs something different. A question that cannot
   // be answered is a question; a memory that cannot be read is a Companion that has forgotten
   // somebody, and it will ask them things they have already answered.
@@ -207,6 +252,14 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'provenance.discardedUnnamed':
     'A model was asked and took {duration}. What it wrote was not supported by the evidence, so '
     + 'this is the answer built from the search itself.',
+  // A model drew a change to the world. Deliberately NOT "answered by": no question was asked
+  // and nothing was looked at, and the second sentence is the one a person needs.
+  'provenance.proposed':
+    '{model} drew this change in {duration}. Nothing is applied until you apply it.',
+  // A model read the request and the reviewed design has no way to make that change. Saying
+  // anything about evidence here would be false, because none was read.
+  'provenance.refused':
+    '{model} read that in {duration}. The reviewed design has no way to make that change.',
   'provenance.none': 'No model was asked. This is what the search found.',
   // A model WAS asked and gave back something unusable. Saying "no model was asked" here would
   // be false, and saying anything about the search would be false too, because there was none.

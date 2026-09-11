@@ -14,7 +14,12 @@
  */
 
 import { ApiError } from '@exulanica/graph-client';
-import { readSourceLight, sourceLightParameters, worldArtProfile } from '@exulanica/presentation';
+import {
+  readSourceLight,
+  sourceLightParameters,
+  worldArtProfile,
+  worldStyleControls,
+} from '@exulanica/presentation';
 
 import { writePreferences, type AtlasPreferences } from '../preferences.js';
 import { applyDocumentAppearance, applyDocumentWorldStyle } from '../theme.js';
@@ -27,7 +32,11 @@ import {
   type WorldStyleConnection,
   type WorldStyleVersionRecord,
 } from '../world-style-api.js';
-import { worldStyleProposalInbox } from '../world-style-proposals.js';
+import {
+  worldStyleProposalInbox,
+  worldStyleProposalOutcomes,
+  type WorldStyleProposalOutcomeKind,
+} from '../world-style-proposals.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
 export interface AppearanceDependencies {
@@ -62,6 +71,15 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
   let optionsView: ReturnType<typeof buildOptions>;
   let serverPreviewTimer: number | null = null;
   let previewSequence = 0;
+  /*
+   * True while a proposal is being put into the panel's own controls.
+   *
+   * The panel reports every control move through `onPreview`, and `onPreview` debounces a
+   * SETTINGS preview onto the authority. Without this, staging a Companion proposal would
+   * silently replace it with a settings-origin preview of the same values 220 ms later, and the
+   * provenance the person was shown would be gone by the time they pressed Apply.
+   */
+  let stagingProposal = false;
 
   const reflectLocalWorldPreview = (
     candidate: AtlasPreferences,
@@ -105,6 +123,18 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       return null;
     }
     const sequence = ++previewSequence;
+    /*
+     * A settings preview REPLACES whatever the client currently holds, so a person who moves a
+     * slider while a Companion proposal is staged throws that proposal away. That is the right
+     * behaviour and it was silent: the Companion had proposed something and would never learn
+     * what became of it, so its memory kept the proposal and no outcome for ever.
+     */
+    const replaced = client.activePreview();
+    if (replaced !== null && replaced.request.origin !== 'settings') {
+      reportProposalOutcome(
+        replaced, 'discarded', 'A change made on this panel replaced the proposed design.',
+      );
+    }
     optionsView.reportWorldLifecycle('checking');
     try {
       const active = await client.previewSettings({
@@ -138,6 +168,27 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     }, 220);
   };
 
+  /**
+   * Say what became of a proposal that came from somewhere other than this panel.
+   *
+   * Read off the ACTIVE PREVIEW rather than from a variable held here, because the client is
+   * what knows which proposal is current: a stale base makes it discard and refine silently, and
+   * a local copy would name the attempt before that one. Settings changes report nothing, which
+   * is not an omission: nobody is waiting to hear what happened to a slider they moved.
+   */
+  const reportProposalOutcome = (
+    active: ActiveWorldStylePreview | null,
+    kind: WorldStyleProposalOutcomeKind,
+    detail: string,
+  ): void => {
+    if (active === null || active.request.origin === 'settings') return;
+    worldStyleProposalOutcomes.report({
+      originReference: active.request.originReference ?? '',
+      kind,
+      detail,
+    });
+  };
+
   optionsView = buildOptions({
     preferences: state.preferences,
     onChange: applyPreferences,
@@ -164,7 +215,10 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       env.shell.setAttribute('data-vignette', candidate.vignette);
       state.atlas?.binding.setFieldOfView(candidate.fieldOfView);
       state.atlas?.binding.setSensitivityMultiplier(candidate.mouseSensitivity);
-      if (reflectLocalWorldPreview(candidate)) queueServerPreview(candidate);
+      // A staged proposal already HAS a reviewed preview on the authority, and it is a
+      // companion-origin one. The local renderer preview still runs, because the person has to
+      // see what they are being asked about.
+      if (reflectLocalWorldPreview(candidate) && !stagingProposal) queueServerPreview(candidate);
     },
     onWorldDiscard: (restored) => {
       if (serverPreviewTimer !== null) {
@@ -183,7 +237,11 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       ));
       const client = state.worldStyles;
       if (client !== null) {
+        // Read BEFORE the discard, because `discardActive` clears it. A proposal thrown away
+        // with nobody able to say which one it was is a proposal the Companion cannot record.
+        const discarded = client.activePreview();
         void client.discardActive().then(() => {
+          reportProposalOutcome(discarded, 'discarded', 'The proposed design was not kept.');
           syncWorldStyleConnection(state, client);
           presentWorldStyleAuthority(
             optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
@@ -208,9 +266,26 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         return false;
       }
       const existing = client.activePreview();
-      const active = existing !== null && worldStylePreviewMatches(existing, candidate)
-        ? existing
-        : await previewOnServer(candidate);
+      const matches = existing !== null && worldStylePreviewMatches(existing, candidate);
+      /*
+       * **A proposal is never quietly re-previewed as a Settings change.**
+       *
+       * `previewOnServer` posts `origin: settings` with no model, no prompt version and no
+       * reference ids. Reaching it with a companion preview staged would discard that preview
+       * and write a version whose provenance says a person moved a slider, which is the one
+       * sentence about this path that must not be able to become false. It can only happen when
+       * the panel's draft and the reviewed candidate have drifted apart, and the honest answer
+       * to that is to say so.
+       */
+      if (existing !== null && existing.request.origin !== 'settings' && !matches) {
+        const detail =
+          'The proposed design no longer matches what is on this panel. Discard it and ask '
+          + 'again, or make the change yourself.';
+        optionsView.reportWorldLifecycle('failed', detail);
+        reportProposalOutcome(existing, 'refused', detail);
+        return false;
+      }
+      const active = matches ? existing : await previewOnServer(candidate);
       if (active === null) return false;
       optionsView.reportWorldLifecycle('checking', 'Applying the reviewed preview…');
       try {
@@ -221,15 +296,27 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
             optionsView, state.worldStyleConnection, state.worldStyleFailure, result.preview,
           );
           optionsView.reportWorldLifecycle('stale');
+          // Still open, not refused: the client has already made a refinement carrying the same
+          // origin reference, and it is that one a person now confirms.
+          reportProposalOutcome(
+            result.preview,
+            'previewed',
+            'The saved world changed elsewhere, so the proposal was made again against it.',
+          );
           return false;
         }
         presentWorldStyleAuthority(
           optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
         );
         optionsView.reportWorldLifecycle('saved');
+        reportProposalOutcome(
+          active, 'accepted', `Applied as revision ${result.version.revision}.`,
+        );
         return true;
       } catch (error) {
-        optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
+        const detail = describeWorldStyleFailure(error);
+        optionsView.reportWorldLifecycle('failed', detail);
+        reportProposalOutcome(active, 'refused', detail);
         return false;
       }
     },
@@ -272,17 +359,26 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
   state.stopWorldStyleProposalInbox = worldStyleProposalInbox.subscribe(async (proposal) => {
     const client = state.worldStyles;
     if (client === null) {
-      optionsView.reportWorldLifecycle(
-        'failed',
-        state.worldStyleFailure ?? 'World style authority is unavailable. The proposal was not previewed.',
-      );
+      const detail =
+        state.worldStyleFailure ??
+        'World style authority is unavailable. The proposal was not previewed.';
+      optionsView.reportWorldLifecycle('failed', detail);
+      worldStyleProposalOutcomes.report({
+        originReference: proposal.originReference ?? '',
+        kind: 'refused',
+        detail,
+      });
       return;
     }
     if (proposal.scope?.kind === 'region') {
-      optionsView.reportWorldLifecycle(
-        'failed',
-        'Regional style proposals require a regional renderer preview and are not shown as a global change.',
-      );
+      const detail =
+        'Regional style proposals require a regional renderer preview and are not shown as a global change.';
+      optionsView.reportWorldLifecycle('failed', detail);
+      worldStyleProposalOutcomes.report({
+        originReference: proposal.originReference ?? '',
+        kind: 'refused',
+        detail,
+      });
       return;
     }
     try {
@@ -292,7 +388,40 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         state.preferences,
         active.preview.candidate.globalStyle,
       );
-      optionsView.setPreferences(candidate);
+      /*
+       * Staged into the panel's OWN controls rather than pushed in as the applied state.
+       *
+       * `setPreferences` moves the panel's applied baseline as well as its draft, which leaves
+       * `worldDirty()` false, and the panel disables Apply and Undo when it is false. So the
+       * obvious version of this line rendered a proposal nobody could accept and whose Undo
+       * would have restored it: the inbox had never been fed, so nothing had ever pressed those
+       * buttons. Moving the controls instead means a proposal and a hand-moved slider arrive at
+       * Apply by exactly the same route, and there is no path to a write that a person could not
+       * have taken themselves.
+       */
+      stagingProposal = true;
+      let staged = false;
+      try {
+        staged = stageWorldProposal(optionsView, candidate, state.preferences);
+      } finally {
+        stagingProposal = false;
+      }
+      if (!staged) {
+        const detail =
+          'That design cannot be shown on this panel, so it was not proposed and nothing changed.';
+        await client.discardActive();
+        syncWorldStyleConnection(state, client);
+        presentWorldStyleAuthority(
+          optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
+        );
+        optionsView.reportWorldLifecycle('failed', detail);
+        worldStyleProposalOutcomes.report({
+          originReference: proposal.originReference ?? '',
+          kind: 'refused',
+          detail,
+        });
+        return;
+      }
       reflectLocalWorldPreview(
         candidate,
         proposal.origin === 'companion' ? 'companion' : 'settings',
@@ -302,8 +431,18 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         optionsView, state.worldStyleConnection, state.worldStyleFailure, active,
       );
       optionsView.reportWorldLifecycle(active.recoveredFromStale ? 'stale' : 'ready');
+      reportProposalOutcome(active, 'previewed', 'Waiting to be confirmed in Customize.');
     } catch (error) {
-      optionsView.reportWorldLifecycle('failed', describeWorldStyleFailure(error));
+      const detail = describeWorldStyleFailure(error);
+      optionsView.reportWorldLifecycle('failed', detail);
+      // Reported from the proposal rather than from an active preview, because there is none:
+      // the authority refused before one existed, and the Companion still has to be able to say
+      // what became of what it proposed.
+      worldStyleProposalOutcomes.report({
+        originReference: proposal.originReference ?? '',
+        kind: 'refused',
+        detail,
+      });
     }
   });
   const settingsView = buildControlsGuide({
@@ -383,6 +522,86 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
       state.stopWorldStyleProposalInbox = null;
     },
   };
+}
+
+/**
+ * Put a proposed design into the panel's own controls, as a person would have moved them.
+ *
+ * Returns false when it cannot, which is a refusal rather than a silent partial staging. The
+ * panel builds its controls once, from the profile that was active when it was mounted, so a
+ * proposal naming a different profile has no controls to move; today the reviewed registry
+ * offers exactly one profile a new proposal may name, so that is a guard against a future
+ * catalogue rather than a case anybody can reach.
+ *
+ * The event dispatched per control is the one the panel listens for, which differs by kind: a
+ * range and a colour report on `input` and everything else on `change`. Sending the wrong one
+ * moves the control on screen and tells the panel nothing, which is the failure mode this
+ * function exists to not have.
+ */
+function stageWorldProposal(
+  view: ReturnType<typeof buildOptions>,
+  candidate: AtlasPreferences,
+  applied: AtlasPreferences,
+): boolean {
+  // `applied` is the session's applied preferences, passed in rather than read off the panel.
+  // `view.preferences()` returns the panel's live DRAFT, so a control the person had already
+  // previewed by hand to the proposed value was skipped as "unchanged" and never dispatched,
+  // and a proposal every one of whose controls they had touched staged nothing at all.
+  if (
+    candidate.worldArtProfile !== applied.worldArtProfile ||
+    candidate.worldArtProfileVersion !== applied.worldArtProfileVersion
+  ) return false;
+  const definitions = worldStyleControls(
+    candidate.worldArtProfile,
+    candidate.worldArtProfileVersion,
+  );
+  let moved = 0;
+  for (const definition of definitions) {
+    const wanted = candidate.worldStyleParameters[definition.key];
+    if (wanted === undefined || wanted === applied.worldStyleParameters[definition.key]) continue;
+    const node = view.root.querySelector<HTMLInputElement | HTMLSelectElement>(
+      `[aria-label="${escapeAttribute(definition.label)}"]`,
+    );
+    if (node === null) return false;
+    if (definition.kind === 'toggle') {
+      (node as HTMLInputElement).checked = wanted === true;
+    } else {
+      node.value = String(wanted);
+      /*
+       * **Read back, because the DOM sanitises.** A range input snaps its value to the declared
+       * step and a colour input rewrites the text it was given, so a value off the control's
+       * grid becomes a DIFFERENT value silently, and the person would then apply something the
+       * authority never validated. Measured: a drafted 0.51 on a control whose step is 0.05
+       * becomes 0.50 here. The drafter's schema now carries the step so this should not fire;
+       * it is a refusal rather than an assertion because "should not" is not "cannot".
+       */
+      if (node.value !== String(wanted)) return false;
+    }
+    /*
+     * Dispatched immediately, one control at a time, and that ORDER is the whole fix. The panel
+     * re-renders on every reported change and rewrites every style input from its own draft, so
+     * writing all the values first and dispatching afterwards meant the second and later
+     * controls were overwritten before their event was sent: a five-control proposal staged
+     * exactly one of them, and the other four were silently dropped.
+     */
+    node.dispatchEvent(new Event(
+      definition.kind === 'range' || definition.kind === 'color' ? 'input' : 'change',
+      { bubbles: true },
+    ));
+    moved += 1;
+  }
+  return moved > 0;
+}
+
+/**
+ * One attribute value, safe inside a `[aria-label="..."]` selector.
+ *
+ * `CSS.escape` is the obvious call and is not universally present: happy-dom, which is what the
+ * tests run in, does not define `CSS` at all, and a missing global here throws inside an inbox
+ * listener whose caller does not await it, so the proposal vanished with nothing on the screen.
+ */
+function escapeAttribute(value: string): string {
+  return value.replace(/["\\]/g, (match) => `\\${match}`);
 }
 
 export function preferencesForWorldVersion(
