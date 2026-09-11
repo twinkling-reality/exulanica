@@ -74,44 +74,70 @@ export interface PointCloud {
   readonly defaultMaxSizePx: number;
   /** True when this map is drawn as a surface, false when as points. Reported, never assumed. */
   readonly surface: boolean;
-  /** The seam triangles of a surface, drawn with the same material; null for points. */
-  readonly seamMesh: pc.Mesh | null;
   /** True when a surface takes its colour from the photograph rather than its own samples. */
   readonly photographed: boolean;
   setTheme(theme: PresentationTheme): void;
   /** Compare evidence without the authored fog or display gain masking reconstruction defects. */
   setInspection(active: boolean): void;
   /**
-   * Draw this map as one photograph's own view: it thins towards the edges of the photograph's
-   * frame and as the visitor's line of sight departs from the camera's. For maps in an unmeasured
-   * arrangement only; see the uniform contract in `point-shader.ts`. Returns the camera's local
-   * position, which `setCaptureWorld` must then be given in world space every frame.
+   * Draw this map as one photograph's own view (see the uniform contract in `point-shader.ts`):
+   * soft at its frame's edges, flattened into a print standing `printDepth` in front of its camera
+   * as the visitor leaves the camera, and a plain card from behind. For maps in an unmeasured
+   * arrangement only. Returns the camera's local position, which the caller turns into
+   * `setCaptureWorld` every frame, with `setRelief`.
    */
-  enableSingleView(): readonly [number, number, number];
+  enableSingleView(printDepth: number): readonly [number, number, number];
   /** The photograph's camera in world space. Ignored until `enableSingleView` has run. */
   setCaptureWorld(x: number, y: number, z: number): void;
+  /** How flat the relief is, 0 to 1, and whether the visitor is behind the print. */
+  setRelief(flatten: number, behind: boolean): void;
   destroy(): void;
 }
 
-/**
- * How a single photograph's view dissolves. The margin is the fraction of the frame, measured in
- * from its edge, over which points thin out; the angles are between the camera's line of sight to
- * a point and the visitor's, where thinning starts and where nothing is left. A visitor standing
- * where the photograph was taken sees all of it; one who steps a metre or two aside sees the
- * people in front begin to dissolve before the distant ridge does, because the angle to a near
- * point grows faster; one who walks round behind sees nothing, which is what was photographed.
- */
+/** The fraction of the frame, measured in from its edge, over which a photograph's points thin out. */
 export const SINGLE_VIEW_EDGE_MARGIN = 0.15;
-export const SINGLE_VIEW_FADE_START_DEG = 18;
-export const SINGLE_VIEW_FADE_END_DEG = 42;
-/** World distance from the photograph's camera over which the whole photograph thins out. */
-export const SINGLE_VIEW_STANDPOINT_START = 3;
-export const SINGLE_VIEW_STANDPOINT_END = 9;
-/** Angles over which a seam of a surface dissolves; see depth-surface.ts. Far tighter than a surface. */
-export const SEAM_FADE_START_DEG = 3;
-export const SEAM_FADE_END_DEG = 9;
-/** The tags flag bit that marks a copied seam vertex. Bit 0 is the file's own one-sided flag. */
-const SEAM_FLAG = 2;
+/**
+ * The most parallax, in degrees, a photograph's relief may show a visitor. See `reliefFor` in
+ * atlas-binding.ts, which flattens the relief just enough to keep within it.
+ *
+ * Parallax is the whole of what one photograph's depth can get wrong away from its camera: every
+ * gap it opens and every edge it stretches is two samples on one camera ray parting by that much.
+ * MEASURED 2026-09-11 on the first personal place, as the share of the flat print's own pixels the
+ * relief left empty, over three photographs and twelve standpoints each (at the camera, 0.1 to
+ * 1 m aside, 2 to 15 m back, halfway in, 30 and 60 degrees round, and behind):
+ *
+ *   limit   0.5 deg   1 deg   2 deg   4 deg
+ *   worst     0.9 %   1.6 %   3.0 %   5.9 %
+ *
+ * plus 1.1 to 4.3 % at one degree for a visitor who has walked half way in to the print, where the
+ * small-angle bound this works in understates the parallax. One degree because the photographs are
+ * whole at it and 4 degrees visibly frayed the edges of people's hair; the choice buys depth, and
+ * the numbers above are the price in holes.
+ */
+export const RELIEF_PARALLAX_DEG = 1;
+
+/** A photograph's depths from its own camera, in its local units. */
+export interface SingleViewDepths {
+  /** Where half the photograph's content is nearer and half further: where its subject stands. */
+  readonly median: number;
+  readonly nearest: number;
+  readonly furthest: number;
+}
+
+/**
+ * MEASURED 2026-09-11 on the first personal place: medians 5.3, 2.6 and 3.9, nearest 2.4, 2.1 and
+ * 2.5, furthest 214, 164 and 201. The median is where the people stand in each photograph.
+ */
+export function singleViewDepths(map: PointMap): SingleViewDepths {
+  const eyeZ = map.header.viewpoint.position[2];
+  const depths = new Float32Array(map.header.pointCount);
+  for (let i = 0; i < depths.length; i += 1) depths[i] = eyeZ - map.position[i * 3 + 2]!;
+  depths.sort();
+  const middle = depths.length >> 1;
+  const median = depths.length % 2 === 1 ? depths[middle]! : (depths[middle - 1]! + depths[middle]!) / 2;
+  if (!(depths.length > 0 && depths[0]! > 0 && median > 0)) return { median: 1, nearest: 1, furthest: 1 };
+  return { median, nearest: depths[0]!, furthest: depths[depths.length - 1]! };
+}
 
 /**
  * Default sprite sizing.
@@ -218,28 +244,25 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   const mesh = new pc.Mesh(device);
   mesh.vertexBuffer = vertexBuffer;
   const triangles = options.surface === true && device.isWebGL2 ? depthSurfaceIndices(map) : null;
-  let seamMesh: pc.Mesh | null = null;
   if (triangles === null || triangles.surface.length === 0) {
     mesh.primitive[0] = { type: pc.PRIMITIVE_POINTS, base: 0, count: n, indexed: false, baseVertex: 0 };
   } else {
-    mesh.indexBuffer[0] = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT32, triangles.surface.length,
-      pc.BUFFER_STATIC, triangles.surface.buffer as ArrayBuffer);
-    mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, count: triangles.surface.length, indexed: true,
+    // The seams are drawn with the surface rather than only down the camera's own rays. A seam
+    // spans a depth jump, so what it can show wrongly is that jump's parallax, and flattening
+    // holds every parallax in this map within `RELIEF_PARALLAX_DEG` from wherever the visitor is.
+    const indices = new Uint32Array(triangles.surface.length + triangles.seams.length);
+    indices.set(triangles.surface);
+    indices.set(triangles.seams, triangles.surface.length);
+    mesh.indexBuffer[0] = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT32, indices.length,
+      pc.BUFFER_STATIC, indices.buffer as ArrayBuffer);
+    mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, count: indices.length, indexed: true,
       baseVertex: 0 };
-    if (triangles.seams.length > 0) seamMesh = buildSeamMesh(device, map, triangles.seams);
   }
   const surface = triangles !== null && triangles.surface.length > 0;
 
   const { min, max } = map.header.bounds;
   mesh.aabb = new pc.BoundingBox();
   mesh.aabb.setMinMax(new pc.Vec3(min[0], min[1], min[2]), new pc.Vec3(max[0], max[1], max[2]));
-  // The seams are copies of samples inside the same bounds. Without a box of its own the engine
-  // treats a mesh built from a raw vertex buffer as empty and culls it, which is exactly how the
-  // first version of this drew no seams at all.
-  if (seamMesh !== null) {
-    seamMesh.aabb = new pc.BoundingBox();
-    seamMesh.aabb.setMinMax(new pc.Vec3(min[0], min[1], min[2]), new pc.Vec3(max[0], max[1], max[2]));
-  }
 
   const blend = options.blend ?? false;
   const photographed = surface && options.photograph !== undefined;
@@ -329,21 +352,11 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   material.setParameter('uLens', [0, 0, 0, 0]);
   // Single-view fading, off: a value rather than an absence, for the reason `uLens` gives above.
   const capture = new Float32Array(4);
+  const relief = new Float32Array(4);
   material.setParameter('uFrame', [0, 0, 0, 0]);
   material.setParameter('uViewpoint', [0, 0, 0, 0]);
   material.setParameter('uCapture', capture);
-  material.setParameter('uSeamFade', [
-    Math.cos((SEAM_FADE_START_DEG * Math.PI) / 180),
-    Math.cos((SEAM_FADE_END_DEG * Math.PI) / 180),
-    0,
-    0,
-  ]);
-  material.setParameter('uViewFade', [
-    Math.cos((SINGLE_VIEW_FADE_START_DEG * Math.PI) / 180),
-    Math.cos((SINGLE_VIEW_FADE_END_DEG * Math.PI) / 180),
-    SINGLE_VIEW_STANDPOINT_START,
-    SINGLE_VIEW_STANDPOINT_END,
-  ]);
+  material.setParameter('uRelief', relief);
   material.update();
 
   if (semantics.some((s) => s.id >= MAX_SEGMENTS)) {
@@ -361,23 +374,24 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     defaultSizeGain: options.sizeGain ?? DEFAULT_SIZE_GAIN,
     defaultMaxSizePx: options.maxSizePx ?? DEFAULT_MAX_SIZE_PX,
     surface,
-    seamMesh,
     photographed,
     setTheme,
     setInspection(active) {
       material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
       material.setParameter('uExposure', active ? 1 : 1.25);
     },
-    enableSingleView() {
+    enableSingleView(printDepth) {
       const { position, fovYDeg, aspect } = map.header.viewpoint;
       const tanY = Math.tan((fovYDeg * Math.PI) / 360);
       const framed = Number.isFinite(tanY) && tanY > 0 && Number.isFinite(aspect) && aspect > 0;
       // A frame the header cannot describe keeps its edges rather than guessing at them; the
-      // line-of-sight fade needs only the camera position and still applies.
+      // flattening needs only the camera position and still applies.
       material.setParameter('uFrame', framed ? [tanY * aspect, tanY, SINGLE_VIEW_EDGE_MARGIN, 1] : [0, 0, 0, 0]);
       material.setParameter('uViewpoint', [position[0], position[1], position[2], 0]);
       capture[3] = 1;
       material.setParameter('uCapture', capture);
+      relief[0] = printDepth > 0 ? printDepth : 1;
+      material.setParameter('uRelief', relief);
       return [position[0], position[1], position[2]];
     },
     setCaptureWorld(x, y, z) {
@@ -387,54 +401,17 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
       capture[2] = z;
       material.setParameter('uCapture', capture);
     },
+    setRelief(flatten, behind) {
+      if (capture[3] !== 1) return;
+      relief[1] = Math.min(1, Math.max(0, flatten));
+      relief[2] = behind ? 1 : 0;
+      material.setParameter('uRelief', relief);
+    },
     destroy(): void {
       mesh.destroy();
-      seamMesh?.destroy();
       photographTexture?.destroy();
       material.destroy();
     },
   };
 }
 
-/**
- * The seam triangles as their own vertices: three copies per triangle of the file's samples, with
- * the seam bit set in each copy's flags. Copies rather than an index list over the file's vertices
- * because the flag is per vertex and a sample on a seam is also a corner of ordinary surface.
- */
-function buildSeamMesh(device: pc.GraphicsDevice, map: PointMap, seams: Uint32Array): pc.Mesh {
-  const count = seams.length;
-  const format = new pc.VertexFormat(
-    device,
-    [
-      { semantic: pc.SEMANTIC_POSITION, components: 3, type: pc.TYPE_FLOAT32 },
-      { semantic: pc.SEMANTIC_COLOR, components: 4, type: pc.TYPE_UINT8, normalize: true },
-      { semantic: pc.SEMANTIC_ATTR8, components: 2, type: pc.TYPE_UINT16, normalize: false },
-    ],
-    count,
-  );
-  const position = new Float32Array(count * 3);
-  const color = new Uint8Array(count * 4);
-  const tags = new Uint16Array(count * 2);
-  for (let k = 0; k < count; k += 1) {
-    const i = seams[k]!;
-    position.set(map.position.subarray(i * 3, i * 3 + 3), k * 3);
-    color.set(map.color.subarray(i * 4, i * 4 + 4), k * 4);
-    tags[k * 2] = map.tags[i * 2]!;
-    tags[k * 2 + 1] = map.tags[i * 2 + 1]! | SEAM_FLAG;
-  }
-  const bytes = new Uint8Array(position.byteLength + color.byteLength + tags.byteLength);
-  bytes.set(new Uint8Array(position.buffer), 0);
-  bytes.set(color, position.byteLength);
-  bytes.set(new Uint8Array(tags.buffer), position.byteLength + color.byteLength);
-  // The same agreement the file's own buffer is held to above: the engine's planar layout and ours.
-  if (format.verticesByteSize !== bytes.byteLength) {
-    throw new RangeError(`the seam vertex format reads ${format.verticesByteSize} bytes and ${bytes.byteLength} were packed`);
-  }
-  const seamMesh = new pc.Mesh(device);
-  seamMesh.vertexBuffer = new pc.VertexBuffer(device, format, count, {
-    usage: pc.BUFFER_STATIC,
-    data: bytes.buffer as ArrayBuffer,
-  });
-  seamMesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, count, indexed: false, baseVertex: 0 };
-  return seamMesh;
-}

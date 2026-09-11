@@ -42,23 +42,30 @@
  *   uFrame        vec4  x tan half horizontal fov, y tan half vertical fov, z edge margin, w enabled
  *   uViewpoint    vec4  xyz the photograph's camera in the local frame
  *   uCapture      vec4  xyz that camera in world space, w enabled
- *   uViewFade     vec4  x cosine where the view fade starts, y cosine where it ends,
- *                       z distance from the camera where the standpoint fade starts, w where it ends
- *   uSeamFade     vec4  x cosine where a seam starts to fade, y cosine where it is gone (surface only)
- *   aTags.y bit 1 marks a seam vertex: a triangle across a depth jump, see depth-surface.ts
+ *   uRelief       vec4  x the print depth, y how flat (0 relief, 1 a flat print), z 1 when seen
+ *                       from behind the print, w unused
  *   uPhotograph   sampler2D  the viewer's image of the photograph (PHOTOGRAPH surfaces only)
  *
- * The last four describe ONE photograph's own camera and are enabled only for a map drawn in an
- * unmeasured arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of
- * what one camera saw. Its points thin out towards the edges of that photograph's frame, so it
- * dissolves into the world instead of ending at a rectangle, and they thin out as the visitor's
- * line of sight to a point departs from the camera's, so walking round behind a photograph shows
- * it dissolving rather than its empty back, and the whole photograph thins as the visitor walks
- * away from where it was taken, because a distant ridge keeps a small angle long after the
- * relief in front of it has stopped meaning anything. This is atlas-spatial-architecture.md's "each panel
- * allows only its measured micro-parallax", rendered. A posed map is never given these: its
- * neighbours cover each other's backs, and thinning it by one camera's view would hide real
- * geometry seen by another.
+ * These describe ONE photograph's own camera and are enabled only for a map drawn in an unmeasured
+ * arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of what one
+ * camera saw, so it is shown as that photograph and never as a place to walk round:
+ *
+ * - its points thin out towards the edges of the photograph's frame, so it ends softly rather
+ *   than at a rectangle;
+ * - as the visitor leaves the camera, every point slides along its own camera ray towards one
+ *   plane at the print depth, in inverse depth, which is what makes the parallax the relief has
+ *   left exactly (1 - uRelief.y) of its own. From the camera nothing moves, because every point
+ *   stays on its ray; far away, or well to the side, the relief has become a flat print of the
+ *   photograph, so there is no empty back or stretched sheet left to see. `reliefFor` in
+ *   atlas-binding.ts decides how flat, and holds what a visitor can see wrongly within a degree;
+ * - seen from behind that plane, it is the back of the print, a plain card.
+ *
+ * It stays visible from everywhere. MEASURED 2026-09-11: an earlier version dissolved it with
+ * angle and distance instead, and the operator could no longer see their photographs from across
+ * the region or from the side, which is the opposite of what a photograph in a world is for. This
+ * is atlas-spatial-architecture.md's rung 3, "each panel allows only its measured micro-parallax
+ * ... unseen backs are blocked by coarse panel proxies". A posed map is never given these: its
+ * neighbours cover each other's backs.
  */
 
 export const POINT_VERTEX_GLSL = /* glsl */ `
@@ -90,10 +97,7 @@ uniform vec4 uFog;
 uniform vec4 uFrame;
 uniform vec4 uViewpoint;
 uniform vec4 uCapture;
-uniform vec4 uViewFade;
-#ifdef SURFACE
-uniform vec4 uSeamFade;
-#endif
+uniform vec4 uRelief;
 
 varying vec4 vColor;
 varying vec4 vSemantic;
@@ -120,7 +124,15 @@ void main(void) {
     float unconfirmed  = state.x;
     float confidence   = aColor.a * state.w;
 
-    vec4 worldPos = matrix_model * vec4(aPosition, 1.0);
+    // One photograph's relief, flattened towards its print as the visitor leaves its camera. Along
+    // each point's own camera ray, so the photograph seen from its camera never changes, and in
+    // inverse depth, where parallax is linear: the relief left is (1 - flatten) of its parallax.
+    vec3 local = aPosition;
+    if (uCapture.w > 0.5) {
+        vec3 fromEye = aPosition - uViewpoint.xyz;
+        local = uViewpoint.xyz + fromEye / mix(1.0, max(-fromEye.z, 0.001) / uRelief.x, uRelief.y);
+    }
+    vec4 worldPos = matrix_model * vec4(local, 1.0);
     float viewDist = length(worldPos.xyz - view_position);
 
     // The dissolving, foggy, particulate boundary. Islands have no edges: the outer fifth of the
@@ -147,18 +159,6 @@ void main(void) {
         float edge = max(abs(rel.x) / (depth * uFrame.x), abs(rel.y) / (depth * uFrame.y));
         survive *= smoothstep(0.0, uFrame.z, 1.0 - edge);
     }
-    if (uCapture.w > 0.5) {
-        vec3 fromCamera = normalize(worldPos.xyz - uCapture.xyz);
-        vec3 fromViewer = normalize(worldPos.xyz - view_position);
-        float along = dot(fromCamera, fromViewer);
-        survive *= smoothstep(uViewFade.y, uViewFade.x, along);
-        survive *= 1.0 - smoothstep(uViewFade.z, uViewFade.w, length(view_position - uCapture.xyz));
-#ifdef SURFACE
-        // A seam is right only down the camera's own rays, so it goes long before the surface does.
-        if (mod(floor(aTags.y / 2.0), 2.0) > 0.5) survive *= smoothstep(uSeamFade.y, uSeamFade.x, along);
-#endif
-    }
-
     float r = hash1(float(gl_VertexID) * 0.6180339887);
 
 #ifdef SURFACE
@@ -217,6 +217,9 @@ void main(void) {
 export const POINT_FRAGMENT_GLSL = /* glsl */ `
 precision highp float;
 
+// The back of a print: a plain warm card, the one colour here that is authored rather than seen.
+const vec3 PRINT_BACK = vec3(0.62, 0.60, 0.56);
+
 uniform vec4 uPalette[4];
 uniform vec3 uFogColor;
 uniform vec4 uPoint;
@@ -239,6 +242,8 @@ uniform vec4 uLens;
  * make one point look more certain than another.
  */
 uniform float uExposure;
+/** z is 1 when the visitor is behind the print: the back of a print is a card. See the contract. */
+uniform vec4 uRelief;
 
 varying vec4 vColor;
 varying vec4 vSemantic;
@@ -280,42 +285,50 @@ void main(void) {
 
     int slot = int(vSemantic.y + 0.5);
     vec4 tint = uPalette[slot];
-
-    vec3 base = vColor.rgb;
-#ifdef PHOTOGRAPH
-    vec3 seen = vLocal - uViewpoint.xyz;
-    float along = max(-seen.z, 0.001);
-    base = texture2D(uPhotograph, vec2(
-        (seen.x / (along * uFrame.x) + 1.0) * 0.5,
-        (1.0 - seen.y / (along * uFrame.y)) * 0.5)).rgb;
-#endif
-    vec3 rgb = mix(base, base * tint.rgb, tint.a);
-
-    // Unconfirmed points breathe: a slow, low-amplitude luminance drift, phase-offset by the
-    // provenance slot so inference and external do not pulse in lockstep.
-    float breathe = 1.0 + vSemantic.x * 0.18 * sin(uPoint.w * 1.3 + vSemantic.y * 2.1);
-    rgb *= breathe;
-
-    rgb = mix(rgb, uFogColor, vFogAmount);
-
     // Emphasis: one float, exactly as the performance contract requires. It controls opacity and
     // saturation together, so a muted island reads as further away rather than merely darker.
     float emphasis = vSemantic.w;
-    float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-    rgb = mix(vec3(luma), rgb, 0.35 + 0.65 * emphasis);
 
-    // CONFIDENCE FADES TOWARD THE GROUND, IT DOES NOT ERASE AND IT DOES NOT DARKEN. The vertex
-    // stage has already used confidence to thin the cloud stochastically, so applying it a
-    // second time as coverage would delete an uncertain surface twice over and leave nothing.
-    //
-    // It fades toward the ground colour rather than toward black, because "faint" has to mean
-    // faint in the theme the world is actually wearing. Multiplying the albedo down assumes a
-    // dark sky: on the light origin landscape it drove low-confidence points AWAY from the
-    // background and a barely sampled surface came out as the most prominent thing on screen,
-    // which is the exact inverse of what this line is for. Mixing toward the ground reads as
-    // receding under both themes, and that is the whole claim being made.
-    rgb = mix(rgb, uFogColor, (1.0 - vColor.a) * 0.55);
-    rgb *= uExposure;
+    vec3 rgb;
+    if (uRelief.z > 0.5) {
+        // The back of a print is a card: one authored colour under the world's own fog. Every
+        // per-point term below says something about the evidence, and a card is showing none of it,
+        // so a back that kept them would print ghosts of the photograph's own people on its back.
+        rgb = mix(PRINT_BACK * uExposure, uFogColor, vFogAmount);
+    } else {
+        vec3 base = vColor.rgb;
+#ifdef PHOTOGRAPH
+        vec3 seen = vLocal - uViewpoint.xyz;
+        float along = max(-seen.z, 0.001);
+        base = texture2D(uPhotograph, vec2(
+            (seen.x / (along * uFrame.x) + 1.0) * 0.5,
+            (1.0 - seen.y / (along * uFrame.y)) * 0.5)).rgb;
+#endif
+        rgb = mix(base, base * tint.rgb, tint.a);
+
+        // Unconfirmed points breathe: a slow, low-amplitude luminance drift, phase-offset by the
+        // provenance slot so inference and external do not pulse in lockstep.
+        float breathe = 1.0 + vSemantic.x * 0.18 * sin(uPoint.w * 1.3 + vSemantic.y * 2.1);
+        rgb *= breathe;
+
+        rgb = mix(rgb, uFogColor, vFogAmount);
+
+        float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+        rgb = mix(vec3(luma), rgb, 0.35 + 0.65 * emphasis);
+
+        // CONFIDENCE FADES TOWARD THE GROUND, IT DOES NOT ERASE AND IT DOES NOT DARKEN. The vertex
+        // stage has already used confidence to thin the cloud stochastically, so applying it a
+        // second time as coverage would delete an uncertain surface twice over and leave nothing.
+        //
+        // It fades toward the ground colour rather than toward black, because "faint" has to mean
+        // faint in the theme the world is actually wearing. Multiplying the albedo down assumes a
+        // dark sky: on the light origin landscape it drove low-confidence points AWAY from the
+        // background and a barely sampled surface came out as the most prominent thing on screen,
+        // which is the exact inverse of what this line is for. Mixing toward the ground reads as
+        // receding under both themes, and that is the whole claim being made.
+        rgb = mix(rgb, uFogColor, (1.0 - vColor.a) * 0.55);
+        rgb *= uExposure;
+    }
 
     // THE PROOF LENS, APPLIED LAST: THE TIER'S HUE AT THIS PIXEL'S OWN BRIGHTNESS.
     //
@@ -393,7 +406,7 @@ uniform uFog : vec4f;
 uniform uFrame : vec4f;
 uniform uViewpoint : vec4f;
 uniform uCapture : vec4f;
-uniform uViewFade : vec4f;
+uniform uRelief : vec4f;
 
 varying vColor : vec4f;
 varying vSemantic : vec4f;
@@ -414,7 +427,12 @@ fn vertexMain(input : VertexInput) -> VertexOutput {
     let unconfirmed : f32 = state.x;
     let confidence : f32 = aColor.a * state.w;
 
-    let worldPos : vec4f = uniform.matrix_model * vec4f(aPosition, 1.0);
+    var local : vec3f = aPosition;
+    if (uniform.uCapture.w > 0.5) {
+        let fromEye : vec3f = aPosition - uniform.uViewpoint.xyz;
+        local = uniform.uViewpoint.xyz + fromEye / mix(1.0, max(-fromEye.z, 0.001) / uniform.uRelief.x, uniform.uRelief.y);
+    }
+    let worldPos : vec4f = uniform.matrix_model * vec4f(local, 1.0);
     let viewDist : f32 = length(worldPos.xyz - uniform.view_position);
 
     let radial : f32 = length(aPosition.xz);
@@ -435,12 +453,6 @@ fn vertexMain(input : VertexInput) -> VertexOutput {
         let depth : f32 = max(-rel.z, 0.001);
         let edge : f32 = max(abs(rel.x) / (depth * uniform.uFrame.x), abs(rel.y) / (depth * uniform.uFrame.y));
         survive = survive * smoothstep(0.0, uniform.uFrame.z, 1.0 - edge);
-    }
-    if (uniform.uCapture.w > 0.5) {
-        let fromCamera : vec3f = normalize(worldPos.xyz - uniform.uCapture.xyz);
-        let fromViewer : vec3f = normalize(worldPos.xyz - uniform.view_position);
-        survive = survive * smoothstep(uniform.uViewFade.y, uniform.uViewFade.x, dot(fromCamera, fromViewer));
-        survive = survive * (1.0 - smoothstep(uniform.uViewFade.z, uniform.uViewFade.w, length(uniform.view_position - uniform.uCapture.xyz)));
     }
 
     let r : f32 = hash1(f32(pcVertexIndex) * 0.6180339887);
@@ -479,6 +491,7 @@ uniform uPoint : vec4f;
 /** The proof lens: a resolved tier colour in xyz and its tint strength in w. See the GLSL source. */
 uniform uLens : vec4f;
 uniform uExposure : f32;
+uniform uRelief : vec4f;
 
 varying vColor : vec4f;
 varying vSemantic : vec4f;
@@ -491,22 +504,29 @@ fn fragmentMain(input : FragmentInput) -> FragmentOutput {
     // One pixel per point on this path, so there is no point-sprite coverage to soften.
     let slot : i32 = i32(input.vSemantic.y + 0.5);
     let tint : vec4f = uniform.uPalette[slot];
-
-    var rgb : vec3f = mix(input.vColor.rgb, input.vColor.rgb * tint.rgb, tint.a);
-
-    let breathe : f32 = 1.0 + input.vSemantic.x * 0.18 * sin(uniform.uPoint.w * 1.3 + input.vSemantic.y * 2.1);
-    rgb = rgb * breathe;
-
-    rgb = mix(rgb, uniform.uFogColor, input.vFogAmount);
-
     let emphasis : f32 = input.vSemantic.w;
-    let luma : f32 = dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
-    rgb = mix(vec3f(luma), rgb, 0.35 + 0.65 * emphasis);
 
-    // Confidence dims rather than erases, exactly as in the GLSL path. The vertex stage already
-    // thinned the cloud by confidence; charging it again would delete uncertain surfaces twice.
-    // Fades toward the ground rather than toward black. See the GLSL source for why.
-    rgb = mix(rgb, uniform.uFogColor, (1.0 - input.vColor.a) * 0.55) * uniform.uExposure;
+    var rgb : vec3f;
+    if (uniform.uRelief.z > 0.5) {
+        // The back of a print is a card, exactly as in the GLSL path: no per-point term reaches it.
+        rgb = mix(vec3f(0.62, 0.60, 0.56) * uniform.uExposure, uniform.uFogColor, input.vFogAmount);
+    } else {
+        let base : vec3f = input.vColor.rgb;
+        rgb = mix(base, base * tint.rgb, tint.a);
+
+        let breathe : f32 = 1.0 + input.vSemantic.x * 0.18 * sin(uniform.uPoint.w * 1.3 + input.vSemantic.y * 2.1);
+        rgb = rgb * breathe;
+
+        rgb = mix(rgb, uniform.uFogColor, input.vFogAmount);
+
+        let luma : f32 = dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
+        rgb = mix(vec3f(luma), rgb, 0.35 + 0.65 * emphasis);
+
+        // Confidence dims rather than erases, exactly as in the GLSL path. The vertex stage already
+        // thinned the cloud by confidence; charging it again would delete uncertain surfaces twice.
+        // Fades toward the ground rather than toward black. See the GLSL source for why.
+        rgb = mix(rgb, uniform.uFogColor, (1.0 - input.vColor.a) * 0.55) * uniform.uExposure;
+    }
 
     // The proof lens: the tier's hue at this pixel's own brightness, exactly as in the GLSL path.
     let lensLuma : f32 = dot(rgb, vec3f(0.2126, 0.7152, 0.0722));
