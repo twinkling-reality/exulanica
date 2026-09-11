@@ -1000,6 +1000,51 @@ def test_a_lift_that_keeps_failing_is_tried_once_for_each_state_it_is_due_in(
     ]
 
 
+def test_a_trained_scene_is_lifted_over_the_gaussians_its_delivery_was_compressed_from(
+    repository, tmp_path
+):
+    """At publication the accepted training output is still in the job's scratch, so the lift
+    samples it beside the point maps and binds it: the PLY by digest and the delivery it became.
+    The sweep cannot lift that again, holding no PLY, so it says so rather than replacing segments
+    that follow the trained surface with ones that follow the per-photograph maps."""
+    import hashlib
+
+    from test_scene_splat_pipeline import ScriptedTrainer, ply, processor, queued
+
+    store, captures, _selected, _config = queued(repository, tmp_path)
+    _segment_members(repository, store, captures, SceneSegmenter())
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    claimed = repository.claim_reconstruction_scene(worker="trained-lift", lease_seconds=60)
+    outcome = processor(repository, store, tmp_path, ScriptedTrainer()).process(claimed)
+    assert outcome.status == "succeeded", outcome.message
+
+    def rows(kind):
+        return repository.connection.execute(
+            "select artifact_id, content_sha256 from artifact "
+            "where workspace_id=%s and scene_id=%s and kind=%s",
+            (repository.workspace_id, outcome.scene_id, kind),
+        ).fetchall()
+
+    [delivery] = rows(STAGES["scene_splat_delivery"].output_kind)
+    [segments] = rows(lift.SCENE_SEGMENTS_KIND)
+    payload = json.loads(store.get(BlobId(bytes(segments["content_sha256"]))))["segments"]
+    assert payload["bindings"]["gaussian_source"] == {
+        "ply_sha256": hashlib.sha256(ply()).hexdigest(),
+        "delivery_sha256": bytes(delivery["content_sha256"]).hex(),
+        "basis": "accepted training output the delivery was compressed from",
+    }
+    assert payload["samples"]["gaussian"] == 1
+    assert payload["samples"]["point_map"] > 0
+
+    _segment_members(repository, store, captures[:1], SceneSegmenter(revision="1" * 40))
+    [due] = lift.scenes_due_segments(repository, store)
+    assert due.over_gaussians
+    [result] = _worker(repository, store, tmp_path, "sweep").refresh_scene_segments()
+    assert result["action"] == "skipped" and "--gaussian-ply" in result["reason"]
+    assert rows(lift.SCENE_SEGMENTS_KIND) == [segments], "the sweep replaced a trained lift"
+
+
 def test_segments_bound_to_another_build_or_unreadable_are_due(repository, tmp_path):
     store, captures, _points, scene_id = _published(repository, tmp_path, "due-reasons")
     _segment_members(repository, store, captures, SceneSegmenter())

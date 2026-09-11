@@ -17,8 +17,10 @@ much is its safe direction, and a segment grown past its object would vote for i
 
 **What is sampled.** Every placed member's posed point map, subsampled evenly to a declared budget
 and carried into the scene frame by the placement's own transform, and, when the caller supplies
-one, the centres of a trained Gaussian scene read by the check's own PLY reader. The volcanic scene
-has no trained delivery, so it lifts from point maps alone, and says so in its bindings.
+one, the centres of a trained Gaussian scene read through the check's own PLY header walk. The
+scene worker supplies the accepted training output whenever a build publishes a trained delivery;
+the command takes a PLY decoded from a delivery. The volcanic scene has no trained delivery, so it
+lifts from point maps alone, and says so in its bindings.
 
 **What a view counts.** A sample is seen by a view when it projects in front of the camera, inside
 the frame, and not clearly behind the surface that view's own placed point map records at that
@@ -78,9 +80,9 @@ from exulanica.evidence.region import PPM
 from exulanica.ingest.masked_geometry import (
     GaussianView,
     camera_point,
+    gaussian_centre_array,
     image_point,
     ppm_point,
-    read_gaussian_centres,
 )
 from exulanica.ingest.stages.segmentation import OBJECT_MASK_KIND, OBJECT_MASK_PROFILE
 from exulanica.reconstruction.placement import (
@@ -353,7 +355,7 @@ _Occlusion = tuple["np.ndarray", int, int]
 def _samples(
     placement: PlacementRecord,
     point_maps: Mapping[str, bytes],
-    gaussian_centres: Sequence[Sequence[float]] | None,
+    gaussian_centres: np.ndarray | None,
     params: Mapping[str, Any],
     cameras: Mapping[str, GaussianView],
 ) -> tuple[_Samples, dict[str, _Occlusion]]:
@@ -387,7 +389,7 @@ def _samples(
         members.append(
             (member.capture_ref, member.point_map_artifact_ref, member.point_map_content_sha256)
         )
-    if gaussian_centres:
+    if gaussian_centres is not None and len(gaussian_centres):
         centres = np.asarray(gaussian_centres, dtype=np.float64).reshape(-1, 3)
         centres = centres[_evenly(len(centres), int(params["gaussian_samples_max"]))]
         chunks.append(centres)
@@ -699,7 +701,7 @@ def build_scene_segments(
         and gaussian_source.get("ply_sha256") != _digest(gaussian_ply)
     ):
         raise ValueError("the declared Gaussian source is not these bytes")
-    centres = None if gaussian_ply is None else read_gaussian_centres(gaussian_ply)[0]
+    centres = None if gaussian_ply is None else gaussian_centre_array(gaussian_ply)
     cameras = _cameras(pose_receipt)
     samples, occlusion = _samples(placement, point_maps, centres, params, cameras)
     segments, summary = _lift(samples, cameras, occlusion, regions, params)
@@ -1289,6 +1291,9 @@ class SegmentsDue:
     job_id: uuid.UUID
     object_masks: tuple[tuple[str, str, str], ...]
     reason: str
+    #: The newest segments of this very build were lifted over trained Gaussians, which only
+    #: the scene worker at publication and the command given a PLY can lift over again.
+    over_gaussians: bool = False
 
     @property
     def state(self) -> tuple[uuid.UUID, tuple[tuple[str, str, str], ...]]:
@@ -1327,9 +1332,10 @@ def scenes_due_segments(
         masks = tuple(sorted((str(c), str(a), str(d)) for c, a, d in row["masks"]))
         if not row["member_count"] or len(masks) != row["member_count"]:
             continue
-        reason = _why_due(store, row, masks)
-        if reason is not None:
-            due.append(SegmentsDue(row["scene_id"], row["job_id"], masks, reason))
+        found = _why_due(store, row, masks)
+        if found is not None:
+            reason, over_gaussians = found
+            due.append(SegmentsDue(row["scene_id"], row["job_id"], masks, reason, over_gaussians))
     return due
 
 
@@ -1337,13 +1343,16 @@ def _why_due(
     store: ContentAddressedStore,
     row: Mapping[str, Any],
     masks: tuple[tuple[str, str, str], ...],
-) -> str | None:
-    """Why a scene's newest segments do not answer for these masks under its build, or None."""
+) -> tuple[str, bool] | None:
+    """Why a scene's newest segments do not answer for these masks under its build, or None.
+
+    The flag says the newest segments are this build's and were lifted over trained Gaussians.
+    """
     from exulanica.errors import BlobNotFoundError, IntegrityError
     from exulanica.evidence.blob import BlobId
 
     if row["segments_sha256"] is None:
-        return "no segments have been lifted for this build"
+        return "no segments have been lifted for this build", False
     try:
         envelope = json.loads(store.get(BlobId(bytes(row["segments_sha256"]))))
         bindings = envelope["segments"]["bindings"]
@@ -1361,14 +1370,18 @@ def _why_due(
                 for item in bindings["object_mask_inputs"]
             )
         )
+        over_gaussians = bindings.get("gaussian_source") is not None
     except (BlobNotFoundError, IntegrityError, KeyError, TypeError, ValueError):
-        return "the newest segments cannot be read"
+        return "the newest segments cannot be read", False
     if receipts != tuple(
         bytes(row[field]).hex() for field in ("pose_sha256", "placement_sha256", "gate_sha256")
     ):
-        return "the newest segments belong to another build"
+        return "the newest segments belong to another build", False
     if bound != masks:
-        return "a member's object masks changed after the newest segments were lifted"
+        return (
+            "a member's object masks changed after the newest segments were lifted",
+            over_gaussians,
+        )
     return None
 
 

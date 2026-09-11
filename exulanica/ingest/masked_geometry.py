@@ -44,6 +44,7 @@ __all__ = [
     "GaussianView",
     "camera_point",
     "count_masked_gaussians",
+    "gaussian_centre_array",
     "image_point",
     "masked_geometry_is_clean",
     "ppm_point",
@@ -66,16 +67,11 @@ class GaussianView:
     projection: str = "exact"
 
 
-def read_gaussian_centres(
-    data: bytes,
-) -> tuple[list[tuple[float, float, float]], list[float] | None]:
-    """Centres and, when the exporter wrote one, an opacity per Gaussian.
+def _ply_vertices(data: bytes) -> tuple[int, list[str], bytes]:
+    """A Gaussian PLY's vertex count, float property names and vertex bytes, refused if malformed.
 
-    The header walk is deliberately the same shape as ``gaussian_ply_bounds`` in
-    ``exulanica.ingest.scene_splat``, because the two read the same file and a second, looser
-    parser would accept bytes the first refuses. Opacity is returned as ``None`` rather than
-    defaulted: whether the pinned exporter writes it, and whether it writes a logit or a
-    probability, is not something this function may guess.
+    The one header walk both readers below use, so the array reader cannot accept a file the
+    tuple reader refuses.
     """
     terminator = b"end_header\n"
     end = data.find(terminator)
@@ -105,6 +101,39 @@ def read_gaussian_centres(
     stride = len(properties) * 4
     if len(payload) != count * stride:
         raise ValueError("Gaussian PLY vertex bytes disagree with its header")
+    return count, properties, payload
+
+
+def gaussian_centre_array(data: bytes) -> Any:
+    """Every Gaussian centre as an (N, 3) float64 array, for a caller that needs no opacity.
+
+    The same file and the same refusals as ``read_gaussian_centres``, read in one vectorised pass
+    rather than one Python tuple per Gaussian: the scene segment lift reads a trained scene of about
+    a million Gaussians and keeps a fraction of them. The values are the exact float32 values the
+    file holds, widened, which is what the tuple reader returns too.
+    """
+    import numpy as np
+
+    count, properties, payload = _ply_vertices(data)
+    vertices = np.frombuffer(payload, dtype="<f4").reshape(count, len(properties))
+    centres = vertices[:, [properties.index(key) for key in ("x", "y", "z")]].astype(np.float64)
+    if not np.isfinite(centres).all():
+        raise ValueError("Gaussian PLY contains nonfinite geometry")
+    return centres
+
+
+def read_gaussian_centres(
+    data: bytes,
+) -> tuple[list[tuple[float, float, float]], list[float] | None]:
+    """Centres and, when the exporter wrote one, an opacity per Gaussian.
+
+    The header walk is deliberately the same shape as ``gaussian_ply_bounds`` in
+    ``exulanica.ingest.scene_splat``, because the two read the same file and a second, looser
+    parser would accept bytes the first refuses. Opacity is returned as ``None`` rather than
+    defaulted: whether the pinned exporter writes it, and whether it writes a logit or a
+    probability, is not something this function may guess.
+    """
+    _count, properties, payload = _ply_vertices(data)
     axes = [properties.index(key) for key in ("x", "y", "z")]
     opacity_index = properties.index("opacity") if "opacity" in properties else None
     centres: list[tuple[float, float, float]] = []

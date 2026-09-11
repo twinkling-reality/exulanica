@@ -119,6 +119,14 @@ class SceneBuildOutcome:
 
 
 @dataclass(frozen=True, slots=True)
+class _TrainedGaussians:
+    """The accepted training output a delivery was compressed from, for the segment lift."""
+
+    ply: Path
+    delivery_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class _PendingArtifact:
     kind: str
     key: str
@@ -277,10 +285,10 @@ class SceneReconstructionProcessor:
         ledger: Ledger,
     ) -> SceneBuildOutcome:
         with ExitStack() as stack:
-            outcome, build = self._process_stages(claimed, job_directory, ledger, stack)
+            outcome, build, trained = self._process_stages(claimed, job_directory, ledger, stack)
         # After every stage of the build has closed, the training stages in `stack` included, so
         # none of them is timed as though the lift were part of it.
-        self._lift_segments(claimed, ledger, build)
+        self._lift_segments(claimed, ledger, build, trained)
         return outcome
 
     def _process_stages(
@@ -289,7 +297,7 @@ class SceneReconstructionProcessor:
         job_directory: Path,
         ledger: Ledger,
         stack: ExitStack,
-    ) -> tuple[SceneBuildOutcome, ValidatedBuild]:
+    ) -> tuple[SceneBuildOutcome, ValidatedBuild, _TrainedGaussians | None]:
         """Build, gate and publish the scene. Returns only once it is published."""
         self._verify_build_inputs(claimed)
         manifest, sources = self._manifest(claimed)
@@ -376,8 +384,9 @@ class SceneReconstructionProcessor:
                 )
                 extras: tuple[tuple[_PendingArtifact, StageRecorder], ...] = ()
                 splat_receipt = None
+                trained: _TrainedGaussians | None = None
                 if claimed.build_inputs.get("splat_training") is not None:
-                    extras, splat_receipt = self._train_splat(
+                    extras, splat_receipt, trained = self._train_splat(
                         claimed,
                         manifest,
                         source_directory,
@@ -520,13 +529,14 @@ class SceneReconstructionProcessor:
                                 ),
                                 ledger,
                             )
-        return SceneBuildOutcome(
+        outcome = SceneBuildOutcome(
             claimed.job_id,
             claimed.scene_id,
             "succeeded",
             rung=decision.rung,
             registered_member_count=registered_count,
-        ), ValidatedBuild(
+        )
+        build = ValidatedBuild(
             job_id=claimed.job_id,
             pose_receipt=pose_bytes,
             placement_receipt=placement_bytes,
@@ -537,9 +547,14 @@ class SceneReconstructionProcessor:
                 if item.content is not None
             },
         )
+        return outcome, build, trained
 
     def _lift_segments(
-        self, claimed: ClaimedSceneJob, ledger: Ledger, build: ValidatedBuild
+        self,
+        claimed: ClaimedSceneJob,
+        ledger: Ledger,
+        build: ValidatedBuild,
+        trained: _TrainedGaussians | None = None,
     ) -> None:
         """Lift what the members' photographs found into the scene just published. Never raises.
 
@@ -551,6 +566,13 @@ class SceneReconstructionProcessor:
         `stage_skipped` with the reason, and `scenes_due_segments` or the command can lift the
         scene again later. It reuses the placement this worker validated a moment ago rather than
         validating it a second time, which is most of what a lift costs.
+
+        When the build trained a delivery that was accepted, the lift also samples the accepted
+        Gaussians the delivery was compressed from, still in this job's scratch. They are one
+        surface where the posed point maps are one guess per photograph, so segments lifted over
+        them follow what a trained scene draws. MEASURED 2026-09-11 on the volcanic point maps:
+        voxels from the stacked per-photograph maps reached 25 per cent of the rock as its own
+        photographs outline it (``docs/scene-segments.md`` section 8).
 
         A worker asked to stop skips it, so that shutting down never waits on an overlay.
         """
@@ -566,8 +588,23 @@ class SceneReconstructionProcessor:
                     reason="the worker was asked to stop before the scene was lifted",
                 )
                 return
+            gaussian_ply = None if trained is None else trained.ply.read_bytes()
             publish_scene_segments(
-                self._repository, self._store, claimed.scene_id, ledger=ledger, validated=build
+                self._repository,
+                self._store,
+                claimed.scene_id,
+                ledger=ledger,
+                validated=build,
+                gaussian_ply=gaussian_ply,
+                gaussian_source=(
+                    None
+                    if trained is None or gaussian_ply is None
+                    else {
+                        "ply_sha256": hashlib.sha256(gaussian_ply).hexdigest(),
+                        "delivery_sha256": trained.delivery_sha256,
+                        "basis": "accepted training output the delivery was compressed from",
+                    }
+                ),
             )
 
     def _train_splat(
@@ -579,7 +616,11 @@ class SceneReconstructionProcessor:
         ledger: Ledger,
         stack: ExitStack,
         pose_artifact: _PendingArtifact,
-    ) -> tuple[tuple[tuple[_PendingArtifact, StageRecorder], ...], SceneReceipt]:
+    ) -> tuple[
+        tuple[tuple[_PendingArtifact, StageRecorder], ...],
+        SceneReceipt,
+        _TrainedGaussians | None,
+    ]:
         request = SceneSplatRequest.from_payload(claimed.build_inputs["splat_training"])
         manifest = request.manifest(pose)
         training_input = input_digest_of(
@@ -622,6 +663,7 @@ class SceneReconstructionProcessor:
             "delivery": None,
         }
         outputs: list[tuple[_PendingArtifact, StageRecorder]] = []
+        trained: _TrainedGaussians | None = None
         evaluation_bytes = evaluation_bundle(result.job_directory / "output")
         evaluation_recorder = stack.enter_context(
             ledger.stage(
@@ -665,6 +707,11 @@ class SceneReconstructionProcessor:
                 ),
                 "bounds_convention": "axis-aligned-three-sigma-Gaussian-support",
             }
+            # Identity above, so the accepted Gaussians are already in the scene frame the
+            # segment lift samples in; a delivery with any other transform would need it here.
+            trained = _TrainedGaussians(
+                result.job_directory / "output" / "accepted.ply", delivery.content_id.hex
+            )
         training_receipt = self._pending(
             claimed.scene_id,
             "scene_splat_training",
@@ -672,11 +719,15 @@ class SceneReconstructionProcessor:
             training_input,
         )
         outputs.append((training_receipt, recorder))
-        return tuple(outputs), SceneReceipt(
-            kind="splat",
-            sha256=training_receipt.content_id.hex,
-            accepted=quality.accepted,
-            reasons=quality.reasons,
+        return (
+            tuple(outputs),
+            SceneReceipt(
+                kind="splat",
+                sha256=training_receipt.content_id.hex,
+                accepted=quality.accepted,
+                reasons=quality.reasons,
+            ),
+            trained,
         )
 
     def _manifest(

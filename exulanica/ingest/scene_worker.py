@@ -186,6 +186,23 @@ class SceneReconstructionWorker:
                     if self._stop.is_set():
                         break
                     self._segments_attempted[item.scene_id] = item.state
+                    if item.over_gaussians:
+                        # Lifting again from point maps alone would replace segments that follow
+                        # the trained surface with ones that follow the stacked per-photograph
+                        # maps. The accepted PLY is not retained, so this is the command's to do.
+                        results.append(
+                            {
+                                "scene_id": str(item.scene_id),
+                                "action": "skipped",
+                                "reason": (
+                                    "its segments were lifted over trained Gaussians, and this "
+                                    "worker holds no PLY to lift it again with; run the command "
+                                    "with --gaussian-ply"
+                                ),
+                                "due": item.reason,
+                            }
+                        )
+                        continue
                     try:
                         result = publish_scene_segments(
                             repository, self._store, item.scene_id, trigger="reprocess"

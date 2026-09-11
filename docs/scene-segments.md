@@ -123,7 +123,12 @@ native runtime.
   widely: every exception is caught, not only the refusals a malformed receipt raises, because
   anything escaping after the commit would report a published scene as failed. The failure is
   `stage_failed` on `scene_segments` in that run, and a worker asked to stop records
-  `stage_skipped` instead of lifting.
+  `stage_skipped` instead of lifting. When the build trained a delivery that was accepted, the
+  lift also samples the accepted training output the delivery was compressed from, still in the
+  job's scratch, and binds it as the Gaussian source: the PLY by digest and the delivery by its
+  artifact digest. The trained Gaussians are one surface where the posed point maps are one
+  guess per photograph, so these segments follow what a trained scene draws (section 8 says why
+  that matters).
 * **When masks complete after the build.** `scenes_due_segments` finds every published scene where
   every member of the current build has a live segmentation artifact and the newest segments are
   absent, unreadable, bound to another build or bound to other masks.
@@ -131,9 +136,13 @@ native runtime.
   own. The scene worker command does this after a drain, at most every
   `--segments-refresh-seconds` (default 300, 0 turns it off), under `--once` as well, and never
   in a job-scoped worker. A scene is attempted once for each state it is due in, so a lift that
-  fails the same way every time is not repeated on every pass.
+  fails the same way every time is not repeated on every pass. A scene whose newest segments of
+  this build were lifted over trained Gaussians is reported as skipped rather than lifted: the
+  accepted PLY is not retained, and lifting it from point maps alone would replace segments that
+  follow the trained surface with ones that follow the per-photograph maps.
 * **On demand**, from `python -m exulanica.ingest.scene_segments --workspace <uuid> --scene <uuid>`,
-  which is also the only way to lift over trained Gaussians.
+  which is also how a published trained scene is lifted over its Gaussians again: `--gaussian-ply`
+  with a PLY decoded from the delivery, bound by `--gaussian-delivery-sha256`.
 
 All three are numpy and nothing else, which is what lets the first two run in the pycolmap
 process. All three skip a scene with nothing to lift, no object masks and no reviewed, shown
@@ -249,8 +258,8 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 * **Nothing re-lifts for people.** A person region reviewed after the lift is reported in the
   reader's `stale_inputs` while everything else is served; it reaches the scene at the next lift,
   from the sweep or the command.
-* **The automatic lifts use point maps alone.** Lifting over trained Gaussians needs a decoded PLY
-  (below) and stays the command's.
+* **Only publication lifts over Gaussians automatically.** The sweep has no PLY and leaves a
+  trained scene whose masks changed to the command (below), and it reports that it did.
 * **What the lift costs now.** MEASURED 2026-09-11 on the volcanic scene, loading what the scene
   worker hands the lift at publication from a frozen copy and timing `build_scene_segments` alone,
   with the peak taken from traced allocations (numpy's arrays included):
@@ -280,8 +289,10 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   map, the work the projection exists to save a reader, because correctness of a durable artifact
   is worth it once. Only the lift at publication skips it, and only because the same process
   validated those exact receipts a moment before.
-* **Gaussian centres need a decoded PLY.** The trained delivery is SOG and no PLY is retained, so
-  lifting over Gaussians takes the decode the masked-geometry evaluation already performs.
+* **Gaussian centres need a decoded PLY after publication.** The trained delivery is SOG and no
+  PLY is retained, so lifting a published trained scene again takes the decode the
+  masked-geometry evaluation already performs. At publication the accepted training output is
+  used instead, which differs from the delivery only by the delivery's quantisation.
 * **Synonymous labels split one object** (`plate` and `table` above), and the segment floor of eight
   samples is low beside 215,040: a fringe segment clears it. Merging labels would need a
   vocabulary with synonyms or a cross-label association step; neither exists.
