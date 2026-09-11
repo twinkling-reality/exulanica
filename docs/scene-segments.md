@@ -166,7 +166,10 @@ It is stable once published: fields may be added, and no field may be renamed, r
 
 On the volcanic scene, on a frozen copy of `exulanica_inspect_test` with a hardlinked copy of the
 reference store, on an Apple M3 Pro with 18 GiB, MPS. The retained database and store were not
-written.
+written. The digest-bound record is
+[2026-09-11-scene-segments-backend.json](evaluation/2026-09-11-scene-segments-backend.json), with the
+harness, the measurement, the mutation controls and both backend suite logs beside it under
+`docs/evaluation/artifacts/2026-09-11-scene-segments-backend/`.
 
 The subject turned out to be a volcanic rock photographed on a white turntable, 210 photographs of
 it from around the turntable. The workspace carries no hosted vision observations on the copy, so
