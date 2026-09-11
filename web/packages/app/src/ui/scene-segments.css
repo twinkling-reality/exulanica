@@ -1,0 +1,129 @@
+/*
+ * The scene segments panel.
+ *
+ * It stands beside the proof lens, bottom aligned with it, because it is the same kind of thing: a
+ * switch that changes how the world is coloured and nothing else, with the words that make the
+ * colour checkable underneath. It takes the lens's material so the two read as one family, and it
+ * leaves with the lens when the Index or the Map takes the screen.
+ *
+ * No colour literals and no timing literals, for the reason `test/style-contract.test.ts` gives for
+ * the other stylesheets: the swatch colours are the only colours here, and they arrive as inline
+ * values from the same function that tints the world, so the list cannot name a colour the world is
+ * not wearing.
+ */
+
+.scene-segments {
+  position: fixed;
+  left: calc(2 * var(--gap) + min(24rem, calc(100vw - 2 * var(--gap))));
+  bottom: 3.2rem;
+  width: min(22rem, calc(100vw - 3 * var(--gap)));
+  /* Low enough to leave the middle of the view to the world it is describing; the list scrolls. */
+  max-height: min(24rem, calc(100vh - 9rem));
+  overflow-y: auto;
+  padding: 0.9rem 1.1rem;
+  display: grid;
+  gap: 0.55rem;
+  background: var(--raised);
+  border: 1px solid var(--ink-faint);
+  color: var(--ink);
+  font: 400 0.8rem/1.5 var(--ui-font-body);
+  text-shadow: none;
+  pointer-events: auto;
+  z-index: 55;
+}
+
+.scene-segments h2 {
+  margin: 0;
+  font: 500 0.72rem/1.4 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.scene-segments p { margin: 0; }
+.scene-segments-toggle,
+.scene-segments-inspect { justify-self: start; }
+.scene-segments-copy,
+.scene-segments-where,
+.scene-segments-pick { color: var(--ink-faint); }
+.scene-segments-message[data-state='failed'] { color: var(--warning); }
+
+.scene-segments-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.scene-segment {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid transparent;
+}
+
+.scene-segment:hover,
+.scene-segment:focus-within,
+.scene-segment[aria-current='true'] { border-color: var(--ink-faint); }
+
+.scene-segment-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.scene-segment-select {
+  display: grid;
+  grid-template-columns: 0.7rem 1fr;
+  column-gap: 0.6rem;
+  align-items: start;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.scene-segment-swatch {
+  grid-row: span 2;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.35em;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+/* Listed and not tinted: an outline with nothing inside, rather than a colour the world is not wearing. */
+.scene-segment-swatch[data-untinted='true'] { background: none; }
+.scene-segment-heading { font-weight: 500; }
+.scene-segment-summary,
+.scene-segment-untinted,
+.scene-segment-fact { color: var(--ink-faint); }
+
+.scene-segment-detail {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.3rem;
+}
+
+.scene-segment-name {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.scene-segment-name input { width: 100%; }
+.scene-segment-name button { justify-self: start; }
+
+.scene-segments-notices {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--ink-faint);
+}
+
+/* The overlay belongs to the world. It says nothing about the Index or the Map, so it leaves them. */
+#shell:not([data-primary='world']) .scene-segments,
+#shell[data-camera='map'] .scene-segments { display: none; }
