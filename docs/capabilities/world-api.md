@@ -53,6 +53,9 @@ EXULANICA_TOKEN=<token> uv run python scripts/world_client_example.py --base-url
 personal; the server never infers it. `--demonstrate-stale-base` presents the pre-add token for the
 move on purpose, so the refusal and the re-read are shown rather than asserted.
 
+Its run against the reference copy, with the wire transcript, is retained in
+[the developer-proof record](../evaluation/2026-09-11-developer-proof.json).
+
 ## Gaps a second tool meets today
 
 - A version can be created only from an existing structural snapshot, and no route composes one.

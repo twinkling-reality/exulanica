@@ -267,6 +267,12 @@ deterministic), and shows the extension changes only `ro-crate-metadata.json` am
 from live PostgreSQL through a signed package and reads it back with a loader that lacks the
 extension and one that has it, and shows a version whose source was deleted is withheld.
 
+[evaluation/2026-09-11-developer-proof.json](evaluation/2026-09-11-developer-proof.json) retains the
+same proof on the reference copy: a package projected from the version the second client edited,
+verified by this code and by the verifier at 90edb49, checked against four loader declarations, and
+the same snapshot projected without the extension by this code and by the 90edb49 projector,
+byte-identical in every file including the signature.
+
 ## Explicit training dataset profile
 
 `exulanica-wmp-training-1.1` is an independently selected dataset profile. The ordinary `project`
