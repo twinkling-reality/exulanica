@@ -17,6 +17,7 @@ import pytest
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.db.roles import provision_runtime_role
 from exulanica.db.session import Database
+from exulanica.env import env_get
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.world_read_verification import EvidenceError, verify_downloads
 from exulanica.ingest.person_review import record_region_edits
@@ -34,9 +35,11 @@ from test_world_read_route import _scene_in
 def readonly(deployment, repository, spine_schema, monkeypatch, request):
     _, schema = spine_schema
     provision_runtime_role(repository.connection, role="exulanica_ro", read_only=True)
+    # The database the schema was migrated into, not a fixed one: a fixed URL reads a schema that
+    # only exists elsewhere, and every request then answers 404 "no such scene".
     database = Database(
         url=make_conninfo(
-            "postgresql://localhost:5433/exulanica_spine_test",
+            env_get("TEST_DATABASE_URL"),
             options=f"-csearch_path={schema},public -crole=exulanica_ro",
         )
     )
@@ -774,9 +777,12 @@ def test_absent_legacy_screening_binding_refuses_actual_routes(deployment, repos
             "where workspace_id=%s and artifact_id=%s",
             (repository.workspace_id, point["artifact_id"]),
         )
-    assert repository.connection.execute("show session_replication_role").fetchone()[
-        "session_replication_role"
-    ] == "origin"
+    assert (
+        repository.connection.execute("show session_replication_role").fetchone()[
+            "session_replication_role"
+        ]
+        == "origin"
+    )
     response = deployment.as_owner("GET", view["photo_bytes"]["fetch"])
     assert response.status_code == 409, response.text
     assert deployment.as_owner("GET", f"/world-read/scenes/{scene}").status_code == 404
