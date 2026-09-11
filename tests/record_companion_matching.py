@@ -145,6 +145,27 @@ def seal_record(path: Path, additions: dict) -> str:
     document = json.loads(path.read_text())
     record = document.get("record", document)
     record.update(additions)
+    root = Path(__file__).resolve().parents[1]
+    predecessor_path = record.get("predecessor_record", {}).get("path", record["predecessor"])
+    predecessor_bytes = (root / predecessor_path).read_bytes()
+    predecessor = json.loads(predecessor_bytes)
+    predecessor_digest = hashlib.sha256(canonical_json(predecessor["record"])).hexdigest()
+    assert predecessor_digest == predecessor["record_sha256"], "predecessor digest mismatch"
+    assert predecessor_digest == record["predecessor_record_sha256"]
+    assert hashlib.sha256(predecessor_bytes).hexdigest() == record["predecessor_file_sha256"]
+    record["predecessor_record"] = {
+        "path": predecessor_path, "record_sha256": predecessor_digest,
+    }
+    for gate in record.get("gates", []):
+        actual = hashlib.sha256(gate["stdout_stderr"].encode()).hexdigest()
+        assert actual == gate["log_sha256"], f"gate log digest mismatch: {gate['name']}"
+    for measured_path, expected in record["measured_files_sha256"].items():
+        content = subprocess.check_output(
+            ["git", "show", f"{record['head']}:{measured_path}"], cwd=root,
+        )
+        assert hashlib.sha256(content).hexdigest() == expected, (
+            f"measured file differs from recorded head: {measured_path}"
+        )
     digest = hashlib.sha256(canonical_json(record)).hexdigest()
     path.write_text(json.dumps({
         "profile": "exulanica.digest-bound-record/v1", "record": record,
