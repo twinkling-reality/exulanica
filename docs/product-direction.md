@@ -190,7 +190,10 @@ the scene's observed bottleneck.
    recognizing someone never implies permission or capability to simulate their personality.
 4. **Simulation:** scope physics, collisions, dynamic objects, and agent behavior through measured
    prototypes. Select a runtime only after those requirements are concrete. Validate physical behavior against explicit test scenarios.
-5. **Developer interoperability:** document stable read/edit contracts, package compatibility,
+5. **Scene segments:** lift per-photograph people and object regions into per-entity 3D
+   segments through the recovered cameras, show them in the scene, and name them there;
+   models and ownership in [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md).
+6. **Developer interoperability:** document stable read/edit contracts, package compatibility,
    capability negotiation, and asset resolution. Prove a second tool can make an accepted change
    without depending on private interface state before claiming interoperability.
 

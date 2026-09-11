@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**116 documents**, excluding `docs/evaluation/`.
+**118 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -118,7 +118,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-11 documents.
+12 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -131,6 +131,7 @@ What was intended, written before the work.
 - [2026-09-08-retained-activation](briefs/2026-09-08-retained-activation.md) : proposed, not dispatched. No retained operation is authorized by this document
 - [2026-09-08-stale-screening-policy](briefs/2026-09-08-stale-screening-policy.md) : completed and integrated at 53039d4; see
 - [2026-09-08-world-read-evidence](briefs/2026-09-08-world-read-evidence.md) : completed and integrated at 3352627 after independent corrected-head gates. See
+- [2026-09-11-scene-segments](briefs/2026-09-11-scene-segments.md) : proposed, not dispatched. Recorded 2026-09-11 after the wave-3 integration
 
 ## Dated records
 
