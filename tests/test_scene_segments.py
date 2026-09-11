@@ -608,14 +608,14 @@ def test_only_a_reviewed_and_shown_person_is_lifted_and_a_withdrawal_takes_them_
     assert after.withheld_segment_count == 1
 
 
-def test_segments_bound_to_another_build_are_stale_not_served(repository, tmp_path):
-    store, captures, _points, scene_id = _published(repository, tmp_path, "lift-build")
-    _segment_members(repository, store, captures, SceneSegmenter())
-    written = lift.publish_scene_segments(repository, store, scene_id)
+def _retarget(repository, store, written, mutate):
+    """Re-seal an edited payload and point the segments row at it, as a tampered publisher would.
+
+    The payload digest is recomputed, so what refuses it is the check under the envelope's.
+    """
     envelope = json.loads(store.get(BlobId.from_hex(written["segments_sha256"])))
-    envelope["segments"]["bindings"]["pose_receipt_sha256"] = "f" * 64
-    payload = envelope["segments"]
-    envelope["payload_sha256"] = lift._digest(lift.canonical_json(payload))
+    mutate(envelope["segments"])
+    envelope["payload_sha256"] = lift._digest(lift.canonical_json(envelope["segments"]))
     tampered = store.put_bytes(lift.canonical_json(envelope) + b"\n")
     repository.connection.execute(
         "update artifact set content_sha256=%s, storage_key=%s, byte_size=%s "
@@ -628,8 +628,32 @@ def test_segments_bound_to_another_build_are_stale_not_served(repository, tmp_pa
             uuid.UUID(written["artifact_id"]),
         ),
     )
+
+
+def test_segments_bound_to_another_build_are_stale_not_served(repository, tmp_path):
+    store, captures, _points, scene_id = _published(repository, tmp_path, "lift-build")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    written = lift.publish_scene_segments(repository, store, scene_id)
+    _retarget(
+        repository,
+        store,
+        written,
+        lambda payload: payload["bindings"].update(pose_receipt_sha256="f" * 64),
+    )
     read = _read(repository, store, scene_id)
     assert read.state == "stale" and read.stale_inputs == ("scene_build",)
+
+
+def test_a_bound_but_malformed_artifact_is_refused_rather_than_raised(repository, tmp_path):
+    store, captures, _points, scene_id = _published(repository, tmp_path, "lift-malformed")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    written = lift.publish_scene_segments(repository, store, scene_id)
+    _retarget(
+        repository, store, written, lambda payload: payload["bindings"].pop("point_map_inputs")
+    )
+    read = _read(repository, store, scene_id)
+    assert read.state == "stale" and read.stale_inputs == ("unreadable",)
+    assert read.segments == ()
 
 
 def test_a_scene_nobody_has_is_not_found_rather_than_empty(repository, tmp_path):

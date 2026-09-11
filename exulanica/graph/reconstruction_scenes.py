@@ -1473,6 +1473,34 @@ def scene_segments_read(
             **receipts,
         )
     candidate, payload = chosen
+    try:
+        return _proven_read(
+            connection, workspace, scene_id, store, candidate, payload, receipts, members
+        )
+    except (KeyError, TypeError, ValueError):
+        # A payload that proved its digest and its bindings and is still not a shape this reader
+        # takes. Refused like any other unreadable artifact and never raised, for the reason the
+        # projection reader gives: a bad artifact must not become a 500 for its whole scene.
+        return SceneSegmentsRead(
+            scene_id,
+            "stale",
+            "The lifted segments cannot be read.",
+            stale_inputs=("unreadable",),
+            **receipts,
+        )
+
+
+def _proven_read(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    scene_id: uuid.UUID,
+    store: ContentAddressedStore,
+    candidate: dict[str, Any],
+    payload: dict[str, Any],
+    receipts: dict[str, str],
+    members: list[str],
+) -> SceneSegmentsRead:
+    """The live checks, over a payload already proven against the scene's current build."""
     bindings = payload["bindings"]
     artifact = {
         "artifact_id": candidate["artifact_id"],
