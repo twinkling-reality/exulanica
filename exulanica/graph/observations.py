@@ -308,7 +308,10 @@ def _bounds(
 # `recovered_camera`), the same projection, the same tolerance and occlusion band with the same
 # defaults, the same tie-break. Its cases are ported from the browser's own tests. What it computes
 # on is the receipt's floats rather than the twelve-decimal strings the graph put on the wire,
-# which moves a projection by far less than a pixel and can change only an exact tie.
+# which moves a projection by far less than a pixel and can change only an exact tie. The camera is
+# the raw recovered one and never the display-frame-composed camera the renderer draws with: these
+# points are in the recovered COLMAP frame and composed with nothing, so pairing them with a
+# displayed camera would be a silent, plausible-looking error.
 #
 # What is NOT held, and is read on every request exactly as the graph read reads it: which
 # captures are live members, every consent state, the tombstone and withdrawal predicates in

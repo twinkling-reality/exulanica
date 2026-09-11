@@ -432,16 +432,12 @@ export {
 
 export type {
   PickCalibration,
-  PickCamera,
-  PickOptions,
   PickResult,
   SparseObservedPoint,
 } from './observation-pick.js';
 export {
   canvasToSourcePixel,
   observationSentence,
-  pickObservedPoint,
-  projectToSourcePixel,
 } from './observation-pick.js';
 
 export type {

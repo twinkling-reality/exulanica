@@ -121,7 +121,7 @@ because no camera stood there. Every listed photograph reports `person_consent: 
 the sentence says what a screening receipt does and does not establish: a named human reviewed the
 whole photograph, and no person in it has agreed to be shown.
 
-The pick inverts the **raw** recovered camera from the graph, not the display-frame-composed one the
+The pick projects through the **raw** recovered camera, not the display-frame-composed one the
 renderer draws with, because the observation graph's world coordinates are the recovered COLMAP
 frame and are composed with nothing. Reprojecting every retained observation of the first photograph
 through that transform reproduced COLMAP's own recorded pixel to a median of 2.83 px and a maximum
@@ -129,10 +129,19 @@ of 9.88 px on a 3060x4080 original, which is the SIMPLE_RADIAL distortion the ca
 pinhole approximation. The world canvas is `aria-hidden`, so the same question is also askable from
 a button inside the inspector, which resolves the centre of the view.
 
-The observation graph is one whole-scene read, about 53 MB of JSON for the bowl, started when the
-inspector opens and cached per scene for the session. It carries no digest of its own, unlike the
-World Read bundle: it is recorded provenance served over an authenticated route, not a receipt a
-recipient can verify offline.
+The pick runs on the server. The browser turns a click into a cursor in the photograph's own pixels
+and asks `GET /world-read/scenes/{id}/observations/resolve` for the one recorded point it selects;
+opening a view asks `.../observations/summary` for the counts the idle sentence shows. It used to
+read the whole observation graph and pick in the browser, and that could not survive a large scene:
+measured on 2026-09-11 against a frozen copy of the 210-photograph volcanic scene, the whole graph is
+1,015,016,928 bytes of JSON, which V8 cannot hold as one string, so the panel failed with
+"Unexpected end of JSON input". A resolved click is kilobytes (11,277 bytes for a point eight
+photographs observed, 1,784 for a miss) and is bounded by the scene's photograph count rather than
+its point count. The server builds an index of the pose receipt on a scene's first read, 6.3 s for
+the volcanic scene, and answers in 0.2 to 0.3 s after that. `exulanica/graph/observations.py`
+records the rest, including what that index does not hold. None of these reads carries a digest of
+its own, unlike the World Read bundle: they are recorded provenance served over an authenticated
+route, not a receipt a recipient can verify offline.
 
 ## Trained artifact delivery
 

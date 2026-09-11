@@ -102,6 +102,27 @@ describe('the inspector evidence panel', () => {
     expect(panel.root.querySelectorAll('.reconstruction-evidence-photograph')).toHaveLength(0);
   });
 
+  it('clears the previous answer the moment a new click goes to the server', () => {
+    // The pick runs on the server now, so there is a gap between a click and its answer. The
+    // previous point's photographs must not stand through that gap as the answer to this click.
+    const panel = inspector();
+    panel.showEvidence({
+      kind: 'hit', sentence: '3 photographs observed this point.', pointId: 1, pixelDistance: 4,
+      meanReprojectionErrorPx: 0.4, projection: 'pinhole', photographs: [{
+        captureId: 'capture-a', title: 'A photograph', label: 'Photograph 1', url: null,
+        alt: 'An original photograph.', available: false, x: 1, y: 2,
+        consentSentence: consentSentence(CONSENT),
+      }],
+    });
+    panel.showEvidence({ kind: 'resolving' });
+    expect(panel.root.querySelector<HTMLElement>('.reconstruction-evidence')!.dataset.evidence)
+      .toBe('resolving');
+    expect(panel.root.querySelector('.reconstruction-evidence-state')!.textContent)
+      .toBe('Finding the recorded point nearest that click.');
+    expect(panel.root.querySelector('.reconstruction-evidence-detail')!.textContent).toBe('');
+    expect(panel.root.querySelectorAll('.reconstruction-evidence-photograph')).toHaveLength(0);
+  });
+
   it('carries each photograph consent state and never reports absent people', () => {
     const sentence = consentSentence(CONSENT);
     expect(sentence).toContain('Screened by a named human reviewer');

@@ -45,6 +45,8 @@ export type ObservationEvidenceState =
   /** This view has no calibrated recovered camera, so a click has nothing exact to invert. */
   | { readonly kind: 'unsupported'; readonly reason: string }
   | { readonly kind: 'loading' }
+  /** A click is with the server. Whatever the panel said about the previous click is gone. */
+  | { readonly kind: 'resolving' }
   | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'ready'; readonly pointCount: number; readonly retainedPerImage: number }
   | { readonly kind: 'miss'; readonly toleranceSourcePx: number; readonly canvasPx: number }
@@ -194,6 +196,11 @@ export function buildReconstructionInspector(options: {
         return;
       case 'loading':
         evidenceState.textContent = 'Reading the recorded observations for this scene.';
+        evidenceDetail.textContent = '';
+        replace(evidenceList, []);
+        return;
+      case 'resolving':
+        evidenceState.textContent = 'Finding the recorded point nearest that click.';
         evidenceDetail.textContent = '';
         replace(evidenceList, []);
         return;
