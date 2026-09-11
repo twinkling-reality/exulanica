@@ -420,9 +420,16 @@ function rawSceneFromLocal(record: ReconstructionSceneRecord, asset: DrawnAsset)
  * Whether these segments are about the geometry drawn here, and through which transforms.
  *
  * The route already refuses an artifact whose bindings moved and withholds a segment whose inputs
- * changed. This is the second look, on this side: the scene, and the pose, placement and gate
- * receipts the artifact names, against the ones the graph holds for the scene being drawn. Any of
- * them disagreeing means the voxels describe other geometry, and nothing is tinted.
+ * changed. This is the second look, on this side: the scene, and the pose and placement receipts
+ * the artifact names, against the ones the graph holds for the scene being drawn. Either of them
+ * disagreeing means the voxels describe other geometry, and nothing is tinted.
+ *
+ * Not the gate. The graph's `gateDigest` is the digest of the gate DECISION, from the rung
+ * assertion, and the artifact's `gateReceiptSha256` is the SHA-256 of the whole gate receipt, the
+ * envelope that decision sits in, so the two differ for every scene. MEASURED on the volcanic scene
+ * against a running backend: `1eb52108...` against `57189a4b...`, and comparing them refused every
+ * real scene. The gate does not move the frame the voxels are in, which the pose and placement
+ * pin, and the route refuses segments bound to another gate receipt before any reach this side.
  *
  * The preview has no scene record and no receipts. Its one map is drawn with the identity transform,
  * which is its scene frame, and the panel says nothing was compared.
@@ -454,9 +461,6 @@ export function bindSegments(
   }
   if (segments.placementReceiptSha256 !== record.placementReceiptSha256) {
     return refuse('These segments were computed against a different placement receipt, so nothing is tinted.');
-  }
-  if (segments.gateReceiptSha256 !== null && record.gateDigest !== null && segments.gateReceiptSha256 !== record.gateDigest) {
-    return refuse('These segments were computed against a different gate receipt, so nothing is tinted.');
   }
   const assets: BoundAsset[] = [];
   const notices: string[] = [];

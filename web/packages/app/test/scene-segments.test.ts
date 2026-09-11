@@ -125,7 +125,8 @@ const RECORD = {
   memberDigest: 'a'.repeat(64),
   poseReceiptSha256: 'b'.repeat(64),
   placementReceiptSha256: 'c'.repeat(64),
-  gateDigest: 'd'.repeat(64),
+  // The gate DECISION's digest, which is never the gate receipt's content hash the artifact names.
+  gateDigest: '9'.repeat(64),
   trainedGeometry: null,
   members: [{ captureId: PREVIEW_IDS.captureStudio, placement: { artifactId: POINTS, contentSha256: 'e'.repeat(64), sceneFromOpmRowMajor: IDENTITY } }],
 } as unknown as ReconstructionSceneRecord;
@@ -387,9 +388,18 @@ describe('segments are refused unless they describe the geometry drawn here', ()
     const differ = (over: Partial<ReconstructionSceneRecord>) => bindSegments(parsed, DRAWN, { ...RECORD, ...over }, false);
     expect(differ({ poseReceiptSha256: 'f'.repeat(64) }).assets).toEqual([]);
     expect(differ({ placementReceiptSha256: 'f'.repeat(64) }).assets).toEqual([]);
-    expect(differ({ gateDigest: 'f'.repeat(64) }).notices[0]).toMatch(/different gate receipt/);
     expect(bindSegments(parsed, DRAWN, undefined, false).assets).toEqual([]);
     expect(bindSegments(parsed, { ...DRAWN, sceneId: '77777777-7777-4777-8777-777777777777' }, RECORD, false).notices[0]).toMatch(/different scene/);
+  });
+
+  it('does not compare the gate decision digest with the gate receipt hash', () => {
+    // Two different digests of two different things, which disagree for every real scene: on the
+    // volcanic scene the graph said `1eb52108...` and the artifact `57189a4b...`. The route refuses
+    // segments bound to another gate receipt before any reach this side.
+    expect(RECORD.gateDigest).not.toBe(parsed.gateReceiptSha256);
+    const bound = bindSegments(parsed, DRAWN, RECORD, false);
+    expect(bound.assets.map((item) => item.asset.artifactId)).toEqual([POINTS]);
+    expect(bound.notices).toEqual([]);
   });
 
   it('skips an asset the graph holds no placement for, and says so', () => {
