@@ -589,6 +589,9 @@ def test_undeclared_loader_capabilities_stay_indeterminate(tmp_path: Path):
     assert checked["loadability"] == "indeterminate"
     assert checked["compatible"] is None
     assert checked["unsupported_capabilities"] == []
+    [extension] = checked["extensions"]
+    assert extension["load"].startswith("indeterminate")
+    assert extension["unsupported_capabilities"] == []
 
 
 def test_import_check_cli_reports_unsupported_capabilities(

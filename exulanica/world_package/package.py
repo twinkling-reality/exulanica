@@ -651,6 +651,19 @@ def import_check_package(
             }
         )
     supplied = bool(declared)
+    if not supplied:
+        # Nothing was declared, so nothing can be called unsupported. Saying "not loaded" here
+        # would be the same fabricated answer as saying "compatible".
+        for item in extension_reports:
+            item.update(
+                {
+                    "load": "indeterminate: the loader declared no capabilities",
+                    "not_loaded": None,
+                    "objects_not_drawable": [],
+                    "objects_with_unsupported_behaviour": [],
+                    "unsupported_capabilities": [],
+                }
+            )
     base_unsupported = sorted(
         [STYLE_PROFILE_PREFIX + value for value in report["missing_style_profiles"]]
         + [INTERACTION_PREFIX + value for value in report["missing_interaction_capabilities"]]
