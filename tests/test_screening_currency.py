@@ -703,7 +703,17 @@ def test_actual_personal_command_preserves_review_inputs(case, tmp_path):
     doc["source"]["path"] = "a.jpg"
     schema = "exulanica_personal_currency_" + uuid.uuid4().hex
     calls = []
-    with psycopg.connect("postgresql://localhost:5433/exulanica_spine_test") as owner:
+    # The command pins its own database, so pointing that one constant at the configured one is
+    # what lets this run anywhere the schema above actually exists. Everything else is the real
+    # command in its own process: its argument parsing, its refusals and its exit codes. The URL
+    # travels in the environment the child already inherits rather than in argv, which is recorded.
+    entry = (
+        "from exulanica.env import env_get; "
+        "from exulanica.ingest import personal_admission_command as command; "
+        "command.DATABASE_URL = env_get('TEST_DATABASE_URL'); "
+        "raise SystemExit(command.main())"
+    )
+    with psycopg.connect(env_get("TEST_DATABASE_URL")) as owner:
         apply_migration(owner, schema)
         try:
             for migration in migrations():
@@ -725,8 +735,8 @@ def test_actual_personal_command_preserves_review_inputs(case, tmp_path):
                 path.write_bytes(canonical_json(doc))
                 argv = [
                     sys.executable,
-                    "-m",
-                    "exulanica.ingest.personal_admission_command",
+                    "-c",
+                    entry,
                     "--schema",
                     schema,
                     "--manifest",
