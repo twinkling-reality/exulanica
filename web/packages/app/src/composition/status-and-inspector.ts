@@ -64,7 +64,8 @@ export interface MountedStatusAndInspector {
   /** A legacy preview map the renderer accepted, so the source-only notice stops claiming it. */
   noteRenderedPreviewRegion(islandId: string): void;
   inspectReconstruction(sceneId: string): void;
-  inspectSceneSources(sceneId: string): void;
+  /** Open a scene's source photographs, on `captureId`'s when one is given and present. */
+  inspectSceneSources(sceneId: string, captureId?: string): void;
   /** One click on the world canvas, resolved by the server against the recorded observations. */
   resolveEvidenceAt(clientX: number, clientY: number): void;
   /** Who is in this photograph, or nothing when the view stands on no single photograph. */
@@ -483,7 +484,7 @@ export function mountStatusAndInspector(
     });
   };
 
-  const inspectSceneSources = (sceneId: string): void => {
+  const inspectSceneSources = (sceneId: string, captureId?: string): void => {
     state.atlas?.binding.endSceneInspection();
     deps.showWorld();
     const sources = sourcesForScene(sceneId);
@@ -492,7 +493,8 @@ export function mountStatusAndInspector(
       label: `Photograph ${index + 1}`, source,
       captureId: source.captureIds?.length === 1 ? source.captureIds[0] ?? null : null,
     }));
-    if (!reconstructionInspector.open(sceneId, choices)) {
+    const focused = captureId === undefined ? -1 : choices.findIndex((choice) => choice.captureId === captureId);
+    if (!reconstructionInspector.open(sceneId, choices, Math.max(0, focused))) {
       deps.showTravelStatus('No authorized source photographs are available in this session.', 'failure');
     }
   };

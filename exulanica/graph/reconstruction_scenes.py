@@ -9,11 +9,13 @@ immutable scene members and exact point-map artifact rows.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import json
 import math
 import uuid
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any, Final, Literal, NamedTuple
@@ -23,6 +25,7 @@ import psycopg
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.asset_read_policy import evaluation_time, image_source
 from exulanica.graph.generated_geometry import generated_geometry_rows
 from exulanica.graph.geometry import POINT_MAP_KIND
 from exulanica.graph.payload import (
@@ -31,6 +34,8 @@ from exulanica.graph.payload import (
     SceneGeometryReferenceRow,
     ScenePointMapPlacementRow,
     SceneRecoveredCameraRow,
+    SceneUnposedPhotographRow,
+    SceneUnposedPointMapRow,
 )
 from exulanica.graph.person_regions import (
     hidden_people,
@@ -632,6 +637,12 @@ def _scene_row(
     excluded = outcome.excluded
     output_members: list[ReconstructionSceneMemberRow] = []
     available_count = 0
+    unposed_count = 0
+    # The pose recovered no photograph at all. Not "nothing was placed": a pose that registered
+    # members can still place none, because the gate refused it or its point-map bytes are gone,
+    # and those keep their recorded meaning.
+    nothing_registered = not any(member.registered for member in members)
+    viewed_at = evaluation_time(connection) if nothing_registered else None
     for member in members:
         capture_ref = str(member.capture_id)
         recovered_camera = (
@@ -639,12 +650,22 @@ def _scene_row(
         )
         placed_member = placed.get(capture_ref)
         if placed_member is None:
+            unposed = (
+                _unposed_point_map(
+                    connection, workspace, viewed_at, references, artifacts, capture_ref, store
+                )
+                if viewed_at is not None
+                else None
+            )
+            if unposed is not None and unposed.state == "available":
+                unposed_count += 1
             output_members.append(
                 ReconstructionSceneMemberRow(
                     capture_id=member.capture_id,
                     ordinal=member.ordinal,
                     registered=member.registered,
                     placement=None,
+                    unposed_point_map=unposed,
                     exclusion_reason=excluded[capture_ref],
                     person_regions=people.get(capture_ref, []),
                     person_review_state=review_state.get(capture_ref, "unscreened"),
@@ -681,6 +702,7 @@ def _scene_row(
                         else None
                     ),
                 ),
+                unposed_point_map=None,
                 exclusion_reason=None,
                 person_regions=people.get(capture_ref, []),
                 person_review_state=review_state.get(capture_ref, "unscreened"),
@@ -690,16 +712,42 @@ def _scene_row(
 
     placed_count = sum(member.registered for member in members)
     if available_count == placed_count and available_count > 0:
-        placement_state: Literal["available", "partial", "bytes_missing"] = "available"
+        placement_state: Literal["available", "partial", "none_placed", "bytes_missing"] = (
+            "available"
+        )
     elif available_count > 0:
         placement_state = "partial"
+    elif nothing_registered:
+        # The pose recovered no photograph, which is a fact about the pose and not about storage:
+        # every point map can be present and verified while none of them has a position.
+        placement_state = "none_placed"
     else:
         placement_state = "bytes_missing"
-    substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"] = (
-        "posed_point_maps" if available_count else "source_photographs"
+    substrate: Literal[
+        "posed_point_maps", "unposed_point_maps", "source_photographs", "gaussian_splats"
+    ] = (
+        "posed_point_maps"
+        if available_count
+        else "unposed_point_maps"
+        if unposed_count
+        else "source_photographs"
     )
-    displayed_rung = max(claim.rung or 4, 3) if available_count else 4
+    # Rung 3 by the product specification's own definition: per-image monocular point maps, "no
+    # poses required ... on a derived path where they do not" exist. The recorded rung is the
+    # scene gate's receipt and is left exactly as recorded; what changes is what can be shown.
+    displayed_rung = max(claim.rung or 4, 3) if available_count else 3 if unposed_count else 4
     display_reasons = list(claim.reasons)
+    if not available_count and unposed_count:
+        # The gate's sentence is about POSED rung 3 and is true; beside a displayed rung 3 it
+        # would read as a contradiction, so it is restated precisely rather than dropped.
+        display_reasons = [
+            reason for reason in display_reasons if reason != _POSED_RUNG_THREE_WITHHELD
+        ]
+        display_reasons.append(
+            "No photograph's position was recovered, so the recorded rung stays 4. Each "
+            "photograph's own depth is shown unplaced, in an arrangement that is not measured: "
+            "rung 3 needs no pose."
+        )
     if placement_state == "partial":
         display_reasons.append(
             "Some posed point maps are unavailable; the remaining verified maps are displayed."
@@ -708,9 +756,12 @@ def _scene_row(
         display_reasons.append(
             "This client displays posed point maps and has no supported rung-1 or rung-2 substrate."
         )
-    if not available_count:
+    if not available_count and not unposed_count:
         display_reasons.append(
-            "No verified posed point map bytes are available, so source photographs are displayed."
+            "No photograph's depth is available to show, so source photographs are displayed."
+            if nothing_registered
+            else "No verified posed point map bytes are available, so source photographs are "
+            "displayed."
         )
     trained = trained_geometry_row(connection, workspace, scene_id, pose_digest, decision, store)
     if trained is not None and trained.state == "available":
@@ -1149,6 +1200,103 @@ def _point_map_bytes(store: ContentAddressedStore, content_sha256: str) -> _Poin
         return _PointMapBytes(None, True)
 
 
+#: The scene gate's sentence when no member was placed. Matched exactly so that restating it beside
+#: an unposed rung 3 cannot silently stop happening if the gate's wording changes: a test pins the
+#: two together.
+_POSED_RUNG_THREE_WITHHELD: Final = (
+    "Rung 3 withheld: no member point map has a recovered placement."
+)
+
+
+def _unposed_point_map(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    viewed_at: dt.datetime,
+    references: tuple[_PointMapRef, ...],
+    artifacts: Mapping[str, Mapping[str, Any]],
+    capture_ref: str,
+    store: ContentAddressedStore,
+) -> SceneUnposedPointMapRow | None:
+    """This member's own point map, when its scene's pose recovered no photograph at all.
+
+    ``references`` and ``artifacts`` come from ``_point_map_references``, which reads the scene's
+    placement record and checks each artifact row live on every request (purge, tombstone,
+    content digest), so nothing here is looser than what a placed member gets.
+
+    Only when nothing registered, which the caller decides. A pose that registered members and
+    was then refused by the gate also places nothing, and whether its members should show unplaced
+    depth is a separate decision this change does not make: it would change what "cannot draw"
+    means for a scene the gate rejected. See ``SceneUnposedPointMapRow``.
+    """
+    reference = next((item for item in references if item.capture_ref == capture_ref), None)
+    artifact = artifacts.get(capture_ref)
+    if reference is None or artifact is None:
+        return None
+    available = store.exists(BlobId.from_hex(reference.content_sha256))
+    photograph = (
+        _viewer_photograph(connection, workspace, capture_ref, viewed_at) if available else None
+    )
+    return SceneUnposedPointMapRow(
+        artifact_id=uuid.UUID(reference.artifact_ref),
+        content_sha256=reference.content_sha256,
+        container=artifact["container"],
+        state="available" if available else "bytes_missing",
+        reference=(
+            SceneGeometryReferenceRow(
+                href=f"/geometry/{reference.artifact_ref}",
+                authorization="workspace-bearer",
+                content_sha256=reference.content_sha256,
+                byte_size=int(artifact["byte_size"]),
+            )
+            if available
+            else None
+        ),
+        photograph=photograph,
+    )
+
+
+def _viewer_photograph(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    capture_ref: str,
+    viewed_at: dt.datetime,
+) -> SceneUnposedPhotographRow | None:
+    """The image the viewer route would serve for this capture now, as a digest-bound reference.
+
+    ``image_source`` is the same function ``GET /evidence/{span_id}/masked`` asks, at the same kind
+    of evaluation time, so the digest named here is the one that route resolves unless something
+    changes in between; the route runs its own final check either way. Null when it would serve
+    nothing, or when the capture has no whole-photograph span to address it by.
+    """
+    row = connection.execute(
+        "select c.blob_sha256, (select s.span_id from evidence_span s "
+        "where s.workspace_id=c.workspace_id and s.blob_sha256=c.blob_sha256 "
+        "and s.modality='still_image' and s.track_key='img' and s.region is null "
+        "order by s.span_id limit 1) as span_id "
+        "from capture c where c.workspace_id=%s and c.capture_id=%s and c.deleted_at is null",
+        (workspace, uuid.UUID(capture_ref)),
+    ).fetchone()
+    if row is None or row["span_id"] is None:
+        return None
+    digest = image_source(connection, workspace, bytes(row["blob_sha256"]), viewed_at)
+    if digest is None:
+        return None
+    size = connection.execute(
+        "select coalesce((select byte_size from blob where blob_sha256=%s),"
+        "(select byte_size from artifact where workspace_id=%s and content_sha256=%s "
+        "and byte_size is not null limit 1)) as size",
+        (digest, workspace, digest),
+    ).fetchone()
+    if size is None or size["size"] is None:
+        return None
+    return SceneUnposedPhotographRow(
+        href=f"/evidence/{row['span_id']}/masked",
+        authorization="workspace-bearer",
+        content_sha256=digest.hex(),
+        byte_size=int(size["size"]),
+    )
+
+
 def _point_map_references(
     connection: psycopg.Connection,
     workspace: uuid.UUID,
@@ -1233,6 +1381,9 @@ def _fallback(
                 ordinal=member.ordinal,
                 registered=member.registered,
                 placement=None,
+                # The receipts are unreadable here, so there is no placement record naming these
+                # bytes and nothing whose lineage an unplaced map could carry.
+                unposed_point_map=None,
                 exclusion_reason=(
                     "pose-not-registered" if not member.registered else "placement-unavailable"
                 ),

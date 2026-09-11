@@ -23,6 +23,18 @@ describe('reconstruction camera register', () => {
     expect(panel.root.querySelector('details')!.open).toBe(true);
     expect(panel.root.textContent).toContain('No reconstructed surface');
   });
+  it('opens on the photograph a visitor pressed E on, not always the first', () => {
+    const panel = buildReconstructionInspector({ onView: () => true, onReturn: vi.fn() });
+    const source = (n: number) => ({ evidenceRef: `span-${n}`, title: `Original ${n}`, capturedLabel: '',
+      url: `blob:authorized-${n}`, available: true, accent: '', alt: 'Original photograph' });
+    const choices = [1, 2, 3].map((n) => ({ id: `source:span-${n}`, kind: 'source-only' as const,
+      label: `Photograph ${n}`, source: source(n), captureId: `capture-${n}` }));
+    panel.open('scene', choices, 1);
+    expect(panel.selected?.captureId).toBe('capture-2');
+    expect(panel.root.querySelector('img')!.src).toBe('blob:authorized-2');
+    panel.open('scene', choices, 9);
+    expect(panel.selected?.captureId).toBe('capture-3');
+  });
   it('connects stable cameras to authorized originals and labels unobserved midpoints honestly', () => {
     const onView = vi.fn(() => true);
     const onReturn = vi.fn();

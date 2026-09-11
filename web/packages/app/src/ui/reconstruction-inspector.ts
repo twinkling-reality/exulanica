@@ -315,7 +315,7 @@ export function buildReconstructionInspector(options: {
     get selected(): ReconstructionInspectionOption | null {
       return root.hidden ? null : (views[select.selectedIndex] ?? null);
     },
-    open(id: string, choices: readonly ReconstructionInspectionOption[]): boolean {
+    open(id: string, choices: readonly ReconstructionInspectionOption[], initialIndex = 0): boolean {
       if (choices.length === 0) return false;
       if (root.hidden) restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       sceneId = id;
@@ -329,7 +329,7 @@ export function buildReconstructionInspector(options: {
       root.dataset.sceneId = id;
       replace(select, choices.map((view) => el('option', { value: view.id, text: view.label })));
       root.hidden = false;
-      showView(0);
+      showView(Math.min(Math.max(0, initialIndex), choices.length - 1));
       select.focus();
       return true;
     },

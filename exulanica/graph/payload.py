@@ -178,6 +178,50 @@ class ScenePointMapPlacementRow(BaseModel):
     reference: SceneGeometryReferenceRow | None
 
 
+class SceneUnposedPhotographRow(BaseModel):
+    """The image a viewer may see of one member, for drawing its unplaced depth in full detail.
+
+    The route is the viewer route, ``/evidence/{span_id}/masked``, which serves the original when
+    nobody in the photograph needs hiding and a current masked derivative when somebody does. The
+    digest is the one that route resolved to when the graph was read, so a client that receives
+    other bytes, because a consent changed in between, refuses them and draws the depth's own
+    colours instead. It is never a way to reach an original the viewer route would not serve.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    href: str
+    authorization: Literal["workspace-bearer"]
+    content_sha256: str
+    byte_size: int
+
+
+class SceneUnposedPointMapRow(BaseModel):
+    """A member's own point map, offered because its scene's pose recovered no photograph.
+
+    No transform, on purpose. Pose recovery found no position for any member, so there is no
+    measured relation between one photograph's depth and another's, and saying where each one
+    stands would be a claim nothing recorded. The client lays these out in an arrangement it
+    labels as unmeasured. The bytes are the ones the scene's own placement record names by digest,
+    read under the same live checks as a placed member's, so the lineage is the scene's and not a
+    loose derivative's. Offered only when no member registered: a scene that placed some members
+    keeps its excluded members as photographs, because mixing measured and unmeasured panels in
+    one frame would let the unmeasured ones borrow the measured ones' authority, and a pose that
+    registered members but was refused keeps its recorded meaning until that is decided.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: uuid.UUID
+    content_sha256: str
+    container: str | None
+    state: Literal["available", "bytes_missing"]
+    reference: SceneGeometryReferenceRow | None
+    #: Without a default, following this file's rule. Null when the viewer may currently see no
+    #: image of this photograph, in which case the depth is drawn in its own colours.
+    photograph: SceneUnposedPhotographRow | None
+
+
 class SceneRecoveredCalibrationRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model: str
@@ -232,6 +276,9 @@ class ReconstructionSceneMemberRow(BaseModel):
     ordinal: int
     registered: bool
     placement: ScenePointMapPlacementRow | None
+    #: Without a default, following this file's rule: a member row assembled without deciding
+    #: whether its unplaced depth may be shown would silently answer no.
+    unposed_point_map: SceneUnposedPointMapRow | None
     exclusion_reason: str | None
     #: Deliberately without a default, following this file's rule. A member row assembled without
     #: thinking about the people in it would report an unscreened photograph as having nobody in
@@ -333,8 +380,14 @@ class ReconstructionSceneRow(BaseModel):
     member_count: int
     registered_member_count: int
     receipt_state: Literal["available", "missing", "invalid"]
-    placement_state: Literal["available", "partial", "bytes_missing", "unavailable", "invalid"]
-    rendering_substrate: Literal["posed_point_maps", "source_photographs", "gaussian_splats"]
+    #: ``none_placed`` is a pose that recovered no member, which is not missing bytes: every point
+    #: map can be present and verified while nothing has a position.
+    placement_state: Literal[
+        "available", "partial", "none_placed", "bytes_missing", "unavailable", "invalid"
+    ]
+    rendering_substrate: Literal[
+        "posed_point_maps", "unposed_point_maps", "source_photographs", "gaussian_splats"
+    ]
     #: What the status line says out loud. Counted server-side rather than derived in the client,
     #: so a client that failed to load the regions cannot report zero hidden people.
     hidden_person_count: int

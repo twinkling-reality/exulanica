@@ -29,6 +29,7 @@ import {
   GeometryClient,
   displayFrameSentence,
   regionsByCapture,
+  unposedArrangementSentence,
   type GeometryIssue,
   type GeometryIssueState,
 } from '../geometry-api.js';
@@ -255,12 +256,16 @@ export function reconstructionRungsFor(
 ): readonly ReconstructionRungDisclosure[] {
   return Object.freeze(scenes.map((scene) => {
     const substrate = actual.get(scene.sceneId) ?? 'source_photographs';
-    const displayedRung = substrate === 'source_photographs' ? 4 : Math.max(scene.recordedRung ?? 3, 3);
+    // Unposed depth is rung 3 whatever the pose recorded: the specification's rung 3 needs no pose.
+    const displayedRung = substrate === 'source_photographs' ? 4
+      : substrate === 'unposed_point_maps' ? 3 : Math.max(scene.recordedRung ?? 3, 3);
     const reasons = [...scene.displayReasons];
     const frame = displayFrames.get(scene.sceneId);
     if (frame !== undefined && substrate !== 'source_photographs') {
       // The presentation frame is a layout decision and is said out loud beside the rung.
-      reasons.push(displayFrameSentence(frame));
+      reasons.push(
+        substrate === 'unposed_point_maps' ? unposedArrangementSentence(frame) : displayFrameSentence(frame),
+      );
     }
     if (notDrawn.has(scene.sceneId)) {
       reasons.push('Not drawn: its region displays a more complete reconstruction of the same photographs.');
@@ -337,6 +342,7 @@ const GEOMETRY_NOTICE: Record<GeometryIssueState, string> = {
   not_displayed: 'Reconstruction not drawn',
   unauthorized: 'Reconstruction not authorized',
   timed_out: 'Reconstruction timed out',
+  photograph_unavailable: 'Photograph not used for detail',
   error: 'Reconstruction loading error',
 };
 

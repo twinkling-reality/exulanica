@@ -314,6 +314,36 @@ function sceneRecord(
   };
 }
 
+/** The first personal place's shape: a pose that registered nothing, every member's own depth sent. */
+function unposedSceneRecord(
+  contentSha256: string,
+  byteSize: number,
+  unposedState: 'available' | 'bytes_missing' = 'available',
+): ReconstructionSceneRecord {
+  const posed = sceneRecord(contentSha256, byteSize);
+  return {
+    ...posed,
+    recordedRung: 4,
+    displayedRung: 3,
+    registeredMemberCount: 0,
+    placementState: 'none_placed',
+    renderingSubstrate: 'unposed_point_maps',
+    members: posed.members.map((member, index) => ({
+      ...member,
+      registered: false,
+      exclusionReason: 'pose-not-registered',
+      placement: null,
+      unposedPointMap: {
+        artifactId: member.placement!.artifactId,
+        contentSha256: member.placement!.contentSha256,
+        container: 'opm/2',
+        state: index === 0 ? unposedState : 'available',
+        reference: index === 0 && unposedState === 'bytes_missing' ? null : member.placement!.reference,
+      },
+    })),
+  };
+}
+
 describe('production reconstruction geometry', () => {
   it('refuses legacy identity placement before fetching any bytes', async () => {
     const bytes = buildOpm();
@@ -334,6 +364,150 @@ describe('production reconstruction geometry', () => {
     expect(session.renderingByScene.get('scene-1')).toBe('source_photographs');
     expect(session.issues.map((issue) => issue.state)).toEqual(['unplaced', 'unplaced']);
   });
+  it('draws a scene that placed nothing as each photograph\u2019s own depth, fanned and labelled unmeasured', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([unposedSceneRecord(digest, bytes.byteLength)], regions);
+
+    expect(session.issues).toEqual([]);
+    expect(requests.map((request) => request.path)).toEqual([
+      '/api/geometry/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      '/api/geometry/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    ]);
+    expect(session.renderingByScene.get('scene-1')).toBe('unposed_point_maps');
+    expect(session.recoveredCameras).toEqual([]);
+    expect(session.placedPointMaps.map((placed) => placed.arrangement)).toEqual(['unmeasured-fan', 'unmeasured-fan']);
+    // Both cameras stand at one point, turned apart: the same position, different headings.
+    const [first, second] = session.placedPointMaps;
+    const eye = (m: readonly number[]) => [
+      m[0]! * 0 + m[1]! * 1.55 + m[2]! * 0 + m[3]!,
+      m[4]! * 0 + m[5]! * 1.55 + m[6]! * 0 + m[7]!,
+      m[8]! * 0 + m[9]! * 1.55 + m[10]! * 0 + m[11]!,
+    ];
+    eye(first!.sceneFromOpmRowMajor).forEach((value, axis) =>
+      expect(value).toBeCloseTo(eye(second!.sceneFromOpmRowMajor)[axis]!, 9));
+    const heading = (m: readonly number[]) => Math.atan2(m[2]!, m[10]!);
+    expect(heading(first!.sceneFromOpmRowMajor)).toBeGreaterThan(heading(second!.sceneFromOpmRowMajor));
+  });
+
+  it('colours unposed depth with the viewer\u2019s photograph only when its bytes match the named digest', async () => {
+    const opm = buildOpm();
+    const opmDigest = await sha256(opm);
+    const photo = new TextEncoder().encode('the viewer image of this photograph').buffer as ArrayBuffer;
+    const photoDigest = await sha256(photo);
+    const SPAN = '33333333-3333-4333-8333-333333333333';
+    const requests: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      requests.push(path);
+      return new Response(path.startsWith('/api/evidence/') ? photo : opm, { status: 200 });
+    });
+    const decoded: { width: number; height: number }[] = [];
+    const bitmap = { width: 400, height: 300, close() {} } as unknown as ImageBitmap;
+    const decode = vi.fn(async (_bytes: ArrayBuffer, source: { width: number; height: number }) => {
+      decoded.push(source);
+      return bitmap;
+    });
+    const withPhotograph = (digest: string): ReconstructionSceneRecord => {
+      const scene = unposedSceneRecord(opmDigest, opm.byteLength);
+      return { ...scene, members: scene.members.map((member) => ({ ...member, unposedPointMap: {
+        ...member.unposedPointMap!,
+        photograph: { href: `/evidence/${SPAN}/masked`, authorization: 'workspace-bearer' as const,
+          contentSha256: digest, byteSize: photo.byteLength },
+      } })) };
+    };
+
+    const good = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch }, undefined, decode)
+      .loadScenes([withPhotograph(photoDigest)], regions);
+    expect(good.issues).toEqual([]);
+    expect(good.placedPointMaps.map((placed) => placed.photograph)).toEqual([bitmap, bitmap]);
+    expect(requests.filter((path) => path.startsWith('/api/evidence/'))).toEqual([
+      `/api/evidence/${SPAN}/masked`, `/api/evidence/${SPAN}/masked`]);
+    expect(decoded[0]).toEqual({ width: 400, height: 300 });
+
+    decode.mockClear();
+    const wrong = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch }, undefined, decode)
+      .loadScenes([withPhotograph('0'.repeat(64))], regions);
+    expect(decode).not.toHaveBeenCalled();
+    expect(wrong.placedPointMaps).toHaveLength(2);
+    expect(wrong.placedPointMaps.every((placed) => placed.photograph === undefined)).toBe(true);
+    expect(wrong.issues.map((issue) => issue.state)).toEqual(['photograph_unavailable', 'photograph_unavailable']);
+  });
+
+  it('never fetches a photograph from anywhere but the viewer route', async () => {
+    const opm = buildOpm();
+    const opmDigest = await sha256(opm);
+    const requests: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      requests.push(new URL(String(input)).pathname);
+      return new Response(opm, { status: 200 });
+    });
+    const scene = unposedSceneRecord(opmDigest, opm.byteLength);
+    const original = { ...scene, members: scene.members.map((member) => ({ ...member, unposedPointMap: {
+      ...member.unposedPointMap!,
+      photograph: { href: '/evidence/33333333-3333-4333-8333-333333333333', authorization: 'workspace-bearer' as const,
+        contentSha256: opmDigest, byteSize: opm.byteLength },
+    } })) } as ReconstructionSceneRecord;
+    const session = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch })
+      .loadScenes([original], regions);
+    expect(requests.some((path) => path.startsWith('/api/evidence/'))).toBe(false);
+    expect(session.placedPointMaps).toHaveLength(2);
+    expect(session.issues.map((issue) => issue.state)).toEqual(['photograph_unavailable', 'photograph_unavailable']);
+  });
+
+  it('draws the rest when one photograph\u2019s depth is gone, and says which', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([unposedSceneRecord(digest, bytes.byteLength, 'bytes_missing')], regions);
+
+    expect(requests.map((request) => request.path)).toEqual(['/api/geometry/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']);
+    expect(session.placedPointMaps).toHaveLength(1);
+    expect(session.issues.map((issue) => [issue.captureId, issue.state])).toEqual([[CAPTURE_A, 'bytes_missing']]);
+    expect(session.renderingByScene.get('scene-1')).toBe('unposed_point_maps');
+  });
+
+  it('never fans unposed depth into a scene that placed anything', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch } = serve([], bytes);
+    const mixed = sceneRecord(digest, bytes.byteLength);
+    const tampered = {
+      ...mixed,
+      members: [mixed.members[0]!, { ...unposedSceneRecord(digest, bytes.byteLength).members[1]! }],
+    } as ReconstructionSceneRecord;
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([tampered], regions);
+    expect(session.placedPointMaps.map((placed) => placed.arrangement ?? 'recovered')).toEqual(['recovered']);
+    expect(session.renderingByScene.get('scene-1')).toBe('posed_point_maps');
+  });
+
+  it('refuses an unposed reference that fails its provenance check before fetching it', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const scene = unposedSceneRecord(digest, bytes.byteLength);
+    const external = {
+      ...scene,
+      members: scene.members.map((member) => ({
+        ...member,
+        unposedPointMap: { ...member.unposedPointMap!, reference: { ...member.unposedPointMap!.reference!, href: 'https://elsewhere.test/x' } },
+      })),
+    } as ReconstructionSceneRecord;
+    const session = await new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    }).loadScenes([external], regions);
+    expect(requests).toEqual([]);
+    expect(session.placedPointMaps).toEqual([]);
+    expect(session.renderingByScene.get('scene-1')).toBe('source_photographs');
+  });
+
   it('loads every digest-verified point map in a posed scene with its distinct transform', async () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);

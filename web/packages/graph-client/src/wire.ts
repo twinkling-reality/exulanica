@@ -46,8 +46,11 @@ export interface ReconstructionScenePayload {
   readonly member_count: number;
   readonly registered_member_count: number;
   readonly receipt_state: 'available' | 'missing' | 'invalid';
-  readonly placement_state: 'available' | 'partial' | 'bytes_missing' | 'unavailable' | 'invalid';
-  readonly rendering_substrate: 'posed_point_maps' | 'gaussian_splats' | 'source_photographs';
+  /** `none_placed`: the pose recovered no photograph, which is not missing bytes. */
+  readonly placement_state:
+    'available' | 'partial' | 'none_placed' | 'bytes_missing' | 'unavailable' | 'invalid';
+  readonly rendering_substrate:
+    'posed_point_maps' | 'unposed_point_maps' | 'gaussian_splats' | 'source_photographs';
   /**
    * How many people in this scene are not being drawn, counted by the server.
    *
@@ -118,6 +121,30 @@ export interface ReconstructionScenePayload {
       readonly projection: 'pinhole' | 'pinhole-approximation';
     } | null;
     readonly exclusion_reason: string | null;
+    /**
+     * The member's own depth, sent only when its scene placed no photograph at all. It carries no
+     * transform because none was recovered; the client arranges these and says the arrangement is
+     * not measured. Absent from an older server, which reads as null.
+     */
+    readonly unposed_point_map?: {
+      readonly artifact_id: string;
+      readonly content_sha256: string;
+      readonly container: string | null;
+      readonly state: 'available' | 'bytes_missing';
+      readonly reference: {
+        readonly href: string;
+        readonly authorization: 'workspace-bearer';
+        readonly content_sha256: string;
+        readonly byte_size: number;
+      } | null;
+      /** The image the viewer route serves of this photograph now, for texturing its depth. */
+      readonly photograph?: {
+        readonly href: string;
+        readonly authorization: 'workspace-bearer';
+        readonly content_sha256: string;
+        readonly byte_size: number;
+      } | null;
+    } | null;
     readonly placement: {
       readonly artifact_id: string;
       readonly content_sha256: string;

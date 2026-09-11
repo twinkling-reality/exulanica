@@ -74,6 +74,8 @@ import {
   RepresentationPressureController,
   INITIAL_RENDER_ORIGIN,
   renderOriginForNeighborhood,
+  frameFraction,
+  DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
 import {
   DAWN_THEME,
@@ -108,7 +110,12 @@ import { createRegionMass, type RegionMass } from './region-mass.js';
 import { createRegionRelief, type RegionRelief } from './region-relief.js';
 import type { PointMap } from './opm.js';
 import type { PointCloud } from './point-cloud.js';
-import { createPointCloud } from './point-cloud.js';
+import {
+  RELIEF_PARALLAX_DEG,
+  SINGLE_VIEW_EDGE_MARGIN,
+  createPointCloud,
+  singleViewDepths,
+} from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
@@ -117,6 +124,7 @@ import {
   opmPointInScene,
   type PlacedScenePointMap,
   validateScenePointMapPlacement,
+  scenePointMapViewpoint,
 } from './scene-point-maps.js';
 
 /**
@@ -143,6 +151,16 @@ export interface IslandVisual {
   readonly uIsland: Float32Array;
   readonly uPoint: Float32Array;
   /**
+   * The photograph's camera in the map's local frame, for a map drawn as one photograph's own
+   * view (an unmeasured arrangement). Null for every other map. The frame loop hands its world
+   * position to the shader, which flattens the relief as the visitor leaves the camera.
+   */
+  readonly singleViewLocal: pc.Vec3 | null;
+  /** Where the print stands in the map's local frame: the camera, moved out by the print depth. */
+  readonly printLocal: pc.Vec3 | null;
+  /** Radians of parallax per world unit the visitor stands from the camera, at full relief. */
+  readonly parallaxPerUnit: number;
+  /**
    * The proof lens for this island: an already-resolved RGB triple and a tint strength.
    *
    * Four zeros is the lens off, which is what every island holds until a caller supplies a value.
@@ -157,6 +175,79 @@ export interface IslandVisual {
 
 /** One island's proof-lens colour, resolved by the caller: red, green, blue, tint strength. */
 export type ProofLensColor = readonly [number, number, number, number];
+
+/** The photograph the visitor is looking into, when it is drawn in an unmeasured arrangement. */
+export interface CentredPhotograph {
+  readonly sceneId: string;
+  readonly captureId: string;
+  readonly islandId: IslandId;
+}
+
+/** Reused by the frame loop so handing a camera to the shader allocates nothing. */
+const SINGLE_VIEW_SCRATCH = new pc.Vec3();
+const SINGLE_VIEW_PRINT = new pc.Vec3();
+
+/**
+ * How flat one photograph's relief should be for a visitor at `viewer`, and whether they are behind
+ * its print.
+ *
+ * The relief is right only from the camera. A visitor a distance D from it sees two samples on one
+ * camera ray, at depths near and far, part by at most D (1/near - 1/far) radians, and that parting
+ * is every gap and stretched edge a relief can show. Flattening in inverse depth scales it by
+ * (1 - flatten), so this keeps the relief whole while the parting stays within
+ * `RELIEF_PARALLAX_DEG` and beyond that flattens just enough to hold it there. `parallaxPerUnit` is
+ * (1/near - 1/far) in world units. Far away, or well to the side, the relief is a flat print.
+ */
+export function reliefFor(
+  camera: Readonly<{ x: number; y: number; z: number }>,
+  print: Readonly<{ x: number; y: number; z: number }>,
+  viewer: Readonly<{ x: number; y: number; z: number }>,
+  parallaxPerUnit: number,
+): { readonly flatten: number; readonly behind: boolean } {
+  const ax = print.x - camera.x;
+  const ay = print.y - camera.y;
+  const az = print.z - camera.z;
+  // Behind the print is beyond its plane, whose normal is the camera's line of sight to it.
+  if (ax * (viewer.x - print.x) + ay * (viewer.y - print.y) + az * (viewer.z - print.z) > 0) {
+    return { flatten: 1, behind: true };
+  }
+  const parallax = Math.hypot(viewer.x - camera.x, viewer.y - camera.y, viewer.z - camera.z) * parallaxPerUnit;
+  const allowed = (RELIEF_PARALLAX_DEG * Math.PI) / 180;
+  return { flatten: parallax > allowed ? 1 - allowed / parallax : 0, behind: false };
+}
+
+/**
+ * The deepest, up to `wanted`, a photograph's print can stand without its lower edge going under
+ * the walking ground. MEASURED 2026-09-11 on the first personal place: a print at the median depth
+ * of the widest photograph, 5.3 m with a 77.5 degree vertical field, had the lower quarter of its
+ * frame under the ground, because a frame that tall reaches the ground well before 5.3 m.
+ */
+function printDepthAboveGround(
+  entity: pc.Entity,
+  island: Island,
+  navigationWorld: NavigationWorld,
+  map: PlacedScenePointMap['map'],
+  wanted: number,
+): number {
+  const { position: eye, fovYDeg, aspect } = map.header.viewpoint;
+  const tanY = Math.tan((fovYDeg * Math.PI) / 360);
+  const tanX = tanY * aspect;
+  if (!(tanY > 0) || !(tanX > 0) || !Number.isFinite(tanX)) return wanted;
+  const local = entity.getLocalTransform();
+  const corner = new pc.Vec3();
+  const STEPS = 100;
+  for (let step = 0; step < STEPS; step += 1) {
+    const depth = wanted * (1 - step / STEPS);
+    const clear = [-1, 0, 1].every((across) => {
+      local.transformPoint(corner.set(eye[0] + across * depth * tanX, eye[1] - depth * tanY, eye[2] - depth), corner);
+      const at = localToAtlas(island.placement, localVec3(corner.x, corner.y, corner.z));
+      const ground = navigationWorld.surface.sample(at.x, at.z);
+      return ground === null || at.y >= ground.height;
+    });
+    if (clear) return depth;
+  }
+  return wanted / STEPS;
+}
 
 /** The lens off. A value rather than an absence, so an unlit island is written, not skipped. */
 const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
@@ -317,6 +408,10 @@ export class AtlasBinding {
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
+  private centred: CentredPhotograph | null = null;
+  private readonly centredInverse = new pc.Mat4();
+  private readonly centredCapture = new pc.Vec3();
+  private readonly centredDirection = new pc.Vec3();
   private readonly normalizer: number;
   private readonly pose: { position: pc.Vec3; rotation: pc.Quat } = {
     position: new pc.Vec3(),
@@ -694,6 +789,7 @@ export class AtlasBinding {
       for (const pointMap of pointMapsByIsland.get(island.islandId) ?? []) {
         const entity = new pc.Entity(`point-map:${pointMap.artifactId}`);
         applyScenePointMapPlacement(entity, pointMap);
+        if (pointMap.arrangement === 'unmeasured-fan') standOnTheGround(entity, pointMap, island, navigationWorld);
         const map = pointMap.map;
         const cloud = createPointCloud({
           device,
@@ -702,17 +798,29 @@ export class AtlasBinding {
           ...(options.sizeGain === undefined ? {} : { sizeGain: options.sizeGain }),
           ...(options.maxSizePx === undefined ? {} : { maxSizePx: options.maxSizePx }),
           ...(options.blend === undefined ? {} : { blend: options.blend }),
+          // One photograph's own view reads as its surface, not as dots. Posed maps overlap one
+          // another from many cameras, so they stay points.
+          surface: pointMap.arrangement === 'unmeasured-fan',
+          ...(pointMap.photograph === undefined ? {} : { photograph: pointMap.photograph }),
           theme,
         });
         const instance = new pc.MeshInstance(cloud.mesh, cloud.material, entity);
         entity.addComponent('render', { meshInstances: [instance] });
         islandEntity.addChild(entity);
+        const depths = pointMap.arrangement === 'unmeasured-fan' ? singleViewDepths(map) : null;
+        const printDepth = depths === null ? 0
+          : printDepthAboveGround(entity, island, navigationWorld, map, depths.median);
+        const eye = depths === null ? null : cloud.enableSingleView(printDepth);
+        const worldScale = entity.getLocalScale().x * island.placement.scale;
 
         visuals.push({
           island,
           entity,
           cloud,
           pointMap,
+          singleViewLocal: eye === null ? null : new pc.Vec3(eye[0], eye[1], eye[2]),
+          printLocal: eye === null ? null : new pc.Vec3(eye[0], eye[1], eye[2] - printDepth),
+          parallaxPerUnit: depths === null ? 0 : (1 / depths.nearest - 1 / depths.furthest) / worldScale,
           uIsland: new Float32Array([
             1,
             cloud.footprintRadiusLocal,
@@ -1323,6 +1431,48 @@ export class AtlasBinding {
     this.focusState = focusDirectly(this.focusState, index, nowMs);
   }
 
+  /**
+   * The photograph whose print the reticle is on, for a map drawn in an unmeasured arrangement, or
+   * null. The reticle's ray is met with the print's plane, from in front of it and within the same
+   * interaction radius an anchor has; seen from its camera that is exactly the photograph's own
+   * pixel, and from anywhere else it is the print the relief flattens into.
+   */
+  get centredPhotograph(): CentredPhotograph | null {
+    return this.centred;
+  }
+
+  private findCentredPhotograph(): CentredPhotograph | null {
+    const eye = this.camera.getPosition();
+    const forward = this.camera.forward;
+    let best: CentredPhotograph | null = null;
+    let bestScore = 1 - SINGLE_VIEW_EDGE_MARGIN;
+    for (const visual of this.islands) {
+      const camera = visual.singleViewLocal;
+      const print = visual.printLocal;
+      const captureId = visual.pointMap.captureId;
+      if (camera === null || print === null || captureId === undefined || !visual.entity.enabled) continue;
+      const world = visual.entity.getWorldTransform();
+      this.centredInverse.copy(world).invert();
+      this.centredInverse.transformPoint(eye, this.centredCapture);
+      this.centredInverse.transformVector(forward, this.centredDirection).normalize();
+      // The print's plane is z = print.z in the camera's own frame, and the camera looks along -z.
+      if (this.centredCapture.z <= print.z || this.centredDirection.z >= 0) continue;
+      const along = (print.z - this.centredCapture.z) / this.centredDirection.z;
+      const hitX = this.centredCapture.x + this.centredDirection.x * along - camera.x;
+      const hitY = this.centredCapture.y + this.centredDirection.y * along - camera.y;
+      const hitZ = print.z - camera.z;
+      // Reachable from where the visitor stands, by the same radius that decides an anchor.
+      world.transformPoint(SINGLE_VIEW_SCRATCH.set(hitX + camera.x, hitY + camera.y, print.z), SINGLE_VIEW_PRINT);
+      if (SINGLE_VIEW_PRINT.distance(eye) > DEFAULT_FOCUS_CONFIG.interactRadius) continue;
+      const score = frameFraction([hitX, hitY, hitZ], visual.pointMap.map.header.viewpoint);
+      if (score !== null && score < bestScore) {
+        bestScore = score;
+        best = { sceneId: visual.pointMap.sceneId, captureId, islandId: visual.island.islandId };
+      }
+    }
+    return best;
+  }
+
   /** Engage exactly the one settled reticle target. The application decides which panel opens. */
   engageFocusedAnchor(): number | null {
     if (this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null) return null;
@@ -1522,6 +1672,14 @@ export class AtlasBinding {
       // path that already does two and never allocates. Its contents were resolved by the caller
       // in `setProofLens`; this loop only delivers them.
       visual.cloud.material.setParameter('uLens', visual.uLens);
+      if (visual.singleViewLocal !== null && visual.printLocal !== null) {
+        const world = visual.entity.getWorldTransform();
+        world.transformPoint(visual.singleViewLocal, SINGLE_VIEW_SCRATCH);
+        world.transformPoint(visual.printLocal, SINGLE_VIEW_PRINT);
+        visual.cloud.setCaptureWorld(SINGLE_VIEW_SCRATCH.x, SINGLE_VIEW_SCRATCH.y, SINGLE_VIEW_SCRATCH.z);
+        const relief = reliefFor(SINGLE_VIEW_SCRATCH, SINGLE_VIEW_PRINT, this.camera.getPosition(), visual.parallaxPerUnit);
+        visual.cloud.setRelief(relief.flatten, relief.behind);
+      }
     }
     this.objects.update(dt);
     this.settleProofLens();
@@ -1550,9 +1708,11 @@ export class AtlasBinding {
     this.sourceFirst.update(nowMs, cameraAtlas, focusedIslandId);
     this.field.update(nowMs);
 
+    this.centred = this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
     const cameraComponent = this.camera.camera;
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
       this.overlay.update({
+        photographPrompt: this.centred !== null,
         table: this.table,
         emphasis: this.emphasis,
         camera: cameraComponent,
@@ -1772,6 +1932,34 @@ function applyPlacement(entity: pc.Entity, island: Island): void {
 }
 
 /** Convert the receipt's row-major affine transform into PlayCanvas local TRS. */
+/**
+ * Lift or lower an unmeasured photograph so its camera stands exactly where a walking visitor's
+ * eye does over the ground at that spot.
+ *
+ * A single photograph's depth is right only from its own camera, and every edge, seam and bridge
+ * of its surface is drawn on that assumption. The walking controls hold the eye at the navigation
+ * surface plus `eyeHeight` wherever the visitor stands, while the display frame put the camera at
+ * its own eye height above the photograph's own ground, and nothing makes those the same height:
+ * the authored landscape is not flat and the island has its own scale. With this, MEASURED
+ * 2026-09-11 on the first personal place, the arrival eye and all three photographs' cameras
+ * coincide to float precision. The arrangement is unmeasured, so moving it vertically claims
+ * nothing; not moving it would draw every photograph from a viewpoint nobody stood at.
+ */
+function standOnTheGround(
+  entity: pc.Entity,
+  pointMap: PlacedScenePointMap,
+  island: Island,
+  navigationWorld: NavigationWorld,
+): void {
+  const [x, y, z] = scenePointMapViewpoint(pointMap);
+  const camera = localToAtlas(island.placement, localVec3(x, y, z));
+  const ground = navigationWorld.surface.sample(camera.x, camera.z);
+  if (ground === null || !(island.placement.scale > 0)) return;
+  const lift = (ground.height + navigationWorld.eyeHeight - camera.y) / island.placement.scale;
+  const at = entity.getLocalPosition();
+  entity.setLocalPosition(at.x, at.y + lift, at.z);
+}
+
 function applyScenePointMapPlacement(entity: pc.Entity, value: PlacedScenePointMap): void {
   applySceneTransform(entity, value.sceneFromOpmRowMajor, value.localUnitsToSceneUnits);
 }

@@ -10,6 +10,18 @@ export interface PlacedScenePointMap {
   readonly map: PointMap;
   readonly sceneFromOpmRowMajor: readonly number[];
   readonly localUnitsToSceneUnits: number;
+  /**
+   * How the transform was obtained. `recovered` (the default when absent) is a placement fitted
+   * to recovered cameras; `unmeasured-fan` is an arrangement the client derived because pose
+   * recovered no photograph, and nothing about it is a position anyone stood at.
+   */
+  readonly arrangement?: 'recovered' | 'unmeasured-fan';
+  /**
+   * The viewer's image of the photograph, upright, for an unmeasured map drawn as a surface: the
+   * surface takes its colour from here, looked up through the photograph's own camera, instead of
+   * from the depth grid's samples. Absent means the depth's own colours.
+   */
+  readonly photograph?: ImageBitmap;
 }
 
 /** Refuse matrices whose producer-side affine and finite guarantees were lost on the wire. */

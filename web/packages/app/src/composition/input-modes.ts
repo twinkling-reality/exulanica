@@ -113,7 +113,16 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
   mounted.binding.controls.onSummon = () => companion.toggle();
   mounted.binding.controls.onInteract = () => {
     const index = mounted.binding.engageFocusedAnchor();
-    if (index === null) return;
+    if (index === null) {
+      // No anchor under the reticle. Looking into a photograph drawn as its own unmeasured view
+      // opens that photograph: the original, who is in it, and its evidence. The mouse is freed
+      // because the inspector is read and clicked, not walked.
+      const photograph = mounted.binding.centredPhotograph;
+      if (photograph === null) return;
+      if (document.pointerLockElement !== null) document.exitPointerLock();
+      status.inspectSceneSources(photograph.sceneId, photograph.captureId);
+      return;
+    }
     const anchor = mounted.binding.table.anchors[index];
     const occurrence = anchor === undefined
       ? undefined
