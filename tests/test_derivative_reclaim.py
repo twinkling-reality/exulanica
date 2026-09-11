@@ -931,3 +931,24 @@ def test_the_vision_budget_is_the_chain_the_timeout_and_the_retries(client, mani
     chain = len(manifest[Role.VISION].chain)
     assert chain == 2
     assert client.worst_case_seconds(Role.VISION) == pytest.approx(chain * 180.0)
+
+
+def test_worker_runs_injected_caption_embedding_after_vision(queued, client, monkeypatch):
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.selection.embeddings import embed_capture
+
+    from test_companion_matching import script, vector
+
+    provision_workspace(queued.connection, queued.workspace_id)
+    calls = script(client, monkeypatch, vector())
+    worker = queued.worker(embedding_pass=lambda connection, workspace, capture:
+                           embed_capture(connection, workspace, capture, client))
+    outcome = worker.drain()[0]
+    assert not outcome.errors
+    assert len(calls) == len(queued.capture_ids)
+    assert all(texts[0] for texts, _ in calls)
+    assert queued.connection.execute(
+        "select count(*) as n from embedding where workspace_id=%s",
+        (queued.workspace_id,),
+    ).fetchone()["n"] == len(queued.capture_ids)
+    assert outcome.input_tokens >= 20 * len(calls)

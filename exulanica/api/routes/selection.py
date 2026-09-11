@@ -109,16 +109,17 @@ class ModelCallView(BaseModel):
 
     role: str
     requested_model: str
-    served_model: str
+    served_model: str | None
     used_fallback: bool
     #: HTTP requests issued, retries and failover included. Zero would mean the client's cache
     #: served it; the API builds its client without one, so on this route it is at least one.
-    attempts: int
+    attempts: int | None
     latency_ms: int
     #: ``null`` where the provider's usage object did not report the count. Never a stand-in zero.
     prompt_tokens: int | None
     completion_tokens: int | None
     reasoning_tokens: int | None
+    usd: str | None = None
 
 
 class ExecutionView(BaseModel):
@@ -317,6 +318,7 @@ def _execution(
                 prompt_tokens=call.prompt_tokens,
                 completion_tokens=call.completion_tokens,
                 reasoning_tokens=call.reasoning_tokens,
+                usd=call.usd,
             )
             for call in calls
         ],
