@@ -261,6 +261,14 @@ job-scoped worker that finds nothing in its scope claims nothing and exits clean
 Defaults are a 900-second lease, 30-second heartbeat, 2-second polling interval, and 3600-second
 abandoned-scratch age.
 
+After a scene publishes, the worker lifts its members' object masks and reviewed, shown people into
+scene segments, in the same run and with numpy alone ([scene-segments.md](scene-segments.md)
+section 5). A lift that fails is `stage_failed` on `scene_segments` and the scene stays published.
+After each drain it also lifts again any published scene whose members all have masks its newest
+segments do not bind, at most every `--segments-refresh-seconds` (default 300; `0` turns it off),
+and reports what it did as one `segments_refreshed` event. A job-scoped worker lifts the scenes it
+publishes and does not sweep.
+
 Authenticated operators can read top-level state from `GET /operations/reconstruction-scenes`.
 It distinguishes derivative work, ready or running scene work, groups blocked on missing point
 maps, published scenes, and superseded builds. `GET /operations/reconstruction-scenes/{job_id}`

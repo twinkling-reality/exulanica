@@ -9,6 +9,7 @@ import platform
 import signal
 import sys
 import threading
+import time
 import uuid
 from collections.abc import Mapping
 from pathlib import Path
@@ -85,6 +86,37 @@ def _emit(stream: Any, event: str, **fields: Any) -> None:
     )
 
 
+def _refresh_segments(worker: SceneReconstructionWorker, stream: Any) -> None:
+    """Lift again the scenes whose members' masks completed after their segments; say so if any.
+
+    Silent when nothing was due, so an idle worker's output is its output before this existed. A
+    failure to look is reported and survived: segments are an overlay, and the worker's job is
+    the scenes.
+    """
+    try:
+        results = worker.refresh_scene_segments()
+    except Exception as error:
+        _emit(
+            stream,
+            "segments_refresh_failed",
+            failure_class=type(error).__name__,
+            message=str(error),
+        )
+        return
+    if not results:
+        return
+    counts: dict[str, int] = {}
+    for result in results:
+        action = str(result.get("action"))
+        counts[action] = counts.get(action, 0) + 1
+    _emit(
+        stream,
+        "segments_refreshed",
+        scenes=len(results),
+        **{action.replace("-", "_"): count for action, count in sorted(counts.items())},
+    )
+
+
 def _worker_data_directory(environment: Mapping[str, str]) -> Path:
     """Keep pycolmap source paths stable after its executor changes directories."""
     return resolve_data_dir(environment).resolve()
@@ -135,6 +167,15 @@ def main(
     parser.add_argument("--lease-seconds", type=float, default=900.0)
     parser.add_argument("--heartbeat-seconds", type=float, default=30.0)
     parser.add_argument("--abandoned-after-seconds", type=float, default=3600.0)
+    parser.add_argument(
+        "--segments-refresh-seconds",
+        type=float,
+        default=300.0,
+        help=(
+            "how often an idle worker lifts again the scenes whose members' object masks "
+            "completed after their segments were lifted; 0 turns it off"
+        ),
+    )
     args = parser.parse_args(argv)
     output = stream or sys.stdout
     environment = os.environ if environ is None else environ
@@ -159,9 +200,12 @@ def main(
         worker.request_stop()
 
     previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
+    refreshing = args.segments_refresh_seconds > 0
     try:
         if args.once:
             outcomes = worker.drain_observed()
+            if refreshing and not requested.is_set():
+                _refresh_segments(worker, output)
             _emit(
                 output,
                 "stopped",
@@ -171,10 +215,15 @@ def main(
                 cancelled=sum(outcome.status == "cancelled" for outcome in outcomes),
             )
             return 1 if any(outcome.status == "failed" for outcome in outcomes) else 0
+        refresh_at = time.monotonic()
         while not requested.is_set():
             outcomes = worker.drain_observed()
             if any(outcome.status == "failed" for outcome in outcomes):
                 _emit(output, "pass_failed", jobs=len(outcomes))
+            # After a drain, so it runs only while no scene is waiting to be built.
+            if refreshing and not requested.is_set() and time.monotonic() >= refresh_at:
+                _refresh_segments(worker, output)
+                refresh_at = time.monotonic() + args.segments_refresh_seconds
             requested.wait(args.poll_seconds)
     finally:
         for signum, handler in previous.items():

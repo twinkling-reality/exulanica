@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
+import sys
 import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -142,6 +144,32 @@ def test_the_worker_hands_the_configured_segmenter_to_its_jobs(monkeypatch, tmp_
     )
     assert isinstance(built["segmenter"], _RecordingSegmenter)
     assert built["segmenter"].kwargs == {"device": "mps"}
+
+
+def test_neither_worker_imports_the_native_runtime_the_other_one_loads():
+    """pycolmap and torch abort one process on macOS (`pycolmap_executor.py`). The scene worker
+    now lifts segments, and its lift imports the segmentation stage's module for two constants,
+    so this holds that importing the scene worker still pulls in no torch, no transformers and
+    no model, and that the derivative worker, which builds the segmenter, pulls in no pycolmap.
+    Each in a child process, because this one's `sys.modules` belongs to the whole suite."""
+    probes = {
+        "exulanica.ingest.scene_worker_command": ("torch", "transformers"),
+        "exulanica.ingest.worker_command": ("pycolmap",),
+    }
+    for module, forbidden in probes.items():
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import sys, {module}; "
+                f"print(sorted(name for name in {forbidden!r} if name in sys.modules))",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stdout.strip() == "[]", (module, completed.stdout)
 
 
 def test_once_mode_uses_observed_lifecycle_and_reports_terminal_counts(monkeypatch):

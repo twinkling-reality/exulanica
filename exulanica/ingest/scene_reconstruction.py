@@ -31,6 +31,11 @@ from exulanica.ingest.scene_projection import (
     validate_scene_projection,
 )
 from exulanica.ingest.scene_rung import record_scene_rung
+from exulanica.ingest.scene_segments import (
+    SCENE_SEGMENTS_STAGE,
+    ValidatedBuild,
+    publish_scene_segments,
+)
 from exulanica.ingest.scene_splat import (
     ContainerCleanupUnconfirmed,
     SceneSplatRequest,
@@ -272,7 +277,11 @@ class SceneReconstructionProcessor:
         ledger: Ledger,
     ) -> SceneBuildOutcome:
         with ExitStack() as stack:
-            return self._process_stages(claimed, job_directory, ledger, stack)
+            outcome, build = self._process_stages(claimed, job_directory, ledger, stack)
+        # After every stage of the build has closed, the training stages in `stack` included, so
+        # none of them is timed as though the lift were part of it.
+        self._lift_segments(claimed, ledger, build)
+        return outcome
 
     def _process_stages(
         self,
@@ -280,7 +289,8 @@ class SceneReconstructionProcessor:
         job_directory: Path,
         ledger: Ledger,
         stack: ExitStack,
-    ) -> SceneBuildOutcome:
+    ) -> tuple[SceneBuildOutcome, ValidatedBuild]:
+        """Build, gate and publish the scene. Returns only once it is published."""
         self._verify_build_inputs(claimed)
         manifest, sources = self._manifest(claimed)
         source_directory = stage_scene_sources(self._store, job_directory, sources)
@@ -478,51 +488,87 @@ class SceneReconstructionProcessor:
                         ):
                             raise _ProjectionRefused(str(error)) from error
                         self._accept(claimed, manifest, decision, registrations, published, ledger)
-                        return SceneBuildOutcome(
-                            claimed.job_id,
-                            claimed.scene_id,
-                            "succeeded",
-                            rung=decision.rung,
-                            registered_member_count=registered_count,
-                        )
-                    with ledger.stage(
-                        projection_spec,
-                        input_artifact_ids=[
-                            pose_artifact.artifact_id,
-                            placement_artifact.artifact_id,
-                            gate_artifact.artifact_id,
-                        ],
-                    ) as projection_recorder:
-                        projection_artifact = self._pending(
-                            claimed.scene_id,
-                            projection_spec.key,
-                            projection_bytes,
-                            input_digest_of(
-                                [
-                                    pose_artifact.content_id.digest,
-                                    placement_artifact.content_id.digest,
-                                    gate_artifact.content_id.digest,
-                                ]
-                            ),
-                        )
-                        self._accept(
-                            claimed,
-                            manifest,
-                            decision,
-                            registrations,
-                            (
-                                *published,
-                                (projection_artifact, projection_recorder),
-                            ),
-                            ledger,
-                        )
+                    else:
+                        with ledger.stage(
+                            projection_spec,
+                            input_artifact_ids=[
+                                pose_artifact.artifact_id,
+                                placement_artifact.artifact_id,
+                                gate_artifact.artifact_id,
+                            ],
+                        ) as projection_recorder:
+                            projection_artifact = self._pending(
+                                claimed.scene_id,
+                                projection_spec.key,
+                                projection_bytes,
+                                input_digest_of(
+                                    [
+                                        pose_artifact.content_id.digest,
+                                        placement_artifact.content_id.digest,
+                                        gate_artifact.content_id.digest,
+                                    ]
+                                ),
+                            )
+                            self._accept(
+                                claimed,
+                                manifest,
+                                decision,
+                                registrations,
+                                (
+                                    *published,
+                                    (projection_artifact, projection_recorder),
+                                ),
+                                ledger,
+                            )
         return SceneBuildOutcome(
             claimed.job_id,
             claimed.scene_id,
             "succeeded",
             rung=decision.rung,
             registered_member_count=registered_count,
+        ), ValidatedBuild(
+            job_id=claimed.job_id,
+            pose_receipt=pose_bytes,
+            placement_receipt=placement_bytes,
+            placement=placement,
+            point_maps={
+                capture_ref: item.content
+                for capture_ref, item in point_maps.items()
+                if item.content is not None
+            },
         )
+
+    def _lift_segments(
+        self, claimed: ClaimedSceneJob, ledger: Ledger, build: ValidatedBuild
+    ) -> None:
+        """Lift what the members' photographs found into the scene just published. Never raises.
+
+        After publication rather than inside it, and never able to take the scene down, for the
+        reason the projection gives in `_process_stages` and more strongly: segments are an overlay
+        on a scene that is complete without them, and a lift can refuse for reasons that have
+        nothing to do with this build, a mask artifact whose bytes were lost among them. Whatever
+        it refuses is on its own `scene_segments` stage in this run, `stage_failed` or
+        `stage_skipped` with the reason, and `scenes_due_segments` or the command can lift the
+        scene again later. It reuses the placement this worker validated a moment ago rather than
+        validating it a second time, which is most of what a lift costs.
+
+        A worker asked to stop skips it, so that shutting down never waits on an overlay.
+        """
+        # Every Exception, not only the refusals the projection names. This runs after the
+        # publication commit, and anything that escaped would reach `process`, which would report
+        # a published scene as failed and try to fail a job that has already succeeded. A failure
+        # inside the lift's stage has already been written as `stage_failed` by the time it lands
+        # here; one before that stage opens is a database that cannot record it either.
+        with suppress(Exception):
+            if self._stop_requested():
+                ledger.skipped(
+                    stage(SCENE_SEGMENTS_STAGE),
+                    reason="the worker was asked to stop before the scene was lifted",
+                )
+                return
+            publish_scene_segments(
+                self._repository, self._store, claimed.scene_id, ledger=ledger, validated=build
+            )
 
     def _train_splat(
         self,

@@ -28,11 +28,19 @@ from exulanica.ingest import scene_segments as lift
 from exulanica.ingest.masked_geometry import GaussianView, camera_point, image_point, ppm_point
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.scene_reconstruction import SceneReconstructionProcessor
+from exulanica.ingest.scene_worker import SceneReconstructionWorker
 from exulanica.ingest.stages import STAGES
 from exulanica.ingest.stages import segmentation as segmentation_stage
 from exulanica.ingest.stages.segmentation import BoxPrompt, Detections, SegmentedMask
 
-from test_scene_reconstruction_pipeline import FakeColmap, _processor, _queued_scene
+from test_scene_reconstruction_pipeline import (
+    _CODE_REVISION,
+    _EXECUTION_IMAGE,
+    FakeColmap,
+    _processor,
+    _queued_scene,
+)
 
 np = pytest.importorskip("numpy")
 
@@ -678,6 +686,264 @@ def test_the_kinds_and_profiles_are_spelled_the_same_in_every_place():
     )
     assert reader._SEGMENTS_PROFILE == lift.SCENE_SEGMENTS_PROFILE == PARAMS["profile"]
     assert reader._SEGMENTS_ENVELOPE == lift.SCENE_SEGMENTS_ENVELOPE == PARAMS["envelope"]
+
+
+# -- when the lift runs --------------------------------------------------------------------------
+#
+# As the scene publishes, in the scene worker's own run and from the placement it has just
+# validated; and again, from the scene worker's sweep, once every member of a published scene has
+# masks its newest segments do not bind. Neither can take a scene down.
+
+
+class _WorkerDatabase:
+    """The scene worker's `Database`, answering every session with this test's own connection."""
+
+    def __init__(self, repository):
+        self._repository = repository
+
+    @contextlib.contextmanager
+    def session(self, workspace_id):
+        assert workspace_id == self._repository.workspace_id
+        yield self._repository.connection
+
+
+def _worker(repository, store, tmp_path, name):
+    return SceneReconstructionWorker(
+        _WorkerDatabase(repository),
+        store,
+        tmp_path / "scratch",
+        frozenset({repository.workspace_id}),
+        name=name,
+        code_revision=_CODE_REVISION,
+        execution_image=_EXECUTION_IMAGE,
+    )
+
+
+def _build(repository, store, tmp_path, worker, *, stop_requested=None):
+    """Claim and build the queued scene exactly as the scene worker does. Returns its id."""
+    clear_placement_memo()
+    clear_scene_inputs_memo()
+    claimed = repository.claim_reconstruction_scene(worker=worker, lease_seconds=60)
+    assert claimed is not None
+    outcome = SceneReconstructionProcessor(
+        repository,
+        store,
+        tmp_path / "scratch",
+        code_revision=_CODE_REVISION,
+        execution_image=_EXECUTION_IMAGE,
+        colmap_version="pycolmap test",
+        executor=FakeColmap(registered=3, camera_spacing=SPACING),
+        retry_delay_seconds=0,
+        stop_requested=stop_requested,
+    ).process(claimed)
+    assert outcome.status == "succeeded", outcome.message
+    return outcome.scene_id
+
+
+def _segments_events(repository):
+    """Every `scene_segments` stage event, its run, and whether that run is the publishing one."""
+    return repository.connection.execute(
+        "select e.type, e.error_class, e.error_message, r.trigger, r.status, "
+        "exists (select 1 from pipeline_event p where p.run_id = e.run_id "
+        "        and p.stage_key = 'scene_projection') as publication_run "
+        "from pipeline_event e join pipeline_run r on r.run_id = e.run_id "
+        "where e.stage_key = 'scene_segments' and e.type::text like 'stage%%' "
+        "order by r.started_at, e.run_id, e.seq"
+    ).fetchall()
+
+
+def _scene_kinds(repository, scene_id):
+    return sorted(
+        row["kind"]
+        for row in repository.connection.execute(
+            "select kind from artifact where workspace_id=%s and scene_id=%s",
+            (repository.workspace_id, scene_id),
+        ).fetchall()
+    )
+
+
+def test_publication_lifts_the_masks_its_members_already_have(repository, tmp_path, monkeypatch):
+    """The ordinary order: every photograph was segmented before the scene was built, so the scene
+    is lifted as it publishes, in the run that published it, from the placement the worker had
+    just validated rather than from a second validation of it."""
+    store, captures, _points, _job = _queued_scene(repository, tmp_path)
+    _segment_members(repository, store, captures, SceneSegmenter())
+    validated = []
+    validate = lift.validate_placement_record
+
+    def counting(*args, **kwargs):
+        validated.append(kwargs["expected_scene_ref"])
+        return validate(*args, **kwargs)
+
+    monkeypatch.setattr(lift, "validate_placement_record", counting)
+    scene_id = _build(repository, store, tmp_path, "publish-lift")
+
+    assert validated == [], "the lift validated the placement a second time"
+    read = _read(repository, store, scene_id)
+    assert read.state == "available", read.reason
+    [segment] = read.segments
+    assert segment["label"] == "sign" and segment["votes"]["views"] == 3
+    [started, succeeded] = _segments_events(repository)
+    assert (started["type"], succeeded["type"]) == ("stage_started", "stage_succeeded")
+    assert succeeded["publication_run"] and succeeded["status"] == "succeeded"
+
+    # And it is what the command writes after validating the stored placement itself, to the byte.
+    again = lift.publish_scene_segments(repository, store, scene_id)
+    assert validated == [str(scene_id)]
+    assert again["action"] == "already-present" and again["placement_revalidated"]
+    assert again["segments_sha256"] == read.content_sha256
+
+
+def test_publication_survives_a_lift_that_cannot_be_built(repository, tmp_path, monkeypatch):
+    """The projection's rule, and wider: not only the refusals a malformed receipt raises. The
+    lift runs after the publication commit, where anything that escaped would report a published
+    scene as failed."""
+    store, captures, _points, _job = _queued_scene(repository, tmp_path)
+    _segment_members(repository, store, captures, SceneSegmenter())
+
+    def refuse(**kwargs):
+        raise RuntimeError("the lift ran out of room")
+
+    monkeypatch.setattr(lift, "build_scene_segments", refuse)
+    scene_id = _build(repository, store, tmp_path, "lift-refused")
+
+    assert _scene_kinds(repository, scene_id) == [
+        "point_map_placement",
+        "pose_receipt",
+        "scene_gate_receipt",
+        "scene_projection",
+    ]
+    [_started, failed] = _segments_events(repository)
+    assert failed["type"] == "stage_failed" and failed["error_class"] == "RuntimeError"
+    assert "ran out of room" in failed["error_message"]
+    assert failed["publication_run"] and failed["status"] == "succeeded"
+    assert _read(repository, store, scene_id).state == "absent"
+
+
+def test_a_scene_with_nothing_to_lift_says_so_and_writes_nothing(repository, tmp_path):
+    """No masks and no reviewed, shown person: an empty artifact would claim somebody looked."""
+    store, _captures, _points, scene_id = _published(repository, tmp_path, "nothing-to-lift")
+
+    [skipped] = _segments_events(repository)
+    assert skipped["type"] == "stage_skipped" and skipped["publication_run"]
+    reason = "no member has object masks or a reviewed, shown person region to lift"
+    assert skipped["error_message"] == reason
+    assert "scene_segments" not in _scene_kinds(repository, scene_id)
+    assert _read(repository, store, scene_id).state == "absent"
+    # The command says the same, and opens no run to say it in.
+    result = lift.publish_scene_segments(repository, store, scene_id)
+    assert (result["action"], result["reason"]) == ("skipped", reason)
+    assert len(_segments_events(repository)) == 1
+
+
+def test_a_worker_asked_to_stop_publishes_and_leaves_the_lift_to_the_sweep(repository, tmp_path):
+    store, captures, _points, _job = _queued_scene(repository, tmp_path)
+    _segment_members(repository, store, captures, SceneSegmenter())
+    scene_id = _build(repository, store, tmp_path, "stopping", stop_requested=lambda: True)
+
+    [skipped] = _segments_events(repository)
+    assert skipped["type"] == "stage_skipped" and "asked to stop" in skipped["error_message"]
+    assert _read(repository, store, scene_id).state == "absent"
+
+    [due] = lift.scenes_due_segments(repository, store)
+    assert due.scene_id == scene_id
+    assert due.reason == "no segments have been lifted for this build"
+    [result] = _worker(repository, store, tmp_path, "sweep").refresh_scene_segments()
+    assert result["action"] == "written" and result["object_mask_missing"] == 0
+    assert _read(repository, store, scene_id).state == "available"
+
+
+def test_masks_that_complete_after_publication_are_lifted_again_once(repository, tmp_path):
+    """What the sweep is for. The scene was built while two photographs still waited for their
+    masks, so the lift at publication named them missing. The reader calls those segments stale the
+    moment one more has masks, and the sweep waits until every member has them, then lifts once."""
+    store, captures, _points, _job = _queued_scene(repository, tmp_path)
+    _segment_members(repository, store, captures[:1], SceneSegmenter())
+    scene_id = _build(repository, store, tmp_path, "partial")
+    first = _read(repository, store, scene_id)
+    assert first.state == "available", first.reason
+    worker = _worker(repository, store, tmp_path, "sweep")
+
+    # Stale, and still not due: a lift now would be one of many as the rest arrive.
+    _segment_members(repository, store, captures[1:2], SceneSegmenter())
+    assert _read(repository, store, scene_id).state == "stale"
+    assert lift.scenes_due_segments(repository, store) == []
+    assert worker.refresh_scene_segments() == [], "not every member has masks yet"
+
+    _segment_members(repository, store, captures[2:], SceneSegmenter())
+    [result] = worker.refresh_scene_segments()
+    assert result["action"] == "written", result
+    assert result["due"] == "a member's object masks changed after the newest segments were lifted"
+    assert result["object_mask_inputs"] == 3 and result["object_mask_missing"] == 0
+    read = _read(repository, store, scene_id)
+    assert read.state == "available" and read.artifact_id != first.artifact_id
+    [segment] = read.segments
+    assert segment["votes"]["views"] == 3
+
+    swept = [event for event in _segments_events(repository) if not event["publication_run"]]
+    assert [event["type"] for event in swept] == ["stage_started", "stage_succeeded"]
+    assert {(event["trigger"], event["status"]) for event in swept} == {("reprocess", "succeeded")}
+    # Lifted, so nothing is due, to this worker or to one started afresh.
+    assert worker.refresh_scene_segments() == []
+    assert _worker(repository, store, tmp_path, "restarted").refresh_scene_segments() == []
+
+
+def test_a_lift_that_keeps_failing_is_tried_once_for_each_state_it_is_due_in(
+    repository, tmp_path, monkeypatch
+):
+    store, captures, _points, scene_id = _published(repository, tmp_path, "failing")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    build = lift.build_scene_segments
+
+    def refuse(**kwargs):
+        raise RuntimeError("broken the same way every time")
+
+    monkeypatch.setattr(lift, "build_scene_segments", refuse)
+    worker = _worker(repository, store, tmp_path, "failing-sweep")
+    [failed] = worker.refresh_scene_segments()
+    assert failed["action"] == "failed" and failed["failure_class"] == "RuntimeError"
+    assert failed["scene_id"] == str(scene_id)
+    assert worker.refresh_scene_segments() == [], "the same state was tried twice"
+
+    # A new mask is a new state, tried once more.
+    _segment_members(repository, store, captures[:1], SceneSegmenter(revision="1" * 40))
+    [again] = worker.refresh_scene_segments()
+    assert again["action"] == "failed"
+    assert worker.refresh_scene_segments() == []
+
+    # A restarted worker tries once, and a lift that can be built now is written.
+    monkeypatch.setattr(lift, "build_scene_segments", build)
+    [written] = _worker(repository, store, tmp_path, "restarted").refresh_scene_segments()
+    assert written["action"] == "written"
+    failures = [event for event in _segments_events(repository) if event["type"] == "stage_failed"]
+    assert [(event["trigger"], event["status"]) for event in failures] == [
+        ("reprocess", "failed"),
+        ("reprocess", "failed"),
+    ]
+
+
+def test_segments_bound_to_another_build_or_unreadable_are_due(repository, tmp_path):
+    store, captures, _points, scene_id = _published(repository, tmp_path, "due-reasons")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    written = lift.publish_scene_segments(repository, store, scene_id)
+    assert written["action"] == "written"
+    assert lift.scenes_due_segments(repository, store) == []
+
+    _retarget(
+        repository,
+        store,
+        written,
+        lambda payload: payload["bindings"].update(pose_receipt_sha256="f" * 64),
+    )
+    [due] = lift.scenes_due_segments(repository, store)
+    assert due.reason == "the newest segments belong to another build"
+
+    repository.connection.execute(
+        "update artifact set content_sha256=%s where workspace_id=%s and artifact_id=%s",
+        (b"\x07" * 32, repository.workspace_id, uuid.UUID(written["artifact_id"])),
+    )
+    [due] = lift.scenes_due_segments(repository, store)
+    assert due.reason == "the newest segments cannot be read"
 
 
 # -- the route -----------------------------------------------------------------------------------

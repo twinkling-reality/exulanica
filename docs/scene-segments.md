@@ -1,9 +1,9 @@
 # Scene segments
 
 Status: implemented 2026-09-11 on branch `codex/segments-backend`, backend half. The derivative
-worker's environment switch for the segmenter (section 4) followed the same day. The frontend half
-(tinting, the segment list, click resolution) is a separate task that consumes the wire shape in
-section 6.
+worker's environment switch for the segmenter (section 4) and the automatic lifts at publication
+and after late masks (section 5) followed the same day. The frontend half (tinting, the segment
+list, click resolution) is a separate task that consumes the wire shape in section 6.
 
 The brief is [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md). Recognition
 used to stop at the photograph: the vision pass returns boxes, people get reviewed outlines, and
@@ -105,12 +105,41 @@ absent or `unavailable`, which is the default. `EXULANICA_SEGMENTATION_DEVICE` p
 override, because the checkpoints are the manifest's. A missing `segmentation` extra or a licence
 drift is a startup failure. The segmenter is built there and nowhere else: that process already
 holds torch for depth, and pycolmap and torch cannot share a process on macOS
-(`exulanica/reconstruction/pycolmap_executor.py`), so the scene worker never loads one.
+(`exulanica/reconstruction/pycolmap_executor.py`), so the scene worker never loads one. A test
+imports each worker command in a child process and holds that neither pulls in the other's
+native runtime.
 
 ## 5. The lift
 
-`publish_scene_segments(repository, store, scene_id)`, or
-`python -m exulanica.ingest.scene_segments --workspace <uuid> --scene <uuid>`.
+`publish_scene_segments(repository, store, scene_id)`, which runs at three moments.
+
+* **As the scene publishes.** `SceneReconstructionProcessor` lifts right after the publication
+  commit, in the scene worker's process and in the run that published the scene, beside the
+  projection. It hands over the placement it has just validated (`ValidatedBuild`), and the lift
+  uses it only when the scene's current build in the database has those exact receipts, so it does
+  not validate the placement a second time; a test holds that the result is byte for byte what the
+  command writes after validating the stored placement itself. The point maps are still checked
+  live. A lift failure never takes the scene down, which is the projection's rule applied more
+  widely: every exception is caught, not only the refusals a malformed receipt raises, because
+  anything escaping after the commit would report a published scene as failed. The failure is
+  `stage_failed` on `scene_segments` in that run, and a worker asked to stop records
+  `stage_skipped` instead of lifting.
+* **When masks complete after the build.** `scenes_due_segments` finds every published scene where
+  every member of the current build has a live segmentation artifact and the newest segments are
+  absent, unreadable, bound to another build or bound to other masks.
+  `SceneReconstructionWorker.refresh_scene_segments` lifts each one in a `reprocess` run of its
+  own. The scene worker command does this after a drain, at most every
+  `--segments-refresh-seconds` (default 300, 0 turns it off), under `--once` as well, and never
+  in a job-scoped worker. A scene is attempted once for each state it is due in, so a lift that
+  fails the same way every time is not repeated on every pass.
+* **On demand**, from `python -m exulanica.ingest.scene_segments --workspace <uuid> --scene <uuid>`,
+  which is also the only way to lift over trained Gaussians.
+
+All three are numpy and nothing else, which is what lets the first two run in the pycolmap
+process. All three skip a scene with nothing to lift, no object masks and no reviewed, shown
+person, rather than write an empty artifact that would say somebody looked; the reader then says
+`absent`, and the skip is `stage_skipped` in a caller's run or, from the command, no run at all.
+A receipt, point map or mask that has gone is `stage_failed` and returned as a skip.
 
 * **One projector.** The masked-geometry check's arithmetic, exposed from
   `exulanica/ingest/masked_geometry.py` as `camera_point`, `image_point` and `ppm_point`, which
@@ -212,8 +241,20 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 
 ## 8. Limitations and open decisions
 
-* **Nothing publishes segments automatically.** The lift runs from the command above. A scene
-  worker hook, which would lift at publication beside the projection, was not writable here.
+* **The lift after a build waits for every member's masks.** Section 5 lifts a scene again only
+  once every member of its build has a segmentation artifact, because a derivative worker segments
+  one photograph at a time and lifting after each would lift a 210 member scene 210 times. Until
+  then the reader calls the segments `stale` and serves none, and a scene whose segmentation never
+  completes stays that way until the command is run for it.
+* **Nothing re-lifts for people.** A person region reviewed after the lift is reported in the
+  reader's `stale_inputs` while everything else is served; it reaches the scene at the next lift,
+  from the sweep or the command.
+* **The automatic lifts use point maps alone.** Lifting over trained Gaussians needs a decoded PLY
+  (below) and stays the command's.
+* **Not measured in the scene worker.** Section 7's numbers are the command's, standalone. At
+  publication the lift skips the placement validation that was most of that time but runs in the
+  same process as the build, beside the pose receipt and point maps the build still holds; no
+  wall time or peak memory has been measured there on a real scene.
 * **The polygon is not on the span.** Section 2 says what that would cost.
 * **A detector-prompted segment offers nothing to name.** Only hosted-prompted masks have vision
   occurrences behind them. Creating occurrences in this stage would give every object two
@@ -222,8 +263,10 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 * **Every threshold is an unvalidated default**: the vocabulary, the detector and overlap
   thresholds, the sample budget, the occlusion tolerance, the vote rule and the voxel grid. They
   are stage parameters, so tuning any of them re-keys.
-* **The lift re-validates the placement** against the pose receipt and every point map, the work the
-  projection exists to save a reader, because correctness of a durable artifact is worth it once.
+* **The command and the sweep re-validate the placement** against the pose receipt and every point
+  map, the work the projection exists to save a reader, because correctness of a durable artifact
+  is worth it once. Only the lift at publication skips it, and only because the same process
+  validated those exact receipts a moment before.
 * **Gaussian centres need a decoded PLY.** The trained delivery is SOG and no PLY is retained, so
   lifting over Gaussians takes the decode the masked-geometry evaluation already performs.
 * **Synonymous labels split one object** (`plate` and `table` above), and the segment floor of eight
