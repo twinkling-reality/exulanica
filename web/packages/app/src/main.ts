@@ -45,7 +45,7 @@ import { applicationTitle, developmentToken } from './config.js';
 import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
-import { CompanionAskClient } from './companion-ask-api.js';
+import { CompanionAskClient, CompanionProposalClient } from './companion-ask-api.js';
 import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
 import type { PersistedMemory } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
@@ -271,6 +271,13 @@ async function mount(): Promise<void> {
   // about the library, and this is the only place holding the credential it takes to ask one.
   const companionAsk = new CompanionAskClient(currentCredentials);
 
+  // The one thing the Companion may DO, and it is still not a write. `POST /selection/appearance`
+  // reads an utterance as a bounded proposal drawn from the reviewed style catalogue; the world
+  // style authority is what turns one into a preview, and the person's own Apply is what commits
+  // it. Constructed here for the same reason as the two clients around it: this file holds the
+  // credential and nothing under it does.
+  const companionPropose = new CompanionProposalClient(currentCredentials);
+
   // The durable half of the same conversation. Read once per mount, because a reload used to be
   // amnesia: interaction-model.md 4.3 and 5.5 both say the Companion may never speak "within 7
   // days of a Skip or 14 days of a Not sure on the same entity", and a window held in a page had
@@ -294,6 +301,7 @@ async function mount(): Promise<void> {
     engine: currentCompanion,
     evidence: currentEvidence,
     ask: (question) => companionAsk.ask(question),
+    proposeAppearance: (utterance) => companionPropose.propose(utterance),
     persistedMemory,
     rememberAnswer: async (answer) => {
       await companionMemory.rememberAnswer(answerToRemember(answer));
