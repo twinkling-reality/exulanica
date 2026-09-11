@@ -11,8 +11,12 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import functools
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -588,6 +592,12 @@ def test_the_stage_is_registered_so_its_ledger_events_are_accepted(repository):
 
 
 # -- the real checkpoints ------------------------------------------------------------------------
+#
+# Each runs in a child pytest, never in the suite's own process. MEASURED 2026-09-11: run in
+# process, the first of these aborted the whole backend suite at 76 per cent with SIGABRT and no
+# summary, because earlier tests had already loaded pycolmap and torch brings a second OpenMP
+# runtime (`exulanica/reconstruction/pycolmap_executor.py` records the same abort, OMP Error #15).
+# `tests/test_gsplat_runner.py` isolates its torch tests the same way, for the same reason.
 
 _EXTRA = all(
     importlib.util.find_spec(name) is not None
@@ -596,10 +606,38 @@ _EXTRA = all(
 real_models = pytest.mark.skipif(
     not _EXTRA, reason="the segmentation extra (torch, transformers, opencv) is not installed"
 )
+_CHILD = "EXULANICA_SEGMENTATION_TEST_CHILD"
 
 
-@pytest.fixture(scope="module")
-def local_segmenter():
+def _isolated_torch(test):
+    """Run ``test`` alone in a child pytest, so torch never shares a process with pycolmap."""
+
+    @functools.wraps(test)
+    def execute():
+        if os.environ.get(_CHILD) == test.__name__:
+            return test()
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--noconftest",
+                f"{Path(__file__).resolve()}::{test.__name__}",
+            ],
+            env={**os.environ, _CHILD: test.__name__},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=900,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    return execute
+
+
+@functools.cache
+def _local_segmenter() -> LocalObjectSegmenter:
     return LocalObjectSegmenter()
 
 
@@ -614,7 +652,9 @@ def _disk_photograph() -> tuple[Image.Image, Rect]:
 
 
 @real_models
-def test_the_pinned_checkpoints_load_with_their_frontmatter_licences(local_segmenter):
+@_isolated_torch
+def test_the_pinned_checkpoints_load_with_their_frontmatter_licences():
+    local_segmenter = _local_segmenter()
     identity = local_segmenter.identity
     roles = local_model_roles()
     assert identity["segmenter"] == roles["object_segmentation"].primary.as_identity()
@@ -627,7 +667,9 @@ def test_the_pinned_checkpoints_load_with_their_frontmatter_licences(local_segme
 
 
 @real_models
-def test_sam_masks_a_drawn_disk_from_a_box(local_segmenter):
+@_isolated_torch
+def test_sam_masks_a_drawn_disk_from_a_box():
+    local_segmenter = _local_segmenter()
     np = pytest.importorskip("numpy")
     image, box = _disk_photograph()
     policy = segmentation_stage._policies(STAGES["segmentation"].params)[1]
@@ -647,7 +689,9 @@ def test_sam_masks_a_drawn_disk_from_a_box(local_segmenter):
 
 
 @real_models
-def test_both_detectors_run_and_answer_in_the_vocabulary(local_segmenter):
+@_isolated_torch
+def test_both_detectors_run_and_answer_in_the_vocabulary():
+    local_segmenter = _local_segmenter()
     image, _box = _disk_photograph()
     policy = segmentation_stage._policies(STAGES["segmentation"].params)[0]
     primary, fallback = local_segmenter._detector_pins
