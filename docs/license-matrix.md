@@ -564,3 +564,34 @@ R-35, R-39 and R-67; and the primary catalog data in `.exulanica/research/nebius
 All primary sources retrieved **2026-08-27**. No claim in this document has been re-verified since.
 **No model identifier in this corpus has ever been invoked**, so every hosted-model row describes a
 catalog entry, not an observed response.
+
+
+## 11. HEIC decoder candidate review, 2026-09-11
+
+**Candidate only, not installed or added to the lock.** `pi-heif==1.4.0` provides a decode-only
+alternative to Pillow-Heif. The inspected Python 3.11 macOS arm64 wheel contains BSD-3-Clause
+wrapper code and declares LGPLv3 for bundled libheif and libde265. Its bundled notice lists no
+x265 encoder. The Python wrapper's BSD metadata alone would therefore be an incomplete license
+claim. [Package and wheel inventory](https://pypi.org/project/pi-heif/1.4.0/).
+
+Inspected wheel: `pi_heif-1.4.0-cp311-cp311-macosx_11_0_arm64.whl`, SHA-256
+`dafa2ea7e7ff594f64fa60e0cd25b3dea9d200277d7aed9fb2b73835fa41fb6d`.
+The wheel's `LICENSE.txt` digest is
+`9e2635f155b00af5a46cb2f2c9b052072ec546d59837ee74efc9cba2cbb83f3d`; its
+`LICENSES_bundled.txt` digest is
+`8155948291bc988b17fa600308e359be32111c1a22aef1dab7b330f17b8106d3`.
+
+The bundled notice points to [libheif v1.18.1 COPYING](https://github.com/strukturag/libheif/blob/v1.18.1/COPYING)
+and [libde265 v1.0.15 COPYING](https://github.com/strukturag/libde265/blob/v1.0.15/COPYING).
+Those primary texts were read, including LGPLv3's additional permissions and its incorporated GPLv3
+terms. LGPLv3 permits application use under separate terms, subject to its conditions. Distribution
+requires the applicable notices and license texts, plus a suitable replaceable shared-library
+mechanism or corresponding source and relinking material. Runtime use is not a finding that
+binary redistribution obligations have been fulfilled. These notices name source versions; the
+actual compiled library versions and Linux wheel contents remain unverified.
+
+This is evidence for a viable LGPL decoder candidate, not evidence that no license-clean decoder
+exists. No decoder has been approved for redistribution. The current implementation blocker is
+separate: the writable set excludes dependency pins and ingest stage wiring, and migration 0040
+requires any non-null geometry `read_source_sha256` to resolve to a current masked-source artifact.
+A distinct format conversion must not bypass that guard or masquerade as a privacy mask.
