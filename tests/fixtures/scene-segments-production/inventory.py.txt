@@ -1,0 +1,21 @@
+import json,uuid,os
+from pathlib import Path
+from exulanica.db import Database
+from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.scene_segments import _SCENE
+from exulanica.store.local import LocalContentAddressedStore
+from exulanica.evidence.blob import BlobId
+from PIL import Image,ImageOps
+root=Path('/tmp/segments-production');root.mkdir(exist_ok=True)
+store=LocalContentAddressedStore('/Users/glendonchin/dev/Technology/orimera/.exulanica/reference-baseline/runtime/blobs')
+db=Database.from_env({'EXULANICA_DATABASE_URL':os.environ['EXULANICA_REFERENCE_DATABASE_URL']+'?options=-crole%3Dexulanica_app'})
+result=[]
+for w in ['79004d44-ca24-4d17-9eef-56786415e233','9e69f7e8-2372-489b-8eb3-b71ea74c16b2']:
+ with db.session(uuid.UUID(w)) as c:
+  scene=c.execute('select scene_id,current_job_id from reconstruction_scene where workspace_id=%s',(w,)).fetchone()
+  rows=c.execute('select c.capture_id,encode(c.blob_sha256,\'hex\') as digest from reconstruction_scene_build_member m join capture c using (workspace_id,capture_id) where m.workspace_id=%s and m.job_id=%s order by m.ordinal,c.capture_id',(w,scene['current_job_id'])).fetchall()
+  for i in ([0,105,209] if len(rows)>3 else range(3)):
+   r=rows[i];item={'workspace':w,'scene':str(scene['scene_id']),'capture':str(r['capture_id']),'digest':r['digest'],'index':i};result.append(item)
+   im=ImageOps.exif_transpose(Image.open(store._path_for(BlobId.from_hex(r['digest'])))); im.thumbnail((768,768));im.save(root/f'{len(result)}.png')
+(root/'inventory.json').write_text(json.dumps(result,indent=2))
+print(json.dumps(result,indent=2))

@@ -1,0 +1,33 @@
+import os,json,time,uuid
+from pathlib import Path
+from exulanica.db import Database
+from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.stages import STAGES
+from exulanica.ingest.stages.segmentation import LocalObjectSegmenter
+from exulanica.ingest import scene_segments as lift
+from exulanica.store.local import LocalContentAddressedStore
+from exulanica.evidence.blob import BlobId
+root=Path('/tmp/segments-production');items=json.loads((root/'inventory.json').read_text())
+db=Database.from_env({'EXULANICA_DATABASE_URL':os.environ['EXULANICA_REFERENCE_DATABASE_URL']+'?options=-crole%3Dexulanica_app'})
+store=LocalContentAddressedStore('/Users/glendonchin/dev/Technology/orimera/.exulanica/reference-baseline/runtime/blobs')
+segmenter=LocalObjectSegmenter()
+result={'hosted_calls':0,'stage':[],'lift':[]}
+for w in [items[0]['workspace']]:
+ with db.session(uuid.UUID(w)) as c:
+  repo=IngestRepository(c,uuid.UUID(w));pipeline=PhotoIngestPipeline(repo,store,segmenter=segmenter)
+  scene=c.execute('select scene_id,current_job_id from reconstruction_scene where workspace_id=%s',(w,)).fetchone()
+  captures=c.execute("select c.capture_id,encode(c.blob_sha256,'hex') as digest from reconstruction_scene_build_member m join capture c using (workspace_id,capture_id) where m.workspace_id=%s and m.job_id=%s order by m.ordinal,c.capture_id",(w,scene['current_job_id'])).fetchall()
+  items=[{'workspace':w,'scene':str(scene['scene_id']),'capture':str(r['capture_id']),'digest':r['digest'],'index':i} for i,r in enumerate(captures)]
+  for item in items:
+   capture=uuid.UUID(item['capture']);screen=repo.latest_privacy_screening(capture);t=time.monotonic()
+   out=pipeline.ingest_derivatives(capture,privacy_screening_id=screen.screening_id)
+   row=c.execute("select a.content_sha256 from artifact a join capture c on c.workspace_id=a.workspace_id and c.blob_sha256=a.source_blob_sha256 where c.capture_id=%s and a.kind='object_mask_list' order by a.created_at desc limit 1",(capture,)).fetchone()
+   doc=json.loads(store.get(BlobId(bytes(row['content_sha256'])))) if row else None
+   entry={**item,'seconds':time.monotonic()-t,'error':str(out.error) if out.error else None,'artifact':None if not row else bytes(row['content_sha256']).hex(),'document':doc};result['stage'].append(entry);print(json.dumps({k:v for k,v in entry.items() if k!='document'}),flush=True)
+  scene=uuid.UUID(item['scene'])
+  for mode in (['before','after'] if w==items[0]['workspace'] else ['after']):
+   original=lift._projected_placement
+   if mode=='before':lift._projected_placement=lambda *a:None
+   t=time.monotonic();entry=lift.publish_scene_segments(repo,store,scene);entry.update(mode=mode,wall_seconds=time.monotonic()-t);result['lift'].append(entry);lift._projected_placement=original;print(json.dumps(entry),flush=True)
+(root/'all-measurement.json').write_text(json.dumps(result,indent=2))

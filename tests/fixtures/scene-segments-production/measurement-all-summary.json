@@ -1,0 +1,4544 @@
+{
+  "hosted_calls": 0,
+  "stage": [
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8c7b-791e-b304-ee9c31019f1c",
+      "digest": "5b09358a5a2e94dd13a469714624fbd559aa1258bdb992b2111740b2614361eb",
+      "index": 0,
+      "seconds": 0.06952474999707192,
+      "error": null,
+      "artifact": "b2b48651c13a3fc95a5399773d9bd9f223696c8bc3ca68c6fb92ddc44a910f85",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8cc9-7960-86ee-bb0e0dfae2d6",
+      "digest": "61e550d6b940564d2305b77c66207c766316f83343d3bfa0567e10ee7189be78",
+      "index": 1,
+      "seconds": 2.5195085830055177,
+      "error": null,
+      "artifact": "2dc899f8fef04fba7103c1416d6d75874e42fd344fb4a82f5ff5ff36351b41ba",
+      "masks": 2,
+      "labels": [
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8d06-7521-8581-cee2086f17aa",
+      "digest": "163278186744f61696ffc04dd1d5f4c83a15f23c0d996cb90f48a0c2a4f9e59f",
+      "index": 2,
+      "seconds": 1.1212746250093915,
+      "error": null,
+      "artifact": "b77d851d216132c4b9846270f7c9462fd6ed9d486163a6aebd9422bb38c5799d",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8d43-7c41-8b74-54cb68cae633",
+      "digest": "22843e46af9fd16907ba709ae26bbf1bc140bd3f29a1469b82366559de589099",
+      "index": 3,
+      "seconds": 1.0855719999526627,
+      "error": null,
+      "artifact": "3baedb05e53c0a72456397fcb683cf54b2c320ed2d0755f1fb63b4baa6d6450e",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8d80-7a2c-9d56-29e20bf1ae27",
+      "digest": "ab4ec9ef06f3403b4db628878b54528440d77a3b1408103de0d62f61bcba04a6",
+      "index": 4,
+      "seconds": 1.086476958997082,
+      "error": null,
+      "artifact": "13cb7dd81bf085467b3c3a99ab386f8030d4efed148c351b4b4b6ceac93f9d71",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8dbc-7c23-b364-4d6089b2085c",
+      "digest": "e1455ec61b3230ffa3899c3e06426ee19cb2f22b31c803f2895fc788eaa4da4c",
+      "index": 5,
+      "seconds": 1.110399458964821,
+      "error": null,
+      "artifact": "da23d3b859b050f5591eb8fc941b783606b171ef74b955bb2c49adb9cd9dc3ac",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8dfd-730b-a73d-754697f8da02",
+      "digest": "94d3884fd69165373bf997beebed08221fee1c18226789f350789419ca9fd5d4",
+      "index": 6,
+      "seconds": 1.0955399159574881,
+      "error": null,
+      "artifact": "8d7e02db634f1a27394d5e59918ddcb87e3d66e6f29575eab1fa8747a47baff8",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8e3a-75df-b07b-e70a0613960f",
+      "digest": "28d8fa0ee93f108ce913f97bdd3ba8f9ea8a712f141023a6625993c00409f459",
+      "index": 7,
+      "seconds": 1.0786639580037445,
+      "error": null,
+      "artifact": "9546dd44ce9dec7127a66fa9ed1eaa73180464ef8b3ab2bda366916206eb23c3",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8e76-7525-bda1-24f89572dc46",
+      "digest": "ec468683648eb0b7cc7f5f65c9dc15bebf1e5851c40e6618f354a4b9afd09ba5",
+      "index": 8,
+      "seconds": 1.0900698330369778,
+      "error": null,
+      "artifact": "55c0720e642b2a057102768f42c68d3eda239f7f3b6c3781761706e6c8943997",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8eb3-73e5-8339-3b1fb9c295dd",
+      "digest": "45a459b02170c4bf937a3c75b13ac7d0c6525636eb5c6de48861986dd2d0376b",
+      "index": 9,
+      "seconds": 1.1167404580046423,
+      "error": null,
+      "artifact": "9a51b49dad2fffd5e4605794e47918c3deb359dfa0e849d19f48dfa68164d999",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8eef-737c-818c-833fd585a4ca",
+      "digest": "ea7260f23fdcf3e4650fa9287153943d8f99db34bb7cfbb3596a856ec11f532f",
+      "index": 10,
+      "seconds": 1.0982534170034342,
+      "error": null,
+      "artifact": "8eb843b2496e2c2d414257482d8fe3fe72d7c0fa63692e90667cea1efc314e41",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8f36-7878-8430-1075b9afd65d",
+      "digest": "91d48fec553ed332c077f72be8007e06c6e49592d0fc2e041df2d394350abf27",
+      "index": 11,
+      "seconds": 1.0753135839477181,
+      "error": null,
+      "artifact": "334a5e9816a6a0a6ad8b3b4ac2931cc555e2683dec4d92e7345f68706f6c5386",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8f74-7aa4-8d09-f1551abb583d",
+      "digest": "8dd99ff4031aa1a9f067469a51cc825b9c5233304a9e568cacc19eb5bf4e9539",
+      "index": 12,
+      "seconds": 1.0900877080275677,
+      "error": null,
+      "artifact": "30925e6c3dc6cfdc42955f181078f5afb169ea79abc117f5828aa8a2d2cc5335",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8fb0-7c66-b5c1-9beb314db8ea",
+      "digest": "8ec5fd7c34ca0fbd470e664804fb1c98196cb722411b7c47ce9a72b30b1a3478",
+      "index": 13,
+      "seconds": 1.098186916031409,
+      "error": null,
+      "artifact": "b08a1b3849a1200f63278a2fb957c8dfc06c56420abae62139172e5216986c36",
+      "masks": 3,
+      "labels": [
+        "table",
+        "boulder",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-8fe8-73b8-ac59-4a1d6c082950",
+      "digest": "e3ff262876f857bcdb2638739a8eca22b9bbd5a1a767850ceb6c68a0cf2fb3d5",
+      "index": 14,
+      "seconds": 1.1259893330279738,
+      "error": null,
+      "artifact": "81e95d6dbcb1c5edb5a1a8b7e4aebed31eb0901bf6d45ad781658a1065243ae2",
+      "masks": 4,
+      "labels": [
+        "table",
+        "boulder",
+        "umbrella",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-901d-7d24-be20-1402c86b5590",
+      "digest": "e40e6013bb9650abfaa56f0d030ada9e6bb29b23d586558abbe37a35478e0d7b",
+      "index": 15,
+      "seconds": 1.1413873750134371,
+      "error": null,
+      "artifact": "75322bd3813f0ed15968bd07c6b063eccfdc91ef5b37a1f5f698a04cd37673f0",
+      "masks": 4,
+      "labels": [
+        "table",
+        "boulder",
+        "sign",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-905d-70d9-876f-4bb57e4d60ad",
+      "digest": "bfd64a08fa3c2df5377096bbf0cb3aea3385e3fb186e8241d1411d4214005b27",
+      "index": 16,
+      "seconds": 1.104622290993575,
+      "error": null,
+      "artifact": "1ccc2392262e002fb76b3b62f0c1aea534e47d5dee2a5c7fb499152e58d20809",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9096-7fd0-b9ff-2d7d3a485616",
+      "digest": "609d913a9fded78535a5263a52ea14fac66b405360f46c7ce7fb4c7feb09a8a6",
+      "index": 17,
+      "seconds": 1.0901137919863686,
+      "error": null,
+      "artifact": "577f7d47d9f4c7f14ec0b324d588a207bee1b99a3df937a3d112c427449f5f18",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-90ce-7f51-89a3-a92ac47ee096",
+      "digest": "f640bb6e1e85dee11ee0a9a31577103c04bb3a8e8f340625b1d307f9559ff0e5",
+      "index": 18,
+      "seconds": 1.0816790829994716,
+      "error": null,
+      "artifact": "8fb904f11e0ec656a99a8515f5b510087abbb3f5ac8fd0e04db8e177d6c33743",
+      "masks": 2,
+      "labels": [
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9108-7bdb-8f10-2a4f9d67ef8e",
+      "digest": "a8f61434f75913075f6e927654a9fdcedb618dd82c95d222eb5162aa0241e2b7",
+      "index": 19,
+      "seconds": 1.086021208029706,
+      "error": null,
+      "artifact": "af119ae8856a090ee87280e8ded28ad3923353197aceecb9830ffae417357de7",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9140-7c83-9d47-6c72c2f5c45f",
+      "digest": "8691be1bcd779171caf093989e6d1ef3beeecf77734d546c3ad76f201566ecdd",
+      "index": 20,
+      "seconds": 1.2107518329867162,
+      "error": null,
+      "artifact": "ee65d70c39aff73185b91090081fab5007009bbe7d0bee95e8197f79654c8207",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-91d6-7b1d-a577-36b148c621cd",
+      "digest": "25e194072be5bab31eb24b1a8629c6b6c91db9d8f1a749e36ff0cf6ed0f66a45",
+      "index": 21,
+      "seconds": 1.119087832979858,
+      "error": null,
+      "artifact": "fc61bf8107d5ab5fc407401bfd9d9963d79c471fbdfb80e6db108f6e16df2823",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9222-717f-acaa-d18f5f361854",
+      "digest": "9e37e602926e21bb9f6ddae783c8af93a7909c2ec6b66209ac36619e9121b238",
+      "index": 22,
+      "seconds": 1.1154993329546414,
+      "error": null,
+      "artifact": "a308dbb572bfb37b6c5e809892aaea3e4cf9e5c51fae7fcb982bc8e4c480ab3f",
+      "masks": 2,
+      "labels": [
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-925d-7b0e-917a-64276365ad0b",
+      "digest": "cfa5463009e8b1f8af096d89c0dea17468faa9b1fbf64331854c2d5ddc4b0d05",
+      "index": 23,
+      "seconds": 1.1131481669726782,
+      "error": null,
+      "artifact": "c67adfef4224ef94e6ddcef9bc9e4f3ba1d82521e0c5595681e2c08cf1aff015",
+      "masks": 2,
+      "labels": [
+        "boulder",
+        "plate"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9298-750e-842b-4ec1a0834002",
+      "digest": "694f5254d525a22ee2548a6d05394b5d991f6e8dfa6df6729b5ed16768e275fd",
+      "index": 24,
+      "seconds": 1.1196305000339635,
+      "error": null,
+      "artifact": "4160c2ab5b5f529ed29ffa2d8d286b37840bf2d5fe684c6c048429d1abe79053",
+      "masks": 2,
+      "labels": [
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-92d4-74a2-9949-de176a44e41b",
+      "digest": "171ee2e281c4a535261f21400965d4e3d39419bf6195e9df854d70d1ca1c27f2",
+      "index": 25,
+      "seconds": 1.149685624986887,
+      "error": null,
+      "artifact": "59b7fed89cf3ed479ada69aa72aa105696c8304ed09f565e6b97d59d01864b8b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-930f-7cfc-a203-c2ae4d90a6fd",
+      "digest": "18ebc5bf660bcab81a0c67d313ad55a6ccda5bcb07d22fa7dcec0032aa787695",
+      "index": 26,
+      "seconds": 1.1439480829867534,
+      "error": null,
+      "artifact": "d1468231ea9e5c5875612f398e992a39b0c7260810d59e57ef36120f3b7ac38b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9348-7fc1-af9a-5c6c2dfda4d9",
+      "digest": "1bfa4fe0f6f8a609c9ed325598141d3ce984dc5e6a83a3c3fd7e92c407f59de3",
+      "index": 27,
+      "seconds": 1.1134646669961512,
+      "error": null,
+      "artifact": "b90f5596ba768168c100fb00c09a366ab8165c4a148c1ac4408745c5ff098a81",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-937f-7a9f-b170-c8140b86e8b6",
+      "digest": "a115238cc38476e6b269c7ff3979fc1283ed763af9811cbd96a3dcd98b990e2a",
+      "index": 28,
+      "seconds": 1.098310291999951,
+      "error": null,
+      "artifact": "612d4bd3de2a8b32d3e4f534c7bb369b996a2c32d51c86e4c6ed21d36cd4b4c2",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-93b6-777c-b6cc-d3dade731a82",
+      "digest": "e24c69ea99487f0cb3ebbc5d58fe6d83edc6ae837508fdf1fa37f9f2dfd5d4c6",
+      "index": 29,
+      "seconds": 1.1313892499892972,
+      "error": null,
+      "artifact": "524f1637ee2f71fbe31d3c844caf8a32b93016676b0b565f43fa77e474647346",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-93ec-7ae7-a202-efad3ff0ba56",
+      "digest": "48b46aeb0f39f7cc1d24ec510ac83921469d861b6860b0c30f13af51765ef689",
+      "index": 30,
+      "seconds": 1.1065976669779047,
+      "error": null,
+      "artifact": "c216a9e70c13247b3fc4da738de6b1aaba882141b3a4c241cafc7896be0a9da9",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9425-7f30-851e-72af9f81754b",
+      "digest": "d6f9c5afd6d4737ff5af15e74b83e500d8ddde588e262463ed38028482ff06b8",
+      "index": 31,
+      "seconds": 1.1233034169999883,
+      "error": null,
+      "artifact": "46a7d094be87ae78fa9962cd1562688f560c1aa1f9751f574db338c9af6f30bd",
+      "masks": 3,
+      "labels": [
+        "table",
+        "boulder",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-945a-7f46-8c63-d1a4a18337d7",
+      "digest": "c1974397e7363a11ad036d4ee6e362ad6eff1b769eaae936b97165b43f827e29",
+      "index": 32,
+      "seconds": 1.141086624993477,
+      "error": null,
+      "artifact": "e97857afd5e99eb4c44f6da59b8ae229c7403b93876087474e26f0d56d429cf6",
+      "masks": 3,
+      "labels": [
+        "table",
+        "boulder",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-948f-7668-b3e2-ce91ef37ddad",
+      "digest": "8826e9c5059e775009f936e82d8efbfe67d83f99d6b3ad96f7321da705dfc70e",
+      "index": 33,
+      "seconds": 1.170784707996063,
+      "error": null,
+      "artifact": "e87d0a9c153b6aad6511fed0acd9aaefbfc305257afecde6e48c7e9e7ebb30b7",
+      "masks": 3,
+      "labels": [
+        "table",
+        "boulder",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-94c4-70c5-ad1b-423c8fbd5aed",
+      "digest": "225c8552eb489643c5ece516b3c48ddca428ba7791fbef236dbf625ee8876a59",
+      "index": 34,
+      "seconds": 1.106300875020679,
+      "error": null,
+      "artifact": "d649ef3bb56a35e94c088bd7fe14f129b7a7fb64c0b4192b94e9d16888eaeb78",
+      "masks": 3,
+      "labels": [
+        "boulder",
+        "table",
+        "statue"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-94ff-7bfb-81ed-4c032d3ad184",
+      "digest": "63a98ce54a5623acd7c3e12261cb59bd4b94f4c392e45b10fec1326ed6b0413c",
+      "index": 35,
+      "seconds": 1.1097867079661228,
+      "error": null,
+      "artifact": "7c5d8953cc6b0624d29369adf049b897dc9d5e59fb6fc211331030f789869154",
+      "masks": 2,
+      "labels": [
+        "table",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9538-7c07-84b2-217fd9e04b1e",
+      "digest": "b5858fa6fa077cb2a24fb97607b81c5e0e50470c8d5de5ca4af795a45276347b",
+      "index": 36,
+      "seconds": 1.0880028329556808,
+      "error": null,
+      "artifact": "e913d7084d6587c55c5499ceed74c73575443c4f4902601076b4a919adc5ee79",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9570-72f5-be48-61bedaa09210",
+      "digest": "15d39e845f7e01d54f077c70bc662b58be5d9a1693df9cd58adc47ab122065c1",
+      "index": 37,
+      "seconds": 1.0880672080093063,
+      "error": null,
+      "artifact": "b7ed7f4892c4c261e97d030112107d5b32dd1a269f5d182b6a10df5d0dbecbca",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-95a8-7d62-bdfc-23eaf2bc6763",
+      "digest": "c770a6b17eb0c2bfbad3d00517febe4ac6d5135b28b9074eae1a541c3207bf8f",
+      "index": 38,
+      "seconds": 1.09756920899963,
+      "error": null,
+      "artifact": "a95d18be0463b92c9fbd2c90098f74da30b0c0f91c6ef1f34776fa97ed53b2e3",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-95dd-77fa-b568-3a8069f919c4",
+      "digest": "14fc73b0e7cd7f39360289fb49b69f98b4ad26cbef001f3ed7c354a02ef98da4",
+      "index": 39,
+      "seconds": 1.1294609580072574,
+      "error": null,
+      "artifact": "e629592b34d8cd41d08a84db0a0d83c734a9ee3f823f6f6059a8e8d2a49de959",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9614-778d-9416-3aa3c8601c6a",
+      "digest": "25b2c60b40b14312cbb9a749f934e59ec1e9ce9f83ee8ffcb9e0a494360d65fc",
+      "index": 40,
+      "seconds": 1.1394858339917846,
+      "error": null,
+      "artifact": "f6af1f9142f31468269214ba313546033892e557ebb5213e0985692b5476203e",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-964e-7571-b575-564cd75caa55",
+      "digest": "9141d840a6d664939840983ce7cc0801d4a796f504e38e7da290964f50c6a57d",
+      "index": 41,
+      "seconds": 1.0834207919542678,
+      "error": null,
+      "artifact": "78d3a976bb03a6379f0a3f441fc6150dd4e9c6fdedf2bb070080f05b22eec267",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-96e0-7a35-8aeb-1ec8323ea639",
+      "digest": "820fafe54d590b3afe3da49f61a4972ba259edba25733c962e4c4509686c4e1a",
+      "index": 42,
+      "seconds": 1.0860155419795774,
+      "error": null,
+      "artifact": "4f8ff48608ad59c80c077fb6fd4a0ffb6db8d1e924912d34dda690eecf09f1b9",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-971f-722f-a7ae-6cb3a661aa33",
+      "digest": "d62baa1791ea196bcd26da4e12dddc915698bdac667533bcd169ac7ec89cc414",
+      "index": 43,
+      "seconds": 1.0917315410333686,
+      "error": null,
+      "artifact": "041108ec6662002e3c1277f72017b90d2f4e8e99e0a72eaa27885ac197123655",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9750-7e7a-be14-c329442bd50d",
+      "digest": "d2b68503ebc1d8cb0225922b8c80b8b00fc02ca0964cffb6b95da0ea5c175b2e",
+      "index": 44,
+      "seconds": 1.1044063339941204,
+      "error": null,
+      "artifact": "c0e44f114dfe03f749c6cfedec9994a7ad1ece6f54ef1636a448fe9e3c48c4cd",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9785-72ad-a2b1-4be98ef61f65",
+      "digest": "24756dd3168172b436d27e7cb4324c99a2045a49dfd1739880f4e345a9221b89",
+      "index": 45,
+      "seconds": 1.107653625018429,
+      "error": null,
+      "artifact": "b09c668f893d223d104b8f6298f19149c0e31aada5e0c5d6c6e1d98ae1f78b9c",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-97b6-7ae1-9e4e-46381d59c2d1",
+      "digest": "9801df0f427a92d5dcb10ed3b0c6ee70fece730ea96789c48691bd592fc0c69e",
+      "index": 46,
+      "seconds": 1.078801958996337,
+      "error": null,
+      "artifact": "a5e1c4a1d7abd1e22b7b40715c8052583f2e2548ed0752e068358324fe3a8197",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-97e7-7d2b-90d1-b8ac74e7d598",
+      "digest": "6904532981fc5137047c0b01911da0846d291716da75ed73d08425367f03ec77",
+      "index": 47,
+      "seconds": 1.1310111249913462,
+      "error": null,
+      "artifact": "b948e93d002da1bf53ad0149c442e785f939b04a8ca6e12af6059bc818580fbc",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9818-7bd8-874f-2cbda0c10e6a",
+      "digest": "dc6239dd396e1558b6ef6cacc69a3f7f469fa0e3bf627d7b1fb2258fab35e7fd",
+      "index": 48,
+      "seconds": 1.119599041994661,
+      "error": null,
+      "artifact": "97dea2ea015b82b3e525f2bcfaa6c3a92439323ac39c58396903ac58e08fd703",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-984b-7a31-8e04-1dcd3edb4dde",
+      "digest": "8fe85e731159e872848500154b5e8ca3834505393533c1880d6573cfdf12e5de",
+      "index": 49,
+      "seconds": 1.1457052909536287,
+      "error": null,
+      "artifact": "f6d64594855ad6330d643fc10dad9f7fdc6236996b9a6849debf9300dbf6869f",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9879-764c-b989-05e3b5ea118a",
+      "digest": "3173ee2829d0aa377c075f82bd7a8e48f5502729331252298b773280bdfcef4f",
+      "index": 50,
+      "seconds": 1.133081250009127,
+      "error": null,
+      "artifact": "6edb3d851c903ae907cbb10422eed75d177186d58ba2d71beac3802f407ca996",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-98a9-799a-808a-a8c81637d9f2",
+      "digest": "e0dbd4b0c27c57e6e84a0fcb4da316c929f0107b260946821f386ae60a98302c",
+      "index": 51,
+      "seconds": 1.1104184170253575,
+      "error": null,
+      "artifact": "5d939b6076fad90a8c6f08aef6723462dc8ba866cd38220759b6becf738f61c5",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-98d8-7960-bd72-28552c260937",
+      "digest": "b869226fadaba64e39e5292cc82cbc741cb499767284823fe29eb6743434fe2a",
+      "index": 52,
+      "seconds": 1.1160120840067975,
+      "error": null,
+      "artifact": "3e83ab9e7bfca2ec8158517baf9d50e64eee39914c3d4ff795c2c5b910fe5714",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9909-7813-b911-2c58767dc8aa",
+      "digest": "803ecfbfc6185705008ae69ab1641d421854bb658d037952086c4272aebcd715",
+      "index": 53,
+      "seconds": 1.1127152499975637,
+      "error": null,
+      "artifact": "08f9ff9f6a087e48a0dc3dd94fd2c29e7119f867104d8b8298fb80141fe17d5a",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9939-7472-9ca7-8ed6d3e1f5e1",
+      "digest": "6b84755b45d7b09d028e741bdb59cb0cd958de9bfd64e9b813871eab879af5f2",
+      "index": 54,
+      "seconds": 1.1943969170097262,
+      "error": null,
+      "artifact": "d8112b14d1f844659bb39ab6c916f5d55743652ef80af0f1bbdc6ed75b06a433",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9969-791a-865d-5d29d583b588",
+      "digest": "e66ddba599b5237ad3b2ae7c90389c663894b32e2e7c10483fd2fbe53f92a7c2",
+      "index": 55,
+      "seconds": 1.1163163750316016,
+      "error": null,
+      "artifact": "f296457a7ecc558ec1e52910038ff7d1a517b5f765d472dbd28c3572727dd883",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-99a3-7163-99b0-77411f6ee46d",
+      "digest": "9e8b99275e1f656a745a7efa139f686e8cfeab96871608a6990096dec6c5488a",
+      "index": 56,
+      "seconds": 1.1066719160298817,
+      "error": null,
+      "artifact": "55f5ebc98219ee5112686ddab2c817397097a98b12ee3a5f0bb018b8669baa77",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-99e6-77a4-a637-d50ec329b9ce",
+      "digest": "cc4e3a07ec6ae7db6de0873057060c411e93a0cc11ef05d61e408def49f5f579",
+      "index": 57,
+      "seconds": 1.1046159170218743,
+      "error": null,
+      "artifact": "472754431d461779ab30b91e6929d9830e9bd6e6c6d02c59c9a18bf9f1893b2b",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9a1c-7c7f-9e3e-39fd6daa545f",
+      "digest": "dc30855cb6526f1c8f6943a4d9730aefe5b43891c32cbe5501380686cdf10c63",
+      "index": 58,
+      "seconds": 1.1169493339839391,
+      "error": null,
+      "artifact": "9d73d78b9a4641b30d45440b6405526c687196eb89a6ff8cbbfb62d770693e10",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9a4d-7d98-9117-db790c072767",
+      "digest": "ac2630182368851a3b9d86b678c2914718b925d3e8b7269a28343b5c3fd04e9a",
+      "index": 59,
+      "seconds": 1.0920366669888608,
+      "error": null,
+      "artifact": "0b7befe65e0d73c9a7c139ff400d819c2e0d65a10d0f0ee86ec8c1c3c29fd66c",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9a7d-7075-9bd6-bb89a189e579",
+      "digest": "0f86b5a861300baa0d60f65a5981e42e6ed1a5b22226bc77f7c3ae4248411570",
+      "index": 60,
+      "seconds": 1.0804314999841154,
+      "error": null,
+      "artifact": "d433abde6c94845ba65c09127681459fd0400712bbea1e5a6e61690be281a145",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9aae-7f71-9989-e1e334e45d57",
+      "digest": "55d52abcfc476bc173c6081b1af7c16de7fe71933b86b5d673faf34be660c351",
+      "index": 61,
+      "seconds": 1.0826023329864256,
+      "error": null,
+      "artifact": "8bdb7f896e293eb6561d5743ee9c9601f3b40d72a7e3dc16c0895d447b126c34",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9add-739f-9e6f-5112bb86e9ae",
+      "digest": "d9b92883db9ef7f8c1e15d64404925ad94a48701ddca276444cc542da8b09ae3",
+      "index": 62,
+      "seconds": 1.0874963329988532,
+      "error": null,
+      "artifact": "bebc76b94d9824316b884d1485aea3738c77f0d91f36e3152054242bde8acc81",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9b0f-71f8-aa06-13313ffe0b7a",
+      "digest": "7dea63283e3f59a602eaaf6fbaa78302bb26ad9fd4324a99f4498e018107fd35",
+      "index": 63,
+      "seconds": 1.0833270830335096,
+      "error": null,
+      "artifact": "840671a161f58734d21ab1d7c3d554741b5636732d6bed65314bfe63e5b3dff2",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9b42-7e61-9b73-c0cc8029db94",
+      "digest": "48db07a1727aaa221c49e2b7ae819a0071313786c45435535bcc3c48255f71af",
+      "index": 64,
+      "seconds": 1.1220317500410601,
+      "error": null,
+      "artifact": "23b4b33a124e5c70bad13a149c57c5642a04586db7db6b40e944957c3a0557a3",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9bd9-7bda-a7bc-6cd388d7bbeb",
+      "digest": "3633829800abda61a4f1c8987228a8f22d0b5aaba0e0caee5ccc2bcd0f21165a",
+      "index": 65,
+      "seconds": 1.0771265410003252,
+      "error": null,
+      "artifact": "b4d2211379a137da698ec2dacbf2a4ffc505bf4737e6ccd2479a5b3d3da36364",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9c23-7125-a1e8-c7aaa5462f57",
+      "digest": "400c8c26567d53838c44c283afb246872678db46bd7567e8b2e10b6d194db800",
+      "index": 66,
+      "seconds": 1.0866960000130348,
+      "error": null,
+      "artifact": "72e4f78eee0de715795b6b8981895a5152a208ac3b959e43a1d572b7b56db720",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9c5b-7a65-9240-8699eb6a6b62",
+      "digest": "52fc57a24dd172031e0030b1892220fdfb5ed10574f3def4ba5c81181a7f30c2",
+      "index": 67,
+      "seconds": 1.109343499992974,
+      "error": null,
+      "artifact": "1d6739f536a2bbebe959cb7608cebbacfbdd836af38c33597347a388d2232ab0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9c9b-7592-9927-f538c29800d4",
+      "digest": "1a9072fcef1b91e7333d5f06300f64cd812bfa60cd5ea333fd483a1eaa64c036",
+      "index": 68,
+      "seconds": 1.0963456660392694,
+      "error": null,
+      "artifact": "b42e551f8e7e0e3a6bc433c0639551c383083f96f288a822d9edcd2f72f55507",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9cd8-7152-b38e-ee9aa287ec3f",
+      "digest": "e3a5964f020eb88b656c64417f1b2b79f7e276c6fcfe9063d043affc5bdfa1d7",
+      "index": 69,
+      "seconds": 1.0817434169584885,
+      "error": null,
+      "artifact": "cfd6fd49faba9833bbcb6548ff9ed025cbc5c8ffc5bf4b559669b01f2212e668",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9d10-7442-a410-d1145241b27a",
+      "digest": "2e5aacbe49968096173c1c2b8ae41e6a71a483c16f4bc7261f09835a7ce378bb",
+      "index": 70,
+      "seconds": 1.0905094589688815,
+      "error": null,
+      "artifact": "77ba80abd8413962ab977c214521e413a148bc4a26eb8a8fed07d22725cf0a31",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9d48-7512-8655-bad4e4b2f863",
+      "digest": "a2b5627c416fdc9f830e5e904cfc5c80955b2b619c27b89e797efd801fbf961d",
+      "index": 71,
+      "seconds": 1.094028708001133,
+      "error": null,
+      "artifact": "324ace6cd372a3fec622a2c4a8d484e67b4e602d494d4e16026c1614bd17039b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9d7c-7ea2-9b97-1508f10cfa17",
+      "digest": "da394496f00207381f6e516089d59fe4dcdb8bfd285ad62e764fe043c17e20d0",
+      "index": 72,
+      "seconds": 1.1161750419996679,
+      "error": null,
+      "artifact": "086e89114f2c1a9ff328443dc8af55433d6b384397a9d43d3b6efcda91e92218",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9db4-7cbf-b7c9-7f8a23d62c97",
+      "digest": "646a0f6e1d097c7a90f5f5239f1fe284bc98f4591bb7222b26d37321f3f4e5d7",
+      "index": 73,
+      "seconds": 1.0812869590008631,
+      "error": null,
+      "artifact": "b177d03c4e8b440efc36ea872f6565e6a08e84dc3c78eacc5529b830eebe653d",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9dec-7423-bcac-489aad65ad86",
+      "digest": "8b23ac176c9ee750cfca09009027ace19addf2e15ac4c9ce7e8f81efdc96b487",
+      "index": 74,
+      "seconds": 1.142846999980975,
+      "error": null,
+      "artifact": "2d209a1bc5b4883b1d66a408b5bb1b0d49bbff3df47420c62362269abca146e2",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9e24-77e2-9716-032c3b19a602",
+      "digest": "5f5621080602decb6b8e8a3dbcd0cd2e0cfdd15c20da849b37d187d31d87465a",
+      "index": 75,
+      "seconds": 1.1858649579808116,
+      "error": null,
+      "artifact": "0b9b80953e30170db60973877cec3ac8b66dbbe981fa326cf8240fa39cb7b9cd",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9e5d-7b4b-8a13-d1700f0826c3",
+      "digest": "09a847a4d55309e15e27c49862bb611c6172513d984bcb201d61367dccb044ef",
+      "index": 76,
+      "seconds": 1.152489667001646,
+      "error": null,
+      "artifact": "3ba35db756a4a262408006f2b34f5cf1ba4f35ed4007190f14dee5cf1a65dc7d",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9eaa-7c7e-b35a-b393644af677",
+      "digest": "836f32078a570536457be6e16c2593a34980c93250f2018b55b4d552509f91e9",
+      "index": 77,
+      "seconds": 1.1547589999972843,
+      "error": null,
+      "artifact": "1ed247bd0f8aa400b189edc099c3687dbcc13ae5193a8a4e5fc84012f3ab4f84",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9ee9-7d6e-85ee-60f34ba6153b",
+      "digest": "b6f62f30b5308025a9beaadf0e8efbde84945a03fccbb1d5b84561f60f8e3a05",
+      "index": 78,
+      "seconds": 1.2033183749881573,
+      "error": null,
+      "artifact": "ad29dfdee2ba7536f415396f3b795266cb38e84204d606267ccf449ecb1a8469",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9f25-731a-ace7-dbf8d1271a04",
+      "digest": "ee735def32837632530a64e388df6c19499d18b3e4ba254a994c42021a4bb42c",
+      "index": 79,
+      "seconds": 1.1977286659530364,
+      "error": null,
+      "artifact": "f042cff1834158e8c7432d32bb6493b95948089fa5893f7b1554053aea7fc670",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9f67-7ecb-8a36-a9e56333c36f",
+      "digest": "80c6d10dd1365a39b315e0e2428e8f46136d3cbce3edb3f7eeb3863dacb9001b",
+      "index": 80,
+      "seconds": 1.2051951249595731,
+      "error": null,
+      "artifact": "a2b3d65c5e9d32d2ab6898688a637da5e000bbf06a2db039f87e46da8ee9e36f",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9fa1-704c-8922-e2543c304333",
+      "digest": "46a7df3f7fd394d73c86437c535b52326e4ae07957f06771b6ac17fa3729801a",
+      "index": 81,
+      "seconds": 1.662148499977775,
+      "error": null,
+      "artifact": "4407f9d2c9edbcfe97e26f1d09d41f3476d275285b86175f223839b9db2ee716",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-9fdc-705f-be08-6ba4b209acff",
+      "digest": "f07a52496d257e38110bd302a8be2eeeda0745ddc2041369d642ac620c0cb582",
+      "index": 82,
+      "seconds": 1.7642658340046182,
+      "error": null,
+      "artifact": "aee37efbbcf29d9d8e8d1a00c5f25a671cc84030f2e6617f1c8ced90be8f4e0f",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a01d-7574-87e4-a0c83e3d7d72",
+      "digest": "fa273ee66b6a8b385b26a78db7b00fde90fc295056f9445ec351e14b17d714c3",
+      "index": 83,
+      "seconds": 1.6982760000391863,
+      "error": null,
+      "artifact": "b0d17cee3502f40e91820817e748c66c055e712b2e6ef66a469b95d8f06d5c94",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a057-7f3e-83a6-be0886c8ced6",
+      "digest": "d9de01b4dce96a7fb1845ce0123c12705d5c8704c969c4568216664bc5971267",
+      "index": 84,
+      "seconds": 1.6731583750224672,
+      "error": null,
+      "artifact": "1fdadc6383b3b3b13f6537fbdcfe894233fc323785550d64606692f1832f65bc",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a089-7f1f-a1af-f2accf4f3a1a",
+      "digest": "4a3780b41069fbbb8ed7e2ec5114505e0d9a1d70b3dcd1f4839fc277bcca4319",
+      "index": 85,
+      "seconds": 2.03412395803025,
+      "error": null,
+      "artifact": "cd494f0b77dd995a1f6afbb625cc113dc39421cb1715aeae3a1c5762581f589c",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a0bb-71ab-8dc8-81607449d701",
+      "digest": "3eac33cfad1c75f0f14700c6ee74d712873e75ef645f2411d06181419d01e16e",
+      "index": 86,
+      "seconds": 1.5421173330396414,
+      "error": null,
+      "artifact": "a9893b04517f2297cd8d887cb2749b269e651105039ec574d93e4e31d353e017",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a0ed-7970-af90-92a487b1b1b3",
+      "digest": "b0873c36f7f3eeacfd9183facc97a3380de9fd3844c75cae8977bbe223cd2757",
+      "index": 87,
+      "seconds": 1.1051128329709172,
+      "error": null,
+      "artifact": "2ba3b4f7f6ec91f521e733895ff3f55b9fcba08509f8d6bf47220adfff6eefd4",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a17b-7bd9-9b0c-f25ecaa58cb3",
+      "digest": "46e322a3b9ed9155cf81cd0f92d3b41f5878f6aec785a9856971fca62955f552",
+      "index": 88,
+      "seconds": 1.0911075830226764,
+      "error": null,
+      "artifact": "3795950d63bda8b45d2c412d57d28e1e071ba5067becadd8157b545f01d16044",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a1bf-75b6-9e74-fb5c7c5f85ce",
+      "digest": "acae8975c5880fc353c96664f0ead30752d1e2671714496b7ac3db333d0ec0ed",
+      "index": 89,
+      "seconds": 1.0911789999809116,
+      "error": null,
+      "artifact": "c9094854e40e4dfae1c5eab8c9ef3df20d16c28ae2a2acb6ba48078c82af1d4d",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a1f2-7ec8-8292-045740ed29b3",
+      "digest": "8d753241e6a5b0e8a7f24e51df9e9d725adad3cab9a208aa59164df5f6322335",
+      "index": 90,
+      "seconds": 1.0877748749917373,
+      "error": null,
+      "artifact": "4265aa455a3edf34ea32414809711fcb50c8b2de80c638c99da1f43a7be18277",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a227-7327-990f-92d2350cd4f7",
+      "digest": "4e86b9f26b87ea322389ae66fd8baae0f0340395ca09840ccbc2a42af892c6ac",
+      "index": 91,
+      "seconds": 1.1295610829838552,
+      "error": null,
+      "artifact": "41869353d1b0ae7a6c235e9d39d292fe902e8639b46787a400f54e89c69b570a",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a25c-74ca-ad4d-2690e9327be5",
+      "digest": "fc471e70be6b5436d688744df9f535cd551d16ad5ef5a4b9e9553b097da202e5",
+      "index": 92,
+      "seconds": 1.1214932500151917,
+      "error": null,
+      "artifact": "0056a0f0bf86f5911e4097c172afa85a729ee082d58f022549e4d5a12b84d541",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a292-70c0-8d82-3cfcf668d179",
+      "digest": "9c17ed92ee49279eaae3c7724a5ac65e15410a4a7b7c31007e04b2bc69c857ce",
+      "index": 93,
+      "seconds": 1.111952624982223,
+      "error": null,
+      "artifact": "07184d4376ca9bcbd5f213f20bd203f40843d2b8b07e8d5a2f96e6c769b95a29",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a2ca-743c-bcc8-04d5ac045b73",
+      "digest": "12a1d3ac1b0e0c7b63230008026cbab7318f103cb8fb4ff9ff66122134983a43",
+      "index": 94,
+      "seconds": 1.0933149999473244,
+      "error": null,
+      "artifact": "47add567a623e48c8b83a73103327a9ee39877db4daf1062c824721a6c0c4198",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a303-7668-bfdd-abc56ee1e4b1",
+      "digest": "4bc54854f2187de1c8e09b34730085b5f277ea7dba8dc6ffefb775cefcd15364",
+      "index": 95,
+      "seconds": 1.0967762080254033,
+      "error": null,
+      "artifact": "0192e21961fd725aae1ece18a1713e3e856b5ce654335833f1bf6fe507ff25bf",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a33f-70d2-85f5-1b5b29cd73ac",
+      "digest": "396b7d0c1259cebf2f963b3636deee369a2c81495e8d63105de3c4adcca1707d",
+      "index": 96,
+      "seconds": 1.1144026659894735,
+      "error": null,
+      "artifact": "2cdcdf33ef5e4a2cf08fcc4229941fd9b6dd6339bebd9dcd5d978a275159d42f",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a373-7c58-b0cb-17654406b619",
+      "digest": "e948a5e982038df96741095066338fc4a5b3aa316e2bc8ee4527b0ae5f577d63",
+      "index": 97,
+      "seconds": 1.093407416017726,
+      "error": null,
+      "artifact": "aac237928afd7ddb4bb859996e312e1300200c2fece8058154ed8c5bf91fba3e",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a3a1-75d5-8465-9c3b1f76bb5a",
+      "digest": "27e6d0b0bd5a183e371613689dc9282df3839b10e3a66b76f5a572683555b826",
+      "index": 98,
+      "seconds": 1.0981798330321908,
+      "error": null,
+      "artifact": "46aca491e36ef1880c8e45a7f506fd91603ed6a44dc3373d1739b9fe4771158e",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a3d3-73af-bacd-e1b51b21da12",
+      "digest": "6558afa4b0463cb0011fe5afa0cd1e71a0276f6aba6f9989142286c3fa0a97ac",
+      "index": 99,
+      "seconds": 1.1099430830217898,
+      "error": null,
+      "artifact": "ef5e3ca678dd272a63854ed67604a947001e3767ef3825f80c84678b9dbc120d",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a406-7247-97fb-940805fcb457",
+      "digest": "ec975469b0b1426066d9ea3a2875e2e42c6605f545b95028a0ed940a112e21dd",
+      "index": 100,
+      "seconds": 1.0903510840144008,
+      "error": null,
+      "artifact": "f2831f57090f70cf0353f1ebbefa3d6224de6a28e2d7ca945364415407a1c07f",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a435-7816-a01a-18f51cb099bd",
+      "digest": "dff4d5c19fbf8c89c43da150777629e36fa717677ec34e52c49b4da9fec5be5f",
+      "index": 101,
+      "seconds": 1.1021523329545744,
+      "error": null,
+      "artifact": "e0521ff8b6caae57f4d761d817203baba9ff65e9d5c3295c50030db1dd0855a2",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a468-73ad-b1d7-499e058ec766",
+      "digest": "13f2e55c81f3d6c0af6b5d87403c55e46dcf78da26039237f169c46349d418ed",
+      "index": 102,
+      "seconds": 1.1133848749450408,
+      "error": null,
+      "artifact": "038be438838d26455c18be5ed0d329ca45f335e424bc19efa1c5592d25913d5b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a49b-7809-baf9-f63d0c167f35",
+      "digest": "c7a7d049735a3c794bcd254e94fc21ed853b625e555f999a42744c749c02e6a1",
+      "index": 103,
+      "seconds": 1.093379666970577,
+      "error": null,
+      "artifact": "e42ff9164c2908f98d692351dea227673ee8816cc0a2e922228f393ca49ab4eb",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a4cb-7c36-bcf6-cd09dc6dcbaa",
+      "digest": "33f692457a94ac188eb6e6ea67265f528f93855915bda1dd91a1d19ecf212dde",
+      "index": 104,
+      "seconds": 1.080579332949128,
+      "error": null,
+      "artifact": "bd06f1276c57f1723ae27eb3eb6c567d9ce2747a50fade569e4c9a6a076ef797",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a4fa-7f7f-aed8-68bddc415f72",
+      "digest": "1d47e91ad536f91389dd6a88e6e88b9c737decafb6069a9f2885c017a7e64ec6",
+      "index": 105,
+      "seconds": 0.04910212499089539,
+      "error": null,
+      "artifact": "95c2f75b8b4f6f1080f1bb4596146ee02a57b92c52f635b319529688e6edda4a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a52d-75bf-a994-c7c9d0a5f853",
+      "digest": "a5edb387055d0a570dbfac99ceab4d550dc905de75feb17c5cd3a2b9557870f3",
+      "index": 106,
+      "seconds": 1.0989427079912275,
+      "error": null,
+      "artifact": "e0c76ae5b242a6c8484a005f691f7bb2acda2c228faf3452123d7a79bc20bbaf",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a55e-72e9-bc2f-829e22a8f736",
+      "digest": "5f85e5078aa1bc61891390a4d258011571997da99e6cdcfda867e5be0671a77c",
+      "index": 107,
+      "seconds": 1.1176484579918906,
+      "error": null,
+      "artifact": "59997d2bdbae9519bb2d071785d5fb4c42cf8ccb71666422ca8a8d5c6ca80b45",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a596-7aad-a7a2-afe69eccd8f5",
+      "digest": "d3da70f1e2ac90cb95aa6a2b005fdbfe31813bac5f073c6655f359afb2f6b02b",
+      "index": 108,
+      "seconds": 1.1248333340045065,
+      "error": null,
+      "artifact": "87760ec61a293e69405c8596547d0a21ae1ff0b81c8deb42e1a172324f5a80b8",
+      "masks": 4,
+      "labels": [
+        "plate",
+        "boulder",
+        "table",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a5cd-7b06-aad7-7f41ba008372",
+      "digest": "b11b63982a54bb2ff63acb1a26e704147cf3378911f47c6c099c78a3e48e4dff",
+      "index": 109,
+      "seconds": 1.128689208009746,
+      "error": null,
+      "artifact": "3d4036a920ada4dadce0e8a824e3373329bf4d24dbb8e4b81e4af01b7cf3e604",
+      "masks": 4,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a65d-7b86-a081-e0bba471c682",
+      "digest": "53f30f340ec45cfecd0ddb31e83c311c288625bfaf026f5fe81e5e566f5ec357",
+      "index": 110,
+      "seconds": 1.1060653750319034,
+      "error": null,
+      "artifact": "34ad871d5e718e52a702f3d05c59d7b8a9b70b7ecf5ea2d98b3452d1099f485d",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "sign"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a6a5-7264-b0b1-b30ef29fe853",
+      "digest": "973e2e42968c89a97cc9542f969cb8b18ee8cbd092284d1024e98d6ba9449ab2",
+      "index": 111,
+      "seconds": 1.0954215410165489,
+      "error": null,
+      "artifact": "e621c32e22603a466ac9532cb24275bd3f86ca81d30b8286640b75639fd1f147",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a6e1-7444-84ed-b683ff5b58d4",
+      "digest": "98638e47caedb3e46747fad68bf27360ace813643516027397c7786cadadc194",
+      "index": 112,
+      "seconds": 1.1293496250291355,
+      "error": null,
+      "artifact": "81a95d77eb1b07375c86f43c5191ecb99d567165756d6563874388ce107d9791",
+      "masks": 4,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 3,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a722-7d3f-8841-002ceb61ea85",
+      "digest": "82d4a8d461637bcb14789a1333788496fb54c3dd1c2bbe9c2a0b68b491ae1f73",
+      "index": 113,
+      "seconds": 1.108017958002165,
+      "error": null,
+      "artifact": "8ac1d4db3be14ce2ac35c1204529f965ba7304ad76fd2c4b271835e07c954071",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a763-750f-bc05-79f3c871be16",
+      "digest": "88675af5b7c83cda8c3be5f83643ea17225497ae21a98680e8bd2b3a8756a0c8",
+      "index": 114,
+      "seconds": 1.1096235829754733,
+      "error": null,
+      "artifact": "87914e6e1e828c3f076c8f29c410bd77d4147c990b31319881808fa95c3dce12",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a79c-7981-a401-2dc7326bc716",
+      "digest": "bffdb06024b4e099dcb9222f7916015089ecce14894c5d0af2df3d2c9f443117",
+      "index": 115,
+      "seconds": 1.1094512909767218,
+      "error": null,
+      "artifact": "cd901be9686ca62e4c666cd0dc2ca83537cb1d2d14d94718b2d911e27452fcdc",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a7d5-767e-bdd5-3d2672f430cf",
+      "digest": "0023439bd90681233e920a015e20d8ea087c0b3f6b474439fca3c3038b09b16f",
+      "index": 116,
+      "seconds": 1.1215689999517053,
+      "error": null,
+      "artifact": "160d5a1a301a7812f6b7f0d814cce798a2ac6f5de4d084c693ba592d56c4ba2f",
+      "masks": 5,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder",
+        "cup",
+        "bridge"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a80d-7987-b449-0e51a562f402",
+      "digest": "9a5962ef9e2fe4be2e4863d18e8c211288a216c745972c2b9fd86031882e3925",
+      "index": 117,
+      "seconds": 1.124827500025276,
+      "error": null,
+      "artifact": "f89948bf40a7c87e813d6f3def1009ceb11ce2a763b56309892f3219a1b92ca6",
+      "masks": 5,
+      "labels": [
+        "sign",
+        "plate",
+        "boulder",
+        "bridge",
+        "bottle"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a850-7822-81e0-4fb7d26abfe5",
+      "digest": "4ab884700f08142c2054e204da335d28c3d76182d955f4d863c718ff4806250f",
+      "index": 118,
+      "seconds": 1.0966968329739757,
+      "error": null,
+      "artifact": "206f064057a9027e78a5da94e012ebd1f249bf555f4e03263eb9d455d4f5a244",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a88e-7d81-b474-d9f8080f92ed",
+      "digest": "4cca7a3d1317a0f0b89bac6143f27c2181e38a1a23e39f48cc7b3b7b30e49d40",
+      "index": 119,
+      "seconds": 1.0896845419774763,
+      "error": null,
+      "artifact": "08a1a13bba93af166a6bfed211cd958d2233cb0d3a3769e972d4ed4097fac584",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "sign",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a8c7-73f5-9620-a513dc662168",
+      "digest": "ba1dc679f2d13c3b1088d69ce49678cb1e9916c50158c5376f18c99714595719",
+      "index": 120,
+      "seconds": 1.1085438330192119,
+      "error": null,
+      "artifact": "9ecbffb777c8f89259ab0e2d24e5f4b46982d0d9357432595bf42ec49e99d73e",
+      "masks": 3,
+      "labels": [
+        "sign",
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a907-7602-a028-accff03c3a95",
+      "digest": "cc8ca61e69d6e1bd37ca1abd051f8afb0f10a6165b4c115235308498ae4d7243",
+      "index": 121,
+      "seconds": 1.1201605420210399,
+      "error": null,
+      "artifact": "a919fe94871c51c2a8307ccf999b136f673265ed47db3187613907284c733039",
+      "masks": 3,
+      "labels": [
+        "sign",
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 2,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a961-7c6a-b70f-49f61de3a5ce",
+      "digest": "5d3c9f1c7a273ec4d9b3a196622eea586ece7dd7c9f301748e943462c43063ee",
+      "index": 122,
+      "seconds": 1.1138985839788802,
+      "error": null,
+      "artifact": "261333fd0fada066754803026f421c5a65f869c7d742cde4b6b8ed788bdb4b51",
+      "masks": 3,
+      "labels": [
+        "sign",
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a99d-7eb5-875b-d8397f9aeebf",
+      "digest": "19ed5d7937b18eb3aaf7ed9383241f212ae28ccb213b1c9d34a0df3c8a5ec247",
+      "index": 123,
+      "seconds": 1.1021668749745004,
+      "error": null,
+      "artifact": "6dd3a6e1cc35677c65668c7a599f6ebfb82ba094f6eb5972dce9115b92a62a6f",
+      "masks": 3,
+      "labels": [
+        "sign",
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-a9d2-7bf9-ada7-4781a3e06af9",
+      "digest": "3ce5f932402b33ad65b8004450912695bc86e29342a26d4223350ee8f96073e0",
+      "index": 124,
+      "seconds": 1.0854457499808632,
+      "error": null,
+      "artifact": "93accee978b6042d03e5f2b13a22bc5604666423c507aee7de00dfe17772a247",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aa3b-7d60-a4c9-bacf3730b94d",
+      "digest": "f703c0bb7cae8372384b32b3ed8e8d0f3b93a1934006d0dac8084bc2b8780042",
+      "index": 125,
+      "seconds": 1.08234108396573,
+      "error": null,
+      "artifact": "33a8fae89e1aa3613e117936ac5049757178f93e013e0b86c261c85c30f6f365",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aa77-71e6-913d-45bc4622409d",
+      "digest": "15173a8a4a4fe757744efc4a9b51c85513be00c788a2a526c2a4e818b6249737",
+      "index": 126,
+      "seconds": 1.0870117080048658,
+      "error": null,
+      "artifact": "9d065b3da45447262a9712ad328823a6e14f61ce9ee9e354ed0a039b3636d69a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aab1-798c-8e6d-2dc1f3cd7ce6",
+      "digest": "df4316c62553815bca0cb4513a18e7fa57f76b1dff6a26231609dacb461326f0",
+      "index": 127,
+      "seconds": 1.0756072499789298,
+      "error": null,
+      "artifact": "6e34d5f29fd868fdc5955ab958639686d6337ce22b6e5e407fc3281ef3399095",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aaea-7b0c-b884-b3e02c5bcebd",
+      "digest": "08743dd77cc746ba52cd58b7e146f6e1805a25157baacec37b5fa4618cf00eb7",
+      "index": 128,
+      "seconds": 1.0843645420391113,
+      "error": null,
+      "artifact": "f381c0c05ff4db9a6950d6be92823e91cef526f2fc091bcf32e0a53ef11f0bf1",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ab7e-7faf-8015-1c4cf76f5b98",
+      "digest": "91c50167001fafc099f6a5e1160f6ddfe66927896a8a95be13610c2a4ae2f446",
+      "index": 129,
+      "seconds": 1.0754837499698624,
+      "error": null,
+      "artifact": "f817f4bee96fb302bd2792e5392742c1af25e5ffe9ebbde5e71107ec3fc7333a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-abc7-74a7-b748-e86ecb6663c3",
+      "digest": "827791b28cb47cb42f0889350d3dcd4224496701c687755fee3eb141dc226007",
+      "index": 130,
+      "seconds": 1.0821272499742918,
+      "error": null,
+      "artifact": "09a2391e7097111f4c9096ecd5c45aa99f89431389d54d4881045d977c9638a5",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ac06-7e2f-8f56-15c751350654",
+      "digest": "3e363456322f9e85e545bb74d6494267ff096a29c89d9b3faeabf1d35d041be1",
+      "index": 131,
+      "seconds": 1.0953217089991085,
+      "error": null,
+      "artifact": "2472f39e7cc46a0d48c2754bbfc6e57d82ddc3ec0da80b1f7024e48ca46f3b72",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ac43-7707-9ed2-133f49b34b05",
+      "digest": "acf571eb4c9b255b5aa92377646f0bcfdec5d84d75e51a56bb1bdef1d7d04813",
+      "index": 132,
+      "seconds": 1.0951299999724142,
+      "error": null,
+      "artifact": "36237a76ac93a4a74b2501b1fd3d45b74e6f8e7577e43a4c06dc7dd76106e29d",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ac7e-753b-a0fa-063a9b84827f",
+      "digest": "564a0c1e29ac0a4d4294b4a30089e85ad6b15d7bdd27a7a63b180b675482bb22",
+      "index": 133,
+      "seconds": 1.0910667499992996,
+      "error": null,
+      "artifact": "c0c0e6516dd897d9e266c7ce0ef48e9932155ad975aa0c3762a5fafa2d74896a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-acb7-79e8-8d7b-e9d17517341d",
+      "digest": "d4fbc8983321aacede5ec0fed92c183dc680246293b5e2fc363e19178f20a7b9",
+      "index": 134,
+      "seconds": 1.0868242919677868,
+      "error": null,
+      "artifact": "1cd07eab3c3efbdfec370e708842db2ed9646cf8ac01e579997dbe6f89642713",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-acf3-7571-87da-0c348648df34",
+      "digest": "be7c1e6f9eb788a943ef20033a6e80bbd9df1dfa95b65605eb54387537cae782",
+      "index": 135,
+      "seconds": 1.0927263330086134,
+      "error": null,
+      "artifact": "3c9c0d9c1130e081134e7203835b922dcd5d02195490517593b31531f46c657b",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "cup",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ad24-773b-8e22-990e1503decd",
+      "digest": "6e6d7180dbc3205f0117ab87452ba1cb545b1acd9827cd8645084c7fb5bab15b",
+      "index": 136,
+      "seconds": 1.0796457080286928,
+      "error": null,
+      "artifact": "332c6e3da24adcf28d70a51180b13ad01fdfc5f587a2b9bb05d10b0dc0d142dc",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ad54-7b5e-a2c5-00324dbb0b30",
+      "digest": "42ee8ec7d171a3b7b97d0499ede82bcb6e3d96cc03b2ca213af0684b06c76e66",
+      "index": 137,
+      "seconds": 1.0856653329683468,
+      "error": null,
+      "artifact": "77182b72ea1cb57478a882a96c91638f6a9d764b03bb03f036564406552f7e34",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ad88-72ea-8958-97d9b66a478c",
+      "digest": "e1213dc17267e5e2d998c397eea8c0f99fb5a0fb4ffb811800bb4534a52bd651",
+      "index": 138,
+      "seconds": 1.0990952080464922,
+      "error": null,
+      "artifact": "53a4ecff060f7bc333f1462ab7ecf37e4cada52fe54d8ba471631a622eed4e0f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-adc3-77f2-aec1-9ef873d48ec6",
+      "digest": "659ae26760aac0c749290da425b1808771ac58613c65ee3969b09628e8741995",
+      "index": 139,
+      "seconds": 1.0781161249615252,
+      "error": null,
+      "artifact": "111a0eb36dd65274263fef6276214923ce9f8b0cf6201038805d882bb86f67d3",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-adf5-7da0-ba3a-30f5a542d10c",
+      "digest": "833ab313d09ee67dc81ef06e70896429c244e579c2f46a1bc0868b1d1a775622",
+      "index": 140,
+      "seconds": 1.085465582960751,
+      "error": null,
+      "artifact": "43260b08ff241427677137dd40fce13bba852645d16d88783edd7cb2c47f5533",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ae2f-7597-b82f-dacdf0aff34a",
+      "digest": "5b574096da771d0855e3710959d2606da851a677155a5a07f7281b74cb8644af",
+      "index": 141,
+      "seconds": 1.0798885409603827,
+      "error": null,
+      "artifact": "4313b59cc604d05e9edaab85eb82be07fe5a9c1ffa085de690aef41ea79e904f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ae67-7afe-894b-892f36a07896",
+      "digest": "ffd494a4e1902ffa794a1ca2bc29037f0a9dc28dfaf61f03d14081b48e5b629a",
+      "index": 142,
+      "seconds": 1.0831847499939613,
+      "error": null,
+      "artifact": "e19fa63271c841182bab1991a3eece6429f120d678c9a74d2f7a679c5eae82b0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aea1-76fb-8f10-3e3817c080bb",
+      "digest": "4b62922bd5b15dd47e96cf7a4f3cb95ea7f1365f0d509a8e0808acab98823d9b",
+      "index": 143,
+      "seconds": 1.0945721250027418,
+      "error": null,
+      "artifact": "c99a9f44bf58f5e4c9cd33256c9bc30131d1b424dc8535f58921d71048e92634",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-aee4-7d03-8630-675f752b891d",
+      "digest": "8483a58a8e6dfdb8e42d75e6e65730705a326a4e051994d0216724fa667a131e",
+      "index": 144,
+      "seconds": 1.0844415000174195,
+      "error": null,
+      "artifact": "94ee7c716cbf8e98842fb087b4249b2345b225607468d6ff4dc788e5663ac276",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-af23-7731-ab76-27a0f98bc2b4",
+      "digest": "9a5e7bcbeb978a1f1e004039b744defa8e936424c1eb29dedda90d00b152798c",
+      "index": 145,
+      "seconds": 1.1141094170161523,
+      "error": null,
+      "artifact": "d54eb60f5aecf9621fa345d27a7bffd1601c50285682f74a592bc7abbf77ae4f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-af57-7069-a61a-269187208576",
+      "digest": "4c7f16ccd5271f6c6c1ba2310a83b79b1a45532f1d404a15f5337a3e53ad695e",
+      "index": 146,
+      "seconds": 1.0921380409854464,
+      "error": null,
+      "artifact": "62e28d231201cbd3abb77ed7b9c69459f7d72ae276047717ec8bca8a5a3c5286",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-af8f-7aa1-b1af-e31059f51ebb",
+      "digest": "ca78b16126372c4ed7c394206185945838572fa420f37753cf18d393a2d8fa4c",
+      "index": 147,
+      "seconds": 1.1123964590369724,
+      "error": null,
+      "artifact": "1f56d4743da489cc318d86a0f25fd8ff435864ed983dea0706584b26b134b285",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-afbf-7fee-a77d-355cb331b207",
+      "digest": "26d9a222d67c757dfacc52ff14b94a8e9ecc088fe01c68f1f1ca913727433719",
+      "index": 148,
+      "seconds": 1.1139448749599978,
+      "error": null,
+      "artifact": "b18d2dedb95308d498a575a04551d714b1a4a775eefa34ed0e219ff7e826c2b3",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-afef-7ccb-91d8-25400f109858",
+      "digest": "2c98462f7f8fa14d0daa6c09a3ec126c2874f3117f8a99af117d28e09793f6e2",
+      "index": 149,
+      "seconds": 1.0825134170008823,
+      "error": null,
+      "artifact": "e786730766bd5469e6e78ea9d6be7662d4b205a6ec4316a0691c3d30784adb05",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b01f-79e5-a99d-53ee62dcb422",
+      "digest": "dcb4e3f64884c386e9c51db5376e05b4efd232c7f8174e6c450e7da60ab6c3dc",
+      "index": 150,
+      "seconds": 1.094000084034633,
+      "error": null,
+      "artifact": "82e751302f54ef3ae9be0b9e1754a1a1b2d7b7d8b622c7ad6cdbc383b2ef4431",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b0b2-7479-83ef-bb811b381a4b",
+      "digest": "110e241a6a054ec2146fdc9f4a4db332ffe1746ff94b170c0b128525ec17efee",
+      "index": 151,
+      "seconds": 1.0822822080226615,
+      "error": null,
+      "artifact": "2bdf7273e24bd7ddf578551617608ac54ebe30b87dc8104ec69d539b0a7a918a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b0f0-7990-b5c3-5140faae06cd",
+      "digest": "bc0dedfb3dcc077d8ba9ba97b53fc223f4ec87058bad8ad6f2801353a14f7b7a",
+      "index": 152,
+      "seconds": 1.075596584007144,
+      "error": null,
+      "artifact": "d91b5f5f367db0baa415339d6e189e3db0d499f5b713311a6ce1e9e999de0e22",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b127-786b-b9b4-7b1707214e8c",
+      "digest": "e85bfc55f6f748297f263d589a94ebefcd70fbc1af5b8dd30a0028ad58963c71",
+      "index": 153,
+      "seconds": 1.0893377090105787,
+      "error": null,
+      "artifact": "1eb03aff42d9b5a84cc7b7af21114d549af63b0ede223c76deb0dbfdc8381d97",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b159-7c27-8463-147e5a501c6c",
+      "digest": "324e65b2a50d4609444b7d95ef0696e7d7e804647795e7b4f3f6e7414ff18129",
+      "index": 154,
+      "seconds": 1.0845160419703461,
+      "error": null,
+      "artifact": "7a42244542e56a5414d50a2f43a71a7e71f38a2a9ea12232c986d428a2908a7c",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b1ab-7a86-88ce-3addf79c1975",
+      "digest": "7b82ced2aa07cbc232b66a563782f339eb1778bc33a89091c5b9b2745d920d6d",
+      "index": 155,
+      "seconds": 1.0882773749763146,
+      "error": null,
+      "artifact": "0af83d668f6e0816de89d5491a4584e24d7e40fd83d380ef484f132c624b408e",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b1e5-77ab-a177-8442e0c4f9a5",
+      "digest": "c41c568df445ea42372d262b63c1b12b337b497bb35e42533925ce65634931b2",
+      "index": 156,
+      "seconds": 1.0813409579568543,
+      "error": null,
+      "artifact": "2f7b5638e6b41ac7767f780df1b87e68e197161a3bcf5dac5f0b74a57d054469",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b21e-7fe1-8eb0-41045f0d147f",
+      "digest": "30af279ffe5f9bd545ff1410f064ff8089fd9803cb03cba20140e0d379ec3204",
+      "index": 157,
+      "seconds": 1.0817081250133924,
+      "error": null,
+      "artifact": "b4489c6ca707303231dc268ada8288d30843ea279748857ecdcc5d536d106197",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b257-7a2c-a5fa-48e052e44667",
+      "digest": "2e2748395aa436264c9f760048b6e0fef24dc78ef8d55bba959b4eafbbab69c4",
+      "index": 158,
+      "seconds": 1.0844700839952566,
+      "error": null,
+      "artifact": "c47e1f40dadc5dc38e864fd0f05163ef3918112f92bef4ed71b298f7284f9a43",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b290-7526-9314-b3d5df9a4d57",
+      "digest": "593706326a2011271299255f8f20d2e1cc830bab7b120f29f16a9d4fdae71ea5",
+      "index": 159,
+      "seconds": 1.0784664999810047,
+      "error": null,
+      "artifact": "da0d5d13f36e390e4be44d4e6be6392ca6968240252d6cc5c2e7beaf328408e7",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b2d6-7014-8a4e-f206a1350a1c",
+      "digest": "6372d5685616a04faf93eef2d805c80df99b6dd4d426bf25bea7efc224719a47",
+      "index": 160,
+      "seconds": 1.1019263750058599,
+      "error": null,
+      "artifact": "e73d652631268b6e4f7a978250b7c23a57ecd18045ab612c6a42d6990948adc7",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b30a-7297-b0d6-669cae815772",
+      "digest": "5c7379da91c3c3f68608e0724699a879fae835bf40292a7197aaee89d07c4b0b",
+      "index": 161,
+      "seconds": 1.0809597910265438,
+      "error": null,
+      "artifact": "269513086b97cdd965168f226fc64c3aa80cc475e8501a77d588d58da3ed9aff",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b33c-76e0-98b5-b24e478b116e",
+      "digest": "dd6a65dcea6564f091455cd613f130ef4d06eeb2eab24dac0c44fe7772cfb603",
+      "index": 162,
+      "seconds": 1.094500832958147,
+      "error": null,
+      "artifact": "f6de730ecb3c394d2ac83521820fe9fcc65ff700668530c33265fd51e1ac7555",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b36d-78cd-9764-2ca4d8808f94",
+      "digest": "2dfcdadfdeb84bd60d0dc25193137f25fed23ed68e52112e0c7fd186e9d57f55",
+      "index": 163,
+      "seconds": 1.0791966659598984,
+      "error": null,
+      "artifact": "dccd85bcfff48e86ed54ff4456049086b81640314e9765d58c8853d07d207b5d",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b3a2-721e-bd94-ff633ce96ff5",
+      "digest": "8c100956284356b4922eb0cda39263b56ac7501585889a229c713620250ed014",
+      "index": 164,
+      "seconds": 1.0917336249840446,
+      "error": null,
+      "artifact": "145b333c7e6e427b0a4d325cf0823f7861fbde5019703cd8c665232640156937",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b3d3-7da0-b268-0d766ce948ea",
+      "digest": "d2da853c638b9610c8ea119d908f32e4bbebcb1cb446b0890240ff54f602ae9e",
+      "index": 165,
+      "seconds": 1.115326083963737,
+      "error": null,
+      "artifact": "65fbf3b97c002108d3fbcef8a6774176bae20ecfbef0c5735c048318d2eeffe9",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b406-7d4f-b61c-29e8ba99fef1",
+      "digest": "218a4b48a7ebbfada86501cbf71f8cb4f2f127b261869e8dd458076d5ee7401a",
+      "index": 166,
+      "seconds": 1.1408567919861525,
+      "error": null,
+      "artifact": "118965b3faeb14db45738a9f82945ef5e61932d11f546a1f4bafe159f387193f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b441-7c98-bb43-02cd7f7181cb",
+      "digest": "d94bdcb1bb5e47971bc70e549cccd2f6e5b6eb8a0eb0e3ab9e1d1f873e2e822f",
+      "index": 167,
+      "seconds": 1.133561540977098,
+      "error": null,
+      "artifact": "bfa15acfc1baf2bf3fef951a115d470ea4ea88f73c286c7732376e6d82454f5a",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b479-7d0e-9fd1-60701dbcf3b9",
+      "digest": "28a7a397dc75cc47610b4206116cfc0c42779fa917763545410919418cb7bf34",
+      "index": 168,
+      "seconds": 1.151485959009733,
+      "error": null,
+      "artifact": "118756ac9cae7ef2cd0f261ae112765c28b9ccdb1148abdd2a497569ad7a16b6",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b4b5-79ed-b066-52905d80020d",
+      "digest": "42d8cd4e545e6cd35f7711fccb03f8191c8165d598a86ee1137aeafa70059e00",
+      "index": 169,
+      "seconds": 1.1165484170196578,
+      "error": null,
+      "artifact": "4f5fa982960b7bfd7b7a6349cbc251647aa9003d034ef32d1f4491822b14010f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b4f0-73ab-a1ee-1bcbfb54e567",
+      "digest": "48fd91851825cae79d683cb22ffcb6ed48e467cdbb041bf3c11925e13a580912",
+      "index": 170,
+      "seconds": 1.1134562500519678,
+      "error": null,
+      "artifact": "8135e50a2f4348c3a52d2a350b24ed84099043e894bc2633a4bbeeb39b96d3dd",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b52d-7af9-883b-c03664b0c4dd",
+      "digest": "19233935bfcf62735dc7adce79a5e82f49d6761f64392dc6311df6ed011d7c00",
+      "index": 171,
+      "seconds": 1.1160994580131955,
+      "error": null,
+      "artifact": "d85ada83fe565544bb829d9943895a49d459fc94e12ca36174136b43868c09b6",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "cup",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b5d2-70e1-8928-4eb2d2207f2b",
+      "digest": "b82e3fe7b0bf0eff4ba4a3752bb4a3b4cdeee9be913fd1779d484129a0a4b767",
+      "index": 172,
+      "seconds": 1.1062589589855634,
+      "error": null,
+      "artifact": "04be938b6217b843893ca38e7d1f6652f4579b5ad1b867bb3c9aacb8cb0ff524",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b615-779c-ac58-6981a2e8d201",
+      "digest": "3cc6a38db467b0107530f64463cc10e22fc1db183c516c6f8506c0f12932e533",
+      "index": 173,
+      "seconds": 1.130722625006456,
+      "error": null,
+      "artifact": "d4bbf6830aef09777ea62649cd3b31c5c2c8666cfee47e79c0774dc31f15d098",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b649-768e-a5ad-742d878166ec",
+      "digest": "a757649961dee10c0f4beba46d45ea1831fe0384a4afa9356c6d547210c7b631",
+      "index": 174,
+      "seconds": 1.11768366699107,
+      "error": null,
+      "artifact": "d2fb6c57ee1203282bf473fd4fb77c9ef1f7f069b5e5f0f38b4fd1ea9aa7fbea",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b685-7058-805f-4a631ece412f",
+      "digest": "f1f89a88b9852b20593563104fa6d4f4db3b9c6c9a18675aeda46dd8f15eecdd",
+      "index": 175,
+      "seconds": 1.1178486670251004,
+      "error": null,
+      "artifact": "b3754d390cc554dd972e6597dd45abdd377088dec304340d5aba71a569f1b6a0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b6c0-7283-9f8b-f11f73f83782",
+      "digest": "950d7dc36be7893788997f095af44c121f10fb2fa71ff2c9f1fc953e0f0d3813",
+      "index": 176,
+      "seconds": 1.1297387499944307,
+      "error": null,
+      "artifact": "498b6a21a9d3deb5e00e8aa0e8b6016a1e071f681055211a764babda7578fd52",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b6f5-77a2-987a-40f2789284dc",
+      "digest": "6d40f94a029859800bd526bd2a63d38b25d7220f1edf1f2e6cf4c23bac90f5f6",
+      "index": 177,
+      "seconds": 1.1456499580526724,
+      "error": null,
+      "artifact": "5088be2ef8383e2797ea4fdd8d6c6a120f09fcd76d2128af75b331aaf567e68b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b73b-71c6-9008-869dcb13e775",
+      "digest": "eb10ca63067d9f362366465ef6271021d199425a06eadc5396dc969543e85241",
+      "index": 178,
+      "seconds": 1.095099875004962,
+      "error": null,
+      "artifact": "271d89ecdfd5a17bca6e25555d74e2569f5b0316538a4d1d722939d429b1ba11",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b774-7820-9b68-68e3f032a164",
+      "digest": "e2ebdda02fe9049114928395dfe0c06295432697136fce388ec7ce2b567f61e7",
+      "index": 179,
+      "seconds": 1.0892510829726234,
+      "error": null,
+      "artifact": "e7b66d0a79af828f9c667138c91dc7e0af9cf253d9dbfdbb36ab925d5e52c66b",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b7a7-76ae-9ddb-dde3f04081d9",
+      "digest": "5a9c0834e8d66e95ab76ffe6863780b51db3e4acd2056eb7f065dddeb4353764",
+      "index": 180,
+      "seconds": 1.0776579580269754,
+      "error": null,
+      "artifact": "8184d0545556e83e4026ae38b5c685d435c94d460a997083d96ea73e18201334",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b7de-788d-91eb-209dfaa9329e",
+      "digest": "a9480275d94bb45eed3a38b9cf91d2f374a960bd160049ff29961c1c4d742889",
+      "index": 181,
+      "seconds": 1.107845707971137,
+      "error": null,
+      "artifact": "0e0afd38c3a17b87db2afa2a50728aef3f2ce8cb38b1061da1c2e1b4dd2ee08f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b813-79aa-a312-4fe6a5b9851e",
+      "digest": "a15aff5592e457ed6a72742b554f84b5b59d1bf20cef5205ec3f27e5f2e433ad",
+      "index": 182,
+      "seconds": 1.0907539579784498,
+      "error": null,
+      "artifact": "ebd2ced2bafd923ab5f4c49af0ae9430f31601d34cdb149bf43498bd636b6c96",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b848-7ed4-9241-077e832d0194",
+      "digest": "c937fbae663601c03d62059040fe88e83d575d8b8998d9ae985d228869f89945",
+      "index": 183,
+      "seconds": 1.0902185830054805,
+      "error": null,
+      "artifact": "cedec9f2dc03f6c71f30d1feeefaada437394ed6a1d79ad6383ad860cd14351f",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b881-70e4-aeaa-15121a04356f",
+      "digest": "c37693f182585e0b059c98f8c2890e00307ebdcdf31f9117a699ca431334a233",
+      "index": 184,
+      "seconds": 1.0798441669903696,
+      "error": null,
+      "artifact": "6f6f82bfa38054c7ce9079be3cb36a10b0c5a8b68b11fdb3bf518a922d40ba43",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b8b3-794d-836d-bd9b99d0e26a",
+      "digest": "b488be22326891401267929949677936dc6c2077eac2b51bda5f66937224e186",
+      "index": 185,
+      "seconds": 1.0868023749790154,
+      "error": null,
+      "artifact": "a508e61070b454c263b100db131093f0dd636f7c9cbcbdfee9e3613a66d30d53",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b8e4-70b8-bef7-4d67469d9e79",
+      "digest": "016ee46559d640d71fb66770ae97e92f7157ad3f2feda20932dc5030ec9e0294",
+      "index": 186,
+      "seconds": 1.0822120410157368,
+      "error": null,
+      "artifact": "e1c8ae00bc79c954e357a9f30b09e1abb97545f087c68335ecceb617c050af9e",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b915-7825-b6ba-0959de37e905",
+      "digest": "1a5c00923f7b68b046c2c088eeed36cde7febd6f1aa57a20ad7e3fe2530f0d2f",
+      "index": 187,
+      "seconds": 1.0861744160065427,
+      "error": null,
+      "artifact": "b0c02050bbdf175ed7e8b4995392ff8a9ac3d49aeb6680632f2494400d9ee875",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b94a-7dcb-98bf-96604b39325a",
+      "digest": "1050be48b70b5008faf4b6e1efe80585058b623739f9c467f01a3b0d44495bec",
+      "index": 188,
+      "seconds": 1.0908036670298316,
+      "error": null,
+      "artifact": "0b3209e75134be40c5c078a5e494cba4b5f3c3c855e9bea42331e5ad46215fdf",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b981-7223-bd85-30e7424d36a3",
+      "digest": "4428e0f040233ca6bd6963364dbb3c0c788bad72262cf12fc55dc204679e6fd1",
+      "index": 189,
+      "seconds": 1.1198265419807285,
+      "error": null,
+      "artifact": "af2fe76d035bf605f89eed7bf0e67738968f11a78752acc5bd65cdc1434d1dd0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b9b8-7ed0-a291-8af9eebad7db",
+      "digest": "73ad260b79cbb714bc68eb551211d4f8a7211960c8c7e3bc5b75f435c087007e",
+      "index": 190,
+      "seconds": 1.0941930410335772,
+      "error": null,
+      "artifact": "d83aa0c95b2ccbe43cbcc8a0149eabf7dfd021b6b72cd65d5da970c33bc11d15",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-b9f1-77f4-bcbd-10bde7eeb9d3",
+      "digest": "ddc8c1e99285dfccf7c21f3c200a190516f72975be5ca83c1cb12a4606e76d97",
+      "index": 191,
+      "seconds": 1.101984791981522,
+      "error": null,
+      "artifact": "7bd377ba391a97d8a5fad2e7dec89ce1f0ed441c4da3963023b1ebef3a4296ab",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-ba26-7300-bf0e-acfd43b391e2",
+      "digest": "243be8e0ed7a0a88aea089405eadf2a0979b5f8af7c9777710e4ca38a0a17ea8",
+      "index": 192,
+      "seconds": 1.103110333031509,
+      "error": null,
+      "artifact": "0547842ac7f5f63e0e6f8a324c092e064542b820f0aacae2527bb5098dd6e123",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bacb-739c-911d-2eccd5d251a5",
+      "digest": "dc78076b48d0f48cc868af8b410b64d79f7bfa17d575468d29d9a811597c1a35",
+      "index": 193,
+      "seconds": 1.0835387909901328,
+      "error": null,
+      "artifact": "51ae91930963225aa4dd540de00a95e9bd753317e8b6455f6a5a93068e1d0cfd",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bb10-7eba-907d-871ebb4b1f68",
+      "digest": "d80de58afc486a781b6724e35524e383e145a910a31684a245efc8e1fc20e1e9",
+      "index": 194,
+      "seconds": 1.0920919590280391,
+      "error": null,
+      "artifact": "e136fb876ff4f28a00d94fec3b09112c809943ffda2ce29d3d7d26b94264c4c4",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bb53-7585-a860-4f16cf9e585e",
+      "digest": "1cc319cafdeacbabfb6952cf384f4d18cb929a93aa9961c83476b248b207b1e5",
+      "index": 195,
+      "seconds": 1.0907803339650854,
+      "error": null,
+      "artifact": "bae81d86b6eb7c041416cc6d67551e1162db086527c327e76ce67a7e8dc2a440",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bb8b-78e5-b878-3d3d3f5e214f",
+      "digest": "c1dec896b8b4df1a70161dca339e2b0122838f202e511356a69b45bc15dee70d",
+      "index": 196,
+      "seconds": 1.1271138329757378,
+      "error": null,
+      "artifact": "00dbfeec9865de81cd724a3aaa063f08c80b58507ec45ad5699221c58019bb54",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bbc5-7f6f-b9fd-dda5fda4a049",
+      "digest": "fd7054a228dc38f464fe49994fad0db944f4b582fe625079399145c3b2530123",
+      "index": 197,
+      "seconds": 1.102524749992881,
+      "error": null,
+      "artifact": "c7c6967f3535af7f8af5ce9df1a860dc2f219ae0ca431eae83883aa19cd53565",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bc00-7d83-9229-ab388202b517",
+      "digest": "c66a7e409f46fd1f42e3df6632d2ac2394fc89befc8a107371feb483a4b13abf",
+      "index": 198,
+      "seconds": 1.0898361669969745,
+      "error": null,
+      "artifact": "84801cd3bf53af148e0b917ea8c6b93ada4aaa75756efd1a2a95531a03d3b572",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bc3a-7568-8aa7-1c68ffe69830",
+      "digest": "a056e4d1627fec16de249f81a9b7f2584f15fe5b1ecb7f17d9b2e8b6b3fed6c1",
+      "index": 199,
+      "seconds": 1.0991932500037365,
+      "error": null,
+      "artifact": "4e65066b83265035cfbb947a89e879db7f58facc5f63664f34c18d8b499aedd0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bc71-7215-a8ae-e59f55e43f0b",
+      "digest": "d21d1c1a1bd472611586ac6cc715cf3bfebd489d55b50e7d7284e55aeee80e73",
+      "index": 200,
+      "seconds": 1.08781891601393,
+      "error": null,
+      "artifact": "f3b314c612bc87eb306f862dbb8ac6df7ce2a2e6b93ba37c20200a009153f3d3",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bca8-7642-ace4-8d2656f8364f",
+      "digest": "2a63bc716ee68bb0e5a1c7dd2b4f78f8ecb1634bf1db093c46f01a913d7d4d38",
+      "index": 201,
+      "seconds": 1.0903059999691322,
+      "error": null,
+      "artifact": "1a6373f06f3a8ab2850900223e34010b519762b3488f344e54c4b148666a2eca",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bcdf-7e26-bfd7-f8243a2aa3dd",
+      "digest": "72b7e887cbb27c0135e69a867a153145bae821488b3302125cd91d39f95e64e6",
+      "index": 202,
+      "seconds": 1.1047409169841558,
+      "error": null,
+      "artifact": "3d94d8c5efb9848befcd2935a6f8894166959b4a05f1b00b16090563243d6c93",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bd28-7022-b59f-ee034204a5a1",
+      "digest": "ffbffa2977b84b047f4e30a04836a00e54ce0d6f263d1301906727cc9dd8c718",
+      "index": 203,
+      "seconds": 1.0973454589839093,
+      "error": null,
+      "artifact": "d45811abebb9ddcc63a96d7e552f4a6ebe94755d5f0a06581973602baebba9e0",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bd67-7317-9434-40a9fb0db7c4",
+      "digest": "345606612d1ae88717e425c8f1867be9c5d4e22e210445a057ccb70022253a1c",
+      "index": 204,
+      "seconds": 1.112225041957572,
+      "error": null,
+      "artifact": "6d8f6a01126d90af282e0bc6b657731710b18921a9292f0bbad7588572c95f71",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "bridge"
+      ],
+      "dropped": {
+        "below_min_area": 2,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bdb3-7149-8578-ed65a34a0301",
+      "digest": "573a0ceedb3587498c7f5b4a49a6cede9668c7d111b9ae5dfc8bbb014e4a976d",
+      "index": 205,
+      "seconds": 1.104164749966003,
+      "error": null,
+      "artifact": "040fbc2942b932d9a7cb5343fba3858a077a02a6ec5335d3d438c3c2217f7d1c",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "bridge"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bdf1-772a-a4a4-8c778706f410",
+      "digest": "afbee35518885dc19fe2561f6b73b116a622429b5110bf892cffb00184a737fe",
+      "index": 206,
+      "seconds": 1.1127914580283687,
+      "error": null,
+      "artifact": "c2a708e3826bbc6dd122484e6362423681001d03e5e23db2b39f3fb801654a58",
+      "masks": 3,
+      "labels": [
+        "plate",
+        "boulder",
+        "table"
+      ],
+      "dropped": {
+        "below_min_area": 0,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-be60-7287-a7db-8dec1f9a1112",
+      "digest": "75b3d094cc469b11f2210465e390e3c2e0949b67dc87341eeb4fe434f5d5f55c",
+      "index": 207,
+      "seconds": 1.1103930000099353,
+      "error": null,
+      "artifact": "9d52f836e120db475beb41465992960cf6bf9b1f16d928fc5e51dd2c32360583",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-beda-7fe7-946d-09e4c26539a8",
+      "digest": "2d27e00e570327d2486a9ecfc2939e9e71ce3a4f62059faafedbf114c77c9c76",
+      "index": 208,
+      "seconds": 1.1179003749857657,
+      "error": null,
+      "artifact": "a88dfe97361c43484982d64ed71e6bbc33a3f89b560fefdb6b817352be5933b7",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 3,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    },
+    {
+      "workspace": "79004d44-ca24-4d17-9eef-56786415e233",
+      "scene": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "capture": "01a0722d-bf34-7380-bc5a-1ef53774595a",
+      "digest": "6b458d17faeeea93f5346fe4f97068da50d102bb694351cd3477863093ac4bce",
+      "index": 209,
+      "seconds": 0.054525458021089435,
+      "error": null,
+      "artifact": "34bd82a25290b00960b32a479c008eb3e7b6a5174cee76425daeb10957b34f09",
+      "masks": 2,
+      "labels": [
+        "plate",
+        "boulder"
+      ],
+      "dropped": {
+        "below_min_area": 1,
+        "outside_vocabulary": 0,
+        "person_overlap": 0,
+        "unusable_outline": 0
+      }
+    }
+  ],
+  "lift": [
+    {
+      "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "job_id": "c62ddc8b-7ae4-51fc-acaf-ca4932251a19",
+      "artifact_id": "24b9d6cb-b20b-5306-a209-12f165fa46a8",
+      "segments_sha256": "92b8f91204b24839099f61f042261fe92497d492de3c42e9e36bd03d7be50f17",
+      "byte_size": 575795,
+      "segments": 3,
+      "object_mask_inputs": 210,
+      "object_mask_missing": 0,
+      "person_regions": 0,
+      "regions_offered": 497,
+      "placement_revalidated": true,
+      "projection_used": false,
+      "placement_seconds": 39.54,
+      "lift_seconds": 46.501,
+      "action": "written",
+      "mode": "before",
+      "wall_seconds": 46.541361541021615
+    },
+    {
+      "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+      "job_id": "c62ddc8b-7ae4-51fc-acaf-ca4932251a19",
+      "artifact_id": "24b9d6cb-b20b-5306-a209-12f165fa46a8",
+      "segments_sha256": "92b8f91204b24839099f61f042261fe92497d492de3c42e9e36bd03d7be50f17",
+      "byte_size": 575795,
+      "segments": 3,
+      "object_mask_inputs": 210,
+      "object_mask_missing": 0,
+      "person_regions": 0,
+      "regions_offered": 497,
+      "placement_revalidated": false,
+      "projection_used": true,
+      "placement_seconds": 0.011,
+      "lift_seconds": 6.833,
+      "action": "already-present",
+      "mode": "after",
+      "wall_seconds": 6.877392416005023
+    }
+  ],
+  "full_private_output_sha256": "1450051cd00a3f81b0edb1761aed50e24428871066053256d7b0731e6acd4711",
+  "summary": {
+    "photographs": 210,
+    "errors": 0,
+    "mask_count": 497,
+    "seconds_median": 1.101984791981522,
+    "reused_indices": [
+      0,
+      105,
+      209
+    ]
+  }
+}

@@ -629,7 +629,7 @@ def test_a_published_scene_lifts_its_masks_into_one_bound_segment(repository, tm
     assert low[1] >= -4_500_000 and high[1] <= 4_500_000
     assert abs(low[2] - DEPTH * 1_000_000) < 100_000 and abs(high[2] - DEPTH * 1_000_000) < 100_000
     assert all(region["span_id"] is not None for region in segment["regions"])
-    assert segment["occurrence_ids"] == [], "a detector-prompted mask has no hosted occurrence"
+    assert len(segment["occurrence_ids"]) == 3, "each detector mask offers a naming target"
     assert read.withheld_segment_count == 0
 
 
@@ -696,6 +696,10 @@ def test_only_a_reviewed_and_shown_person_is_lifted_and_a_withdrawal_takes_them_
     after = _read(repository, store, scene_id)
     assert [segment["kind"] for segment in after.segments] == ["object"]
     assert after.withheld_segment_count == 1
+    rebuilt = lift.publish_scene_segments(repository, store, scene_id)
+    assert rebuilt["person_regions"] == 0
+    payload = json.loads(store.get(BlobId.from_hex(rebuilt["segments_sha256"])))
+    assert all(item["kind"] != "person" for item in payload["segments"]["segments"])
 
 
 def _retarget(repository, store, written, mutate):
@@ -865,10 +869,11 @@ def test_publication_lifts_the_masks_its_members_already_have(repository, tmp_pa
     assert (started["type"], succeeded["type"]) == ("stage_started", "stage_succeeded")
     assert succeeded["publication_run"] and succeeded["status"] == "succeeded"
 
-    # And it is what the command writes after validating the stored placement itself, to the byte.
+    # The command reads the validated projection and writes exactly the publication artifact.
     again = lift.publish_scene_segments(repository, store, scene_id)
-    assert validated == [str(scene_id)]
-    assert again["action"] == "already-present" and again["placement_revalidated"]
+    assert validated == []
+    assert again["action"] == "already-present" and not again["placement_revalidated"]
+    assert again["projection_used"]
     assert again["segments_sha256"] == read.content_sha256
 
 
@@ -1277,3 +1282,77 @@ def test_a_served_body_has_exactly_the_published_fixtures_shape(person_segments_
     body = _get(client, _OWNER, f"/scene-segments/{scene_id}").json()
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     assert _shape(body) == _shape(fixture)
+
+
+def test_detector_segment_can_be_named_on_confirmation(segments_client, repository):
+    client, scene_id = segments_client
+    response = _get(client, _OWNER, f"/scene-segments/{scene_id}")
+    segment = response.json()["segments"][0]
+    assert segment["occurrence_ids"], "a detector-only segment must offer a naming target"
+    occurrence = segment["occurrence_ids"][0]
+    before = repository.connection.execute(
+        "select count(*) as n from entity where workspace_id=%s",
+        (repository.workspace_id,),
+    ).fetchone()["n"]
+    assert before == 0, "segmentation must not create an entity before confirmation"
+    named = client.post(
+        "/identity/name",
+        headers={"Authorization": f"Bearer {_OWNER}"},
+        json={"occurrence_id": occurrence, "display_name": "My marker"},
+    )
+    assert named.status_code == 200, named.text
+    row = repository.connection.execute(
+        "select class, display_name from entity where workspace_id=%s and entity_id=%s",
+        (repository.workspace_id, named.json()["entity_id"]),
+    ).fetchone()
+    assert row == {"class": "object", "display_name": "My marker"}
+    assert (
+        repository.connection.execute(
+            "select count(*) as n from entity where workspace_id=%s",
+            (repository.workspace_id,),
+        ).fetchone()["n"]
+        == before + 1
+    )
+
+
+@pytest.mark.parametrize("fault", ["needs_repair", "receipt", "members", "points"])
+def test_invalid_projection_falls_back_to_placement_validation(repository, tmp_path, fault):
+    from exulanica.ingest.scene_projection import _canonical as projection_json
+
+    store, captures, _, scene_id = _published(repository, tmp_path, "projection-fallback")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    if fault == "needs_repair":
+        repository.connection.execute(
+            "update artifact set needs_repair=true where workspace_id=%s and scene_id=%s "
+            "and kind='scene_projection'",
+            (repository.workspace_id, scene_id),
+        )
+    else:
+        row = repository.connection.execute(
+            "select artifact_id, content_sha256 from artifact where workspace_id=%s "
+            "and scene_id=%s and kind='scene_projection'",
+            (repository.workspace_id, scene_id),
+        ).fetchone()
+        envelope = json.loads(store.get(BlobId(bytes(row["content_sha256"]))))
+        binding = envelope["projection"]["bindings"]
+        if fault == "receipt":
+            binding["pose_receipt_sha256"] = "f" * 64
+        elif fault == "members":
+            binding["member_capture_refs"] = binding["member_capture_refs"][::-1]
+        else:
+            binding["point_map_inputs"][0]["content_sha256"] = "e" * 64
+        envelope["payload_sha256"] = lift._digest(projection_json(envelope["projection"]))
+        changed = store.put_bytes(projection_json(envelope) + b"\n")
+        repository.connection.execute(
+            "update artifact set content_sha256=%s, storage_key=%s, byte_size=%s "
+            "where workspace_id=%s and artifact_id=%s",
+            (
+                changed.blob_id.digest,
+                store.key_for(changed.blob_id),
+                changed.byte_size,
+                repository.workspace_id,
+                row["artifact_id"],
+            ),
+        )
+    result = lift.publish_scene_segments(repository, store, scene_id)
+    assert result["placement_revalidated"] and not result["projection_used"]

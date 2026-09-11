@@ -413,7 +413,7 @@ def test_with_no_hosted_boxes_the_local_detector_prompts_and_is_named(
     assert document["dropped"]["outside_vocabulary"] == 1
     [mask] = document["masks"]
     assert mask["label_confidence"] == {"score_millionths": 640_000}
-    assert mask["prompt_span_digest"] is None
+    assert mask["prompt_span_digest"] == mask["span_digest"]
 
     event = _rows(
         repository,
