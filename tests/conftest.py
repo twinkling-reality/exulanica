@@ -388,6 +388,28 @@ def repository(ingest_spine):
     return ingest_spine[0]
 
 
+def scratch_role_database(scratch: str, role: str):
+    """A ``Database`` over the throwaway schema, connected as ``role``, on the configured server.
+
+    Built from ``EXULANICA_TEST_DATABASE_URL`` like ``tests_support_api.scratch_database``, never
+    from a spelled-out URL. Two read-only fixtures once named ``exulanica_spine_test`` directly.
+    On that database they passed, because the harness puts its scratch schema there too. On any
+    other, their search path named a schema that database does not have, so every table resolved
+    in its ``public`` schema instead, and a scene the fixture had just built came back "no such
+    scene". Observed 2026-09-11 on a freshly created database: 43 failures across
+    ``test_world_read_views.py`` and ``test_asset_read_currency.py``.
+    """
+    from exulanica.db.session import Database
+    from exulanica.env import env_get
+    from psycopg.conninfo import make_conninfo
+
+    base = env_get("TEST_DATABASE_URL")
+    assert base is not None
+    return Database(
+        url=make_conninfo(base, options=f"-csearch_path={scratch},public -crole={role}")
+    )
+
+
 @pytest.fixture
 def cli_database(spine_schema, _spine_tables, monkeypatch):
     """Point the command line at the spine schema, through the environment it reads itself.

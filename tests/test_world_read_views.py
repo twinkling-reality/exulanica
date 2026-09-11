@@ -16,13 +16,11 @@ from unittest.mock import patch
 import pytest
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.db.roles import provision_runtime_role
-from exulanica.db.session import Database
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.world_read_verification import EvidenceError, verify_downloads
 from exulanica.ingest.person_review import record_region_edits
-from psycopg.conninfo import make_conninfo
 
-from conftest import photo_bytes, write_photo
+from conftest import photo_bytes, scratch_role_database, write_photo
 from test_api import deployment as deployment
 from test_place_read_bundle import _bind, _second_scene
 from test_screening_currency import ACTOR, KEY, OUTLINE
@@ -34,12 +32,7 @@ from test_world_read_route import _scene_in
 def readonly(deployment, repository, spine_schema, monkeypatch, request):
     _, schema = spine_schema
     provision_runtime_role(repository.connection, role="exulanica_ro", read_only=True)
-    database = Database(
-        url=make_conninfo(
-            "postgresql://localhost:5433/exulanica_spine_test",
-            options=f"-csearch_path={schema},public -crole=exulanica_ro",
-        )
-    )
+    database = scratch_role_database(schema, "exulanica_ro")
     services = deployment.client.app.state.services
     deployment.client.app.state.services = dataclasses.replace(
         services, readonly_database=database, executor_shares_the_write_role=False
