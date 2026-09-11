@@ -12,10 +12,10 @@ That claim is checkable, and it is worth stating exactly what makes it true here
     and enumerable by reading the source.
 *   Every value from the plan is bound. Ids are bound as ``uuid[]``, times as ``timestamptz``,
     the limit as an integer.
-*   The one free-text field goes to ``plainto_tsquery``, not ``to_tsquery``. The difference is
-    the whole safety argument: ``plainto_tsquery`` treats its input as plain words and discards
-    operator syntax, so ``'gullfoss & secret | admin'`` becomes ``'gullfoss' & 'secret' &
-    'admin'`` rather than a boolean expression the caller authored. Verified on the server.
+*   The free-text field goes through English plain-text lexing. Code assembles an OR query
+    from quoted lexemes, never from operator syntax supplied by a caller. The minimum-match
+    rule and ts_rank/cosine fusion are fixed code, with every query value bound.
+
 
 Execution runs in a **read-only transaction with a statement timeout**, per 5.2 stage 6. Both
 matter and they are not the same guarantee: read-only means a plan cannot write whatever
@@ -34,6 +34,11 @@ import psycopg
 from psycopg import sql
 
 from exulanica.evidence.blob import BlobId
+from exulanica.selection.embeddings import (
+    SEARCHABLE_PREDICATES,
+    QueryEmbedding,
+    text_match_query,
+)
 from exulanica.selection.plan import EntityMode, EpistemicScope, Intent, ProcessingState
 from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
 
@@ -57,7 +62,7 @@ _LINK_STATES: Final[dict[EpistemicScope, tuple[str, ...]]] = {
 #: The predicates whose object is capture-derived text worth searching. All three are model
 #: output over the user's own photographs, so anything matched through them is untrusted input
 #: and is tagged as such on the way out.
-_SEARCHABLE_PREDICATES: Final = ("caption_is", "ocr_text_is", "place_is")
+_SEARCHABLE_PREDICATES: Final = SEARCHABLE_PREDICATES
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +131,12 @@ class SelectionResult:
         return not self.captures and not self.entities
 
 
-def execute(connection: psycopg.Connection, validated: ValidatedPlan) -> SelectionResult:
+def execute(
+    connection: psycopg.Connection,
+    validated: ValidatedPlan,
+    *,
+    query_embedding: QueryEmbedding | None = None,
+) -> SelectionResult:
     """Run a validated plan. The only function in this package that touches data."""
     plan = validated.plan
     with connection.transaction():
@@ -134,7 +144,7 @@ def execute(connection: psycopg.Connection, validated: ValidatedPlan) -> Selecti
             sql.SQL("set local statement_timeout = {}").format(sql.Literal(STATEMENT_TIMEOUT_MS))
         )
         connection.execute("set local transaction read only")
-        capture_ids, total = _matching_captures(connection, validated)
+        capture_ids, total = _matching_captures(connection, validated, query_embedding)
         captures = _describe_captures(connection, validated, capture_ids)
         entities = (
             _describe_entities(connection, validated, capture_ids)
@@ -151,7 +161,9 @@ def execute(connection: psycopg.Connection, validated: ValidatedPlan) -> Selecti
 
 
 def _matching_captures(
-    connection: psycopg.Connection, validated: ValidatedPlan
+    connection: psycopg.Connection,
+    validated: ValidatedPlan,
+    query_embedding: QueryEmbedding | None = None,
 ) -> tuple[tuple[uuid.UUID, ...], int]:
     """Intersect the active dimensions, then order and bound.
 
@@ -165,12 +177,18 @@ def _matching_captures(
     that never shares a photograph returns nothing, while ALL over the same pair returns the
     region.
 
-    The ordering is fixed by the code rather than chosen by the caller: newest capture first,
-    ties broken by capture id, so two runs over unchanged data return the same page.
+    Text queries use relevance, then newest capture and capture id. Other queries use newest
+    capture and capture id. Two runs over unchanged data return the same page.
     """
     plan = validated.plan
     workspace = validated.workspace_id
+    prefix = sql.SQL("")
+    prefix_params: list[object] = []
     scope_clauses, scope_params = _scope_clauses(validated)
+    if plan.semantic_query:
+        text_sql, prefix_params = text_match_query(workspace, plan.semantic_query, query_embedding)
+        prefix = sql.SQL("with text_matches as ({}) ").format(text_sql)
+        scope_clauses.append(sql.SQL("c.capture_id in (select capture_id from text_matches)"))
     mode = plan.entities.mode if plan.entities is not None else None
 
     row_clauses = list(scope_clauses)
@@ -183,20 +201,39 @@ def _matching_captures(
     if (
         validated.entity_ids
         and mode is EntityMode.ALL
-        and not _scope_covers_every_entity(connection, validated, scope_clauses, scope_params)
+        and not _scope_covers_every_entity(
+            connection, validated, scope_clauses, scope_params, prefix, prefix_params
+        )
     ):
         return (), 0
 
     where = sql.SQL(" and ").join(
         [sql.SQL("c.workspace_id = %s"), sql.SQL("c.deleted_at is null"), *row_clauses]
     )
-    statement = sql.SQL(
-        "select c.capture_id, count(*) over () as total from capture c "
-        "where {} order by c.started_at desc nulls last, c.capture_id limit %s"
-    ).format(where)
-    rows = connection.execute(statement, [workspace, *row_params, plan.limit]).fetchall()
-    total = rows[0]["total"] if rows else 0
-    return tuple(row["capture_id"] for row in rows), int(total)
+    if not plan.semantic_query:
+        statement = sql.SQL(
+            "select c.capture_id, count(*) over () as total from capture c where {} "
+            "order by c.started_at desc nulls last, c.capture_id limit %s"
+        ).format(where)
+    else:
+        # Rank inside the permitted scope, and send at most plan.limit IDs to Python.
+        ordering = sql.SQL("lexical desc")
+        if query_embedding is not None:
+            ordering = sql.SQL(
+                "(case when lexical > 0 then 1.0/(60+lex_rank) else 0 end + "
+                " case when cosine is not null then 1.0/(60+sem_rank) else 0 end) desc"
+            )
+        statement = prefix + sql.SQL(
+            ", permitted as (select c.capture_id, c.started_at, m.lexical, m.cosine "
+            "from capture c join text_matches m on m.capture_id=c.capture_id where {}), "
+            "ranked as (select *, dense_rank() over (order by lexical desc) as lex_rank, "
+            "dense_rank() over (order by cosine desc nulls last) as sem_rank from permitted) "
+            "select capture_id, count(*) over () as total from ranked "
+            "order by {}, started_at desc nulls last, capture_id limit %s"
+        ).format(where, ordering)
+    rows = connection.execute(statement, [*prefix_params, workspace, *row_params, plan.limit])
+    rows = rows.fetchall()
+    return tuple(row["capture_id"] for row in rows), int(rows[0]["total"]) if rows else 0
 
 
 def _scope_clauses(validated: ValidatedPlan) -> tuple[list[sql.Composed], list[object]]:
@@ -227,19 +264,6 @@ def _scope_clauses(validated: ValidatedPlan) -> tuple[list[sql.Composed], list[o
     if plan.capture is not None:
         clauses.append(_processing_state_clause(plan.capture.processing_states))
         params.append(workspace)
-    if plan.semantic_query:
-        clauses.append(
-            sql.SQL(
-                "exists (select 1 from assertion a"
-                "         join predicate p on p.predicate_id = a.predicate_id"
-                "        where a.workspace_id = %s and a.status = 'active'"
-                "          and p.key = any(%s::text[])"
-                "          and a.subject_ref->>'id' = c.capture_id::text"
-                "          and to_tsvector('simple', a.object_value #>> '{}')"
-                "              @@ plainto_tsquery('simple', %s))"
-            )
-        )
-        params.extend([workspace, list(_SEARCHABLE_PREDICATES), plan.semantic_query])
     return clauses, params
 
 
@@ -248,6 +272,8 @@ def _scope_covers_every_entity(
     validated: ValidatedPlan,
     scope_clauses: list[sql.Composed],
     scope_params: list[object],
+    prefix: sql.Composable | None = None,
+    prefix_params: list[object] | None = None,
 ) -> bool:
     """Does every named entity appear somewhere in the scope?
 
@@ -269,8 +295,9 @@ def _scope_covers_every_entity(
         "where {} and l.state = any(%s::link_state[]) and l.entity_id = any(%s::uuid[])"
     ).format(where)
     row = connection.execute(
-        statement,
+        (prefix if prefix is not None else sql.SQL("")) + statement,
         [
+            *(prefix_params or []),
             validated.workspace_id,
             *scope_params,
             list(_LINK_STATES[validated.plan.epistemic]),
@@ -394,9 +421,7 @@ def _describe_captures(
             # when no window was asked for. That is the same mislabel the branch below exists to
             # avoid, and an unconstrained plan falls into it now: it sets no dimension, so it
             # produces no support of its own, so `reasons` is empty.
-            reasons.append(
-                Support(span_id=row["span_id"], assertion_id=None, dimension="time")
-            )
+            reasons.append(Support(span_id=row["span_id"], assertion_id=None, dimension="time"))
         elif not reasons:
             # **A capture that matched must never leave here with nothing to cite.**
             #
@@ -429,9 +454,7 @@ def _describe_captures(
             #     "more captures matched than are shown here" when nothing had been truncated
             #     and one capture simply had nothing citable. A scope member that cannot be
             #     cited is a scope member the answer cannot mention.
-            reasons.append(
-                Support(span_id=row["span_id"], assertion_id=None, dimension="capture")
-            )
+            reasons.append(Support(span_id=row["span_id"], assertion_id=None, dimension="capture"))
         captures.append(
             SelectedCapture(
                 capture_id=row["capture_id"],
@@ -440,7 +463,8 @@ def _describe_captures(
                 support=tuple(reasons),
             )
         )
-    return tuple(captures)
+    by_id = {capture.capture_id: capture for capture in captures}
+    return tuple(by_id[key] for key in capture_ids if key in by_id)
 
 
 def _support_for(
@@ -479,14 +503,12 @@ def _support_for(
             "from assertion a join predicate p on p.predicate_id = a.predicate_id "
             "where a.workspace_id = %s and a.status = 'active' and p.key = any(%s::text[]) "
             "and a.subject_ref->>'id' = any(%s::text[]) "
-            "and to_tsvector('simple', a.object_value #>> '{}') "
-            "    @@ plainto_tsquery('simple', %s) "
+            "and not tombstone_blocks_any_span(a.workspace_id, a.support_span_ids) "
             "order by a.assertion_id",
             (
                 workspace,
                 list(_SEARCHABLE_PREDICATES),
                 [str(capture_id) for capture_id in capture_ids],
-                plan.semantic_query,
             ),
         ).fetchall()
         for row in rows:

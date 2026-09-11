@@ -1370,3 +1370,86 @@ to be in the form or in the validator, not in a sentence asking for it.
 | 2 | Narrowed to a mechanism. Five controls on every successful draft, under every wording | Put the bound in the form, as a `maxItems` on a list of changes, or in `_validate_draft` as a refusal. Both are real changes to what a proposal may be and neither is a prompt edit |
 | 3 | Unchanged. The tense rule produced the future tense on both occasions it survived | Re-measure once item 7 makes three attempts mean something |
 
+
+## 16. Caption matching candidate, 2026-09-11
+
+This branch addresses FP-3: copying a whole question into an AND query over the `simple`
+configuration made "people wearing" miss captions saying "people wear". `selection-4` asks the
+planner for content terms, with explicit what/where examples. Its schema-derived prompt test
+checks those examples and their legal form; that test does not measure a model following them.
+
+The executor parses distinct English lexemes once, combines them with OR, and requires at least
+half to match, rounded up. Two terms need one hit; three or four need two. Repeated terms cannot
+lower the requirement. PostgreSQL ranks lexical hits with `ts_rank`. Already-stemmed lexemes
+are quoted directly as a tsquery: parsing them through English again changes `waterfal` into
+`waterf`, an edge case found by the waterfall regression test.
+
+The vector candidate embeds the active caption, OCR and place-text assertions together once
+per capture, source content, model and prompt version. It uses the configured embedding role,
+4096 dimensions and the existing `halfvec` column. A SHA-256 source fingerprint excludes vectors
+for superseded text. The reference is the exact whole-photograph span; no face, person or
+occurrence is embedded. The pass deliberately does not copy assertions to `text_chunk`, which
+requires an artifact reference and has a `simple` generated index. Model response caching is
+disabled for caption and query vectors so it does not retain a separate copy after deletion.
+
+At ask time, a workspace with current vectors embeds the distilled query. An unindexed workspace
+uses lexical retrieval without a query-vector call. Both candidate sets pass through the same
+workspace, deletion, time, place, entity and processing-state filters. Equal-weight reciprocal
+rank fusion uses `1 / (60 + dense_rank)` for each qualifying modality. Missing modalities
+contribute zero. Semantic-only hits must reach cosine 0.65, a provisional threshold with no
+real-model calibration. Ranking, counting and limiting run in PostgreSQL; Python receives only
+the requested page. This remains an exact scan over eligible source text and vectors under the
+existing five-second timeout. No ANN index or large-corpus latency claim is added.
+
+The page order survives support loading and packet creation. Packet loading rechecks tombstones
+and assertion status, including deletion between selection and packet creation. A vector can
+suggest a photograph but cannot mint a citation. Query-call logs include accounting usage, cost
+and measured elapsed time. `EmbeddingResult` does not expose a served-model echo or HTTP attempt
+count, so those fields are null for the vector call; the selected model is recorded separately.
+
+### Release blockers
+
+This is a candidate, not completed semantic acceptance. Do not enable live indexing yet.
+
+- The new deletion acceptance test finds that capture tombstones block reads and reinsertion,
+  but do not enqueue caption vectors for physical purge. Migration 0013 deliberately covered
+  blob/artifact bytes; migration 0030 added person-dependent vectors only. Completing physical
+  purge needs an authorized extension to the deletion code. No migration has been added.
+- The ingest worker exposes an injected pass, avoiding an import from ingest into selection,
+  which the import contract prohibits. The application wiring requires an authorized edit to
+  `exulanica/api/services.py`; it is not wired on this branch.
+- The web decoder currently types served model and attempt count as non-nullable, although
+  its runtime mapping passes values through and provenance selects only reasoning/extraction
+  calls. The new vector-call shape violates that declared TypeScript contract. Web was read-only
+  for this task; updating that contract is also required before enabling live vector calls.
+- No live-call budget was authorized in this task. Scripted pgvector tests verify mechanics,
+  not embedding quality or the planner's response to the new wording.
+- The inspected first-place workspace has three active captions. The volcanic workspace has
+  210 captures and zero active captions. The predecessor proposal record does not supply a
+  volcanic caption corpus. Those captions cannot be invented for an evaluation.
+
+`docs/evaluation/2026-09-11-companion-matching.json` records the five prior questions plus ten
+natural questions against both workspaces. Distillations are declared inputs. Retrieval hits
+and empty packets are separate from answer-level abstention: a count/date query can use a
+photograph without a caption, while place names, identities and current exchange rates require
+additional evidence even when an unconstrained selection returns photographs. A null fused
+result means the comparison was not run, not zero hits. The record names
+`docs/evaluation/2026-09-10-companion-proposals.json` as predecessor.
+
+The full backend suite is deferred to the integration coordinator's serialized run. In
+particular, `tests/test_frontier_dry_run.py` must not be run here: it contains retained-database
+writes despite a test database override. Focused PostgreSQL tests use scratch schemas on
+`exulanica_inspect_test`; reference measurements use a read-only connection to that copy.
+
+### Focused gate results
+
+The final broad focused run covered 417 tests: 415 passed and two failed. One failure was a
+test-only comparison of equivalent Decimal strings (`2.0E-7` and `0.00000020`); it now compares
+decimal values. The matching-file recheck passed 19 tests and retained one failure, physical
+purge. No skip or expected-failure marker hides it. Ruff and all four import contracts passed.
+
+On the real first-place captions, declared queries `people wearing` and `snow mountain` each
+return all three photographs; `icy landscape` returns two, `reflective strips clothes` one, and
+`penguin beach` none. `cold weather clothing` and `protective headgear` also return none: those
+are observed lexical misses, not evidence that live embeddings would recover them. All ten
+visual queries return zero on the volcanic workspace with no captions.

@@ -615,6 +615,23 @@ def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
         assert f"`{name}`" in offered_null, f"{name} takes null and the prompt should say so"
 
 
+@pytest.mark.parametrize(("question", "terms"), [
+    ("What is this place, and what are the people wearing?", "people wearing"),
+    ("Where are the snow-covered mountains?", "snow mountain"),
+])
+def test_planner_content_examples_fit_the_schema(question, terms):
+    from exulanica.models.schema import response_format_for
+    from exulanica.selection.question import _PLANNER_SYSTEM, PROMPT_VERSION
+
+    schema = response_format_for(SelectionPlan)["json_schema"]["schema"]
+    assert "semantic_query" in schema["properties"]
+    plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query=terms)
+    assert plan.semantic_query == terms
+    assert f'"{question}" -> "{terms}"' in _PLANNER_SYSTEM
+    assert "Never copy the whole question" in _PLANNER_SYSTEM
+    assert PROMPT_VERSION == "selection-4"
+
+
 def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant():
     """The rule ``CaptureWindow._non_empty`` enforces, said where the model can act on it.
 

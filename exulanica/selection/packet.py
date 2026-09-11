@@ -230,7 +230,11 @@ def _load_items(
     rows = {
         row["span_id"]: row
         for row in connection.execute(
-            "select * from evidence_span where workspace_id = %s and span_id = any(%s::uuid[])",
+            "select s.* from evidence_span s where s.workspace_id = %s "
+            "and s.span_id = any(%s::uuid[]) "
+            "and not tombstone_blocks_any_span(s.workspace_id, array[s.span_id]) "
+            "and exists (select 1 from capture c where c.workspace_id=s.workspace_id "
+            "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null)",
             (workspace_id, span_ids),
         ).fetchall()
     }
@@ -241,7 +245,8 @@ def _load_items(
             row["assertion_id"]: row
             for row in connection.execute(
                 "select a.assertion_id, a.kind, a.object_value from assertion a "
-                "where a.workspace_id = %s and a.assertion_id = any(%s::uuid[])",
+                "where a.workspace_id = %s and a.assertion_id = any(%s::uuid[]) "
+                "and a.status = 'active'",
                 (workspace_id, assertion_ids),
             ).fetchall()
         }
@@ -253,6 +258,8 @@ def _load_items(
         if (span_id, assertion_id) in seen or span_id not in rows:
             continue
         seen.add((span_id, assertion_id))
+        if assertion_id is not None and assertion_id not in claims:
+            continue
         claim = claims.get(assertion_id) if assertion_id else None
         value = claim["object_value"] if claim else None
         items.append(

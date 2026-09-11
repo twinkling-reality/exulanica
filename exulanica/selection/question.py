@@ -1,9 +1,9 @@
 """Asking a question in words, and getting back an answer that cites its evidence.
 
-This module sequences the path and owns the two model calls in it. Everything between them is
-deterministic and lives elsewhere, which is the arrangement the architecture describes: a model
-proposes what to look for, code decides what that means and finds it, and a model writes the
-sentence about what code found.
+This module sequences planning, optional query-vector generation, and composition. The executor
+deterministically filters and ranks the supplied query and vector. A model proposes what to
+look for, code decides what that means and finds it, and a model writes the sentence about what
+code found.
 
     plan  ->  validate  ->  execute  ->  packet  ->  compose  ->  validate  ->  repair once
                                                                                     |
@@ -37,15 +37,16 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Final
 
 import psycopg
 
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
+from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
-from exulanica.models.results import ChatResult
+from exulanica.models.results import ChatResult, EmbeddingResult
 from exulanica.selection.answer import (
     Abstention,
     Answer,
@@ -55,6 +56,7 @@ from exulanica.selection.answer import (
     render_deterministic_answer,
     validate_answer,
 )
+from exulanica.selection.embeddings import embed_query, has_embeddings
 from exulanica.selection.executor import SelectionResult, execute
 from exulanica.selection.packet import EvidencePacket, build_packet
 from exulanica.selection.plan import SelectionPlan
@@ -112,7 +114,7 @@ __all__ = [
 #:     uncitable and the answer was an ``UNANSWERABLE_AMBIGUOUS`` abstention telling the user to
 #:     "confirm them, or ask again for confirmed matches only" about a question that had nothing
 #:     to do with confidence. Another field filled because the form had a slot for it.
-PROMPT_VERSION: Final = "selection-3"
+PROMPT_VERSION: Final = "selection-4"
 
 #: How many entities the planner may be shown. A bound, because the catalogue goes into a prompt
 #: and a library with a thousand named people would otherwise cost more than the answer.
@@ -217,16 +219,17 @@ class ModelCall:
     #: The identifier the chain sent. A manifest fact, restated here so the pair can be compared.
     requested_model: str
     #: The identifier the response body echoed. The executed variant, and the only one recorded.
-    served_model: str
+    served_model: str | None
     used_fallback: bool
     #: HTTP requests issued for this call, retries and failover included. Zero means the cache.
-    attempts: int
+    attempts: int | None
     #: Whole milliseconds. Integer because a record with floats in it is a record that changes
     #: under a JSON round trip, and every evaluation record in this repository refuses them.
     latency_ms: int
     prompt_tokens: int | None
     completion_tokens: int | None
     reasoning_tokens: int | None
+    usd: str | None = None
 
     @classmethod
     def from_result(cls, call: ChatResult) -> ModelCall:
@@ -244,6 +247,7 @@ class ModelCall:
             prompt_tokens=_reported(usage, "prompt_tokens"),
             completion_tokens=_reported(usage, "completion_tokens"),
             reasoning_tokens=_reported(details, "reasoning_tokens"),
+            usd=str(call.usage.usd),
         )
 
 
@@ -287,6 +291,20 @@ class CallLog:
         """Note one completed call and hand it straight back, so a call site stays one line."""
         self._calls.append(ModelCall.from_result(call))
         return call
+
+    def record_embedding(self, result: EmbeddingResult, latency_ms: int) -> None:
+        """Record vector-call accounting without inventing metadata the client omits.
+
+        EmbeddingResult exposes the selected model and usage but no served-model echo or
+        HTTP attempt count. Those remain null; elapsed time is measured around the call.
+        """
+        self._calls.append(ModelCall(
+            role=str(Role.EMBEDDING), requested_model=result.model_id,
+            served_model=None, used_fallback=result.usage.used_fallback, attempts=None,
+            latency_ms=latency_ms, prompt_tokens=result.usage.prompt_tokens,
+            completion_tokens=result.usage.completion_tokens, reasoning_tokens=None,
+            usd=str(result.usage.usd),
+        ))
 
     @property
     def calls(self) -> tuple[ModelCall, ...]:
@@ -368,8 +386,14 @@ Rules you cannot break, because the form has no field for breaking them:
 - Reference people, objects and places ONLY by an id from the catalogue below. If the question \
 names somebody who is not in the catalogue, leave the entity dimension empty rather than \
 guessing an id.
-- Put the question's own words in semantic_query only when the question is about what is \
-visible or written in a photograph. Leave it null otherwise.
+- Distil `semantic_query` to content terms only when the question concerns visible or written \
+content. Remove question framing (what, where, which, show me, my photos), stop words, and \
+unspecified references such as this place. Keep meaningful nouns, descriptive adjectives and \
+actions, without inventing objects or a location. Never copy the whole question. Examples:
+  "What is this place, and what are the people wearing?" -> "people wearing"
+  "Where are the snow-covered mountains?" -> "snow mountain"
+  "Which photographs show a volcanic crater?" -> "volcanic crater"
+Leave it null for counts, dates, or questions with no visual content terms.
 - Choose mode 'together' only when the question means the entities were in one photograph at \
 one moment. Choose 'all' when it means each of them appears somewhere in the selection. Choose \
 'any' otherwise.
@@ -705,7 +729,12 @@ def answer_question(
             rejections=(str(rejected),),
             calls=log.calls,
         )
-    result = execute(connection, validated)
+    query_vector = None
+    if plan.semantic_query and has_embeddings(connection, session.workspace_id, client):
+        # An unavailable vector role leaves lexical retrieval usable.
+        with suppress(ModelError):
+            query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)
+    result = execute(connection, validated, query_embedding=query_vector)
     packet = build_packet(connection, result, workspace_id=session.workspace_id, now=now)
 
     if packet.is_empty:
@@ -716,9 +745,8 @@ def answer_question(
             result=result,
             packet=packet,
             abstention=reason,
-            # Whatever the planner spent, and NOTHING AFTER IT. Empty only when the caller
-            # supplied the plan; a question asked in words always paid for a planner call first
-            # and the record says so. What the emptiness of the composer's half guarantees is
+            # Keep planning and query-vector costs even when retrieval abstains.
+            # What the emptiness of the composer's half guarantees is
             # the sentence above: no code path leads from an empty packet to a composer call.
             calls=log.calls,
         )

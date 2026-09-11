@@ -45,7 +45,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -64,6 +64,7 @@ from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages.segmentation import ObjectSegmenter
 from exulanica.ingest.vision import VisionModel
+from exulanica.models.results import EmbeddingResult
 from exulanica.reconstruction import DepthModel
 from exulanica.store.base import ContentAddressedStore
 
@@ -235,6 +236,8 @@ class DerivativeWorker:
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
         segmenter: ObjectSegmenter | None = None,
+        embedding_pass: Callable[[psycopg.Connection, uuid.UUID, uuid.UUID],
+                                 EmbeddingResult | None] | None = None,
         name: str = "derivatives",
         poll_seconds: float = _POLL_SECONDS,
         lease_seconds: float = MINIMUM_LEASE_SECONDS,
@@ -256,6 +259,7 @@ class DerivativeWorker:
         self._database = database
         self._store = store
         self._workspaces = workspaces
+        self._embedding_pass = embedding_pass
         self._vision = vision
         self._depth = depth
         self._detector = detector
@@ -672,6 +676,15 @@ class DerivativeWorker:
                 outcome.errors.append(f"{capture_id}: {result.error}")
                 event_type = "capture_failed"
             else:
+                if self._embedding_pass is not None:
+                    self._beat(repository, claimed, keeper)
+                    embedded = self._embedding_pass(
+                        repository.connection, repository.workspace_id, capture_id,
+                    )
+                    if embedded is not None:
+                        outcome.model_calls += 1
+                        outcome.input_tokens += embedded.usage.prompt_tokens
+                        outcome.usd_estimate += embedded.usage.usd
                 outcome.succeeded += 1
                 event_type = "capture_succeeded"
 

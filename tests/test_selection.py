@@ -570,3 +570,34 @@ def test_selecting_is_read_only(library):
     assert library.repository.rows_in_schema("capture") == before
     # And the transaction the executor opened has been closed, so the connection is usable.
     assert library.repository.rows_in_schema("assertion") > 0
+
+
+def test_fused_candidates_cannot_escape_entity_filters(library, client, monkeypatch):
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.models.manifest import Role
+    from exulanica.selection.embeddings import QueryEmbedding, embed_capture
+    from exulanica.selection.packet import build_packet
+
+    from test_companion_matching import script, vector
+
+    connection = library.repository.connection
+    workspace = library.session.workspace_id
+    provision_workspace(connection, workspace)
+    script(client, monkeypatch, vector())
+    for capture in library.captures.values():
+        embed_capture(connection, workspace, capture, client)
+    query = QueryEmbedding(vector(), client.manifest[Role.EMBEDDING].primary.model_id,
+                           client.manifest.pipeline_version)
+    for mode, expected in (
+        (EntityMode.ANY, {"together", "alone_a", "alone_b"}),
+        (EntityMode.TOGETHER, {"together"}),
+        (EntityMode.ALL, set(library.captures)),
+    ):
+        plan = _plan(semantic_query="winter clothing", entities=EntitySelector(
+            ids=[library.entities["A"], library.entities["B"]], mode=mode))
+        result = execute(connection, validate(connection, plan, library.session),
+                         query_embedding=query)
+        allowed = {library.captures[name] for name in expected}
+        assert {capture.capture_id for capture in result.captures} == allowed
+        packet = build_packet(connection, result, workspace_id=workspace)
+        assert {item.capture_id for item in packet.items} == allowed
