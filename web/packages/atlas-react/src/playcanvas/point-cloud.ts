@@ -57,6 +57,8 @@ export interface PointCloudOptions {
    * keeps drawing points, and `surface` on the result says which happened.
    */
   readonly surface?: boolean;
+  /** The viewer's image of the photograph, upright, to colour a surface with. Ignored for points. */
+  readonly photograph?: ImageBitmap;
 }
 
 export interface PointCloud {
@@ -74,6 +76,8 @@ export interface PointCloud {
   readonly surface: boolean;
   /** The seam triangles of a surface, drawn with the same material; null for points. */
   readonly seamMesh: pc.Mesh | null;
+  /** True when a surface takes its colour from the photograph rather than its own samples. */
+  readonly photographed: boolean;
   setTheme(theme: PresentationTheme): void;
   /** Compare evidence without the authored fog or display gain masking reconstruction defects. */
   setInspection(active: boolean): void;
@@ -148,10 +152,11 @@ interface ShaderDesc {
   fragmentWGSL?: string;
 }
 
-function buildShaderDesc(blend: boolean, surface = false): ShaderDesc {
-  const defines = `${blend ? '#define POINT_BLEND\n' : ''}${surface ? '#define SURFACE\n' : ''}`;
+function buildShaderDesc(blend: boolean, surface = false, photographed = false): ShaderDesc {
+  const defines = `${blend ? '#define POINT_BLEND\n' : ''}${surface ? '#define SURFACE\n' : ''}`
+    + `${photographed ? '#define PHOTOGRAPH\n' : ''}`;
   return {
-    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}${surface ? '-surface' : ''}`,
+    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}${surface ? '-surface' : ''}${photographed ? '-photograph' : ''}`,
     attributes: { ...ATTRIBUTES },
     vertexGLSL: `${defines}${POINT_VERTEX_GLSL}`,
     fragmentGLSL: `${defines}${POINT_FRAGMENT_GLSL}`,
@@ -237,7 +242,29 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   }
 
   const blend = options.blend ?? false;
-  const material = new pc.ShaderMaterial(buildShaderDesc(blend, surface) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
+  const photographed = surface && options.photograph !== undefined;
+  const material = new pc.ShaderMaterial(
+    buildShaderDesc(blend, surface, photographed) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
+  let photographTexture: pc.Texture | null = null;
+  if (photographed) {
+    const image = options.photograph!;
+    photographTexture = new pc.Texture(device, {
+      name: 'photograph',
+      width: image.width,
+      height: image.height,
+      format: pc.PIXELFORMAT_RGBA8,
+      mipmaps: true,
+      minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+      magFilter: pc.FILTER_LINEAR,
+      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+      flipY: false,
+    });
+    // The engine uploads an ImageBitmap directly (playcanvas 2.21.4's texture upload tests
+    // `instanceof ImageBitmap`); only its declared parameter type omits it.
+    photographTexture.setSource(image as unknown as HTMLImageElement);
+    material.setParameter('uPhotograph', photographTexture);
+  }
   material.cull = pc.CULLFACE_NONE;
   if (blend) {
     material.blendType = pc.BLEND_NORMAL;
@@ -335,6 +362,7 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     defaultMaxSizePx: options.maxSizePx ?? DEFAULT_MAX_SIZE_PX,
     surface,
     seamMesh,
+    photographed,
     setTheme,
     setInspection(active) {
       material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
@@ -362,6 +390,7 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     destroy(): void {
       mesh.destroy();
       seamMesh?.destroy();
+      photographTexture?.destroy();
       material.destroy();
     },
   };

@@ -378,6 +378,17 @@ export interface UnposedPointMapRecord {
     readonly contentSha256: string;
     readonly byteSize: number;
   } | null;
+  /**
+   * The image the viewer route (`/evidence/{span}/masked`) served of this photograph when the graph
+   * was read: the original when nobody needs hiding, a masked derivative when somebody does.
+   * Digest-bound, so bytes that differ by the time they are fetched are refused.
+   */
+  readonly photograph?: {
+    readonly href: string;
+    readonly authorization: 'workspace-bearer';
+    readonly contentSha256: string;
+    readonly byteSize: number;
+  } | null;
 }
 
 export interface RecoveredCameraCalibration {

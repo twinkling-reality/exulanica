@@ -68,21 +68,44 @@ describe('depthSurfaceIndices', () => {
     expect(seams(built)).toBe(0);
   });
 
-  it('bridges a short empty run between two real samples as a seam, and leaves a wide one empty', () => {
-    // Row 1, columns 1 and 2 empty: a two-cell band like the one a producer leaves at a silhouette.
-    const band = depthSurfaceIndices(grid((c, r) => (r === 1 && (c === 1 || c === 2) ? null : 5)))!;
-    const left = 0 + W; // row 1, column 0
-    const right = 3 + W - 2; // row 1, column 3, after two absent cells
-    expect(Array.from(band.seams)).toContain(left);
-    expect(Array.from(band.seams)).toContain(right);
-    // One quad along the rows (row 1 to 2, column 0 to 3) and one along each empty column
-    // (row 0 to 2): three quads, six seam triangles, covering the hole between them.
-    expect(seams(band)).toBe(6);
-    // A gap wider than the bridge limit in both directions, like the sky, stays empty.
+  it('fills a ragged band of empty cells with seams between the real samples on either side', () => {
+    // A band two to three cells wide whose edges move from row to row, like the one a depth producer
+    // leaves round a person. Every empty cell's centre must fall inside some seam triangle.
+    const width = 9;
+    const height = 5;
+    const empty = (c: number, r: number) => (r === 1 && (c === 3 || c === 4))
+      || (r === 2 && (c === 4 || c === 5 || c === 6)) || (r === 3 && (c === 3 || c === 4 || c === 5));
+    const built = depthSurfaceIndices(grid((c, r) => (empty(c, r) ? null : 5), [0, 0, 0], width, height))!;
+    const order: [number, number][] = [];
+    for (let r = 0; r < height; r += 1) for (let c = 0; c < width; c += 1) if (!empty(c, r)) order.push([c, r]);
+    const inside = (p: [number, number], a: [number, number], b: [number, number], c: [number, number]) => {
+      const side = (u: [number, number], v: [number, number]) => (v[0] - u[0]) * (p[1] - u[1]) - (v[1] - u[1]) * (p[0] - u[0]);
+      const s1 = side(a, b); const s2 = side(b, c); const s3 = side(c, a);
+      return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+    };
+    const covered = (p: [number, number]) => {
+      for (let k = 0; k < built.seams.length; k += 3) {
+        if (inside(p, order[built.seams[k]!]!, order[built.seams[k + 1]!]!, order[built.seams[k + 2]!]!)) return true;
+      }
+      return false;
+    };
+    for (let r = 0; r < height; r += 1) {
+      for (let c = 0; c < width; c += 1) if (empty(c, r)) expect(covered([c, r]), `cell ${c},${r}`).toBe(true);
+    }
+  });
+
+  it('leaves a gap wider than the bridge limit empty, as the sky is', () => {
     const wide = MAX_BRIDGED_CELLS + 4;
     const sky = depthSurfaceIndices(grid((c, r) => (c >= 1 && c <= wide - 2 && r >= 1 && r <= wide - 2 ? null : 5),
       [0, 0, 0], wide, wide))!;
-    expect(seams(sky)).toBe(0);
+    const order: number[] = [];
+    for (let r = 0; r < wide; r += 1) for (let c = 0; c < wide; c += 1) {
+      if (!(c >= 1 && c <= wide - 2 && r >= 1 && r <= wide - 2)) order.push(c);
+    }
+    for (let k = 0; k < sky.seams.length; k += 3) {
+      const columns = [sky.seams[k]!, sky.seams[k + 1]!, sky.seams[k + 2]!].map((index) => order[index]!);
+      expect(Math.max(...columns) - Math.min(...columns)).toBeLessThanOrEqual(MAX_BRIDGED_CELLS + 1);
+    }
   });
 
   it('draws points instead for a file that is not a single photograph’s grid', () => {

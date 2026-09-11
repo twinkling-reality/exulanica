@@ -46,6 +46,7 @@
  *                       z distance from the camera where the standpoint fade starts, w where it ends
  *   uSeamFade     vec4  x cosine where a seam starts to fade, y cosine where it is gone (surface only)
  *   aTags.y bit 1 marks a seam vertex: a triangle across a depth jump, see depth-surface.ts
+ *   uPhotograph   sampler2D  the viewer's image of the photograph (PHOTOGRAPH surfaces only)
  *
  * The last four describe ONE photograph's own camera and are enabled only for a map drawn in an
  * unmeasured arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of
@@ -100,6 +101,9 @@ varying float vFogAmount;
 #ifdef SURFACE
 varying float vSurvive;
 varying float vPresence;
+#endif
+#ifdef PHOTOGRAPH
+varying vec3 vLocal;
 #endif
 
 // One hash, used for the particulate dissolve. Deterministic per point, so the boundary does not
@@ -162,6 +166,9 @@ void main(void) {
     // two decisions travel to the fragment stage and are made there, per pixel. See depth-surface.ts.
     vSurvive = survive;
     vPresence = presenceOnly;
+#ifdef PHOTOGRAPH
+    vLocal = aPosition;
+#endif
 #else
     if (presenceOnly > 0.5 || r > survive) {
         // Culled. Pushed behind the near plane rather than discarded in the fragment stage, so a
@@ -240,6 +247,17 @@ varying float vFogAmount;
 varying float vSurvive;
 varying float vPresence;
 #endif
+#ifdef PHOTOGRAPH
+/**
+ * The viewer's image of the photograph, and the camera it was taken through. Each pixel of the
+ * surface looks its colour up where its own point projects into that camera, which is exactly the
+ * photograph from where it was taken and the photograph's colour on its surface from anywhere else.
+ */
+uniform sampler2D uPhotograph;
+uniform vec4 uFrame;
+uniform vec4 uViewpoint;
+varying vec3 vLocal;
+#endif
 
 void main(void) {
 #ifdef SURFACE
@@ -263,7 +281,15 @@ void main(void) {
     int slot = int(vSemantic.y + 0.5);
     vec4 tint = uPalette[slot];
 
-    vec3 rgb = mix(vColor.rgb, vColor.rgb * tint.rgb, tint.a);
+    vec3 base = vColor.rgb;
+#ifdef PHOTOGRAPH
+    vec3 seen = vLocal - uViewpoint.xyz;
+    float along = max(-seen.z, 0.001);
+    base = texture2D(uPhotograph, vec2(
+        (seen.x / (along * uFrame.x) + 1.0) * 0.5,
+        (1.0 - seen.y / (along * uFrame.y)) * 0.5)).rgb;
+#endif
+    vec3 rgb = mix(base, base * tint.rgb, tint.a);
 
     // Unconfirmed points breathe: a slow, low-amplitude luminance drift, phase-offset by the
     // provenance slot so inference and external do not pulse in lockstep.

@@ -265,6 +265,14 @@ export function adaptSnapshot(
                       contentSha256: member.unposed_point_map.reference.content_sha256,
                       byteSize: member.unposed_point_map.reference.byte_size,
                     },
+                photograph: member.unposed_point_map.photograph == null
+                  ? null
+                  : {
+                      href: member.unposed_point_map.photograph.href,
+                      authorization: member.unposed_point_map.photograph.authorization,
+                      contentSha256: member.unposed_point_map.photograph.content_sha256,
+                      byteSize: member.unposed_point_map.photograph.byte_size,
+                    },
               },
           placement: member.placement === null
             ? null

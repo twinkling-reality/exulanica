@@ -178,6 +178,24 @@ class ScenePointMapPlacementRow(BaseModel):
     reference: SceneGeometryReferenceRow | None
 
 
+class SceneUnposedPhotographRow(BaseModel):
+    """The image a viewer may see of one member, for drawing its unplaced depth in full detail.
+
+    The route is the viewer route, ``/evidence/{span_id}/masked``, which serves the original when
+    nobody in the photograph needs hiding and a current masked derivative when somebody does. The
+    digest is the one that route resolved to when the graph was read, so a client that receives
+    other bytes, because a consent changed in between, refuses them and draws the depth's own
+    colours instead. It is never a way to reach an original the viewer route would not serve.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    href: str
+    authorization: Literal["workspace-bearer"]
+    content_sha256: str
+    byte_size: int
+
+
 class SceneUnposedPointMapRow(BaseModel):
     """A member's own point map, offered because its scene's pose recovered no photograph.
 
@@ -199,6 +217,9 @@ class SceneUnposedPointMapRow(BaseModel):
     container: str | None
     state: Literal["available", "bytes_missing"]
     reference: SceneGeometryReferenceRow | None
+    #: Without a default, following this file's rule. Null when the viewer may currently see no
+    #: image of this photograph, in which case the depth is drawn in its own colours.
+    photograph: SceneUnposedPhotographRow | None
 
 
 class SceneRecoveredCalibrationRow(BaseModel):

@@ -342,6 +342,7 @@ const GEOMETRY_NOTICE: Record<GeometryIssueState, string> = {
   not_displayed: 'Reconstruction not drawn',
   unauthorized: 'Reconstruction not authorized',
   timed_out: 'Reconstruction timed out',
+  photograph_unavailable: 'Photograph not used for detail',
   error: 'Reconstruction loading error',
 };
 

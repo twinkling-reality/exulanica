@@ -118,6 +118,7 @@ import {
   opmPointInScene,
   type PlacedScenePointMap,
   validateScenePointMapPlacement,
+  scenePointMapViewpoint,
 } from './scene-point-maps.js';
 
 /**
@@ -708,6 +709,7 @@ export class AtlasBinding {
       for (const pointMap of pointMapsByIsland.get(island.islandId) ?? []) {
         const entity = new pc.Entity(`point-map:${pointMap.artifactId}`);
         applyScenePointMapPlacement(entity, pointMap);
+        if (pointMap.arrangement === 'unmeasured-fan') standOnTheGround(entity, pointMap, island, navigationWorld);
         const map = pointMap.map;
         const cloud = createPointCloud({
           device,
@@ -719,6 +721,7 @@ export class AtlasBinding {
           // One photograph's own view reads as its surface, not as dots. Posed maps overlap one
           // another from many cameras, so they stay points.
           surface: pointMap.arrangement === 'unmeasured-fan',
+          ...(pointMap.photograph === undefined ? {} : { photograph: pointMap.photograph }),
           theme,
         });
         const instance = new pc.MeshInstance(cloud.mesh, cloud.material, entity);
@@ -1830,6 +1833,34 @@ function applyPlacement(entity: pc.Entity, island: Island): void {
 }
 
 /** Convert the receipt's row-major affine transform into PlayCanvas local TRS. */
+/**
+ * Lift or lower an unmeasured photograph so its camera stands exactly where a walking visitor's
+ * eye does over the ground at that spot.
+ *
+ * A single photograph's depth is right only from its own camera, and every edge, seam and bridge
+ * of its surface is drawn on that assumption. The walking controls hold the eye at the navigation
+ * surface plus `eyeHeight` wherever the visitor stands, while the display frame put the camera at
+ * its own eye height above the photograph's own ground, and nothing makes those the same height:
+ * the authored landscape is not flat and the island has its own scale. With this, MEASURED
+ * 2026-09-11 on the first personal place, the arrival eye and all three photographs' cameras
+ * coincide to float precision. The arrangement is unmeasured, so moving it vertically claims
+ * nothing; not moving it would draw every photograph from a viewpoint nobody stood at.
+ */
+function standOnTheGround(
+  entity: pc.Entity,
+  pointMap: PlacedScenePointMap,
+  island: Island,
+  navigationWorld: NavigationWorld,
+): void {
+  const [x, y, z] = scenePointMapViewpoint(pointMap);
+  const camera = localToAtlas(island.placement, localVec3(x, y, z));
+  const ground = navigationWorld.surface.sample(camera.x, camera.z);
+  if (ground === null || !(island.placement.scale > 0)) return;
+  const lift = (ground.height + navigationWorld.eyeHeight - camera.y) / island.placement.scale;
+  const at = entity.getLocalPosition();
+  entity.setLocalPosition(at.x, at.y + lift, at.z);
+}
+
 function applyScenePointMapPlacement(entity: pc.Entity, value: PlacedScenePointMap): void {
   applySceneTransform(entity, value.sceneFromOpmRowMajor, value.localUnitsToSceneUnits);
 }

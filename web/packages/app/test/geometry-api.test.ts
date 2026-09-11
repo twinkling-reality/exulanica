@@ -393,6 +393,71 @@ describe('production reconstruction geometry', () => {
     expect(heading(first!.sceneFromOpmRowMajor)).toBeGreaterThan(heading(second!.sceneFromOpmRowMajor));
   });
 
+  it('colours unposed depth with the viewer\u2019s photograph only when its bytes match the named digest', async () => {
+    const opm = buildOpm();
+    const opmDigest = await sha256(opm);
+    const photo = new TextEncoder().encode('the viewer image of this photograph').buffer as ArrayBuffer;
+    const photoDigest = await sha256(photo);
+    const SPAN = '33333333-3333-4333-8333-333333333333';
+    const requests: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      requests.push(path);
+      return new Response(path.startsWith('/api/evidence/') ? photo : opm, { status: 200 });
+    });
+    const decoded: { width: number; height: number }[] = [];
+    const bitmap = { width: 400, height: 300, close() {} } as unknown as ImageBitmap;
+    const decode = vi.fn(async (_bytes: ArrayBuffer, source: { width: number; height: number }) => {
+      decoded.push(source);
+      return bitmap;
+    });
+    const withPhotograph = (digest: string): ReconstructionSceneRecord => {
+      const scene = unposedSceneRecord(opmDigest, opm.byteLength);
+      return { ...scene, members: scene.members.map((member) => ({ ...member, unposedPointMap: {
+        ...member.unposedPointMap!,
+        photograph: { href: `/evidence/${SPAN}/masked`, authorization: 'workspace-bearer' as const,
+          contentSha256: digest, byteSize: photo.byteLength },
+      } })) };
+    };
+
+    const good = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch }, undefined, decode)
+      .loadScenes([withPhotograph(photoDigest)], regions);
+    expect(good.issues).toEqual([]);
+    expect(good.placedPointMaps.map((placed) => placed.photograph)).toEqual([bitmap, bitmap]);
+    expect(requests.filter((path) => path.startsWith('/api/evidence/'))).toEqual([
+      `/api/evidence/${SPAN}/masked`, `/api/evidence/${SPAN}/masked`]);
+    expect(decoded[0]).toEqual({ width: 400, height: 300 });
+
+    decode.mockClear();
+    const wrong = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch }, undefined, decode)
+      .loadScenes([withPhotograph('0'.repeat(64))], regions);
+    expect(decode).not.toHaveBeenCalled();
+    expect(wrong.placedPointMaps).toHaveLength(2);
+    expect(wrong.placedPointMaps.every((placed) => placed.photograph === undefined)).toBe(true);
+    expect(wrong.issues.map((issue) => issue.state)).toEqual(['photograph_unavailable', 'photograph_unavailable']);
+  });
+
+  it('never fetches a photograph from anywhere but the viewer route', async () => {
+    const opm = buildOpm();
+    const opmDigest = await sha256(opm);
+    const requests: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      requests.push(new URL(String(input)).pathname);
+      return new Response(opm, { status: 200 });
+    });
+    const scene = unposedSceneRecord(opmDigest, opm.byteLength);
+    const original = { ...scene, members: scene.members.map((member) => ({ ...member, unposedPointMap: {
+      ...member.unposedPointMap!,
+      photograph: { href: '/evidence/33333333-3333-4333-8333-333333333333', authorization: 'workspace-bearer' as const,
+        contentSha256: opmDigest, byteSize: opm.byteLength },
+    } })) } as ReconstructionSceneRecord;
+    const session = await new GeometryClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch })
+      .loadScenes([original], regions);
+    expect(requests.some((path) => path.startsWith('/api/evidence/'))).toBe(false);
+    expect(session.placedPointMaps).toHaveLength(2);
+    expect(session.issues.map((issue) => issue.state)).toEqual(['photograph_unavailable', 'photograph_unavailable']);
+  });
+
   it('draws the rest when one photograph\u2019s depth is gone, and says which', async () => {
     const bytes = buildOpm();
     const digest = await sha256(bytes);

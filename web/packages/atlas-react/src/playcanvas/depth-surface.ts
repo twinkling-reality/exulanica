@@ -24,7 +24,7 @@
  * unreliable. MEASURED 2026-09-11 on the first personal place: only 4 of 282,643 triangles crossed
  * a depth jump, and the pale outline round every person and the pale bars across the far snowfield
  * were runs of cells with no sample at all, a few cells wide. A run of at most `MAX_BRIDGED_CELLS`
- * between two real samples is bridged by triangles between those samples, and the bridge is a
+ * between two real samples is bridged by triangles between those samples, and every bridge is a
  * seam. Nothing is invented: every bridge vertex is a measured sample, and what fills the band from
  * the camera is the interpolation between the edge of the person and the ground just behind them,
  * which is what the photograph's own soft edge was. A wider gap, such as the sky, stays empty.
@@ -96,47 +96,72 @@ export function depthSurfaceIndices(map: DepthGridInput): DepthSurface | null {
     depth[i] = d;
   }
 
+  // Each pair of neighbouring rows is zipped into one strip: walk the present samples of both rows
+  // together and join the current pair to whichever row's next sample comes first. On a complete
+  // grid this is exactly the two triangles per cell a regular triangulation makes. Across a gap it
+  // fans between whatever real samples stand on either side, however ragged the gap's edges are,
+  // which a quad-per-run bridge cannot do: MEASURED 2026-09-11, bridging only runs whose ends
+  // matched in the next row left alternate rows unbridged and drew a comb round every person.
   const surface: number[] = [];
   const seams: number[] = [];
-  const add = (a: number, b: number, c: number): void => {
-    if (a < 0 || b < 0 || c < 0) return;
+  const rows: number[][] = [];
+  for (let r = 0; r < height; r += 1) {
+    const present: number[] = [];
+    for (let c = 0; c < width; c += 1) if (cell[r * width + c]! >= 0) present.push(c);
+    rows.push(present);
+  }
+  const add = (r0: number, c0: number, r1: number, c1: number, r2: number, c2: number): void => {
+    const span = Math.max(c0, c1, c2) - Math.min(c0, c1, c2);
+    if (span > MAX_BRIDGED_CELLS + 1) return;
+    const a = cell[r0 * width + c0]!;
+    const b = cell[r1 * width + c1]!;
+    const c = cell[r2 * width + c2]!;
     const da = depth[a]!;
     const db = depth[b]!;
     const dc = depth[c]!;
-    (Math.max(da, db, dc) <= DEPTH_JUMP_RATIO * Math.min(da, db, dc) ? surface : seams).push(a, b, c);
+    const continuous = span <= 1 && Math.max(da, db, dc) <= DEPTH_JUMP_RATIO * Math.min(da, db, dc);
+    (continuous ? surface : seams).push(a, b, c);
+  };
+  // `first` and `second` are the present positions along two neighbouring lines of the grid, and
+  // `emit(a, b, c)` receives three [line, position] pairs.
+  const zip = (first: number[], second: number[], emit: (a: [0 | 1, number], b: [0 | 1, number], c: [0 | 1, number]) => void): void => {
+    if (first.length === 0 || second.length === 0) return;
+    let i = 0;
+    let j = 0;
+    while (i < first.length - 1 || j < second.length - 1) {
+      const advanceFirst = j === second.length - 1
+        || (i < first.length - 1 && first[i + 1]! <= second[j + 1]!);
+      if (advanceFirst) {
+        emit([0, first[i]!], [1, second[j]!], [0, first[i + 1]!]);
+        i += 1;
+      } else {
+        emit([0, first[i]!], [1, second[j]!], [1, second[j + 1]!]);
+        j += 1;
+      }
+    }
   };
   for (let r = 0; r + 1 < height; r += 1) {
-    for (let c = 0; c + 1 < width; c += 1) {
-      const a = cell[r * width + c]!;
-      const b = cell[r * width + c + 1]!;
-      const below = cell[(r + 1) * width + c]!;
-      const diagonal = cell[(r + 1) * width + c + 1]!;
-      add(a, below, b);
-      add(b, below, diagonal);
-    }
+    zip(rows[r]!, rows[r + 1]!, (a, b, c) => add(r + a[0], a[1], r + b[0], b[1], r + c[0], c[1]));
   }
-  // Bridges across short empty runs, along rows and then along columns. Each needs the same two
-  // endpoint samples in the neighbouring row (or column) so the bridge is a quad of real samples.
-  const at = (r: number, c: number): number => cell[r * width + c]!;
-  const nextPresent = (from: number, limit: number, present: (k: number) => boolean): number => {
-    for (let k = from; k <= limit; k += 1) if (present(k)) return k;
-    return -1;
-  };
-  for (let r = 0; r + 1 < height; r += 1) {
-    for (let c = 0; c + 2 < width; c += 1) {
-      if (at(r, c) < 0 || at(r, c + 1) >= 0) continue;
-      const end = nextPresent(c + 2, Math.min(width - 1, c + 1 + MAX_BRIDGED_CELLS), (k) => at(r, k) >= 0);
-      if (end < 0 || at(r + 1, c) < 0 || at(r + 1, end) < 0) continue;
-      seams.push(at(r, c), at(r + 1, c), at(r, end), at(r, end), at(r + 1, c), at(r + 1, end));
-    }
+  // Down the columns as well, for the gaps that run across the photograph: the top of a head, a
+  // band of far ground the producer dropped. Only the triangles that bridge such a gap are kept,
+  // because every triangle of continuous surface was already made by the rows.
+  const columns: number[][] = [];
+  for (let c = 0; c < width; c += 1) {
+    const present: number[] = [];
+    for (let r = 0; r < height; r += 1) if (cell[r * width + c]! >= 0) present.push(r);
+    columns.push(present);
   }
   for (let c = 0; c + 1 < width; c += 1) {
-    for (let r = 0; r + 2 < height; r += 1) {
-      if (at(r, c) < 0 || at(r + 1, c) >= 0) continue;
-      const end = nextPresent(r + 2, Math.min(height - 1, r + 1 + MAX_BRIDGED_CELLS), (k) => at(k, c) >= 0);
-      if (end < 0 || at(r, c + 1) < 0 || at(end, c + 1) < 0) continue;
-      seams.push(at(r, c), at(end, c), at(r, c + 1), at(r, c + 1), at(end, c), at(end, c + 1));
-    }
+    zip(columns[c]!, columns[c + 1]!, (a, b, d) => {
+      if (Math.max(a[1], b[1], d[1]) - Math.min(a[1], b[1], d[1]) <= 1) return;
+      if (Math.max(a[1], b[1], d[1]) - Math.min(a[1], b[1], d[1]) > MAX_BRIDGED_CELLS + 1) return;
+      seams.push(
+        cell[a[1] * width + c + a[0]]!,
+        cell[b[1] * width + c + b[0]]!,
+        cell[d[1] * width + c + d[0]]!,
+      );
+    });
   }
   if (surface.length + seams.length === 0) return null;
   return { surface: Uint32Array.from(surface), seams: Uint32Array.from(seams) };

@@ -662,6 +662,22 @@ def test_a_scene_that_placed_nothing_shows_each_members_own_depth_at_rung_three(
                 ).content_sha256
                 == unposed.content_sha256
             )
+            # The viewer's image of the photograph, digest-bound, for the surface's texture: with
+            # nobody to hide in these generated photographs, the original itself.
+            photo = unposed.photograph
+            blob = repository.connection.execute(
+                "select c.blob_sha256, b.byte_size, (select s.span_id from evidence_span s "
+                "where s.workspace_id=c.workspace_id and s.blob_sha256=c.blob_sha256 "
+                "and s.modality='still_image' and s.track_key='img' and s.region is null "
+                "order by s.span_id limit 1) as span_id from capture c "
+                "join blob b on b.blob_sha256=c.blob_sha256 "
+                "where c.workspace_id=%s and c.capture_id=%s",
+                (repository.workspace_id, member.capture_id),
+            ).fetchone()
+            assert photo is not None
+            assert photo.href == f"/evidence/{blob['span_id']}/masked"
+            assert photo.content_sha256 == bytes(blob["blob_sha256"]).hex()
+            assert photo.byte_size == blob["byte_size"]
 
 
 def test_the_gate_sentence_restated_beside_unposed_depth_is_the_one_the_gate_writes():
@@ -709,6 +725,7 @@ def test_unposed_depth_whose_bytes_are_gone_is_recorded_and_not_advertised(repos
     assert first.unposed_point_map is not None
     assert first.unposed_point_map.state == "bytes_missing"
     assert first.unposed_point_map.reference is None
+    assert first.unposed_point_map.photograph is None
     assert all(
         member.unposed_point_map is not None and member.unposed_point_map.state == "available"
         for member in rest

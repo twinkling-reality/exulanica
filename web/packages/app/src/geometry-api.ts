@@ -47,6 +47,7 @@ import {
   type ReconstructionSceneRecord,
   type RenderingSubstrate,
   type TransportOptions,
+  type UnposedPointMapRecord,
 } from '@exulanica/graph-client';
 
 export type GeometryIssueState =
@@ -60,6 +61,7 @@ export type GeometryIssueState =
   | 'not_displayed'
   | 'unauthorized'
   | 'timed_out'
+  | 'photograph_unavailable'
   | 'error';
 
 export interface GeometryIssue {
@@ -223,9 +225,11 @@ interface GeometryWire {
 export class GeometryClient {
   readonly #options: TransportOptions;
   readonly #observer: GeometryLoadObserver | undefined;
+  readonly #decodePhotograph: PhotographDecoder;
 
-  constructor(options: TransportOptions, observer?: GeometryLoadObserver) {
+  constructor(options: TransportOptions, observer?: GeometryLoadObserver, decodePhotograph?: PhotographDecoder) {
     this.#options = options;
+    this.#decodePhotograph = decodePhotograph ?? decodePhotographInBrowser;
     this.#observer = observer;
   }
 
@@ -604,7 +608,8 @@ export class GeometryClient {
         : [];
       const unposedLoaded: { captureId: string; artifactId: string; map: PointMap;
         measurement: GeometryLoadMeasurement | null; byteSize: number;
-        report: (state: GeometryIssueState, reason: string) => void }[] = [];
+        report: (state: GeometryIssueState, reason: string) => void;
+        photograph: ImageBitmap | null }[] = [];
       for (const member of unposedMembers) {
         const unposed = member.unposedPointMap!;
         const report = (state: GeometryIssueState, reason: string): void => {
@@ -634,8 +639,9 @@ export class GeometryClient {
         }
         const obtained = await obtain(scene.sceneId, member.captureId, unposed.artifactId, reference, report);
         if (obtained === null) continue;
+        const photograph = await this.#photograph(unposed.photograph ?? null, obtained.map, digest, report);
         unposedLoaded.push({ captureId: member.captureId, artifactId: unposed.artifactId, ...obtained,
-          byteSize: reference.byteSize, report });
+          byteSize: reference.byteSize, report, photograph });
       }
       const fan = unmeasuredFan(unposedLoaded.map(({ map }) => ({
         position: map.header.viewpoint.position,
@@ -657,6 +663,7 @@ export class GeometryClient {
           sceneFromOpmRowMajor: sceneFromOpm,
           localUnitsToSceneUnits: 1,
           arrangement: 'unmeasured-fan',
+          ...(loaded.photograph === null ? {} : { photograph: loaded.photograph }),
         };
         try {
           validateScenePointMapPlacement(placed);
@@ -772,6 +779,48 @@ export class GeometryClient {
     });
   }
 
+  /**
+   * The viewer's image of one photograph, for texturing its unplaced depth, or null with the
+   * reason reported. Fetched from the viewer route the graph named, refused unless its bytes hash
+   * to the digest the graph named, and decoded upright at the photograph's own proportions. A
+   * failure costs detail and nothing else: the depth is still drawn, in its own colours.
+   */
+  async #photograph(
+    reference: NonNullable<UnposedPointMapRecord['photograph']> | null,
+    map: PointMap,
+    digest: SubtleCrypto | undefined,
+    report: (state: GeometryIssueState, reason: string) => void,
+  ): Promise<ImageBitmap | null> {
+    if (reference === null) return null;
+    if (reference.authorization !== 'workspace-bearer' || !PHOTOGRAPH_PATH.test(reference.href)) {
+      report('photograph_unavailable', 'The photograph reference failed its provenance check; its depth keeps its own colours.');
+      return null;
+    }
+    if (digest === undefined) {
+      report('photograph_unavailable', 'This page cannot verify the photograph, so its depth keeps its own colours.');
+      return null;
+    }
+    try {
+      const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(reference.href);
+      const bytes = await response.arrayBuffer();
+      const failure = await verify(digest, bytes, reference.contentSha256, reference.byteSize);
+      if (failure !== null) {
+        report('photograph_unavailable', `${failure} Its depth keeps its own colours.`);
+        return null;
+      }
+      const decoded = await this.#decodePhotograph(bytes, map.header.sourceImage);
+      if (decoded === null) {
+        report('photograph_unavailable', 'The photograph did not decode at its recorded proportions; its depth keeps its own colours.');
+      }
+      return decoded;
+    } catch (error) {
+      report('photograph_unavailable', error instanceof ApiError
+        ? `${geometryFailure(error)} Its depth keeps its own colours.`
+        : 'The photograph could not be loaded; its depth keeps its own colours.');
+      return null;
+    }
+  }
+
   /** A transport for one request, carrying its own deadline. See `load`. */
   #transport(timeoutMs: number): Transport {
     const deadline = AbortSignal.timeout(timeoutMs);
@@ -815,6 +864,44 @@ function hex(buffer: ArrayBuffer): string {
 }
 
 /** The same shape `source-media-api.ts` requires of an evidence path, for the same reason. */
+/** Decode a verified photograph upright, or null when it is not at the recorded proportions. */
+export type PhotographDecoder = (
+  bytes: ArrayBuffer,
+  source: { readonly width: number; readonly height: number },
+) => Promise<ImageBitmap | null>;
+
+/** The viewer route and nothing else: a span id and the masked suffix. */
+const PHOTOGRAPH_PATH = /^\/evidence\/[0-9a-f-]{36}\/masked$/u;
+/** Longest side a photograph is uploaded at. Detail beyond this is not visible at walking distance. */
+export const PHOTOGRAPH_MAX_SIDE = 4096;
+
+/**
+ * The browser's own decoder, EXIF orientation applied, scaled to at most `PHOTOGRAPH_MAX_SIDE`.
+ * The result must have the photograph's recorded proportions, which is what proves it is upright
+ * the same way the depth grid is: a sideways decode of a portrait photograph would be refused here
+ * rather than drawn across the surface rotated.
+ */
+async function decodePhotographInBrowser(
+  bytes: ArrayBuffer,
+  source: { readonly width: number; readonly height: number },
+): Promise<ImageBitmap | null> {
+  if (typeof createImageBitmap !== 'function') return null;
+  const full = await createImageBitmap(new Blob([bytes]), { imageOrientation: 'from-image' });
+  if (Math.abs(full.width * source.height - full.height * source.width) > Math.max(full.width, full.height)) {
+    full.close();
+    return null;
+  }
+  const scale = Math.min(1, PHOTOGRAPH_MAX_SIDE / Math.max(full.width, full.height));
+  if (scale === 1) return full;
+  const scaled = await createImageBitmap(full, {
+    resizeWidth: Math.round(full.width * scale),
+    resizeHeight: Math.round(full.height * scale),
+    resizeQuality: 'high',
+  });
+  full.close();
+  return scaled;
+}
+
 function safeGeometryPath(value: string): boolean {
   return value.startsWith('/geometry/')
     && !value.includes('://')

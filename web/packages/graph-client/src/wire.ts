@@ -137,6 +137,13 @@ export interface ReconstructionScenePayload {
         readonly content_sha256: string;
         readonly byte_size: number;
       } | null;
+      /** The image the viewer route serves of this photograph now, for texturing its depth. */
+      readonly photograph?: {
+        readonly href: string;
+        readonly authorization: 'workspace-bearer';
+        readonly content_sha256: string;
+        readonly byte_size: number;
+      } | null;
     } | null;
     readonly placement: {
       readonly artifact_id: string;
