@@ -137,8 +137,9 @@ measured on 2026-09-11 against a frozen copy of the 210-photograph volcanic scen
 1,015,016,928 bytes of JSON, which V8 cannot hold as one string, so the panel failed with
 "Unexpected end of JSON input". A resolved click is kilobytes (11,277 bytes for a point eight
 photographs observed, 1,784 for a miss) and is bounded by the scene's photograph count rather than
-its point count. The server builds an index of the pose receipt on a scene's first read, 6.3 s for
-the volcanic scene, and answers in 0.2 to 0.3 s after that. `exulanica/graph/observations.py`
+its point count; the heaviest point a click can select on that scene, 78 retained photographs, is
+92,547 bytes. The server builds an index of the pose receipt on a scene's first read, 6.3 to 6.5 s
+for the volcanic scene, and answers in 0.2 to 0.3 s after that. `exulanica/graph/observations.py`
 records the rest, including what that index does not hold. None of these reads carries a digest of
 its own, unlike the World Read bundle: they are recorded provenance served over an authenticated
 route, not a receipt a recipient can verify offline.

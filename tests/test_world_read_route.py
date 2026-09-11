@@ -353,7 +353,8 @@ def test_a_bounded_observation_request_says_it_was_bounded_and_what_it_left(
 #: What one resolved click may weigh on the wire, as a header plus at most one observation per
 #: scene photograph, each carrying that photograph's consent record. The answer holds one point,
 #: so the point count is absent from the bound on purpose. MEASURED 2026-09-11 on the frozen
-#: volcanic copy: a miss is 1,784 bytes and a hit adds about 1,190 per observation it lists.
+#: volcanic copy: a miss is 1,784 bytes and a hit adds 1,160 to 1,190 per observation it lists
+#: (11,277 bytes for eight, 92,547 for seventy-eight).
 _RESOLVE_HEADER_BUDGET = 2_560
 _RESOLVE_PER_PHOTOGRAPH_BUDGET = 1_536
 #: Counts and three sentences. MEASURED 2026-09-11 on the same copy: 781 bytes.

@@ -484,9 +484,9 @@ def observations_and_cameras(
 
     For a reader that needs both together, which is a reader that projects the retained points
     through a recovered camera. Each of the two parses and validates the whole receipt on its own.
-    MEASURED 2026-09-11 on the volcanic scene's 107,742,795 byte pose receipt: 5.4 s and 6.0 s, so
-    calling them in turn spends both. Each half equals what its own function returns, including
-    ``({}, {})`` for an unaccepted receipt.
+    MEASURED 2026-09-11, twice, on the volcanic scene's 107,742,795 byte pose receipt: 5.4 and
+    5.0 s for the first, 6.0 and 5.5 s for the second, so calling them in turn spends both. Each
+    half equals what its own function returns, including ``({}, {})`` for an unaccepted receipt.
     """
     receipt = _read_pose_receipt(pose_receipt)
     if json.loads(pose_receipt)["quality"].get("accepted") is not True:

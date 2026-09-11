@@ -42,7 +42,7 @@ const SUMMARY_PROFILE = 'exulanica.scene-observation-summary/v1';
 const RESOLVE_PROFILE = 'exulanica.scene-observation-resolve/v1';
 /**
  * The first read of a large scene builds the server's index of it. MEASURED 2026-09-11 on the
- * volcanic scene: 6.3 s cold, then 0.2 to 0.3 s. Either read can be the first.
+ * volcanic scene: 6.3 to 6.5 s cold, then 0.2 to 0.3 s. Either read can be the first.
  */
 const OBSERVATIONS_TIMEOUT_MS = 60_000;
 

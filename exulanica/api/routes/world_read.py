@@ -328,7 +328,9 @@ def scene_observation_resolve(
 
     The answer holds at most one point and that point's retained observations, so it is bounded
     by the scene's member count and not by its point count. MEASURED 2026-09-11 on the volcanic
-    scene: a hit is 5,474 bytes where the whole graph the inspector used to read is 1,015,016,928.
+    scene: the inspector's own centre-of-view click is 11,277 bytes, and the heaviest point any
+    click can select there, 78 retained photographs, is 92,547. The whole graph the inspector
+    used to read is 1,015,016,928.
     A miss is a 200 whose ``state`` says so, because nothing recorded near a click is an answer.
     ``exulanica/graph/observations.py`` holds the rest of the argument.
     """
