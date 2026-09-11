@@ -746,7 +746,7 @@ export interface SegmentsDependencies {
   readonly showWorld: () => void;
   readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
   readonly travelUsesReducedMotion: () => boolean;
-  /** Injectable for tests. Production reads the route, the preview the provisional fixture. */
+  /** Injectable for tests. Production reads the route, the preview the published fixture. */
   readonly load?: (sceneId: string) => Promise<SceneSegments>;
 }
 
