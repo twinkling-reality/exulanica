@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
+from exulanica.world.composed import composed_candidate
 from exulanica.world.errors import (
     InvalidStructuralData,
     InvalidStructuralPreviewState,
@@ -122,6 +124,7 @@ class WorldStructureRepository:
         base_graph_sha256: str | None,
         base_reconstruction_sha256: str | None,
         committed_by: uuid.UUID,
+        base_composed_topology_digest: str | None = None,
     ) -> SpatialSnapshot:
         """Atomically revalidate, append, and CAS every protected current base."""
         failure: Exception | None = None
@@ -159,6 +162,27 @@ class WorldStructureRepository:
                 self._validate_database_dependencies(candidate)
                 self._validate_stable_owners(candidate)
                 region_changes = self._validate_region_migrations(previous, candidate)
+                preserved = None
+                if base_composed_topology_digest is not None:
+                    preserved = WorldStyleRepository(
+                        self.connection, self.workspace_id, world_id=self.world_id
+                    ).current_topology_contract()
+                    if (
+                        state is not None
+                        or preserved.topology_digest != base_composed_topology_digest
+                    ):
+                        raise StaleStructuralBase(
+                            "bootstrap no longer names the initial composed base"
+                        )
+                    expected = composed_candidate(
+                        preserved, candidate.graph_sha256, candidate.reconstruction_sha256
+                    )
+                    if canonical_candidate_document(candidate) != canonical_candidate_document(
+                        expected
+                    ):
+                        raise InvalidStructuralData(
+                            "bootstrap must preserve the exact composed sources"
+                        )
                 result = self._commit_snapshot(
                     preview_id,
                     candidate,
@@ -166,6 +190,7 @@ class WorldStructureRepository:
                     state,
                     region_changes,
                     committed_by,
+                    preserved,
                 )
         if failure is not None:
             raise failure
@@ -241,6 +266,7 @@ class WorldStructureRepository:
         state: Mapping[str, Any] | None,
         region_changes: Mapping[str, tuple[str, str]],
         committed_by: uuid.UUID,
+        preserved_topology: TopologyContract | None = None,
     ) -> SpatialSnapshot:
         revision = (
             0
@@ -249,12 +275,17 @@ class WorldStructureRepository:
         )
         parent_id = None if state is None else state["current_snapshot_id"]
         snapshot_id = uuid.uuid4()
-        topology_contract = self._topology_contract(candidate, digests)
-        # The style topology pointer is protected by the same outer transaction.  A failure
-        # below rolls it back as well, so appearance can never observe half a structural apply.
-        WorldStyleRepository(
-            self.connection, self.workspace_id, world_id=self.world_id
-        ).register_topology(topology_contract)
+        topology_contract = (
+            replace(preserved_topology, topology_digest=digests.topology_sha256)
+            if preserved_topology is not None
+            else self._topology_contract(candidate, digests)
+        )
+        styles = WorldStyleRepository(self.connection, self.workspace_id, world_id=self.world_id)
+        if preserved_topology is None:
+            styles.register_topology(topology_contract)
+        else:
+            # Satisfy the snapshot FK without moving the composed source pointer or style.
+            styles.register_topology_history(topology_contract)
         projection = self._package_projection(snapshot_id, revision, parent_id, candidate, digests)
         self.connection.execute(
             "insert into world_structure_snapshot "

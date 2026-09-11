@@ -41,6 +41,7 @@ from exulanica.world.models import (
     StyleScope,
     StyleVersion,
     TopologyContract,
+    TopologySourceSlot,
     WorldSourceMedia,
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
@@ -75,51 +76,8 @@ class WorldStyleRepository:
         world-composition workflow calls after its reachability and evidence checks.  Reusing a
         digest for different regions or source bindings is refused rather than overwritten.
         """
-        self._validate_topology_contract(contract)
         with self.connection.transaction():
-            inserted = self.connection.execute(
-                "insert into world_topology_contract "
-                "(workspace_id,world_id,topology_digest,compatibility_key) values (%s,%s,%s,%s) "
-                "on conflict do nothing returning topology_digest",
-                (
-                    self.workspace_id,
-                    self.world_id,
-                    contract.topology_digest,
-                    contract.compatibility_key,
-                ),
-            ).fetchone()
-            if inserted is not None:
-                for region_id in sorted(contract.region_ids):
-                    self.connection.execute(
-                        "insert into world_topology_region "
-                        "(workspace_id, world_id, topology_digest, region_id) values (%s,%s,%s,%s)",
-                        (self.workspace_id, self.world_id, contract.topology_digest, region_id),
-                    )
-                for source in sorted(contract.source_slots, key=lambda value: str(value.source_id)):
-                    try:
-                        self.connection.execute(
-                            "insert into world_topology_source "
-                            "(source_id,workspace_id,world_id,topology_digest,region_id,slot_key,"
-                            "evidence_span_id,missing_reason) values (%s,%s,%s,%s,%s,%s,%s,%s)",
-                            (
-                                source.source_id,
-                                self.workspace_id,
-                                self.world_id,
-                                contract.topology_digest,
-                                source.region_id,
-                                source.slot_key,
-                                source.evidence_span_id,
-                                source.missing_reason,
-                            ),
-                        )
-                    except psycopg.errors.ForeignKeyViolation as exc:
-                        raise ProtectedTopologyConflict(
-                            f"source slot {source.slot_key} does not name authorised evidence "
-                            "from this topology workspace"
-                        ) from exc
-            else:
-                self._assert_existing_topology_matches(contract)
-
+            self.register_topology_history(contract)
             state = self._state(for_update=True)
             if state is None:
                 default = self.registry.default_reference
@@ -172,6 +130,63 @@ class WorldStyleRepository:
                 contract.topology_digest,
             )
 
+    def register_topology_history(self, contract: TopologyContract) -> None:
+        """Register immutable history without activating it or writing appearance state.
+
+        Structural bootstrap uses this for the snapshot's digest-bound foreign key while
+        retaining the exact composed contract as current. Ordinary composition calls
+        register_topology, which shares this writer before activating the result.
+        """
+        self._validate_topology_contract(contract)
+        with self.connection.transaction():
+            # Serialize composer handoff with structural bootstrap and deletion invalidation.
+            self.connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s::text,%s))",
+                (self.workspace_id, 880_024),
+            )
+            inserted = self.connection.execute(
+                "insert into world_topology_contract "
+                "(workspace_id,world_id,topology_digest,compatibility_key) values (%s,%s,%s,%s) "
+                "on conflict do nothing returning topology_digest",
+                (
+                    self.workspace_id,
+                    self.world_id,
+                    contract.topology_digest,
+                    contract.compatibility_key,
+                ),
+            ).fetchone()
+            if inserted is not None:
+                for region_id in sorted(contract.region_ids):
+                    self.connection.execute(
+                        "insert into world_topology_region "
+                        "(workspace_id, world_id, topology_digest, region_id) values (%s,%s,%s,%s)",
+                        (self.workspace_id, self.world_id, contract.topology_digest, region_id),
+                    )
+                for source in sorted(contract.source_slots, key=lambda value: str(value.source_id)):
+                    try:
+                        self.connection.execute(
+                            "insert into world_topology_source "
+                            "(source_id,workspace_id,world_id,topology_digest,region_id,slot_key,"
+                            "evidence_span_id,missing_reason) values (%s,%s,%s,%s,%s,%s,%s,%s)",
+                            (
+                                source.source_id,
+                                self.workspace_id,
+                                self.world_id,
+                                contract.topology_digest,
+                                source.region_id,
+                                source.slot_key,
+                                source.evidence_span_id,
+                                source.missing_reason,
+                            ),
+                        )
+                    except psycopg.errors.ForeignKeyViolation as exc:
+                        raise ProtectedTopologyConflict(
+                            f"source slot {source.slot_key} does not name authorised evidence "
+                            "from this topology workspace"
+                        ) from exc
+            else:
+                self._assert_existing_topology_matches(contract)
+
     # -- reads ---------------------------------------------------------------------------
 
     def current(self) -> StyleVersion:
@@ -183,6 +198,34 @@ class WorldStyleRepository:
 
     def current_topology_digest(self) -> str:
         return str(self._require_state()["current_topology_digest"])
+
+    def current_topology_contract(self) -> TopologyContract:
+        """Read only the current contract, including exact source identities and bindings."""
+        digest = self.current_topology_digest()
+        parameters = (self.workspace_id, self.world_id, digest)
+        regions = self.connection.execute(
+            "select region_id from world_topology_region where workspace_id=%s "
+            "and world_id=%s and topology_digest=%s order by region_id",
+            parameters,
+        ).fetchall()
+        sources = self.connection.execute(
+            "select source_id,slot_key,region_id,evidence_span_id,missing_reason "
+            "from world_topology_source where workspace_id=%s and world_id=%s "
+            "and topology_digest=%s order by source_id",
+            parameters,
+        ).fetchall()
+        contract = self.connection.execute(
+            "select compatibility_key from world_topology_contract where workspace_id=%s "
+            "and world_id=%s and topology_digest=%s",
+            parameters,
+        ).fetchone()
+        return TopologyContract(
+            digest,
+            tuple(row["region_id"] for row in regions),
+            tuple(TopologySourceSlot(**row) for row in sources),
+            compatibility_key=contract["compatibility_key"],
+            world_id=self.world_id,
+        )
 
     def versions(self) -> tuple[StyleVersion, ...]:
         rows = self.connection.execute(
