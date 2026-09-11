@@ -74,6 +74,7 @@ import {
   RepresentationPressureController,
   INITIAL_RENDER_ORIGIN,
   renderOriginForNeighborhood,
+  frameFraction,
 } from '@exulanica/atlas-core';
 import {
   DAWN_THEME,
@@ -108,7 +109,7 @@ import { createRegionMass, type RegionMass } from './region-mass.js';
 import { createRegionRelief, type RegionRelief } from './region-relief.js';
 import type { PointMap } from './opm.js';
 import type { PointCloud } from './point-cloud.js';
-import { createPointCloud } from './point-cloud.js';
+import { SINGLE_VIEW_EDGE_MARGIN, SINGLE_VIEW_STANDPOINT_START, createPointCloud } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
@@ -164,6 +165,13 @@ export interface IslandVisual {
 
 /** One island's proof-lens colour, resolved by the caller: red, green, blue, tint strength. */
 export type ProofLensColor = readonly [number, number, number, number];
+
+/** The photograph the visitor is looking into, when it is drawn in an unmeasured arrangement. */
+export interface CentredPhotograph {
+  readonly sceneId: string;
+  readonly captureId: string;
+  readonly islandId: IslandId;
+}
 
 /** Reused by the frame loop so handing a camera to the shader allocates nothing. */
 const SINGLE_VIEW_SCRATCH = new pc.Vec3();
@@ -325,6 +333,10 @@ export class AtlasBinding {
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
+  private centred: CentredPhotograph | null = null;
+  private readonly centredInverse = new pc.Mat4();
+  private readonly centredCapture = new pc.Vec3();
+  private readonly centredDirection = new pc.Vec3();
   private readonly normalizer: number;
   private readonly pose: { position: pc.Vec3; rotation: pc.Quat } = {
     position: new pc.Vec3(),
@@ -1324,6 +1336,42 @@ export class AtlasBinding {
   }
 
   /** Engage exactly the one settled reticle target. The application decides which panel opens. */
+  /**
+   * The photograph whose own view the reticle is inside, for a map drawn in an unmeasured
+   * arrangement, or null. Only from within the distance at which that photograph is fully drawn:
+   * past it the photograph has begun to dissolve, and offering to open something the visitor can
+   * no longer see would be a prompt about nothing.
+   */
+  get centredPhotograph(): CentredPhotograph | null {
+    return this.centred;
+  }
+
+  private findCentredPhotograph(): CentredPhotograph | null {
+    const eye = this.camera.getPosition();
+    const forward = this.camera.forward;
+    let best: CentredPhotograph | null = null;
+    let bestScore = 1 - SINGLE_VIEW_EDGE_MARGIN;
+    for (const visual of this.islands) {
+      const local = visual.singleViewLocal;
+      const captureId = visual.pointMap.captureId;
+      if (local === null || captureId === undefined || !visual.entity.enabled) continue;
+      const world = visual.entity.getWorldTransform();
+      world.transformPoint(local, this.centredCapture);
+      if (this.centredCapture.distance(eye) > SINGLE_VIEW_STANDPOINT_START) continue;
+      this.centredInverse.copy(world).invert();
+      this.centredInverse.transformVector(forward, this.centredDirection).normalize();
+      const score = frameFraction(
+        [this.centredDirection.x, this.centredDirection.y, this.centredDirection.z],
+        visual.pointMap.map.header.viewpoint,
+      );
+      if (score !== null && score < bestScore) {
+        bestScore = score;
+        best = { sceneId: visual.pointMap.sceneId, captureId, islandId: visual.island.islandId };
+      }
+    }
+    return best;
+  }
+
   engageFocusedAnchor(): number | null {
     if (this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null) return null;
     const index = this.focusState.focusedIndex;
@@ -1554,9 +1602,11 @@ export class AtlasBinding {
     this.sourceFirst.update(nowMs, cameraAtlas, focusedIslandId);
     this.field.update(nowMs);
 
+    this.centred = this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
     const cameraComponent = this.camera.camera;
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
       this.overlay.update({
+        photographPrompt: this.centred !== null,
         table: this.table,
         emphasis: this.emphasis,
         camera: cameraComponent,

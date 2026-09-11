@@ -96,12 +96,19 @@ export interface OverlayFrame {
   /** Epoch milliseconds for the anchor whose presence marker is being stamped. */
   readonly capturedAt: number;
   readonly renderOrigin: readonly [number, number, number];
+  /**
+   * The visitor is looking into one photograph drawn in an unmeasured arrangement, from near
+   * where it was taken, and E would open it. Yields to an anchor's own prompt, which is the more
+   * specific thing under the reticle.
+   */
+  readonly photographPrompt?: boolean;
 }
 
 export class AnchorOverlay {
   readonly root: HTMLDivElement;
   private readonly interactionSigil: Node;
   private readonly focusLabel: Node;
+  private readonly photographLabel: Node;
   private readonly callouts: Node[];
   private readonly chevrons: Node[];
   private readonly markers: Node[];
@@ -145,6 +152,18 @@ export class AnchorOverlay {
         className: 'ov-focus-verb',
         textContent: 'Interact',
       }),
+    );
+    // The same key-and-verb prompt as an anchor's, so pressing E reads as one gesture wherever it
+    // is offered. Never shown at the same time as the anchor prompt, so the one-focus-label cap
+    // still holds.
+    this.photographLabel = makeNode('ov-focus', this.root);
+    this.photographLabel.root.dataset['stage'] = 'label';
+    this.photographLabel.root.setAttribute('role', 'status');
+    this.photographLabel.root.setAttribute('aria-live', 'polite');
+    this.photographLabel.root.setAttribute('aria-label', 'Press E to open this photograph');
+    this.photographLabel.root.replaceChildren(
+      Object.assign(document.createElement('span'), { className: 'ov-focus-key', textContent: 'E' }),
+      Object.assign(document.createElement('span'), { className: 'ov-focus-verb', textContent: 'Open photograph' }),
     );
     this.callouts = Array.from({ length: MAX_CAPTIONS }, () => makeNode('ov-callout', this.root));
     this.chevrons = Array.from({ length: MAX_EDGE_CHEVRONS }, () =>
@@ -292,6 +311,13 @@ export class AnchorOverlay {
     }
 
     if (focusUsed === 0) hide(this.focusLabel);
+    // Lower right of the reticle, where an anchor's prompt sits, so the centre stays clear.
+    if (focusUsed === 0 && frame.traversalActive && frame.photographPrompt === true) {
+      show(this.photographLabel, w / 2 + 18, h / 2 + 14, 1);
+      focusUsed = 1;
+    } else {
+      hide(this.photographLabel);
+    }
     if (sigilUsed === 0) hide(this.interactionSigil);
     for (let i = calloutUsed; i < this.callouts.length; i += 1) hide(this.callouts[i]!);
     for (let i = chevronUsed; i < this.chevrons.length; i += 1) hide(this.chevrons[i]!);

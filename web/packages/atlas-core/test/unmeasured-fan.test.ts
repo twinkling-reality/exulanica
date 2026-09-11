@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  UNMEASURED_FAN_GAP_DEG, UNMEASURED_FAN_MAX_SWEEP_DEG, horizontalFovDeg, unmeasuredFan,
+  UNMEASURED_FAN_GAP_DEG, UNMEASURED_FAN_MAX_SWEEP_DEG, frameFraction, horizontalFovDeg, unmeasuredFan,
   type UnmeasuredFanInput,
 } from '../src/unmeasured-fan.js';
 
@@ -79,5 +79,26 @@ describe('unmeasuredFan', () => {
     expect(horizontalFovDeg({ position: [0, 0, 0], fovYDeg: Number.NaN, aspect: 1 })).toBe(60);
     expect(horizontalFovDeg({ position: [0, 0, 0], fovYDeg: 200, aspect: 1 })).toBe(60);
     expect(horizontalFovDeg({ position: [0, 0, 0], fovYDeg: 90, aspect: 1 })).toBeCloseTo(90, 9);
+  });
+});
+
+describe('frameFraction', () => {
+  const frame = { fovYDeg: 90, aspect: 0.5 };
+
+  it('is 0 straight down the camera axis and 1 on the frame edge', () => {
+    expect(frameFraction([0, 0, -1], frame)).toBe(0);
+    expect(frameFraction([0, 1, -1], frame)).toBeCloseTo(1, 12);
+    expect(frameFraction([0.5, 0, -1], frame)).toBeCloseTo(1, 12);
+  });
+
+  it('takes the tighter of the two axes, because the frame is a rectangle', () => {
+    expect(frameFraction([0.25, 0.9, -1], frame)).toBeCloseTo(0.9, 12);
+    expect(frameFraction([0.45, 0.1, -1], frame)).toBeCloseTo(0.9, 12);
+  });
+
+  it('answers nothing for a direction behind the camera or a frame no camera has', () => {
+    expect(frameFraction([0, 0, 1], frame)).toBeNull();
+    expect(frameFraction([0, 0, -1], { fovYDeg: 0, aspect: 1 })).toBeNull();
+    expect(frameFraction([0, 0, -1], { fovYDeg: 60, aspect: 0 })).toBeNull();
   });
 });

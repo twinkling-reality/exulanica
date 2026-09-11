@@ -83,3 +83,19 @@ export function unmeasuredFan(inputs: readonly UnmeasuredFanInput[]): (number[] 
     ];
   });
 }
+
+/**
+ * How far inside one photograph's frame a direction points, in its camera's own axes: 0 at the
+ * centre, 1 at the edge, above 1 outside it. Null for a direction behind the camera or a frame
+ * the header cannot describe. The larger of the horizontal and vertical fractions, because the
+ * frame is a rectangle.
+ */
+export function frameFraction(direction: FanVec3, input: Pick<UnmeasuredFanInput, 'fovYDeg' | 'aspect'>): number | null {
+  const depth = -direction[2];
+  const tanY = Math.tan((input.fovYDeg * Math.PI) / 360);
+  if (!(depth > 0) || !(tanY > 0) || !(input.aspect > 0) || !Number.isFinite(tanY)) return null;
+  return Math.max(
+    Math.abs(direction[0] / (depth * tanY * input.aspect)),
+    Math.abs(direction[1] / (depth * tanY)),
+  );
+}
