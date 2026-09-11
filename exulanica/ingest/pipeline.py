@@ -9,6 +9,8 @@ Four stages, each one idempotent by construction and each one a module in ``stag
     vision     one structured call, producing model inferences that each carry an evidence
                address and are filed as inference and never as anything else
     depth      one optional point-map prediction, producing a derived reconstruction artifact
+    segmentation  optional local object masks, each a frame_region span and an inference, read
+               from the masked derivative whenever anybody in the photograph is hidden
 
 Scene grouping runs once over the corpus after these per-capture stages, from the worker or
 directory command, and produces proposals rather than pretending to be a fifth capture stage.
@@ -47,7 +49,7 @@ from typing import Final
 from PIL import Image
 
 from exulanica.canonical import sha256_digest
-from exulanica.consent.regions import PersonDetector
+from exulanica.consent.regions import PersonDetector, Silhouette
 from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence import EvidenceAddress
 from exulanica.evidence.blob import BlobId
@@ -72,6 +74,7 @@ from exulanica.ingest.stages import intake as intake_stage
 from exulanica.ingest.stages import masked_source as masked_source_stage
 from exulanica.ingest.stages import person_regions as person_regions_stage
 from exulanica.ingest.stages import rendition as rendition_stage
+from exulanica.ingest.stages import segmentation as segmentation_stage
 from exulanica.ingest.stages import vision as vision_stage
 from exulanica.ingest.stages.writes import StageResult
 from exulanica.ingest.vision import VisionModel
@@ -124,11 +127,15 @@ class PhotoIngestPipeline:
         vision: VisionModel | None = None,
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
+        segmenter: segmentation_stage.ObjectSegmenter | None = None,
     ) -> None:
         self._repository = repository
         self._store = store
         self._vision = vision
         self._depth = depth
+        # Not a binding either, for the reason the detector below is not: `segmentation` declares
+        # no model_role, and its checkpoints enter each photograph's input digest instead.
+        self._segmenter = segmenter
         # Not a binding. `person_regions` declares no model_role, so `_require_binding`
         # refuses a run-time binding for it; the detector it was given is pinned in the
         # stage parameters instead and the stage refuses one that does not match.
@@ -419,7 +426,9 @@ class PhotoIngestPipeline:
                     "to derive from. Ingest the photograph rather than resuming it."
                 )
             upright, facts = _decode(self._store.get(blob_id))
-            if privacy_screening_id is None and self._depth is not None:
+            if privacy_screening_id is None and (
+                self._depth is not None or self._segmenter is not None
+            ):
                 screening = self._repository.latest_privacy_screening(capture_id)
                 privacy_screening_id = screening.screening_id if screening else None
             self._derivatives(
@@ -551,7 +560,9 @@ class PhotoIngestPipeline:
             ledger,
             outcome,
         )
-        masked, masked_image, consent_digests = self._masked_source(prepared, ledger, outcome)
+        masked, masked_image, consent_digests, people = self._masked_source(
+            prepared, ledger, outcome
+        )
         # After vision, and from the UPRIGHT source rather than from the rendition. The rendition
         # is 768px and exists so a model can look at something small; depth is the geometry the
         # photograph will be walked through and is worth the full frame the size parameter allows.
@@ -571,20 +582,42 @@ class PhotoIngestPipeline:
             masked_image=masked_image,
             consent_digests=consent_digests,
         )
+        # Last, because it reads what the three before it settled: the boxes vision located, the
+        # people the region stage outlined, and the derivative the masking stage filled. The same
+        # masked pixels depth read, so a hidden person is neutral fill to the segmenter too, and
+        # every live person outline, so no object mask can become an outline of somebody.
+        segmentation_stage.run(
+            self,
+            self._segmenter,
+            prepared.blob_id,
+            prepared.upright,
+            prepared.capture_id,
+            prepared.facts,
+            prepared.intake,
+            vision,
+            ledger,
+            outcome,
+            privacy_screening_id,
+            masked=masked,
+            masked_image=masked_image,
+            consent_digests=consent_digests,
+            person_outlines=people,
+        )
 
     def _masked_source(
         self, prepared: _Prepared, ledger: Ledger, outcome: IngestOutcome
-    ) -> tuple[StageResult | None, Image.Image | None, tuple[bytes, ...]]:
+    ) -> tuple[StageResult | None, Image.Image | None, tuple[bytes, ...], tuple[Silhouette, ...]]:
         """Produce the masked derivative for one photograph, or nothing when nobody is hidden.
 
         Returns the digests as well as the image, because they are what puts the consent state
         into the depth stage's key. A photograph where everybody has consented produces no
         derivative and no digests, so it keys and reconstructs exactly as it did before any of
-        this existed.
+        this existed. The live outlines come back too, hidden or not, for the segmentation stage.
         """
         state = region_state_for_capture(self._repository, prepared.capture_id)
         if not state.outlines:
-            return None, None, ()
+            return None, None, (), ()
+        people = tuple(state.outlines[key] for key in sorted(state.outlines))
         digests = (
             region_set_digest(
                 capture_id=prepared.capture_id,
@@ -610,14 +643,14 @@ class PhotoIngestPipeline:
             outcome,
         )
         if masked is None:
-            return None, None, digests
+            return None, None, digests, people
         hidden = masked_source_stage.hidden_outlines(state.outlines, state.resolved)
         image = mask_image(
             prepared.upright,
             hidden,
             dilation_millionths=int(STAGES["masked_source"].params["dilation_millionths"]),
         )
-        return masked, image, digests
+        return masked, image, digests, people
 
 
 def _decode(data: bytes) -> tuple[Image.Image, ExifFacts]:
