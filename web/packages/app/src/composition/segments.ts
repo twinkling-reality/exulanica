@@ -44,7 +44,7 @@
  * object wears the same colour in every region, on every visit and in every build.
  */
 
-import { anchorId as toAnchorId, type Island, type IslandId } from '@exulanica/atlas-core';
+import type { Island, IslandId } from '@exulanica/atlas-core';
 import {
   calibratedCameraFrustum,
   type AtlasBinding,
@@ -972,6 +972,15 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       : undefined;
   }
 
+  /**
+   * Travel to the segment's region, arriving where that region's first photograph was taken, with
+   * the segment emphasised.
+   *
+   * Not to its detection's anchor, which the browser check tried first: anchors are seeded on a
+   * presentation disc and say nothing about where the geometry is, so arriving at one left the
+   * visitor facing empty ground beside the thing they asked for. The region's arrival is the one
+   * recorded viewpoint direct travel can reach, and it looks at the reconstruction.
+   */
   function travel(segmentId: string): void {
     const binding = state.atlas?.binding;
     const segment = segmentById(segmentId);
@@ -980,12 +989,7 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       return;
     }
     const reduced = deps.travelUsesReducedMotion();
-    const anchor = segment.occurrenceIds
-      .map((occurrenceId) => deps.snapshot.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId))
-      .find((occurrence) => occurrence !== undefined && binding.table.indexOf.has(toAnchorId(occurrence.anchorId)));
-    const resolution = anchor === undefined
-      ? binding.navigateToIsland(region.islandId, reduced)
-      : binding.navigateToAnchor(toAnchorId(anchor.anchorId), reduced);
+    const resolution = binding.navigateToIsland(region.islandId, reduced);
     if (!resolution.ok) {
       deps.showTravelStatus({
         'unknown-target': 'That segment is not in this Atlas.',
@@ -995,8 +999,14 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       }[resolution.reason], 'failure');
       return;
     }
+    kept.selectedSegmentId = segment.segmentId;
+    picked = null;
+    recolour();
+    render();
     deps.showWorld();
-    deps.showTravelStatus(reduced ? 'Located the segment.' : 'Moving to the segment…');
+    deps.showTravelStatus(reduced
+      ? 'Arrived where this region was photographed, with the segment highlighted.'
+      : 'Moving to where this region was photographed…');
   }
 
   function name(segmentId: string, displayName: string): void {

@@ -97,7 +97,7 @@ export function buildSceneSegments(handlers: SceneSegmentsHandlers): SceneSegmen
       type: 'button',
       class: 'scene-segment-travel',
       text: 'Travel',
-      'aria-label': `Travel to ${model.heading}`,
+      'aria-label': `Travel to the region of ${model.heading}`,
     });
     travel.addEventListener('click', () => handlers.onTravel(model.segmentId));
     item.append(el('div', { class: 'scene-segment-row' }, [select, travel]));
