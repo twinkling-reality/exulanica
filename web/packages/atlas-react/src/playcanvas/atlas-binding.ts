@@ -310,6 +310,8 @@ export class AtlasBinding {
   readonly customization: WorldCustomizationController;
   /** Authored objects. Empty until a surface places one; see `scene-objects.ts`. */
   readonly objects: SceneObjectRuntime;
+  /** Scene segments, one region at a time. Installs nothing until a surface applies one. */
+  readonly segmentOverlay: SegmentOverlayRuntime;
   readonly neighborhoodIndex: NeighborhoodIndex;
   readonly renderRoot: pc.Entity;
 
@@ -443,6 +445,12 @@ export class AtlasBinding {
     this.field = field;
     this.sourceFirst = sourceFirst;
     this.objects = new SceneObjectRuntime(app, objectRoots);
+    this.segmentOverlay = new SegmentOverlayRuntime(islands, trainedScenes, () => playcanvasSegmentEngine(app), {
+      lensPrepared: (entity) => this.proofLensSplatsPrepared.has(entity),
+      // The same window the lens holds, on the same clock, closed by the same `settleProofLens`.
+      settle: () => { this.proofLensSettleUntil = this.elapsed + PROOF_LENS_SETTLE_SECONDS; },
+      invalidate: () => this.invalidate(),
+    });
     this.topology = topology;
     this.composedWorld = composedWorld;
     this.regionMass = regionMass;
@@ -990,7 +998,11 @@ export class AtlasBinding {
         // modified shader on the default path, where a compile failure would cost the trained
         // scene itself rather than only the lens; installing and removing it per toggle would
         // rebuild the shader twice for a value that is a uniform.
-        gsplat.setWorkBufferModifier(PROOF_LENS_SPLAT_MODIFIER);
+        //
+        // A scene the segment overlay covers already carries a modifier with the lens inside it,
+        // and replacing that would drop the segments. The overlay restores the lens's own modifier
+        // when it leaves, because this set now says the lens was here.
+        if (!this.segmentOverlay.covers(visual.entity)) gsplat.setWorkBufferModifier(PROOF_LENS_SPLAT_MODIFIER);
         this.proofLensSplatsPrepared.add(visual.entity);
       }
       gsplat.setParameter('uProofLens', [...color]);
@@ -1607,6 +1619,7 @@ export class AtlasBinding {
     this.regionMass.destroy();
     this.regionRelief.destroy();
     this.objects.destroy();
+    this.segmentOverlay.destroy();
     for (const visual of this.islands) visual.cloud.destroy();
     for (const visual of this.trainedScenes) {
       visual.entity.destroy();
@@ -1773,4 +1786,564 @@ function applySceneTransform(entity: pc.Entity, m: readonly number[], scale: num
   entity.setLocalPosition(m[3]!, m[7]!, m[11]!);
   entity.setLocalRotation(new pc.Quat().setFromMat4(rotation));
   entity.setLocalScale(scale, scale, scale);
+}
+
+// -- scene segments ----------------------------------------------------------------------------------
+
+/**
+ * Scene segments over trained Gaussian geometry: the proof lens first, then one tint per splat.
+ *
+ * The same hook as `PROOF_LENS_SPLAT_MODIFIER`, for the same reason: unified gsplat rendering fills
+ * one shared work buffer, and `modifySplatColor` is the one place a value can differ between two
+ * splats. What makes it per splat rather than per component is `splat.index`, which the copy shader
+ * sets from the component's own splat order before this runs, so a splat is addressed by the same
+ * number the segment artifact names it by. The artifact is digest-bound to the trained bytes for
+ * exactly that reason: the same index is a different Gaussian in a retrained scene.
+ *
+ * TWO TEXTURES, AND THE SPLIT IS WHAT KEEPS A HOVER CHEAP. `uSegmentSlots` holds one byte per splat,
+ * the slot of its segment or zero; `uSegmentPalette` holds one resolved colour and strength per slot.
+ * Highlighting a segment rewrites the 1 KB palette and never the per-splat bytes.
+ *
+ * A splat in no segment reads slot 0, whose palette entry is all zero, and `mix(c, x, 0.0)` is `c`,
+ * so it comes out exactly as `PROOF_LENS_SPLAT_MODIFIER` would have left it. The lens term is
+ * repeated here rather than chained because a component carries exactly one modifier.
+ */
+export const SEGMENT_OVERLAY_SPLAT_MODIFIER = Object.freeze({
+  glsl: /* glsl */ `
+uniform vec4 uProofLens;
+uniform sampler2D uSegmentSlots;
+uniform sampler2D uSegmentPalette;
+void modifySplatCenter(inout vec3 center) {}
+void modifySplatRotationScale(vec3 originalCenter, vec3 modifiedCenter, inout vec4 rotation, inout vec3 scale) {}
+vec3 exulanicaTint(vec3 rgb, float luma, vec4 tint) {
+    vec3 hue = tint.rgb / max(dot(tint.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.004);
+    return mix(rgb, clamp(hue * luma, 0.0, 1.0), tint.a);
+}
+void modifySplatColor(vec3 center, inout vec4 color) {
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    vec3 lensed = exulanicaTint(color.rgb, luma, uProofLens);
+    int width = textureSize(uSegmentSlots, 0).x;
+    int splatIndex = int(splat.index);
+    float slot = texelFetch(uSegmentSlots, ivec2(splatIndex % width, splatIndex / width), 0).r;
+    vec4 tint = texelFetch(uSegmentPalette, ivec2(int(slot * 255.0 + 0.5), 0), 0);
+    color.rgb = exulanicaTint(lensed, luma, tint);
+}
+`,
+  wgsl: /* wgsl */ `
+uniform uProofLens : vec4f;
+var uSegmentSlots : texture_2d<f32>;
+var uSegmentPalette : texture_2d<f32>;
+fn modifySplatCenter(center : ptr<function, vec3f>) {}
+fn modifySplatRotationScale(originalCenter : vec3f, modifiedCenter : vec3f, rotation : ptr<function, vec4f>, scale : ptr<function, vec3f>) {}
+fn exulanicaTint(rgb : vec3f, luma : f32, tint : vec4f) -> vec3f {
+    let hue : vec3f = tint.rgb / max(dot(tint.rgb, vec3f(0.2126, 0.7152, 0.0722)), 0.004);
+    return mix(rgb, clamp(hue * luma, vec3f(0.0), vec3f(1.0)), tint.a);
+}
+fn modifySplatColor(center : vec3f, color : ptr<function, vec4f>) {
+    let luma : f32 = dot((*color).rgb, vec3f(0.2126, 0.7152, 0.0722));
+    let lensed : vec3f = exulanicaTint((*color).rgb, luma, uniform.uProofLens);
+    let width : u32 = textureDimensions(uSegmentSlots, 0).x;
+    let splatIndex : u32 = splat.index;
+    let slot : f32 = textureLoad(uSegmentSlots, vec2i(i32(splatIndex % width), i32(splatIndex / width)), 0).r;
+    let tint : vec4f = textureLoad(uSegmentPalette, vec2i(i32(slot * 255.0 + 0.5), 0), 0);
+    (*color) = vec4f(exulanicaTint(lensed, luma, tint), (*color).a);
+}
+`,
+});
+
+/** One byte per splat, so 255 segments per region; slot 0 means "in no segment". */
+export const SEGMENT_SLOT_LIMIT = 255;
+/** Width of the per-splat slot texture. Its height follows the splat count. */
+const SEGMENT_SLOT_TEXTURE_WIDTH = 1024;
+
+/** One segment's samples on one drawn asset, under a slot number the caller chose. */
+export interface SegmentOverlayTint {
+  /** 1 to 255. The caller's own numbering; the palette is keyed by it. */
+  readonly slot: number;
+  /** A trained scene's or a placed point map's artifact id. */
+  readonly artifactId: string;
+  /** Ascending sample indices in the asset's own order: the splat index, or the point index. */
+  readonly indices: Uint32Array;
+}
+
+/** Slot to an already resolved colour and strength. Nothing in this package picks one. */
+export type SegmentPalette = ReadonlyMap<number, ProofLensColor>;
+
+export interface SegmentOverlay {
+  readonly islandId: IslandId;
+  /** In precedence order: a sample that two tints name keeps the first. */
+  readonly tints: readonly SegmentOverlayTint[];
+  readonly palette: SegmentPalette;
+}
+
+/** What one drawn asset now shows, with the tinted samples' atlas positions for a pick. */
+export interface SegmentOverlayAsset {
+  readonly artifactId: string;
+  readonly kind: 'gaussians' | 'points';
+  readonly sampleCount: number;
+  /** Tinted sample indices, ascending. */
+  readonly indices: Uint32Array;
+  /** The slot of each tinted sample, parallel to `indices`. */
+  readonly slots: Uint8Array;
+  /**
+   * Atlas-space positions, three floats per tinted sample, parallel to `indices`.
+   *
+   * Null when the engine holds no CPU copy of a trained scene's centres. The tint does not depend
+   * on it; only a click can no longer reach those samples, and a caller has to say so.
+   */
+  readonly positions: Float32Array | null;
+}
+
+export interface SegmentOverlayReport {
+  readonly islandId: IslandId | null;
+  readonly assets: readonly SegmentOverlayAsset[];
+  readonly refused: readonly { readonly artifactId: string; readonly reason: string }[];
+}
+
+/** The engine calls the overlay makes, gathered so the rules around them run without a GPU. */
+export interface SegmentOverlayEngine {
+  readonly maxTextureSize: number;
+  texture(kind: 'slots' | 'palette', width: number, height: number, bytes: Uint8Array): SegmentOverlayTexture;
+  pointGroups(visual: IslandVisual, order: Uint32Array, groups: readonly SegmentPointGroup[]): SegmentPointOverlay;
+}
+
+export interface SegmentOverlayTexture {
+  readonly texture: unknown;
+  write(bytes: Uint8Array): void;
+  destroy(): void;
+}
+
+export interface SegmentPointGroup {
+  readonly slot: number;
+  readonly base: number;
+  readonly count: number;
+}
+
+export interface SegmentPointOverlay {
+  setLens(slot: number, color: ProofLensColor): void;
+  destroy(): void;
+}
+
+interface SegmentOverlayHost {
+  /** Whether the proof lens has installed its own modifier on this scene. */
+  lensPrepared(entity: pc.Entity): boolean;
+  /** Hold the trained scenes' work buffers open, exactly as the lens does. */
+  settle(): void;
+  invalidate(): void;
+}
+
+type SegmentGsplat = Pick<
+  pc.GSplatComponent,
+  'setWorkBufferModifier' | 'setParameter' | 'getParameter' | 'deleteParameter' | 'workBufferUpdate'
+>;
+type TrainedSceneVisual = AtlasBinding['trainedScenes'][number];
+
+interface HeldSplats {
+  readonly gsplat: SegmentGsplat;
+  readonly slots: SegmentOverlayTexture;
+  readonly palette: SegmentOverlayTexture;
+  /** Whether the overlay supplied `uProofLens` because the lens had not, so it can take it back. */
+  readonly addedLens: boolean;
+}
+
+interface HeldPoints {
+  readonly overlay: SegmentPointOverlay;
+  readonly slots: readonly number[];
+}
+
+const NO_SEGMENT_OVERLAY: SegmentOverlayReport = Object.freeze({
+  islandId: null,
+  assets: Object.freeze([]),
+  refused: Object.freeze([]),
+});
+
+/**
+ * One byte per sample: the slot of the first tint that names it, or zero.
+ *
+ * A tint whose slot is out of range, whose indices are not ascending, or which names a sample past
+ * the end of its asset is refused whole rather than drawn in part: an index outside its asset means
+ * the segments were computed against different bytes, and part of such a tint is not an answer.
+ */
+export function segmentSlotsFor(
+  sampleCount: number,
+  tints: readonly SegmentOverlayTint[],
+): { readonly slots: Uint8Array; readonly refused: readonly string[] } {
+  const slots = new Uint8Array(sampleCount);
+  const refused: string[] = [];
+  for (const tint of tints) {
+    if (!Number.isInteger(tint.slot) || tint.slot < 1 || tint.slot > SEGMENT_SLOT_LIMIT) {
+      refused.push(`Slot ${String(tint.slot)} is outside 1 to ${SEGMENT_SLOT_LIMIT}.`);
+      continue;
+    }
+    let previous = -1;
+    let valid = true;
+    for (const index of tint.indices) {
+      if (index <= previous || index >= sampleCount) { valid = false; break; }
+      previous = index;
+    }
+    if (!valid) {
+      refused.push(`Slot ${tint.slot} names samples out of order or beyond this asset's ${sampleCount}.`);
+      continue;
+    }
+    for (const index of tint.indices) if (slots[index] === 0) slots[index] = tint.slot;
+  }
+  return { slots, refused };
+}
+
+/** The palette as 256 RGBA bytes. Slot 0 stays zero, which is what makes "in no segment" exact. */
+export function segmentPaletteBytes(palette: SegmentPalette): Uint8Array {
+  const bytes = new Uint8Array((SEGMENT_SLOT_LIMIT + 1) * 4);
+  for (const [slot, color] of palette) {
+    if (!Number.isInteger(slot) || slot < 1 || slot > SEGMENT_SLOT_LIMIT) {
+      throw new RangeError(`segment palette slot ${String(slot)} is outside 1 to ${SEGMENT_SLOT_LIMIT}`);
+    }
+    for (let channel = 0; channel < 4; channel += 1) {
+      bytes[slot * 4 + channel] = Math.round(Math.min(1, Math.max(0, color[channel] ?? 0)) * 255);
+    }
+  }
+  return bytes;
+}
+
+/**
+ * Sample order grouped by slot, the untinted rest first, for drawing a point map one slot per draw.
+ *
+ * Indexed draws keep `gl_VertexID` equal to the sample's own index, which is what the point shader
+ * hashes for its dissolve, so the same samples survive as in the single unindexed draw.
+ */
+export function segmentPointGroups(slots: Uint8Array): {
+  readonly order: Uint32Array;
+  readonly groups: readonly SegmentPointGroup[];
+} {
+  const counts = new Uint32Array(SEGMENT_SLOT_LIMIT + 1);
+  for (const slot of slots) counts[slot]! += 1;
+  const starts = new Uint32Array(SEGMENT_SLOT_LIMIT + 1);
+  const groups: SegmentPointGroup[] = [];
+  let base = 0;
+  for (let slot = 0; slot <= SEGMENT_SLOT_LIMIT; slot += 1) {
+    starts[slot] = base;
+    if (counts[slot]! > 0) groups.push(Object.freeze({ slot, base, count: counts[slot]! }));
+    base += counts[slot]!;
+  }
+  const order = new Uint32Array(slots.length);
+  for (let index = 0; index < slots.length; index += 1) order[starts[slots[index]!]!++] = index;
+  return { order, groups: Object.freeze(groups) };
+}
+
+function tintedSamples(slots: Uint8Array): { readonly indices: Uint32Array; readonly slots: Uint8Array } {
+  let count = 0;
+  for (const slot of slots) if (slot !== 0) count += 1;
+  const indices = new Uint32Array(count);
+  const tinted = new Uint8Array(count);
+  let at = 0;
+  for (let index = 0; index < slots.length; index += 1) {
+    if (slots[index] === 0) continue;
+    indices[at] = index;
+    tinted[at] = slots[index]!;
+    at += 1;
+  }
+  return { indices, slots: tinted };
+}
+
+/** Atlas positions of the given samples, through the scene transform and the region placement. */
+function atlasPositions(
+  island: Island,
+  sceneFromLocal: readonly number[],
+  local: Float32Array,
+  indices: Uint32Array,
+): Float32Array {
+  const m = sceneFromLocal;
+  const out = new Float32Array(indices.length * 3);
+  for (let k = 0; k < indices.length; k += 1) {
+    const i = indices[k]! * 3;
+    const x = local[i]!;
+    const y = local[i + 1]!;
+    const z = local[i + 2]!;
+    const atlas = localToAtlas(island.placement, localVec3(
+      m[0]! * x + m[1]! * y + m[2]! * z + m[3]!,
+      m[4]! * x + m[5]! * y + m[6]! * z + m[7]!,
+      m[8]! * x + m[9]! * y + m[10]! * z + m[11]!,
+    ));
+    out[k * 3] = atlas.x;
+    out[k * 3 + 1] = atlas.y;
+    out[k * 3 + 2] = atlas.z;
+  }
+  return out;
+}
+
+/**
+ * The scene segment overlay: one region at a time, and nothing at all until a surface asks.
+ *
+ * THIS DECIDES NOTHING ABOUT WHAT A SEGMENT IS OR WHAT COLOUR IT WEARS. The caller hands over sample
+ * indices under slot numbers and one resolved RGBA per slot, exactly as `setProofLens` is handed one
+ * per region; this puts those numbers where the renderer reads them and reports what it could not.
+ *
+ * Trained geometry takes them through `SEGMENT_OVERLAY_SPLAT_MODIFIER`, with the same settle window
+ * the lens needed. A point map takes them through its existing `uLens` uniform: the map is drawn as
+ * one indexed draw per slot over its own vertex buffer, each draw carrying its slot's colour as a
+ * per-instance `uLens`, and the original draw is hidden while they stand in for it. No shader and no
+ * vertex byte changes.
+ *
+ * OFF IS EXACTLY WHAT WAS THERE BEFORE. Leaving a trained scene puts back the lens's own modifier if
+ * the lens had installed one and no modifier otherwise, and deletes every parameter the overlay set;
+ * leaving a point map removes its draws and shows the original again. A runtime that was never
+ * applied touches nothing, which `test/scene-segment-overlay.test.ts` asserts call by call.
+ */
+export class SegmentOverlayRuntime {
+  readonly #islands: readonly IslandVisual[];
+  readonly #trained: readonly TrainedSceneVisual[];
+  readonly #engineFactory: () => SegmentOverlayEngine;
+  readonly #host: SegmentOverlayHost;
+  #engine: SegmentOverlayEngine | null = null;
+  #report: SegmentOverlayReport | null = null;
+  #splats = new Map<pc.Entity, HeldSplats>();
+  #points = new Map<IslandVisual, HeldPoints>();
+
+  constructor(
+    islands: readonly IslandVisual[],
+    trained: readonly TrainedSceneVisual[],
+    engine: () => SegmentOverlayEngine,
+    host: SegmentOverlayHost,
+  ) {
+    this.#islands = islands;
+    this.#trained = trained;
+    this.#engineFactory = engine;
+    this.#host = host;
+  }
+
+  /** What is tinted now, or null when the overlay is off. */
+  get report(): SegmentOverlayReport | null {
+    return this.#report;
+  }
+
+  /** Whether this trained scene currently carries the segment modifier. */
+  covers(entity: pc.Entity): boolean {
+    return this.#splats.has(entity);
+  }
+
+  /** Tint one region's segments, replacing whatever region was tinted before. Null is off. */
+  apply(overlay: SegmentOverlay | null): SegmentOverlayReport {
+    if (overlay === null) {
+      this.#clear();
+      return NO_SEGMENT_OVERLAY;
+    }
+    const paletteBytes = segmentPaletteBytes(overlay.palette);
+    const engine = this.#engine ?? (this.#engine = this.#engineFactory());
+    const assets: SegmentOverlayAsset[] = [];
+    const refused: { artifactId: string; reason: string }[] = [];
+    const drawn = new Set<string>();
+    const nextSplats = new Map<pc.Entity, HeldSplats>();
+    const nextPoints = new Map<IslandVisual, HeldPoints>();
+    const trainedScenes = new Set(this.#trained.map((visual) => visual.geometry.sceneId));
+
+    for (const visual of this.#trained) {
+      const artifactId = visual.geometry.artifactId;
+      const tints = overlay.tints.filter((tint) => tint.artifactId === artifactId);
+      if (visual.island.islandId !== overlay.islandId || tints.length === 0) continue;
+      drawn.add(artifactId);
+      const sampleCount = visual.geometry.pointCount;
+      const height = Math.max(1, Math.ceil(sampleCount / SEGMENT_SLOT_TEXTURE_WIDTH));
+      const gsplat = visual.entity.gsplat as SegmentGsplat | null | undefined;
+      if (gsplat === null || gsplat === undefined || height > engine.maxTextureSize) {
+        refused.push({ artifactId, reason: gsplat == null
+          ? 'This trained scene has no drawn Gaussian component to tint.'
+          : `${sampleCount} splats need a slot texture taller than this device allows.` });
+        continue;
+      }
+      const { slots, refused: problems } = segmentSlotsFor(sampleCount, tints);
+      for (const reason of problems) refused.push({ artifactId, reason });
+      const tinted = tintedSamples(slots);
+      if (tinted.indices.length === 0) continue;
+      const bytes = new Uint8Array(SEGMENT_SLOT_TEXTURE_WIDTH * height);
+      bytes.set(slots);
+      const held = this.#splats.get(visual.entity);
+      const slotTexture = engine.texture('slots', SEGMENT_SLOT_TEXTURE_WIDTH, height, bytes);
+      const paletteTexture = engine.texture('palette', SEGMENT_SLOT_LIMIT + 1, 1, paletteBytes);
+      gsplat.setParameter('uSegmentSlots', slotTexture.texture as pc.Texture);
+      gsplat.setParameter('uSegmentPalette', paletteTexture.texture as pc.Texture);
+      // A lens the visitor never switched on has never bound `uProofLens`, and an unbound uniform
+      // reads whatever another component last left in the device scope. Off has to be a value.
+      const addedLens = held?.addedLens ?? gsplat.getParameter('uProofLens') === undefined;
+      if (gsplat.getParameter('uProofLens') === undefined) gsplat.setParameter('uProofLens', [...PROOF_LENS_OFF]);
+      if (held === undefined) gsplat.setWorkBufferModifier(SEGMENT_OVERLAY_SPLAT_MODIFIER);
+      gsplat.workBufferUpdate = pc.WORKBUFFER_UPDATE_ALWAYS;
+      held?.slots.destroy();
+      held?.palette.destroy();
+      nextSplats.set(visual.entity, { gsplat, slots: slotTexture, palette: paletteTexture, addedLens });
+      const centres = (visual.asset.resource as { centers?: unknown } | null | undefined)?.centers;
+      assets.push(Object.freeze({
+        artifactId, kind: 'gaussians' as const, sampleCount, ...tinted,
+        positions: centres instanceof Float32Array && centres.length >= sampleCount * 3
+          ? atlasPositions(visual.island, visual.geometry.sceneFromAssetRowMajor, centres, tinted.indices)
+          : null,
+      }));
+    }
+
+    for (const visual of this.#islands) {
+      const artifactId = visual.pointMap.artifactId;
+      const tints = overlay.tints.filter((tint) => tint.artifactId === artifactId);
+      if (visual.island.islandId !== overlay.islandId || tints.length === 0) continue;
+      drawn.add(artifactId);
+      if (trainedScenes.has(visual.pointMap.sceneId)) {
+        refused.push({ artifactId, reason: 'Not drawn: this region draws its trained geometry instead of its point maps.' });
+        continue;
+      }
+      const sampleCount = visual.cloud.pointCount;
+      const { slots, refused: problems } = segmentSlotsFor(sampleCount, tints);
+      for (const reason of problems) refused.push({ artifactId, reason });
+      const tinted = tintedSamples(slots);
+      if (tinted.indices.length === 0) continue;
+      // Taken down before the replacement goes up: its teardown shows the original draw again,
+      // and doing that after would draw every sample twice.
+      const previous = this.#points.get(visual);
+      if (previous !== undefined) {
+        previous.overlay.destroy();
+        this.#points.delete(visual);
+      }
+      const { order, groups } = segmentPointGroups(slots);
+      const pointOverlay = engine.pointGroups(visual, order, groups);
+      const used = groups.filter((group) => group.slot !== 0).map((group) => group.slot);
+      for (const slot of used) pointOverlay.setLens(slot, overlay.palette.get(slot) ?? PROOF_LENS_OFF);
+      nextPoints.set(visual, { overlay: pointOverlay, slots: used });
+      assets.push(Object.freeze({
+        artifactId, kind: 'points' as const, sampleCount, ...tinted,
+        positions: atlasPositions(visual.island, visual.pointMap.sceneFromOpmRowMajor, visual.pointMap.map.position, tinted.indices),
+      }));
+    }
+
+    for (const tint of overlay.tints) {
+      if (drawn.has(tint.artifactId)) continue;
+      drawn.add(tint.artifactId);
+      refused.push({ artifactId: tint.artifactId, reason: 'Not drawn in this region, so there is nothing of it to tint.' });
+    }
+
+    const touchedSplats = this.#splats.size > 0 || nextSplats.size > 0;
+    for (const [entity, held] of this.#splats) if (!nextSplats.has(entity)) this.#restore(entity, held);
+    for (const [visual, held] of this.#points) if (!nextPoints.has(visual)) held.overlay.destroy();
+    this.#splats = nextSplats;
+    this.#points = nextPoints;
+    this.#report = Object.freeze({
+      islandId: overlay.islandId,
+      assets: Object.freeze(assets),
+      refused: Object.freeze(refused),
+    });
+    if (touchedSplats) this.#host.settle();
+    this.#host.invalidate();
+    return this.#report;
+  }
+
+  /** Re-colour the slots already tinted, for a hover or a selection. Rebuilds nothing. */
+  setPalette(palette: SegmentPalette): void {
+    if (this.#report === null) return;
+    const bytes = segmentPaletteBytes(palette);
+    for (const held of this.#splats.values()) {
+      held.palette.write(bytes);
+      held.gsplat.workBufferUpdate = pc.WORKBUFFER_UPDATE_ALWAYS;
+    }
+    for (const held of this.#points.values()) {
+      for (const slot of held.slots) held.overlay.setLens(slot, palette.get(slot) ?? PROOF_LENS_OFF);
+    }
+    if (this.#splats.size > 0) this.#host.settle();
+    this.#host.invalidate();
+  }
+
+  /** Release every texture and draw without restoring modifiers. The binding is going away. */
+  destroy(): void {
+    for (const held of this.#splats.values()) {
+      held.slots.destroy();
+      held.palette.destroy();
+    }
+    for (const held of this.#points.values()) held.overlay.destroy();
+    this.#splats.clear();
+    this.#points.clear();
+    this.#report = null;
+  }
+
+  #clear(): void {
+    if (this.#report === null && this.#splats.size === 0 && this.#points.size === 0) return;
+    const hadSplats = this.#splats.size > 0;
+    for (const [entity, held] of this.#splats) this.#restore(entity, held);
+    for (const held of this.#points.values()) held.overlay.destroy();
+    this.#splats = new Map();
+    this.#points = new Map();
+    this.#report = null;
+    if (hadSplats) this.#host.settle();
+    this.#host.invalidate();
+  }
+
+  #restore(entity: pc.Entity, held: HeldSplats): void {
+    const lens = this.#host.lensPrepared(entity);
+    held.gsplat.setWorkBufferModifier(lens ? PROOF_LENS_SPLAT_MODIFIER : null);
+    held.gsplat.deleteParameter('uSegmentSlots');
+    held.gsplat.deleteParameter('uSegmentPalette');
+    if (held.addedLens && !lens) held.gsplat.deleteParameter('uProofLens');
+    // Refilled once more without the tint, inside the same settle window the caller opens.
+    held.gsplat.workBufferUpdate = pc.WORKBUFFER_UPDATE_ALWAYS;
+    held.slots.destroy();
+    held.palette.destroy();
+  }
+}
+
+/** The overlay's engine calls, made with PlayCanvas. */
+function playcanvasSegmentEngine(app: pc.AppBase): SegmentOverlayEngine {
+  const device = app.graphicsDevice;
+  return {
+    maxTextureSize: device.maxTextureSize,
+    texture(kind, width, height, bytes) {
+      const texture = new pc.Texture(device, {
+        name: `segment-${kind}`,
+        width,
+        height,
+        format: kind === 'slots' ? pc.PIXELFORMAT_R8 : pc.PIXELFORMAT_RGBA8,
+        mipmaps: false,
+        minFilter: pc.FILTER_NEAREST,
+        magFilter: pc.FILTER_NEAREST,
+        addressU: pc.ADDRESS_CLAMP_TO_EDGE,
+        addressV: pc.ADDRESS_CLAMP_TO_EDGE,
+        levels: [bytes],
+      });
+      return {
+        texture,
+        write(next) {
+          (texture.lock() as Uint8Array).set(next);
+          texture.unlock();
+        },
+        destroy: () => texture.destroy(),
+      };
+    },
+    pointGroups(visual, order, groups) {
+      const indexBuffer = new pc.IndexBuffer(
+        device, pc.INDEXFORMAT_UINT32, order.length, pc.BUFFER_STATIC,
+        order.buffer.slice(order.byteOffset, order.byteOffset + order.byteLength) as ArrayBuffer,
+      );
+      const node = new pc.Entity(`segment-overlay:${visual.pointMap.artifactId}`);
+      const draws = groups.map((group) => {
+        const mesh = new pc.Mesh(device);
+        mesh.vertexBuffer = visual.cloud.vertexBuffer;
+        mesh.indexBuffer[0] = indexBuffer;
+        mesh.primitive[0] = { type: pc.PRIMITIVE_POINTS, base: group.base, baseVertex: 0, count: group.count, indexed: true };
+        mesh.aabb = visual.cloud.mesh.aabb;
+        return { slot: group.slot, mesh, instance: new pc.MeshInstance(mesh, visual.cloud.material, node) };
+      });
+      node.addComponent('render', { meshInstances: draws.map((draw) => draw.instance) });
+      visual.entity.addChild(node);
+      const original = visual.entity.render?.meshInstances ?? [];
+      for (const instance of original) instance.visible = false;
+      return {
+        setLens(slot, color) {
+          for (const draw of draws) if (draw.slot === slot) draw.instance.setParameter('uLens', [...color]);
+        },
+        destroy() {
+          for (const instance of original) instance.visible = true;
+          // The vertex buffer is the cloud's and the index buffer is shared by every draw here.
+          // Detached before the node goes, or destroying the node's meshes would destroy both.
+          for (const draw of draws) {
+            (draw.mesh as { vertexBuffer: pc.VertexBuffer | null }).vertexBuffer = null;
+            draw.mesh.indexBuffer.length = 0;
+          }
+          node.destroy();
+          indexBuffer.destroy();
+        },
+      };
+    },
+  };
 }
