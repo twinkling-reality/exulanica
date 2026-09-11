@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import ast
 import io
 import json
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from exulanica.ingest import worker_command
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_workspace_configuration_is_explicit_deduplicated_and_validated():
@@ -113,3 +119,44 @@ def test_once_mode_uses_observed_lifecycle_and_reports_terminal_counts(monkeypat
             "unavailable": 3,
         },
     ]
+
+
+def test_the_module_entry_starts_under_python_dash_m():
+    """`scripts/reference_instance.py` starts this worker with `python -m`, not the console script.
+
+    Run from the repository root with the interpreter running this suite, so the module that
+    answers is this checkout's rather than whatever copy another path would find first.
+    """
+    completed = subprocess.run(
+        [sys.executable, "-m", "exulanica.ingest.worker_command", "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "exulanica-derivative-worker" in completed.stdout
+    assert "--once" in completed.stdout
+    assert "Traceback" not in completed.stderr
+
+
+def _is_main_guard(node: ast.stmt) -> bool:
+    return (
+        isinstance(node, ast.If)
+        and isinstance(node.test, ast.Compare)
+        and isinstance(node.test.left, ast.Name)
+        and node.test.left.id == "__name__"
+    )
+
+
+def test_the_main_guard_comes_after_every_definition():
+    """What the `--help` test above cannot see on its own.
+
+    argparse exits inside `parse_args` for `--help`, before `main()` builds a worker, so that test
+    passed while `_build_detector` sat below the guard and every real `python -m` start failed with
+    NameError. `python -m` executes the module top to bottom as `__main__`, so the guard has to be
+    its last statement for `main()` to find everything it calls.
+    """
+    body = ast.parse(Path(worker_command.__file__).read_text()).body
+    assert [index for index, node in enumerate(body) if _is_main_guard(node)] == [len(body) - 1]
