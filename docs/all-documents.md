@@ -8,13 +8,13 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**118 documents**, excluding `docs/evaluation/`.
+**119 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-56 documents.
+57 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -64,6 +64,7 @@ How the system works now. Edited as the system changes.
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
 - [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
+- [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The frontend
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
