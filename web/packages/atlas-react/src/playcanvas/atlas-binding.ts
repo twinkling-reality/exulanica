@@ -143,6 +143,13 @@ export interface IslandVisual {
   readonly uIsland: Float32Array;
   readonly uPoint: Float32Array;
   /**
+   * The photograph's camera in the map's local frame, for a map drawn as one photograph's own
+   * view (an unmeasured arrangement). Null for every other map. The frame loop hands its world
+   * position to the shader, which is what lets a point dissolve as the visitor's line of sight
+   * departs from the camera's.
+   */
+  readonly singleViewLocal: pc.Vec3 | null;
+  /**
    * The proof lens for this island: an already-resolved RGB triple and a tint strength.
    *
    * Four zeros is the lens off, which is what every island holds until a caller supplies a value.
@@ -157,6 +164,9 @@ export interface IslandVisual {
 
 /** One island's proof-lens colour, resolved by the caller: red, green, blue, tint strength. */
 export type ProofLensColor = readonly [number, number, number, number];
+
+/** Reused by the frame loop so handing a camera to the shader allocates nothing. */
+const SINGLE_VIEW_SCRATCH = new pc.Vec3();
 
 /** The lens off. A value rather than an absence, so an unlit island is written, not skipped. */
 const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
@@ -699,12 +709,14 @@ export class AtlasBinding {
         const instance = new pc.MeshInstance(cloud.mesh, cloud.material, entity);
         entity.addComponent('render', { meshInstances: [instance] });
         islandEntity.addChild(entity);
+        const singleView = pointMap.arrangement === 'unmeasured-fan' ? cloud.enableSingleView() : null;
 
         visuals.push({
           island,
           entity,
           cloud,
           pointMap,
+          singleViewLocal: singleView === null ? null : new pc.Vec3(singleView[0], singleView[1], singleView[2]),
           uIsland: new Float32Array([
             1,
             cloud.footprintRadiusLocal,
@@ -1510,6 +1522,10 @@ export class AtlasBinding {
       // path that already does two and never allocates. Its contents were resolved by the caller
       // in `setProofLens`; this loop only delivers them.
       visual.cloud.material.setParameter('uLens', visual.uLens);
+      if (visual.singleViewLocal !== null) {
+        visual.entity.getWorldTransform().transformPoint(visual.singleViewLocal, SINGLE_VIEW_SCRATCH);
+        visual.cloud.setCaptureWorld(SINGLE_VIEW_SCRATCH.x, SINGLE_VIEW_SCRATCH.y, SINGLE_VIEW_SCRATCH.z);
+      }
     }
     this.objects.update(dt);
     this.settleProofLens();

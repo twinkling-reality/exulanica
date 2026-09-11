@@ -66,8 +66,32 @@ export interface PointCloud {
   setTheme(theme: PresentationTheme): void;
   /** Compare evidence without the authored fog or display gain masking reconstruction defects. */
   setInspection(active: boolean): void;
+  /**
+   * Draw this map as one photograph's own view: it thins towards the edges of the photograph's
+   * frame and as the visitor's line of sight departs from the camera's. For maps in an unmeasured
+   * arrangement only; see the uniform contract in `point-shader.ts`. Returns the camera's local
+   * position, which `setCaptureWorld` must then be given in world space every frame.
+   */
+  enableSingleView(): readonly [number, number, number];
+  /** The photograph's camera in world space. Ignored until `enableSingleView` has run. */
+  setCaptureWorld(x: number, y: number, z: number): void;
   destroy(): void;
 }
+
+/**
+ * How a single photograph's view dissolves. The margin is the fraction of the frame, measured in
+ * from its edge, over which points thin out; the angles are between the camera's line of sight to
+ * a point and the visitor's, where thinning starts and where nothing is left. A visitor standing
+ * where the photograph was taken sees all of it; one who steps a metre or two aside sees the
+ * people in front begin to dissolve before the distant ridge does, because the angle to a near
+ * point grows faster; one who walks round behind sees nothing, which is what was photographed.
+ */
+export const SINGLE_VIEW_EDGE_MARGIN = 0.15;
+export const SINGLE_VIEW_FADE_START_DEG = 18;
+export const SINGLE_VIEW_FADE_END_DEG = 42;
+/** World distance from the photograph's camera over which the whole photograph thins out. */
+export const SINGLE_VIEW_STANDPOINT_START = 3;
+export const SINGLE_VIEW_STANDPOINT_END = 9;
 
 /**
  * Default sprite sizing.
@@ -239,6 +263,17 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   // unbound uniform is read as whatever the device scope last held for that name, which on a
   // second cloud would be the previous cloud's tier. The off state has to be a value.
   material.setParameter('uLens', [0, 0, 0, 0]);
+  // Single-view fading, off: a value rather than an absence, for the reason `uLens` gives above.
+  const capture = new Float32Array(4);
+  material.setParameter('uFrame', [0, 0, 0, 0]);
+  material.setParameter('uViewpoint', [0, 0, 0, 0]);
+  material.setParameter('uCapture', capture);
+  material.setParameter('uViewFade', [
+    Math.cos((SINGLE_VIEW_FADE_START_DEG * Math.PI) / 180),
+    Math.cos((SINGLE_VIEW_FADE_END_DEG * Math.PI) / 180),
+    SINGLE_VIEW_STANDPOINT_START,
+    SINGLE_VIEW_STANDPOINT_END,
+  ]);
   material.update();
 
   if (semantics.some((s) => s.id >= MAX_SEGMENTS)) {
@@ -259,6 +294,25 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     setInspection(active) {
       material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
       material.setParameter('uExposure', active ? 1 : 1.25);
+    },
+    enableSingleView() {
+      const { position, fovYDeg, aspect } = map.header.viewpoint;
+      const tanY = Math.tan((fovYDeg * Math.PI) / 360);
+      const framed = Number.isFinite(tanY) && tanY > 0 && Number.isFinite(aspect) && aspect > 0;
+      // A frame the header cannot describe keeps its edges rather than guessing at them; the
+      // line-of-sight fade needs only the camera position and still applies.
+      material.setParameter('uFrame', framed ? [tanY * aspect, tanY, SINGLE_VIEW_EDGE_MARGIN, 1] : [0, 0, 0, 0]);
+      material.setParameter('uViewpoint', [position[0], position[1], position[2], 0]);
+      capture[3] = 1;
+      material.setParameter('uCapture', capture);
+      return [position[0], position[1], position[2]];
+    },
+    setCaptureWorld(x, y, z) {
+      if (capture[3] !== 1) return;
+      capture[0] = x;
+      capture[1] = y;
+      capture[2] = z;
+      material.setParameter('uCapture', capture);
     },
     destroy(): void {
       mesh.destroy();

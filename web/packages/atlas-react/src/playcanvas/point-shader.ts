@@ -39,6 +39,23 @@
  *   uPalette[4]   vec4  one per provenance class: capture, inference, user, external
  *   uLens         vec4  xyz proof-tier colour, w tint strength; all zero is the lens switched off
  *   uExposure     float display gain, never per point
+ *   uFrame        vec4  x tan half horizontal fov, y tan half vertical fov, z edge margin, w enabled
+ *   uViewpoint    vec4  xyz the photograph's camera in the local frame
+ *   uCapture      vec4  xyz that camera in world space, w enabled
+ *   uViewFade     vec4  x cosine where the view fade starts, y cosine where it ends,
+ *                       z distance from the camera where the standpoint fade starts, w where it ends
+ *
+ * The last four describe ONE photograph's own camera and are enabled only for a map drawn in an
+ * unmeasured arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of
+ * what one camera saw. Its points thin out towards the edges of that photograph's frame, so it
+ * dissolves into the world instead of ending at a rectangle, and they thin out as the visitor's
+ * line of sight to a point departs from the camera's, so walking round behind a photograph shows
+ * it dissolving rather than its empty back, and the whole photograph thins as the visitor walks
+ * away from where it was taken, because a distant ridge keeps a small angle long after the
+ * relief in front of it has stopped meaning anything. This is atlas-spatial-architecture.md's "each panel
+ * allows only its measured micro-parallax", rendered. A posed map is never given these: its
+ * neighbours cover each other's backs, and thinning it by one camera's view would hide real
+ * geometry seen by another.
  */
 
 export const POINT_VERTEX_GLSL = /* glsl */ `
@@ -67,6 +84,10 @@ uniform vec4 uPoint;
 /** Lower bound on the per-point support divisor. 1.0 disables spacing-aware sizing. */
 uniform float uSupportFloor;
 uniform vec4 uFog;
+uniform vec4 uFrame;
+uniform vec4 uViewpoint;
+uniform vec4 uCapture;
+uniform vec4 uViewFade;
 
 varying vec4 vColor;
 varying vec4 vSemantic;
@@ -104,6 +125,21 @@ void main(void) {
     survive *= mix(1.0, confidence, unconfirmed);
     survive *= mix(1.0, 0.35 + 0.65 * confidence, unconfirmed);
     survive *= uIsland.x > 0.0 ? 1.0 : 0.0;
+
+    // One photograph's own frame and line of sight. See the contract above; both are off (w = 0)
+    // for every map not drawn in an unmeasured arrangement.
+    if (uFrame.w > 0.5) {
+        vec3 rel = aPosition - uViewpoint.xyz;
+        float depth = max(-rel.z, 0.001);
+        float edge = max(abs(rel.x) / (depth * uFrame.x), abs(rel.y) / (depth * uFrame.y));
+        survive *= smoothstep(0.0, uFrame.z, 1.0 - edge);
+    }
+    if (uCapture.w > 0.5) {
+        vec3 fromCamera = normalize(worldPos.xyz - uCapture.xyz);
+        vec3 fromViewer = normalize(worldPos.xyz - view_position);
+        survive *= smoothstep(uViewFade.y, uViewFade.x, dot(fromCamera, fromViewer));
+        survive *= 1.0 - smoothstep(uViewFade.z, uViewFade.w, length(view_position - uCapture.xyz));
+    }
 
     float r = hash1(float(gl_VertexID) * 0.6180339887);
 
@@ -290,6 +326,10 @@ uniform uSegState : array<vec4f, 16>;
 uniform uIsland : vec4f;
 uniform uPoint : vec4f;
 uniform uFog : vec4f;
+uniform uFrame : vec4f;
+uniform uViewpoint : vec4f;
+uniform uCapture : vec4f;
+uniform uViewFade : vec4f;
 
 varying vColor : vec4f;
 varying vSemantic : vec4f;
@@ -324,6 +364,19 @@ fn vertexMain(input : VertexInput) -> VertexOutput {
     survive = survive * mix(1.0, 0.35 + 0.65 * confidence, unconfirmed);
     if (uniform.uIsland.x <= 0.0) {
         survive = 0.0;
+    }
+
+    if (uniform.uFrame.w > 0.5) {
+        let rel : vec3f = aPosition - uniform.uViewpoint.xyz;
+        let depth : f32 = max(-rel.z, 0.001);
+        let edge : f32 = max(abs(rel.x) / (depth * uniform.uFrame.x), abs(rel.y) / (depth * uniform.uFrame.y));
+        survive = survive * smoothstep(0.0, uniform.uFrame.z, 1.0 - edge);
+    }
+    if (uniform.uCapture.w > 0.5) {
+        let fromCamera : vec3f = normalize(worldPos.xyz - uniform.uCapture.xyz);
+        let fromViewer : vec3f = normalize(worldPos.xyz - uniform.view_position);
+        survive = survive * smoothstep(uniform.uViewFade.y, uniform.uViewFade.x, dot(fromCamera, fromViewer));
+        survive = survive * (1.0 - smoothstep(uniform.uViewFade.z, uniform.uViewFade.w, length(uniform.view_position - uniform.uCapture.xyz)));
     }
 
     let r : f32 = hash1(f32(pcVertexIndex) * 0.6180339887);
