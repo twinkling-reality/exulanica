@@ -12,7 +12,10 @@ against the retained volcanic workspace, twice on two schemas, and those records
 `docs/evaluation/2026-09-10-companion-proposals.json` and
 `docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json`. Section 14 is a fourth pass
 over the prompts themselves: one of the three defects section 13 recorded is fixed and two are
-measured and refused.
+measured and refused. Section 15 is a fifth, over the drafting call rather than its wording: the
+token ceiling is measured and refused, and a repair the function promised and did not have is
+made. Those records are `docs/evaluation/2026-09-10-companion-prompts.json` and
+`docs/evaluation/2026-09-10-drafting-reliability.json`.
 
 `product-direction.md` makes this a delivery gate: "Ask about the selected place through the
 actual Companion; ground the answer in available evidence and show missing information
@@ -1284,3 +1287,86 @@ only caught by running the reconstructed one against a differently-obtained copy
 | 7 | The drafting call returns malformed JSON from the endpoint's constrained decoding, at a rate that varies between sittings and reached 4 in 10 | Not a prompt change. Try a `max_tokens` ceiling for this call, a schema shape simpler than seven nullable bounded numbers, or a different extraction model, and measure each against the same request |
 | 2 | Still open. The drafter moves five controls for a two-part request, and a numeric bound in the prompt did not change that | Something other than wording. The form could carry fewer controls, or the count could be validated rather than requested |
 | 3 | Still open, and now with a direction. The tense rule produced the future tense on both occasions the call survived it | Re-measure it once item 7 makes the call reliable enough for three attempts to mean something |
+
+---
+
+## 15. Why the drafting call fails, measured three ways
+
+Section 14.5 left item 7 as the one that blocks the other two: the drafting call returns nothing
+usable often enough to matter, and no prompt wording changes that. It named three candidates, a
+token ceiling, a schema shape, and a different extraction model. This section is the first of
+them, measured, plus a code defect the measurement uncovered on the way.
+
+The record is `docs/evaluation/2026-09-10-drafting-reliability.json`.
+
+**The ceiling is not the cause, and the retry never covered the failure that happens.** One of
+those is a refusal and one is a fix.
+
+### 15.1 The failure mode chooses the experiment
+
+Across every recorded run of the shipped prompt, all six failures were `TruncatedResponseError`
+and none were `StructuredOutputError`. The call was not emitting invalid JSON, it was running out
+of room, and `draft_appearance` passes no `max_tokens` at all, so it takes the role default of
+2048. That is a cheap thing to check and nothing had checked it.
+
+### 15.2 The ceiling, measured and refused
+
+**MEASURED 2026-09-10, six attempts per ceiling, on the same two-part request.**
+
+| Ceiling | Drafted | Largest completion on success | Cost |
+| --- | --- | --- | --- |
+| 2048, the role default | 4 of 6 | 290 tokens | 1625 uUSD |
+| 4096 | 3 of 6 | 290 tokens | 1219 uUSD |
+| 8192 | 4 of 6 | 290 tokens | 1620 uUSD |
+
+**A successful draft never exceeded 290 completion tokens against a ceiling of 2048.** The call
+has seven times the room it uses. Raising the ceiling changed nothing, and at 8192 two of the six
+failures arrived as `TransportError` read timeouts instead, because a runaway given more room
+takes longer to give up.
+
+So the ceiling is refused, and the reason is worth keeping: `COMPOSER_MAX_TOKENS` in
+`question.py` argues that "a ceiling is not a spend: an unused one costs nothing and a low one
+costs a failed answer". That is true of a call that is cramped. This one is not cramped. When it
+fails it enters a degenerate repetition that will consume whatever it is given, and the token
+count on success is what says so.
+
+### 15.3 The repair the function promised and did not have
+
+`draft_appearance`'s docstring says it "raises `StructuredOutputError` or
+`TruncatedResponseError` when it cannot be filled twice". It caught only the first. A truncated
+reply left on the FIRST attempt, with no repair at all, which made the docstring false for the
+only failure the call actually has.
+
+`compose_answer` in `question.py` had the identical bug and its comment records it: "**
+`TruncatedResponseError` belongs here and its absence made the docstring false.**" That note is
+how this one was recognised.
+
+Both are retried now, and the repair message differs by cause. A refused form is told what the
+validator said. A truncated one is told it ran past the room it had and to keep it short,
+because repeating a schema complaint to a model that never finished a sentence says nothing
+about what went wrong, and because section 15.2 establishes that more room is not the answer.
+
+**The measurement does not show this raising the success rate, and it is not claimed to.** Six
+attempts per arm gave 6 of 6 for the shipped path, 5 of 6 with the retry at 2048, and 5 of 6 with
+the retry at 1024. The shipped path has now measured 5 of 5, 3 of 3, 1 of 3, 6 of 10, 4 of 6 and
+6 of 6 across six sittings, about 25 of 33 overall, and six attempts cannot separate arms at that
+variance. The change ships because the function does not do what it says, which is true
+independently of the rate, and because one more attempt cannot lower a success rate.
+
+### 15.4 The finding that is now beyond doubt
+
+**Every successful draft ever recorded on this call moved five controls.** Across the prompt
+comparison, the ceiling arms and the recovery arms, on every wording tried including the one
+whose prompt said "never more than three", the count is 5 and has never been anything else.
+
+Item 2 is not a prompt problem and section 14 was too generous to it. If the bound matters it has
+to be in the form or in the validator, not in a sentence asking for it.
+
+### 15.5 Open items after this section
+
+| # | Open item | What settles it |
+| --- | --- | --- |
+| 7 | Still open, and narrowed. Roughly one drafting call in four returns nothing usable, and it is neither the ceiling nor the prompt | The two untried candidates: a schema shape simpler than seven nullable bounded numbers behind an `anyOf`, and the role's declared fallback model. Both are measurable with `scripts/measure_drafting_ceiling.py` and neither is attempted here |
+| 2 | Narrowed to a mechanism. Five controls on every successful draft, under every wording | Put the bound in the form, as a `maxItems` on a list of changes, or in `_validate_draft` as a refusal. Both are real changes to what a proposal may be and neither is a prompt edit |
+| 3 | Unchanged. The tense rule produced the future tense on both occasions it survived | Re-measure once item 7 makes three attempts mean something |
+
