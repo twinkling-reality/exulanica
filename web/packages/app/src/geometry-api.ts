@@ -127,6 +127,15 @@ export type HeldPointMaps = ReadonlyMap<string, PointMap>;
  * no gravity axis in its recovered frame) the scene axes stand and the sentence says no upright
  * is claimed, so a tilted exhibit reads as a fact about the photographs rather than a bug.
  */
+/**
+ * The sentence beside unposed depth. Not `displayFrameSentence`: that one speaks of recovered
+ * cameras, and here there are none. The standpoint and the headings are this client's arrangement.
+ */
+export function unposedArrangementSentence(frame: SceneDisplayFrame): string {
+  return `Arranged by this browser around one standpoint at ${frame.scale.toPrecision(3)}\u00d7 exhibit scale, `
+    + 'each photograph turned to its own heading; no photograph\u2019s position was recovered.';
+}
+
 export function displayFrameSentence(frame: SceneDisplayFrame): string {
   const scale = `${frame.scale.toPrecision(3)}× nonmetric exhibit scale`;
   if (frame.upMethod !== 'scene-axes') {
