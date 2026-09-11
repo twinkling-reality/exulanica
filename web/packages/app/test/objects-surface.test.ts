@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   atlasVec3, islandId, localVec3, makeIsland, placement, sceneDisplayFrame,
 } from '@exulanica/atlas-core';
@@ -651,5 +651,96 @@ describe('teardown', () => {
     (h.mounted as MountedObjects).dispose();
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
     expect(h.objects.setTransform).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('opening the first alternate through confirmation', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const returnedId = '6f1d2c40-0000-7000-8000-000000000020';
+  const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+
+  function emptyWorld() {
+    const connect = vi.fn(async (versionId?: string) => ({
+      assets: [asset()],
+      version: versionId === undefined ? null : version({ versionId }),
+    }));
+    const placeObject = vi.fn();
+    const client = { connect, place: placeObject } as unknown as WorldObjectsClient;
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetcher);
+    return { ...harness({ client }), connect, placeObject, fetcher };
+  }
+
+  it('stages bootstrap for an empty world and sends no POST before confirmation or after cancel', async () => {
+    const h = emptyWorld();
+    h.fetcher.mockResolvedValueOnce(response({ current_topology_digest: STATE }));
+    await h.mounted.begin();
+    expect(h.mounted.panel.root.textContent).toContain('open an alternate version first');
+    await place(h);
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
+    expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version');
+    expect(h.fetcher).toHaveBeenCalledTimes(1);
+    expect(h.fetcher.mock.calls[0]![0]).toBe('https://exulanica.test/world/styles/current');
+    expect(h.fetcher.mock.calls[0]![1]?.method).toBeUndefined();
+    expect(h.placeObject).not.toHaveBeenCalled();
+    button(h.mounted.confirm.root, 'Cancel').click();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(h.fetcher).toHaveBeenCalledTimes(1);
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.connect).toHaveBeenCalledTimes(1);
+    h.mounted.dispose();
+  });
+
+  it('POSTs exactly the reviewed digest on confirm and reconnects to the returned version ID', async () => {
+    const h = emptyWorld();
+    h.fetcher
+      .mockResolvedValueOnce(response({ current_topology_digest: STATE }))
+      .mockResolvedValueOnce(response({ version_id: returnedId }));
+    await h.mounted.begin();
+    await place(h);
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
+    expect(h.fetcher).toHaveBeenCalledTimes(1);
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(h.connect).toHaveBeenLastCalledWith(returnedId));
+    const [url, request] = h.fetcher.mock.calls[1]!;
+    expect(url).toBe('https://exulanica.test/world/versions/bootstrap');
+    expect(request?.method).toBe('POST');
+    expect(JSON.parse(String(request?.body))).toEqual({ base_topology_digest: STATE });
+    expect(request?.headers).toEqual({ Authorization: 'Bearer token', 'Content-Type': 'application/json' });
+    expect(h.fetcher).toHaveBeenCalledTimes(2);
+    expect(h.placeObject).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(h.mounted.panel.root.textContent).toContain('Alternate version opened'));
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    h.mounted.dispose();
+  });
+
+  it('keeps a stale 409 actionable and rereads the digest before another confirmation', async () => {
+    const h = emptyWorld();
+    const freshDigest = 'f'.repeat(64);
+    h.fetcher
+      .mockResolvedValueOnce(response({ current_topology_digest: STATE }))
+      .mockResolvedValueOnce(response({ code: 'protected_topology_conflict' }, 409))
+      .mockResolvedValueOnce(response({ current_topology_digest: freshDigest }))
+      .mockResolvedValueOnce(response({ version_id: returnedId }));
+    await h.mounted.begin();
+    await place(h);
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('Nothing was written'));
+    expect(h.mounted.confirm.root.textContent).toContain('Choose “Place before me” again');
+    expect(h.connect).toHaveBeenCalledTimes(1);
+    expect(h.fetcher).toHaveBeenCalledTimes(2);
+    button(h.mounted.confirm.root, 'Close').click();
+    await place(h);
+    await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version'));
+    expect(h.fetcher).toHaveBeenCalledTimes(3);
+    expect(h.fetcher.mock.calls[2]![1]?.method).toBeUndefined();
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(h.connect).toHaveBeenLastCalledWith(returnedId));
+    expect(JSON.parse(String(h.fetcher.mock.calls[3]![1]?.body))).toEqual({ base_topology_digest: freshDigest });
+    expect(h.placeObject).not.toHaveBeenCalled();
+    h.mounted.dispose();
   });
 });
