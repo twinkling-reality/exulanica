@@ -30,6 +30,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
+from exulanica.world_package.authored import (
+    EXTENSION_KEY,
+    EXTENSION_NAME,
+    EXTENSION_VERSION,
+    AuthoredWorld,
+    ExtensionError,
+    loader_report,
+    verify_authored_world,
+)
 
 PROFILE_VERSION: Final = "exulanica-wmp-1.0"
 PROFILE_ID: Final = "https://exulanica.local/profiles/world-memory-package/1.0"
@@ -137,6 +146,47 @@ class ProhibitedContentError(PackageError):
     """A package contains a payload class WMP v1 excludes by default."""
 
 
+#: What ``verify`` says it did not do. Verification and runtime loading are different claims, and
+#: a report that only said ``verified: true`` let the first be read as the second.
+RUNTIME_LOADABILITY: Final = (
+    "not assessed: verify never loads a world. Run import-check with the receiving loader's "
+    "declared capabilities to learn what it can load, and what it must refuse or name as "
+    "unsupported."
+)
+_VERIFIED_MEANING: Final = (
+    "The signature proves these bytes and possession of the signing key. It does not prove the "
+    "signer was authorized, that the package is historically true, or that any renderer will "
+    "load or execute it the same way."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ExtensionFinding:
+    """One ``extensions/<directory>`` in a verified package, and how far it was checked."""
+
+    extension: str
+    extension_version: str
+    directory: str
+    rules_checked: bool
+    required_loader_capabilities: tuple[str, ...]
+    authored_world: AuthoredWorld | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "directory": self.directory,
+            "extension": self.extension,
+            "extension_version": self.extension_version,
+            "required_loader_capabilities": list(self.required_loader_capabilities),
+            "rules": (
+                "checked by this verifier"
+                if self.rules_checked
+                else "not known to this verifier: its bytes are inventoried, hashed, scanned for "
+                "prohibited content and covered by the signature, and its own rules were not "
+                "checked"
+            ),
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class VerificationReport:
     profile_version: str
@@ -144,14 +194,36 @@ class VerificationReport:
     manifest_sha256: str
     signing_public_key_sha256: str
     file_count: int
+    extensions: tuple[ExtensionFinding, ...] = ()
+    uninterpreted_paths: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
+        checked = [finding for finding in self.extensions if finding.rules_checked]
+        unknown = [finding for finding in self.extensions if not finding.rules_checked]
+        scope = "bytes, inventory, canonical JSON, profile, prohibited-content boundary"
+        if checked:
+            scope += ", the rules of " + ", ".join(
+                f"{finding.extension}@{finding.extension_version}" for finding in checked
+            )
+        summary = (
+            f"Verified {self.profile_version}: {scope}, Merkle root and Ed25519 signature agree. "
+            f"{_VERIFIED_MEANING} Runtime loadability was not assessed."
+        )
+        if unknown:
+            summary += " Not checked by this verifier: " + ", ".join(
+                f"{finding.extension}@{finding.extension_version}" for finding in unknown
+            )
+            summary += "."
         return {
+            "extensions": [finding.as_dict() for finding in self.extensions],
             "file_count": self.file_count,
             "manifest_sha256": self.manifest_sha256,
             "merkle_root_sha256": self.merkle_root_sha256,
             "profile_version": self.profile_version,
+            "runtime_loadability": RUNTIME_LOADABILITY,
             "signing_public_key_sha256": self.signing_public_key_sha256,
+            "summary": summary,
+            "uninterpreted_paths": list(self.uninterpreted_paths),
             "verified": True,
         }
 
@@ -350,8 +422,16 @@ def verify_package(directory: Path) -> VerificationReport:
     root_hash = merkle_root(actual_entries)
     if root_hash != manifest.get("merkle_root_sha256"):
         raise PackageError("Merkle root does not match the manifest entries")
+    extensions: tuple[ExtensionFinding, ...] = ()
+    uninterpreted: tuple[str, ...] = ()
     if version == PROFILE_VERSION:
         _validate_profile(parsed)
+        extensions = _verify_extensions(parsed, expected_paths)
+        uninterpreted = tuple(
+            path
+            for path in expected_paths
+            if path not in REQUIRED_PAYLOAD_PATHS and not path.startswith("extensions/")
+        )
     else:
         validate_dataset(parsed, {entry["path"]: entry for entry in actual_entries})
     manifest_sha256 = _sha256(manifest_bytes)
@@ -383,7 +463,85 @@ def verify_package(directory: Path) -> VerificationReport:
         manifest_sha256=manifest_sha256,
         signing_public_key_sha256=_sha256(public_raw),
         file_count=len(actual_entries),
+        extensions=extensions,
+        uninterpreted_paths=uninterpreted,
     )
+
+
+def _verify_extensions(
+    files: Mapping[str, Any], paths: Sequence[str]
+) -> tuple[ExtensionFinding, ...]:
+    """Find every ``extensions/<directory>``, check the ones this verifier knows, name the rest.
+
+    An extension this verifier does not know is not a failure. Its bytes are already covered by
+    everything above, and refusing it would make every future extension a compatibility break,
+    which is the problem an extension exists to avoid. It is reported, and import-check treats it
+    as unsupported unless the loader says otherwise. A directory with no declaration is refused,
+    because then nothing says what a loader would need.
+    """
+    directories: dict[str, list[str]] = {}
+    for path in paths:
+        if not path.startswith("extensions/"):
+            continue
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise PackageError(f"{path}: an extension payload must sit in its own directory")
+        directories.setdefault(parts[1], []).append(path)
+    findings: list[ExtensionFinding] = []
+    for directory, members in sorted(directories.items()):
+        declaration_path = f"extensions/{directory}/extension.json"
+        header = files.get(declaration_path)
+        if (
+            declaration_path not in members
+            or not isinstance(header, dict)
+            or not isinstance(header.get("extension"), str)
+            or not isinstance(header.get("extension_version"), str)
+            or header.get("base_profile") != PROFILE_VERSION
+            or not isinstance(header.get("required_loader_capabilities"), list)
+            or not all(isinstance(c, str) for c in header["required_loader_capabilities"])
+        ):
+            raise PackageError(
+                f"extensions/{directory} has no valid extension.json naming its extension, "
+                f"version, base profile {PROFILE_VERSION} and required loader capabilities"
+            )
+        name, version = header["extension"], header["extension_version"]
+        if (name, version) == (EXTENSION_NAME, EXTENSION_VERSION):
+            if directory != EXTENSION_KEY:
+                raise PackageError(f"{name}@{version} must sit at extensions/{EXTENSION_KEY}")
+            try:
+                world = verify_authored_world(files, paths)
+            except ExtensionError as error:
+                raise PackageError(str(error)) from error
+            except (KeyError, TypeError, AttributeError, ValueError) as error:
+                raise PackageError(f"extensions/{directory} is malformed: {error!r}") from error
+            findings.append(
+                ExtensionFinding(
+                    extension=name,
+                    extension_version=version,
+                    directory=f"extensions/{directory}",
+                    rules_checked=True,
+                    required_loader_capabilities=tuple(
+                        world.declaration["required_loader_capabilities"]
+                    ),
+                    authored_world=world,
+                )
+            )
+        else:
+            findings.append(
+                ExtensionFinding(
+                    extension=name,
+                    extension_version=version,
+                    directory=f"extensions/{directory}",
+                    rules_checked=False,
+                    required_loader_capabilities=tuple(
+                        sorted(
+                            {f"wmp-extension:{name}@{version}"}
+                            | set(header["required_loader_capabilities"])
+                        )
+                    ),
+                )
+            )
+    return tuple(findings)
 
 
 def inspect_package(directory: Path) -> dict[str, Any]:
@@ -416,14 +574,129 @@ def inspect_package(directory: Path) -> dict[str, Any]:
     return {"components": components, **verification.as_dict()}
 
 
+STYLE_PROFILE_PREFIX: Final = "style-profile:"
+INTERACTION_PREFIX: Final = "interaction:"
+
+
 def import_check_package(
     directory: Path,
     *,
     supported_style_profiles: frozenset[str] = frozenset(),
     supported_interaction_capabilities: frozenset[str] = frozenset(),
+    loader_capabilities: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
-    """Inspect receiver compatibility without writing a database or importing package state."""
+    """Inspect receiver compatibility without writing a database or importing package state.
+
+    ``loader_capabilities`` is the receiving loader's declaration, in one vocabulary:
+    ``style-profile:<id>@<version>``, ``interaction:<key>@<version>``, ``wmp-extension:<name>@
+    <version>``, ``asset-resolution:...``, ``asset-media:<media type>`` and ``behaviour:<key>@
+    <version>``. The two older keyword sets are the same declarations without their prefix and
+    are merged in. The answer is a comparison of that declaration with what the signed content
+    requires; nothing here runs a loader, and a declared capability remains the loader's claim.
+    """
     verification = verify_package(directory)
+    style_supported = set(supported_style_profiles) | {
+        c.removeprefix(STYLE_PROFILE_PREFIX)
+        for c in loader_capabilities
+        if c.startswith(STYLE_PROFILE_PREFIX)
+    }
+    interaction_supported = set(supported_interaction_capabilities) | {
+        c.removeprefix(INTERACTION_PREFIX)
+        for c in loader_capabilities
+        if c.startswith(INTERACTION_PREFIX)
+    }
+    declared = frozenset(
+        loader_capabilities
+        | {STYLE_PROFILE_PREFIX + value for value in style_supported}
+        | {INTERACTION_PREFIX + value for value in interaction_supported}
+    )
+    report = _import_check_base(
+        directory,
+        verification,
+        supported_style_profiles=frozenset(style_supported),
+        supported_interaction_capabilities=frozenset(interaction_supported),
+        declarations_supplied=bool(declared),
+    )
+    extension_reports: list[dict[str, Any]] = []
+    for finding in verification.extensions:
+        if finding.authored_world is not None:
+            detail = loader_report(finding.authored_world, declared)
+        else:
+            unsupported = sorted(set(finding.required_loader_capabilities) - declared)
+            detail = {
+                "load": (
+                    "the loader declares every capability this extension names; this checker "
+                    "does not know its rules and verified none of them"
+                    if not unsupported
+                    else "not loaded"
+                ),
+                "not_loaded": (
+                    None
+                    if not unsupported
+                    else f"this loader does not declare {', '.join(unsupported)}, so "
+                    f"{finding.directory} is not loaded and the loader must say so"
+                ),
+                "objects_not_drawable": [],
+                "objects_with_unsupported_behaviour": [],
+                "required_capabilities": list(finding.required_loader_capabilities),
+                "unsupported_capabilities": unsupported,
+            }
+        extension_reports.append(
+            {
+                "directory": finding.directory,
+                "extension": finding.extension,
+                "extension_version": finding.extension_version,
+                "rules_checked": finding.rules_checked,
+                **detail,
+            }
+        )
+    supplied = bool(declared)
+    base_unsupported = sorted(
+        [STYLE_PROFILE_PREFIX + value for value in report["missing_style_profiles"]]
+        + [INTERACTION_PREFIX + value for value in report["missing_interaction_capabilities"]]
+    )
+    extension_unsupported = sorted(
+        {value for item in extension_reports for value in item["unsupported_capabilities"]}
+    )
+    if not supplied:
+        loadability = "indeterminate"
+    elif base_unsupported:
+        loadability = "refused"
+    elif extension_unsupported:
+        loadability = "partial"
+    else:
+        loadability = "complete"
+    for item in extension_reports:
+        if supplied and item["not_loaded"]:
+            report["warnings"].append(item["not_loaded"])
+    return {
+        **report,
+        "declared_loader_capabilities": sorted(declared),
+        "extensions": extension_reports,
+        "loadability": loadability,
+        "loadability_basis": (
+            "the receiving loader's declared capabilities compared with what the signed content "
+            "requires; import-check runs no loader and proves no declared capability"
+        ),
+        "unsupported_capabilities": (
+            sorted(set(base_unsupported) | set(extension_unsupported)) if supplied else []
+        ),
+    }
+
+
+def _import_check_base(
+    directory: Path,
+    verification: VerificationReport,
+    *,
+    supported_style_profiles: frozenset[str],
+    supported_interaction_capabilities: frozenset[str],
+    declarations_supplied: bool,
+) -> dict[str, Any]:
+    """The 1.0 answer, unchanged: required style profiles and interaction capabilities.
+
+    ``compatible`` keeps its 1.0 meaning, the base world only. An extension a loader cannot
+    present does not make it false; ``loadability`` in the caller says that instead.
+    """
     if verification.profile_version != PROFILE_VERSION:
         raise PackageError(
             "training datasets are not interactive-world imports; use verify or inspect"
@@ -457,7 +730,6 @@ def import_check_package(
         warnings.append("spatial structure is unavailable")
     missing_profiles = sorted(required_profiles - supported_style_profiles)
     missing_capabilities = sorted(required_capabilities - supported_interaction_capabilities)
-    declarations_supplied = bool(supported_style_profiles or supported_interaction_capabilities)
     compatible: bool | None = (
         not (missing_profiles or missing_capabilities) if declarations_supplied else None
     )
