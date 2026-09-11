@@ -20,6 +20,7 @@ from exulanica.api.services import Services
 from exulanica.consent.regions import Silhouette
 from exulanica.db.roles import provision_runtime_role
 from exulanica.db.session import Database
+from exulanica.env import env_get
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.asset_read_policy import final_check, image_source
 from fastapi.testclient import TestClient
@@ -92,9 +93,11 @@ def delivery(repository, tmp_path, spine_schema, monkeypatch):
     case = Case(repository, tmp_path)
     _, schema = spine_schema
     provision_runtime_role(repository.connection, role="exulanica_ro", read_only=True)
+    # The database the schema was migrated into, not a fixed one: a fixed URL reads a schema that
+    # only exists elsewhere, and every delivery then answers 404 for a reason no test is about.
     readonly = Database(
         url=make_conninfo(
-            "postgresql://localhost:5433/exulanica_spine_test",
+            env_get("TEST_DATABASE_URL"),
             options=f"-csearch_path={schema},public -crole=exulanica_ro",
         )
     )
