@@ -8,13 +8,13 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**118 documents**, excluding `docs/evaluation/`.
+**123 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-56 documents.
+57 documents.
 
 - [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -36,6 +36,7 @@ How the system works now. Edited as the system changes.
 - [evaluation-corpus-contract](evaluation-corpus-contract.md) : IMPLEMENTED INPUT BOUNDARY; REAL OGC-1 INPUTS NOT FOUND LOCALLY 2026-08-31
 - [evaluation-harness](evaluation-harness.md) : REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
+- [first-place-2026-09-11](first-place-2026-09-11.md) : Executed on 2026-09-11 in the worktree exulanica-first-place, branch codex/first-place, from
 - [frontier-demonstration](frontier-demonstration.md) : AUTHORIZED PERSONAL CORPUS AND PRODUCTION SIGNING KEY NOT SUPPLIED; REAL RUN PENDING
 - [frontier-roadmap](frontier-roadmap.md) : DECISION and IMPLEMENTATION PLAN. This document orders existing Exulanica decisions
 - [goal-brief-2026-09-05-unblocked-backend-program](goal-brief-2026-09-05-unblocked-backend-program.md) : Written 2026-09-05, at commit ef73866, immediately after the semantic-answers and
@@ -118,7 +119,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-12 documents.
+16 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -131,7 +132,11 @@ What was intended, written before the work.
 - [2026-09-08-retained-activation](briefs/2026-09-08-retained-activation.md) : proposed, not dispatched. No retained operation is authorized by this document
 - [2026-09-08-stale-screening-policy](briefs/2026-09-08-stale-screening-policy.md) : completed and integrated at 53039d4; see
 - [2026-09-08-world-read-evidence](briefs/2026-09-08-world-read-evidence.md) : completed and integrated at 3352627 after independent corrected-head gates. See
+- [2026-09-11-companion-question-matching](briefs/2026-09-11-companion-question-matching.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-3 in
+- [2026-09-11-personal-path-first-run](briefs/2026-09-11-personal-path-first-run.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-4 to FP-7
 - [2026-09-11-scene-segments](briefs/2026-09-11-scene-segments.md) : proposed, not dispatched. Recorded 2026-09-11 after the wave-3 integration
+- [2026-09-11-structural-snapshot-sources](briefs/2026-09-11-structural-snapshot-sources.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-8 in
+- [2026-09-11-unposed-rung-three](briefs/2026-09-11-unposed-rung-three.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-1 and FP-2
 
 ## Dated records
 
