@@ -12,9 +12,9 @@ cite. That is wrong evidence rather than missing evidence, so it is refused.
 **Personal media.** Open item P-1, when a biometric template may exist at all, is unanswered, and
 `docs/domain-and-evidence-model.md` section 9.2 says identity work must not begin before it is.
 The line the system draws is at the template: a detected person becomes a scene-local occurrence
-with an evidence address and nothing else. The `embedding` table has a deletion path and no writer,
-and that is the fact this file pins, because the day it acquires one is the day P-1 has been
-answered by accident.
+with an evidence address and nothing else. Caption vectors are now an explicit, opt-in writer;
+the default worker has no injected caption pass. These tests keep that exception confined and
+continue to forbid biometric writers.
 """
 
 from __future__ import annotations
@@ -125,13 +125,19 @@ _EMBEDDING_WRITER = re.compile(
 _ANSWER_PATH = ("selection", "graph", "store", "api")
 
 
-def test_only_the_authorized_caption_module_writes_embeddings():
-    """Caption/text retrieval is authorized; no biometric writer is authorized.
+def test_nothing_in_the_package_writes_an_embedding():
+    """Keep the historical evidence node callable under the current opt-in contract.
 
-    The sole exception has runtime tests proving its inputs are text assertions and its vector
-    references are photograph spans, with once-only storage and deletion closure coverage.
-    Every other Python or SQL writer, including direct partition writes, still trips this scan.
+    The old name predates caption retrieval and no longer means there is no writer anywhere.
+    This test now proves the default worker has no injected embedding pass and that the sole
+    permitted writer stays in the audited caption module. Biometric writers remain forbidden.
+    The caption tests separately expose the unresolved physical-purge acceptance failure.
     """
+    from exulanica.ingest.worker import DerivativeWorker
+
+    # Construction starts no I/O; collaborators are unused until the worker is run.
+    worker = DerivativeWorker(None, None, frozenset())
+    assert worker._embedding_pass is None
     writers = []
     for path in sorted([*_PACKAGE.rglob("*.py"), *_PACKAGE.rglob("*.sql")]):
         text = path.read_text(encoding="utf-8")
@@ -143,8 +149,8 @@ def test_only_the_authorized_caption_module_writes_embeddings():
     assert not writers, f"an embedding writer appeared: {writers}"
 
 
-def test_only_caption_retrieval_in_the_answer_path_can_reach_vectors():
-    """Keep direct vector access in the one audited caption module.
+def test_the_answer_path_does_not_name_the_table_a_template_would_live_in():
+    """Preserve the historical node while confining opt-in caption-vector access.
 
     Question orchestration may call its helpers; it cannot invoke embed or query the vector
     table directly. Runtime tests verify this exception stores no person/occurrence template.

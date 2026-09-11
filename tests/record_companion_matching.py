@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -166,6 +167,36 @@ def seal_record(path: Path, additions: dict) -> str:
         assert hashlib.sha256(content).hexdigest() == expected, (
             f"measured file differs from recorded head: {measured_path}"
         )
+    # Keep command structure without publishing the operator's checkout or runtime paths.
+    runtime = Path(sys.executable).parent.parent
+    replacements = {
+        str(runtime): "{RUNTIME_ENV}",
+        os.path.relpath(runtime, root): "{RUNTIME_ENV}",
+        str(root): "{MATCHING_CHECKOUT}",
+    }
+
+    def scrub(value):
+        if isinstance(value, str):
+            for local, placeholder in replacements.items():
+                value = value.replace(local, placeholder)
+            return value
+        if isinstance(value, dict):
+            return {key: scrub(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [scrub(item) for item in value]
+        return value
+
+    scrubbed = scrub(record)
+    for old_gate, gate in zip(record.get("gates", []), scrubbed.get("gates", []), strict=True):
+        if gate["stdout_stderr"] != old_gate["stdout_stderr"]:
+            gate.setdefault("unredacted_log_sha256", old_gate["log_sha256"])
+            gate["log_sha256"] = hashlib.sha256(gate["stdout_stderr"].encode()).hexdigest()
+    record = scrubbed
+    record["path_placeholders"] = {
+        "{RUNTIME_ENV}": "The shared virtual environment used by the recorded commands",
+        "{MATCHING_CHECKOUT}": "The matching worktree at the recorded tested head",
+    }
+    assert "/Users/" not in json.dumps(record), "an undeclared personal path remains"
     digest = hashlib.sha256(canonical_json(record)).hexdigest()
     path.write_text(json.dumps({
         "profile": "exulanica.digest-bound-record/v1", "record": record,
