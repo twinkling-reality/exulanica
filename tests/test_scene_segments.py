@@ -259,6 +259,31 @@ def test_each_view_keeps_a_coarse_occlusion_grid_and_not_its_whole_map():
     assert len(samples.points) == 3 * PARAMS["point_map_samples_per_member"]
 
 
+def test_the_lift_refuses_a_pose_receipt_that_is_not_the_one_its_placement_is_bound_to():
+    """The cameras are read without re-verifying the receipt, which is safe only for the exact bytes
+    the placement was built from, so the digest they are held to is checked before anything else."""
+    from types import SimpleNamespace
+
+    placement = SimpleNamespace(
+        scene_ref="scene", pose_receipt_sha256="a" * 64, member_capture_refs=()
+    )
+    with pytest.raises(ValueError, match="not the bytes its digest names"):
+        lift.build_scene_segments(
+            scene_ref="scene",
+            pose_receipt=b"another receipt",
+            pose_receipt_sha256="a" * 64,
+            placement=placement,
+            placement_receipt_sha256="b" * 64,
+            gate_receipt_sha256="c" * 64,
+            member_capture_refs=(),
+            point_maps={},
+            object_mask_inputs=(),
+            object_mask_missing=(),
+            regions=(),
+            params=PARAMS,
+        )
+
+
 def test_an_object_every_view_outlines_is_one_segment_and_the_wall_behind_it_is_not():
     pytest.importorskip("scipy")
     views = _views()

@@ -251,16 +251,23 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   from the sweep or the command.
 * **The automatic lifts use point maps alone.** Lifting over trained Gaussians needs a decoded PLY
   (below) and stays the command's.
-* **The lift's peak is now the pose receipt.** MEASURED 2026-09-11 on the volcanic scene, loading
-  what the scene worker hands the lift at publication from the frozen copy and timing
-  `build_scene_segments` alone: 9.8 s, and a peak of 599 MiB of traced allocations (numpy's arrays
-  included), all of it `recovered_camera_records` parsing the 107,742,795 byte pose receipt. About
-  99.9 per cent of that receipt is sparse observations the lift never reads; a reader that skipped
-  them is the next cut, and it belongs in `exulanica/reconstruction/placement.py`. Holding every
-  placed point map until the vote had cost another 453 MiB (1,052 MiB before), and each view's
-  occlusion grid is now built as its map is placed; the artifact was byte for byte the stored one
-  both times. Placement validation, which publication skips, took 36 to 40 s of the command's run.
-  None of this was measured inside a running scene worker.
+* **What the lift costs now.** MEASURED 2026-09-11 on the volcanic scene, loading what the scene
+  worker hands the lift at publication from a frozen copy and timing `build_scene_segments` alone,
+  with the peak taken from traced allocations (numpy's arrays included):
+
+  | Build | Seconds | Peak |
+  | --- | --- | --- |
+  | Every placed point map held until the vote | 10.4 | 1,052 MiB |
+  | Each view's occlusion grid built as its map is placed | 9.8 | 599 MiB |
+  | Cameras read by `validated_receipt_cameras`, without the sparse observations | 5.4 | 126 MiB |
+
+  The artifact was byte for byte the stored one every time. The 599 MiB was the pose receipt: its
+  sparse observations are about 99.9 per cent of 107,742,795 bytes and the lift never reads them,
+  and most of what remains is the text the parser decodes the receipt into. The light reader skips
+  the receipt's digest checks, so the lift first holds the bytes to the digest its placement is
+  bound to; building or validating that placement read the whole receipt. Placement validation,
+  which publication skips, took 36 to 42 s of the command's run. None of this was measured inside a
+  running scene worker.
 * **The polygon is not on the span.** Section 2 says what that would cost.
 * **A detector-prompted segment offers nothing to name.** Only hosted-prompted masks have vision
   occurrences behind them. Creating occurrences in this stage would give every object two

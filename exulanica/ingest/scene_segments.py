@@ -86,8 +86,8 @@ from exulanica.ingest.stages.segmentation import OBJECT_MASK_KIND, OBJECT_MASK_P
 from exulanica.reconstruction.placement import (
     PlacementRecord,
     PointMapInput,
-    recovered_camera_records,
     validate_placement_record,
+    validated_receipt_cameras,
 )
 
 if TYPE_CHECKING:
@@ -191,27 +191,21 @@ def object_regions_from_artifact(
 def _cameras(pose_receipt: bytes) -> dict[str, GaussianView]:
     """Every accepted recovered camera, in the masked-geometry check's own view type.
 
-    ``recovered_camera_records`` validates the receipt and resolves each camera's calibration,
-    including the distortion models that are projected as a pinhole approximation. The rotation
-    and translation are then read from the same receipt, because the check's projector takes the
-    COLMAP camera-from-world pose rather than the scene-from-camera matrix the graph publishes.
+    Read by ``validated_receipt_cameras``, which resolves each camera's calibration through the
+    same code ``recovered_camera_records`` uses, including the distortion models projected as a
+    pinhole approximation, and returns the COLMAP camera-from-world pose the check's projector
+    takes. It leaves the sparse observations unread, which is why the receipt must already have
+    been validated: ``build_scene_segments`` holds these bytes to the digest its placement is
+    bound to, and that placement was built from them.
     """
-    records = recovered_camera_records(pose_receipt)
-    if not records:
-        return {}
-    receipt = json.loads(pose_receipt)
-    frames = {frame["filename"]: frame["capture_ref"] for frame in receipt["manifest"]["frames"]}
     views: dict[str, GaussianView] = {}
-    for camera in receipt["quality"]["cameras"]:
-        capture_ref = frames.get(camera["image_name"])
-        record = records.get(capture_ref) if capture_ref is not None else None
-        if record is None:
-            continue
+    for capture_ref, record in validated_receipt_cameras(pose_receipt).items():
         calibration = record["calibration"]
+        assert isinstance(calibration, dict)
         views[capture_ref] = GaussianView(
-            image_name=str(camera["image_name"]),
-            quaternion_wxyz=tuple(float(value) for value in camera["quaternion_wxyz"]),  # type: ignore[arg-type]
-            translation_xyz=tuple(float(value) for value in camera["translation_xyz"]),  # type: ignore[arg-type]
+            image_name=str(record["image_name"]),
+            quaternion_wxyz=tuple(float(value) for value in record["quaternion_wxyz"]),  # type: ignore[arg-type,attr-defined]
+            translation_xyz=tuple(float(value) for value in record["translation_xyz"]),  # type: ignore[arg-type,attr-defined]
             image_size=(int(calibration["width"]), int(calibration["height"])),
             focal_xy=(float(calibration["fx"]), float(calibration["fy"])),
             principal_xy=(float(calibration["cx"]), float(calibration["cy"])),
@@ -685,12 +679,16 @@ def build_scene_segments(
     """Lift one published scene's regions into segments, and bind them to everything they used.
 
     ``placement`` must already have been validated against ``pose_receipt`` and these exact point
-    maps, as the projection requires; the transforms are used as they stand. Every person region
-    offered must already have passed the reviewed-and-shown rule; ``publish_scene_segments`` is
-    the one caller that selects them, and a test holds it to that.
+    maps, as the projection requires; the transforms are used as they stand, and building it read
+    the whole receipt, so the cameras are read here without its sparse observations. The receipt is
+    held to the digest the placement is bound to first, which is what makes that safe. Every person
+    region offered must already have passed the reviewed-and-shown rule; ``publish_scene_segments``
+    is the one caller that selects them, and a test holds it to that.
     """
     if placement.scene_ref != scene_ref or placement.pose_receipt_sha256 != pose_receipt_sha256:
         raise ValueError("the placement belongs to another scene or another pose receipt")
+    if _digest(pose_receipt) != pose_receipt_sha256:
+        raise ValueError("the pose receipt is not the bytes its digest names")
     if tuple(placement.member_capture_refs) != tuple(member_capture_refs):
         raise ValueError("the placement member list differs from the scene member list")
     if (gaussian_ply is None) != (gaussian_source is None):
@@ -967,7 +965,7 @@ class ValidatedBuild:
     The scene worker builds the placement from the pose receipt and every point map and checks the
     stored bytes against it before it publishes, and doing that a second time is most of a lift.
     MEASURED 2026-09-11 on the volcanic scene: validating the placement against 210 point maps and
-    a 107,742,795 byte pose receipt took 36 to 40 s, and the build that follows it 10 s
+    a 107,742,795 byte pose receipt took 36 to 42 s, and the build that follows it 5.4 s
     (``docs/scene-segments.md`` sections 7 and 8).
     ``publish_scene_segments`` still reads the scene's current build from the database, uses these
     only when they are that build's own receipts byte for byte, and otherwise reads and validates
