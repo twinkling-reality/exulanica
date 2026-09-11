@@ -16,6 +16,7 @@ import { SegmentOverlayRuntime, type SegmentOverlayEngine } from '../../atlas-re
 import {
   SEGMENT_PICK_TOLERANCE_CANVAS_PX,
   bindSegments,
+  classifySamples,
   colourKeyOf,
   createSegmentSession,
   mountSegments,
@@ -23,6 +24,7 @@ import {
   planSegmentTints,
   projectToCanvas,
   segmentColor,
+  segmentGrid,
   segmentPalette,
   segmentsFirst,
   type DrawnScene,
@@ -34,7 +36,7 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 import { mountWritePath } from '../src/composition/write-path.js';
 import { PREVIEW_GRAPH, PREVIEW_IDS } from '../src/dev/preview-graph.js';
 import type { EvidenceCache } from '../src/evidence.js';
-import { SEGMENTS_PROFILE, SegmentsUnavailable, parseSceneSegments, type SceneSegments } from '../src/scene-segments-api.js';
+import { SegmentsUnavailable, parseSceneSegments, type SceneSegments } from '../src/scene-segments-api.js';
 import { openSession } from '../src/session.js';
 import type { CompanionStage } from '../src/ui/companion-stage.js';
 import { buildDetail } from '../src/ui/detail.js';
@@ -49,6 +51,11 @@ import { buildDetail } from '../src/ui/detail.js';
  * then falls back. And naming a segment is the Index's own flow: the same draft, the same
  * confirmation panel, and nothing sent until Confirm, which is checked against the real session,
  * the real gate and the real commit transport over a scripted `fetch`.
+ *
+ * The artifact is the backend's: `graph-client/test/fixtures/scene-segments.json` is the body
+ * `GET /scene-segments/{id}` serves for the scene the backend's own tests build, and it is parsed
+ * here as it arrives. Segments are voxels in the scene frame, so the surface's one piece of
+ * geometry is the lift's own rule for which cell a sample lands in, tested at the cell edges.
  */
 
 // Read from the workspace root vitest runs in: under happy-dom, `import.meta.url` is not a file URL.
@@ -58,42 +65,58 @@ const FIXTURE = JSON.parse(readFileSync(
 
 const SCENE_ID = '11111111-1111-4111-8111-111111111111';
 const POINTS = '22222222-2222-4222-8222-222222222222';
-const segmentId = (n: number) => `33333333-3333-4333-8333-${String(n).padStart(12, '0')}`;
+const SUBJECT = '55555555-5555-4555-8555-555555555555';
+const segmentId = (n: number) => n.toString(16).padStart(32, '0');
 const REGION = toIslandId(PREVIEW_IDS.regionStudio);
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+/** Five centimetres a cell, so each sample below sits alone in its own. */
+const EDGE = 50_000;
+
+const cellOf = (point: readonly number[]) => point.map((value) => Math.floor((value * 1_000_000) / EDGE));
 
 function wire(segments: readonly Record<string, unknown>[], over: Record<string, unknown> = {}) {
   return {
-    profile: SEGMENTS_PROFILE,
+    schema_version: 1,
     scene_id: SCENE_ID,
-    bound_to: {
-      member_digest: 'a'.repeat(64),
-      pose_receipt_sha256: 'b'.repeat(64),
-      placement_receipt_sha256: 'c'.repeat(64),
-      region_digest: 'd'.repeat(64),
-    },
-    method: {
-      masks: { model: 'facebook/sam2.1-hiera-tiny', revision: 'r1', licence: 'Apache-2.0' },
-      boxes: null,
-      projection: 'masked-geometry',
-      views: 4,
-    },
-    assets: [{ artifact_id: POINTS, kind: 'point_map', content_sha256: 'e'.repeat(64), sample_count: 6 }],
+    state: 'available',
+    reason: null,
+    artifact: { artifact_id: '66666666-6666-4666-8666-666666666666', content_sha256: 'f'.repeat(64), byte_size: 100 },
+    pose_receipt_sha256: 'b'.repeat(64),
+    placement_receipt_sha256: 'c'.repeat(64),
+    gate_receipt_sha256: 'd'.repeat(64),
+    grid: { frame: 'scene', voxel_size_microunits: EDGE },
+    policy: { person_segments: 'reviewed-region-with-subject-and-shown-consent-only' },
     segments,
+    withheld_segment_count: 0,
+    stale_inputs: [],
     ...over,
   };
 }
 
-const segment = (n: number, over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  segment_id: segmentId(n),
-  entity_id: null,
-  entity_class: 'object',
-  label: 'chair',
-  vote_count: 3,
-  confidence: 'medium',
-  occurrence_ids: [],
-  person: null,
-  samples: [{ artifact_id: POINTS, index_runs: [[0, 2]] }],
-  ...over,
+const votes = { views: 4, min: 2, median: 3, max: 4, fraction_min_millionths: 500000, fraction_median_millionths: 750000 };
+
+function segment(n: number, voxels: readonly (readonly number[])[], over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    segment_id: segmentId(n),
+    kind: 'object',
+    label: 'chair',
+    subject_id: null,
+    display_name: null,
+    voxel_count: voxels.length,
+    voxels,
+    bounds_microunits: { min: [0, 0, 0], max: [1, 1, 1] },
+    centroid_microunits: [0, 0, 0],
+    samples: { point_map: 12, gaussian: 0 },
+    votes,
+    regions: [{ capture_id: PREVIEW_IDS.captureStudio, kind: 'object_mask', span_id: PREVIEW_IDS.spanStudioChair, region_key: null, samples: 12 }],
+    occurrence_ids: [],
+    ...over,
+  };
+}
+
+const person = (n: number, voxels: readonly (readonly number[])[], displayName: string | null) => segment(n, voxels, {
+  kind: 'person', label: null, subject_id: SUBJECT, display_name: displayName,
+  regions: [{ capture_id: PREVIEW_IDS.captureStudio, kind: 'person_region', span_id: null, region_key: 'a'.repeat(64), samples: 9 }],
 });
 
 const RECORD = {
@@ -102,43 +125,98 @@ const RECORD = {
   memberDigest: 'a'.repeat(64),
   poseReceiptSha256: 'b'.repeat(64),
   placementReceiptSha256: 'c'.repeat(64),
+  gateDigest: 'd'.repeat(64),
   trainedGeometry: null,
-  members: [{ captureId: PREVIEW_IDS.captureStudio, placement: { artifactId: POINTS, contentSha256: 'e'.repeat(64) } }],
+  members: [{ captureId: PREVIEW_IDS.captureStudio, placement: { artifactId: POINTS, contentSha256: 'e'.repeat(64), sceneFromOpmRowMajor: IDENTITY } }],
 } as unknown as ReconstructionSceneRecord;
 
-const DRAWN: DrawnScene = { sceneId: SCENE_ID, islandId: REGION, assets: [{ artifactId: POINTS, kind: 'point_map', sampleCount: 6 }] };
+const DRAWN: DrawnScene = {
+  sceneId: SCENE_ID, islandId: REGION,
+  assets: [{ artifactId: POINTS, kind: 'point_map', sampleCount: 6, drawnSceneFromLocal: IDENTITY }],
+};
 
 // -- the artifact -----------------------------------------------------------------------------------
 
-describe('the segment artifact', () => {
-  it('reads the provisional fixture: two bound assets, five segments, one person with consent and no name', () => {
+describe('the published scene segments body', () => {
+  it('reads the backend fixture as it is served: a person by subject and no name, an object by label', () => {
     const parsed = parseSceneSegments(FIXTURE);
-    expect(parsed.assets.map((asset) => [asset.kind, asset.sampleCount])).toEqual([['point_map', 190570], ['trained_geometry', 512]]);
-    expect(parsed.segments.map((item) => item.label)).toEqual(['person', 'bicycle', 'paper bag', 'planter', 'glasshouse']);
-    const person = parsed.segments[0]!;
-    expect(person.person).toEqual({
-      reviewState: 'screened', state: 'shown', consent: { presence: 'granted', naming: 'granted', likeness: 'granted' },
-    });
-    expect(JSON.stringify(person)).not.toMatch(/display_?name/i);
-    expect(parsed.segments.every((item) => item.samples.every((samples) => samples.count > 0))).toBe(true);
+    expect(parsed.state).toBe('available');
+    expect(parsed.voxelSizeMicrounits).toBe(459682);
+    expect(parsed.withheldSegmentCount).toBe(0);
+    const [someone, sign] = parsed.segments;
+    expect([someone!.kind, someone!.label, someone!.displayName]).toEqual(['person', null, null]);
+    expect(someone!.subjectId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(someone!.voxels.length).toBe(45 * 3);
+    expect([sign!.kind, sign!.label, sign!.subjectId]).toEqual(['object', 'trail sign', null]);
+    expect(sign!.occurrenceIds).toHaveLength(3);
+    expect(sign!.votes).toEqual({ views: 3, min: 2, median: 3, max: 3, fractionMinMillionths: 666666, fractionMedianMillionths: 1000000 });
   });
 
-  it('refuses what cannot be an answer about the geometry it names', () => {
+  it('ignores a field the server adds, and refuses one it renamed, retyped or mixed', () => {
+    expect(parseSceneSegments({ ...wire([segment(1, [[0, 0, 0]])]), a_later_field: true }).segments).toHaveLength(1);
     const refuse = (value: unknown) => expect(() => parseSceneSegments(value)).toThrow(SegmentsUnavailable);
-    refuse({ ...wire([segment(1)]), profile: 'exulanica.scene-segments/v0' });
-    refuse(wire([segment(1, { samples: [{ artifact_id: POINTS, index_runs: [[0, 3], [2, 1]] }] })]));
-    refuse(wire([segment(1, { samples: [{ artifact_id: POINTS, index_runs: [[5, 2]] }] })]));
-    refuse(wire([segment(1, { vote_count: 5 })]));
-    refuse(wire([segment(1, { entity_class: 'person', person: null })]));
-    refuse(wire([segment(1, { samples: [{ artifact_id: '99999999-9999-4999-8999-999999999999', index_runs: [[0, 1]] }] })]));
-    expect(() => parseSceneSegments(wire([segment(1)]), '44444444-4444-4444-8444-444444444444')).toThrow(/different scene/);
+    refuse({ ...wire([]), schema_version: 2 });
+    refuse(wire([segment(1, [[0, 0, 0]], { kind: 'person', label: 'person', subject_id: SUBJECT })]));
+    refuse(wire([segment(1, [[0, 0, 0]], { subject_id: SUBJECT })]));
+    refuse(wire([segment(1, [[0, 0, 0]], { voxel_count: 2 })]));
+    refuse(wire([segment(1, [[0, 0, 0]], { votes: { ...votes, min: 4 } })]));
+    refuse(wire([segment(1, [[0, 0, 0]])], { state: 'stale' }));
+    refuse(wire([segment(1, [[0, 0, 0]])], { grid: null }));
+    refuse(wire([segment(1, [[0, 0, 0]]), segment(1, [[1, 0, 0]])]));
+    refuse(wire([], { grid: { frame: 'display', voxel_size_microunits: EDGE } }));
+    expect(() => parseSceneSegments(wire([]), '44444444-4444-4444-8444-444444444444')).toThrow(/different scene/);
   });
 
-  it('reads a consent it does not recognise, or one that is missing, as not recorded', () => {
-    const parsed = parseSceneSegments(wire([segment(1, {
-      entity_class: 'person', person: { review_state: 'screened', consent: { presence: 'granted', naming: 'maybe' } },
-    })]));
-    expect(parsed.segments[0]!.person!.consent).toEqual({ presence: 'granted', naming: 'not_recorded', likeness: 'not_recorded' });
+  it('reads a scene with no segments to give, with its reason', () => {
+    const parsed = parseSceneSegments(wire([], { state: 'stale', reason: 'A region moved.', stale_inputs: ['person_region'], grid: null }));
+    expect([parsed.state, parsed.reason, parsed.staleInputs]).toEqual(['stale', 'A region moved.', ['person_region']]);
+  });
+});
+
+// -- the voxel rule ---------------------------------------------------------------------------------
+
+describe('a drawn sample is tinted by the cell the lift would put it in', () => {
+  it('floors each axis at the cell edge, the way `_voxels` does, negative coordinates included', () => {
+    const [a, b] = parseSceneSegments(wire([segment(1, [[2, 0, -1]]), segment(2, [[1, 0, -1]])])).segments;
+    const grid = segmentGrid([a!, b!], new Map([[a!.segmentId, 1], [b!.segmentId, 2]]), EDGE)!;
+    const at = (x: number, z: number) => classifySamples(Float32Array.from([x, 0.01, z]), IDENTITY, grid)[0];
+    expect(at(0.1, -0.01)).toBe(1);
+    expect(at(0.0999, -0.01)).toBe(2);
+    expect(at(0.1, 0)).toBe(0);
+    expect(at(0.15, -0.05)).toBe(0);
+  });
+
+  it('places samples with the graph’s own transform, not the display frame the renderer draws with', () => {
+    const local = Float32Array.from([0.01, 0.01, 0.01, 1.01, 0.01, 0.01]);
+    const segments = parseSceneSegments(wire([segment(1, [cellOf([0.01, 0.01, 0.01])])]));
+    const displayed = { ...DRAWN.assets[0]!, sampleCount: 2, drawnSceneFromLocal: [1, 0, 0, 5, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] };
+    const bound = bindSegments(segments, { ...DRAWN, assets: [displayed] }, RECORD, false);
+    const plan = planSegmentTints(segments, bound, () => local);
+    expect(plan.tints.map((tint) => [tint.slot, [...tint.indices]])).toEqual([[1, [0]]]);
+  });
+
+  it('gives a cell two segments share to the one listed first, and counts it', () => {
+    const shared = [3, 3, 3];
+    const [first, second] = parseSceneSegments(wire([person(1, [shared], null), segment(2, [shared, [4, 3, 3]])])).segments;
+    const grid = segmentGrid([first!, second!], new Map([[first!.segmentId, 1], [second!.segmentId, 2]]), EDGE)!;
+    expect(grid.contested).toBe(1);
+    const centre = (cell: readonly number[]) => cell.map((index) => ((index + 0.5) * EDGE) / 1_000_000);
+    expect([...classifySamples(Float32Array.from([...centre(shared), ...centre([4, 3, 3])]), IDENTITY, grid)]).toEqual([1, 2]);
+  });
+
+  it('tints every sample that lies in the published fixture’s own cells as that segment', () => {
+    const parsed = parseSceneSegments(FIXTURE);
+    const slots = new Map(parsed.segments.map((item, index) => [item.segmentId, index + 1]));
+    const grid = segmentGrid(parsed.segments, slots, parsed.voxelSizeMicrounits!)!;
+    const edge = parsed.voxelSizeMicrounits! / 1_000_000;
+    for (const [index, item] of parsed.segments.entries()) {
+      const centres: number[] = [];
+      for (let at = 0; at < item.voxels.length; at += 3) centres.push(...[0, 1, 2].map((axis) => (item.voxels[at + axis]! + 0.5) * edge));
+      const classified = classifySamples(Float32Array.from(centres), IDENTITY, grid);
+      // Every cell of the first segment is its own; a later one may lose a shared cell to it.
+      if (index === 0) expect(new Set(classified)).toEqual(new Set([1]));
+      expect(classified.filter((slot) => slot === index + 1).length).toBe(item.voxels.length / 3 - (index === 0 ? 0 : grid.contested));
+    }
   });
 });
 
@@ -156,26 +234,33 @@ describe('a segment wears its entity colour, and nothing else decides it', () =>
     }
   });
 
-  it('does not depend on the other segments, their order, or the region', () => {
-    const segments = parseSceneSegments(FIXTURE);
-    const reversed = { ...segments, segments: [...segments.segments].reverse() };
-    const bound = bindSegments(segments, { sceneId: segments.sceneId, islandId: REGION, assets: [{ artifactId: segments.assets[0]!.artifactId, kind: 'point_map', sampleCount: 190570 }] }, undefined, true);
-    const colourOf = (value: SceneSegments) => {
-      const plan = planSegmentTints(value, bound);
-      const palette = segmentPalette(plan, null);
-      return new Map([...plan.slotOf.values()].map((slot) => [colourKeyOf(plan.segmentOfSlot.get(slot)!), palette.get(slot)!.slice(0, 3)]));
+  it('keys a person by subject, an object by its linked entity, and otherwise by the segment', () => {
+    const snapshot = { occurrences: [{ occurrenceId: PREVIEW_IDS.occurrenceStudioPlace, entityId: PREVIEW_IDS.entityGlasshouse }] } as unknown as GraphSnapshot;
+    const [someone, linked, bare] = parseSceneSegments(wire([
+      person(1, [[0, 0, 0]], null),
+      segment(2, [[1, 0, 0]], { occurrence_ids: [PREVIEW_IDS.occurrenceStudioPlace] }),
+      segment(3, [[2, 0, 0]]),
+    ])).segments;
+    expect(colourKeyOf(someone!, snapshot)).toBe(SUBJECT);
+    expect(colourKeyOf(linked!, snapshot)).toBe(PREVIEW_IDS.entityGlasshouse);
+    expect(colourKeyOf(bare!, snapshot)).toBe(segmentId(3));
+  });
+
+  it('does not depend on the other segments or their order', () => {
+    const snapshot = { occurrences: [] } as unknown as GraphSnapshot;
+    const parsed = parseSceneSegments(FIXTURE);
+    const colours = (items: SceneSegments['segments']) => {
+      const slotOf = new Map(items.map((item, index) => [item.segmentId, index + 1]));
+      const palette = segmentPalette({ slotOf, segmentOfSlot: new Map(items.map((item, index) => [index + 1, item])) }, null, snapshot);
+      return new Map(items.map((item) => [item.segmentId, palette.get(slotOf.get(item.segmentId)!)!.slice(0, 3)]));
     };
-    const first = colourOf(segments);
-    const second = colourOf(reversed);
-    expect([...first.keys()].sort()).toEqual([...second.keys()].sort());
-    for (const [key, colour] of first) expect(second.get(key)).toEqual(colour);
-    // The same entity in another scene's artifact, under another segment id, is the same colour.
-    expect(colourKeyOf({ entityId: MARA, segmentId: segmentId(9) })).toBe(colourKeyOf({ entityId: MARA, segmentId: segmentId(1) }));
+    const forward = colours(parsed.segments);
+    const backward = colours([...parsed.segments].reverse());
+    for (const [id, colour] of forward) expect(backward.get(id)).toEqual(colour);
   });
 
   it('spreads identifiers that differ only in their last digits, which the browser showed as one green', () => {
-    const keys = ['101', '102', '103', '104', '105'].map((tail) => `00000000-0000-4000-8000-000000000${tail}`);
-    const colours = keys.map(segmentColor);
+    const colours = ['101', '102', '103', '104', '105'].map((tail) => segmentColor(`00000000-0000-4000-8000-000000000${tail}`));
     for (let i = 0; i < colours.length; i += 1) {
       for (let j = i + 1; j < colours.length; j += 1) {
         const [a, b] = [colours[i]!, colours[j]!];
@@ -289,33 +374,35 @@ describe('a click is answered by a segment first, within a stated tolerance', ()
 
 // -- what an artifact is bound to ------------------------------------------------------------------
 
-describe('segments tint only the bytes they were computed against', () => {
-  const parsed = parseSceneSegments(wire([segment(1)]));
+describe('segments are refused unless they describe the geometry drawn here', () => {
+  const parsed = parseSceneSegments(wire([segment(1, [[0, 0, 0]])]));
 
-  it('binds an asset whose scene receipts, digest and sample count all agree', () => {
+  it('binds a drawn asset through its graph placement when the receipts agree', () => {
     const bound = bindSegments(parsed, DRAWN, RECORD, false);
-    expect([...bound.assets.keys()]).toEqual([POINTS]);
+    expect(bound.assets.map((item) => [item.asset.artifactId, item.sceneFromLocal])).toEqual([[POINTS, IDENTITY]]);
     expect(bound.notices).toEqual([]);
   });
 
-  it('refuses the whole artifact when a scene receipt differs, and an asset whose bytes or count differ', () => {
+  it('refuses the whole artifact when the scene or a receipt differs', () => {
     const differ = (over: Partial<ReconstructionSceneRecord>) => bindSegments(parsed, DRAWN, { ...RECORD, ...over }, false);
-    expect(differ({ poseReceiptSha256: 'f'.repeat(64) }).assets.size).toBe(0);
-    expect(differ({ placementReceiptSha256: 'f'.repeat(64) }).assets.size).toBe(0);
-    expect(differ({ memberDigest: 'f'.repeat(64) }).assets.size).toBe(0);
-    expect(bindSegments(parsed, DRAWN, undefined, false).assets.size).toBe(0);
-    const rebuilt = differ({ members: [{ placement: { artifactId: POINTS, contentSha256: 'f'.repeat(64) } }] } as never);
-    expect(rebuilt.assets.size).toBe(0);
-    expect(rebuilt.notices[0]).toMatch(/not the ones the segments were computed against/);
-    const resampled = bindSegments(parsed, { ...DRAWN, assets: [{ artifactId: POINTS, kind: 'point_map', sampleCount: 7 }] }, RECORD, false);
-    expect(resampled.notices[0]).toMatch(/draws 7 samples and the segments index 6/);
+    expect(differ({ poseReceiptSha256: 'f'.repeat(64) }).assets).toEqual([]);
+    expect(differ({ placementReceiptSha256: 'f'.repeat(64) }).assets).toEqual([]);
+    expect(differ({ gateDigest: 'f'.repeat(64) }).notices[0]).toMatch(/different gate receipt/);
+    expect(bindSegments(parsed, DRAWN, undefined, false).assets).toEqual([]);
+    expect(bindSegments(parsed, { ...DRAWN, sceneId: '77777777-7777-4777-8777-777777777777' }, RECORD, false).notices[0]).toMatch(/different scene/);
   });
 
-  it('binds the preview by sample count alone, and says that it did', () => {
-    const preview = bindSegments(parsed, { ...DRAWN, sceneId: 'legacy:x', assets: [{ artifactId: 'legacy:x:0', kind: 'point_map', sampleCount: 6 }] }, undefined, true);
-    expect(preview.assets.get(POINTS)?.artifactId).toBe('legacy:x:0');
+  it('skips an asset the graph holds no placement for, and says so', () => {
+    const bound = bindSegments(parsed, DRAWN, { ...RECORD, members: [] } as unknown as ReconstructionSceneRecord, false);
+    expect(bound.assets).toEqual([]);
+    expect(bound.notices[0]).toMatch(/no placement for drawn asset/);
+  });
+
+  it('binds the preview through its drawn transform, and says nothing was compared', () => {
+    const preview = bindSegments(parsed, { ...DRAWN, sceneId: 'legacy:x' }, undefined, true);
+    expect(preview.assets).toHaveLength(1);
     expect(preview.verified).toBe(false);
-    expect(preview.notices[0]).toMatch(/sample count only/);
+    expect(preview.notices[0]).toMatch(/No receipt was compared/);
   });
 });
 
@@ -339,6 +426,13 @@ const INSPECTING: SceneInspectionView = {
   position: [0, 1.6, 5], forward: [0, 0, -1], up: [0, 1, 0], fovYDeg: 60, sourceAspect: 4 / 3,
 };
 
+/** Six drawn samples, each alone in its cell, at known pixels from the inspection camera. */
+const SAMPLES = [
+  pointAt(300, 300, 5), pointAt(320, 300, 5), pointAt(500, 300, 5),
+  pointAt(520, 300, 5), pointAt(600, 400, 5), pointAt(620, 400, 5),
+];
+const cells = (...indices: number[]) => indices.map((index) => cellOf(SAMPLES[index]!));
+
 function fakeEngine(): SegmentOverlayEngine {
   return {
     maxTextureSize: 4096,
@@ -348,15 +442,14 @@ function fakeEngine(): SegmentOverlayEngine {
 }
 
 function harness(segments: SceneSegments, snapshot: GraphSnapshot, over: Partial<SegmentsDependencies> = {}) {
-  const positions = Float32Array.from([
-    ...pointAt(300, 300, 5), ...pointAt(320, 300, 5), ...pointAt(500, 300, 5),
-    ...pointAt(520, 300, 5), ...pointAt(600, 400, 5), ...pointAt(620, 400, 5),
-  ]);
   const visual = {
     island: region(),
     entity: {},
-    cloud: { pointCount: 6 },
-    pointMap: { sceneId: SCENE_ID, artifactId: POINTS, islandId: REGION, map: { position: positions }, sceneFromOpmRowMajor: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], localUnitsToSceneUnits: 1 },
+    cloud: { pointCount: SAMPLES.length },
+    pointMap: {
+      sceneId: SCENE_ID, artifactId: POINTS, islandId: REGION, map: { position: Float32Array.from(SAMPLES.flat()) },
+      sceneFromOpmRowMajor: IDENTITY, localUnitsToSceneUnits: 1,
+    },
   };
   const overlay = new SegmentOverlayRuntime([visual as never], [], fakeEngine, {
     lensPrepared: () => false, settle: () => undefined, invalidate: () => undefined,
@@ -376,14 +469,13 @@ function harness(segments: SceneSegments, snapshot: GraphSnapshot, over: Partial
   canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   const state = { atlas: { binding }, credentials: null, issued: 0 } as unknown as SessionState;
   const env = { preview: false, canvas } as unknown as AppEnvironment;
-  const confirmShown: unknown[] = [];
   const mounted = mountSegments({
     env,
     state,
     snapshot,
     segmentSession: createSegmentSession(),
     session: { stage: vi.fn(), stateVersion: () => snapshot.stateVersion },
-    confirm: { root: document.createElement('aside'), show: (...args: unknown[]) => { confirmShown.push(args); }, reportFailure: vi.fn(), hide: vi.fn() },
+    confirm: { root: document.createElement('aside'), show: vi.fn(), reportFailure: vi.fn(), hide: vi.fn() },
     hideOtherConfirms: vi.fn(),
     inspect: vi.fn(),
     showWorld: vi.fn(),
@@ -393,7 +485,7 @@ function harness(segments: SceneSegments, snapshot: GraphSnapshot, over: Partial
     ...over,
   });
   document.body.append(mounted.root);
-  return { mounted, binding, apply, setPalette, state, confirmShown };
+  return { mounted, binding, apply, setPalette, state };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -413,7 +505,7 @@ afterEach(() => { mounted?.dispose(); mounted = null; });
 
 describe('with the overlay off, nothing changes', () => {
   it('makes no call on the renderer, and a click in the inspector is click-to-evidence', async () => {
-    const h = harness(parseSceneSegments(wire([segment(1)])), snapshotWith());
+    const h = harness(parseSceneSegments(wire([segment(1, cells(0, 1))])), snapshotWith());
     mounted = h.mounted;
     await h.mounted.begin();
     h.binding.inspectionView = INSPECTING;
@@ -428,13 +520,15 @@ describe('with the overlay off, nothing changes', () => {
   });
 
   it('switched on and off again, calls the renderer once to put the overlay up and once to take it down', async () => {
-    const h = harness(parseSceneSegments(wire([segment(1)])), snapshotWith());
+    const h = harness(parseSceneSegments(wire([segment(1, cells(0, 1))])), snapshotWith());
     mounted = h.mounted;
     await h.mounted.begin();
     toggle(h.mounted);
     await settle();
     expect(h.apply).toHaveBeenCalledTimes(1);
-    expect(h.apply.mock.calls[0]![0]).toMatchObject({ islandId: REGION, tints: [{ slot: 1, artifactId: POINTS }] });
+    const overlay = h.apply.mock.calls[0]![0]!;
+    expect(overlay.islandId).toBe(REGION);
+    expect(overlay.tints.map((tint) => [tint.slot, tint.artifactId, [...tint.indices]])).toEqual([[1, POINTS, [0, 1]]]);
     toggle(h.mounted);
     await settle();
     expect(h.apply.mock.calls.map((call) => call[0] === null)).toEqual([false, true]);
@@ -445,8 +539,8 @@ describe('with the overlay off, nothing changes', () => {
 describe('selecting a segment in the inspector', () => {
   async function inspecting() {
     const segments = parseSceneSegments(wire([
-      segment(1, { samples: [{ artifact_id: POINTS, index_runs: [[0, 2]] }] }),
-      segment(2, { label: 'lamp', vote_count: 2, samples: [{ artifact_id: POINTS, index_runs: [[2, 2]] }] }),
+      segment(1, cells(0, 1)),
+      segment(2, cells(2, 3), { label: 'lamp' }),
     ]));
     const h = harness(segments, snapshotWith());
     mounted = h.mounted;
@@ -493,47 +587,47 @@ describe('selecting a segment in the inspector', () => {
     expect(h.binding.navigateToIsland).toHaveBeenCalledWith(REGION, true);
     expect(h.mounted.root.querySelector('.scene-segment[aria-current="true"]')?.textContent).toContain('lamp');
   });
+
+  it('lists a segment whose cells hold nothing drawn here, and says why it is not tinted', async () => {
+    const h = harness(parseSceneSegments(wire([segment(1, [[999, 999, 999]])])), snapshotWith());
+    mounted = h.mounted;
+    await h.mounted.begin();
+    toggle(h.mounted);
+    await settle();
+    expect(rows(h.mounted)[0]!.textContent).toContain('Not tinted: no sample drawn here falls in any of its voxels.');
+    expect(h.apply).not.toHaveBeenCalled();
+  });
 });
 
 describe('a person segment', () => {
-  const PERSON = '55555555-5555-4555-8555-555555555555';
-  const person = (consent: Record<string, string>, label = 'Mara Kowalski') => segment(1, {
-    entity_id: PERSON, entity_class: 'person', label, vote_count: 4,
-    person: { review_state: 'screened', state: 'present', consent },
-  });
-
-  it('never shows a name the graph withheld, and says what consent is recorded', async () => {
-    const h = harness(parseSceneSegments(wire([person({ presence: 'granted', likeness: 'withdrawn' })])),
-      snapshotWith([{ entityId: PERSON, kind: 'person', displayName: null }]));
+  async function showing(body: SceneSegments) {
+    const h = harness(body, snapshotWith());
     mounted = h.mounted;
     await h.mounted.begin();
     toggle(h.mounted);
     await settle();
     rows(h.mounted)[0]!.querySelector<HTMLButtonElement>('.scene-segment-select')!.click();
+    return h;
+  }
+
+  it('is unnamed unless the server sends a name, and says what consent lets it be shown', async () => {
+    const h = await showing(parseSceneSegments(wire([person(1, cells(0), null)])));
     const text = h.mounted.root.textContent ?? '';
-    expect(text).toContain('Unnamed person');
-    expect(text).not.toContain('Mara Kowalski');
-    expect(text).toContain('Presence consent: granted. Naming consent: not recorded. Likeness consent: withdrawn.');
+    expect(rows(h.mounted)[0]!.querySelector('.scene-segment-heading')?.textContent).toBe('Unnamed person');
+    expect(text).toContain('presentation state is shown');
+    expect(text).toContain('No naming receipt is held for this person, so no name is shown.');
+    expect(text).toContain('the naming flow has nothing to name');
   });
 
-  it('shows the name the graph gives, and only that one', async () => {
-    const h = harness(parseSceneSegments(wire([person({ presence: 'granted', naming: 'granted' }, 'person')])),
-      snapshotWith([{ entityId: PERSON, kind: 'person', displayName: 'Mara' }]));
-    mounted = h.mounted;
-    await h.mounted.begin();
-    toggle(h.mounted);
-    await settle();
+  it('shows the name the server sends, and only while it sends it', async () => {
+    const h = await showing(parseSceneSegments(wire([person(1, cells(0), 'Mara')])));
     expect(rows(h.mounted)[0]!.querySelector('.scene-segment-heading')?.textContent).toBe('Mara');
+    expect(h.mounted.root.textContent).toContain('A naming receipt is held for this person');
   });
 
-  it('is listed and not tinted without recorded presence consent', async () => {
-    const h = harness(parseSceneSegments(wire([person({ presence: 'withdrawn' })])), snapshotWith());
-    mounted = h.mounted;
-    await h.mounted.begin();
-    toggle(h.mounted);
-    await settle();
-    expect(rows(h.mounted)[0]!.textContent).toContain('Not tinted: no presence consent is recorded for this person.');
-    expect(h.apply).not.toHaveBeenCalled();
+  it('counts the people the server withheld rather than drawing none and saying there were none', async () => {
+    const h = await showing(parseSceneSegments(wire([segment(1, cells(0))], { withheld_segment_count: 2 })));
+    expect(h.mounted.root.textContent).toContain('2 segments were withheld by a live consent check or the read policy');
   });
 });
 
@@ -563,7 +657,7 @@ describe('naming a segment is the Index naming flow, confirmed before it is comm
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  async function openFlow() {
+  async function openFlow(occurrenceIds: readonly string[] = [CHAIR]) {
     const opened = await openSession({ baseUrl: API, token: 'token' });
     const snapshot = { ...opened.initial, reconstructionScenes: [RECORD] } as GraphSnapshot;
     const state = { atlas: null, credentials: null, issued: 0, snapshot, selected: null } as unknown as SessionState;
@@ -583,16 +677,15 @@ describe('naming a segment is the Index naming flow, confirmed before it is comm
       remount,
     });
     document.body.append(detail.root, writePath.confirm.root);
-    const segments = parseSceneSegments(wire([segment(1, { label: 'chair', occurrence_ids: [CHAIR] })]));
+    const segments = parseSceneSegments(wire([segment(1, cells(0, 1), { occurrence_ids: occurrenceIds })]));
     const h = harness(segments, snapshot, { session: opened.session, confirm: writePath.confirm });
-    (h.state as { issued: number }).issued = 0;
-    Object.assign(h.state, { snapshot });
+    Object.assign(h.state, { snapshot, issued: 0 });
     mounted = h.mounted;
     await h.mounted.begin();
     toggle(h.mounted);
     await settle();
     h.binding.inspectionView = INSPECTING;
-    return { h, writePath, detail, snapshot, state, remount };
+    return { h, writePath, detail, snapshot, remount };
   }
 
   const nameSegment = (h: ReturnType<typeof harness>, name: string) => {
@@ -645,17 +738,12 @@ describe('naming a segment is the Index naming flow, confirmed before it is comm
       .toEqual(['GET /graph', 'POST /identity/name', 'GET /graph', 'GET /graph']);
   });
 
-  it('offers no naming form for a segment whose detections the graph already links', async () => {
-    const segments = parseSceneSegments(wire([segment(1, { occurrence_ids: [PREVIEW_IDS.occurrenceStudioPlace] })]));
-    const opened = await openSession({ baseUrl: API, token: 'token' });
-    const h = harness(segments, { ...opened.initial, reconstructionScenes: [RECORD] } as GraphSnapshot);
-    mounted = h.mounted;
-    await h.mounted.begin();
-    toggle(h.mounted);
-    await settle();
+  it('shows the graph’s name and offers no form for a segment whose detections are already linked', async () => {
+    const { h } = await openFlow([PREVIEW_IDS.occurrenceStudioPlace]);
     rows(h.mounted)[0]!.querySelector<HTMLButtonElement>('.scene-segment-select')!.click();
     expect(h.mounted.root.querySelector('.scene-segment-name')).toBeNull();
-    expect(h.mounted.root.textContent).toMatch(/already linked to an entity/);
+    expect(rows(h.mounted)[0]!.querySelector('.scene-segment-heading')?.textContent).toBe('Glasshouse');
+    expect(h.mounted.root.textContent).toContain('The graph names this chair Glasshouse.');
   });
 });
 

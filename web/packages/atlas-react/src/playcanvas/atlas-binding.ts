@@ -2044,6 +2044,13 @@ function tintedSamples(slots: Uint8Array): { readonly indices: Uint32Array; read
   return { indices, slots: tinted };
 }
 
+/** A trained scene's Gaussian centres in its asset frame, when the engine kept a CPU copy. */
+function splatCentres(visual: TrainedSceneVisual): Float32Array | null {
+  const centres = (visual.asset.resource as { centers?: unknown } | null | undefined)?.centers;
+  const length = visual.geometry.pointCount * 3;
+  return centres instanceof Float32Array && centres.length >= length ? centres.subarray(0, length) : null;
+}
+
 /** Atlas positions of the given samples, through the scene transform and the region placement. */
 function atlasPositions(
   island: Island,
@@ -2120,6 +2127,26 @@ export class SegmentOverlayRuntime {
     return this.#splats.has(entity);
   }
 
+  /**
+   * One drawn asset's samples in its own local frame, three floats each, in the asset's own order.
+   *
+   * A point map's positions, or a trained scene's Gaussian centres when the engine holds a CPU copy
+   * of them; null otherwise. This is what a caller needs to decide which samples a segment covers,
+   * and it is read here so the engine's resource stays behind the binding. The overlay itself only
+   * ever takes indices.
+   */
+  localSamples(artifactId: string): { readonly kind: 'gaussians' | 'points'; readonly positions: Float32Array } | null {
+    for (const visual of this.#trained) {
+      if (visual.geometry.artifactId !== artifactId) continue;
+      const centres = splatCentres(visual);
+      return centres === null ? null : { kind: 'gaussians', positions: centres };
+    }
+    for (const visual of this.#islands) {
+      if (visual.pointMap.artifactId === artifactId) return { kind: 'points', positions: visual.pointMap.map.position };
+    }
+    return null;
+  }
+
   /** Tint one region's segments, replacing whatever region was tinted before. Null is off. */
   apply(overlay: SegmentOverlay | null): SegmentOverlayReport {
     if (overlay === null) {
@@ -2169,12 +2196,12 @@ export class SegmentOverlayRuntime {
       held?.slots.destroy();
       held?.palette.destroy();
       nextSplats.set(visual.entity, { gsplat, slots: slotTexture, palette: paletteTexture, addedLens });
-      const centres = (visual.asset.resource as { centers?: unknown } | null | undefined)?.centers;
+      const centres = splatCentres(visual);
       assets.push(Object.freeze({
         artifactId, kind: 'gaussians' as const, sampleCount, ...tinted,
-        positions: centres instanceof Float32Array && centres.length >= sampleCount * 3
-          ? atlasPositions(visual.island, visual.geometry.sceneFromAssetRowMajor, centres, tinted.indices)
-          : null,
+        positions: centres === null
+          ? null
+          : atlasPositions(visual.island, visual.geometry.sceneFromAssetRowMajor, centres, tinted.indices),
       }));
     }
 

@@ -16,10 +16,12 @@
  * click in the inspector goes to click-to-evidence exactly as it did before this surface existed.
  * Switching it off undoes every call switching it on made.
  *
- * **A segment artifact is only an answer about the bytes it was computed against.** It is refused
- * unless its scene, member set, pose receipt and placement receipt are the ones the graph holds, and
- * each asset is tinted only when its digest and sample count are the drawn asset's. The development
- * preview has no receipts to compare, and its binding says so beside the list.
+ * **A segment is a set of voxels in the scene's own frame, and only that frame.** Each drawn sample
+ * is carried into it by the graph's own placement transform, the one the lift used, and tinted when
+ * it lands in one of a segment's cells. Not by the transform the renderer draws with: that has the
+ * display frame composed in, and would put every sample in the wrong cell. The artifact is refused
+ * unless its scene and its pose, placement and gate receipts are the ones the graph holds for the
+ * scene being drawn. The development preview has no receipts to compare, and says so beside the list.
  *
  * **A click resolves to a segment first.** In the inspector the cursor has real coordinates and the
  * camera an exact projection, so a click selects the nearest tinted sample within
@@ -35,13 +37,15 @@
  * `write-path.ts` reads the name out of the detail pane's form, which this panel is not; proposal
  * ids come from the same session counter, so the two can never collide.
  *
- * **A person is shown with the consent the server resolved, and named only by the graph.** The
- * segment's label is a detector's class word and is never shown as a person's name. A name appears
- * only when the snapshot's entity record carries one, which is the place a withheld name is already
- * absent. A person without recorded presence consent is listed and not tinted.
+ * **A person is shown with the consent the server resolved, and named only by the server.** The
+ * backend lifts a person only from a region a reviewer confirmed or drew, naming a subject whose
+ * presentation state is `shown`, and sends a display name only while a naming receipt is held; the
+ * panel says both in words and invents neither. There is no detector word for a person, so an
+ * unnamed one is "Unnamed person" and nothing else.
  *
- * **Colour is a property of the entity.** A pure function of the entity id, so the same person or
- * object wears the same colour in every region, on every visit and in every build.
+ * **Colour is a property of the entity.** A pure function of the entity's identifier (a person's
+ * subject, an object's linked graph entity, else the segment's own content-derived id), so the same
+ * person or object wears the same colour in every region, on every visit and in every build.
  */
 
 import type { Island, IslandId } from '@exulanica/atlas-core';
@@ -63,12 +67,9 @@ import { toUpdateProposal } from '../proposal.js';
 import {
   SceneSegmentsClient,
   SegmentsUnavailable,
-  indicesOf,
   previewSceneSegments,
-  type ConsentDecision,
   type SceneSegment,
   type SceneSegments,
-  type SegmentAssetKind,
 } from '../scene-segments-api.js';
 import type { Session } from '../session.js';
 import type { ConfirmPanel } from '../ui/confirm.js';
@@ -160,11 +161,6 @@ export function segmentColor(key: string): Rgb {
     srgbEncode(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
     srgbEncode(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
   ]) as Rgb;
-}
-
-/** The key a segment's colour is derived from: its entity, or itself when it names none. */
-export function colourKeyOf(segment: Pick<SceneSegment, 'entityId' | 'segmentId'>): string {
-  return segment.entityId ?? segment.segmentId;
 }
 
 function cssColour([r, g, b]: Rgb): string {
@@ -298,8 +294,10 @@ export function segmentsFirst<T extends { resolveEvidenceAt(clientX: number, cli
 /** One asset the renderer is drawing for a scene, as the binding holds it. */
 export interface DrawnAsset {
   readonly artifactId: string;
-  readonly kind: SegmentAssetKind;
+  readonly kind: 'trained_geometry' | 'point_map';
   readonly sampleCount: number;
+  /** The transform the renderer draws with, the scene's display frame composed in. */
+  readonly drawnSceneFromLocal: readonly number[];
 }
 
 export interface DrawnScene {
@@ -320,42 +318,59 @@ export function drawnScenesOf(binding: Pick<AtlasBinding, 'islands' | 'trainedSc
   for (const visual of binding.trainedScenes) {
     add(visual.geometry.sceneId, visual.island.islandId, {
       artifactId: visual.geometry.artifactId, kind: 'trained_geometry', sampleCount: visual.geometry.pointCount,
+      drawnSceneFromLocal: visual.geometry.sceneFromAssetRowMajor,
     });
   }
   for (const visual of binding.islands) {
     if (trained.has(visual.pointMap.sceneId)) continue;
     add(visual.pointMap.sceneId, visual.island.islandId, {
       artifactId: visual.pointMap.artifactId, kind: 'point_map', sampleCount: visual.cloud.pointCount,
+      drawnSceneFromLocal: visual.pointMap.sceneFromOpmRowMajor,
     });
   }
   return [...scenes].map(([sceneId, held]) => Object.freeze({ sceneId, ...held }));
 }
 
+/** One drawn asset, and the transform that carries its samples into the frame the voxels are in. */
+export interface BoundAsset {
+  readonly asset: DrawnAsset;
+  /** Row-major affine from the asset's own frame into the scene frame the segments are gridded in. */
+  readonly sceneFromLocal: readonly number[];
+}
+
 export interface SegmentBinding {
-  /** Segment artifact asset id to the drawn asset its indices address. */
-  readonly assets: ReadonlyMap<string, DrawnAsset>;
+  readonly assets: readonly BoundAsset[];
   /** What could not be bound and why, and in the preview what was not checked. */
   readonly notices: readonly string[];
   /** False in the preview, where there is no receipt to compare against. */
   readonly verified: boolean;
 }
 
-function expectedDigest(record: ReconstructionSceneRecord, artifactId: string, kind: SegmentAssetKind): string | null {
-  if (kind === 'trained_geometry') {
-    return record.trainedGeometry?.artifactId === artifactId ? record.trainedGeometry.contentSha256 : null;
+/**
+ * The graph's own placement of one drawn asset in the scene frame, before any display frame.
+ *
+ * The voxels are in the frame the lift placed samples in: a member's `scene_from_opm`, and the
+ * trained delivery's `scene_from_asset`, which the geometry route holds at the identity. The
+ * renderer draws with the display frame composed in, so those drawn matrices would put every
+ * sample in the wrong cell; the records in the snapshot are the ones the lift used.
+ */
+function rawSceneFromLocal(record: ReconstructionSceneRecord, asset: DrawnAsset): readonly number[] | null {
+  if (asset.kind === 'trained_geometry') {
+    return record.trainedGeometry?.artifactId === asset.artifactId ? record.trainedGeometry.sceneFromAssetRowMajor : null;
   }
-  return record.members.find((member) => member.placement?.artifactId === artifactId)?.placement?.contentSha256 ?? null;
+  return record.members.find((member) => member.placement?.artifactId === asset.artifactId)?.placement?.sceneFromOpmRowMajor ?? null;
 }
 
 /**
- * Which drawn asset each of the artifact's assets is, or why it is none.
+ * Whether these segments are about the geometry drawn here, and through which transforms.
  *
- * Production compares everything the artifact says it was computed against with what the graph
- * holds, and refuses the whole artifact when a scene-level digest disagrees: indices computed under
- * another pose or placement are about other geometry, however well they happen to line up.
+ * The route already refuses an artifact whose bindings moved and withholds a segment whose inputs
+ * changed. This is the second look, on this side: the scene, and the pose, placement and gate
+ * receipts the artifact names, against the ones the graph holds for the scene being drawn. Any of
+ * them disagreeing means the voxels describe other geometry, and nothing is tinted.
  *
- * The preview has no scene record and its point map carries no digest, so it binds by kind and
- * sample count alone, exactly as the preview's loader skips the digest check, and says so.
+ * The preview has no scene record and no receipts. Its one map is drawn with the identity transform,
+ * which is its scene frame, and the panel says nothing was compared.
  */
 export function bindSegments(
   segments: SceneSegments,
@@ -363,141 +378,232 @@ export function bindSegments(
   record: ReconstructionSceneRecord | undefined,
   preview: boolean,
 ): SegmentBinding {
-  const assets = new Map<string, DrawnAsset>();
   if (preview) {
-    const unused = [...drawn.assets];
-    for (const asset of segments.assets) {
-      const match = unused.findIndex((candidate) => candidate.kind === asset.kind && candidate.sampleCount === asset.sampleCount);
-      if (match < 0) continue;
-      assets.set(asset.artifactId, unused[match]!);
-      unused.splice(match, 1);
-    }
     return {
-      assets,
+      assets: drawn.assets.map((asset) => ({ asset, sceneFromLocal: asset.drawnSceneFromLocal })),
       verified: false,
       notices: [
-        'Synthetic preview: the segments are bound to the drawn map by sample count only. No receipt '
-          + 'or digest was compared, because the preview has none.',
-        ...(assets.size === 0 ? ['No asset in the preview fixture has the sample count of anything drawn here.'] : []),
+        'Synthetic preview: these are the published fixture’s segments, for a scene this preview does not '
+          + 'draw. No receipt was compared, because the preview has none, and a segment is tinted only where '
+          + 'a drawn sample falls in one of its voxels.',
       ],
     };
   }
-  const refuse = (reason: string): SegmentBinding => ({ assets, verified: true, notices: [reason] });
+  const refuse = (reason: string): SegmentBinding => ({ assets: [], verified: true, notices: [reason] });
   if (segments.sceneId !== drawn.sceneId) return refuse('These segments were recorded for a different scene.');
   if (record === undefined) {
     return refuse('The graph holds no record of this scene, so nothing the segments are bound to can be checked.');
   }
-  if (segments.boundTo.memberDigest !== record.memberDigest) {
-    return refuse('These segments were computed over a different set of photographs, so nothing is tinted.');
-  }
-  if (segments.boundTo.poseReceiptSha256 !== record.poseReceiptSha256) {
+  if (segments.poseReceiptSha256 !== record.poseReceiptSha256) {
     return refuse('These segments were computed against a different pose receipt, so nothing is tinted.');
   }
-  if (segments.boundTo.placementReceiptSha256 !== record.placementReceiptSha256) {
+  if (segments.placementReceiptSha256 !== record.placementReceiptSha256) {
     return refuse('These segments were computed against a different placement receipt, so nothing is tinted.');
   }
-  const refusals: string[] = [];
-  let undrawn = 0;
-  for (const asset of segments.assets) {
-    const match = drawn.assets.find((candidate) => candidate.artifactId === asset.artifactId);
-    if (match === undefined) {
-      undrawn += 1;
+  if (segments.gateReceiptSha256 !== null && record.gateDigest !== null && segments.gateReceiptSha256 !== record.gateDigest) {
+    return refuse('These segments were computed against a different gate receipt, so nothing is tinted.');
+  }
+  const assets: BoundAsset[] = [];
+  const notices: string[] = [];
+  for (const asset of drawn.assets) {
+    const sceneFromLocal = rawSceneFromLocal(record, asset);
+    if (sceneFromLocal === null) {
+      notices.push(`The graph holds no placement for drawn asset ${asset.artifactId}, so its samples cannot be placed on the segment grid.`);
       continue;
     }
-    if (match.kind !== asset.kind) {
-      refusals.push(`Asset ${asset.artifactId} is drawn as a different kind of geometry than the segments name.`);
-    } else if (expectedDigest(record, asset.artifactId, asset.kind) !== asset.contentSha256) {
-      refusals.push(`The drawn bytes of asset ${asset.artifactId} are not the ones the segments were computed against.`);
-    } else if (match.sampleCount !== asset.sampleCount) {
-      refusals.push(`Asset ${asset.artifactId} draws ${match.sampleCount} samples and the segments index ${asset.sampleCount}.`);
-    } else {
-      assets.set(asset.artifactId, match);
+    assets.push({ asset, sceneFromLocal });
+  }
+  return { assets, verified: true, notices };
+}
+
+/** The segments' cells as one dense byte grid: the slot of the first segment to claim each cell. */
+export interface SegmentGrid {
+  readonly edgeMicrounits: number;
+  readonly origin: readonly [number, number, number];
+  readonly size: readonly [number, number, number];
+  readonly slots: Uint8Array;
+  /** Cells two segments both occupy, each tinted as the one listed first. */
+  readonly contested: number;
+}
+
+/** A grid larger than this is refused rather than allocated. 128 cells a side is what the lift uses. */
+const GRID_CELL_LIMIT = 16_777_216;
+
+/**
+ * Rasterise the segments' voxels into one grid, in the artifact's own order.
+ *
+ * The artifact lists people before objects, which is the lift's own precedence: a reviewed person
+ * takes a sample an object ties for. A cell two segments share follows the same rule here, so a
+ * drawn sample is tinted as the entity the lift would have given it to.
+ */
+export function segmentGrid(
+  segments: readonly SceneSegment[],
+  slotOf: ReadonlyMap<string, number>,
+  edgeMicrounits: number,
+): SegmentGrid | null {
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (const segment of segments) {
+    if (!slotOf.has(segment.segmentId)) continue;
+    for (let at = 0; at < segment.voxels.length; at += 3) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        low[axis] = Math.min(low[axis]!, segment.voxels[at + axis]!);
+        high[axis] = Math.max(high[axis]!, segment.voxels[at + axis]!);
+      }
     }
   }
-  if (undrawn > 0) {
-    refusals.push(undrawn === 1
-      ? 'One asset the segments index is not drawn here, so its samples are not tinted.'
-      : `${undrawn} assets the segments index are not drawn here, so their samples are not tinted.`);
+  if (low[0] === Infinity) return null;
+  const size = [0, 1, 2].map((axis) => high[axis]! - low[axis]! + 1) as [number, number, number];
+  if (size[0] * size[1] * size[2] > GRID_CELL_LIMIT) return null;
+  const slots = new Uint8Array(size[0] * size[1] * size[2]);
+  let contested = 0;
+  for (const segment of segments) {
+    const slot = slotOf.get(segment.segmentId);
+    if (slot === undefined) continue;
+    for (let at = 0; at < segment.voxels.length; at += 3) {
+      const cell = ((segment.voxels[at]! - low[0]!) * size[1] + (segment.voxels[at + 1]! - low[1]!)) * size[2]
+        + (segment.voxels[at + 2]! - low[2]!);
+      if (slots[cell] === 0) slots[cell] = slot;
+      else if (slots[cell] !== slot) contested += 1;
+    }
   }
-  return { assets, verified: true, notices: refusals };
+  return { edgeMicrounits, origin: [low[0]!, low[1]!, low[2]!], size, slots, contested };
+}
+
+/**
+ * The slot of every sample, by the cell it lands in: `floor(x * 1e6 / edge)` along each axis.
+ *
+ * The lift's own rule, spelled in `exulanica/ingest/scene_segments.py` as `_voxels`, applied to each
+ * drawn sample carried into the scene frame by the same row-major transform the lift used. A sample
+ * outside every segment's cells is slot 0, and so is every sample when there is no grid.
+ */
+export function classifySamples(positions: Float32Array, sceneFromLocal: readonly number[], grid: SegmentGrid): Uint8Array {
+  const m = sceneFromLocal;
+  const scale = 1_000_000 / grid.edgeMicrounits;
+  const [ox, oy, oz] = grid.origin;
+  const [sx, sy, sz] = grid.size;
+  const slots = new Uint8Array(positions.length / 3);
+  for (let index = 0; index < slots.length; index += 1) {
+    const x = positions[index * 3]!;
+    const y = positions[index * 3 + 1]!;
+    const z = positions[index * 3 + 2]!;
+    const i = Math.floor((m[0]! * x + m[1]! * y + m[2]! * z + m[3]!) * scale) - ox;
+    const j = Math.floor((m[4]! * x + m[5]! * y + m[6]! * z + m[7]!) * scale) - oy;
+    const k = Math.floor((m[8]! * x + m[9]! * y + m[10]! * z + m[11]!) * scale) - oz;
+    if (i < 0 || j < 0 || k < 0 || i >= sx || j >= sy || k >= sz) continue;
+    slots[index] = grid.slots[(i * sy + j) * sz + k]!;
+  }
+  return slots;
 }
 
 export interface SegmentPlan {
-  /** Every segment, most votes first. The list and the slot numbers both follow this order. */
+  /** Every segment in the artifact's own order. The list and the slot numbers both follow it. */
   readonly ordered: readonly SceneSegment[];
   readonly slotOf: ReadonlyMap<string, number>;
   readonly segmentOfSlot: ReadonlyMap<number, SceneSegment>;
   /** Why a listed segment is not tinted. */
   readonly untinted: ReadonlyMap<string, string>;
   readonly tints: readonly SegmentOverlayTint[];
-  /** Samples two segments both claimed, each tinted as the one with more votes. */
+  /** Cells two segments both occupy. */
   readonly contested: number;
+  /** Drawn samples that fell in some segment's cells. */
+  readonly tintedSamples: number;
+  /** Drawn assets whose samples the binding could not read, so they could not be placed. */
+  readonly unread: readonly string[];
 }
 
 /**
- * Slot numbers and disjoint sample sets, in vote order.
+ * Slot numbers, and the drawn samples each segment covers, for every bound asset.
  *
- * A sample two segments both claim is tinted as the one with more votes, and the count of such
- * samples is reported rather than hidden. The binding would resolve a collision the same way, but
- * doing it here is what lets the panel say how many there were.
+ * `localSamples` is the binding's read of an asset's samples in its own frame; an asset it cannot
+ * read is skipped and said to be. A segment none of whose cells holds a drawn sample stays in the
+ * list and is not tinted, with that reason beside it.
  */
-export function planSegmentTints(segments: SceneSegments, binding: SegmentBinding): SegmentPlan {
-  const ordered = [...segments.segments].sort((left, right) =>
-    right.voteCount - left.voteCount || (left.segmentId < right.segmentId ? -1 : 1));
+export function planSegmentTints(
+  segments: SceneSegments,
+  binding: SegmentBinding,
+  localSamples: (artifactId: string) => Float32Array | null,
+): SegmentPlan {
+  const ordered = segments.segments;
   const slotOf = new Map<string, number>();
   const segmentOfSlot = new Map<number, SceneSegment>();
   const untinted = new Map<string, string>();
-  const tints: SegmentOverlayTint[] = [];
-  const claimed = new Map<string, Uint8Array>();
-  let contested = 0;
   for (const segment of ordered) {
-    if (segment.person !== null && segment.person.consent.presence !== 'granted') {
-      untinted.set(segment.segmentId, 'Not tinted: no presence consent is recorded for this person.');
-      continue;
-    }
-    const drawn = segment.samples.filter((samples) => binding.assets.has(samples.artifactId));
-    if (drawn.length === 0) {
-      untinted.set(segment.segmentId, 'Not tinted: none of its samples are in geometry drawn here.');
-      continue;
-    }
     if (slotOf.size >= SLOT_LIMIT) {
       untinted.set(segment.segmentId, `Not tinted: one region can carry ${SLOT_LIMIT} tinted segments.`);
       continue;
     }
-    const slot = slotOf.size + 1;
-    const own: SegmentOverlayTint[] = [];
-    for (const samples of drawn) {
-      const asset = binding.assets.get(samples.artifactId)!;
-      const taken = claimed.get(asset.artifactId) ?? new Uint8Array(asset.sampleCount);
-      claimed.set(asset.artifactId, taken);
-      const indices = indicesOf(samples);
-      const kept = new Uint32Array(indices.length);
-      let count = 0;
-      for (const index of indices) {
-        if (taken[index] !== 0) { contested += 1; continue; }
-        taken[index] = 1;
-        kept[count++] = index;
-      }
-      if (count > 0) own.push({ slot, artifactId: asset.artifactId, indices: kept.subarray(0, count) });
-    }
-    if (own.length === 0) {
-      untinted.set(segment.segmentId, 'Not tinted: every one of its samples belongs to a segment with more votes.');
+    slotOf.set(segment.segmentId, slotOf.size + 1);
+  }
+  const grid = segments.voxelSizeMicrounits === null ? null : segmentGrid(ordered, slotOf, segments.voxelSizeMicrounits);
+  const perSlot = new Map<number, Map<string, number[]>>();
+  const unread: string[] = [];
+  let tintedSamples = 0;
+  for (const { asset, sceneFromLocal } of grid === null ? [] : binding.assets) {
+    const positions = localSamples(asset.artifactId);
+    if (positions === null) {
+      unread.push(asset.artifactId);
       continue;
     }
-    tints.push(...own);
-    slotOf.set(segment.segmentId, slot);
-    segmentOfSlot.set(slot, segment);
+    const slots = classifySamples(positions, sceneFromLocal, grid!);
+    for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index]!;
+      if (slot === 0) continue;
+      tintedSamples += 1;
+      const byAsset = perSlot.get(slot) ?? new Map<string, number[]>();
+      perSlot.set(slot, byAsset);
+      const indices = byAsset.get(asset.artifactId) ?? [];
+      byAsset.set(asset.artifactId, indices);
+      indices.push(index);
+    }
   }
-  return { ordered, slotOf, segmentOfSlot, untinted, tints, contested };
+  const tints: SegmentOverlayTint[] = [];
+  for (const segment of ordered) {
+    const slot = slotOf.get(segment.segmentId);
+    if (slot === undefined) continue;
+    const byAsset = perSlot.get(slot);
+    if (byAsset === undefined) {
+      slotOf.delete(segment.segmentId);
+      untinted.set(segment.segmentId, 'Not tinted: no sample drawn here falls in any of its voxels.');
+      continue;
+    }
+    segmentOfSlot.set(slot, segment);
+    for (const [artifactId, indices] of byAsset) tints.push({ slot, artifactId, indices: Uint32Array.from(indices) });
+  }
+  return { ordered, slotOf, segmentOfSlot, untinted, tints, contested: grid?.contested ?? 0, tintedSamples, unread };
+}
+
+/**
+ * The key a segment's colour is derived from: the entity it is.
+ *
+ * A person is their subject. An object is the graph entity its detections are linked to, when any
+ * is; otherwise the segment itself, whose identifier the lift derives from its kind, label and
+ * voxels, so it is stable for as long as the segment is the same segment.
+ */
+export function colourKeyOf(
+  segment: Pick<SceneSegment, 'segmentId' | 'kind' | 'subjectId' | 'occurrenceIds'>,
+  snapshot: Pick<GraphSnapshot, 'occurrences'>,
+): string {
+  if (segment.kind === 'person' && segment.subjectId !== null) return segment.subjectId;
+  for (const occurrenceId of segment.occurrenceIds) {
+    const entityId = snapshot.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId)?.entityId;
+    if (entityId !== null && entityId !== undefined) return entityId;
+  }
+  return segment.segmentId;
 }
 
 /** One resolved colour per tinted slot; the emphasised segment full, the rest receded. */
-export function segmentPalette(plan: SegmentPlan, emphasis: string | null): SegmentPalette {
+export function segmentPalette(
+  plan: Pick<SegmentPlan, 'slotOf' | 'segmentOfSlot'>,
+  emphasis: string | null,
+  snapshot: Pick<GraphSnapshot, 'occurrences'>,
+): SegmentPalette {
   const palette = new Map<number, ProofLensColor>();
   const emphasised = emphasis !== null && plan.slotOf.has(emphasis) ? emphasis : null;
   for (const [segmentId, slot] of plan.slotOf) {
-    const segment = plan.segmentOfSlot.get(slot)!;
-    const [r, g, b] = segmentColor(colourKeyOf(segment));
+    const segment = plan.segmentOfSlot.get(slot);
+    if (segment === undefined) continue;
+    const [r, g, b] = segmentColor(colourKeyOf(segment, snapshot));
     const strength = emphasised === null ? TINT_AT_REST : segmentId === emphasised ? TINT_EMPHASISED : TINT_RECEDED;
     palette.set(slot, Object.freeze([r, g, b, strength]) as ProofLensColor);
   }
@@ -507,28 +613,44 @@ export function segmentPalette(plan: SegmentPlan, emphasis: string | null): Segm
 // -- naming ---------------------------------------------------------------------------------------------
 
 export type NamingTarget =
-  | { readonly kind: 'named'; readonly name: string }
+  | { readonly kind: 'named'; readonly name: string; readonly by: 'graph' | 'person-review' }
   | { readonly kind: 'offer'; readonly occurrence: OccurrenceRecord }
   | { readonly kind: 'unavailable'; readonly reason: string };
+
+/** The graph entity a segment's detections are linked to, when any is. */
+function linkedEntity(segment: SceneSegment, snapshot: Pick<GraphSnapshot, 'entities' | 'occurrences'>): EntityRecord | undefined {
+  for (const occurrenceId of segment.occurrenceIds) {
+    const entityId = snapshot.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId)?.entityId;
+    if (entityId === null || entityId === undefined) continue;
+    const entity = snapshot.entities.find((candidate) => candidate.entityId === entityId);
+    if (entity !== undefined) return entity;
+  }
+  return undefined;
+}
 
 /**
  * What the naming flow can do with this segment, and on which detection.
  *
- * The API names a detection and creates the entity; it refuses a detection that is already linked,
- * and it has no rename. So a segment whose entity the graph already names shows that name, a
- * segment with an unlinked detection offers to name it (preferring the one in the photograph the
- * inspector stands on), and anything else says why nothing can be named here.
+ * The API names a detection and creates the entity; it refuses a detection already linked, and it
+ * has no rename. So a segment whose detections the graph already names shows that name, a segment
+ * with an unlinked detection offers to name it (preferring the one in the photograph the inspector
+ * stands on), and anything else says why nothing can be named here.
+ *
+ * A person segment's name is the one the server sends beside it, which it sends only while a naming
+ * receipt is held and no withdrawal stands. A person the vision stage never detected has no
+ * detection to name, and their name belongs to the person review, where their consent is recorded.
  */
 export function namingTargetFor(
   segment: SceneSegment,
   snapshot: Pick<GraphSnapshot, 'entities' | 'occurrences'>,
   captureId: string | null,
 ): NamingTarget {
-  const entity = segment.entityId === null
-    ? undefined
-    : snapshot.entities.find((candidate) => candidate.entityId === segment.entityId);
-  if (entity !== undefined && typeof entity.displayName === 'string' && entity.displayName.length > 0) {
-    return { kind: 'named', name: entity.displayName };
+  if (segment.kind === 'person' && segment.displayName !== null) {
+    return { kind: 'named', name: segment.displayName, by: 'person-review' };
+  }
+  const entity = linkedEntity(segment, snapshot);
+  if (segment.kind === 'object' && entity !== undefined && typeof entity.displayName === 'string' && entity.displayName.length > 0) {
+    return { kind: 'named', name: entity.displayName, by: 'graph' };
   }
   const detections = segment.occurrenceIds
     .map((occurrenceId) => snapshot.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId))
@@ -536,11 +658,21 @@ export function namingTargetFor(
   const unlinked = detections.filter((occurrence) => occurrence.entityId === null);
   const chosen = unlinked.find((occurrence) => captureId !== null && occurrence.captureId === captureId) ?? unlinked[0];
   if (chosen !== undefined) return { kind: 'offer', occurrence: chosen };
+  if (segment.kind === 'person' && segment.occurrenceIds.length === 0) {
+    return {
+      kind: 'unavailable',
+      reason: 'This person’s segment rests on reviewed outlines, not on a detection the graph holds, so the '
+        + 'naming flow has nothing to name. A person’s name is recorded in the person review, with their consent.',
+    };
+  }
   if (detections.length === 0) {
     return {
       kind: 'unavailable',
-      reason: 'No detection behind this segment is in the graph this session reads, so there is nothing the '
-        + 'naming flow can name here.',
+      reason: segment.occurrenceIds.length === 0
+        ? 'This segment was prompted by the local detector and names no detection the graph holds, so there '
+          + 'is nothing the naming flow can name here.'
+        : 'No detection behind this segment is in the graph this session reads, so there is nothing the '
+          + 'naming flow can name here.',
     };
   }
   return {
@@ -739,7 +871,7 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
   function recolour(): void {
     const binding = state.atlas?.binding;
     if (binding === undefined || region?.load.kind !== 'ready' || appliedKey !== region.key) return;
-    binding.segmentOverlay.setPalette(segmentPalette(region.load.plan, emphasis()));
+    binding.segmentOverlay.setPalette(segmentPalette(region.load.plan, emphasis(), deps.snapshot));
   }
 
   /** Take the overlay off the renderer, if and only if this surface put one there. */
@@ -761,7 +893,7 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
     load.report = binding.segmentOverlay.apply({
       islandId: current.islandId,
       tints: load.plan.tints,
-      palette: segmentPalette(load.plan, emphasis()),
+      palette: segmentPalette(load.plan, emphasis(), deps.snapshot),
     });
     appliedKey = current.key;
   }
@@ -804,9 +936,9 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       } else {
         const record = deps.snapshot.reconstructionScenes?.find((scene) => scene.sceneId === here.sceneId);
         const segmentBinding = bindSegments(segments, drawn, record, env.preview);
-        current.load = {
-          kind: 'ready', segments, binding: segmentBinding, plan: planSegmentTints(segments, segmentBinding), report: null,
-        };
+        const plan = planSegmentTints(segments, segmentBinding,
+          (artifactId) => binding.segmentOverlay.localSamples(artifactId)?.positions ?? null);
+        current.load = { kind: 'ready', segments, binding: segmentBinding, plan, report: null };
         applyRegion(current);
       }
     } catch (error) {
@@ -836,40 +968,36 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
 
   // -- the panel ------------------------------------------------------------------------------------
 
-  function consentWords(decision: ConsentDecision): string {
-    return decision === 'not_recorded' ? 'not recorded' : decision;
-  }
-
   function headingOf(segment: SceneSegment): string {
-    const entity = segment.entityId === null
-      ? undefined
-      : deps.snapshot.entities.find((candidate) => candidate.entityId === segment.entityId);
-    const name = typeof entity?.displayName === 'string' && entity.displayName.length > 0 ? entity.displayName : null;
-    // A person's heading comes from the graph or says it has none. The detector's word for them is
-    // a class, not a name, and showing it as one is how a withheld name would leak back in.
-    if (segment.entityClass === 'person') return name ?? 'Unnamed person';
-    return name ?? segment.label;
+    const target = namingTargetFor(segment, deps.snapshot, null);
+    // A person's heading is the name the server sent beside them or says there is none. There is no
+    // detector word for a person to fall back on, and inventing one is how a withheld name would
+    // leak back in as a description.
+    if (segment.kind === 'person') return target.kind === 'named' ? target.name : 'Unnamed person';
+    return target.kind === 'named' ? target.name : segment.label ?? 'Unlabelled object';
   }
 
   function rowOf(segment: SceneSegment, load: Extract<RegionLoad, { kind: 'ready' }>, captureId: string | null): SegmentRowModel {
-    const views = load.segments.method.views;
+    const votes = segment.votes;
     const slot = load.plan.slotOf.get(segment.segmentId);
     const selected = kept.selectedSegmentId === segment.segmentId;
+    const photographs = new Set(segment.regions.map((region) => region.captureId)).size;
     const facts: string[] = [];
     if (selected) {
-      if (segment.entityClass !== 'person') facts.push(`Detector label: ${segment.label}.`);
-      facts.push(segment.entityId === null
-        ? 'Linked to no entity in the graph.'
-        : deps.snapshot.entities.some((candidate) => candidate.entityId === segment.entityId)
-          ? 'Linked to an entity in the graph.'
-          : 'Linked to an entity this session cannot see.');
-      if (segment.person !== null) {
-        facts.push(segment.person.reviewState === 'screened'
-          ? 'Screened for people by a reviewer.'
-          : 'Not screened for people.');
-        facts.push(`Presence consent: ${consentWords(segment.person.consent.presence)}. `
-          + `Naming consent: ${consentWords(segment.person.consent.naming)}. `
-          + `Likeness consent: ${consentWords(segment.person.consent.likeness)}.`);
+      if (segment.kind === 'object') facts.push(`Detector label: ${segment.label ?? 'none'}.`);
+      facts.push(`Confidence: at the median sample ${votes.median} of the ${votes.views} views that could see it `
+        + `voted for it, and never fewer than ${votes.min}.`);
+      facts.push(`Rests on ${segment.regions.length} ${segment.regions.length === 1 ? 'region' : 'regions'} in `
+        + `${photographs} ${photographs === 1 ? 'photograph' : 'photographs'}, and ${segment.voxels.length / 3} voxels of the scene.`);
+      if (segment.kind === 'person') {
+        facts.push('Consent: a reviewer confirmed or drew this person’s outline and their presentation state is '
+          + 'shown, which is the only person the server lifts into a scene.');
+        facts.push(segment.displayName === null
+          ? 'No naming receipt is held for this person, so no name is shown.'
+          : 'A naming receipt is held for this person, and the name shown is the one it records.');
+      } else {
+        const entity = linkedEntityOf(segment);
+        facts.push(entity === undefined ? 'Linked to no entity in the graph.' : 'Its detections are linked to an entity in the graph.');
       }
       if (picked?.segmentId === segment.segmentId) {
         facts.push(`Selected by a click: the nearest tinted sample was ${picked.pixelDistance.toFixed(1)} screen `
@@ -878,7 +1006,12 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
     }
     const target = namingTargetFor(segment, deps.snapshot, captureId);
     const naming: SegmentNamingModel = target.kind === 'named'
-      ? { kind: 'named', sentence: `The graph names this ${segment.entityClass} ${target.name}.` }
+      ? {
+        kind: 'named',
+        sentence: target.by === 'person-review'
+          ? `The person review names this person ${target.name}.`
+          : `The graph names this ${segment.label ?? 'object'} ${target.name}.`,
+      }
       : target.kind === 'unavailable'
         ? { kind: 'unavailable', reason: target.reason }
         : env.preview
@@ -887,14 +1020,21 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
     return {
       segmentId: segment.segmentId,
       heading: headingOf(segment),
-      summary: `${segment.entityClass}, ${segment.confidence} confidence, `
-        + `${segment.voteCount} of ${views} ${views === 1 ? 'photograph' : 'photographs'} voted for it`,
-      swatch: slot === undefined ? null : cssColour(segmentColor(colourKeyOf(segment))),
+      summary: `${segment.kind}, ${votes.median} of ${votes.views} views agree at the median`,
+      swatch: slot === undefined ? null : cssColour(segmentColor(colourKeyOf(segment, deps.snapshot))),
       untinted: load.plan.untinted.get(segment.segmentId) ?? null,
       selected,
       facts,
       naming,
     };
+  }
+
+  function linkedEntityOf(segment: SceneSegment): string | undefined {
+    for (const occurrenceId of segment.occurrenceIds) {
+      const entityId = deps.snapshot.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId)?.entityId;
+      if (entityId !== null && entityId !== undefined) return entityId;
+    }
+    return undefined;
   }
 
   function modelNow(): SceneSegmentsModel {
@@ -916,20 +1056,36 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
     if (region.load.kind === 'failed') return { ...base, on: true, state: 'failed', where, canInspect, message: region.load.reason };
     const load = region.load;
     const captureId = state.atlas?.binding.inspectionView?.captureIds[0] ?? null;
-    const notices = [...load.binding.notices, ...(load.report?.refused.map((item) => item.reason) ?? [])];
+    const segments = load.segments;
+    const notices: string[] = [];
+    if (segments.withheldSegmentCount > 0) {
+      notices.push(segments.withheldSegmentCount === 1
+        ? 'One segment was withheld by a live consent check or the read policy, and is not listed.'
+        : `${segments.withheldSegmentCount} segments were withheld by a live consent check or the read policy, and are not listed.`);
+    }
+    if (segments.staleInputs.length > 0) notices.push(`Stale inputs: ${segments.staleInputs.join(', ')}.`);
+    notices.push(...load.binding.notices, ...(load.report?.refused.map((item) => item.reason) ?? []));
+    if (load.plan.unread.length > 0) {
+      notices.push('This device holds no copy of some drawn samples, so they cannot be placed on the segment grid.');
+    }
     if (load.plan.contested > 0) {
-      notices.push(`${load.plan.contested} samples are claimed by two segments and tinted as the one with more votes.`);
+      notices.push(`${load.plan.contested} voxels are occupied by two segments and tinted as the one listed first.`);
+    }
+    if (segments.segments.length > 0 && load.plan.tintedSamples === 0 && load.binding.assets.length > 0) {
+      notices.push('No sample drawn here falls in any segment’s voxels, so nothing is tinted.');
     }
     if (load.report?.assets.some((asset) => asset.positions === null)) {
-      notices.push('This device holds no copy of the trained Gaussians\' centres, so a click cannot select them; the list still can.');
+      notices.push('This device holds no copy of the trained Gaussians’ centres, so a click cannot select them; the list still can.');
     }
-    const empty = load.segments.segments.length === 0;
+    const message = segments.state !== 'available'
+      ? `Segments for this scene are ${segments.state}${segments.reason === null ? '.' : `: ${segments.reason}`}`
+      : segments.segments.length === 0 ? 'No segments are recorded for this scene.' : null;
     return {
       on: true,
       state: 'ready',
       where,
       canInspect,
-      message: empty ? 'No segments are recorded for this scene.' : null,
+      message,
       rows: load.plan.ordered.map((segment) => rowOf(segment, load, captureId)),
       notices,
       pickSentence,

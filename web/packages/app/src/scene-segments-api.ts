@@ -1,110 +1,99 @@
 /**
  * What the photographs found, lifted into one reconstructed scene, fetched for the segment overlay.
  *
- * `GET /world-read/scenes/{id}/segments` serves one per-entity segment artifact: for each thing a
- * vision pass found in the scene's photographs and the lift voted onto the geometry, the entity it
- * names, its class, a label, how many views voted for it, and which Gaussians or point-map samples
- * it covers in each scene asset. The artifact is bound to the scene's member set, pose receipt,
- * placement receipt and region set, and to each asset's content digest, because an index is only
- * an answer about the bytes it was computed against: the same number names a different Gaussian in
- * a retrained artifact.
+ * `GET /scene-segments/{scene_id}` (`exulanica/api/routes/scene_segments.py`) serves one scene's
+ * segment artifact under the same asset-read policy as its geometry. Each segment is an entity the
+ * lift voted onto the scene: an object (a detector label, split into connected pieces) or a person
+ * (a reviewed subject whose presentation state is `shown`). What it covers is a set of occupied
+ * voxels in the scene's own frame, on a grid whose edge the artifact states, together with how the
+ * views voted and which regions in which photographs it rests on.
  *
- * **THE ROUTE AND THE SHAPE ARE PROVISIONAL.** They follow `docs/briefs/2026-09-11-scene-segments.md`
- * and were written before the backend published anything. So was
- * `graph-client/test/fixtures/scene-segments.json`, which was authored in the front end against the
- * preview courtyard: its point-map asset is the real `glasshouse-courtyard.opm` and its segments are
- * image-space boxes narrowed by depth; its trained asset is the 512-Gaussian format-only SOG from
- * `web/test-data`, whose runs are arbitrary test data rather than a claim about what those
- * Gaussians depict. When the backend's own fixture lands it replaces that file, and this parser is
- * the one place that has to agree with it.
+ * **Voxels, not sample indices, and that is the backend's decision to make.** The brief imagined
+ * indices per scene asset. The lift subsamples every placed map and the trained centres, so the
+ * samples it voted over are not the samples a browser draws; a voxel set in the scene frame is the
+ * answer that survives that. The surface turns it back into drawn samples by carrying each one into
+ * the scene frame with the graph's own placement transform and asking which cell it lands in.
  *
- * **Indices cross as runs.** `index_runs` is a list of `[start, length]` pairs in ascending order.
- * Samples are stored in a spatially coherent order (image rows for a point map, the compressor's
- * Morton order for a trained scene), so a segment is a few hundred runs rather than tens of
- * thousands of integers.
+ * **The published fixture is the backend's.** `graph-client/test/fixtures/scene-segments.json` is
+ * the body the route serves for the scene its own tests build, byte for byte, and this parser is
+ * tested against it. Fields may be added on the wire and are ignored here; none may be renamed,
+ * retyped or removed, and a body that did any of that is refused rather than read around.
  *
- * **Nothing here decides what may be shown.** A person segment carries the consent state the server
- * resolved, in the server's words, and this file only defaults what is missing to the hiding answer.
- * It never carries a name: what a person is called is the graph's to say, and the surface reads it
- * from the snapshot, which is the only place a withheld name is already absent.
+ * **Nothing here decides what may be shown.** A person segment exists only under the backend's own
+ * rule, and it carries a subject reference and, only when a naming receipt is held and no withdrawal
+ * stands, a display name. This file passes both through in the server's words and invents neither.
  */
 
-import { ApiError, Transport, type ConfidenceBand, type TransportOptions } from '@exulanica/graph-client';
+import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 
-export const SEGMENTS_PROFILE = 'exulanica.scene-segments/v1';
+export const SEGMENTS_SCHEMA_VERSION = 1;
 const SEGMENTS_TIMEOUT_MS = 30_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
+const SEGMENT_ID = /^[0-9a-f]{32}$/u;
 
-export type SegmentAssetKind = 'trained_geometry' | 'point_map';
-export type SegmentEntityClass = 'person' | 'object' | 'place';
-export type ConsentScope = 'presence' | 'naming' | 'likeness';
-/** The three decisions the consent route records, and the absence of any. */
-export type ConsentDecision = 'granted' | 'revoked' | 'withdrawn' | 'not_recorded';
+export type SegmentsState = 'available' | 'stale' | 'absent' | 'unavailable';
+export type SegmentKind = 'object' | 'person';
 
-export interface SegmentAsset {
-  readonly artifactId: string;
-  readonly kind: SegmentAssetKind;
-  readonly contentSha256: string;
-  readonly sampleCount: number;
+export interface SegmentVotes {
+  /** How many views the lift could project the segment's samples into. */
+  readonly views: number;
+  readonly min: number;
+  readonly median: number;
+  readonly max: number;
+  readonly fractionMinMillionths: number;
+  readonly fractionMedianMillionths: number;
 }
 
-export interface SegmentSamples {
-  readonly artifactId: string;
-  /** Ascending, disjoint `[start, length]` runs, exactly as served. */
-  readonly runs: readonly (readonly [number, number])[];
-  readonly count: number;
-}
-
-/** The consent state behind one person segment, as the server resolved it. Never a name. */
-export interface SegmentPerson {
-  /** `screened` or anything else; anything else is read as unscreened. */
-  readonly reviewState: string;
-  /** The resolved presentation state (`shown`, `present`, `hidden`, ...), or `unknown`. */
-  readonly state: string;
-  readonly consent: Readonly<Record<ConsentScope, ConsentDecision>>;
+export interface SegmentRegion {
+  readonly captureId: string;
+  readonly kind: 'object_mask' | 'person_region';
+  /** The mask's own evidence span. Null for a person region, whose outline is not evidence. */
+  readonly spanId: string | null;
+  /** The person region's key, for the review flow. Null for an object mask. */
+  readonly regionKey: string | null;
+  readonly samples: number;
 }
 
 export interface SceneSegment {
   readonly segmentId: string;
-  readonly entityId: string | null;
-  readonly entityClass: SegmentEntityClass;
-  /** What the detector called it. For a person this is a class word and is never shown as a name. */
-  readonly label: string;
-  readonly voteCount: number;
-  readonly confidence: ConfidenceBand;
-  /** The detections whose masks voted for this segment, as graph occurrence ids. */
+  readonly kind: SegmentKind;
+  /** A detector's common noun for an object. Always null for a person. */
+  readonly label: string | null;
+  /** The person subject. Always null for an object. */
+  readonly subjectId: string | null;
+  /** Present only when a naming receipt is held and no withdrawal stands. */
+  readonly displayName: string | null;
+  /** Occupied cells as `i, j, k` triples, flattened. */
+  readonly voxels: Int32Array;
+  readonly boundsMicrounits: { readonly min: readonly number[]; readonly max: readonly number[] };
+  readonly centroidMicrounits: readonly number[];
+  /** How many lift samples voted it in: a statement about the lift, not about what is drawn. */
+  readonly samples: { readonly pointMap: number; readonly gaussian: number };
+  readonly votes: SegmentVotes;
+  readonly regions: readonly SegmentRegion[];
+  /** The vision stage's occurrences of this object, which the naming flow can name. */
   readonly occurrenceIds: readonly string[];
-  readonly person: SegmentPerson | null;
-  readonly samples: readonly SegmentSamples[];
-}
-
-export interface SegmentModel {
-  readonly model: string;
-  readonly revision: string;
-  readonly licence: string;
 }
 
 export interface SceneSegments {
   readonly sceneId: string;
-  readonly boundTo: {
-    readonly memberDigest: string;
-    readonly poseReceiptSha256: string | null;
-    readonly placementReceiptSha256: string | null;
-    readonly regionDigest: string;
-  };
-  readonly method: {
-    readonly masks: SegmentModel;
-    readonly boxes: SegmentModel | null;
-    readonly projection: string;
-    /** How many photographs the lift projected into. A vote count is out of this. */
-    readonly views: number;
-  };
-  readonly assets: readonly SegmentAsset[];
+  readonly state: SegmentsState;
+  readonly reason: string | null;
+  readonly artifact: { readonly artifactId: string; readonly contentSha256: string; readonly byteSize: number } | null;
+  readonly poseReceiptSha256: string | null;
+  readonly placementReceiptSha256: string | null;
+  readonly gateReceiptSha256: string | null;
+  /** The voxel edge in millionths of a scene unit. Null when the scene has no segments to grid. */
+  readonly voxelSizeMicrounits: number | null;
+  readonly policy: Readonly<Record<string, unknown>> | null;
   readonly segments: readonly SceneSegment[];
+  /** Segments a live check or the read policy took back, counted so none drawn is not "none". */
+  readonly withheldSegmentCount: number;
+  readonly staleInputs: readonly string[];
 }
 
-/** Why a scene has no segments, in words a panel can show without inventing a reason. */
+/** Why a scene has no segments to read, in words a panel can show without inventing a reason. */
 export type SegmentsFailure = 'none-recorded' | 'unauthorized' | 'withdrawn' | 'timed-out' | 'unreadable';
 
 export class SegmentsUnavailable extends Error {
@@ -120,193 +109,167 @@ const unreadable = (message: string): SegmentsUnavailable => new SegmentsUnavail
 
 function record(value: unknown, what: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw unreadable(`The segment artifact's ${what} is not an object.`);
+    throw unreadable(`The scene segments' ${what} is not an object.`);
   }
   return value as Record<string, unknown>;
 }
 
-function text(value: unknown, what: string): string {
-  if (typeof value !== 'string' || value.length === 0) throw unreadable(`The segment artifact's ${what} is missing.`);
-  return value;
-}
-
-function digest(value: unknown, what: string): string {
-  if (typeof value !== 'string' || !SHA256.test(value)) throw unreadable(`The segment artifact's ${what} is not a SHA-256 digest.`);
-  return value;
-}
-
-function nullableDigest(value: unknown, what: string): string | null {
-  return value === null ? null : digest(value, what);
-}
-
-function uuid(value: unknown, what: string): string {
-  if (typeof value !== 'string' || !UUID.test(value)) throw unreadable(`The segment artifact's ${what} is not an identifier.`);
-  return value;
-}
-
-function count(value: unknown, what: string, minimum = 0): number {
+function integer(value: unknown, what: string, minimum = Number.MIN_SAFE_INTEGER): number {
   if (!Number.isSafeInteger(value) || (value as number) < minimum) {
-    throw unreadable(`The segment artifact's ${what} is not a whole number.`);
+    throw unreadable(`The scene segments' ${what} is not a whole number.`);
   }
   return value as number;
 }
 
-function modelOf(value: unknown, what: string): SegmentModel {
-  const wire = record(value, what);
-  return Object.freeze({
-    model: text(wire['model'], `${what} model`),
-    revision: text(wire['revision'], `${what} revision`),
-    licence: text(wire['licence'], `${what} licence`),
-  });
+function matching(value: unknown, pattern: RegExp, what: string): string {
+  if (typeof value !== 'string' || !pattern.test(value)) throw unreadable(`The scene segments' ${what} is malformed.`);
+  return value;
 }
 
-/** Missing and unrecognised decisions are both `not_recorded`: a default has to hide, not show. */
-function decision(value: unknown): ConsentDecision {
-  return value === 'granted' || value === 'revoked' || value === 'withdrawn' ? value : 'not_recorded';
+function nullable<T>(value: unknown, read: (present: unknown) => T): T | null {
+  return value === null || value === undefined ? null : read(value);
 }
 
-function personOf(value: unknown): SegmentPerson {
-  const wire = record(value, 'person block');
-  const consent = wire['consent'] === undefined || wire['consent'] === null ? {} : record(wire['consent'], 'person consent');
-  return Object.freeze({
-    reviewState: typeof wire['review_state'] === 'string' ? wire['review_state'] : 'unscreened',
-    state: typeof wire['state'] === 'string' ? wire['state'] : 'unknown',
-    consent: Object.freeze({
-      presence: decision(consent['presence']),
-      naming: decision(consent['naming']),
-      likeness: decision(consent['likeness']),
-    }),
-  });
+function triple(value: unknown, what: string): readonly number[] {
+  if (!Array.isArray(value) || value.length !== 3) throw unreadable(`The scene segments' ${what} is not three numbers.`);
+  return Object.freeze(value.map((item) => integer(item, what)));
 }
 
-function runsOf(value: unknown, sampleCount: number, what: string): SegmentSamples['runs'] {
-  if (!Array.isArray(value) || value.length === 0) throw unreadable(`${what} names no samples.`);
-  const runs: (readonly [number, number])[] = [];
-  let end = 0;
-  for (const run of value) {
-    if (!Array.isArray(run) || run.length !== 2) throw unreadable(`${what} holds a run that is not a pair.`);
-    const start = count(run[0], `${what} run start`);
-    const length = count(run[1], `${what} run length`, 1);
-    // Ascending and disjoint, so a sample is named at most once by one segment.
-    if (start < end) throw unreadable(`${what} holds runs out of order or overlapping.`);
-    end = start + length;
-    if (end > sampleCount) throw unreadable(`${what} names a sample beyond the asset's ${sampleCount}.`);
-    runs.push(Object.freeze([start, length] as const));
+function votesOf(value: unknown): SegmentVotes {
+  const wire = record(value, 'votes');
+  const votes = {
+    views: integer(wire['views'], 'view count', 0),
+    min: integer(wire['min'], 'minimum votes', 0),
+    median: integer(wire['median'], 'median votes', 0),
+    max: integer(wire['max'], 'maximum votes', 0),
+    fractionMinMillionths: integer(wire['fraction_min_millionths'], 'minimum vote fraction', 0),
+    fractionMedianMillionths: integer(wire['fraction_median_millionths'], 'median vote fraction', 0),
+  };
+  if (!(votes.min <= votes.median && votes.median <= votes.max && votes.max <= votes.views)) {
+    throw unreadable('A segment carries votes out of order or beyond its views.');
   }
-  return Object.freeze(runs);
+  return Object.freeze(votes);
+}
+
+function regionOf(value: unknown): SegmentRegion {
+  const wire = record(value, 'region');
+  const kind = wire['kind'];
+  if (kind !== 'object_mask' && kind !== 'person_region') throw unreadable('A segment rests on a region of an unknown kind.');
+  return Object.freeze({
+    captureId: matching(wire['capture_id'], UUID, 'region capture'),
+    kind,
+    spanId: nullable(wire['span_id'], (id) => matching(id, UUID, 'region span')),
+    regionKey: nullable(wire['region_key'], (key) => matching(key, SHA256, 'region key')),
+    samples: integer(wire['samples'], 'region sample count', 0),
+  });
+}
+
+function segmentOf(value: unknown): SceneSegment {
+  const wire = record(value, 'segment');
+  const kind = wire['kind'];
+  if (kind !== 'object' && kind !== 'person') throw unreadable('A segment is of a kind this build does not know.');
+  const label = nullable(wire['label'], (text) => {
+    if (typeof text !== 'string' || text.length === 0) throw unreadable('A segment label is not text.');
+    return text;
+  });
+  const subjectId = nullable(wire['subject_id'], (id) => matching(id, UUID, 'person subject'));
+  // The two shapes the route promises, held: a person has a subject and no label, an object a
+  // label and no subject. A body that mixed them would be describing someone as a thing.
+  if (kind === 'person' ? label !== null || subjectId === null : label === null || subjectId !== null) {
+    throw unreadable('A segment mixes the person and object shapes.');
+  }
+  const displayName = nullable(wire['display_name'], (text) => {
+    if (typeof text !== 'string' || text.length === 0) throw unreadable('A segment display name is not text.');
+    return text;
+  });
+  if (!Array.isArray(wire['voxels'])) throw unreadable('A segment holds no voxel list.');
+  const voxels = new Int32Array(wire['voxels'].length * 3);
+  wire['voxels'].forEach((cell, index) => voxels.set(triple(cell, 'voxel'), index * 3));
+  if (integer(wire['voxel_count'], 'voxel count', 0) !== wire['voxels'].length) {
+    throw unreadable('A segment holds a different number of voxels than it declares.');
+  }
+  const bounds = record(wire['bounds_microunits'], 'bounds');
+  const samples = record(wire['samples'], 'sample counts');
+  if (!Array.isArray(wire['regions']) || !Array.isArray(wire['occurrence_ids'])) {
+    throw unreadable('A segment holds no region or occurrence list.');
+  }
+  return Object.freeze({
+    segmentId: matching(wire['segment_id'], SEGMENT_ID, 'segment identifier'),
+    kind,
+    label,
+    subjectId,
+    displayName,
+    voxels,
+    boundsMicrounits: Object.freeze({ min: triple(bounds['min'], 'bounds'), max: triple(bounds['max'], 'bounds') }),
+    centroidMicrounits: triple(wire['centroid_microunits'], 'centroid'),
+    samples: Object.freeze({
+      pointMap: integer(samples['point_map'], 'point-map sample count', 0),
+      gaussian: integer(samples['gaussian'], 'Gaussian sample count', 0),
+    }),
+    votes: votesOf(wire['votes']),
+    regions: Object.freeze(wire['regions'].map(regionOf)),
+    occurrenceIds: Object.freeze(wire['occurrence_ids'].map((id) => matching(id, UUID, 'occurrence'))),
+  });
 }
 
 /**
- * Parse and check one served segment artifact.
+ * Parse and check one served body.
  *
- * Refuses rather than repairs. A run past the end of its asset, an asset named by no segment's
- * binding, or a sample the artifact claims for two assets at once are all signs that the artifact
- * and the geometry disagree, and the honest consequence of that is no overlay rather than an
- * overlay of whatever happened to line up.
+ * Refuses rather than repairs. A segment list on a scene that is not `available`, an available one
+ * with no grid, or a segment whose shape mixes a person and an object are all signs that the body
+ * and this build disagree, and the honest consequence is no overlay rather than a partial one.
  */
 export function parseSceneSegments(value: unknown, expectedSceneId?: string): SceneSegments {
   const wire = record(value, 'body');
-  if (wire['profile'] !== SEGMENTS_PROFILE) {
-    throw unreadable(`This build reads ${SEGMENTS_PROFILE}; the server answered ${String(wire['profile'])}.`);
+  if (wire['schema_version'] !== SEGMENTS_SCHEMA_VERSION) {
+    throw unreadable(`This build reads scene segments schema ${SEGMENTS_SCHEMA_VERSION}; the server answered ${String(wire['schema_version'])}.`);
   }
-  const sceneId = uuid(wire['scene_id'], 'scene');
+  const sceneId = matching(wire['scene_id'], UUID, 'scene');
   if (expectedSceneId !== undefined && sceneId !== expectedSceneId) {
-    throw unreadable('The segment artifact is for a different scene than the one asked about.');
+    throw unreadable('The scene segments are for a different scene than the one asked about.');
   }
-  const bound = record(wire['bound_to'], 'binding');
-  const method = record(wire['method'], 'method');
-  const assets = new Map<string, SegmentAsset>();
-  if (!Array.isArray(wire['assets']) || wire['assets'].length === 0) throw unreadable('The segment artifact names no scene asset.');
-  for (const item of wire['assets']) {
-    const asset = record(item, 'asset');
-    const kind = asset['kind'];
-    if (kind !== 'trained_geometry' && kind !== 'point_map') throw unreadable('The segment artifact names an asset of an unknown kind.');
-    const artifactId = uuid(asset['artifact_id'], 'asset');
-    if (assets.has(artifactId)) throw unreadable('The segment artifact names one asset twice.');
-    assets.set(artifactId, Object.freeze({
-      artifactId,
-      kind,
-      contentSha256: digest(asset['content_sha256'], 'asset digest'),
-      sampleCount: count(asset['sample_count'], 'asset sample count', 1),
-    }));
+  const state = wire['state'];
+  if (state !== 'available' && state !== 'stale' && state !== 'absent' && state !== 'unavailable') {
+    throw unreadable('The scene segments are in a state this build does not know.');
   }
-  const views = count(method['views'], 'view count', 1);
-  if (!Array.isArray(wire['segments'])) throw unreadable('The segment artifact holds no segment list.');
-  const seen = new Set<string>();
-  const segments = wire['segments'].map((item): SceneSegment => {
-    const segment = record(item, 'segment');
-    const segmentId = uuid(segment['segment_id'], 'segment');
-    if (seen.has(segmentId)) throw unreadable('The segment artifact names one segment twice.');
-    seen.add(segmentId);
-    const entityClass = segment['entity_class'];
-    if (entityClass !== 'person' && entityClass !== 'object' && entityClass !== 'place') {
-      throw unreadable('A segment names an entity class this build does not know.');
-    }
-    const confidence = segment['confidence'];
-    if (confidence !== 'low' && confidence !== 'medium' && confidence !== 'high') {
-      throw unreadable('A segment carries no qualitative confidence.');
-    }
-    const voteCount = count(segment['vote_count'], 'vote count', 1);
-    if (voteCount > views) throw unreadable('A segment carries more votes than the lift had views.');
-    const occurrenceIds = Array.isArray(segment['occurrence_ids'])
-      ? segment['occurrence_ids'].map((id) => uuid(id, 'occurrence'))
-      : [];
-    if (!Array.isArray(segment['samples']) || segment['samples'].length === 0) throw unreadable('A segment covers no samples.');
-    const bySample = new Set<string>();
-    const samples = segment['samples'].map((entry): SegmentSamples => {
-      const samplesWire = record(entry, 'sample list');
-      const artifactId = uuid(samplesWire['artifact_id'], 'sample asset');
-      const asset = assets.get(artifactId);
-      if (asset === undefined) throw unreadable('A segment names samples in an asset the artifact does not bind.');
-      if (bySample.has(artifactId)) throw unreadable('A segment names one asset twice.');
-      bySample.add(artifactId);
-      const runs = runsOf(samplesWire['index_runs'], asset.sampleCount, 'A segment');
-      return Object.freeze({ artifactId, runs, count: runs.reduce((sum, [, length]) => sum + length, 0) });
-    });
-    return Object.freeze({
-      segmentId,
-      entityId: segment['entity_id'] === null ? null : uuid(segment['entity_id'], 'entity'),
-      entityClass,
-      label: text(segment['label'], 'segment label'),
-      voteCount,
-      confidence,
-      occurrenceIds: Object.freeze(occurrenceIds),
-      // A person segment without a person block is refused rather than drawn with no consent
-      // state: the brief says one exists only for someone whose consent is recorded.
-      person: entityClass === 'person' ? personOf(segment['person']) : null,
-      samples: Object.freeze(samples),
-    });
+  const grid = nullable(wire['grid'], (value) => {
+    const held = record(value, 'grid');
+    if (held['frame'] !== 'scene') throw unreadable('The scene segments are gridded in a frame other than the scene.');
+    return integer(held['voxel_size_microunits'], 'voxel size', 1);
   });
+  if (!Array.isArray(wire['segments']) || !Array.isArray(wire['stale_inputs'])) {
+    throw unreadable('The scene segments hold no segment or stale-input list.');
+  }
+  const segments = wire['segments'].map(segmentOf);
+  if (state !== 'available' && segments.length > 0) throw unreadable('Segments were served for a scene that is not available.');
+  if (segments.length > 0 && grid === null) throw unreadable('Segments were served with no grid to place them on.');
+  if (new Set(segments.map((segment) => segment.segmentId)).size !== segments.length) {
+    throw unreadable('The scene segments name one segment twice.');
+  }
   return Object.freeze({
     sceneId,
-    boundTo: Object.freeze({
-      memberDigest: digest(bound['member_digest'], 'member digest'),
-      poseReceiptSha256: nullableDigest(bound['pose_receipt_sha256'] ?? null, 'pose receipt digest'),
-      placementReceiptSha256: nullableDigest(bound['placement_receipt_sha256'] ?? null, 'placement receipt digest'),
-      regionDigest: digest(bound['region_digest'], 'region digest'),
+    state,
+    reason: nullable(wire['reason'], (text) => String(text)),
+    artifact: nullable(wire['artifact'], (value) => {
+      const held = record(value, 'artifact');
+      return Object.freeze({
+        artifactId: matching(held['artifact_id'], UUID, 'artifact'),
+        contentSha256: matching(held['content_sha256'], SHA256, 'artifact digest'),
+        byteSize: integer(held['byte_size'], 'artifact size', 0),
+      });
     }),
-    method: Object.freeze({
-      masks: modelOf(method['masks'], 'mask model'),
-      boxes: method['boxes'] === undefined || method['boxes'] === null ? null : modelOf(method['boxes'], 'box model'),
-      projection: text(method['projection'], 'projection method'),
-      views,
-    }),
-    assets: Object.freeze([...assets.values()]),
+    poseReceiptSha256: nullable(wire['pose_receipt_sha256'], (value) => matching(value, SHA256, 'pose receipt digest')),
+    placementReceiptSha256: nullable(wire['placement_receipt_sha256'], (value) => matching(value, SHA256, 'placement receipt digest')),
+    gateReceiptSha256: nullable(wire['gate_receipt_sha256'], (value) => matching(value, SHA256, 'gate receipt digest')),
+    voxelSizeMicrounits: grid,
+    policy: nullable(wire['policy'], (value) => Object.freeze({ ...record(value, 'policy') })),
     segments: Object.freeze(segments),
+    withheldSegmentCount: integer(wire['withheld_segment_count'], 'withheld segment count', 0),
+    staleInputs: Object.freeze(wire['stale_inputs'].map((item) => String(item))),
   });
 }
 
-/** Expand one segment's runs on one asset into ascending sample indices. */
-export function indicesOf(samples: SegmentSamples): Uint32Array {
-  const out = new Uint32Array(samples.count);
-  let at = 0;
-  for (const [start, length] of samples.runs) {
-    for (let index = start; index < start + length; index += 1) out[at++] = index;
-  }
-  return out;
-}
-
-/** Reads one scene's segment artifact through the same authenticated transport. */
+/** Reads one scene's segments through the same authenticated transport. */
 export class SceneSegmentsClient {
   readonly #options: TransportOptions;
 
@@ -319,7 +282,7 @@ export class SceneSegmentsClient {
     const transport = new Transport({ ...this.#options, signal: AbortSignal.timeout(SEGMENTS_TIMEOUT_MS) });
     let wire: unknown;
     try {
-      wire = await transport.getJson<unknown>(`/world-read/scenes/${sceneId}/segments`);
+      wire = await transport.getJson<unknown>(`/scene-segments/${sceneId}`);
     } catch (error) {
       throw asUnavailable(error);
     }
@@ -328,7 +291,7 @@ export class SceneSegmentsClient {
 }
 
 /**
- * The provisional fixture, for the development preview only.
+ * The published fixture, for the development preview only.
  *
  * Guarded on `import.meta.env.DEV` as well as the caller's preview flag, so a production build
  * drops the import and the fixture never enters a bundle that could be deployed.
@@ -346,9 +309,9 @@ function asUnavailable(error: unknown): SegmentsUnavailable {
     }
     if (error.status === 410) return new SegmentsUnavailable('withdrawn', 'This reconstructed scene was withdrawn.');
     if (error.status === 404) {
-      // A missing scene, a foreign one and one nobody has segmented all answer 404, and the route
-      // will not say which, so neither does this.
-      return new SegmentsUnavailable('none-recorded', 'No segments are recorded for this scene.');
+      // The route answers 404 for a scene this workspace does not hold and will not say more, so
+      // neither does this.
+      return new SegmentsUnavailable('none-recorded', 'This scene is not one this session can read segments for.');
     }
     return new SegmentsUnavailable('unreadable', error.message);
   }
