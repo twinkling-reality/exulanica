@@ -44,6 +44,8 @@
  *   uCapture      vec4  xyz that camera in world space, w enabled
  *   uViewFade     vec4  x cosine where the view fade starts, y cosine where it ends,
  *                       z distance from the camera where the standpoint fade starts, w where it ends
+ *   uSeamFade     vec4  x cosine where a seam starts to fade, y cosine where it is gone (surface only)
+ *   aTags.y bit 1 marks a seam vertex: a triangle across a depth jump, see depth-surface.ts
  *
  * The last four describe ONE photograph's own camera and are enabled only for a map drawn in an
  * unmeasured arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of
@@ -88,10 +90,17 @@ uniform vec4 uFrame;
 uniform vec4 uViewpoint;
 uniform vec4 uCapture;
 uniform vec4 uViewFade;
+#ifdef SURFACE
+uniform vec4 uSeamFade;
+#endif
 
 varying vec4 vColor;
 varying vec4 vSemantic;
 varying float vFogAmount;
+#ifdef SURFACE
+varying float vSurvive;
+varying float vPresence;
+#endif
 
 // One hash, used for the particulate dissolve. Deterministic per point, so the boundary does not
 // crawl when the camera moves; it is a property of the point, not of the frame.
@@ -137,12 +146,23 @@ void main(void) {
     if (uCapture.w > 0.5) {
         vec3 fromCamera = normalize(worldPos.xyz - uCapture.xyz);
         vec3 fromViewer = normalize(worldPos.xyz - view_position);
-        survive *= smoothstep(uViewFade.y, uViewFade.x, dot(fromCamera, fromViewer));
+        float along = dot(fromCamera, fromViewer);
+        survive *= smoothstep(uViewFade.y, uViewFade.x, along);
         survive *= 1.0 - smoothstep(uViewFade.z, uViewFade.w, length(view_position - uCapture.xyz));
+#ifdef SURFACE
+        // A seam is right only down the camera's own rays, so it goes long before the surface does.
+        if (mod(floor(aTags.y / 2.0), 2.0) > 0.5) survive *= smoothstep(uSeamFade.y, uSeamFade.x, along);
+#endif
     }
 
     float r = hash1(float(gl_VertexID) * 0.6180339887);
 
+#ifdef SURFACE
+    // A surface cannot drop one vertex without tearing every triangle that shares it, so the same
+    // two decisions travel to the fragment stage and are made there, per pixel. See depth-surface.ts.
+    vSurvive = survive;
+    vPresence = presenceOnly;
+#else
     if (presenceOnly > 0.5 || r > survive) {
         // Culled. Pushed behind the near plane rather than discarded in the fragment stage, so a
         // culled point costs no rasterisation at all.
@@ -153,6 +173,7 @@ void main(void) {
         vFogAmount = 0.0;
         return;
     }
+#endif
 
     gl_Position = matrix_viewProjection * worldPos;
 
@@ -169,8 +190,10 @@ void main(void) {
     //
     // uSupportFloor is 1.0 for a producer whose alpha is not a spacing ratio, which makes the
     // division exactly 1 and leaves that file rendering as it always did.
+#ifndef SURFACE
     float spread = uPoint.x / max(aColor.a, uSupportFloor);
     gl_PointSize = clamp(spread * uPoint.z / max(viewDist, 0.001), 1.0, uPoint.y);
+#endif
 
     float fogAmount = 0.0;
     if (uFog.w > 0.5) {
@@ -213,14 +236,29 @@ uniform float uExposure;
 varying vec4 vColor;
 varying vec4 vSemantic;
 varying float vFogAmount;
+#ifdef SURFACE
+varying float vSurvive;
+varying float vPresence;
+#endif
 
 void main(void) {
+#ifdef SURFACE
+    // Somebody who may be present but not shown is not drawn. The flag is interpolated, so it is
+    // above zero anywhere inside a triangle that touches one of their samples, and the whole
+    // triangle goes: the conservative reading, the one that cannot leak a likeness at an edge.
+    if (vPresence > 0.0) discard;
+    // The particulate dissolve, per pixel rather than per point: the same survival the point path
+    // spends on whole points, spent against a hash of this pixel's cell so it does not crawl.
+    if (fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453) > vSurvive) discard;
+    float soft = 1.0;
+#else
     // Soft round edges. A square point sprite reads as a pixel grid, which is the one thing the
     // dissolving boundary must not look like.
     vec2 d = gl_PointCoord * 2.0 - 1.0;
     float r2 = dot(d, d);
     if (r2 > 1.0) discard;
     float soft = smoothstep(1.0, 0.25, r2);
+#endif
 
     int slot = int(vSemantic.y + 0.5);
     vec4 tint = uPalette[slot];

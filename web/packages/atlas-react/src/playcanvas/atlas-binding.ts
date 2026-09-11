@@ -716,10 +716,15 @@ export class AtlasBinding {
           ...(options.sizeGain === undefined ? {} : { sizeGain: options.sizeGain }),
           ...(options.maxSizePx === undefined ? {} : { maxSizePx: options.maxSizePx }),
           ...(options.blend === undefined ? {} : { blend: options.blend }),
+          // One photograph's own view reads as its surface, not as dots. Posed maps overlap one
+          // another from many cameras, so they stay points.
+          surface: pointMap.arrangement === 'unmeasured-fan',
           theme,
         });
         const instance = new pc.MeshInstance(cloud.mesh, cloud.material, entity);
-        entity.addComponent('render', { meshInstances: [instance] });
+        // A surface's seams share its material, so every per-frame uniform below reaches them too.
+        const seams = cloud.seamMesh === null ? [] : [new pc.MeshInstance(cloud.seamMesh, cloud.material, entity)];
+        entity.addComponent('render', { meshInstances: [instance, ...seams] });
         islandEntity.addChild(entity);
         const singleView = pointMap.arrangement === 'unmeasured-fan' ? cloud.enableSingleView() : null;
 

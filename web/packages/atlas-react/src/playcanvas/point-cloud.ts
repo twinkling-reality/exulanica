@@ -6,6 +6,7 @@ import {
   unitRgb,
   type PresentationTheme,
 } from '@exulanica/presentation';
+import { depthSurfaceIndices } from './depth-surface.js';
 import type { PointMap } from './opm.js';
 import { footprintRadiusOf, packedVertexBytes } from './opm.js';
 import type { SegmentSemantics } from './semantics.js';
@@ -50,6 +51,12 @@ export interface PointCloudOptions {
   /** Alpha blending instead of the alpha-tested opaque path. Order-dependent; off by default. */
   readonly blend?: boolean;
   readonly theme?: PresentationTheme;
+  /**
+   * Draw a single photograph's map as a surface between neighbouring grid samples rather than as
+   * points (see `depth-surface.ts`). Honoured on WebGL2 for a map that is a grid; anything else
+   * keeps drawing points, and `surface` on the result says which happened.
+   */
+  readonly surface?: boolean;
 }
 
 export interface PointCloud {
@@ -63,6 +70,10 @@ export interface PointCloud {
   readonly vertexBytes: number;
   readonly defaultSizeGain: number;
   readonly defaultMaxSizePx: number;
+  /** True when this map is drawn as a surface, false when as points. Reported, never assumed. */
+  readonly surface: boolean;
+  /** The seam triangles of a surface, drawn with the same material; null for points. */
+  readonly seamMesh: pc.Mesh | null;
   setTheme(theme: PresentationTheme): void;
   /** Compare evidence without the authored fog or display gain masking reconstruction defects. */
   setInspection(active: boolean): void;
@@ -92,6 +103,11 @@ export const SINGLE_VIEW_FADE_END_DEG = 42;
 /** World distance from the photograph's camera over which the whole photograph thins out. */
 export const SINGLE_VIEW_STANDPOINT_START = 3;
 export const SINGLE_VIEW_STANDPOINT_END = 9;
+/** Angles over which a seam of a surface dissolves; see depth-surface.ts. Far tighter than a surface. */
+export const SEAM_FADE_START_DEG = 3;
+export const SEAM_FADE_END_DEG = 9;
+/** The tags flag bit that marks a copied seam vertex. Bit 0 is the file's own one-sided flag. */
+const SEAM_FLAG = 2;
 
 /**
  * Default sprite sizing.
@@ -132,12 +148,15 @@ interface ShaderDesc {
   fragmentWGSL?: string;
 }
 
-function buildShaderDesc(blend: boolean): ShaderDesc {
+function buildShaderDesc(blend: boolean, surface = false): ShaderDesc {
+  const defines = `${blend ? '#define POINT_BLEND\n' : ''}${surface ? '#define SURFACE\n' : ''}`;
   return {
-    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}`,
+    uniqueName: `exulanica-point-map${blend ? '-blend' : ''}${surface ? '-surface' : ''}`,
     attributes: { ...ATTRIBUTES },
-    vertexGLSL: blend ? `#define POINT_BLEND\n${POINT_VERTEX_GLSL}` : POINT_VERTEX_GLSL,
-    fragmentGLSL: blend ? `#define POINT_BLEND\n${POINT_FRAGMENT_GLSL}` : POINT_FRAGMENT_GLSL,
+    vertexGLSL: `${defines}${POINT_VERTEX_GLSL}`,
+    fragmentGLSL: `${defines}${POINT_FRAGMENT_GLSL}`,
+    // A surface is only ever built on WebGL2 (see `createPointCloud`), so the WGSL twins stay the
+    // point shader: there is no WGSL surface to keep in step, and none that could ship untested.
     vertexWGSL: POINT_VERTEX_WGSL,
     fragmentWGSL: POINT_FRAGMENT_WGSL,
   };
@@ -193,14 +212,32 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
 
   const mesh = new pc.Mesh(device);
   mesh.vertexBuffer = vertexBuffer;
-  mesh.primitive[0] = { type: pc.PRIMITIVE_POINTS, base: 0, count: n, indexed: false, baseVertex: 0 };
+  const triangles = options.surface === true && device.isWebGL2 ? depthSurfaceIndices(map) : null;
+  let seamMesh: pc.Mesh | null = null;
+  if (triangles === null || triangles.surface.length === 0) {
+    mesh.primitive[0] = { type: pc.PRIMITIVE_POINTS, base: 0, count: n, indexed: false, baseVertex: 0 };
+  } else {
+    mesh.indexBuffer[0] = new pc.IndexBuffer(device, pc.INDEXFORMAT_UINT32, triangles.surface.length,
+      pc.BUFFER_STATIC, triangles.surface.buffer as ArrayBuffer);
+    mesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, count: triangles.surface.length, indexed: true,
+      baseVertex: 0 };
+    if (triangles.seams.length > 0) seamMesh = buildSeamMesh(device, map, triangles.seams);
+  }
+  const surface = triangles !== null && triangles.surface.length > 0;
 
   const { min, max } = map.header.bounds;
   mesh.aabb = new pc.BoundingBox();
   mesh.aabb.setMinMax(new pc.Vec3(min[0], min[1], min[2]), new pc.Vec3(max[0], max[1], max[2]));
+  // The seams are copies of samples inside the same bounds. Without a box of its own the engine
+  // treats a mesh built from a raw vertex buffer as empty and culls it, which is exactly how the
+  // first version of this drew no seams at all.
+  if (seamMesh !== null) {
+    seamMesh.aabb = new pc.BoundingBox();
+    seamMesh.aabb.setMinMax(new pc.Vec3(min[0], min[1], min[2]), new pc.Vec3(max[0], max[1], max[2]));
+  }
 
   const blend = options.blend ?? false;
-  const material = new pc.ShaderMaterial(buildShaderDesc(blend) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
+  const material = new pc.ShaderMaterial(buildShaderDesc(blend, surface) as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
   material.cull = pc.CULLFACE_NONE;
   if (blend) {
     material.blendType = pc.BLEND_NORMAL;
@@ -268,6 +305,12 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   material.setParameter('uFrame', [0, 0, 0, 0]);
   material.setParameter('uViewpoint', [0, 0, 0, 0]);
   material.setParameter('uCapture', capture);
+  material.setParameter('uSeamFade', [
+    Math.cos((SEAM_FADE_START_DEG * Math.PI) / 180),
+    Math.cos((SEAM_FADE_END_DEG * Math.PI) / 180),
+    0,
+    0,
+  ]);
   material.setParameter('uViewFade', [
     Math.cos((SINGLE_VIEW_FADE_START_DEG * Math.PI) / 180),
     Math.cos((SINGLE_VIEW_FADE_END_DEG * Math.PI) / 180),
@@ -290,6 +333,8 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     vertexBytes: vertexBuffer.numBytes,
     defaultSizeGain: options.sizeGain ?? DEFAULT_SIZE_GAIN,
     defaultMaxSizePx: options.maxSizePx ?? DEFAULT_MAX_SIZE_PX,
+    surface,
+    seamMesh,
     setTheme,
     setInspection(active) {
       material.setParameter('uFog', [footprint * 0.9, footprint * 3.2, 1.2, active ? 0 : 1]);
@@ -316,7 +361,51 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
     },
     destroy(): void {
       mesh.destroy();
+      seamMesh?.destroy();
       material.destroy();
     },
   };
+}
+
+/**
+ * The seam triangles as their own vertices: three copies per triangle of the file's samples, with
+ * the seam bit set in each copy's flags. Copies rather than an index list over the file's vertices
+ * because the flag is per vertex and a sample on a seam is also a corner of ordinary surface.
+ */
+function buildSeamMesh(device: pc.GraphicsDevice, map: PointMap, seams: Uint32Array): pc.Mesh {
+  const count = seams.length;
+  const format = new pc.VertexFormat(
+    device,
+    [
+      { semantic: pc.SEMANTIC_POSITION, components: 3, type: pc.TYPE_FLOAT32 },
+      { semantic: pc.SEMANTIC_COLOR, components: 4, type: pc.TYPE_UINT8, normalize: true },
+      { semantic: pc.SEMANTIC_ATTR8, components: 2, type: pc.TYPE_UINT16, normalize: false },
+    ],
+    count,
+  );
+  const position = new Float32Array(count * 3);
+  const color = new Uint8Array(count * 4);
+  const tags = new Uint16Array(count * 2);
+  for (let k = 0; k < count; k += 1) {
+    const i = seams[k]!;
+    position.set(map.position.subarray(i * 3, i * 3 + 3), k * 3);
+    color.set(map.color.subarray(i * 4, i * 4 + 4), k * 4);
+    tags[k * 2] = map.tags[i * 2]!;
+    tags[k * 2 + 1] = map.tags[i * 2 + 1]! | SEAM_FLAG;
+  }
+  const bytes = new Uint8Array(position.byteLength + color.byteLength + tags.byteLength);
+  bytes.set(new Uint8Array(position.buffer), 0);
+  bytes.set(color, position.byteLength);
+  bytes.set(new Uint8Array(tags.buffer), position.byteLength + color.byteLength);
+  // The same agreement the file's own buffer is held to above: the engine's planar layout and ours.
+  if (format.verticesByteSize !== bytes.byteLength) {
+    throw new RangeError(`the seam vertex format reads ${format.verticesByteSize} bytes and ${bytes.byteLength} were packed`);
+  }
+  const seamMesh = new pc.Mesh(device);
+  seamMesh.vertexBuffer = new pc.VertexBuffer(device, format, count, {
+    usage: pc.BUFFER_STATIC,
+    data: bytes.buffer as ArrayBuffer,
+  });
+  seamMesh.primitive[0] = { type: pc.PRIMITIVE_TRIANGLES, base: 0, count, indexed: false, baseVertex: 0 };
+  return seamMesh;
 }

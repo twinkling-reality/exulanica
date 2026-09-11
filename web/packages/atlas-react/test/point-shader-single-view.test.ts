@@ -30,9 +30,11 @@ describe('single-view point fading', () => {
       expect(source).toContain('if (uFrame.w > 0.5)');
       expect(source).toContain('smoothstep(0.0, uFrame.z, 1.0 - edge)');
       expect(source).toContain('if (uCapture.w > 0.5)');
-      expect(source).toContain('smoothstep(uViewFade.y, uViewFade.x, dot(fromCamera, fromViewer))');
+      expect(source).toMatch(/smoothstep\(uViewFade\.y, uViewFade\.x, (along|dot\(fromCamera, fromViewer\))\)/);
       expect(source).toMatch(/1\.0 - smoothstep\(uViewFade\.z, uViewFade\.w, length\(view_position - uCapture\.xyz\)\)/);
     }
+    // The GLSL surface variant's seams: bit 1 of the flags word, faded far sooner than a surface.
+    expect(glsl).toContain('if (mod(floor(aTags.y / 2.0), 2.0) > 0.5) survive *= smoothstep(uSeamFade.y, uSeamFade.x, along);');
   });
 
   it('fades over the ranges the renderer documents', () => {
