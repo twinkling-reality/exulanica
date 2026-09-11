@@ -20,6 +20,10 @@ What this stage writes, and why each piece is the shape it is:
     ``models_tried`` for the run the assertion's ``produced_by_run`` points at; the label's own
     confidence, the detector score or the hosted pass's band, is in the artifact.
 
+**A detector-only mask also writes an unnamed object occurrence**, on its bounding span. Hosted
+masks already have a vision occurrence, so they write no second one. The identity route creates
+an entity and a naming assertion only on the account holder's confirmation.
+
 **Where the boxes come from.** The hosted vision pass's located objects when it located any,
 otherwise the local open-vocabulary detector over a declared vocabulary. Both are prompts for the
 same local segmenter; the artifact records which source ran and why.
@@ -60,9 +64,10 @@ from PIL import Image
 from exulanica.canonical import canonical_json, sha256_digest, sha256_of_canonical
 from exulanica.consent.regions import Silhouette
 from exulanica.errors import PrivacyAdmissionError
-from exulanica.evidence import EvidenceAddress
+from exulanica.evidence import PHOTOGRAPH_INTERVAL, EvidenceAddress
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import PPM, DisplayGeometry, Rect, Region, to_ppm
+from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
 from exulanica.ingest.privacy import require_privacy_screening
@@ -404,6 +409,7 @@ def run(
             *([masked.content_sha256] if masked is not None else []),
             *consent_digests,
             offered,
+            sha256_of_canonical({"detector_occurrences": 1}),
             sha256_digest(identity),
         ]
     )
@@ -484,12 +490,14 @@ def run(
                     "area_millionths": mask.area_millionths,
                     "components": mask.components,
                     "span_digest": address.span_digest_hex,
+                    # Backing occurrence span for naming: the hosted box if there is one,
+                    # otherwise this detector mask's own bounding span.
                     "prompt_span_digest": (
                         EvidenceAddress.photograph(
                             blob_id, region=Region(rect=prompt.box, display=display)
                         ).span_digest_hex
                         if prompt.source == "hosted_vision"
-                        else None
+                        else address.span_digest_hex
                     ),
                 }
             )
@@ -573,6 +581,19 @@ def run(
                 )
                 if assertion_id is not None:
                     emitted.append(assertion_id)
+                if prompt.source == "local_detector":
+                    writes.repository.insert_occurrence(
+                        capture_id=capture_id,
+                        occurrence_class="object",
+                        primary_span_id=span_id,
+                        span_ids=[span_id],
+                        presence=[(PHOTOGRAPH_INTERVAL.start_ns, PHOTOGRAPH_INTERVAL.end_ns)],
+                        produced_by_run=ledger.run_id,
+                        detector_version=SEGMENTER_CONTRACT,
+                        identity_key=occurrence_identity_key(address, "object"),
+                        emit_key=f"{key}:o:{record['index']}",
+                        quality={"label": prompt.label, "trust_tier": "T2"},
+                    )
         ledger.emitted("assertion", emitted, spec)
     return result
 

@@ -1,0 +1,63 @@
+import json,os,uuid,itertools
+from pathlib import Path
+import numpy as np
+from PIL import Image,ImageDraw
+from scipy.optimize import linear_sum_assignment
+from exulanica.db import Database
+from exulanica.consent.regions import Silhouette
+from exulanica.ingest.stages.segmentation import BoxPrompt,deduplicate,person_overlap_millionths
+from exulanica.evidence.region import Rect
+from exulanica.ingest.scene_segments import _raster
+root=Path('/tmp/segments-production');truth=json.loads(Path('tests/fixtures/scene-segments-production-labels.json').read_text())['photos'];raw=json.loads((root/'raw.json').read_text());measurement=json.loads((root/'measurement.json').read_text())
+def raster(points,size):
+ im=Image.new('1',tuple(size));ImageDraw.Draw(im).polygon([tuple(p) for p in points],fill=1);return np.array(im,dtype=bool)
+def ground(item):
+ masks=[raster(a['polygon'],item['preview_size']) for a in item['annotations']]
+ if item['index'] in [0,105,209] and item['workspace']==truth[0]['workspace']:masks[0]&=~masks[1]
+ return masks
+def iou(a,b):return int((a&b).sum())/max(1,int((a|b).sum()))
+result={'annotation_scope':'Manual source-preview tracing by Codex, not human validated. Volcanic targets: rock and turntable. First-place: all people, with other objects unlabelled. No held-out photographs.','stage_masks':[],'person_regions':[],'detector_sweep':[],'overlap_sweep':[]}
+db=Database.from_env({'EXULANICA_DATABASE_URL':os.environ['EXULANICA_REFERENCE_DATABASE_URL']+'?options=-crole%3Dexulanica_app'})
+people={}
+with db.session(uuid.UUID(truth[3]['workspace'])) as c:
+ for item in truth[3:]:
+  rows=c.execute('select silhouette,subject_id,confirmed_by from person_region_current where workspace_id=%s and capture_id=%s order by region_key',(item['workspace'],item['capture'])).fetchall()
+  people[item['capture']]=[Silhouette.from_digest_input(r['silhouette']) for r in rows]
+  gt=ground(item);pred=[_raster(p,*item['preview_size']) for p in people[item['capture']]]
+  values=np.array([[iou(a,b) for b in pred] for a in gt]);r,col=linear_sum_assignment(-values)
+  result['person_regions'].append({'capture':item['capture'],'ground_truth_people':len(gt),'confirmed_regions':len(rows),'subjects':len({str(r['subject_id']) for r in rows}),'matched_iou':values[r,col].tolist(),'mean_iou':float(values[r,col].mean())})
+for item,measured in zip(truth,measurement['stage'],strict=True):
+ gt=ground(item);masks=measured['document']['masks'];pred=[_raster(Silhouette.from_digest_input(m['outline']),*item['preview_size']) for m in masks]
+ info={'capture':item['capture'],'masks':len(masks),'labels':[m['label'] for m in masks],'dropped':measured['document']['dropped']}
+ if len(result['stage_masks'])<3:
+  info['best_target_iou']={a['class']:max([iou(g,p) for p in pred],default=0) for a,g in zip(item['annotations'],gt)}
+ else:
+  union=np.logical_or.reduce(gt);info['person_pixel_overlap_fraction']=[int((p&union).sum())/max(1,int(p.sum())) for p in pred]
+ result['stage_masks'].append(info)
+for threshold,nms,area in itertools.product([150000,200000,250000,300000,350000,400000,500000],[500000,700000,900000],[0,500,2000]):
+ tp=fp=fn=0;ious=[]
+ for item,data in zip(truth[:3],raw[:3],strict=True):
+  candidates=[BoxPrompt(p['label'],Rect(p['box']['x'],p['box']['y'],p['box']['w'],p['box']['h']),p['source'],p['score_millionths']) for p in data['boxes']]
+  lookup={id(p):m for p,m in zip(candidates,data['masks'],strict=True)}
+  kept=deduplicate([p for p in candidates if p.score_millionths>threshold],iou_millionths=nms,limit=24)
+  pred=[_raster(Silhouette.from_digest_input(lookup[id(p)]['outline']),*item['preview_size']) for p in kept if lookup[id(p)] and lookup[id(p)]['area']>=area]
+  gt=ground(item);matrix=np.array([[iou(g,p) for p in pred] for g in gt]);good=[]
+  if pred:
+   r,col=linear_sum_assignment(-matrix);good=[matrix[a,b] for a,b in zip(r,col) if matrix[a,b]>=.5]
+  tp+=len(good);fp+=len(pred)-len(good);fn+=len(gt)-len(good);ious+=good
+ result['detector_sweep'].append({'box_threshold':threshold,'duplicate_iou':nms,'min_area':area,'tp':tp,'fp':fp,'fn':fn,'f1':2*tp/max(1,2*tp+fp+fn),'matched_mean_iou':float(np.mean(ious)) if ious else 0})
+for limit in [100000,250000,500000,750000,900000]:
+ unsafe_kept=unsafe_dropped=other_kept=other_dropped=0
+ for item,data in zip(truth[3:],raw[3:],strict=True):
+  union=np.logical_or.reduce(ground(item))
+  for m in data['masks']:
+   if not m:continue
+   outline=Silhouette.from_digest_input(m['outline']);pred=_raster(outline,*item['preview_size']);overlap=int((pred&union).sum())/max(1,int(pred.sum()))
+   unsafe=overlap>=.5;drop=person_overlap_millionths(outline,people[item['capture']])>=limit
+   if unsafe and drop:unsafe_dropped+=1
+   elif unsafe:unsafe_kept+=1
+   elif drop:other_dropped+=1
+   else:other_kept+=1
+ result['overlap_sweep'].append({'person_overlap_drop':limit,'person_dominant_masks_kept':unsafe_kept,'person_dominant_masks_dropped':unsafe_dropped,'other_masks_kept':other_kept,'other_masks_dropped':other_dropped})
+(root/'scores.json').write_text(json.dumps(result,indent=2))
+print(json.dumps({k:v for k,v in result.items() if k!='detector_sweep'},indent=2));print('best',sorted(result['detector_sweep'],key=lambda a:(-a['f1'],-a['matched_mean_iou']))[:5])

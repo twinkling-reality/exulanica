@@ -1,0 +1,46 @@
+import json,os,uuid,time,itertools
+from pathlib import Path
+import numpy as np
+from PIL import Image,ImageDraw
+from exulanica.db import Database
+from exulanica.evidence.blob import BlobId
+from exulanica.ingest import scene_segments as lift
+from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.stages import stage
+from exulanica.store.local import LocalContentAddressedStore
+root=Path('/tmp/segments-production');truth=json.loads(Path('tests/fixtures/scene-segments-production-labels.json').read_text())['photos'][:3];workspace=uuid.UUID(truth[0]['workspace']);scene=uuid.UUID(truth[0]['scene'])
+db=Database.from_env({'EXULANICA_DATABASE_URL':os.environ['EXULANICA_REFERENCE_DATABASE_URL']+'?options=-crole%3Dexulanica_app'});store=LocalContentAddressedStore('/Users/glendonchin/dev/Technology/orimera/.exulanica/reference-baseline/runtime/blobs')
+with db.session(workspace) as c:
+ repo=IngestRepository(c,workspace);row=c.execute(lift._SCENE,(workspace,scene)).fetchone();members=[str(r['capture_id']) for r in c.execute('select capture_id from reconstruction_scene_build_member where workspace_id=%s and job_id=%s order by ordinal,capture_id',(workspace,row['job_id'])).fetchall()]
+ placement_bytes=store.get(BlobId(bytes(row['placement_sha256'])));placement=lift._projected_placement(repo,store,scene,row,members,placement_bytes);assert placement is not None
+ pose=store.get(BlobId(bytes(row['pose_sha256'])));cameras=lift._cameras(pose)
+ maps={i.capture_ref:store.get(BlobId.from_hex(i.content_sha256)) for i in placement.point_map_inputs}
+ masks=c.execute(lift._OBJECT_MASKS,(workspace,[uuid.UUID(m) for m in members],lift.OBJECT_MASK_KIND)).fetchall();assert len(masks)==210
+ regions=[r for m in masks for r in lift.object_regions_from_artifact(str(m['capture_id']),str(m['artifact_id']),store.get(BlobId(bytes(m['content_sha256']))))]
+params=stage('scene_segments').params
+samples,occlusion=lift._samples(placement,maps,None,params,cameras)
+indices=[];labels=[]
+for item in truth:
+ member_index=[m[0] for m in samples.members].index(item['capture']);chosen=np.flatnonzero(samples.source==member_index)
+ front,u,v,_=lift._project(cameras[item['capture']],samples.points[chosen]);camera=cameras[item['capture']];inside=(u>=0)&(u<camera.image_size[0])&(v>=0)&(v<camera.image_size[1]);front,u,v=front[inside],u[inside],v[inside];width,height=item['preview_size'];x=np.clip((u*width/camera.image_size[0]).astype(int),0,width-1);y=np.clip((v*height/camera.image_size[1]).astype(int),0,height-1)
+ canvas=Image.new('L',(width,height));draw=ImageDraw.Draw(canvas)
+ for ann in item['annotations']:draw.polygon([tuple(p) for p in ann['polygon']],fill=1 if ann['class']=='turntable' else 2)
+ gt=np.array(canvas)[y,x];indices.extend(chosen[front].tolist());labels.extend(gt.tolist())
+indices=np.array(indices);labels=np.array(labels);eval_points=samples.points[indices]
+variants=[{'min_votes':v,'vote_threshold_millionths':t,'min_segment_samples':n} for v,t,n in itertools.product([1,2,3],[400000,500000,600000,750000],[8,32])]
+variants += [{k:v} for k,values in {'point_map_samples_per_member':[512,2048],'voxel_grid_cells':[64,256],'region_raster_cells':[256,1024],'occlusion_relative_tolerance_millionths':[50000,300000],'occlusion_grid_cells':[48,192]}.items() for v in values]
+variants=[{'occlusion_relative_tolerance_millionths':50000,'min_segment_samples':32},{'occlusion_relative_tolerance_millionths':50000,'min_segment_samples':32,'vote_threshold_millionths':400000}];results=[]
+for change in variants:
+ policy={**params,**change};t=time.monotonic()
+ grids=occlusion if 'occlusion_grid_cells' not in change else lift._samples(placement,maps,None,policy,cameras)[1]
+ voting_samples=samples if 'point_map_samples_per_member' not in change else lift._samples(placement,maps,None,policy,cameras)[0]
+ segments,summary=lift._lift(voting_samples,cameras,grids,regions,policy)
+ voxel_keys=[tuple(row) for row in lift._voxels(eval_points,summary['voxel_size_microunits'])];prediction=np.zeros(len(labels),dtype=int)
+ for segment in segments:
+  label=2 if segment['label'] in ['rock','boulder'] else 1 if segment['label'] in ['plate','table'] else 3
+  occupied={tuple(row) for row in segment['voxels']};prediction[[i for i,k in enumerate(voxel_keys) if k in occupied]]=label
+ scores={}
+ for label,name in [(1,'turntable'),(2,'rock')]:
+  tp=int(((prediction==label)&(labels==label)).sum());fp=int(((prediction==label)&(labels!=label)).sum());fn=int(((prediction!=label)&(labels==label)).sum());scores[name]={'tp':tp,'fp':fp,'fn':fn,'iou':tp/max(1,tp+fp+fn),'precision':tp/max(1,tp+fp),'recall':tp/max(1,tp+fn)}
+ entry={'change':change,'seconds':time.monotonic()-t,'segments':len(segments),'scores':scores,'mean_iou':float(np.mean([r['iou'] for r in scores.values()]))};results.append(entry);print(json.dumps(entry),flush=True)
+(root/'votes-combined.json').write_text(json.dumps({'method':'All 210 cameras and point maps vote; score rendered voxel membership of the in-frame own-camera samples (at most 3072) from the three manually labelled volcanic photographs against their independent source-pixel labels. Alias labels combined for scoring only. Same-corpus tuning, no held-out test.','scored_samples':len(labels),'truth_counts':{str(k):int((labels==k).sum()) for k in np.unique(labels)},'variants':results},indent=2))

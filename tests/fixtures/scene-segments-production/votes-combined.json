@@ -1,0 +1,66 @@
+{
+  "method": "All 210 cameras and point maps vote; score rendered voxel membership of the in-frame own-camera samples (at most 3072) from the three manually labelled volcanic photographs against their independent source-pixel labels. Alias labels combined for scoring only. Same-corpus tuning, no held-out test.",
+  "scored_samples": 911,
+  "truth_counts": {
+    "0": 368,
+    "1": 300,
+    "2": 243
+  },
+  "variants": [
+    {
+      "change": {
+        "occlusion_relative_tolerance_millionths": 50000,
+        "min_segment_samples": 32
+      },
+      "seconds": 3.279939917032607,
+      "segments": 2,
+      "scores": {
+        "turntable": {
+          "tp": 127,
+          "fp": 46,
+          "fn": 173,
+          "iou": 0.3670520231213873,
+          "precision": 0.7341040462427746,
+          "recall": 0.42333333333333334
+        },
+        "rock": {
+          "tp": 146,
+          "fp": 7,
+          "fn": 97,
+          "iou": 0.584,
+          "precision": 0.954248366013072,
+          "recall": 0.6008230452674898
+        }
+      },
+      "mean_iou": 0.47552601156069363
+    },
+    {
+      "change": {
+        "occlusion_relative_tolerance_millionths": 50000,
+        "min_segment_samples": 32,
+        "vote_threshold_millionths": 400000
+      },
+      "seconds": 3.5127751660184003,
+      "segments": 3,
+      "scores": {
+        "turntable": {
+          "tp": 158,
+          "fp": 97,
+          "fn": 142,
+          "iou": 0.3979848866498741,
+          "precision": 0.6196078431372549,
+          "recall": 0.5266666666666666
+        },
+        "rock": {
+          "tp": 189,
+          "fp": 30,
+          "fn": 54,
+          "iou": 0.6923076923076923,
+          "precision": 0.863013698630137,
+          "recall": 0.7777777777777778
+        }
+      },
+      "mean_iou": 0.5451462894787832
+    }
+  ]
+}

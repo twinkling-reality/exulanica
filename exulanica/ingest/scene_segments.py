@@ -86,6 +86,8 @@ from exulanica.ingest.masked_geometry import (
 )
 from exulanica.ingest.stages.segmentation import OBJECT_MASK_KIND, OBJECT_MASK_PROFILE
 from exulanica.reconstruction.placement import (
+    ExcludedPlacementMember,
+    PlacedPointMap,
     PlacementRecord,
     PointMapInput,
     validate_placement_record,
@@ -175,9 +177,9 @@ def object_regions_from_artifact(
                     "artifact_ref": artifact_ref,
                     "mask_index": int(record["index"]),
                     "span_digest": str(record["span_digest"]),
-                    # The hosted box this mask was prompted with, when it was, which is the span
-                    # the vision stage's own occurrence of the object stands on. It is how a reader
-                    # finds something the naming flow can name.
+                    # The naming occurrence stands on the hosted prompt box, or on the mask
+                    # bounding span for a detector-only object. Both use the reader's existing
+                    # occurrence lookup; neither creates an entity before human confirmation.
                     "prompt_span_digest": record.get("prompt_span_digest"),
                 },
                 digest=_digest(canonical_json(record)),
@@ -970,8 +972,9 @@ class ValidatedBuild:
     a 107,742,795 byte pose receipt took 36 to 42 s, and the build that follows it 5.4 s
     (``docs/scene-segments.md`` sections 7 and 8).
     ``publish_scene_segments`` still reads the scene's current build from the database, uses these
-    only when they are that build's own receipts byte for byte, and otherwise reads and validates
-    the stored ones as the command does. ``placement`` is the record ``build_placement_record``
+    only when they are that build's own receipts byte for byte, and otherwise reads the bound
+    projection, falling back to placement validation if no valid projection is available.
+    ``placement`` is the record ``build_placement_record``
     makes from that pose receipt and those point maps, which is exactly what
     ``validate_placement_record`` returns for them, so both paths lift from the same record.
     """
@@ -1138,17 +1141,23 @@ def _lift_and_write(
         if content is None:
             content = _stored(store, digest, "a point map")
         point_maps[capture_ref] = PointMapInput(capture_ref, artifact_ref, digest, content)
+    placement_started = time.monotonic()
     placement = (
         build.placement
         if build is not None
-        else validate_placement_record(
+        else _projected_placement(repository, store, scene_id, row, members, placement_bytes)
+    )
+    projection_used = build is None and placement is not None
+    revalidated = placement is None
+    if placement is None:
+        placement = validate_placement_record(
             placement_bytes,
             expected_scene_ref=str(scene_id),
             pose_receipt=pose_bytes,
             member_capture_refs=members,
             point_maps=point_maps,
         )
-    )
+    placement_seconds = time.monotonic() - placement_started
 
     regions: list[LiftRegion] = []
     mask_inputs: list[tuple[str, str, str]] = []
@@ -1216,7 +1225,9 @@ def _lift_and_write(
         "object_mask_missing": len(missing),
         "person_regions": sum(region.kind == "person" for region in regions),
         "regions_offered": len(regions),
-        "placement_revalidated": build is None,
+        "placement_revalidated": revalidated,
+        "projection_used": projection_used,
+        "placement_seconds": round(placement_seconds, 3),
         "lift_seconds": round(time.monotonic() - started, 3),
     }
     with (
@@ -1244,6 +1255,75 @@ def _lift_and_write(
         if inserted:
             recorder.record_output(artifact_id)
     return outcome, inserted
+
+
+def _projected_placement(
+    repository: IngestRepository,
+    store: ContentAddressedStore,
+    scene_id: uuid.UUID,
+    row: Mapping[str, Any],
+    members: list[str],
+    placement_bytes: bytes,
+) -> PlacementRecord | None:
+    """Read the publication's validated transforms with all current bindings checked.
+
+    An absent or invalid projection falls back to receipt validation. Point-map liveness and
+    content digests are checked by the caller on either path; the projection grants no access.
+    """
+    from exulanica.ingest.scene_projection import validate_scene_projection
+
+    raw = json.loads(placement_bytes)["placement"]
+    inputs = tuple(
+        PointMapInput(item["capture_ref"], item["artifact_ref"], item["content_sha256"])
+        for item in raw["point_map_inputs"]
+    )
+    rows = repository.connection.execute(
+        "select content_sha256 from artifact where workspace_id=%s and scene_id=%s "
+        "and kind='scene_projection' and purged_at is null and not needs_repair "
+        "and content_sha256 is not null and byte_size is not null "
+        "order by created_at desc, artifact_id desc limit 4",
+        (repository.workspace_id, scene_id),
+    ).fetchall()
+    for candidate in rows:
+        try:
+            projection = validate_scene_projection(
+                _stored(store, bytes(candidate["content_sha256"]).hex(), "a scene projection"),
+                expected_scene_ref=str(scene_id),
+                pose_receipt_sha256=bytes(row["pose_sha256"]).hex(),
+                placement_receipt_sha256=bytes(row["placement_sha256"]).hex(),
+                gate_receipt_sha256=bytes(row["gate_sha256"]).hex(),
+                member_capture_refs=members,
+                point_map_inputs=tuple(
+                    (item.capture_ref, item.artifact_ref, item.content_sha256) for item in inputs
+                ),
+            )
+        except (_LiftRefused, ValueError, KeyError, TypeError):
+            continue
+        return PlacementRecord(
+            scene_ref=projection.scene_ref,
+            pose_receipt_sha256=projection.pose_receipt_sha256,
+            pose_manifest_sha256=raw["pose_manifest_sha256"],
+            member_capture_refs=projection.member_capture_refs,
+            placed=tuple(
+                PlacedPointMap(
+                    item.capture_ref,
+                    item.point_map_artifact_ref,
+                    item.point_map_content_sha256,
+                    item.scene_from_opm_row_major,
+                    item.local_units_to_scene_units,
+                    {},
+                    item.scale_status,
+                )
+                for item in projection.placed
+            ),
+            excluded=tuple(
+                ExcludedPlacementMember(item.capture_ref, item.registered, item.reason)
+                for item in projection.excluded
+            ),
+            input_sha256=raw["input_sha256"],
+            point_map_inputs=inputs,
+        )
+    return None
 
 
 def _is_build(build: ValidatedBuild, row: Mapping[str, Any]) -> bool:

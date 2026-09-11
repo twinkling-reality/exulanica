@@ -1,0 +1,15 @@
+import dataclasses,json,os,uuid,time
+from pathlib import Path
+from PIL import Image,ImageOps
+from exulanica.ingest.stages import stage
+from exulanica.ingest.stages.segmentation import LocalObjectSegmenter,_policies,_fit
+from exulanica.evidence.blob import BlobId
+from exulanica.store.local import LocalContentAddressedStore
+root=Path('/tmp/segments-production');items=json.loads((root/'inventory.json').read_text());s=LocalObjectSegmenter();d,o=_policies(stage('segmentation').params);d=dataclasses.replace(d,box_threshold_millionths=150000,duplicate_iou_millionths=950000,max_boxes=100)
+store=LocalContentAddressedStore('/Users/glendonchin/dev/Technology/orimera/.exulanica/reference-baseline/runtime/blobs');out=[]
+for item in items:
+ im=_fit(ImageOps.exif_transpose(Image.open(store._path_for(BlobId.from_hex(item['digest'])))).convert('RGB'),1024)
+ t=time.monotonic();boxes=s.detect(im,d);masks=s.segment(im,[p.box for p in boxes.boxes],o)
+ entry={**item,'seconds':time.monotonic()-t,'boxes':[p.as_record() for p in boxes.boxes],'masks':[None if m is None else {'outline':m.outline.as_digest_input(),'area':m.area_millionths,'confidence':m.confidence_millionths} for m in masks]};out.append(entry)
+ print(item['index'],len(boxes.boxes),flush=True)
+(root/'raw.json').write_text(json.dumps(out,indent=2))

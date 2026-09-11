@@ -161,7 +161,7 @@ A receipt, point map or mask that has gone is `stage_failed` and returned as a s
   frame, and not more than 15 per cent behind the surface that view's own placed point map records
   in that cell of a 96-cell grid.
 * **Votes.** A sample joins an entity when at least 2 views put it inside one of that entity's
-  regions and those are a majority of the views that saw it. A contested sample goes to the entity
+  regions and those are at least half of the views that saw it. A contested sample goes to the entity
   with more votes, and a tie goes to the person.
 * **Entities.** A person is their subject, and only a region a human confirmed or drew, naming a
   subject whose state is `shown` (likeness granted, not withdrawn, not temporarily hidden), is
@@ -201,8 +201,8 @@ Each segment: `segment_id`, `kind` (`object` or `person`), `label` (objects only
 (`[i, j, k]` cells of `grid.voxel_size_microunits`), `bounds_microunits`, `centroid_microunits`,
 `samples`, `votes` (`views`, `min`, `median`, `max`, `fraction_min_millionths`,
 `fraction_median_millionths`), `regions` (capture, kind, the mask's `span_id` for click-to-evidence
-or the person's `region_key`), and `occurrence_ids`, the vision stage's occurrences behind
-hosted-prompted masks, which are what the naming flow names.
+or the person's `region_key`), and `occurrence_ids`, the occurrences behind hosted or local
+detector masks, which are what the naming flow names.
 
 `web/packages/graph-client/test/fixtures/scene-segments.json` is one complete served body, from the
 synthetic scene in `tests/test_scene_segments.py` with one object and one reviewed, shown person.
@@ -278,17 +278,19 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   which publication skips, took 36 to 42 s of the command's run. None of this was measured inside a
   running scene worker.
 * **The polygon is not on the span.** Section 2 says what that would cost.
-* **A detector-prompted segment offers nothing to name.** Only hosted-prompted masks have vision
-  occurrences behind them. Creating occurrences in this stage would give every object two
-  occurrences where the hosted pass ran and would reach identity proposals; that is a decision for
-  the owner rather than a side effect.
-* **Every threshold is an unvalidated default**: the vocabulary, the detector and overlap
-  thresholds, the sample budget, the occlusion tolerance, the vote rule and the voxel grid. They
-  are stage parameters, so tuning any of them re-keys.
-* **The command and the sweep re-validate the placement** against the pose receipt and every point
-  map, the work the projection exists to save a reader, because correctness of a durable artifact
-  is worth it once. Only the lift at publication skips it, and only because the same process
-  validated those exact receipts a moment before.
+* **Detector-prompted objects now have naming targets.** Segmentation writes an unnamed object
+  occurrence only for a local-detector mask, using its bounding span. Hosted masks retain the
+  hosted occurrence. The existing identity naming route creates the object entity, naming
+  assertion and confirmed link only when the user confirms a name. The input contract re-keys
+  older masks so a rerun supplies the missing occurrences. No identity or web change is needed.
+* **Threshold evidence is tiny and provisional.** Section 9 scores three volcanic and three
+  first-place photographs. The labels were traced by Codex, not reviewed by a human. These are
+  tuning photographs, with no held-out set; no threshold is validated for general deployment.
+  Thresholds remain stage parameters, so changing them re-keys.
+* **The command and sweep read the validated projection.** They check its payload digest, all
+  three receipt bindings, ordered members and point-map inputs before using its transforms. A
+  missing, damaged or mismatched projection falls back to placement validation. Both paths still
+  check point-map liveness and content digests. Publication keeps its already-validated build.
 * **Gaussian centres need a decoded PLY after publication.** The trained delivery is SOG and no
   PLY is retained, so lifting a published trained scene again takes the decode the
   masked-geometry evaluation already performs. At publication the accepted training output is
@@ -299,3 +301,91 @@ depth model's points along that silhouette. Neither is corrected here; both are 
 * **A person segment is written durably.** It carries a subject reference and never a name, it is
   re-checked on every read, and a scene tombstone reaches it as it reaches every scene artifact. A
   consent withdrawal withholds it at once; the bytes stay until the scene is rebuilt or purged.
+
+
+## 9. Production follow-up, 2026-09-11
+
+The production branch starts at `d13b01d`. The worker switch and publication hook, including the
+late-mask sweep and their tests, already exist at that base. This follow-up supplies projection
+reuse for later lifts and detector-only naming occurrences. The measurement record is
+[2026-09-11-scene-segments-production.json](evaluation/2026-09-11-scene-segments-production.json),
+with the backend record as predecessor. No migration, hosted inference, merge or push occurred.
+
+The first comparison used the same three completed volcanic masks on both paths: 47.59 s with
+placement validation, 4.49 s with projection reuse, byte-identical artifacts. Placement alone
+fell from 43.026 s to 0.011 s. With 207 masks still missing that artifact contained zero segments;
+the completed 210-mask comparison took **46.54 s before and 6.88 s after**, again with
+byte-identical output, now containing three segments. Placement took 39.540 s versus 0.011 s.
+These are single sequential wall-clock measurements, not latency percentiles or memory tests.
+
+### Naming
+
+A local detector mask gets one unnamed `object` occurrence standing on the mask's bounding span.
+Its `prompt_span_digest` now names that backing occurrence span, just as it names a hosted
+occurrence's box span for hosted masks. The existing graph reader and panel can therefore find
+it without a wire-shape change. Segmentation creates no entity or confirmed link. The account
+holder's confirmation through `POST /identity/name` creates the entity and records the name as a
+user assertion. The hosted path does not create an additional segmentation occurrence.
+
+### First-place and consent
+
+The local stage ran on all three photographs of workspace
+`9e69f7e8-2372-489b-8eb3-b71ea74c16b2` in `exulanica_inspect_test`. Each produced one cliff mask;
+one additional mask in the close-up was dropped for person overlap. None of the retained masks
+covered a pixel inside the manually traced people. Eleven reviewed regions, naming the four
+consenting subjects, were offered to the real lift. It wrote zero segments in 0.025 s because
+this scene has zero recovered cameras and zero placed maps. Consent does not supply geometry.
+
+The accepted synthetic scene test proves the positive and negative cases: only a reviewed subject
+with current presentation consent produces a person segment; withdrawal immediately withholds it
+on read, and a new lift omits it from the durable artifact. This is **partial acceptance** of the
+people requirement. No shared-scene person appearance was established for first-place, and no
+per-photo coordinates were passed off as recovered shared geometry.
+
+### Tiny threshold study
+
+The annotation fixture records source digests and manual polygons, without photographs or faces.
+The volcanic targets are the visible rock and turntable; the first-place targets are all eleven
+visible people, including their clothing and held helmets. Other first-place objects are
+unlabelled, so the person-overlap study does not establish object precision or recall there.
+The six volcanic target-mask IoUs average 0.843: rocks 0.967, 0.949, 0.950; turntables 0.801,
+0.524, 0.869. Matching is one-to-one at IoU at least 0.5. Labels such as rock/boulder and
+plate/table are combined for scoring only; production still separates these labels.
+
+| Parameter | Measured trade or remaining limit |
+| --- | --- |
+| Detector box threshold 300,000 | Six targets found with zero extra masks at 0.30 to 0.40. At 0.15 there are seven extras; at 0.50 four targets are lost. Retain 0.30 as the least restrictive measured optimum. |
+| Duplicate box IoU 700,000 | 0.50, 0.70 and 0.90 tie at the selected detector threshold. This sample cannot distinguish the defaults; retain 0.70. Lower values suppress nearby distinct objects as well as duplicates. |
+| Minimum area 500 ppm | Zero retains a speck. 500 and 2,000 tie on these targets; retain 500 to avoid increasing the small-object exclusion without evidence. |
+| Person overlap drop 500,000 | At 0.25 through 0.90 all three person-dominant raw masks are dropped, together with five other masks. At 0.10 eight other masks are dropped. Retain 0.50; unlabelled objects prevent a claim about false rejections. |
+| Vocabulary | Tested only for the observed targets. Held helmets are not a vocabulary term. No claim of general object recall. |
+| Text threshold 250,000 | Currently unused by the per-word Grounding DINO scorer. It is not an effective independent control. |
+| Fallback detector threshold 200,000 | No fallback measurement on these six photographs. Remains unvalidated. |
+| Image edge 1,024, contour simplification 1,500 ppm, vertex cap 256 | Fixed for this study. Finer contours can retain detail at greater storage cost; no comparative measurement establishes an optimum. |
+| Maximum prompts 24 | No selected photograph reached the cap under production defaults. No recall claim for crowded scenes. |
+| Gaussian sample cap 200,000 | No trained-Gaussian ground truth in this study. Remains unvalidated. |
+| Region margin 0 | Avoids deliberately enlarging boundaries. Not empirically tuned here. |
+| Instance link distance 2 voxels | Connects sparse samples but can join nearby objects. No instance-separation ground truth here. |
+
+For the scene study, all 210 cameras and masks vote over 215,040 placed samples. Of the 3,072
+samples belonging to the three labelled views, 911 project inside their own recovered camera and
+can be scored against a source pixel: 300 turntable, 243 rock, 368 background. The remaining 2,161
+are outside the recovered frame or behind it and are excluded, never clamped to border labels.
+This is a projection-based check of depth, placement, voting and voxel coverage together, not an
+independent 3D ground truth or a way to attribute every miss to voting.
+
+| Scene parameter | Measured trade |
+| --- | --- |
+| Vote minimum 2 | Keep the requirement for corroboration. One view admits more fringe segments; three does not improve this sample enough to justify excluding two-view support. |
+| Vote fraction 500,000 | Current rock precision/recall is 1.000/0.284; turntable 0.677/0.357. Lowering to 0.40 with the proposed tolerance improves coverage but reduces precision to 0.863 for rock and 0.620 for turntable. Retain 0.50 in the proposal. |
+| Occlusion tolerance 150,000 | **Propose 50,000**, not yet applied: with floor 32 and the other defaults, mean IoU rises from 0.294 to 0.476. Rock precision/recall becomes 0.954/0.601; turntable 0.734/0.423. A stricter visibility test removes conflicting views from the denominator, which also increases assignments; it is not simply a stricter mask. |
+| Minimum segment samples 8 | **Propose 32**, not yet applied: removes the third fringe segment with no change to any scored sample, both at current tolerance and in the combined proposal. Smaller real objects could also disappear. |
+| Samples per member 1,024 | At 512, mean IoU is 0.239; at 2,048, 0.303 versus current 0.294, with twice as many samples to vote. Retain 1,024 provisionally. |
+| Voxel grid 128 | Grid 64 raises mean IoU to 0.388 through coarser occupied cells; grid 256 lowers it to 0.273. This metric rewards filled area and cannot establish boundary quality; retain 128. |
+| Region raster 512 | 256 gives mean IoU 0.293 and 1,024 gives 0.290. Retain 512; this sample does not establish a meaningful improvement from either change. |
+| Occlusion grid 96 | Grids 48 and 192 give mean IoU 0.293 and 0.296. Retain 96; the tiny difference does not justify a claim of better general visibility. |
+
+The evaluation records every tested configuration, including the combined proposal. Registry
+edits remain unauthorized, so these proposed values are **not deployed defaults**. General
+validation and changes requiring registry edits remain open acceptance items. The full backend suite is deferred to the integration task's
+single serialized run; this task reports its focused and static checks.
