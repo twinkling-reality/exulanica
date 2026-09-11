@@ -110,14 +110,26 @@ type SegmentOverlayAsset = SegmentOverlayReport['assets'][number];
 
 // -- colour -------------------------------------------------------------------------------------------
 
-/** FNV-1a over UTF-16 code units: small, dependency free, and the same in every build. */
-function fnv1a(text: string): number {
+/**
+ * FNV-1a over UTF-16 code units, then MurmurHash3's 32-bit finaliser.
+ *
+ * The finaliser is not decoration. FNV-1a alone barely moves its high bits for a change in the last
+ * character, and the hue is read from the high bits, so identifiers that differ only in their final
+ * digits (which sequential ones do) all came out the same green in the browser. The finaliser
+ * spreads every input bit across the whole word.
+ */
+function entityHash(text: string): number {
   let hash = 0x811c9dc5;
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash = Math.imul(hash, 0x01000193);
   }
-  return hash;
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return hash >>> 0;
 }
 
 function srgbEncode(linear: number): number {
@@ -135,7 +147,7 @@ function srgbEncode(linear: number): number {
  * highlight are how they are told apart.
  */
 export function segmentColor(key: string): Rgb {
-  const hue = (fnv1a(key) / 0x1_0000_0000) * 2 * Math.PI;
+  const hue = (entityHash(key) / 0x1_0000_0000) * 2 * Math.PI;
   const lightness = 0.74;
   const chroma = 0.13;
   const a = chroma * Math.cos(hue);
