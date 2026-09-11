@@ -430,6 +430,18 @@ def draft_appearance(
     Raises :class:`StructuredOutputError` or :class:`TruncatedResponseError` when it cannot be
     filled twice. The caller turns that into a refusal, because by this point somebody has asked
     for something and is owed a sentence about why they are not getting it.
+
+    **Both of those are retried, and the absence of the second one made this docstring false.**
+    `compose_answer` in :mod:`exulanica.selection.question` carries the same note about the same
+    mistake, which is how this one was recognised: it promised one repair, caught only
+    `StructuredOutputError`, and let a truncated reply out on the FIRST attempt. Measured, that
+    was not the rare case. Every recorded failure of this call on the shipped prompt was a
+    truncation, so the one repair the function advertises covered none of them.
+
+    The repair message differs by cause, because the two failures ask the model for different
+    things. A refused form is told what the validator said; a truncated one is told it ran past
+    the room it had and to be shorter, because repeating the schema error to a model that never
+    finished a sentence tells it nothing about what went wrong.
     """
     proposable = _proposable_profiles(registry)
     schema = _draft_model(proposable, catalogue)
@@ -459,14 +471,23 @@ def draft_appearance(
             if log is not None:
                 log.record(drafted.call)
             return drafted.value.model_dump(), drafted.call.served_model_id
-        except StructuredOutputError as rejected:
+        except (StructuredOutputError, TruncatedResponseError) as rejected:
             if attempt == DRAFT_ATTEMPTS:
                 raise
             messages.append(
                 {
                     "role": "user",
                     "content": (
-                        "That form was refused:\n"
+                        # A truncated reply is a runaway rather than a wrong answer. Measured:
+                        # a successful draft never exceeded 296 completion tokens against a
+                        # ceiling of 2048, and raising that ceiling to 4096 and 8192 changed
+                        # nothing, so the call is not cramped. What it needs is to be told to
+                        # stop, not to be given more room.
+                        "That form ran past the room it had. Fill it in again and keep it "
+                        "short: the same change, one or two sentences in `spoken`, and nothing "
+                        "repeated."
+                        if isinstance(rejected, TruncatedResponseError)
+                        else "That form was refused:\n"
                         f"{rejected}\n\nFill it in again, fixing exactly that. Change nothing "
                         "else about what the request is asking for."
                     ),

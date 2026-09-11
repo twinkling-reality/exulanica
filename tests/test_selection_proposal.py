@@ -25,7 +25,7 @@ import pytest
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import StructuredOutputError
+from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.schema import strict_json_schema
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.proposal import (
@@ -924,3 +924,59 @@ def test_the_drafter_prompt_is_the_wording_that_was_measured():
     # oversight: both of them made the drafting call fail more often than it already does.
     assert "never more than three" not in _DRAFTER_SYSTEM
     assert "so write it in the future" not in _DRAFTER_SYSTEM
+
+
+def test_a_truncated_draft_is_repaired_once_rather_than_refused_on_the_first_attempt():
+    """The repair this function advertises, covering the failure it actually has.
+
+    Measured over six sittings against the live endpoint: every failure of the shipped prompt on
+    this call was a truncation, and truncation was the one failure the retry did not catch, so
+    the "one try and one repair" the docstring promises was one try and none. `compose_answer`
+    in `question.py` carries a note about the identical mistake, which is how this was found.
+    """
+    truncated = HttpResponse(
+        status_code=200,
+        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+    )
+    client, transport = scripted(truncated, reply(draft()))
+
+    raw, model_id = draft_appearance(client, "softer horizon", current_reference(), catalogue())
+
+    assert raw["parameters"]["horizon_softness"] == 0.8
+    assert model_id == DRAFTER
+    assert transport.call_count == 2, "the truncated attempt was retried rather than raised"
+
+
+def test_a_truncated_draft_is_told_it_ran_long_rather_than_handed_a_schema_error():
+    """The two failures ask the model for different things, so they are told different things.
+
+    Repeating a schema complaint to a model that never finished a sentence says nothing about
+    what went wrong. Measured: a successful draft never exceeded 296 completion tokens against a
+    ceiling of 2048, and raising the ceiling to 4096 and 8192 did not help, so a truncation here
+    is a runaway and the useful instruction is to stop rather than to have more room.
+    """
+    truncated = HttpResponse(
+        status_code=200,
+        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+    )
+    client, transport = scripted(truncated, reply(draft()))
+    draft_appearance(client, "softer horizon", current_reference(), catalogue())
+
+    repair = transport.requests[1]["payload"]["messages"][-1]["content"]
+    assert "ran past the room it had" in repair
+    assert "keep it short" in repair
+    assert "was refused" not in repair
+
+
+def test_twice_truncated_is_still_a_refusal_rather_than_a_third_attempt():
+    """One repair, then refuse. The bound is `DRAFT_ATTEMPTS` and it did not move."""
+    truncated = HttpResponse(
+        status_code=200,
+        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+    )
+    client, transport = scripted(truncated, truncated, reply(draft()))
+
+    with pytest.raises(TruncatedResponseError):
+        draft_appearance(client, "softer horizon", current_reference(), catalogue())
+
+    assert transport.call_count == 2
