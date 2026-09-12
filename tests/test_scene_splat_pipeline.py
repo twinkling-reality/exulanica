@@ -798,7 +798,7 @@ def test_changed_point_map_build_gets_new_training_artifacts_with_the_same_train
     key = idempotency_key(
         capture.blob_id, spec, input_digest, binding={"model_id": "synthetic-depth-v2"}
     )
-    replacement_id = artifact_id_for(key)
+    replacement_id = artifact_id_for(key, workspace_id=repository.workspace_id)
     replacement = store.put_bytes(_numeric_point_map(0, color=129))
     repository.insert_artifact(
         artifact_id=replacement_id,

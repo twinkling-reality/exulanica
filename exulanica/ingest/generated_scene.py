@@ -98,7 +98,12 @@ def record_generated_scene(
     # were identical on purpose. A private name reached across two modules of one package is a
     # smaller cost than a second copy of a frozen digest construction.
     key = _scene_key(scene_id, spec.key, input_digest)
-    artifact_id = artifact_id_for(key)
+    existing_artifact = repository.find_artifact(key)
+    artifact_id = (
+        existing_artifact.artifact_id
+        if existing_artifact is not None
+        else artifact_id_for(key, workspace_id=repository.workspace_id)
+    )
 
     # "manual" rather than a new trigger value: `pipeline_run.trigger` is a closed CHECK set
     # (ingest, reprocess, repair, manual) and widening it is a migration. Manual is also the

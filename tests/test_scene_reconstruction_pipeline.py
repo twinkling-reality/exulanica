@@ -428,7 +428,7 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         input_digest,
         binding={"model_id": "test/depth-model-v2"},
     )
-    replacement_id = artifact_id_for(key)
+    replacement_id = artifact_id_for(key, workspace_id=repository.workspace_id)
     replacement = store.put_bytes(_numeric_point_map(0, color=129))
     privacy = repository.connection.execute(
         "select privacy_screening_id from artifact where workspace_id=%s and artifact_id=%s",
@@ -533,8 +533,9 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
         )
 
 
+@pytest.mark.parametrize("historical_ids", [False, True])
 def test_object_store_failure_keeps_a_prepared_scene_private_and_retryable(
-    repository, tmp_path, monkeypatch
+    repository, tmp_path, monkeypatch, historical_ids
 ):
     store, _captures, _point_artifacts, job_id = _queued_scene(repository, tmp_path)
     claimed = repository.claim_reconstruction_scene(worker="first", lease_seconds=60)
@@ -544,6 +545,13 @@ def test_object_store_failure_keeps_a_prepared_scene_private_and_retryable(
     def refuse_write(_payload: bytes) -> None:
         raise OSError("simulated object-store outage")
 
+    from exulanica.ingest import scene_reconstruction
+
+    from test_artifact_workspace_identity import legacy_artifact_id
+
+    current_id_for = scene_reconstruction.artifact_id_for
+    if historical_ids:
+        monkeypatch.setattr(scene_reconstruction, "artifact_id_for", legacy_artifact_id)
     monkeypatch.setattr(store, "put_bytes", refuse_write)
     failed = _processor(repository, store, tmp_path, FakeColmap(registered=2)).process(claimed)
 
@@ -571,6 +579,19 @@ def test_object_store_failure_keeps_a_prepared_scene_private_and_retryable(
     assert reconstruction["scenes"] == []
     assert not any(item["scene"] is not None for item in reconstruction["items"])
 
+    prepared_artifacts = repository.connection.execute(
+        "select artifact_id,idempotency_key from artifact where workspace_id=%s "
+        "and scene_id is not null order by artifact_id",
+        (repository.workspace_id,),
+    ).fetchall()
+    assert prepared_artifacts
+    if historical_ids:
+        assert all(
+            row["artifact_id"]
+            == legacy_artifact_id(row["idempotency_key"], workspace_id=repository.workspace_id)
+            for row in prepared_artifacts
+        )
+    monkeypatch.setattr(scene_reconstruction, "artifact_id_for", current_id_for)
     monkeypatch.setattr(store, "put_bytes", put_bytes)
     retried_claim = repository.claim_reconstruction_scene(worker="second", lease_seconds=60)
     assert retried_claim is not None
@@ -579,6 +600,14 @@ def test_object_store_failure_keeps_a_prepared_scene_private_and_retryable(
     )
 
     assert retried.status == "succeeded"
+    assert (
+        repository.connection.execute(
+            "select artifact_id,idempotency_key from artifact where workspace_id=%s "
+            "and scene_id is not null order by artifact_id",
+            (repository.workspace_id,),
+        ).fetchall()
+        == prepared_artifacts
+    )
     assert (
         len(
             read_snapshot(

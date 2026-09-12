@@ -243,11 +243,15 @@ def _project_one(repository, store, row) -> dict:
     base_key = _scene_key(scene_id, spec.key, input_digest)
     generation, live, passed_over = _open_generation(repository, base_key)
     key = projection_identity_key(base_key, generation)
-    artifact_id = artifact_id_for(key)
+    artifact_id = (
+        live["artifact_id"]
+        if live is not None
+        else artifact_id_for(key, workspace_id=repository.workspace_id)
+    )
     outcome["generation"] = generation
     if passed_over:
         outcome["passed_over"] = passed_over
-    if live is not None and live["artifact_id"] == artifact_id:
+    if live is not None:
         stored = bytes(live["content_sha256"]).hex()
         if store.exists(BlobId.from_hex(stored)):
             return {
