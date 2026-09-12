@@ -171,7 +171,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     onUndo: () => proposeUndo(),
     onSaveMove: () => proposeMove(),
     onDiscardMove: () => discardMove(),
-    onClose: () => panel.setVisible(false),
+    onClose: () => setPanelVisible(false),
   }, {
     axes: choiceParameter('axis').choices as readonly MotionAxisKey[],
     axisFallback: choiceParameter('axis').fallback as MotionAxisKey,
@@ -180,6 +180,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     travelMm: integerParameter('travel_mm'),
     periodMilliseconds: integerParameter('period_milliseconds'),
   });
+
+  function setPanelVisible(visible: boolean): void {
+    // The browser owns traversal mode. Let its pointerlockchange event update the shell before
+    // the visitor clicks the object controls; displaying a panel alone leaves the mouse locked.
+    if (visible && document.pointerLockElement != null) document.exitPointerLock();
+    panel.setVisible(visible);
+  }
 
   // -- reading -----------------------------------------------------------------------------------
 
@@ -881,7 +888,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     if (event.code === 'KeyP') {
       event.preventDefault();
-      panel.setVisible(!panel.visible());
+      setPanelVisible(!panel.visible());
       return;
     }
     if (!panel.visible()) return;
@@ -911,7 +918,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     panel,
     confirm,
     toggle() {
-      panel.setVisible(!panel.visible());
+      setPanelVisible(!panel.visible());
     },
     begin,
     dispose() {

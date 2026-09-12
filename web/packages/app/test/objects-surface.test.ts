@@ -181,6 +181,9 @@ function script(initial: AlternateVersion = version()) {
   };
 }
 
+const mounts: MountedObjects[] = [];
+afterEach(() => { for (const mounted of mounts.splice(0)) mounted.dispose(); });
+
 function harness(
   over: Partial<ObjectsDependencies> & {
     readonly noClient?: true;
@@ -222,6 +225,7 @@ function harness(
     loadBytes: async () => new ArrayBuffer(784),
     ...over,
   });
+  mounts.push(mounted);
   document.body.append(mounted.panel.root, mounted.confirm.root);
   return { mounted, objects, authority, travel, state };
 }
@@ -746,4 +750,31 @@ describe('opening the first alternate through confirmation', () => {
     expect(h.placeObject).not.toHaveBeenCalled();
     h.mounted.dispose();
   });
+});
+
+
+it('releases browser pointer lock when P or the app toggle opens object controls', async () => {
+  const h = harness({ noClient: true }, true);
+  await h.mounted.begin();
+  const canvas = document.createElement('canvas');
+  const exit = vi.fn();
+  const pointer = Object.getOwnPropertyDescriptor(document, 'pointerLockElement');
+  const release = Object.getOwnPropertyDescriptor(document, 'exitPointerLock');
+  Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: canvas });
+  Object.defineProperty(document, 'exitPointerLock', { configurable: true, value: exit });
+  try {
+    window.dispatchEvent(new KeyboardEvent('keydown', {code:'KeyP'}));
+    expect(h.mounted.panel.visible()).toBe(true);
+    expect(exit).toHaveBeenCalledTimes(1);
+    h.mounted.toggle();
+    expect(exit).toHaveBeenCalledTimes(1);
+    h.mounted.toggle();
+    expect(exit).toHaveBeenCalledTimes(2);
+  } finally {
+    if (pointer) Object.defineProperty(document, 'pointerLockElement', pointer);
+    else Reflect.deleteProperty(document, 'pointerLockElement');
+    if (release) Object.defineProperty(document, 'exitPointerLock', release);
+    else Reflect.deleteProperty(document, 'exitPointerLock');
+    h.mounted.dispose();
+  }
 });
