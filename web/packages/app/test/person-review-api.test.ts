@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PersonReviewApi, ReviewUnavailable } from '../src/person-review-api.js';
 import { buildPersonReview } from '../src/ui/person-review.js';
@@ -66,65 +66,66 @@ describe('the review screen boundary', () => {
     expect(review.regions).toHaveLength(0);
   });
 
-  it('creates and binds a subject before the first consent, in that order', async () => {
-    const calls: { path: string; body: unknown }[] = [];
-    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
-      const path = new URL(String(input)).pathname;
-      calls.push({ path, body: init.body === undefined ? null : JSON.parse(String(init.body)) });
-      if (path === '/api/person-subjects') return json({ subject_id: SUBJECT });
-      return json({});
-    });
-    const api = new PersonReviewApi({
-      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
-    });
-    const region = (await new PersonReviewApi({
-      baseUrl: 'https://exulanica.test/api',
-      token: 't',
-      fetch: async () => json({ capture_id: CAPTURE, review_state: 'screened', regions: [wireRegion()] }),
-    }).load(CAPTURE)).regions[0]!;
-
-    const subject = await api.consent(CAPTURE, region, 'presence', 'granted');
-
-    expect(subject).toBe(SUBJECT);
-    expect(calls.map((call) => call.path)).toEqual([
-      '/api/person-subjects',
-      `/api/person-regions/${CAPTURE}/edits`,
-      `/api/person-subjects/${SUBJECT}/consents`,
-    ]);
-    // The binding is a confirmation, and it carries the subject the first call created. Without
-    // this the consent would be recorded against somebody attached to no outline, and the region
-    // would go on resolving to `unknown` while the receipt said otherwise.
-    expect(calls[1]!.body).toEqual({
-      edits: [{ region_key: 'a'.repeat(64), action: 'confirm', subject_id: SUBJECT }],
-    });
-    expect(calls[2]!.body).toEqual({
-      consent_scope: 'presence', decision: 'granted', region_key: 'a'.repeat(64),
-    });
+  it('refuses consent without an explicit identity and never creates a subject', async () => {
+    const fetch = vi.fn(async () => json({ capture_id: CAPTURE, review_state: 'screened', regions: [wireRegion()] }));
+    const api = new PersonReviewApi({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const region = (await api.load(CAPTURE)).regions[0]!;
+    await expect(api.consent(CAPTURE, region, 'presence', 'granted')).rejects.toThrow('Identify this person');
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it('records against an existing subject without creating a second one', async () => {
-    const paths: string[] = [];
-    const fetch = vi.fn(async (input: string | URL | Request) => {
-      paths.push(new URL(String(input)).pathname);
-      return json({});
+  it('links matching regions through the atomic route and reconciles an interrupted response', async () => {
+    let linked = false;
+    const posts: string[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      const path = new URL(String(input)).pathname;
+      if (init.method === 'POST') {
+        posts.push(path);
+        expect(JSON.parse(String(init.body))).toEqual({ request_id: expect.any(String), regions: [
+          { capture_id: CAPTURE, region_key: 'a'.repeat(64) },
+          { capture_id: 'other', region_key: 'a'.repeat(64) },
+        ] });
+        if (linked) return json({ subject_id: SUBJECT });
+        linked = true;
+        throw new Error('response interrupted after server commit');
+      }
+      return json({ capture_id: path.split('/').at(-1), review_state: 'screened',
+        regions: [wireRegion({ subject_id: linked ? SUBJECT : null })] });
     });
-    const region = (await new PersonReviewApi({
-      baseUrl: 'https://exulanica.test/api',
-      token: 't',
-      fetch: async () => json({
-        capture_id: CAPTURE,
-        review_state: 'screened',
-        regions: [wireRegion({ subject_id: SUBJECT, action: 'confirmed' })],
-      }),
-    }).load(CAPTURE)).regions[0]!;
+    const api = new PersonReviewApi({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const regions = [CAPTURE, 'other'].map(capture_id => ({ capture_id, region_key: 'a'.repeat(64) }));
+    await expect(api.link(regions)).rejects.toThrow();
+    expect(await api.requests.retry()).toEqual({ subject_id: SUBJECT });
+    expect(posts).toEqual(['/api/identity/subjects/link', '/api/identity/subjects/link']);
+  });
 
-    await new PersonReviewApi({
-      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
-    }).consent(CAPTURE, region, 'likeness', 'revoked');
+  it('rechecks current identity before recording consent on its existing subject', async () => {
+    const posts: { path: string; body: unknown }[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      const path = new URL(String(input)).pathname;
+      if (init.method === 'POST') { posts.push({ path, body: JSON.parse(String(init.body)) }); return json({ actor_role: 'owner' }); }
+      return json({ capture_id: CAPTURE, review_state: 'screened', regions: [wireRegion({ subject_id: SUBJECT, action: 'confirmed' })] });
+    });
+    const api = new PersonReviewApi({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const region = (await api.load(CAPTURE)).regions[0]!;
+    await api.consent(CAPTURE, region, 'temporary_hide', 'granted');
+    expect(posts).toEqual([{ path: `/api/person-subjects/${SUBJECT}/consents`,
+      body: { request_id: expect.any(String), consent_scope: 'temporary_hide', decision: 'granted', region_key: region.regionKey } }]);
+  });
 
-    // One request, not three. A second subject for a person who already has one would split their
-    // receipt chain in two, and the fold that resolves their state reads one chain.
-    expect(paths).toEqual([`/api/person-subjects/${SUBJECT}/consents`]);
+  it('corrects an outline without changing its subject and reuses a completed correction', async () => {
+    let shape = wireRegion().silhouette;
+    const posts: unknown[] = [];
+    const fetch = vi.fn(async (_input: string | URL | Request, init: RequestInit = {}) => {
+      if (init.method === 'POST') {
+        const body = JSON.parse(String(init.body)); posts.push(body); shape = body.edits[0].silhouette; return json({});
+      }
+      return json({ capture_id: CAPTURE, review_state: 'screened', regions: [wireRegion({ silhouette: shape, subject_id: SUBJECT })] });
+    });
+    const api = new PersonReviewApi({ baseUrl: 'https://exulanica.test/api', token: 't', fetch });
+    const edit = { region_key: 'a'.repeat(64), silhouette: { kind: 'polygon' as const, points: [[0, 0], [500000, 0], [0, 500000]] } };
+    await api.correct(CAPTURE, edit); await api.correct(CAPTURE, edit);
+    expect(posts).toEqual([{ request_id: expect.any(String), edits: [{ ...edit, action: 'confirm', shape: 'box' }] }]);
   });
 
   it('turns a refused edit into a sentence a reviewer can act on', async () => {
@@ -194,9 +195,11 @@ describe('the client and the panel, joined', () => {
       capture_id: CAPTURE, review_state: 'unscreened', regions: [],
     }));
     expect(looked.querySelector('.person-review-empty')?.textContent)
-      .toContain('nobody was found');
+      .toContain('does not establish a human no-person attestation');
     expect(nobodyLooked.querySelector('.person-review-unscreened')?.textContent)
-      .toContain('Nobody has looked');
+      .toContain('No person regions are recorded');
     expect(looked.textContent).not.toEqual(nobodyLooked.textContent);
   });
 });
+
+afterEach(() => window.sessionStorage.clear());

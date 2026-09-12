@@ -1,26 +1,4 @@
-/**
- * The screen a reviewer uses to say who is in a photograph and what they agreed to.
- *
- * This replaces one checkbox. The old gate asked a person to attest that a photograph contained
- * nobody, and the only way to keep a usable collection was to answer yes; the retained bowl
- * review did exactly that over 51 frames containing diners' arms. So this panel is built around
- * the answers that were missing: this is a person, this is not, I missed one, and separately,
- * here is what each of them agreed to.
- *
- * Three things it deliberately does NOT do.
- *
- * Manual authoring uses only the session's existing authorized media descriptor.
- * Existing region thumbnails remain neutral outlines.
- *
- * It does not offer a "consent on their behalf" control that pretends to be the subject's own
- * decision. Every consent recorded here is the account holder's, the API records `owner`, and
- * this panel says so in words next to the buttons rather than in a tooltip.
- *
- * It does not let a reviewer confirm everything at once. Bulk-confirm is the affordance that
- * turned the old gate into a formality, and a screen whose fastest path is "agree to all of it"
- * collects the same worthless answer in a new shape.
- */
-
+/** Proposals, explicit identity and account-holder decisions over server-resolved states. */
 import { buildPersonRegionEditor, type PersonRegionEditorInput } from './person-region-editor.js';
 import { el, replace } from './dom.js';
 
@@ -51,9 +29,14 @@ export interface PersonReviewInput {
   readonly onReload?: () => void;
   readonly onConfirm?: (regionKey: string) => void;
   readonly onDelete?: (regionKey: string) => void;
+  readonly onIdentify?: (regionKey: string) => void;
+  readonly onUnlink?: (regionKey: string) => void;
+  readonly onCorrect?: (regionKey: string) => void;
+  readonly selectedRegions?: ReadonlySet<string>;
+  readonly onSelectRegion?: (regionKey: string, selected: boolean) => void;
   readonly onConsent?: (
     regionKey: string,
-    scope: 'presence' | 'naming' | 'likeness',
+    scope: 'presence' | 'naming' | 'likeness' | 'temporary_hide',
     decision: 'granted' | 'revoked',
   ) => void;
 }
@@ -138,8 +121,8 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
       el('p', {
         class: 'person-review-unscreened',
         text:
-          'Nobody has looked at this photograph for people yet, so it is not shown anywhere. ' +
-          'That is different from a photograph somebody checked and found empty.',
+          'No person regions are recorded yet. Detection may be pending or unavailable. ' +
+          'An empty inventory is not a human no-person attestation.',
       }),
     );
     replace(panel, body);
@@ -150,7 +133,7 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
     body.push(
       el('p', {
         class: 'person-review-empty',
-        text: 'Screened, and nobody was found in this photograph.',
+        text: 'No active person regions remain. This does not establish a human no-person attestation.',
       }),
     );
     replace(panel, body);
@@ -172,26 +155,41 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
     item.dataset.state = region.state;
     const controls = el('div', { class: 'person-review-controls' });
 
+    if (input.onSelectRegion) {
+      const select = el('input', { type: 'checkbox', 'aria-label': 'Select region for same-person linking' });
+      select.checked = input.selectedRegions?.has(region.regionKey) ?? false;
+      select.addEventListener('change', () => input.onSelectRegion?.(region.regionKey, select.checked));
+      controls.append(el('label', {}, [select, 'Same person across photographs']));
+    }
     if (region.action === 'detected') {
-      controls.append(
-        button('This is a person', () => input.onConfirm?.(region.regionKey)),
-        button('Not a person', () => input.onDelete?.(region.regionKey)),
-      );
+      controls.append(button('This is a person', () => input.onConfirm?.(region.regionKey)));
+    }
+    controls.append(button('Not a person', () => input.onDelete?.(region.regionKey)));
+    if (input.onCorrect) controls.append(button('Correct outline', () => input.onCorrect?.(region.regionKey)));
+    if (region.subjectId === null) {
+      controls.append(el('p', { text: 'Identity not linked. Select matching regions or identify this person separately.' }));
+      if (input.onIdentify) controls.append(button('Identify as a separate person', () => input.onIdentify?.(region.regionKey)));
     } else {
-      for (const scope of ['presence', 'naming', 'likeness'] as const) {
-        const granted = scope === 'likeness' ? !region.masked : undefined;
-        controls.append(
-          button(
-            granted === true ? `Withdraw ${scope}` : `Record ${scope} consent`,
-            () =>
-              input.onConsent?.(
-                region.regionKey,
-                scope,
-                granted === true ? 'revoked' : 'granted',
-              ),
-          ),
-        );
-      }
+      controls.append(el('p', { text: `Person ${region.subjectId}` }));
+      if (input.onUnlink) controls.append(button('Unlink incorrect identity', () => input.onUnlink?.(region.regionKey)));
+      const choice = el('select', { 'aria-label': 'Account-holder decision for this region' });
+      choice.append(el('option', { value: '', text: 'Choose the actual decision' }));
+      const decisions = [
+        ['presence', 'granted', 'Record presence consent'], ['presence', 'revoked', 'Withdraw presence'],
+        ['naming', 'granted', 'Record naming consent'], ['naming', 'revoked', 'Withdraw naming'],
+        ['likeness', 'granted', 'Record likeness consent'], ['likeness', 'revoked', 'Withdraw likeness'],
+        ['temporary_hide', 'granted', 'Hide this person here'],
+        ['temporary_hide', 'revoked', 'Show here if likeness is permitted'],
+      ] as const;
+      decisions.forEach(([, , label], i) => choice.append(el('option', { value: String(i), text: label })));
+      const save = button('Record selected decision', () => {
+        if (choice.value === '') return;
+        const selected = decisions[Number(choice.value)];
+        if (selected) input.onConsent?.(region.regionKey, selected[0], selected[1]);
+      });
+      save.disabled = true;
+      choice.addEventListener('change', () => { save.disabled = choice.value === ''; });
+      controls.append(choice, save);
     }
 
     item.append(

@@ -4,7 +4,7 @@ import { PersonReviewApi } from '../src/person-review-api.js';
 import { buildPersonReview } from '../src/ui/person-review.js';
 import { buildPersonRegionEditor, imagePoint, PersonRegionDrafts, validateOutline } from '../src/ui/person-region-editor.js';
 
-afterEach(() => document.body.replaceChildren());
+afterEach(() => { document.body.replaceChildren(); window.sessionStorage.clear(); });
 const capture = 'c0ffee00-0000-4000-8000-000000000000';
 function mounted(onAdd: Parameters<typeof buildPersonRegionEditor>[0]['onAdd'], drafts = new PersonRegionDrafts(), isCurrent = () => true) {
   const editor = { captureId: capture, source: { available: true, url: 'blob:generated-fixture', alt: 'GENERATED TEST IMAGE' }, drafts, isCurrent, onAdd };
@@ -29,7 +29,8 @@ describe('manual person authoring', () => {
     const fetch = vi.fn(async () => new Response('{}', { status: 201 }));
     const api = new PersonReviewApi({ baseUrl: 'https://test.invalid/api', token: 'test-token', fetch });
     const { root, draw, submit } = mounted(region => api.add(capture, region));
-    draw(); submit(); submit(); await settle();
+    draw(); submit(); submit(); await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(root.textContent).toContain('Region saved'));
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(String(url)).toBe(`https://test.invalid/api/person-regions/${capture}/edits`);
@@ -45,7 +46,7 @@ describe('manual person authoring', () => {
     const api = new PersonReviewApi({ baseUrl: 'https://test.invalid/api', token: 't', fetch });
     const { stage, draw, submit } = mounted(region => api.add(capture, region));
     vi.mocked(stage.getBoundingClientRect).mockReturnValue({ left: 0, top: 0, width: 800, height: 400 } as DOMRect);
-    draw(); submit(); await settle();
+    draw(); submit(); await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     const init = (fetch.mock.calls[0] as unknown as [unknown, RequestInit])[1];
     expect(JSON.parse(String(init.body)).edits[0].silhouette.points).toEqual([
       [50000, 300000], [250000, 300000], [250000, 600000], [50000, 600000],
@@ -100,13 +101,13 @@ describe('manual person authoring', () => {
       field.value = ['0', '0', '400000', '800000'][i]!;
       field.dispatchEvent(new Event('input'));
     });
-    submit(); await settle();
-    expect(root.textContent).toContain('Draft retained');
+    submit(); await vi.waitFor(() => expect(root.textContent).toContain('Draft retained'));
     expect(root.querySelector('input')!.value).toBe('0');
     expect(fetch).toHaveBeenCalledTimes(1);
-    submit(); await settle();
+    submit(); await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     const bodies = fetch.mock.calls.map(call => JSON.parse(String((call as unknown as [unknown, RequestInit])[1].body)));
-    expect(bodies[0]).toEqual(bodies[1]);
+    expect(bodies[0].edits).toEqual(bodies[1].edits);
+    expect(bodies[0].request_id).not.toEqual(bodies[1].request_id);
   });
   it('retains the draft and refusal through a capture switch while saving', async () => {
     let refuse!: (e: Error) => void;
@@ -128,4 +129,25 @@ describe('manual person authoring', () => {
     const node = buildPersonRegionEditor({ captureId: capture, source: null, drafts: new PersonRegionDrafts(), isCurrent: () => true, onAdd: vi.fn() });
     expect(node.textContent).toContain('unavailable'); expect(node.querySelector('button')).toBeNull();
   });
+});
+
+it('reopens a saved correction from the current outline with editable coordinates and the same region key', async () => {
+  const drafts = new PersonRegionDrafts();
+  const key = 'b'.repeat(64);
+  const onAdd = vi.fn(async () => {});
+  const correction = { region_key: key, silhouette: { kind: 'polygon' as const,
+    points: [[100000, 100000], [500000, 100000], [500000, 700000], [100000, 700000]] } };
+  const options = { captureId: capture, correction, drafts, source: { available: true, url: 'blob:fixture', alt: 'Synthetic fixture' },
+    isCurrent: () => true, onAdd };
+  const first = buildPersonRegionEditor(options); document.body.append(first);
+  const photo = first.querySelector('img')!;
+  Object.defineProperties(photo, { naturalWidth: { value: 800 }, naturalHeight: { value: 400 } });
+  photo.dispatchEvent(new Event('load'));
+  first.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+  await vi.waitFor(() => expect(first.textContent).toContain('Region saved'));
+  first.remove();
+  const next = buildPersonRegionEditor(options); document.body.append(next);
+  expect(next.querySelector('input')!.disabled).toBe(false);
+  expect(next.querySelector('input')!.value).toBe('100000');
+  expect(onAdd).toHaveBeenCalledWith(correction);
 });

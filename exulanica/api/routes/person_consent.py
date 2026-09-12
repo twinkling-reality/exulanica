@@ -29,6 +29,7 @@ from exulanica.ingest.person_review import (
     record_region_edits,
     review_list,
 )
+from exulanica.ingest.personal_requests import personal_request, subject_captures
 from exulanica.ingest.repository import IngestRepository
 
 router = APIRouter(tags=["person-regions"])
@@ -51,11 +52,15 @@ class RegionEdit(BaseModel):
 class RegionEdits(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    request_id: uuid.UUID | None = None
+
     edits: list[RegionEdit] = Field(min_length=1, max_length=200)
 
 
 class NewSubject(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID | None = None
 
     #: Set only when this person has actually been named. A subject with no entity is somebody
     #: present and owed a decision whose name nobody knows, which is the ordinary case.
@@ -64,6 +69,8 @@ class NewSubject(BaseModel):
 
 class ConsentDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID | None = None
 
     consent_scope: str = Field(pattern=r"^(presence|naming|likeness|temporary_hide)$")
     decision: str = Field(pattern=r"^(granted|revoked|withdrawn)$")
@@ -114,6 +121,19 @@ def edit_regions(
 ) -> dict[str, Any]:
     """Confirm, correct or delete proposed regions. Each edit is its own receipt."""
     try:
+        if body.request_id is not None:
+            return personal_request(
+                connection,
+                workspace=session.workspace_id,
+                actor=session.actor,
+                request_id=body.request_id,
+                operation=f"region-edits:{capture_id}",
+                body=body.model_dump(mode="json", exclude={"request_id"}, exclude_unset=True),
+                captures=[capture_id],
+                run=lambda: edit_regions(
+                    capture_id, body.model_copy(update={"request_id": None}), connection, session
+                ),
+            )
         with connection.transaction():
             if len({edit.region_key for edit in body.edits}) != len(body.edits):
                 raise PrivacyAdmissionError("name each region exactly once per edit request")
@@ -150,6 +170,22 @@ def new_subject(
     session: CurrentSession,
 ) -> dict[str, Any]:
     """Create somebody a decision can be about, named or not."""
+    if body.request_id is not None:
+        try:
+            return personal_request(
+                connection,
+                workspace=session.workspace_id,
+                actor=session.actor,
+                request_id=body.request_id,
+                operation="new-subject",
+                body=body.model_dump(mode="json", exclude={"request_id"}),
+                captures=[],
+                run=lambda: new_subject(
+                    body.model_copy(update={"request_id": None}), connection, session
+                ),
+            )
+        except PrivacyAdmissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     with connection.transaction():
         subject_id = create_subject(
             IngestRepository(connection, session.workspace_id),
@@ -168,6 +204,20 @@ def add_consent(
 ) -> dict[str, Any]:
     """Record one consent transition, as the account holder and never as the subject."""
     try:
+        if body.request_id is not None:
+            return personal_request(
+                connection,
+                workspace=session.workspace_id,
+                actor=session.actor,
+                request_id=body.request_id,
+                operation=f"consent:{subject_id}",
+                body=body.model_dump(mode="json", exclude={"request_id"}),
+                captures=lambda: subject_captures(connection, session.workspace_id, subject_id),
+                subjects=[subject_id],
+                run=lambda: add_consent(
+                    subject_id, body.model_copy(update={"request_id": None}), connection, session
+                ),
+            )
         with connection.transaction():
             consent_id = record_consent(
                 IngestRepository(connection, session.workspace_id),
@@ -199,12 +249,16 @@ class SubjectRegion(BaseModel):
 class LinkSubject(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    request_id: uuid.UUID | None = None
+
     regions: list[SubjectRegion] = Field(min_length=1, max_length=200)
     subject_id: uuid.UUID | None = None
 
 
 class UnlinkSubject(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID | None = None
 
     regions: list[SubjectRegion] = Field(min_length=1, max_length=200)
     subject_id: uuid.UUID
@@ -253,7 +307,17 @@ def _link_regions(
                     raise PrivacyAdmissionError("the region no longer links to that subject")
                 found.append((item, row))
             if subject_id is None:
-                subject_id = create_subject(repository, actor=session.actor)
+                known = {row["subject_id"] for _, row in found if row["subject_id"] is not None}
+                if len(known) > 1:
+                    raise PrivacyAdmissionError(
+                        "selected regions already identify different people; "
+                        "unlink the incorrect identity first"
+                    )
+                subject_id = (
+                    uuid.UUID(next(iter(known)))
+                    if known
+                    else create_subject(repository, actor=session.actor)
+                )
             written = []
             for item, row in found:
                 written.extend(
@@ -281,6 +345,23 @@ def link_subject_regions(
     body: LinkSubject, connection: ScopedConnection, session: CurrentSession
 ) -> dict[str, Any]:
     """Confirm that regions across photographs show one person, creating one subject if needed."""
+    if body.request_id is not None:
+        try:
+            return personal_request(
+                connection,
+                workspace=session.workspace_id,
+                actor=session.actor,
+                request_id=body.request_id,
+                operation="link",
+                body=body.model_dump(mode="json", exclude={"request_id"}),
+                captures=[item.capture_id for item in body.regions],
+                subjects=[body.subject_id] if body.subject_id is not None else [],
+                run=lambda: link_subject_regions(
+                    body.model_copy(update={"request_id": None}), connection, session
+                ),
+            )
+        except PrivacyAdmissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _link_regions(connection, session, body.regions, body.subject_id, unlink=False)
 
 
@@ -289,4 +370,21 @@ def unlink_subject_regions(
     body: UnlinkSubject, connection: ScopedConnection, session: CurrentSession
 ) -> dict[str, Any]:
     """Withdraw region-to-subject links, retaining every earlier edit and consent receipt."""
+    if body.request_id is not None:
+        try:
+            return personal_request(
+                connection,
+                workspace=session.workspace_id,
+                actor=session.actor,
+                request_id=body.request_id,
+                operation="unlink",
+                body=body.model_dump(mode="json", exclude={"request_id"}),
+                captures=[item.capture_id for item in body.regions],
+                subjects=[body.subject_id] if body.subject_id is not None else [],
+                run=lambda: unlink_subject_regions(
+                    body.model_copy(update={"request_id": None}), connection, session
+                ),
+            )
+        except PrivacyAdmissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _link_regions(connection, session, body.regions, body.subject_id, unlink=True)

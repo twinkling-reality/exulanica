@@ -47,15 +47,18 @@ export class PersonRegionDrafts {
 }
 export interface PersonRegionEditorInput {
   readonly captureId: string;
+  readonly correction?: ManualRegion;
   readonly source: { readonly url: string | null; readonly available: boolean; readonly alt: string } | null;
   readonly drafts: PersonRegionDrafts;
   readonly isCurrent: () => boolean;
   readonly onAdd: (region: ManualRegion) => Promise<void>;
 }
 export function buildPersonRegionEditor(input: PersonRegionEditorInput): HTMLElement {
-  const root = el('section', { class: 'person-region-editor', 'aria-label': 'Add a missed person' });
+  const label = input.correction ? 'Correct person outline' : 'Add a missed person';
+  const draftId = input.correction ? `${input.captureId}:${input.correction.region_key}` : input.captureId;
+  const root = el('section', { class: 'person-region-editor', 'aria-label': label });
   root.dataset.captureId = input.captureId;
-  root.append(el('h3', { text: 'Add a missed person' }), el('p', {
+  root.append(el('h3', { text: label }), el('p', {
     text: 'Draw a box around the whole visible person, including partial bodies and reflections. '
       + 'This records your review, not the photographed person’s authentication or consent. '
       + 'Drafts stay with this photograph while you switch views; leaving the app loses unsaved drafts.',
@@ -64,10 +67,14 @@ export function buildPersonRegionEditor(input: PersonRegionEditorInput): HTMLEle
     root.append(el('p', { text: 'An authorized editable photograph is unavailable in this session. No original is fetched separately.' }));
     return root;
   }
-  let draft = input.drafts.entries.get(input.captureId);
+  let draft = input.drafts.entries.get(draftId);
+  if (input.correction && draft?.saved) draft = undefined;
   if (!draft) {
-    draft = { values: ['', '', '', ''], key: '', pending: false, saved: false, message: '' };
-    input.drafts.entries.set(input.captureId, draft);
+    const points = input.correction?.silhouette.points;
+    const values = points ? [Math.min(...points.map(p => p[0]!)), Math.min(...points.map(p => p[1]!)),
+      Math.max(...points.map(p => p[0]!)), Math.max(...points.map(p => p[1]!))].map(String) : ['', '', '', ''];
+    draft = { values, key: input.correction?.region_key ?? '', pending: false, saved: false, message: '' };
+    input.drafts.entries.set(draftId, draft);
   }
   const state = draft;
   const photo = el('img', { src: input.source.url, alt: input.source.alt, draggable: false });
@@ -81,7 +88,7 @@ export function buildPersonRegionEditor(input: PersonRegionEditorInput): HTMLEle
     field.value = state.values[i]!;
     form.append(el('label', {}, [name, field]));
     field.addEventListener('input', () => {
-      state.values[i] = field.value; state.key = ''; state.saved = false; draw();
+      state.values[i] = field.value; state.key = input.correction?.region_key ?? ''; state.saved = false; draw();
     });
     return field;
   });
@@ -125,14 +132,14 @@ export function buildPersonRegionEditor(input: PersonRegionEditorInput): HTMLEle
     if (end) {
       state.values = [Math.min(start[0], end[0]), Math.min(start[1], end[1]),
         Math.max(start[0], end[0]), Math.max(start[1], end[1])].map(String);
-      state.key = ''; render();
+      state.key = input.correction?.region_key ?? ''; render();
     } else { state.message = 'Finish the box inside the photograph. Your draft is unchanged.'; render(); }
     start = null;
   });
   stage.addEventListener('pointercancel', () => { start = null; });
   cancel.addEventListener('click', () => {
     if (!active() || state.pending) return;
-    state.values = ['', '', '', '']; state.key = ''; state.saved = false;
+    state.values = ['', '', '', '']; state.key = input.correction?.region_key ?? ''; state.saved = false;
     state.message = 'Draft cleared. Saved regions are unchanged.'; render();
   });
   form.addEventListener('submit', (event) => {

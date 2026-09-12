@@ -129,6 +129,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     },
     # Authentication must precede validation of personal authority or review receipts.
     ("POST", "/personal-admission"): {"json": {}},
+    ("GET", "/personal-admission"): {},
     ("GET", "/identity/events"): {},
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
