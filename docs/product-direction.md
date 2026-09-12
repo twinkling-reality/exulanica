@@ -74,6 +74,40 @@ was deleted; the provider posted a $0.23 total. This establishes trainer packagi
 not a usable walk-around capture or place coverage. The first personal-place demonstration and the complete
 scene-to-Companion rehearsal remain acceptance gates before calling the experience complete.
 
+## Optional Earth foundation and September demo scope
+
+Prepared 2026-09-12 following the operator's request; not yet implemented or
+accepted. The [Earth wave](briefs/2026-09-12-earth-wave.md) promotes the previously
+deferred streamed Earth view into a bounded feasibility and integration task.
+Earth is optional public geographic context, while the personal Atlas retains its
+semantic layout. Streaming existing licensed terrain and buildings needs no model
+training. Reconstructing a supplied personal place remains a separate scene run.
+
+The first target is globe navigation, a recognizable San Francisco destination,
+and a working transition to the existing authenticated personal-world path.
+No evidence locates the current personal capture in San Francisco or establishes
+a measured transform into Earth. Seamless placement needs separate geographic
+alignment. Full interiors, traffic, collision-safe walking and general simulation
+are not established by a streamed city.
+
+The production renderer remains PlayCanvas; atlas-three is a retained comparison
+binding. Earth architecture and stack selection require a documented comparison against
+existing renderer, world/version, authored-content and asset contracts, with
+measured performance and explicit data rights. The first implementation must be a
+reusable foundation with bounded resource ownership and provider attribution.
+September18 may limit exposed features; it does not justify a disposable viewer
+or weakening the long-term contracts. Ordinary personal use must remain available
+if Earth configuration or network access fails. Keep provider tokens
+and private memories separate and preserve the UI/composition boundary for the
+operator's later interface redesign.
+
+The Product Hunt page lists September 18, 2026. This is an additional proposed
+submission window, not a replacement for the October schedule below. Exact
+submission requirements and cutoff still need verification. Demonstration scope
+is one destination and one complete useful interaction, with recording/access
+checks protected. Prepared work and a passing renderer test are not a submission
+or proof of live Companion quality.
+
 ## World state contract
 
 Preserve the source reconstruction and let a person create an alternate version. The alternate

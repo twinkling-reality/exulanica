@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**153 documents**, excluding `docs/evaluation/`.
+**156 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-45 documents.
+48 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -149,6 +149,8 @@ What was intended, written before the work.
 - [2026-09-12-companion-preview-binding](briefs/2026-09-12-companion-preview-binding.md) : measured root follow-up, 2026-09-12. The repaired failure-area run passed
 - [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
+- [2026-09-12-earth-foundation](briefs/2026-09-12-earth-foundation.md) : prepared for operator dispatch. Branch: codex/earth-foundation
+- [2026-09-12-earth-wave](briefs/2026-09-12-earth-wave.md) : prepared for operator dispatch on 2026-09-12; no lane has been started by
 - [2026-09-12-experience-activation](briefs/2026-09-12-experience-activation.md) : root preparation, 2026-09-12. Execute database mutations only after the full
 - [2026-09-12-experience-gate-repairs](briefs/2026-09-12-experience-gate-repairs.md) : root amendment after the full backend run, 2026-09-12. The run completed
 - [2026-09-12-experience-integration](briefs/2026-09-12-experience-integration.md) : root execution brief, 2026-09-12. The scratch integration worktree is
@@ -158,6 +160,7 @@ What was intended, written before the work.
 - [2026-09-12-frozen-brief-links](briefs/2026-09-12-frozen-brief-links.md) : measured integration repair, 2026-09-12. The place-acceptance owner ran the existing
 - [2026-09-12-personal-browser-recovery](briefs/2026-09-12-personal-browser-recovery.md) : measured scope amendment for personal-browser, 2026-09-12. Keep its original brief
 - [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
+- [2026-09-12-personal-place-training](briefs/2026-09-12-personal-place-training.md) : prepared for operator dispatch. Branch: codex/personal-place-training
 - [2026-09-12-place-acceptance](briefs/2026-09-12-place-acceptance.md) : prepared, not dispatched. Branch: codex/place-acceptance
 - [2026-09-12-place-compute-readiness](briefs/2026-09-12-place-compute-readiness.md) : operator-authorized successor to the immutable place-acceptance report
 - [2026-09-12-world-api-registry-integration](briefs/2026-09-12-world-api-registry-integration.md) : measured root integration repair, 2026-09-12. The combined focused backend
