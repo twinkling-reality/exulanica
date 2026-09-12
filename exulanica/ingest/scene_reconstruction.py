@@ -862,10 +862,15 @@ class SceneReconstructionProcessor:
         spec = stage(stage_key)
         key = _scene_key(scene_id, spec.key, input_digest)
         content_id = BlobId.of_bytes(payload)
+        existing = self._repository.find_artifact(key)
         return _PendingArtifact(
             kind=spec.output_kind,
             key=key,
-            artifact_id=artifact_id_for(key),
+            artifact_id=(
+                existing.artifact_id
+                if existing is not None
+                else artifact_id_for(key, workspace_id=self._repository.workspace_id)
+            ),
             input_digest=input_digest,
             payload=payload,
             content_id=content_id,

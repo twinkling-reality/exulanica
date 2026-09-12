@@ -2,7 +2,8 @@
 
 A derivative's identity is ``(source_blob_sha256, stage_key, stage_version, params_digest,
 input_digest, binding_digest)``. Not the capture id, because two captures of identical bytes
-should share derivatives. Not the wall clock, obviously.
+should share derivative content. Artifact row IDs additionally name their workspace;
+idempotency keys and content hashes do not. Not the wall clock, obviously.
 
 ``binding_digest`` covers the part of a stage's identity that is resolved at run time rather
 than declared in this file: for a model-backed stage, the identifier the stage will actually
@@ -854,9 +855,13 @@ def idempotency_key(
     return hasher.hexdigest()
 
 
-def artifact_id_for(key: str) -> uuid.UUID:
-    """Deterministic ``artifact_id``, so a retry inserts the same row rather than a second."""
-    return uuid.uuid5(ARTIFACT_NAMESPACE, key)
+def artifact_id_for(key: str, *, workspace_id: uuid.UUID) -> uuid.UUID:
+    """Identify a new workspace-owned row without changing its content or idempotency key.
+
+    Historical rows keep their stored IDs. Callers must look up an existing row by the
+    workspace-scoped idempotency key before predicting an ID for new work.
+    """
+    return uuid.uuid5(ARTIFACT_NAMESPACE, f"{workspace_id}:{key}")
 
 
 def pipeline_digest(bindings: Mapping[str, Mapping[str, str]] | None = None) -> str:

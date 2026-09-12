@@ -74,7 +74,7 @@ def _rebuild(repository, store, tmp_path, captures, point_artifacts):
     key = idempotency_key(
         capture.blob_id, spec, input_digest, binding={"model_id": "test/depth-model-v2"}
     )
-    replacement_id = artifact_id_for(key)
+    replacement_id = artifact_id_for(key, workspace_id=repository.workspace_id)
     replacement = store.put_bytes(_numeric_point_map(0, color=129))
     privacy = repository.connection.execute(
         "select privacy_screening_id from artifact where workspace_id=%s and artifact_id=%s",
@@ -397,7 +397,9 @@ def test_the_backfill_replaces_a_purged_projection_under_the_next_generation(
     assert replacement["idempotency_key"] == projection_identity_key(
         published["idempotency_key"], 1
     )
-    assert replacement["artifact_id"] == artifact_id_for(replacement["idempotency_key"])
+    assert replacement["artifact_id"] == artifact_id_for(
+        replacement["idempotency_key"], workspace_id=repository.workspace_id
+    )
     assert replacement["artifact_id"] != published["artifact_id"]
     assert uuid.UUID(outcome["artifact_id"]) == replacement["artifact_id"]
     assert replacement["content_sha256"] == published["content_sha256"]
@@ -561,7 +563,7 @@ def test_a_projection_a_deletion_purged_is_never_written_back(repository, tmp_pa
     next_key = projection_identity_key(published["idempotency_key"], 1)
     with pytest.raises(TombstonedError):
         repository.insert_scene_artifact(
-            artifact_id=artifact_id_for(next_key),
+            artifact_id=artifact_id_for(next_key, workspace_id=repository.workspace_id),
             kind=spec.output_kind,
             scene_id=scene_id,
             stage_key=spec.key,
@@ -591,3 +593,24 @@ def test_a_projection_identity_generation_is_the_base_key_at_zero_and_distinct_a
             projection_identity_key(base, bad)
     with pytest.raises(ValueError, match="SHA-256"):
         projection_identity_key("not a key", 1)
+
+
+@pytest.mark.parametrize("missing_bytes", [False, True])
+def test_backfill_reuses_historical_projection_id(repository, tmp_path, monkeypatch, missing_bytes):
+    from test_artifact_workspace_identity import legacy_artifact_id
+
+    with monkeypatch.context() as patch:
+        patch.setattr("exulanica.ingest.scene_reconstruction.artifact_id_for", legacy_artifact_id)
+        store, _, _, _, scene_id = _published(repository, tmp_path, "legacy-projection")
+    before = _rows(repository, scene_id)
+    assert len(before) == 1
+    original = before[0]
+    assert original["artifact_id"] == legacy_artifact_id(
+        original["idempotency_key"], workspace_id=repository.workspace_id
+    )
+    if missing_bytes:
+        _unlink(store, original["content_sha256"])
+    _one(repository, store, scene_id)
+    assert _rows(repository, scene_id) == before
+    assert store.exists(BlobId(bytes(original["content_sha256"])))
+    assert _served_without_rebuilding(repository, store, monkeypatch).scene_id == scene_id

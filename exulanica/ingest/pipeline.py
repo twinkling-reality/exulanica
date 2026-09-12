@@ -256,7 +256,7 @@ class PhotoIngestPipeline:
                 reused=True,
             )
         pending.append(payload)
-        artifact_id = artifact_id_for(key)
+        artifact_id = artifact_id_for(key, workspace_id=self._repository.workspace_id)
         self._repository.insert_artifact(
             artifact_id=artifact_id,
             kind=spec.output_kind,

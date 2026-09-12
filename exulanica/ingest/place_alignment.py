@@ -300,7 +300,12 @@ def build_place_alignment(
         params_digest=spec.params_digest,
         input_digest=input_digest,
     )
-    receipt_artifact_id = artifact_id_for(key)
+    existing_artifact = repository.find_artifact(key)
+    receipt_artifact_id = (
+        existing_artifact.artifact_id
+        if existing_artifact is not None
+        else artifact_id_for(key, workspace_id=repository.workspace_id)
+    )
 
     manifest = PoseBuildManifest(
         scene_ref=f"place:{place_id}",

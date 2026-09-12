@@ -66,7 +66,7 @@ def _insert_point_map(repository, blob, screening_id=None):
         binding={"model_id": "privacy-boundary-test"},
     )
     return repository.insert_artifact(
-        artifact_id=artifact_id_for(key),
+        artifact_id=artifact_id_for(key, workspace_id=repository.workspace_id),
         kind="point_map",
         source_blob=blob,
         stage_key=spec.key,

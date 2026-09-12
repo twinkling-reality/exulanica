@@ -523,4 +523,38 @@ def test_the_generated_artifact_key_is_the_ordinary_scene_artifact_key(repositor
     """
     _store, scene_id, receipt, record = generated
     key = _scene_key(scene_id, GENERATED_SCENE_STAGE, generation_input_digest(receipt))
-    assert artifact_id_for(key) == record.artifact_id
+    assert artifact_id_for(key, workspace_id=repository.workspace_id) == record.artifact_id
+
+
+def test_generated_receipt_retry_preserves_historical_id(repository, tmp_path, monkeypatch):
+    from test_artifact_workspace_identity import legacy_artifact_id
+
+    store, _, scene_id = _published_scene(repository, tmp_path, registered=3, spacing=5)
+    envelope = world_read_bundle(repository.connection, repository.workspace_id, scene_id, store)
+    assert envelope is not None
+    bundle_digest = envelope["bundle"]["recorded_sha256"]
+    receipt = _receipt(bundle_digest)
+    with monkeypatch.context() as patch:
+        patch.setattr("exulanica.ingest.generated_scene.artifact_id_for", legacy_artifact_id)
+        original = record_generated_scene(
+            repository,
+            store,
+            scene_id=scene_id,
+            receipt=receipt,
+            expected_recorded_sha256=bundle_digest,
+        )
+    assert original.inserted
+    retried = record_generated_scene(
+        repository,
+        store,
+        scene_id=scene_id,
+        receipt=receipt,
+        expected_recorded_sha256=bundle_digest,
+    )
+    assert not retried.inserted
+    assert retried.artifact_id == original.artifact_id
+    rows = repository.connection.execute(
+        "select artifact_id from artifact where workspace_id=%s and scene_id=%s and kind=%s",
+        (repository.workspace_id, scene_id, GENERATED_SCENE_KIND),
+    ).fetchall()
+    assert rows == [{"artifact_id": original.artifact_id}]

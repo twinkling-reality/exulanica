@@ -204,8 +204,14 @@ def write_point_map(
     input_digest = input_digest_of([])
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     stored = store.put_bytes(payload)
+    existing = repository.find_artifact(key)
+    artifact_id = (
+        existing.artifact_id
+        if existing is not None
+        else artifact_id_for(key, workspace_id=repository.workspace_id)
+    )
     repository.insert_artifact(
-        artifact_id=artifact_id_for(key),
+        artifact_id=artifact_id,
         kind=spec.output_kind,
         source_blob=blob_id,
         stage_key=spec.key,
@@ -223,7 +229,7 @@ def write_point_map(
         # capture that needs none. Defaulting to None keeps every existing caller byte-identical.
         read_source_sha256=read_source_sha256,
     )
-    return artifact_id_for(key), stored.blob_id
+    return artifact_id, stored.blob_id
 
 
 DEFAULT_PAYLOAD: dict[str, Any] = {
@@ -430,15 +436,10 @@ def cli_database(spine_schema, _spine_tables, monkeypatch):
         "assertion_kind" already exists``. Recording what the harness applied makes the
         bookkeeping agree with the schema that is actually there, which is also the only
         honest description of it.
-    *   **Workspace scoping alone does not isolate two CLI tests.** ``artifact_id`` is
-        ``uuid5`` over the idempotency key, and that key is a hash of the source bytes, the
-        stage and its parameters, with no workspace in it. Two tests that ingest byte-identical
-        photographs therefore compute the same primary key under different workspaces, and the
-        second insert dies on ``artifact_pkey`` rather than being absorbed by ``on conflict
-        (workspace_id, idempotency_key)``. Row-level security does not help here: a unique
-        index is enforced over rows the policy hides. So the tables are wiped between tests
-        exactly as :func:`ingest_spine` wipes them, and a fresh workspace per test is a convenience
-        rather than the isolation mechanism.
+    *   Tables are wiped between tests to isolate their counts and queue state. Artifact IDs
+        now include workspace identity, so exact bytes can coexist in live workspaces; that
+        behavior is tested without truncating between the two imports in
+        ``test_artifact_workspace_identity.py``.
     """
     psycopg, scratch = spine_schema
     from exulanica.env import env_get

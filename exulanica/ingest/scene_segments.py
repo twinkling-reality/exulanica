@@ -1213,7 +1213,12 @@ def _lift_and_write(
         ]
     )
     key = _scene_key(scene_id, spec.key, input_digest)
-    artifact_id = artifact_id_for(key)
+    existing_artifact = repository.find_artifact(key)
+    artifact_id = (
+        existing_artifact.artifact_id
+        if existing_artifact is not None
+        else artifact_id_for(key, workspace_id=repository.workspace_id)
+    )
     content_id = BlobId.of_bytes(payload)
     outcome = {
         **outcome,
