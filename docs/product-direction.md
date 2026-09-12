@@ -45,8 +45,13 @@ Neither is evidence that a compatible simulation runtime exists.
 
 ### Measured experience work on September 12
 
-The experience candidate is under integration; the dated reports distinguish implemented
-contracts, executed fixture checks and remaining personal-source acceptance.
+The four experience lanes are integrated on main. The
+[integration record](evaluation/2026-09-12-experience-integration.json) retains 2,974 passing
+backend tests, 3 skips and 1,238 passing web tests, including the initial failures and repairs.
+The [local activation record](evaluation/2026-09-12-experience-activation.json) verifies the
+copy at migration 0047 and the preview running from main on ports 8001 and 5182. The retained
+database remains unchanged at 0038. The dated reports distinguish implemented contracts,
+executed fixture checks and remaining personal-source acceptance.
 
 - [Personal browser intake](evaluation/2026-09-12-personal-browser.json) implements original
   upload, explicit batch selection, person linking, region correction and atomic request
