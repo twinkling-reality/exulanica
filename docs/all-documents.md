@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**132 documents**, excluding `docs/evaluation/`.
+**137 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-24 documents.
+29 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -146,6 +146,11 @@ What was intended, written before the work.
 - [2026-09-11-structural-snapshot-sources](briefs/2026-09-11-structural-snapshot-sources.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-8 in
 - [2026-09-11-unposed-rung-three](briefs/2026-09-11-unposed-rung-three.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-1 and FP-2
 - [2026-09-11-wave-integration](briefs/2026-09-11-wave-integration.md) : integration preparation; no implementation branch has been accepted
+- [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
+- [2026-09-12-experience-wave](briefs/2026-09-12-experience-wave.md) : prepared on 2026-09-12, not dispatched. This packet proposes four parallel tasks and
+- [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
+- [2026-09-12-place-acceptance](briefs/2026-09-12-place-acceptance.md) : prepared, not dispatched. Branch: codex/place-acceptance
+- [2026-09-12-world-browser](briefs/2026-09-12-world-browser.md) : prepared, not dispatched. Branch: codex/world-browser
 
 ## Dated records
 
