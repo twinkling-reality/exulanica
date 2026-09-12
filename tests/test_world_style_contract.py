@@ -24,8 +24,13 @@ FRONTEND_CAPABILITIES = {
     "material.technical-contrast",
     "surface.finish",
     "motion.tempo",
+    "interface.hue",
+    "interface.warmth",
+    "interface.depth",
+    "interface.light",
 }
 FRONTEND_MODULES = {
+    "source-light-v1": {"interface.hue", "interface.warmth", "interface.depth", "interface.light"},
     "aeroheart-optics-v1": {
         "world.vitality",
         "material.transmission",
@@ -72,8 +77,13 @@ def test_the_backend_adapter_is_pinned_to_the_reviewed_frontend_recipe_contract(
             "aeroheart-optics-v1",
             "registered-surface-v1",
             "bounded-tempo-v1",
+            "source-light-v1",
         ],
         "capabilityMapping": {
+            "source-hue": "interface.hue",
+            "source-warmth": "interface.warmth",
+            "source-depth": "interface.depth",
+            "source-light": "interface.light",
             "vitality": "world.vitality",
             "glass": "material.transmission",
             "relationship-energy": "relationships.energy",

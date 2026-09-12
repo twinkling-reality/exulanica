@@ -348,3 +348,38 @@ describe('world style API boundary', () => {
       .catch((error: ApiError) => expect(error.code).toBe('protected_topology_conflict'));
   });
 });
+
+
+describe('reviewed historical recipe bindings', () => {
+  const historicalVersion = () => {
+    const saved = version('historical-v0', 0);
+    const old = worldStyleRecipe('origin-landscape', 1)!.readCompatibleBindings![0]!;
+    saved.recipe_binding = { ...saved.recipe_binding, modules: [...old.modules], capabilityMapping: { ...old.capabilityMapping } };
+    saved.capability_mapping = { ...old.capabilityMapping };
+    for (const key of ['source-hue', 'source-warmth', 'source-depth', 'source-light']) delete (saved.global_style.parameters as Record<string, unknown>)[key];
+    return saved;
+  };
+  it('opens an exact historical binding without rewriting it and keeps new previews strict', async () => {
+    const saved = historicalVersion();
+    const original = structuredClone(saved);
+    const fetch = connectedFetch(url => {
+      if (url.pathname.endsWith('/current')) return json({ current_topology_digest: 'topology-a', current: saved });
+      if (url.pathname.endsWith('/versions')) return json([saved]);
+      if (url.pathname.endsWith('/previews')) return json({ ...preview('p', 'proposal'), candidate: saved }, 201);
+      return undefined;
+    });
+    const client = new WorldStyleClient({baseUrl:'https://exulanica.test',token:'fixture',fetch});
+    const connected = await client.connect();
+    expect(connected.state.current.recipeBinding.modules).toEqual(saved.recipe_binding.modules);
+    expect(connected.state.current.globalStyle.parameters['source-hue']).toBe(0.6);
+    expect(saved).toEqual(original);
+    await expect(client.previewSettings({profileId:'origin-landscape',profileVersion:1,parameters:{vitality:0.5}})).rejects.toThrow('not executable');
+  });
+  it('refuses an unreviewed historical module subset', async () => {
+    const saved = historicalVersion();
+    saved.recipe_binding.modules.pop();
+    const fetch = connectedFetch(url => url.pathname.endsWith('/current')
+      ? json({current_topology_digest:'topology-a',current:saved}) : undefined);
+    await expect(new WorldStyleClient({baseUrl:'https://exulanica.test',token:'fixture',fetch}).connect()).rejects.toThrow('not executable');
+  });
+});

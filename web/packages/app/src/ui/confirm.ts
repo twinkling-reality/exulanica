@@ -29,7 +29,8 @@ export interface ConfirmHandlers {
 export interface ConfirmPanel {
   readonly root: HTMLElement;
   /** Render a staged proposal for reading. Shows the panel; writes nothing. */
-  show(proposalId: string, summary: ConfirmationSummary, utterance: string): void;
+  show(proposalId: string, summary: ConfirmationSummary, utterance: string,
+    options?: { readonly undoControlAvailable: boolean }): void;
   /** Report what happened to a commit, in the words the failure used. */
   reportFailure(reason: string): void;
   hide(): void;
@@ -55,7 +56,7 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
 
   return {
     root,
-    show(proposalId, summary, utterance) {
+    show(proposalId, summary, utterance, options) {
       const confirm = el('button', { type: 'button', class: 'primary', text: 'Confirm' });
       const cancel = el('button', { type: 'button', class: 'ghost', text: 'Cancel' });
       confirm.addEventListener('click', () => handlers.onConfirm(proposalId));
@@ -72,7 +73,9 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
         el('p', { class: 'confirm-effect' }, [effectOf(summary)]),
         el('p', { class: 'confirm-reversible' }, [
           summary.reversible
-            ? 'This writes a reversible event. This build does not yet expose the undo control.'
+            ? options?.undoControlAvailable === true
+              ? 'This writes a reversible event. Use “Take back the last change” in the object panel to undo it.'
+              : 'This writes a reversible event. This build does not yet expose the undo control.'
             : 'This cannot be undone.',
         ]),
       );

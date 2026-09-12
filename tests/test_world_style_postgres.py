@@ -318,6 +318,7 @@ def test_companion_recipe_refinement_persists_only_inert_binding_and_provenance(
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     assert record.capability_mapping["surface-finish"] == "surface.finish"
     serialized = str(record.recipe_binding).lower()
@@ -384,11 +385,25 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
     ).fetchone()["capture_id"]
     assert metadata.capture_ids == (capture_id,)
     record_region_edits(
-        repository, capture_id=capture_id, actor=uuid.uuid4(),
-        edits=[{"region_key": "aa" * 32, "action": "add", "shape": "box",
-                "silhouette": {"kind": "polygon", "points": [
-                    [100000, 100000], [400000, 100000], [400000, 800000], [100000, 800000],
-                ]}}],
+        repository,
+        capture_id=capture_id,
+        actor=uuid.uuid4(),
+        edits=[
+            {
+                "region_key": "aa" * 32,
+                "action": "add",
+                "shape": "box",
+                "silhouette": {
+                    "kind": "polygon",
+                    "points": [
+                        [100000, 100000],
+                        [400000, 100000],
+                        [400000, 800000],
+                        [100000, 800000],
+                    ],
+                },
+            }
+        ],
     )
     [pending] = styles.source_media(store)
     assert pending.state is SourceMediaState.UNAVAILABLE_ASSET
@@ -407,3 +422,109 @@ def test_available_source_metadata_comes_only_from_authorised_local_evidence(
     assert deleted.reason == "source evidence was deleted"
     assert deleted.evidence_path is None
     assert deleted.capture_ids == ()
+
+
+def test_source_light_upgrade_preserves_prior_receipts_and_source_slots(monkeypatch):
+    import json
+    from pathlib import Path
+
+    from exulanica.migrations import migrations
+    from exulanica.world import StyleRegistry
+    from psycopg.rows import dict_row
+
+    import pg_harness
+
+    all_migrations = list(migrations())
+    upgrade = next(item for item in all_migrations if item.version == "0047")
+    document = json.loads(
+        (Path(__file__).parents[1] / "exulanica/world/style-registry.v1.json").read_text()
+    )
+    old_capabilities = {"interface.hue", "interface.warmth", "interface.depth", "interface.light"}
+    document["capabilities"] = [
+        c for c in document["capabilities"] if c["capability"] not in old_capabilities
+    ]
+    document["modules"] = [m for m in document["modules"] if m["module_id"] != "source-light-v1"]
+    profile = document["profiles"][0]
+    profile["recipe"]["modules"].remove("source-light-v1")
+    profile["controls"] = [
+        c for c in profile["controls"] if c["capability"] not in old_capabilities
+    ]
+    previous_registry = StyleRegistry(document)
+    monkeypatch.setattr(
+        pg_harness, "migrations", lambda: iter(m for m in all_migrations if m.version < "0047")
+    )
+    with pg_harness.migrated_schema() as (_, connection):
+        connection.autocommit = True
+        connection.row_factory = dict_row
+        workspace = uuid.uuid4()
+        connection.execute(
+            "select set_config('exulanica.workspace_id', %s, false)", (str(workspace),)
+        )
+        previous = WorldStyleRepository(connection, workspace, registry=previous_registry)
+        initial = previous.register_topology(
+            topology(
+                sources=(
+                    TopologySourceSlot(
+                        uuid.uuid4(), "photo.one", "region-a", None, "Synthetic source one"
+                    ),
+                    TopologySourceSlot(
+                        uuid.uuid4(), "photo.two", "region-a", None, "Synthetic source two"
+                    ),
+                )
+            )
+        )
+        staged = previous.preview(proposal(initial))
+        saved = previous.apply(
+            staged.preview_id,
+            base_style_version_id=initial.version_id,
+            base_topology_digest="topology-a",
+            applied_by=uuid.uuid4(),
+        )
+        pending = previous.preview(proposal(saved, parameters={"vitality": 0.4}))
+        tables = ("world_style_version", "world_style_proposal", "world_topology_source")
+
+        def contents():
+            return {
+                name: connection.execute(
+                    f"select to_jsonb(t) as row from {name} t order by to_jsonb(t)::text"
+                ).fetchall()
+                for name in tables
+            }
+
+        before = contents()
+        connection.execute(upgrade.sql)
+        assert contents() == before
+        current = WorldStyleRepository(connection, workspace)
+        assert current.current().version_id == saved.version_id
+        assert current.current().recipe_binding == saved.recipe_binding
+        assert "source-light-v1" not in saved.recipe_binding["modules"]
+        with pytest.raises(InvalidStyleData, match="binding changed"):
+            current.apply(
+                pending.preview_id,
+                base_style_version_id=saved.version_id,
+                base_topology_digest="topology-a",
+                applied_by=uuid.uuid4(),
+            )
+        assert contents() == before
+        candidate = current.preview(proposal(current.current(), parameters={"source-hue": 0.35}))
+        accepted = current.apply(
+            candidate.preview_id,
+            base_style_version_id=saved.version_id,
+            base_topology_digest="topology-a",
+            applied_by=uuid.uuid4(),
+        )
+        assert accepted.global_style.parameters["source-hue"] == 0.35
+        assert "source-light-v1" in accepted.recipe_binding["modules"]
+        assert (
+            connection.execute(
+                "select to_jsonb(t) as row from world_topology_source t order by to_jsonb(t)::text"
+            ).fetchall()
+            == before["world_topology_source"]
+        )
+        assert (
+            connection.execute(
+                "select to_jsonb(t) as row from world_style_version t where version_id=%s",
+                (saved.version_id,),
+            ).fetchone()
+            in before["world_style_version"]
+        )

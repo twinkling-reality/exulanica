@@ -6,6 +6,10 @@
   },
   "default_profile": {"profile_id": "origin-landscape", "profile_version": 1},
   "capabilities": [
+    {"capability":"interface.hue","kind":"range","group":"world","min":0,"max":1},
+    {"capability":"interface.warmth","kind":"range","group":"world","min":0,"max":1},
+    {"capability":"interface.depth","kind":"range","group":"world","min":0,"max":1},
+    {"capability":"interface.light","kind":"range","group":"world","min":0,"max":1},
     {"capability": "world.vitality", "kind": "range", "group": "world", "min": 0, "max": 1},
     {"capability": "material.transmission", "kind": "range", "group": "material", "min": 0, "max": 1},
     {"capability": "relationships.energy", "kind": "range", "group": "motion", "min": 0, "max": 1},
@@ -17,6 +21,7 @@
     {"capability": "motion.tempo", "kind": "range", "group": "motion", "min": 0.75, "max": 1.25}
   ],
   "modules": [
+    {"module_id":"source-light-v1","capabilities":["interface.hue","interface.warmth","interface.depth","interface.light"]},
     {"module_id": "aeroheart-optics-v1", "capabilities": ["world.vitality", "material.transmission", "relationships.energy", "detail.ecology", "atmosphere.softness"]},
     {"module_id": "registered-surface-v1", "capabilities": ["surface.finish"]},
     {"module_id": "bounded-tempo-v1", "capabilities": ["motion.tempo"]},
@@ -35,16 +40,20 @@
         "schema_version": 1,
         "availability": "product",
         "origin": "authored",
-        "modules": ["aeroheart-optics-v1", "registered-surface-v1", "bounded-tempo-v1"]
+        "modules": ["aeroheart-optics-v1", "registered-surface-v1", "bounded-tempo-v1", "source-light-v1"]
       },
       "controls": [
-        {"key": "vitality", "capability": "world.vitality", "kind": "range", "group": "world", "label": "Color vitality", "description": "Tunes one shared color family across the memory field and its interface surfaces.", "min": 0, "max": 1, "step": 0.05, "default_value": 0.82},
-        {"key": "glass", "capability": "material.transmission", "kind": "range", "group": "material", "label": "Veil clarity", "description": "Changes the memory weave from soft optical thread to a crisp source image.", "min": 0, "max": 1, "step": 0.05, "default_value": 0.76},
-        {"key": "relationship-energy", "capability": "relationships.energy", "kind": "range", "group": "motion", "label": "Relationship energy", "description": "Controls the visual strength of confirmed relationship filaments.", "min": 0, "max": 1, "step": 0.05, "default_value": 0.68},
-        {"key": "garden-density", "capability": "detail.ecology", "kind": "range", "group": "detail", "label": "Weave detail", "description": "Controls bounded source-thread detail without adding, removing, or implying evidence.", "min": 0, "max": 1, "step": 0.05, "default_value": 0.72},
-        {"key": "horizon-softness", "capability": "atmosphere.softness", "kind": "range", "group": "atmosphere", "label": "Horizon softness", "description": "Changes atmospheric depth without hiding destinations.", "min": 0, "max": 1, "step": 0.05, "default_value": 0.46},
-        {"key": "surface-finish", "capability": "surface.finish", "kind": "choice", "group": "material", "label": "Surface finish", "description": "Uses one registered finish across the field and summoned interface surfaces.", "options": [{"value": "source-paper", "label": "Source paper"}, {"value": "clear-lens", "label": "Clear lens"}], "default_value": "source-paper"},
-        {"key": "world-tempo", "capability": "motion.tempo", "kind": "range", "group": "motion", "label": "Memory tempo", "description": "Changes the shared ambient and interface cadence inside a calm, bounded range.", "min": 0.75, "max": 1.25, "step": 0.05, "default_value": 1}
+        {"key":"vitality","capability":"world.vitality","kind":"range","group":"world","label":"Color vitality","description":"Tunes the colour of the memory field itself.","min":0,"max":1,"step":0.05,"default_value":0.82},
+        {"key":"glass","capability":"material.transmission","kind":"range","group":"material","label":"Veil clarity","description":"Changes the memory weave from soft optical thread to a crisp source image.","min":0,"max":1,"step":0.05,"default_value":0.76},
+        {"key":"relationship-energy","capability":"relationships.energy","kind":"range","group":"motion","label":"Relationship energy","description":"Controls the visual strength of confirmed relationship filaments.","min":0,"max":1,"step":0.05,"default_value":0.68},
+        {"key":"garden-density","capability":"detail.ecology","kind":"range","group":"detail","label":"Weave detail","description":"Controls bounded source-thread detail without adding, removing, or implying evidence.","min":0,"max":1,"step":0.05,"default_value":0.72},
+        {"key":"horizon-softness","capability":"atmosphere.softness","kind":"range","group":"atmosphere","label":"Horizon softness","description":"Changes atmospheric depth without hiding destinations.","min":0,"max":1,"step":0.05,"default_value":0.46},
+        {"key":"surface-finish","capability":"surface.finish","kind":"choice","group":"material","label":"Surface finish","description":"Uses one registered finish across the field and summoned interface surfaces.","options":[{"value":"source-paper","label":"Source paper"},{"value":"clear-lens","label":"Clear lens"}],"default_value":"source-paper"},
+        {"key":"source-hue","capability":"interface.hue","kind":"range","group":"world","label":"Interface hue","description":"The colour the interface is built from. Reading it from your photographs sets this.","min":0,"max":1,"step":0.01,"default_value":0.6},
+        {"key":"source-warmth","capability":"interface.warmth","kind":"range","group":"world","label":"Evidence warmth","description":"How warm the mark for your own words and your own photographs runs.","min":0,"max":1,"step":0.01,"default_value":0.19},
+        {"key":"source-depth","capability":"interface.depth","kind":"range","group":"world","label":"Reading depth","description":"How deep the reading colour sits. It never goes light enough to be hard to read.","min":0,"max":1,"step":0.01,"default_value":0.36},
+        {"key":"source-light","capability":"interface.light","kind":"range","group":"world","label":"Plate light","description":"How much light the summoned surfaces hold.","min":0,"max":1,"step":0.01,"default_value":0.86},
+        {"key":"world-tempo","capability":"motion.tempo","kind":"range","group":"motion","label":"Memory tempo","description":"Changes the shared ambient and interface cadence inside a calm, bounded range.","min":0.75,"max":1.25,"step":0.05,"default_value":1}
       ]
     },
     {
@@ -62,8 +71,8 @@
         "modules": ["survey-relief-response-v1"]
       },
       "controls": [
-        {"key": "contour-density", "capability": "detail.contours", "kind": "range", "group": "detail", "label": "Contour density", "description": "Changes the number of non-semantic survey contour marks.", "min": 0, "max": 1, "step": 0.1, "default_value": 0.55},
-        {"key": "technical-contrast", "capability": "material.technical-contrast", "kind": "range", "group": "material", "label": "Technical contrast", "description": "Controls separation between survey strata and their field.", "min": 0, "max": 1, "step": 0.1, "default_value": 0.7}
+        {"key":"contour-density","capability":"detail.contours","kind":"range","group":"detail","label":"Contour density","description":"Changes the number of non-semantic survey contour marks.","min":0,"max":1,"step":0.1,"default_value":0.55},
+        {"key":"technical-contrast","capability":"material.technical-contrast","kind":"range","group":"material","label":"Technical contrast","description":"Controls separation between survey strata and their field.","min":0,"max":1,"step":0.1,"default_value":0.7}
       ]
     }
   ]

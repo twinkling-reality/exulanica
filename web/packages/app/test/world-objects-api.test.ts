@@ -504,3 +504,25 @@ describe('a refusal reaches the surface in words', () => {
       .toBe('bad shape');
   });
 });
+
+
+describe('alternate version bootstrap transport', () => {
+  it('reads a base before confirmation and submits only that base', async () => {
+    const calls: { path: string; method: string; body: unknown; authorization: string | null }[] = [];
+    const client = new WorldObjectsClient({ baseUrl: 'https://fixture.test', token: 'fixture',
+      fetch: async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        calls.push({ path, method: init?.method ?? 'GET',
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+          authorization: new Headers(init?.headers).get('Authorization') });
+        return new Response(JSON.stringify(path.endsWith('/current')
+          ? { current_topology_digest: 'reviewed-topology' } : { version_id: 'opened-version' }));
+      },
+    });
+    const base = await client.bootstrapBase();
+    expect(calls.map(c => c.method)).toEqual(['GET']);
+    expect(await client.bootstrapVersion(base)).toBe('opened-version');
+    expect(calls[1]).toEqual({ path: '/world/versions/bootstrap', method: 'POST',
+      body: { base_topology_digest: 'reviewed-topology' }, authorization: 'Bearer fixture' });
+  });
+});

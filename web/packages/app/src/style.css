@@ -754,6 +754,15 @@ button.ghost {
   opacity: 0.82;
 }
 
+/* Keep the complete source warning readable beside the object panel, outside its controls. */
+#shell:has(.object-placement:not([hidden])) .source-status {
+  position: fixed;
+  top: var(--gap);
+  left: var(--gap);
+  right: calc(23rem + 2 * var(--gap));
+  text-align: left;
+}
+
 .reconstruction-availability {
   position: fixed;
   left: clamp(1.2rem, 4vw, 4rem);

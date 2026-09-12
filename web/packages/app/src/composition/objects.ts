@@ -171,7 +171,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     onUndo: () => proposeUndo(),
     onSaveMove: () => proposeMove(),
     onDiscardMove: () => discardMove(),
-    onClose: () => panel.setVisible(false),
+    onClose: () => setPanelVisible(false),
   }, {
     axes: choiceParameter('axis').choices as readonly MotionAxisKey[],
     axisFallback: choiceParameter('axis').fallback as MotionAxisKey,
@@ -180,6 +180,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     travelMm: integerParameter('travel_mm'),
     periodMilliseconds: integerParameter('period_milliseconds'),
   });
+
+  function setPanelVisible(visible: boolean): void {
+    // The browser owns traversal mode. Let its pointerlockchange event update the shell before
+    // the visitor clicks the object controls; displaying a panel alone leaves the mouse locked.
+    if (visible && document.pointerLockElement != null) document.exitPointerLock();
+    panel.setVisible(visible);
+  }
 
   // -- reading -----------------------------------------------------------------------------------
 
@@ -421,27 +428,17 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   // -- proposing -----------------------------------------------------------------------------------
 
   async function proposeBootstrap(): Promise<void> {
-    const headers = { Authorization: `Bearer ${deps.credentials.token}`, 'Content-Type': 'application/json' };
-    const base = deps.credentials.baseUrl.replace(/\/$/, '');
+    if (client === null) return;
     try {
-      const current = await fetch(`${base}/world/styles/current`, { headers });
-      if (!current.ok) throw new Error('Could not read this world. Try again.');
-      const { current_topology_digest } = await current.json();
+      const baseTopologyDigest = await client.bootstrapBase();
       stage({
         kind: 'bootstrap',
         describe: 'Open an alternate version of this world so you can add objects, keeping every source photograph.',
         reversible: false,
         run: async () => {
-          const result = await fetch(`${base}/world/versions/bootstrap`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ base_topology_digest: current_topology_digest }),
-          });
-          if (!result.ok) throw new Error(result.status === 409
-            ? 'This world changed. Choose “Place before me” again to review its current version.'
-            : 'Could not open an alternate version. Try again.');
-          const opened = await result.json();
-          await begin(opened.version_id);
-          if (version?.versionId !== opened.version_id) {
+          const versionId = await client.bootstrapVersion(baseTopologyDigest);
+          await begin(versionId);
+          if (version?.versionId !== versionId) {
             panel.report('The alternate version opened, but could not be read. Reload to try again.', 'failure');
             return;
           }
@@ -633,7 +630,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     pending = next;
     issued += 1;
     deps.hideWritePathConfirm();
-    confirm.show(`world-object-${issued}`, summaryFor(next), next.describe);
+    confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
+      undoControlAvailable: client !== null && next.reversible
+        && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'),
+    });
   }
 
   async function commit(): Promise<void> {
@@ -891,7 +891,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     if (event.code === 'KeyP') {
       event.preventDefault();
-      panel.setVisible(!panel.visible());
+      setPanelVisible(!panel.visible());
       return;
     }
     if (!panel.visible()) return;
@@ -921,7 +921,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     panel,
     confirm,
     toggle() {
-      panel.setVisible(!panel.visible());
+      setPanelVisible(!panel.visible());
     },
     begin,
     dispose() {
