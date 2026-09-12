@@ -5,6 +5,7 @@ torchvision==0.22.1
 numpy==2.2.6
 scipy==1.15.3
 pillow==12.3.0
+pi-heif==1.4.0
 pycolmap==4.2.0
 torchmetrics==1.7.2
 ninja==1.11.1.4
