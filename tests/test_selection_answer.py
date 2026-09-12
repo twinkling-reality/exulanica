@@ -1284,3 +1284,44 @@ def test_answering_a_question_persists_no_biometric_template(answered):
         # who they are. The set is smaller than it was, deliberately.
         assert set(row["quality"]) <= {"confidence_band", "part", "trust_tier"}
         assert "label" not in row["quality"]
+
+
+@pytest.mark.parametrize('change', ['capture_tombstone', 'caption_retracted', 'caption_revised'])
+def test_answer_rechecks_database_after_composition(answered, monkeypatch, change):
+    """A model wait must not preserve support that the database has already withdrawn."""
+    import exulanica.selection.question as question_module
+
+    repository = answered.repository
+    plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query='waterfall')
+    def compose_then_change(client, question, packet, **kwargs):
+        item = next(item for item in packet.items if item.text and 'waterfall' in item.text)
+        if change == 'capture_tombstone':
+            repository.insert_tombstone(scope='capture', capture_id=item.capture_id,
+                                        requested_by=answered.session.actor)
+        else:
+            writer = AssertionWriter(repository.connection, repository.workspace_id)
+            writer.retract(item.assertion_id, retracted_by=answered.session.actor,
+                           reason='scripted withdrawal during composition')
+            if change == 'caption_revised':
+                prior = repository.connection.execute(
+                    "select * from assertion where workspace_id=%s and assertion_id=%s",
+                    (repository.workspace_id, item.assertion_id),
+                ).fetchone()
+                writer.insert(kind=prior['kind'], predicate_key='caption_is',
+                              subject_ref=prior['subject_ref'], emit_key='revised-caption-control',
+                              support_span_ids=prior['support_span_ids'],
+                              produced_by_run=prior['produced_by_run'],
+                              object_value='The previous caption was corrected.')
+        return Answer(clauses=[AnswerClause(
+            text='A person beside a waterfall.', type=ClauseType.HISTORICAL,
+            citations=[item.token],
+        )]), False, ()
+
+    monkeypatch.setattr(question_module, 'compose_answer', compose_then_change)
+    outcome = answer_question(repository.connection, answered.client([]), 'What is visible?',
+                              answered.session, plan=plan)
+    assert outcome.abstention == Abstention.AMBIGUOUS
+    assert outcome.packet is None and outcome.result is None
+    assert outcome.rejections == ('evidence_changed_during_composition',)
+    assert all(c.type is ClauseType.META and not c.citations for c in outcome.answer.clauses)
+    assert answered.transport.requests == []
