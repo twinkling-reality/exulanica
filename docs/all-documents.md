@@ -164,6 +164,7 @@ What was intended, written before the work.
 - [2026-09-12-experience-wave](briefs/2026-09-12-experience-wave.md) : prepared on 2026-09-12, not dispatched. This packet proposes four parallel tasks and
 - [2026-09-12-frozen-brief-heading](briefs/2026-09-12-frozen-brief-heading.md) : measured follow-up, 2026-09-12. Comparing all four actual frozen briefs with their
 - [2026-09-12-frozen-brief-links](briefs/2026-09-12-frozen-brief-links.md) : measured integration repair, 2026-09-12. The place-acceptance owner ran the existing
+- [2026-09-12-helsinki-visual-feasibility](briefs/2026-09-12-helsinki-visual-feasibility.md) : bounded implementation brief
 - [2026-09-12-personal-browser-recovery](briefs/2026-09-12-personal-browser-recovery.md) : measured scope amendment for personal-browser, 2026-09-12. Keep its original brief
 - [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
 - [2026-09-12-personal-place-training](briefs/2026-09-12-personal-place-training.md) : prepared for operator dispatch. Branch: codex/personal-place-training
