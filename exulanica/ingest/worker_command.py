@@ -15,12 +15,14 @@ import sys
 import threading
 import uuid
 from collections.abc import Mapping
+from functools import partial
 from typing import Any, Final
 
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
 from exulanica.env import env_get, env_name, resolve_data_dir
+from exulanica.epistemics.caption_embeddings import embed_capture
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
@@ -97,7 +99,9 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
     detector = _build_detector(environ)
     segmenter = _build_segmenter(environ)
     lease_seconds = lease_seconds_for(
-        client.worst_case_seconds(Role.VISION) if client is not None else None
+        max(client.worst_case_seconds(role) for role in (Role.VISION, Role.EMBEDDING))
+        if client is not None
+        else None
     )
     data_dir = resolve_data_dir(environ)
     return DerivativeWorker(
@@ -105,6 +109,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         LocalContentAddressedStore(data_dir / "blobs"),
         parse_workspaces(args.workspace, environ),
         vision=vision,
+        embedding_pass=partial(embed_capture, client=client) if client is not None else None,
         depth=depth,
         detector=detector,
         segmenter=segmenter,

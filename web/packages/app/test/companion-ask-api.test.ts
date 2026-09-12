@@ -172,6 +172,25 @@ describe('asking the library a question', () => {
     expect(answer.provenance.latencyMs).toBe(86_000);
   });
 
+  it('preserves unknown embedding metadata without attributing composition to it', async () => {
+    const { fetch } = transport(
+      json(answerBody({ execution: {
+        prompt_version: 'selection-4',
+        calls: [
+          call({ role: 'embedding', served_model: null, attempts: null, latency_ms: 15 }),
+          call({ latency_ms: 80 }),
+        ],
+      } })),
+      json(packetBody([packetItem('X', URI_A, SPAN_A)])),
+    );
+    const answer = await new CompanionAskClient({ ...WHERE, fetch }).ask('people wearing');
+    expect(answer.calls[0]?.servedModel).toBeNull();
+    expect(answer.calls[0]?.attempts).toBeNull();
+    expect(answer.provenance.composed).toBe('model');
+    expect(answer.provenance.servedModel).toBe('nvidia/Nemotron-3_5-Lightning');
+    expect(answer.provenance.latencyMs).toBe(95);
+  });
+
   it('says the model was asked and its answer discarded, rather than crediting it', async () => {
     const { fetch } = transport(
       json(answerBody({ deterministic: true, repaired: false })),

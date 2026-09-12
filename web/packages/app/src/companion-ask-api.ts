@@ -89,9 +89,9 @@ export interface AnswerEvidence {
 export interface ModelCall {
   readonly role: string;
   readonly requestedModel: string;
-  readonly servedModel: string;
+  readonly servedModel: string | null;
   readonly usedFallback: boolean;
-  readonly attempts: number;
+  readonly attempts: number | null;
   readonly latencyMs: number;
   readonly promptTokens: number | null;
   readonly completionTokens: number | null;
@@ -192,9 +192,9 @@ interface WireClause {
 interface WireCall {
   readonly role: string;
   readonly requested_model: string;
-  readonly served_model: string;
+  readonly served_model: string | null;
   readonly used_fallback: boolean;
-  readonly attempts: number;
+  readonly attempts: number | null;
   readonly latency_ms: number;
   readonly prompt_tokens: number | null;
   readonly completion_tokens: number | null;
