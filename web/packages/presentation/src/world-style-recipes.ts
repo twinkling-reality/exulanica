@@ -15,6 +15,11 @@ export interface WorldStyleRecipeV1 {
   readonly profile: WorldArtProfileSource;
   readonly controls: readonly WorldStyleParameterDefinition[];
   readonly modules: readonly string[];
+  /** Exact reviewed historical bindings accepted for saved reads, never for new proposals. */
+  readonly readCompatibleBindings?: readonly {
+    readonly modules: readonly string[];
+    readonly capabilityMapping: Readonly<Record<string, string>>;
+  }[];
 }
 
 export const AEROHEART_CONTROLS: readonly WorldStyleParameterDefinition[] = [
@@ -294,6 +299,15 @@ export const WORLD_STYLE_RECIPES: readonly WorldStyleRecipeV1[] = [
     profile: AEROHEART_SOURCE,
     controls: AEROHEART_CONTROLS,
     modules: ['aeroheart-optics-v1', 'registered-surface-v1', 'bounded-tempo-v1', 'source-light-v1'],
+    readCompatibleBindings: [{
+      modules: ['aeroheart-optics-v1', 'registered-surface-v1', 'bounded-tempo-v1'],
+      capabilityMapping: {
+        vitality: 'world.vitality', glass: 'material.transmission',
+        'relationship-energy': 'relationships.energy', 'garden-density': 'detail.ecology',
+        'horizon-softness': 'atmosphere.softness', 'surface-finish': 'surface.finish',
+        'world-tempo': 'motion.tempo',
+      },
+    }],
   },
   {
     schemaVersion: 1,

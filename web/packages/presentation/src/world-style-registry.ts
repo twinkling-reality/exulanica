@@ -115,6 +115,27 @@ export class WorldStyleRegistry {
         }
       }
 
+      for (const historical of input.readCompatibleBindings ?? []) {
+        const capabilities = new Set<string>();
+        const seenModules = new Set<string>();
+        for (const moduleId of historical.modules) {
+          const module = modules.get(moduleId);
+          if (module === undefined || !selectedModules.has(moduleId) || seenModules.has(moduleId)) {
+            throw new TypeError(`invalid historical module ${moduleId} in ${key}`);
+          }
+          seenModules.add(moduleId);
+          for (const capability of module.capabilities) capabilities.add(capability);
+        }
+        const expected = Object.fromEntries(input.controls
+          .filter(control => capabilities.has(control.capability))
+          .map(control => [control.key, control.capability]));
+        if (seenModules.size === 0 || Object.keys(expected).length !== capabilities.size ||
+          Object.keys(historical.capabilityMapping).length !== capabilities.size ||
+          Object.entries(expected).some(([name, capability]) => historical.capabilityMapping[name] !== capability)) {
+          throw new TypeError(`invalid historical capability mapping in ${key}`);
+        }
+      }
+
       const recipe = deepFreeze(structuredClone(input));
       recipes.set(key, recipe);
       baseProfiles.set(key, createWorldArtProfile(recipe.profile));

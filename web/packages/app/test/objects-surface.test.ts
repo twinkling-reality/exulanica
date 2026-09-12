@@ -5,8 +5,9 @@ import {
 } from '@exulanica/atlas-core';
 import { mountObjects, type MountedObjects, type ObjectsDependencies } from '../src/composition/objects.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
+import { WorldObjectsClient } from '../src/world-objects-api.js';
 import type {
-  AlternateVersion, AuthoredObject, ReviewedAsset, WorldObjectsClient,
+  AlternateVersion, AuthoredObject, ReviewedAsset,
 } from '../src/world-objects-api.js';
 
 /**
@@ -667,9 +668,10 @@ describe('opening the first alternate through confirmation', () => {
       version: versionId === undefined ? null : version({ versionId }),
     }));
     const placeObject = vi.fn();
-    const client = { connect, place: placeObject } as unknown as WorldObjectsClient;
     const fetcher = vi.fn<typeof fetch>();
-    vi.stubGlobal('fetch', fetcher);
+    const client = new WorldObjectsClient({ baseUrl: 'https://exulanica.test', token: 'token', fetch: fetcher });
+    client.connect = connect;
+    client.place = placeObject;
     return { ...harness({ client }), connect, placeObject, fetcher };
   }
 
@@ -683,7 +685,7 @@ describe('opening the first alternate through confirmation', () => {
     expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version');
     expect(h.fetcher).toHaveBeenCalledTimes(1);
     expect(h.fetcher.mock.calls[0]![0]).toBe('https://exulanica.test/world/styles/current');
-    expect(h.fetcher.mock.calls[0]![1]?.method).toBeUndefined();
+    expect(h.fetcher.mock.calls[0]![1]?.method).toBe('GET');
     expect(h.placeObject).not.toHaveBeenCalled();
     button(h.mounted.confirm.root, 'Cancel').click();
     await new Promise((resolve) => { setTimeout(resolve, 0); });
@@ -708,7 +710,8 @@ describe('opening the first alternate through confirmation', () => {
     expect(url).toBe('https://exulanica.test/world/versions/bootstrap');
     expect(request?.method).toBe('POST');
     expect(JSON.parse(String(request?.body))).toEqual({ base_topology_digest: STATE });
-    expect(request?.headers).toEqual({ Authorization: 'Bearer token', 'Content-Type': 'application/json' });
+    expect(new Headers(request?.headers).get('authorization')).toBe('Bearer token');
+    expect(new Headers(request?.headers).get('content-type')).toBe('application/json');
     expect(h.fetcher).toHaveBeenCalledTimes(2);
     expect(h.placeObject).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(h.mounted.panel.root.textContent).toContain('Alternate version opened'));
@@ -736,7 +739,7 @@ describe('opening the first alternate through confirmation', () => {
     await place(h);
     await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version'));
     expect(h.fetcher).toHaveBeenCalledTimes(3);
-    expect(h.fetcher.mock.calls[2]![1]?.method).toBeUndefined();
+    expect(h.fetcher.mock.calls[2]![1]?.method).toBe('GET');
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(h.connect).toHaveBeenLastCalledWith(returnedId));
     expect(JSON.parse(String(h.fetcher.mock.calls[3]![1]?.body))).toEqual({ base_topology_digest: freshDigest });

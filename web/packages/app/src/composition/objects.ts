@@ -421,27 +421,17 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   // -- proposing -----------------------------------------------------------------------------------
 
   async function proposeBootstrap(): Promise<void> {
-    const headers = { Authorization: `Bearer ${deps.credentials.token}`, 'Content-Type': 'application/json' };
-    const base = deps.credentials.baseUrl.replace(/\/$/, '');
+    if (client === null) return;
     try {
-      const current = await fetch(`${base}/world/styles/current`, { headers });
-      if (!current.ok) throw new Error('Could not read this world. Try again.');
-      const { current_topology_digest } = await current.json();
+      const baseTopologyDigest = await client.bootstrapBase();
       stage({
         kind: 'bootstrap',
         describe: 'Open an alternate version of this world so you can add objects, keeping every source photograph.',
         reversible: false,
         run: async () => {
-          const result = await fetch(`${base}/world/versions/bootstrap`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ base_topology_digest: current_topology_digest }),
-          });
-          if (!result.ok) throw new Error(result.status === 409
-            ? 'This world changed. Choose “Place before me” again to review its current version.'
-            : 'Could not open an alternate version. Try again.');
-          const opened = await result.json();
-          await begin(opened.version_id);
-          if (version?.versionId !== opened.version_id) {
+          const versionId = await client.bootstrapVersion(baseTopologyDigest);
+          await begin(versionId);
+          if (version?.versionId !== versionId) {
             panel.report('The alternate version opened, but could not be read. Reload to try again.', 'failure');
             return;
           }

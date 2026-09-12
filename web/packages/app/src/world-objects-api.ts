@@ -280,6 +280,20 @@ export class WorldObjectsClient {
     return Object.freeze({ assets, version });
   }
 
+  /** Read the topology base before the person confirms opening an alternate version. */
+  async bootstrapBase(): Promise<string> {
+    const current = record(await this.#transport.getJson<unknown>('/world/styles/current'), 'world style state');
+    return text(current['current_topology_digest'], 'topology digest');
+  }
+
+  /** Bootstrap preserves the source slots; only the reviewed topology base is submitted. */
+  async bootstrapVersion(baseTopologyDigest: string): Promise<string> {
+    const opened = record(await this.#transport.postJson<unknown>('/world/versions/bootstrap', {
+      base_topology_digest: text(baseTopologyDigest, 'topology digest'),
+    }), 'opened alternate version');
+    return text(opened['version_id'], 'version id');
+  }
+
   async createVersion(input: {
     readonly title: string;
     readonly sourceSnapshotId?: string;
@@ -581,6 +595,8 @@ export function objectWriteFailure(error: unknown): string {
   switch (error.code) {
     case 'unknown_reference':
       return 'That version, object or asset is not in this workspace.';
+    case 'protected_topology_conflict':
+      return 'This world changed. Choose “Place before me” again to review its current version.';
     case 'stale_object_base':
       return 'This world changed while you were deciding, so nothing was written.';
     case 'invalid_object_state':

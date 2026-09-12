@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   WORLD_STYLE_MODULES,
@@ -84,4 +85,42 @@ describe('world style recipe registry', () => {
     };
     expect(() => registryFrom([missingControl])).toThrow(/has no control/);
   });
+});
+
+// Read the independently maintained backend manifest. A catalog generated from the frontend
+// under test cannot catch a missing module on the server.
+it('matches every reviewed backend module and control contract', () => {
+  const backend = JSON.parse(readFileSync(new URL(
+    '../../../../exulanica/world/style-registry.v1.json', import.meta.url,
+  ), 'utf8'));
+  expect(backend.modules.map((module: { module_id: string; capabilities: string[] }) => ({
+    moduleId: module.module_id, capabilities: [...module.capabilities].sort(),
+  })).sort((a: { moduleId: string }, b: { moduleId: string }) => a.moduleId.localeCompare(b.moduleId)))
+    .toEqual(WORLD_STYLE_MODULES.map(module => ({
+      moduleId: module.moduleId, capabilities: [...module.capabilities].sort(),
+    })).sort((a, b) => a.moduleId.localeCompare(b.moduleId)));
+  for (const recipe of WORLD_STYLE_RECIPES) {
+    const profile = backend.profiles.find((value: { profile_id: string; profile_version: number }) =>
+      value.profile_id === recipe.profile.profileId && value.profile_version === recipe.profile.profileVersion);
+    expect(profile.recipe.modules).toEqual(recipe.modules);
+    expect(profile.recipe.availability).toBe(recipe.availability);
+    expect(profile.recipe.origin).toBe(recipe.origin);
+    const contract = (control: Record<string, unknown>) => {
+      const { default_value, ...rest } = control;
+      return default_value === undefined ? rest : { ...rest, defaultValue: default_value };
+    };
+    expect(profile.controls.map(contract)).toEqual(recipe.controls.map(control => contract({ ...control })));
+  }
+});
+
+
+it('rejects historical bindings that invent modules or capability ownership', () => {
+  for (const compatible of [
+    { modules: ['unknown-module-v1'], capabilityMapping: {} },
+    { modules: ['bounded-tempo-v1'], capabilityMapping: { 'world-tempo': 'world.vitality' } },
+  ]) {
+    const recipes = [...structuredClone(WORLD_STYLE_RECIPES)];
+    recipes[0] = { ...recipes[0]!, readCompatibleBindings: [compatible] };
+    expect(() => registryFrom(recipes)).toThrow(/historical/);
+  }
 });

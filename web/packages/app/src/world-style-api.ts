@@ -491,19 +491,19 @@ function parseState(value: unknown): WorldStyleState {
   const state = record(value, 'world style state');
   return Object.freeze({
     currentTopologyDigest: text(state['current_topology_digest'], 'current topology digest'),
-    current: parseVersion(state['current']),
+    current: parseVersion(state['current'], true),
   });
 }
 
 function parseVersions(value: unknown): readonly WorldStyleVersionRecord[] {
-  return Object.freeze(array(value, 'world style versions').map(parseVersion));
+  return Object.freeze(array(value, 'world style versions').map(version => parseVersion(version, true)));
 }
 
-function parseVersion(value: unknown): WorldStyleVersionRecord {
+function parseVersion(value: unknown, historical = false): WorldStyleVersionRecord {
   const version = record(value, 'world style version');
   const globalStyle = parseReference(version['global_style']);
   const recipeBinding = parseBinding(version['recipe_binding']);
-  validateBinding(recipeBinding, globalStyle.profileId, globalStyle.profileVersion);
+  validateBinding(recipeBinding, globalStyle.profileId, globalStyle.profileVersion, historical);
   const capabilityMapping = stringRecord(version['capability_mapping'], 'capability mapping');
   if (!sameValue(capabilityMapping, recipeBinding.capabilityMapping)) {
     throw new WorldStyleContractError('capability_mapping_mismatch', 'Persisted capability mapping does not match its recipe binding.');
@@ -631,8 +631,16 @@ function validateBinding(
   binding: WorldStyleRecipeBinding,
   profileId: string,
   profileVersion: number,
+  historical = false,
 ): void {
   const recipe = worldStyleRecipe(profileId, profileVersion);
+  const executableBinding = recipe !== null && (
+    (sameValue(binding.modules, recipe.modules) && sameValue(binding.capabilityMapping,
+      Object.fromEntries(recipe.controls.map(control => [control.key, control.capability])))) ||
+    (historical && (recipe.readCompatibleBindings ?? []).some(compatible =>
+      sameValue(binding.modules, compatible.modules) &&
+      sameValue(binding.capabilityMapping, compatible.capabilityMapping)))
+  );
   if (
     recipe === null ||
     binding.frontendCommit !== WORLD_STYLE_CONTRACT_COMMIT ||
@@ -640,10 +648,7 @@ function validateBinding(
     binding.profileVersion !== profileVersion ||
     binding.availability !== recipe.availability ||
     binding.origin !== recipe.origin ||
-    !sameValue(binding.modules, recipe.modules) ||
-    !sameValue(binding.capabilityMapping, Object.fromEntries(
-      recipe.controls.map((control) => [control.key, control.capability]),
-    ))
+    !executableBinding
   ) {
     throw new WorldStyleContractError(
       'recipe_binding_mismatch',

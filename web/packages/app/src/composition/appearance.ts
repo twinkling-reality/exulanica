@@ -673,7 +673,7 @@ function presentWorldStyleAuthority(
       ].filter((item): item is string => item !== null).join(' · ');
   view.setWorldAuthority({
     state: 'ready',
-    detail: 'Connected to immutable world style history.',
+    detail: 'Appearance is saved across this workspace, including alternate versions. History is immutable.',
     currentVersionId: current.versionId,
     revision: current.revision,
     provenance,
