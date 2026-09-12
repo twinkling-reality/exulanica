@@ -325,6 +325,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     // The contract keeps the row with removed = true so undo restores the same identity. Saying
     // "this cannot be undone" here would be the false reversibility claim confirm.ts warns about.
     expect(h.mounted.confirm.root.textContent).toContain('reversible event');
+    expect(h.mounted.confirm.root.textContent).toContain('Use “Take back the last change”');
     expect(h.mounted.confirm.root.textContent).not.toContain('This cannot be undone');
     expect(writes(h.authority.calls)).toEqual([]);
     button(h.mounted.confirm.root, 'Confirm').click();

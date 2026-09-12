@@ -87,4 +87,19 @@ describe('proposal confirmation copy', () => {
     );
     expect(panel.root.textContent).toContain('This will record the name “Julie”.');
   });
+
+  it('names the available undo control only for a reversible operation', () => {
+    const panel = buildConfirm({ onConfirm: vi.fn(), onCancel: vi.fn() });
+    const proposed = summary(pendingRow('row.note', { text: 'Move the cube' }));
+    panel.show('move', proposed, 'Move the cube', { undoControlAvailable: true });
+    expect(panel.root.textContent).toContain('Use “Take back the last change” in the object panel');
+    expect(panel.root.textContent).not.toContain('does not yet expose');
+    panel.show('bootstrap', { ...proposed, reversible: false }, 'Open a version', {
+      undoControlAvailable: true,
+    });
+    expect(panel.root.textContent).toContain('This cannot be undone.');
+    expect(panel.root.textContent).not.toContain('Take back the last change');
+    panel.show('other-caller', proposed, 'Another proposal');
+    expect(panel.root.textContent).toContain('does not yet expose the undo control');
+  });
 });

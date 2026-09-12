@@ -19,6 +19,8 @@
 
 .object-placement {
   position: fixed;
+  /* The later status footer must not intercept clicks on the panel's last row. */
+  z-index: 1;
   right: var(--gap);
   bottom: 2.6rem;
   width: min(23rem, calc(100vw - 2 * var(--gap)));

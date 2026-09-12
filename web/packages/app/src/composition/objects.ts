@@ -630,7 +630,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     pending = next;
     issued += 1;
     deps.hideWritePathConfirm();
-    confirm.show(`world-object-${issued}`, summaryFor(next), next.describe);
+    confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
+      undoControlAvailable: client !== null && next.reversible
+        && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'),
+    });
   }
 
   async function commit(): Promise<void> {
