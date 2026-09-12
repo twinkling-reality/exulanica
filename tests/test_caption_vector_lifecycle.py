@@ -33,6 +33,37 @@ def indexed(purged, client, monkeypatch):
     return purged, capture, embedding, calls
 
 
+@pytest.mark.postgres
+def test_lifecycle_guard_refuses_a_function_from_a_later_search_path_schema(client, monkeypatch):
+    from exulanica.migrations import migrations
+
+    import pg_harness
+
+    available = list(migrations())
+    with pg_harness.migrated_schema() as (_, newer):
+        newer_schema = newer.execute("select current_schema()").fetchone()[0]
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                pg_harness, "migrations", lambda: iter(m for m in available if m.version < "0044")
+            )
+            with pg_harness.migrated_schema() as (_, older):
+                older_schema = older.execute("select current_schema()").fetchone()[0]
+                older.execute(
+                    psycopg.sql.SQL("set search_path to {}, {}, public").format(
+                        psycopg.sql.Identifier(older_schema), psycopg.sql.Identifier(newer_schema)
+                    )
+                )
+                # The unqualified lookup really can see the newer schema's lifecycle guard.
+                assert older.execute(
+                    "select to_regprocedure('caption_vector_purge_is_authorized(uuid,uuid,uuid)')"
+                ).fetchone()[0] is not None
+                older.row_factory = psycopg.rows.dict_row
+                calls = script(client, monkeypatch, vector())
+                with pytest.raises(RuntimeError, match="0044"):
+                    embed_capture(older, uuid.uuid4(), uuid.uuid4(), client)
+                assert calls == []
+
+
 def _reinsert(connection, row, *, embedding_id=None):
     connection.execute(
         "insert into embedding (workspace_id,embedding_id,family,ref_type,ref_id,model_ref,"

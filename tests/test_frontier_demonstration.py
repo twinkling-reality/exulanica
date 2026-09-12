@@ -155,6 +155,7 @@ def test_frontier_demonstration_runs_every_gate_without_fabricating_reconstructi
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     assert receipt["adaptation"]["capability_mapping"]["vitality"] == "world.vitality"
     assert receipt["adaptation"]["current_semantics_restored"] is True

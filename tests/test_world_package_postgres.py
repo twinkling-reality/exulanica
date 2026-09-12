@@ -93,6 +93,7 @@ def test_projector_archives_current_structure_and_append_only_receipt(repository
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     assert {
         value["module_id"] for value in appearance["registry_modules"]

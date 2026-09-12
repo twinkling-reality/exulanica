@@ -74,7 +74,8 @@ def embed_capture(
     """
     if (
         connection.execute(
-            "select to_regprocedure('caption_vector_purge_is_authorized(uuid,uuid,uuid)') as guard"
+            "select to_regprocedure(format("
+            "'%I.caption_vector_purge_is_authorized(uuid,uuid,uuid)',current_schema())) as guard"
         ).fetchone()["guard"]
         is None
     ):

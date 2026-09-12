@@ -814,7 +814,9 @@ def test_the_module_lookup_uses_the_registry_it_was_given():
     )
     for profile in document["profiles"]:
         if profile["profile_id"] == "origin-landscape":
-            profile["recipe"]["modules"] = ["aeroheart-optics-v1", "registered-surface-v1"]
+            profile["recipe"]["modules"] = [
+                "aeroheart-optics-v1", "registered-surface-v1", "source-light-v1"
+            ]
             profile["controls"] = [
                 control
                 for control in profile["controls"]

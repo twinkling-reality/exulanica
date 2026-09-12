@@ -31,7 +31,12 @@ from exulanica.models.client import ModelClient
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
+from exulanica.world import (
+    STYLE_REGISTRY,
+    TopologyContract,
+    TopologySourceSlot,
+    WorldStyleRepository,
+)
 from fastapi.testclient import TestClient
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
@@ -84,13 +89,11 @@ class ProposalApi:
             "profile": "origin-landscape@1",
             "modules": ["aeroheart-optics-v1"],
             "parameters": {
-                "vitality": None,
-                "glass": None,
-                "relationship_energy": None,
-                "garden_density": None,
+                **{
+                    key.replace("-", "_"): None
+                    for key in STYLE_REGISTRY.profiles[("origin-landscape", 1)].controls
+                },
                 "horizon_softness": 0.8,
-                "surface_finish": None,
-                "world_tempo": None,
             },
             "references": [self.source_ids[0]],
             "spoken": "The horizon will sit softer, so the far edge reads as distance.",
@@ -247,15 +250,9 @@ def test_an_appearance_request_comes_back_as_a_complete_reference_with_its_prove
     assert proposal["profile"]["changed"] == ["horizon-softness"]
     assert proposal["profile"]["parameters"]["horizon-softness"] == 0.8
     # Complete, so a preview posted from it does not reset the controls nobody mentioned.
-    assert set(proposal["profile"]["parameters"]) == {
-        "vitality",
-        "glass",
-        "relationship-energy",
-        "garden-density",
-        "horizon-softness",
-        "surface-finish",
-        "world-tempo",
-    }
+    assert set(proposal["profile"]["parameters"]) == set(
+        STYLE_REGISTRY.profiles[("origin-landscape", 1)].controls
+    )
     assert proposal["model_id"] == DRAFTER
     assert proposal["prompt_version"] == PROPOSAL_PROMPT_VERSION
     assert proposal["reference_ids"] == [proposal_api.source_ids[0]]
