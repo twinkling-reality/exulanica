@@ -61,6 +61,7 @@ PUBLIC_ROUTES: dict[str, str] = {
 #: missing from here and from PUBLIC_ROUTES fails `test_every_route_is_covered_by_this_file`.
 ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/graph"): {},
+    ("GET", "/graph/sources"): {},
     ("GET", "/geometry"): {},
     ("GET", "/geometry/{artifact_id}"): {},
     ("GET", "/scene-geometry/{artifact_id}"): {},
