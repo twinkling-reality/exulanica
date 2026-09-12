@@ -1055,7 +1055,7 @@ def _annotations_naming_a_connection() -> list[str]:
 def test_every_spine_function_takes_a_workspace_scope():
     """Nothing in the spine package is reachable by a session that named no workspace.
 
-    76 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
+    78 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
     those policies compare against, and the tombstone and epistemic guards go further: they call
     ``assert_workspace_context()`` and raise when it is unset, because a guard that silently sees
     no tombstones is worse than no guard. So no path into the spine package may begin with a

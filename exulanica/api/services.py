@@ -75,6 +75,9 @@ class Services:
     executor_shares_the_write_role: bool
     #: None when no model credential is configured. The two endpoints that need one say so.
     model_client: ModelClient | None
+    #: The only directory whose already-local files the environment admission route may name.
+    #: None disables that write surface while retaining metadata and byte reads.
+    environment_admission_root: Path | None = None
     #: True when this process drains the derivative queue itself. Defaulted to False so that a
     #: hand-constructed Services, which is how every test builds one, does not start a thread
     #: nobody asked for. ``build_services`` reads the environment and defaults the other way.
@@ -192,6 +195,7 @@ def build_services(
         tokens=load_token_directory(environ),
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
+        environment_admission_root=data_dir / "environment-inbox",
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
