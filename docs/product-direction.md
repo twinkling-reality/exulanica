@@ -63,9 +63,10 @@ contracts, executed fixture checks and remaining personal-source acceptance.
   actual model answers, accessible citations and human quality judgments are still pending.
 
 The operator authorized necessary Brev GPU work on September 12. The
-[trainer validation brief](briefs/2026-09-12-place-compute-readiness.md) scopes a generated-data
-packaging and CUDA execution check. GPU authorization does not supply a usable walk-around
-capture or establish place coverage. The first personal-place demonstration and the complete
+[trainer validation](evaluation/2026-09-12-place-compute-readiness.json) passed production
+image decoding and eight generated-data CUDA rendering/backward steps on an L40S. The instance
+was deleted; the provider posted a $0.23 total. This establishes trainer packaging and execution,
+not a usable walk-around capture or place coverage. The first personal-place demonstration and the complete
 scene-to-Companion rehearsal remain acceptance gates before calling the experience complete.
 
 ## World state contract
