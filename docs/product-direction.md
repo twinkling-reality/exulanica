@@ -184,6 +184,73 @@ profile, a second developer client and broader infrastructure work do not block 
 candidate unless the chosen demonstration actually depends on them. Hosting and recovery become
 release dependencies if a live retained-data deployment is selected.
 
+## Model selection and compute priorities
+
+Decision dated 2026-09-12, following the operator's request for the strongest justified stack.
+Add the work below to delivery planning; retain current runtime models as the baseline until a
+candidate passes its comparison. The [current stack review](model-and-service-selection.md#0-current-stack-and-selection-decision)
+separates implemented roles from reserved configurations and historical plans. This is a
+quality-first selection process within actual hardware and interaction constraints, not a rule
+to use the smallest or cheapest model. No comparative results are claimed by this roadmap update.
+
+### Required next work
+
+| Priority and stage | Concrete work | Evidence required to change production |
+| --- | --- | --- |
+| P0: inputs and diagnosis | Obtain the already-required eligible place capture and human review. Separate source coverage, detection, masks, depth, pose, training and display failures. Trace the complete Companion classification/planning/retrieval/composition path. | A reproducible failure assigned to a stage, with source/consent boundaries recorded. Missing viewpoints or missing evidence are not proof that a larger model is needed. |
+| P1: Companion quality and routing | Reuse the September 12 corpus and evaluator; expand beyond its three related photographs with authorized, scene-disjoint held-out examples. Compare Nano with Super on hard grounded answers; include Ultra on the same difficult subset where measured quality remains inadequate. Compare Qwen 235B with Nano for classification and structured planning separately. | Human-reviewed factual support, usable citations, appropriate abstention, correct plans and safe proposed edits; per-stage and end-to-end latency and cost, including repairs. Existing Lightning-era planning latency does not establish Nano's planning performance. Preserve Qwen until a replacement passes. |
+| P1: photo observations and masks | Compare M3 with the configured MiniCPM fallback on caption omissions and unsupported observations using identical approved image renditions. Separate box errors from mask errors; compare SAM 2.1 Tiny with Base+/Large using the same validated prompts. | Held-out observation correctness and completeness; masks compared with human-reviewed reference outlines, including missed objects, boundary errors, occlusion and people. Record peak memory, cold/warm latency and host. A model's predicted mask score is not measured IoU. Promote a larger segmenter only for a demonstrated task benefit. |
+| P2: visual retrieval addition | If relevant visual details are absent from captions, evaluate a separate SigLIP 2 image/text retrieval arm against existing lexical/Qwen-caption retrieval. If the right evidence is present but poorly ordered, test a Qwen3 reranker instead of treating both failures as the same problem. | Relevance judgments made before ranking, recall@k/nDCG@k, false matches and end-to-end answer impact on the same held-out queries. Apply existing permissions before evidence reaches the answer model; preserve deletion/lineage for new vectors. No visual embedding establishes a person's identity. |
+| P2: pose or depth improvement | If a sufficiently overlapping capture still fails COLMAP, compare the Apache MapAnything variant through the existing pose boundary. If the defect is single-image surface detail, compare MoGe-2 with MoGe-3 on Linux instead. | Independent pose/reprojection and held-out-view checks, geometry/scale checks and coverage inspection, plus memory/time. Run downstream scene training only after pose gates pass. A predicted pose or detailed single view cannot establish unseen backs or usable place coverage. |
+| P3: additional architecture | Consider SAM 3 only if concept-driven detection/segmentation is a measured unmet requirement. Evaluate shared object storage, retrieval indexes, worker concurrency or multi-GPU execution only when measured load or host limits require them. | Compatibility with existing outputs, license/dependency review for the exact artifact, quality/recovery tests and measured operational benefit. No framework rewrite, new face-recognition stack or model fine-tuning is selected by this review. |
+
+The P1 comparisons are the next model-selection work, with scene readiness still the prerequisite
+for place claims. P2/P3 are conditional branches after diagnosing failures, not a requirement to
+install every candidate. Existing retained examples can support preparation, but the current tiny,
+related-image corpus cannot establish broad generalization. A rephrased query over the same scene
+is not an unseen-scene evaluation.
+
+### Promotion, compute reuse and rollback
+
+Before running each comparison, freeze its baseline/candidate revisions, permitted inputs,
+development/held-out split, human rubric, primary task metric, practical minimum improvement,
+and latency/memory ceilings derived from the intended interaction and actual hardware. These
+ceilings and improvement thresholds are not yet measured or numerically selected; set them before
+examining candidate outputs. Use paired inputs, record denominators and uncertainty, and keep
+repeated calls from being misreported as additional independent examples. Define difficult-task
+subsets and routing rules on development examples before scoring held-out cases. Refresh the
+live provider catalog and candidate shortlist before execution; the listed models are supported
+comparison candidates, not an exhaustive ranking of available intelligence. If evidence is too
+small or inconclusive, keep the baseline and report that limitation.
+
+Inspect false claims, invented identities, stale evidence, permission handling and deletion as
+separate regression gates. Model self-confidence is not the routing trigger. Missing evidence
+continues to require abstention; escalation cannot create supporting sources. If Super/Ultra earns
+a role, implement an explicit, tested task-routing policy behind the existing role interface.
+The current provider-error fallback is not that policy. Measure both difficult-task benefit and
+the full user-visible response time before widening the route.
+
+Reuse valid authorized stage outputs for fair comparisons: caption/index artifacts, reviewed
+masks, prepared poses and immutable dependency builds where compatible. Keep source, version and
+permission identity in cache keys and invalidate affected descendants after model or input changes.
+Use staged small comparisons before full scene runs. Cache prepared model weights on approved
+storage where useful, record cold and warm timings, and avoid idle rented GPUs. Higher compute is
+justified by measured task improvement or a verified hardware requirement, not by model size alone.
+Existing operator Brev authorization remains in force within its scope; it does not extend to
+hosted model spending, new private inputs or additional data rights through this document.
+
+A promotion binds the tested source/model/input versions and results, passes the same user-facing
+workflow, and retains the previous route/output version for rollback without resurrecting removed
+private data. Model identity and preprocessing changes must version affected caches and derived
+artifacts; an embedding-space change requires compatible re-embedding. Never tune registry
+thresholds on held-out examples to manufacture a pass.
+
+By the September 25 baseline checkpoint, record the diagnosed bottlenecks, completed comparisons
+and chosen routes, or name the missing inputs and preserve the working baseline. Integrate any
+winning candidate before the October 16 feature freeze. Incomplete experiments remain roadmap
+items; no model migration should consume the October 23 rehearsal buffer. These dates govern
+the submission build, not the long-term architecture or the depth of subsequent evaluation.
+
 ## Working delivery schedule through October 2026
 
 These are decision checkpoints, not measured duration estimates or promises of completion.

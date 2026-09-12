@@ -47,7 +47,7 @@ How the system works now. Edited as the system changes.
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [judge-access](judge-access.md) : EXECUTED locally on 2026-09-10, unprovisioned everywhere else. A judge stack was seeded, torn down, restored, opened, edited and reset on...
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
-- [model-and-service-selection](model-and-service-selection.md) : mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
+- [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-12; model upgrades require task-specific evidence
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
 - [phase-10-tickets](phase-10-tickets.md) : PLAN AND PROGRESS, reconciled 2026-09-08. This turns frontier-roadmap.md

@@ -1,6 +1,93 @@
 # Model and service selection
 
-Status: mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
+Status: current implementation reviewed 2026-09-12; model upgrades require task-specific evidence.
+
+## 0. Current stack and selection decision
+
+This section supersedes the routing and deployment descriptions in sections 1–8 below. Those
+sections retain the August research, its prices and rejected alternatives; they are historical
+rationale, not a current runtime inventory. Inspect actual call sites as well as the manifest:
+its `structured_extraction` rationale still says reserved although product code uses that role.
+The [product roadmap](product-direction.md#model-selection-and-compute-priorities) records the
+ordered work and adoption gates. No model configuration changes are made by this review.
+
+### Implemented roles
+
+Reviewed against main `e84663086fc4900eeca5082f0aca5595096ac130`. Implemented means there is a
+production call path; it does not mean every configured model is running or has passed a quality
+comparison. Provider availability and prices must be checked again before an execution campaign.
+
+| Role | Current implementation | Evidence and boundary |
+| --- | --- | --- |
+| Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. |
+| Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role, despite the stale reserved-role rationale in the manifest. |
+| Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. No broad comparison establishes M3 as the most accurate option for our photographs. |
+| Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
+| Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
+| Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
+| Single-image geometry | MoGe-2 ViT-L | `exulanica/reconstruction/moge.py` loads the v2 implementation and a pinned checkpoint. MoGe-3 is not an implemented automatic fallback. |
+| Multi-view camera recovery | pycolmap 4.2.0 / COLMAP, SIFT and exhaustive matching | `exulanica/reconstruction/pycolmap_executor.py`; registration must be measured before training. MapAnything is not an implemented rescue path. |
+| Scene training and compression | gsplat / PyTorch CUDA; PlayCanvas splat-transform | Production trainer and publication boundaries exist. The September 12 generated L40S check validates packaging and forward/backward execution, not personal-place quality. |
+| Browser | TypeScript, Vite, DOM UI, PlayCanvas 2.21.4 | The app imports the PlayCanvas binding. Three.js/Spark is retained as a separate implementation; the `atlas-react` package name does not establish a React application. |
+| API, durable state and jobs | Python 3.11, FastAPI, Pydantic, PostgreSQL, pgvector, PostgreSQL-backed job leases/retries | Existing replaceable model/stage interfaces and enforced module boundaries are the extension points. No new orchestration framework is selected. |
+| Original bytes and compute | Local content-addressed file store; local API/workers and Docker GPU execution; hosted model calls on Nebius | `exulanica/api/services.py` constructs `LocalContentAddressedStore`. Brev/MassedCompute L40S execution is measured; Nebius GPU hosting and an S3 store implementation are not established by that run. |
+
+Nemotron Super and Ultra are configured roles but have no production caller in the reviewed
+Python code. Fallback in the hosted client is provider-error handling, not a quality escalation
+policy. DINOv2 appearance embeddings, YuNet/SFace biometric recognition, speech models, a learned
+reranker and MapAnything appear in earlier plans or candidate discussions, not in implemented
+model paths found by this review. Do not count them as delivered capabilities.
+
+### Decision and evidence
+
+**DECISION:** retain the implemented stack as the comparison baseline. Add the evaluations in the
+roadmap, then promote the model or stage that improves the declared user task within measured
+runtime limits. No model family, parameter count, vendor benchmark or successful import establishes
+an absolute best stack. A candidate that materially improves the task is worth additional compute
+when it fits the demonstrated hardware and interaction budget; cheapest is not the selection rule.
+
+The [September 9 comparison](evaluation/2026-09-09-companion-memory.json) recorded median Nano
+latency 3627 ms versus Lightning 18617 ms at the selected ceiling, with zero Nano validator
+rejections in 24 calls. Its answer-quality measurement is explicitly null. The
+[September 12 Companion record](evaluation/2026-09-12-companion-quality.json) prepares retrieval
+checks and an evaluation corpus; live answers and human quality judgments remain pending. The
+[segmentation record](evaluation/2026-09-11-scene-segments-production.json) records masks but no
+positive first-place person lift because pose was absent. The
+[GPU record](evaluation/2026-09-12-place-compute-readiness.json) establishes generated CUDA
+execution and cleanup at a displayed provider charge of $0.23. None proves an optimal model set.
+
+### Candidate capabilities checked against primary sources
+
+Retrieved 2026-09-12. These sources establish what can be evaluated, not a measured benefit in
+Exulanica. Pin exact checkpoint revisions and verify runtime compatibility before comparison.
+
+| Candidate | Reason to evaluate | What is not established |
+| --- | --- | --- |
+| [SAM 2.1 Base+ or Large](https://github.com/facebookresearch/sam2) | Larger variants of the current segmentation family exist, allowing a comparison with Tiny on the same prompts and masks | Improved boundary quality or acceptable memory/latency on our photographs |
+| [SigLIP 2 Base Patch16 224](https://huggingface.co/google/siglip2-base-patch16-224) | Image/text representations could retrieve visual details omitted by captions | Better retrieval on our queries, or identity matching across photographs |
+| [Qwen3-Reranker-0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) | A separate query/document reranker could improve ordering when relevant evidence is already retrieved | Token Factory availability, deployment cost, or a cure for missing candidate evidence |
+| [MapAnything Apache variant](https://github.com/facebookresearch/map-anything) | Feed-forward multi-view reconstruction is a candidate when otherwise suitable captures fail the current pose pipeline | Reliable recovered geometry on our scenes; learned predictions still require independent validation |
+| [MoGe-3](https://github.com/microsoft/MoGe) | A finer single-image geometry candidate for the Linux GPU path | A macOS replacement or a fix for absent multi-view coverage; upstream reports no macOS support |
+| [SAM 3](https://github.com/facebookresearch/sam3) | Text/concept-driven detection and segmentation may address a failure that larger SAM 2 masks cannot | A compatible replacement under our deployment and license constraints; it uses the SAM License and a different integration |
+
+**Scale boundary:** the current exact search uses `halfvec(4096)`. Standard pgvector HNSW/IVFFlat
+half-vector indexes support at most 4000 dimensions. Before claiming large-library scalability,
+compare indexed reduced-dimension/subvector or quantized recall with exact full-vector reranking
+and permission filtering; changing a model or vector space needs versioned re-embedding, not
+mixing old and new vectors. [Primary limit](https://github.com/pgvector/pgvector#hnsw).
+The current file store and worker topology also need shared-storage and concurrency evidence
+before a multi-host claim. Reuse their interfaces; do not introduce infrastructure on speculation.
+
+The [hackathon criteria](https://nebiusglobalaihackathon.devpost.com/) require Nebius execution and
+an NVIDIA open model, and assess implementation, coherent design, impact and originality. They
+do not require every role to use NVIDIA or reward parameter count. Keep functional Nemotron use
+in the demonstrated experience and identify the actual executed model/provider.
+
+---
+
+## Historical research context
+
+Historical status: mixed. Every claim below carries exactly one label. Retrieval date for all VERIFIED claims is
 **2026-08-27**, except the two deprecation notices cited in section 3, which were re-read on
 **2026-08-28** and carry that date inline.
 
