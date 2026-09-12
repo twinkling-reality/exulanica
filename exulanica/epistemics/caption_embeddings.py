@@ -72,6 +72,8 @@ def embed_capture(
     at runtime. The transaction serializes this pass; the insert's tombstone guard refuses a
     deletion that arrived while the model ran. No response cache retains deleted caption text.
     """
+    # A later search-path schema can have newer migrations. Its lifecycle guard does not
+    # protect embedding rows in the active schema.
     if (
         connection.execute(
             "select to_regprocedure(format("
