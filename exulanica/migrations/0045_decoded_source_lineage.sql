@@ -184,7 +184,7 @@ begin
     where r->>'state' in ('unknown','present','withdrawn')) into needs_mask;
   if coalesce(new.read_source_sha256,new.source_blob_sha256) is distinct from
       source_image_input(new.workspace_id,capture_ref,clock_timestamp()) then
-    raise exception 'point map must read the masked derivative or current decoded source: read_source_sha256 disagrees' using errcode='23514';
+    raise exception 'point map must read the current masked derivative or current decoded source: read_source_sha256 disagrees' using errcode='23514';
   end if;
   return new;
 end $fn$;

@@ -227,10 +227,12 @@ def test_completed_database_jobs_do_not_certify_restored_old_object_bytes(purged
 def test_checkpoint_seals_raw_sql_and_only_administrators_can_certify_restore(purged, tmp_path):
     purged.tombstone_the_capture(_capture(purged))
     foreign = uuid.uuid4()
-    purged.repository.connection.execute(
-        "insert into tombstone(workspace_id,scope,requested_by) values (%s,'workspace',%s)",
-        (foreign, uuid.uuid4()),
-    )
+    statement = "insert into tombstone(workspace_id,scope,requested_by) values (%s,'workspace',%s)"
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match="workspace context"):
+        purged.repository.connection.execute(statement, (foreign, uuid.uuid4()))
+    # Raw administrative SQL still declares the workspace whose tombstone it writes.
+    with purged.database().session(foreign) as connection:
+        connection.execute(statement, (foreign, uuid.uuid4()))
     checkpoint_path = tmp_path / "checkpoint.json"
     checkpoint(purged.database(), checkpoint_path)
     archived = json.loads(checkpoint_path.read_bytes())["record"]["tombstones"]
