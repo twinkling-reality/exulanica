@@ -119,30 +119,40 @@ def test_every_documentation_path_named_anywhere_in_the_repository_resolves():
 def _relative_link_origin(path: Path, brief_origins: dict[bytes, Path]) -> Path:
     """An exact frozen prompt retains the source document's relative-link context.
 
-    Only artifact brief.md copies qualify, and complete byte equality verifies their
-    origin. A changed copy or an ordinary document must resolve from its own directory.
+    Only artifact brief.md copies qualify. Complete byte equality verifies the origin;
+    copying a rendered title may omit its initial heading marker and final newline.
+    A changed body or an ordinary document must resolve from its own directory.
     """
     if path.name == "brief.md" and path.is_relative_to(ROOT / "docs/evaluation/artifacts"):
-        return brief_origins.get(path.read_bytes(), path.parent)
+        content = path.read_bytes()
+        for candidate in (content, b"# " + content, b"# " + content + b"\n"):
+            if candidate in brief_origins:
+                return brief_origins[candidate]
     return path.parent
 
 
-@pytest.mark.parametrize("location,changed,uses_source", [
-    ("evaluation/artifacts/run", False, True),
-    ("evaluation/artifacts/run", True, False),
-    ("ordinary", False, False),
+@pytest.mark.parametrize("location,changed,heading_removed,newline_removed,uses_source", [
+    ("evaluation/artifacts/run", False, False, False, True),
+    ("evaluation/artifacts/run", True, False, False, False),
+    ("ordinary", False, False, False, False),
+    ("evaluation/artifacts/run", False, True, False, True),
+    ("evaluation/artifacts/run", True, True, False, False),
+    ("evaluation/artifacts/run", False, True, True, True),
+    ("evaluation/artifacts/run", True, True, True, False),
 ])
 def test_frozen_brief_link_context_requires_exact_source_bytes(
-    tmp_path, monkeypatch, location, changed, uses_source,
+    tmp_path, monkeypatch, location, changed, heading_removed, newline_removed, uses_source,
 ):
     monkeypatch.setitem(globals(), "ROOT", tmp_path)
     source = tmp_path / "docs/briefs" / "source.md"
     source.parent.mkdir(parents=True)
-    source.write_text("[Wave](wave.md)\n")
+    source.write_text("# Source\n[Wave](wave.md)\n")
     (source.parent / "wave.md").write_text("The wave\n")
     frozen = tmp_path / "docs" / location / "brief.md"
     frozen.parent.mkdir(parents=True)
-    frozen.write_bytes(source.read_bytes() + (b"Changed\n" if changed else b""))
+    content = source.read_bytes()[2:] if heading_removed else source.read_bytes()
+    content += b"Changed\n" if changed else b""
+    frozen.write_bytes(content[:-1] if newline_removed else content)
     origin = _relative_link_origin(frozen, {source.read_bytes(): source.parent})
     assert (origin / "wave.md").exists() is uses_source
 
