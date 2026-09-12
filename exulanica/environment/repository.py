@@ -13,9 +13,9 @@ from psycopg.types.json import Jsonb
 
 from exulanica.db.session import set_workspace
 from exulanica.environment.admission import (
+    MAX_ENVIRONMENT_PAYLOAD_BYTES,
     DerivedEnvironmentAsset,
     EnvironmentOperation,
-    OperationRights,
     SourceAdmission,
     derived_receipt,
     source_receipt,
@@ -44,6 +44,10 @@ class SourceDigestMismatch(IntegrityError):
     pass
 
 
+class EnvironmentPayloadTooLarge(ExulanicaError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class EnvironmentResource:
     kind: ResourceKind
@@ -60,6 +64,12 @@ class EnvironmentResource:
             "receipt_sha256": self.receipt_sha256,
             "operation_rights": self.operation_rights,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorizedEnvironmentBytes:
+    data: bytes
+    media_type: str
 
 
 class EnvironmentRepository:
@@ -195,8 +205,13 @@ class EnvironmentRepository:
 
     def read_bytes(
         self, kind: ResourceKind, resource_id: uuid.UUID, operation: EnvironmentOperation
-    ) -> bytes:
+    ) -> AuthorizedEnvironmentBytes:
         row = self._authorized_row(kind, resource_id, operation)
+        if row["byte_size"] > MAX_ENVIRONMENT_PAYLOAD_BYTES:
+            raise IntegrityError(
+                f"environment row declares {row['byte_size']} bytes; buffered reads permit at most "
+                f"{MAX_ENVIRONMENT_PAYLOAD_BYTES}"
+            )
         digest = bytes(row["content_sha256"])
         data = self.store.get(BlobId(digest))
         if len(data) != row["byte_size"]:
@@ -206,19 +221,7 @@ class EnvironmentRepository:
         with final_check(self.connection) as at:
             current = self._row(kind, resource_id, operation, at=at)
             self._require_current(row, current, operation)
-        return data
-
-    def set_rights(
-        self, kind: ResourceKind, resource_id: uuid.UUID, rights: OperationRights
-    ) -> None:
-        table, id_column = self._table(kind)
-        result = self.connection.execute(
-            f"update {table} set operation_rights=%s "
-            f"where workspace_id=%s and {id_column}=%s and withdrawn_at is null",
-            (Jsonb(rights.model_dump(mode="json")), self.workspace_id, resource_id),
-        )
-        if result.rowcount != 1:
-            raise UnknownEnvironmentResource("no such environment resource")
+        return AuthorizedEnvironmentBytes(data=data, media_type=row["media_type"])
 
     def withdraw(self, kind: ResourceKind, resource_id: uuid.UUID) -> None:
         table, id_column = self._table(kind)
@@ -231,8 +234,13 @@ class EnvironmentRepository:
             raise UnknownEnvironmentResource("no such environment resource")
 
     def _store_exact(self, path: Path, expected_hex: str, expected_size: int) -> PutResult:
-        actual = BlobId.of_file(path)
         size = path.stat().st_size
+        if size > MAX_ENVIRONMENT_PAYLOAD_BYTES or expected_size > MAX_ENVIRONMENT_PAYLOAD_BYTES:
+            raise EnvironmentPayloadTooLarge(
+                f"buffered environment payloads permit at most "
+                f"{MAX_ENVIRONMENT_PAYLOAD_BYTES} bytes"
+            )
+        actual = BlobId.of_file(path)
         if actual.hex != expected_hex or size != expected_size:
             raise SourceDigestMismatch(
                 f"local bytes are sha256 {actual.hex} and size {size}; "
@@ -271,7 +279,7 @@ class EnvironmentRepository:
                 """
                 select receipt_record,receipt_sha256,operation_rights,withdrawn_at,
                        null::timestamptz as source_withdrawn_at,
-                       source_sha256 as content_sha256,byte_size,
+                       source_sha256 as content_sha256,byte_size,media_type,
                        environment_resource_allows(%s,'source',admission_id,%s,%s) as allowed
                 from environment_source_admission
                 where workspace_id=%s and admission_id=%s
@@ -281,7 +289,7 @@ class EnvironmentRepository:
         return self.connection.execute(
             """
             select a.receipt_record,a.receipt_sha256,a.operation_rights,a.withdrawn_at,
-                   s.withdrawn_at as source_withdrawn_at,a.content_sha256,a.byte_size,
+                   s.withdrawn_at as source_withdrawn_at,a.content_sha256,a.byte_size,a.media_type,
                    environment_resource_allows(%s,'asset',a.asset_id,%s,%s) as allowed
             from derived_environment_asset a
             join environment_source_admission s

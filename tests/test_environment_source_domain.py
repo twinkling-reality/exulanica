@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from exulanica.environment import (
+    MAX_ENVIRONMENT_PAYLOAD_BYTES,
     GeographicBounds,
     GeographicFrame,
     OperationRights,
@@ -37,8 +38,8 @@ def _source(**changes):
         "provider_key": "plateau",
         "provider_original_id": "shibuya-2023-citygml-v3",
         "provider_revision": "2023",
-        "expected_sha256": "7deee52ded16c15cbab062586f298ff132ad1b4f3ea3f567e4facf3875800fe6",
-        "expected_byte_size": 649954662,
+        "expected_sha256": hashlib.sha256(b"bounded member fixture").hexdigest(),
+        "expected_byte_size": len(b"bounded member fixture"),
         "source_path": "https://example.invalid/official-archive.zip",
         "member_path": "udx/bldg/53393567.gml",
         "media_type": "application/zip",
@@ -67,6 +68,7 @@ def _source(**changes):
 
 
 def test_operation_rights_are_closed_and_export_is_independent():
+    assert MAX_ENVIRONMENT_PAYLOAD_BYTES == 64 * 1024 * 1024
     assert _source().operation_rights.export is False
     with pytest.raises(ValidationError):
         OperationRights.model_validate({**_rights(), "redistribute": True})

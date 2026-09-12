@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import uuid
+
+from exulanica.db.roles import provision_runtime_role
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
@@ -67,4 +70,29 @@ def test_database_rights_validation_fails_closed(spine_schema):
             ("00000000-0000-0000-0000-000000000001",),
         ).fetchone()["ok"]
     finally:
+        connection.close()
+
+
+def test_activated_read_role_can_select_but_cannot_mutate_environment_tables(spine_schema):
+    psycopg, scratch = spine_schema
+    connection = open_scratch_connection(psycopg, scratch)
+    connection.row_factory = dict_row
+    role = f"environment_ro_{uuid.uuid4().hex}"
+    try:
+        provision_runtime_role(connection, role=role, read_only=True)
+        for table in ("environment_source_admission", "derived_environment_asset"):
+            privileges = connection.execute(
+                "select has_table_privilege(%s,%s,'SELECT') can_read,"
+                "has_table_privilege(%s,%s,'INSERT') can_insert,"
+                "has_table_privilege(%s,%s,'UPDATE') can_update",
+                (role, table, role, table, role, table),
+            ).fetchone()
+            assert privileges == {
+                "can_read": True,
+                "can_insert": False,
+                "can_update": False,
+            }
+    finally:
+        connection.execute(f'drop owned by "{role}"')
+        connection.execute(f'drop role if exists "{role}"')
         connection.close()

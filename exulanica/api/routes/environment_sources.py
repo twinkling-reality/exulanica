@@ -18,6 +18,7 @@ from exulanica.api.services import Services
 from exulanica.environment import (
     EnvironmentOperation,
     EnvironmentOperationDenied,
+    EnvironmentPayloadTooLarge,
     EnvironmentRepository,
     EnvironmentResourceWithdrawn,
     SourceAdmission,
@@ -44,15 +45,18 @@ def admit_source(
     local_path = body.local_path.resolve()
     if root is None:
         return _problem(503, "admission_unavailable", "the local environment inbox is disabled")
-    if not local_path.is_relative_to(root.resolve()) or not local_path.is_file():
-        return _problem(404, "unknown_reference", "no such staged environment source")
+    workspace_root = root.resolve() / str(session.workspace_id)
+    if not local_path.is_relative_to(workspace_root) or not local_path.is_file():
+        return _problem(404, "unknown_reference", "no such environment admission input")
     try:
         resource = EnvironmentRepository(
             connection, session.workspace_id, services.store
         ).admit_source(body.model_copy(update={"local_path": local_path}), actor=session.actor)
         return JSONResponse(status_code=201, content=resource.document())
-    except UnknownEnvironmentResource as exc:
-        return _problem(404, "unknown_reference", str(exc))
+    except UnknownEnvironmentResource:
+        return _problem(404, "unknown_reference", "no such environment admission input")
+    except EnvironmentPayloadTooLarge as exc:
+        return _problem(413, "payload_too_large", str(exc))
     except SourceDigestMismatch as exc:
         return _problem(409, "source_digest_mismatch", str(exc))
 
@@ -91,11 +95,10 @@ def resource_bytes(
 ) -> Response:
     repository = EnvironmentRepository(connection, session.workspace_id, services.store)
     try:
-        metadata = repository.read_metadata(kind, resource_id, operation)
-        data = repository.read_bytes(kind, resource_id, operation)
+        authorized = repository.read_bytes(kind, resource_id, operation)
         return Response(
-            content=data,
-            media_type=metadata.receipt["media_type"],
+            content=authorized.data,
+            media_type=authorized.media_type,
             headers={"Cache-Control": "private, no-store"},
         )
     except (UnknownEnvironmentResource, BlobNotFoundError) as exc:

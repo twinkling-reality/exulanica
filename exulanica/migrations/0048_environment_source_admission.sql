@@ -27,7 +27,7 @@ create table environment_source_admission (
   source_path text not null check(source_path=btrim(source_path) and source_path<>''),
   member_path text,
   media_type text not null check(media_type ~ '^[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*$'),
-  byte_size bigint not null check(byte_size>=0),
+  byte_size bigint not null check(byte_size between 0 and 67108864),
   geographic_frame jsonb not null,
   geographic_bounds jsonb not null,
   operation_rights jsonb not null check(environment_rights_valid(operation_rights)),
@@ -66,7 +66,7 @@ create table derived_environment_asset (
   content_sha256 bytea not null check(octet_length(content_sha256)=32),
   source_member_path text,
   media_type text not null check(media_type ~ '^[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*$'),
-  byte_size bigint not null check(byte_size>=0),
+  byte_size bigint not null check(byte_size between 0 and 67108864),
   derivation_kind text not null
     check(derivation_kind=btrim(derivation_kind) and derivation_kind<>''),
   derivation_lineage jsonb not null,
@@ -153,7 +153,8 @@ begin
   if new.parent_asset_id is not null then
     select * into parent_record from derived_environment_asset
       where workspace_id=new.workspace_id and asset_id=new.parent_asset_id;
-    if not found or parent_record.admission_id<>new.admission_id
+    if not found or parent_record.withdrawn_at is not null
+      or parent_record.admission_id<>new.admission_id
       or parent_record.source_sha256<>new.source_sha256 then
       raise exception 'derived environment parent belongs to another source'
         using errcode='23514';
@@ -196,13 +197,13 @@ begin
   end if;
   if (new.workspace_id,new.admission_id,new.place_id,new.provider_key,new.provider_original_id,
       new.provider_revision,new.source_sha256,new.source_path,new.member_path,new.media_type,
-      new.byte_size,new.geographic_frame,new.geographic_bounds,new.attribution,
+      new.byte_size,new.geographic_frame,new.geographic_bounds,new.operation_rights,new.attribution,
       new.modification_notice,new.receipt_record,new.receipt_canonical,new.receipt_sha256,
       new.admitted_by,new.admitted_at)
     is distinct from
      (old.workspace_id,old.admission_id,old.place_id,old.provider_key,old.provider_original_id,
       old.provider_revision,old.source_sha256,old.source_path,old.member_path,old.media_type,
-      old.byte_size,old.geographic_frame,old.geographic_bounds,old.attribution,
+      old.byte_size,old.geographic_frame,old.geographic_bounds,old.operation_rights,old.attribution,
       old.modification_notice,old.receipt_record,old.receipt_canonical,old.receipt_sha256,
       old.admitted_by,old.admitted_at)
     or (old.withdrawn_at is not null and new.withdrawn_at is distinct from old.withdrawn_at)
@@ -224,13 +225,15 @@ begin
   end if;
   if (new.workspace_id,new.asset_id,new.admission_id,new.parent_asset_id,new.source_sha256,
       new.content_sha256,new.source_member_path,new.media_type,new.byte_size,new.derivation_kind,
-      new.derivation_lineage,new.geographic_frame,new.geographic_bounds,new.attribution,
+      new.derivation_lineage,new.geographic_frame,new.geographic_bounds,new.operation_rights,
+      new.attribution,
       new.modification_notice,new.receipt_record,new.receipt_canonical,new.receipt_sha256,
       new.created_by,new.created_at)
     is distinct from
      (old.workspace_id,old.asset_id,old.admission_id,old.parent_asset_id,old.source_sha256,
       old.content_sha256,old.source_member_path,old.media_type,old.byte_size,old.derivation_kind,
-      old.derivation_lineage,old.geographic_frame,old.geographic_bounds,old.attribution,
+      old.derivation_lineage,old.geographic_frame,old.geographic_bounds,old.operation_rights,
+      old.attribution,
       old.modification_notice,old.receipt_record,old.receipt_canonical,old.receipt_sha256,
       old.created_by,old.created_at)
     or (old.withdrawn_at is not null and new.withdrawn_at is distinct from old.withdrawn_at)

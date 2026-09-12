@@ -14,6 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, 
 from exulanica.canonical import canonical_json
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+# Buffered delivery verifies one complete object in memory. 64 MiB is twice the frontend's
+# 32 MiB tile ceiling while still placing a hard, reviewable bound on each request.
+MAX_ENVIRONMENT_PAYLOAD_BYTES = 64 * 1024 * 1024
 
 
 class EnvironmentOperation(StrEnum):

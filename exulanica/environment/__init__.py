@@ -1,6 +1,7 @@
 """Admitted reusable environment sources and derived assets."""
 
 from exulanica.environment.admission import (
+    MAX_ENVIRONMENT_PAYLOAD_BYTES,
     DerivedEnvironmentAsset,
     EnvironmentOperation,
     GeographicBounds,
@@ -11,7 +12,9 @@ from exulanica.environment.admission import (
     source_receipt,
 )
 from exulanica.environment.repository import (
+    AuthorizedEnvironmentBytes,
     EnvironmentOperationDenied,
+    EnvironmentPayloadTooLarge,
     EnvironmentRepository,
     EnvironmentResource,
     EnvironmentResourceWithdrawn,
@@ -20,9 +23,12 @@ from exulanica.environment.repository import (
 )
 
 __all__ = [
+    "MAX_ENVIRONMENT_PAYLOAD_BYTES",
+    "AuthorizedEnvironmentBytes",
     "DerivedEnvironmentAsset",
     "EnvironmentOperation",
     "EnvironmentOperationDenied",
+    "EnvironmentPayloadTooLarge",
     "EnvironmentRepository",
     "EnvironmentResource",
     "EnvironmentResourceWithdrawn",
