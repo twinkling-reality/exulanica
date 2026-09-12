@@ -256,6 +256,11 @@ export function mountStatusAndInspector(
           api.edit(captureId, { region_key: regionKey, action: 'confirm' })),
         onDelete: (regionKey) => act(() =>
           api.edit(captureId, { region_key: regionKey, action: 'delete' })),
+        onIdentify: (region_key) => act(() => api.link([{ capture_id: captureId, region_key }])),
+        onUnlink: (key) => {
+          const region = review.regions.find(item => item.regionKey === key);
+          if (region) act(() => api.unlink(captureId, region));
+        },
         onConsent: (regionKey, scope, decision) => {
           const region = review.regions.find((item) => item.regionKey === regionKey);
           if (region === undefined) return;

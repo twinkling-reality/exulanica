@@ -327,6 +327,12 @@ class BatchMember(StrictInput):
 class PersonalBatch(StrictInput):
     """An exact upload inventory; identity always comes from the authenticated session."""
 
+    request_id: str | None = None
+
+    _request_identifier = field_validator("request_id")(
+        lambda value: identifier(value) if value is not None else None
+    )
+
     members: list[BatchMember] = Field(min_length=1, max_length=200)
     purpose: str = Field(min_length=1, max_length=2000)
     authority: Authority

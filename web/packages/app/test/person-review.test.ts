@@ -59,10 +59,10 @@ describe('the person review screen', () => {
 
   it('distinguishes a photograph nobody has looked at from one found empty', () => {
     const unscreened = panel({ reviewState: 'unscreened', regions: [] });
-    expect(unscreened.textContent).toContain('Nobody has looked');
+    expect(unscreened.textContent).toContain('No person regions are recorded');
     const empty = panel({ reviewState: 'screened', regions: [] });
-    expect(empty.textContent).toContain('found');
-    expect(empty.textContent).not.toContain('Nobody has looked');
+    expect(empty.textContent).toContain('does not establish a human no-person attestation');
+    expect(empty.textContent).not.toContain('No person regions are recorded');
   });
 
   it('offers no way to confirm every region at once', () => {
@@ -97,8 +97,8 @@ describe('the person review screen', () => {
   });
 
   it('offers the three consents separately once a person is confirmed', () => {
-    const node = panel({ regions: [detected({ action: 'confirmed', confirmedBy: 'someone' })] });
-    const labels = [...node.querySelectorAll('button')].map((b) => b.textContent ?? '');
+    const node = panel({ regions: [detected({ action: 'confirmed', confirmedBy: 'someone', subjectId: 'person-1' })] });
+    const labels = [...node.querySelectorAll('option')].map((b) => b.textContent ?? '');
     for (const scope of ['presence', 'naming', 'likeness']) {
       expect(labels.some((l) => l.includes(scope))).toBe(true);
     }
@@ -106,17 +106,17 @@ describe('the person review screen', () => {
 
   it('records a likeness consent and offers to withdraw it afterwards', () => {
     const calls: unknown[] = [];
-    const confirmed = detected({ action: 'confirmed', confirmedBy: 'someone' });
+    const confirmed = detected({ action: 'confirmed', confirmedBy: 'someone', subjectId: 'person-1' });
     const node = panel({ regions: [confirmed], onConsent: (...a) => calls.push(a) });
-    [...node.querySelectorAll('button')]
-      .find((b) => b.textContent === 'Record likeness consent')
-      ?.dispatchEvent(new Event('click'));
+    const select = node.querySelector('select')!;
+    select.value = '4'; select.dispatchEvent(new Event('change'));
+    [...node.querySelectorAll('button')].find(b => b.textContent === 'Record selected decision')?.click();
     expect(calls).toEqual([['aa'.repeat(32), 'likeness', 'granted']]);
 
     const shown = panel({
-      regions: [detected({ action: 'confirmed', state: 'shown', masked: false })],
+      regions: [detected({ action: 'confirmed', state: 'shown', masked: false, subjectId: 'person-1' })],
     });
-    const labels = [...shown.querySelectorAll('button')].map((b) => b.textContent ?? '');
+    const labels = [...shown.querySelectorAll('option')].map((b) => b.textContent ?? '');
     expect(labels).toContain('Withdraw likeness');
   });
 
@@ -143,4 +143,10 @@ describe('the person review screen', () => {
     expect(region.dataset.regionKey).toBe('aa'.repeat(32));
     expect(region.dataset.state).toBe('unknown');
   });
+});
+
+it('requires an explicit choice even for a linked person', () => {
+  const node = panel({ regions: [detected({ action: 'confirmed', subjectId: 'person-1' })] });
+  expect(node.querySelector('select')!.value).toBe('');
+  expect([...node.querySelectorAll('button')].find(b => b.textContent === 'Record selected decision')!.disabled).toBe(true);
 });

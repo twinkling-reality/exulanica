@@ -61,6 +61,7 @@ import { MAP_ORIENTATION_CAPTION } from './ui/status.js';
 import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
+import { mountPersonalIntake } from './composition/personal-intake.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
@@ -196,6 +197,12 @@ async function mount(): Promise<void> {
   // would open every refresh by asking the question the user just answered.
   currentCompanion.observeSnapshot(current);
 
+  const intake = mountPersonalIntake({
+    credentials: currentCredentials, session: state.personalIntake, snapshot: current,
+    media: state.previewSourceMedia,
+    reloadSnapshot: () => currentSession.snapshot(),
+    refreshWorld: async () => { state.snapshot = await currentSession.snapshot(); await mount(); },
+  });
   const emptyWorld = buildEmptyWorld(current);
   if (emptyWorld !== null) {
     // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
@@ -206,7 +213,9 @@ async function mount(): Promise<void> {
     disposeRenderer(state);
     canvas.hidden = true;
     shell.setAttribute('data-world-state', 'empty');
-    replace(shell, [emptyWorld]);
+    replace(shell, [emptyWorld, intake.root]);
+    intake.root.open = true;
+    void intake.begin();
     return;
   }
   canvas.hidden = false;
@@ -559,7 +568,9 @@ async function mount(): Promise<void> {
     status.inspectorRoot,
     status.statusElement,
     segments.root,
+    intake.root,
   ]);
+  void intake.begin();
 
   reflectShell = (): void => {
     if (shellState.primary !== 'world') {

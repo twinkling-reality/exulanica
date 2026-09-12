@@ -1,30 +1,7 @@
-/**
- * The review screen's half of the person-consent API.
- *
- * `web/packages/app/src/ui/person-review.ts` draws the panel and decides nothing. This file is
- * the only thing between it and `exulanica/api/routes/person_consent.py`, and it exists for the
- * same reason `observations-api.ts` does: the bearer token belongs in one place, and a panel that
- * built its own requests would be a second place.
- *
- * **Recording a consent is three requests, and that is the shape of the data rather than a
- * clumsy client.** A consent is addressed to a SUBJECT, meaning a person, while the panel is
- * looking at a REGION, meaning an outline in one photograph. A region a detector proposed has no
- * subject: nobody has said the outline is a person, let alone which person. So the first consent
- * recorded against such a region has to create somebody for it to be about, bind them to the
- * outline, and only then record what they agreed to. The binding is an ordinary region edit with
- * `action: "confirm"`, which is also the honest reading of the gesture: attaching a person to an
- * outline IS confirming that the outline is a person.
- *
- * A region that already carries a subject skips straight to the third request, which is the
- * ordinary case once somebody has been given a decision at all.
- *
- * **Nothing here retries.** Each of the three requests is a receipt, and a client that replayed a
- * failed one could write two subjects for one person or two confirmations of one outline. A
- * failure surfaces as an error the panel states; the reviewer decides whether to try again.
- */
-
+/** Person review writes use server policy. Identity linking is an explicit, separate decision. */
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 
+import { PersonalRequestClient } from './personal-admission-api.js';
 import { validateOutline, type ManualRegion } from './ui/person-region-editor.js';
 
 import type { ReviewRegion } from './ui/person-review.js';
@@ -113,12 +90,14 @@ function regionOf(wire: WireRegion): ReviewRegion {
 
 export class PersonReviewApi {
   readonly #options: TransportOptions;
+  readonly requests: PersonalRequestClient;
 
   constructor(options: TransportOptions) {
     // Narrowed to the three fields a request needs, and `fetch` is spread conditionally rather
     // than passed as possibly-undefined: `exactOptionalPropertyTypes` is on, so an absent option
     // and an option set to undefined are different types. `signal` is deliberately dropped, since
     // each request below sets its own timeout.
+    this.requests = new PersonalRequestClient(options);
     this.#options = options.fetch === undefined
       ? { baseUrl: options.baseUrl, token: options.token }
       : { baseUrl: options.baseUrl, token: options.token, fetch: options.fetch };
@@ -156,7 +135,7 @@ export class PersonReviewApi {
       readonly subject_id?: string },
   ): Promise<void> {
     try {
-      await this.#transport().postJson(`/person-regions/${captureId}/edits`, { edits: [edit] });
+      await this.requests.post(`/person-regions/${captureId}/edits`, { edits: [edit] });
     } catch (error) {
       throw asUnavailable(error);
     }
@@ -167,7 +146,7 @@ export class PersonReviewApi {
     validateOutline(region.silhouette);
     if (!/^[0-9a-f]{64}$/u.test(region.region_key)) throw new Error('Invalid region key.');
     try {
-      await this.#transport().postJson(`/person-regions/${captureId}/edits`, {
+      await this.requests.post(`/person-regions/${captureId}/edits`, {
         edits: [{ region_key: region.region_key, action: 'add', shape: 'box',
           silhouette: region.silhouette }],
       });
@@ -176,44 +155,56 @@ export class PersonReviewApi {
     }
   }
 
-  /**
-   * Record what one person agreed to, creating and binding them first if nobody has yet.
-   *
-   * Returns the subject the decision was recorded against, so a caller holding stale regions can
-   * tell that a subject now exists without refetching. It refetches anyway, because the resolved
-   * state of every other region can move when one receipt lands.
-   */
+  /** The server atomically binds the selected regions and reuses their existing person. */
+  async link(regions: readonly { capture_id: string; region_key: string }[], subjectId?: string): Promise<string> {
+    if (!regions.length) throw new Error('Select the regions that show the same person.');
+    try {
+      const result = await this.requests.post<{ subject_id: string }>('/identity/subjects/link', {
+        regions, ...(subjectId ? { subject_id: subjectId } : {}),
+      });
+      return result.subject_id;
+    } catch (error) { throw asUnavailable(error); }
+  }
+
+  async unlink(captureId: string, region: ReviewRegion): Promise<void> {
+    if (!region.subjectId) return;
+    try {
+      await this.requests.post('/identity/subjects/unlink', {
+        subject_id: region.subjectId,
+        regions: [{ capture_id: captureId, region_key: region.regionKey }],
+      });
+    } catch (error) { throw asUnavailable(error); }
+  }
+
+  /** Correct the same region, preserving its identity and receipt history. */
+  async correct(captureId: string, region: ManualRegion): Promise<void> {
+    validateOutline(region.silhouette);
+    const latest = (await this.load(captureId)).regions.find(r => r.regionKey === region.region_key);
+    if (!latest) throw new Error('The region is no longer available. Reload review.');
+    if (JSON.stringify(latest.silhouette) === JSON.stringify(region.silhouette)) return;
+    try {
+      await this.requests.post(`/person-regions/${captureId}/edits`, {
+        edits: [{ ...region, action: 'confirm', shape: 'box' }],
+      });
+    } catch (error) { throw asUnavailable(error); }
+  }
+
+  /** Never infer identity from a consent gesture or manufacture a subject's authentication. */
   async consent(
     captureId: string,
     region: ReviewRegion,
-    scope: 'presence' | 'naming' | 'likeness',
+    scope: 'presence' | 'naming' | 'likeness' | 'temporary_hide',
     decision: 'granted' | 'revoked',
   ): Promise<string> {
-    let subjectId = region.subjectId;
-    if (subjectId === null) {
-      // Nobody has said this outline is a person yet, so there is nobody for a receipt to be
-      // about. Creating the subject and binding it are separate requests because the server has
-      // no combined writer; if one is ever added, this is the only place that changes.
-      let created: { readonly subject_id: string };
-      try {
-        created = await this.#transport().postJson<{ readonly subject_id: string }>(
-          '/person-subjects', {},
-        );
-      } catch (error) {
-        throw asUnavailable(error);
-      }
-      subjectId = created.subject_id;
-      await this.edit(captureId, {
-        region_key: region.regionKey, action: 'confirm', subject_id: subjectId,
-      });
+    const latest = (await this.load(captureId)).regions.find(r => r.regionKey === region.regionKey);
+    if (!latest?.subjectId || latest.subjectId !== region.subjectId) {
+      throw new Error('Identify this person explicitly and reload review before recording a decision.');
     }
     try {
-      await this.#transport().postJson(`/person-subjects/${subjectId}/consents`, {
+      await this.requests.post(`/person-subjects/${latest.subjectId}/consents`, {
         consent_scope: scope, decision, region_key: region.regionKey,
       });
-    } catch (error) {
-      throw asUnavailable(error);
-    }
-    return subjectId;
+    } catch (error) { throw asUnavailable(error); }
+    return latest.subjectId;
   }
 }

@@ -15,6 +15,7 @@
  * URL decided before any session existed, and nothing in a mount may change it.
  */
 
+import { createPersonalIntakeSession, type PersonalIntakeSession } from './personal-intake.js';
 import type { IslandId, SceneDisplayFrame } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 import type {
@@ -70,6 +71,7 @@ export interface AppEnvironment {
  * builds them, which is what makes "this surface is rebuilt each mount" true by construction.
  */
 export interface SessionState {
+  personalIntake: PersonalIntakeSession;
   credentials: { baseUrl: string; token: string } | null;
   session: Session | null;
   snapshot: GraphSnapshot | null;
@@ -184,6 +186,7 @@ export function createAppEnvironment(): AppEnvironment {
 /** The empty session. Every field starts at the value the single-file version initialised it to. */
 export function createSessionState(): SessionState {
   return {
+    personalIntake: createPersonalIntakeSession(),
     credentials: null,
     session: null,
     snapshot: null,
