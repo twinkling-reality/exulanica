@@ -14,6 +14,7 @@ import { el, replace } from '../ui/dom.js';
 
 interface Journal {
   sources: PersonalSource[];
+  memberIds: string[];
   pending: PersonalAdmission | null;
   result: AdmissionResult | null;
 }
@@ -39,7 +40,8 @@ export function mountPersonalIntake(deps: {
   const reviewApi = new PersonReviewApi(deps.credentials);
   let storage: Storage | null = deps.storage ?? null;
   try { storage ??= window.sessionStorage; } catch { /* Server review still loads in restricted browsers. */ }
-  let journal: Journal = { sources: [], pending: null, result: null };
+  let journal: Journal = { sources: [], memberIds: [], pending: null, result: null };
+  let receiptHistory: AdmissionResult[] = [];
   let storageKey = '';
   let current = deps.snapshot;
   let media = deps.media;
@@ -68,12 +70,26 @@ export function mountPersonalIntake(deps: {
 
     ui.upload.disabled = ui.detect.disabled = ui.complete.disabled = journal.pending !== null;
     ui.selection.textContent = `${selected.size} region(s) explicitly selected across photographs.`;
-    replace(ui.inventory, journal.sources.map((source, index) => el('p', {
-      text: `Original ${index + 1}: ${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}`,
-    })));
-    replace(ui.receipts, journal.result?.receipts.map(receipt => el('p', {
+    ui.members.textContent = `${journal.memberIds.length} of ${journal.sources.length} saved photographs selected for this admission (maximum 200).`;
+    replace(ui.inventory, journal.sources.map((source, index) => {
+      const checkbox = el('input', { type: 'checkbox', 'aria-label': `Include photograph ${index + 1} in this admission` });
+      checkbox.checked = journal.memberIds.includes(source.capture_id);
+      checkbox.disabled = journal.pending !== null;
+      checkbox.onchange = () => {
+        if (checkbox.checked && journal.memberIds.length >= 200) {
+          checkbox.checked = false; say('An admission can contain at most 200 photographs. Deselect a photograph first.'); return;
+        }
+        journal.memberIds = checkbox.checked ? [...journal.memberIds, source.capture_id]
+          : journal.memberIds.filter(id => id !== source.capture_id);
+        ui.attestation.checked = false; persist(); reflect();
+      };
+      return el('p', {}, [el('label', {}, [checkbox,
+        ` Original ${index + 1}: ${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}`])]);
+    }));
+    replace(ui.receipts, receiptHistory.flatMap(result => [el('p', { text: `Saved admission ${result.batch_id}` }),
+      ...result.receipts.map(receipt => el('p', {
       text: `Capture ${receipt.capture_id}: ${receipt.eligibility_state}. Authorization ${receipt.authorization_id}; screening ${receipt.screening_id}. Queued work is not completed depth.`,
-    })) ?? []);
+    }))]));
   }
   async function act(run: () => Promise<void>): Promise<void> {
     if (busy || disposed) return;
@@ -139,6 +155,8 @@ export function mountPersonalIntake(deps: {
     const recovered = await api.status();
     if (disposed) return;
     journal.sources = recovered.sources.filter(s => ids.has(s.capture_id)).map(({ capture_id, sha256, bytes }) => ({ capture_id, sha256, bytes }));
+    const available = new Set(journal.sources.map(s => s.capture_id));
+    journal.memberIds = journal.memberIds.filter(id => available.has(id));
     await api.requests.reconcile(recovered.requests.map(r => r.request_id));
     await reviewApi.requests.reconcile(recovered.requests.map(r => r.request_id));
     const completed = recovered.requests.find(r => r.request_id === journal.pending?.request_id);
@@ -150,6 +168,8 @@ export function mountPersonalIntake(deps: {
     journal.result = latest?.receipts && latest.batch_id && latest.queued_job_id
       ? { receipts: latest.receipts, batch_id: latest.batch_id, queued_job_id: latest.queued_job_id }
       : null;
+    receiptHistory = recovered.requests.flatMap(r => r.receipts && r.batch_id && r.queued_job_id
+      ? [{ receipts: r.receipts, batch_id: r.batch_id, queued_job_id: r.queued_job_id }] : []);
     const pendingWrite = await reviewApi.requests.pending();
     ui.retryReview.hidden = !pendingWrite || pendingWrite.path === '/personal-admission';
     sourceOptions(); renderReview(); persist();
@@ -222,17 +242,19 @@ export function mountPersonalIntake(deps: {
     }
   }
   function prepare(operation: 'detect' | 'review'): PersonalAdmission {
+    const members = journal.sources.filter(s => journal.memberIds.includes(s.capture_id));
+    if (!members.length || members.length > 200) throw new Error('Select between 1 and 200 photographs for this admission.');
     const now = new Date().toISOString();
     const until = new Date(ui.validUntil.value);
     if (!Number.isFinite(until.getTime()) || until.getTime() <= Date.now()) throw new Error('Enter a future authority expiry.');
-    if (!journal.sources.length || !ui.purpose.value.trim() || !ui.authority.value.trim()) throw new Error('Choose sources and state your purpose and account authority.');
+    if (!ui.purpose.value.trim() || !ui.authority.value.trim()) throw new Error('Choose sources and state your purpose and account authority.');
     if (operation === 'review' && (!ui.attestation.checked || !ui.reviewer.value.trim()
-      || journal.sources.some(s => !inspected.has(s.capture_id) || !choices.has(s.capture_id)))) {
+      || members.some(s => !inspected.has(s.capture_id) || !choices.has(s.capture_id)))) {
       throw new Error('Inspect every exact original, choose its actual review, and complete the named attestation.');
     }
     return {
       request_id: crypto.randomUUID(),
-      members: journal.sources.map(s => ({ ...s, review: operation === 'detect' ? 'not-reviewed' : choices.get(s.capture_id) ?? 'not-reviewed' })),
+      members: members.map(s => ({ ...s, review: operation === 'detect' ? 'not-reviewed' : choices.get(s.capture_id) ?? 'not-reviewed' })),
       purpose: ui.purpose.value.trim(),
       authority: { account_authority_basis: ui.authority.value.trim(), authorized_at: now, valid_until: until.toISOString() },
       recorded_at: now, operation,
@@ -269,6 +291,7 @@ export function mountPersonalIntake(deps: {
     const result = await api.upload([...ui.files.files ?? []]);
     journal.sources = [...new Map([...journal.sources, ...result.accepted].map(s => [s.capture_id,
       { capture_id: s.capture_id, sha256: s.sha256, bytes: s.bytes }])).values()];
+    if (result.accepted.length) { journal.memberIds = result.accepted.map(s => s.capture_id); ui.attestation.checked = false; }
     persist(); if (result.queued_job_id) watch(result.batch_id);
     say(result.refused.length ? result.refused.map(r => `${r.filename}: ${r.reason}. ${r.detail}`).join('\n')
       : 'Original byte digests verified against upload receipts. Authorize detection separately.');
@@ -308,6 +331,9 @@ export function mountPersonalIntake(deps: {
         const saved = storage?.getItem(storageKey);
         if (saved) journal = JSON.parse(saved) as Journal;
       } catch { say('Local recovery metadata could not be read. Saved server regions remain available.'); }
+      // Old local journals did not distinguish inventory and admission. Only a frozen pending
+      // request proves its intended membership; never infer selection from historical inventory.
+      journal.memberIds = journal.pending?.members.map(s => s.capture_id) ?? journal.memberIds ?? [];
       if (journal.pending) say('An interrupted admission is retained. Retry uses the exact original dated request.');
       if (journal.result) watch(journal.result.batch_id);
       else { const latest = (await listBatches(deps.credentials))[0]; if (latest && !disposed) watch(latest.batchId); }

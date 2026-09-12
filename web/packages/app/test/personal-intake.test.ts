@@ -13,15 +13,17 @@ vi.mock('../src/source-media-api.js', () => ({ SourceMediaClient: class {
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'];
 const key = 'a'.repeat(64), subject = '33333333-3333-4333-8333-333333333333';
 const json = (body: unknown) => new Response(JSON.stringify(body));
-function fixture() {
+function fixture(count = 2) {
   let uploaded = false, linked = false, interrupted = false;
   let regions = true;
   const posts: { path: string; body: any }[] = [];
   const savedRequests: any[] = [];
-  const files = [new File(['fixture HEIC bytes'], 'a.heic'), new File(['fixture JPEG bytes'], 'b.jpg')];
+  const captureIds = Array.from({ length: count }, (_, i) => ids[i] ?? `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+  const files = [new File(['fixture HEIC bytes'], 'a.heic'), new File(['fixture JPEG bytes'], 'b.jpg'),
+    ...Array.from({ length: count - 2 }, (_, i) => new File([`history ${i}`], `history-${i}.jpg`))];
   const snapshot = () => adaptSnapshot({ state_version: 1, entities: [], occurrences: [], proposals: [],
     scene_groups: [], reconstruction_scenes: [], never_same: [], deleted_entity_ids: [],
-    review_sources: uploaded ? ids.map((id, i) => ({ kind: 'admitted_capture' as const, capture_id: id,
+    review_sources: uploaded ? captureIds.map((id, i) => ({ kind: 'admitted_capture' as const, capture_id: id,
       evidence_span_id: `span-${i}`, captured_at: null, media_type: 'image/jpeg', state: 'unavailable_asset' as const,
       reason: 'Fixture viewer unavailable', evidence_path: null, content_sha256: null,
       person_review_state: 'screened' as const, person_regions: [],
@@ -30,13 +32,13 @@ function fixture() {
   const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const path = new URL(String(input)).pathname;
     if (path === '/personal-admission' && init.method === 'GET') return json({
-      sources: uploaded ? await Promise.all(files.map(async (f, i) => ({ capture_id: ids[i], sha256: await sha256(await f.arrayBuffer()), bytes: f.size, media_type: 'image/jpeg', authority: null }))) : [],
+      sources: uploaded ? await Promise.all(files.map(async (f, i) => ({ capture_id: captureIds[i], sha256: await sha256(await f.arrayBuffer()), bytes: f.size, media_type: 'image/jpeg', authority: null }))) : [],
       requests: savedRequests,
     });
     if (path === '/intake') {
       uploaded = true;
       return json({ batch_id: 'upload', queued_job_id: 'upload-job', refused: [{ filename: 'bad.jpg', reason: 'not_an_image', detail: 'Fixture rejection' }],
-        accepted: await Promise.all(files.map(async (f, i) => ({ capture_id: ids[i], blob_sha256: await sha256(await f.arrayBuffer()), filename: f.name, status: 'ingested' }))) });
+        accepted: await Promise.all(files.slice(0, 2).map(async (f, i) => ({ capture_id: captureIds[i], blob_sha256: await sha256(await f.arrayBuffer()), filename: f.name, status: 'ingested' }))) });
     }
     if (init.method === 'POST') {
       const body = JSON.parse(String(init.body)); posts.push({ path, body });
@@ -60,7 +62,7 @@ function fixture() {
     snapshot: snapshot(), media: undefined, reloadSnapshot: async () => snapshot(),
     refreshWorld: vi.fn(async () => undefined), storage: window.sessionStorage,
   });
-  return { files, posts, make, setUploaded: () => { uploaded = true; }, noRegions: () => { regions = false; } };
+  return { files, posts, make, captureIds, savedRequests, setUploaded: () => { uploaded = true; }, noRegions: () => { regions = false; } };
 }
 function button(root: HTMLElement, text: string) { return [...root.querySelectorAll('button')].find(b => b.textContent === text)!; }
 function input(root: HTMLElement, label: string) { return root.querySelector(`[aria-label="${label}"]`) as HTMLInputElement; }
@@ -129,6 +131,7 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     expect(mounted.root.textContent).toContain('Queued work is not completed depth');
     expect(input(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
     expect(input(mounted.root, 'Human review of this photograph').value).toBe('');
+    expect(mounted.root.textContent).toContain('0 of 2 saved photographs selected');
     expect(f.posts).toHaveLength(writes);
     mounted.dispose();
   });
@@ -157,6 +160,55 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     button(mounted.root, 'Upload originals').click(); await settle(mounted.root);
     expect(mounted.root.textContent).toContain('Person detector unavailable: no provider configured.');
     expect(input(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
+    mounted.dispose();
+  });
+  it('selects a small exact admission from 201 saved photographs and recovers selection, retry and prior receipts', async () => {
+    const f = fixture(201); f.setUploaded();
+    f.savedRequests.push({ request_id: 'old-request', operation: 'admission', batch_id: 'prior-batch', queued_job_id: 'prior-job',
+      receipts: [{ capture_id: ids[1], authorization_id: 'prior-authority', screening_id: 'prior-screen', eligibility_state: 'blocked-or-stale' }] });
+    let mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
+    expect(mounted.root.textContent).toContain('0 of 201 saved photographs selected');
+    for (const i of [1, 201]) {
+      const checkbox = input(mounted.root, `Include photograph ${i} in this admission`);
+      checkbox.checked = true; checkbox.dispatchEvent(new Event('change'));
+    }
+    mounted.dispose(); mounted.root.remove();
+    mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
+    expect(mounted.root.textContent).toContain('2 of 201 saved photographs selected');
+    expect(mounted.root.textContent).toContain('prior-screen');
+    input(mounted.root, 'Purpose of this use').value = 'Selected fixture pair';
+    input(mounted.root, 'Your account authority basis').value = 'Fixture operator permission';
+    input(mounted.root, 'Authority valid until').value = '2099-01-01T12:00';
+    button(mounted.root, 'Authorize personal admission and request detection').click(); await settle(mounted.root);
+    const pending = f.posts.at(-1)!.body;
+    expect(pending.members).toEqual(await Promise.all([0, 200].map(async i => ({ capture_id: f.captureIds[i],
+      sha256: await sha256(await f.files[i]!.arrayBuffer()), bytes: f.files[i]!.size, review: 'not-reviewed' }))));
+    expect(input(mounted.root, 'Include photograph 2 in this admission').disabled).toBe(true);
+    mounted.dispose(); mounted.root.remove();
+    mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
+    button(mounted.root, 'Retry exact interrupted admission').click(); await settle(mounted.root);
+    expect(f.posts.at(-1)!.body).toEqual(pending);
+    expect(mounted.root.textContent).toContain('prior-screen');
+    expect(mounted.root.textContent).toContain('2 of 201 saved photographs selected');
+    // A subsequent upload starts with only its accepted photographs, not the historical selection.
+    Object.defineProperty(input(mounted.root, 'Original HEIC or JPEG photographs'), 'files', { value: f.files.slice(0, 2) });
+    button(mounted.root, 'Upload originals').click(); await settle(mounted.root);
+    expect(mounted.root.textContent).toContain('2 of 201 saved photographs selected');
+    expect(input(mounted.root, 'Include photograph 201 in this admission').checked).toBe(false);
+    expect(input(mounted.root, 'Include photograph 2 in this admission').checked).toBe(true);
+    mounted.dispose();
+  });
+  it('limits admission membership to 200 while preserving access to a larger saved inventory', async () => {
+    const f = fixture(201); f.setUploaded();
+    const mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
+    for (let i = 1; i <= 201; i++) {
+      const checkbox = input(mounted.root, `Include photograph ${i} in this admission`);
+      checkbox.checked = true; checkbox.dispatchEvent(new Event('change'));
+    }
+    expect(mounted.root.textContent).toContain('200 of 201 saved photographs selected');
+    expect(mounted.root.textContent).toContain('An admission can contain at most 200 photographs');
+    expect(input(mounted.root, 'Include photograph 201 in this admission').checked).toBe(false);
+    expect(f.posts).toEqual([]);
     mounted.dispose();
   });
 });

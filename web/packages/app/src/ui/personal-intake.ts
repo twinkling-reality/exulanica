@@ -31,8 +31,10 @@ export function buildPersonalIntake() {
   const files = field('Original HEIC or JPEG photographs', 'file');
   files.multiple = true; files.accept = '.heic,.heif,.jpg,.jpeg,image/heic,image/heif,image/jpeg';
   const upload = button('Upload originals');
-  const inventory = el('div', { 'aria-label': 'Upload receipts' });
-  controls.append(inventory);
+  const inventory = el('div', { 'aria-label': 'Saved original photographs' });
+  const members = el('p', { role: 'status', 'aria-live': 'polite' });
+  controls.append(el('p', { text: 'Select up to 200 photographs for this admission. Newly uploaded photographs are selected; '
+    + 'saved photographs stay available for review without joining a new admission automatically.' }), members, inventory);
   const purpose = field('Purpose of this use');
   const authority = field('Your account authority basis');
   const validUntil = field('Authority valid until', 'datetime-local');
@@ -62,11 +64,13 @@ export function buildPersonalIntake() {
     el('option', { value: 'no-person', text: 'I inspected this photograph and it contains no person regions' }));
   controls.append(reviewChoice);
   const reviewer = field('Reviewer’s actual name');
+  controls.append(el('p', { text: 'The inventory in this attestation is the selected admission photographs. '
+    + 'Inspect and review every selected original before checking it.' }));
   const attestation = field(HUMAN_ATTESTATION, 'checkbox');
   const complete = button('Record human review and request eligible depth');
   const refreshWorld = button('Refresh world after processing');
   root.append(controls, status);
-  return { root, controls, status, files, upload, inventory, purpose, authority, validUntil, detect,
+  return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
     reviewChoice, reviewer, attestation, complete, refreshWorld, originals };
 }
