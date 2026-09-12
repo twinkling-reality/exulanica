@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**161 documents**, excluding `docs/evaluation/`.
+**162 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -121,7 +121,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-52 documents.
+53 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -155,6 +155,7 @@ What was intended, written before the work.
 - [2026-09-12-earth-foundation](briefs/2026-09-12-earth-foundation.md) : prepared for operator dispatch. Branch: codex/earth-foundation
 - [2026-09-12-earth-plateau-source](briefs/2026-09-12-earth-plateau-source.md) : authorized bounded continuation, 2026-09-12
 - [2026-09-12-earth-wave](briefs/2026-09-12-earth-wave.md) : prepared for operator dispatch on 2026-09-12; no lane has been started by
+- [2026-09-12-environment-source-admission](briefs/2026-09-12-environment-source-admission.md) : ISSUED
 - [2026-09-12-experience-activation](briefs/2026-09-12-experience-activation.md) : root preparation, 2026-09-12. Execute database mutations only after the full
 - [2026-09-12-experience-gate-repairs](briefs/2026-09-12-experience-gate-repairs.md) : root amendment after the full backend run, 2026-09-12. The run completed
 - [2026-09-12-experience-integration](briefs/2026-09-12-experience-integration.md) : root execution brief, 2026-09-12. The scratch integration worktree is
