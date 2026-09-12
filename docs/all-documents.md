@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**156 documents**, excluding `docs/evaluation/`.
+**157 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-48 documents.
+49 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -149,6 +149,7 @@ What was intended, written before the work.
 - [2026-09-12-companion-preview-binding](briefs/2026-09-12-companion-preview-binding.md) : measured root follow-up, 2026-09-12. The repaired failure-area run passed
 - [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
+- [2026-09-12-earth-experience-correction](briefs/2026-09-12-earth-experience-correction.md) : corrected product contract and bounded frontend implementation amendment
 - [2026-09-12-earth-foundation](briefs/2026-09-12-earth-foundation.md) : prepared for operator dispatch. Branch: codex/earth-foundation
 - [2026-09-12-earth-wave](briefs/2026-09-12-earth-wave.md) : prepared for operator dispatch on 2026-09-12; no lane has been started by
 - [2026-09-12-experience-activation](briefs/2026-09-12-experience-activation.md) : root preparation, 2026-09-12. Execute database mutations only after the full

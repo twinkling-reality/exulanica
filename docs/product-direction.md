@@ -76,30 +76,46 @@ scene-to-Companion rehearsal remain acceptance gates before calling the experien
 
 ## Optional Earth foundation and September demo scope
 
-Prepared 2026-09-12 following the operator's request; not yet implemented or
-accepted. The [Earth wave](briefs/2026-09-12-earth-wave.md) promotes the previously
-deferred streamed Earth view into a bounded feasibility and integration task.
-Earth is optional public geographic context, while the personal Atlas retains its
-semantic layout. Streaming existing licensed terrain and buildings needs no model
-training. Reconstructing a supplied personal place remains a separate scene run.
+Corrected 2026-09-12 after the operator rejected the orbital viewer. The
+[experience correction](briefs/2026-09-12-earth-experience-correction.md) supersedes
+the globe-navigation and separate-handoff outcome in the original
+[Earth wave](briefs/2026-09-12-earth-wave.md) and lane brief. That original scope
+misunderstood the requested product. The orbital implementation is not accepted
+or integrated.
 
-The first target is globe navigation, a recognizable San Francisco destination,
-and a working transition to the existing authenticated personal-world path.
-No evidence locates the current personal capture in San Francisco or establishes
-a measured transform into Earth. Seamless placement needs separate geographic
-alignment. Full interiors, traffic, collision-safe walking and general simulation
-are not established by a streamed city.
+Earth is an optional environment inside Exulanica's interactive world. The person
+stands on its streamed terrain, moves with the existing first-person controls,
+and continues using the world's interaction system while terrain and buildings
+are visible. The production renderer remains PlayCanvas. A separate map, a camera
+lowered into a globe viewer, or a shared canvas that replaces the interactive
+world with a navigation-only experience does not satisfy this outcome.
 
-The production renderer remains PlayCanvas; atlas-three is a retained comparison
-binding. Earth architecture and stack selection require a documented comparison against
-existing renderer, world/version, authored-content and asset contracts, with
-measured performance and explicit data rights. The first implementation must be a
-reusable foundation with bounded resource ownership and provider attribution.
-September18 may limit exposed features; it does not justify a disposable viewer
-or weakening the long-term contracts. Ordinary personal use must remain available
-if Earth configuration or network access fails. Keep provider tokens
-and private memories separate and preserve the UI/composition boundary for the
-operator's later interface redesign.
+Implement Earth as an environmental layer within the shared rendering and
+interaction architecture. Keep geographic coordinates distinct from semantic
+Atlas layout and region-local authored poses, with explicit transforms between
+compatible frames. Earth geometry and existing interactive content must coexist;
+an explicit local placement for a labeled fixture does not establish the real
+geographic location of any personal reconstruction. Persistent Earth anchoring
+or edits require the appropriate versioned contract before they can be claimed.
+Existing authenticated access, consent, source identity and withdrawal remain
+authoritative. An optional public Earth entry must not expose personal content.
+
+The implementation must establish terrain support, collision behavior, streamed
+coverage boundaries, bounded resource ownership and origin precision through
+measurements. Network-served buildings do not establish full interiors, traffic
+or general simulation. A proposed adapter or synthetic triangle probe is not
+proof of a usable city. Live ground exploration and existing interaction must be
+tested together, including a second geographically different destination.
+
+Streaming suitably licensed terrain and buildings does not inherently require
+training a model. Personal-place reconstruction remains a separate scene run.
+Assess rights for the actual chosen provider and use, including runtime geometry
+processing, separately from renderer licensing. Preserve provider attribution,
+keep provider credentials and private memories separate, and preserve the
+UI/composition boundary for the operator's later interface redesign. Ordinary
+personal use must remain available when Earth is disabled or unavailable.
+September18 may limit exposed features, but does not justify substituting a
+different experience or weakening long-term integration contracts.
 
 The Product Hunt page lists September 18, 2026. This is an additional proposed
 submission window, not a replacement for the October schedule below. Exact
