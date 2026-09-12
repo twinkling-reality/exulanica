@@ -117,20 +117,22 @@ def _publication(render_id: uuid.UUID, label: str) -> FeatureIndexPublication:
             EnvironmentFeatureInput(
                 provider_feature_id=f"gml-{label.lower()}",
                 kind="building",
-                bbox=(0, 0, 10, 10),
+                bbox=(0, 0, 0, 10, 10, 10),
                 label=label,
+                render_batch_id=1,
             ),
             EnvironmentFeatureInput(
                 provider_feature_id="gml-water",
                 kind="water",
-                bbox=(20, 20, 30, 30),
+                bbox=(20, 20, 0, 30, 30, 10),
                 label="Canal",
+                render_batch_id=2,
             ),
         ),
     )
 
 
-def test_publication_stores_one_catalog_asset_and_current_filters_exactly(indexed_environment):
+def test_publication_stores_one_catalog_asset_and_current_filters_spatially(indexed_environment):
     repo, source, render, _store = indexed_environment
     first = repo.publish_feature_index(
         source.admission_id, _publication(render.asset_id, "Hall"), actor=uuid.uuid4()
@@ -141,11 +143,14 @@ def test_publication_stores_one_catalog_asset_and_current_filters_exactly(indexe
     assert first.publication_id != second.publication_id
     assert second.receipt["index_asset_id"] == str(second.index_asset_id)
     assert second.receipt["render_asset_id"] == str(render.asset_id)
+    assert second.place_id == source.place_id
+    assert second.geographic_frame["name"] == "grid"
+    assert second.coordinate_scale == 1000
     assert repo.read_features(source.admission_id).publication_id == second.publication_id
     selected = repo.read_features(
         source.admission_id,
         kind=EnvironmentFeatureKind.BUILDING,
-        bbox=(0, 0, 10, 10),
+        bbox=(5, 5, 5, 15, 15, 15),
         label="Tower",
     )
     assert [feature["label"] for feature in selected.features] == ["Tower"]

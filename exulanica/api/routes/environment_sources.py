@@ -23,6 +23,7 @@ from exulanica.environment import (
     EnvironmentRepository,
     EnvironmentResourceWithdrawn,
     FeatureIndexPublication,
+    InvalidEnvironmentFeatureFilter,
     SourceAdmission,
     SourceDigestMismatch,
     UnknownEnvironmentResource,
@@ -119,6 +120,8 @@ def features(
         return _problem(410, "withdrawn", str(exc))
     except EnvironmentOperationDenied as exc:
         return _problem(403, "operation_denied", str(exc))
+    except InvalidEnvironmentFeatureFilter as exc:
+        return _problem(422, "invalid_filter", str(exc))
 
 
 @router.get("/{kind}/{resource_id}")

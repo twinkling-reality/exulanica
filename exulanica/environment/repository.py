@@ -88,8 +88,11 @@ class AuthorizedEnvironmentBytes:
 class EnvironmentFeatureCatalog:
     publication_id: uuid.UUID
     admission_id: uuid.UUID
+    place_id: uuid.UUID
     index_asset_id: uuid.UUID
     render_asset_id: uuid.UUID
+    geographic_frame: dict[str, Any]
+    coordinate_scale: int
     receipt: dict[str, Any]
     receipt_sha256: str
     features: tuple[dict[str, Any], ...]
@@ -98,8 +101,11 @@ class EnvironmentFeatureCatalog:
         return {
             "publication_id": str(self.publication_id),
             "admission_id": str(self.admission_id),
+            "place_id": str(self.place_id),
             "index_asset_id": str(self.index_asset_id),
             "render_asset_id": str(self.render_asset_id),
+            "geographic_frame": self.geographic_frame,
+            "coordinate_scale": self.coordinate_scale,
             "receipt": self.receipt,
             "receipt_sha256": self.receipt_sha256,
             "features": list(self.features),
@@ -238,7 +244,7 @@ class EnvironmentRepository:
         self._authorized_row("asset", value.render_asset_id, EnvironmentOperation.INDEX)
         source_record = self.connection.execute(
             """
-            select provider_key,provider_original_id,provider_revision,source_sha256,
+            select place_id,provider_key,provider_original_id,provider_revision,source_sha256,
                    receipt_sha256,geographic_frame,geographic_bounds,operation_rights,
                    attribution
               from environment_source_admission
@@ -270,6 +276,7 @@ class EnvironmentRepository:
         data = build_feature_index(
             value,
             admission_id=admission_id,
+            place_id=source_record["place_id"],
             provider_key=source_record["provider_key"],
             provider_original_id=source_record["provider_original_id"],
             provider_revision=source_record["provider_revision"],
@@ -400,6 +407,7 @@ class EnvironmentRepository:
             payload = validate_feature_index(
                 data,
                 admission_id=admission_id,
+                place_id=row["place_id"],
                 source_sha256=bytes(row["source_sha256"]).hex(),
                 source_receipt_sha256=bytes(row["source_receipt_sha256"]).hex(),
                 render_asset_id=row["render_asset_id"],
@@ -414,6 +422,7 @@ class EnvironmentRepository:
             kind=kind,
             bbox=bbox,
             label=label,
+            dimensions=len(payload["geographic_frame"]["axis_order"]),
         )
         with final_check(self.connection) as at:
             current = self._publication_row(admission_id, at=at)
@@ -421,8 +430,11 @@ class EnvironmentRepository:
         return EnvironmentFeatureCatalog(
             publication_id=row["publication_id"],
             admission_id=admission_id,
+            place_id=row["place_id"],
             index_asset_id=row["index_asset_id"],
             render_asset_id=row["render_asset_id"],
+            geographic_frame=payload["geographic_frame"],
+            coordinate_scale=payload["coordinate_scale"],
             receipt=row["publication_receipt"],
             receipt_sha256=bytes(row["publication_receipt_sha256"]).hex(),
             features=tuple(selected),
@@ -572,7 +584,7 @@ class EnvironmentRepository:
         )
         return self.connection.execute(
             """
-            select p.publication_id,p.admission_id,p.index_asset_id,p.render_asset_id,
+            select p.publication_id,p.admission_id,s.place_id,p.index_asset_id,p.render_asset_id,
                    p.source_sha256,p.source_receipt_sha256,p.index_sha256,
                    p.index_receipt_sha256,p.render_sha256,p.render_receipt_sha256,
                    p.receipt_record as publication_receipt,

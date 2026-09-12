@@ -54,6 +54,7 @@ def _bytes(value: FeatureIndexPublication) -> bytes:
     return build_feature_index(
         value,
         admission_id=uuid.UUID("8d1566cb-37cd-43db-b60a-b59023566d13"),
+        place_id=uuid.UUID("22c1d8ac-79b3-44b8-b72c-5967aed94f99"),
         provider_key="plateau",
         provider_original_id="shibuya",
         provider_revision="2023",
@@ -70,6 +71,7 @@ def _validate(data: bytes):
     return validate_feature_index(
         data,
         admission_id=uuid.UUID("8d1566cb-37cd-43db-b60a-b59023566d13"),
+        place_id=uuid.UUID("22c1d8ac-79b3-44b8-b72c-5967aed94f99"),
         source_sha256="1" * 64,
         source_receipt_sha256="2" * 64,
         render_asset_id=uuid.UUID("2c92fc99-67f1-453d-aacd-1105c2229445"),
@@ -82,23 +84,29 @@ def test_catalog_is_bounded_sorted_unique_and_provider_derived():
     first = EnvironmentFeatureInput(
         provider_feature_id="gml-building-2",
         kind="building",
-        bbox=(20, 20, 30, 30),
+        bbox=(20, 20, 0, 30, 30, 10),
         label="Annex",
+        render_batch_id=2,
     )
     second = EnvironmentFeatureInput(
         provider_feature_id="gml-building-1",
         kind="building",
-        bbox=(0, 0, 10, 10),
+        bbox=(0, 0, 0, 10, 10, 10),
         label="Hall",
+        render_batch_id=1,
     )
     payload = _validate(_bytes(_publication(first, second)))
     identifiers = [feature["id"] for feature in payload["features"]]
     assert identifiers == sorted(identifiers)
+    assert payload["place_id"] == "22c1d8ac-79b3-44b8-b72c-5967aed94f99"
+    assert payload["geographic_frame"]["name"] == "provider-grid"
+    assert payload["coordinate_scale"] == 1000
     assert payload["features"][0]["id"] == segment_id(
         provider_key="plateau",
         provider_original_id="shibuya",
         provider_revision="2023",
         provider_feature_id=payload["features"][0]["provider_feature_id"],
+        source_sha256="1" * 64,
     )
 
     with pytest.raises(ValidationError, match="unique"):
@@ -110,10 +118,20 @@ def test_catalog_is_bounded_sorted_unique_and_provider_derived():
                 EnvironmentFeatureInput(
                     provider_feature_id=str(index),
                     kind="other",
-                    bbox=(0, 0, 1, 1),
+                    bbox=(0, 0, 0, 1, 1, 1),
                 )
                 for index in range(MAX_ENVIRONMENT_FEATURES + 1)
             ),
+        )
+    with pytest.raises(ValueError, match="dimensions"):
+        _bytes(
+            _publication(
+                EnvironmentFeatureInput(
+                    provider_feature_id="two-dimensional",
+                    kind="other",
+                    bbox=(0, 0, 1, 1),
+                )
+            )
         )
 
 
@@ -122,9 +140,11 @@ def test_digest_id_and_sort_tampering_fail_validation():
         _bytes(
             _publication(
                 EnvironmentFeatureInput(
-                    provider_feature_id="one", kind="terrain", bbox=(0, 0, 1, 1)
+                    provider_feature_id="one", kind="terrain", bbox=(0, 0, 0, 1, 1, 1)
                 ),
-                EnvironmentFeatureInput(provider_feature_id="two", kind="water", bbox=(2, 2, 3, 3)),
+                EnvironmentFeatureInput(
+                    provider_feature_id="two", kind="water", bbox=(2, 2, 2, 3, 3, 3)
+                ),
             )
         )
     )
@@ -140,14 +160,14 @@ def test_digest_id_and_sort_tampering_fail_validation():
         _validate(canonical_json(document))
 
 
-def test_filters_are_typed_and_exact():
+def test_identity_filters_are_exact_and_bbox_filter_intersects():
     features = _validate(
         _bytes(
             _publication(
                 EnvironmentFeatureInput(
                     provider_feature_id="one",
                     kind="building",
-                    bbox=(0, 0, 1, 1),
+                    bbox=(0, 0, 0, 10, 10, 10),
                     label="Hall",
                 )
             )
@@ -159,10 +179,47 @@ def test_filters_are_typed_and_exact():
             features,
             feature_id=feature_id,
             kind=EnvironmentFeatureKind.BUILDING,
-            bbox=(0, 0, 1, 1),
+            bbox=(5, 5, 5, 15, 15, 15),
             label="Hall",
+            dimensions=3,
         )
         == features
     )
-    assert filter_features(features, label="hall") == []
-    assert filter_features(features, bbox=(0, 0, 2, 2)) == []
+    assert filter_features(features, label="hall", dimensions=3) == []
+    assert (
+        filter_features(
+            features,
+            bbox=(20, 20, 20, 30, 30, 30),
+            dimensions=3,
+        )
+        == []
+    )
+    with pytest.raises(ValueError, match="dimensionality"):
+        filter_features(features, bbox=(0, 0, 10, 10), dimensions=3)
+
+
+def test_segment_identity_binds_source_bytes_and_render_batch_ids_are_optional_unique():
+    identity = {
+        "provider_key": "provider",
+        "provider_original_id": "city",
+        "provider_revision": "2026-09",
+        "provider_feature_id": "building-1",
+    }
+    first = segment_id(**identity, source_sha256="1" * 64)
+    assert first == segment_id(**identity, source_sha256="1" * 64)
+    assert first != segment_id(**identity, source_sha256="2" * 64)
+
+    feature = EnvironmentFeatureInput(
+        provider_feature_id="one",
+        kind="building",
+        bbox=(0, 0, 0, 1, 1, 1),
+        render_batch_id=7,
+    )
+    with pytest.raises(ValidationError, match="batch"):
+        _publication(feature, feature.model_copy(update={"provider_feature_id": "two"}))
+    assert (
+        _publication(feature.model_copy(update={"render_batch_id": None}))
+        .features[0]
+        .render_batch_id
+        is None
+    )

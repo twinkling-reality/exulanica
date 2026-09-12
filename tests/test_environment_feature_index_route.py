@@ -103,14 +103,16 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
             {
                 "provider_feature_id": "b-2",
                 "kind": "water",
-                "bbox": [20, 20, 30, 30],
+                "bbox": [20, 20, 0, 30, 30, 10],
                 "label": "Canal",
+                "render_batch_id": 2,
             },
             {
                 "provider_feature_id": "b-1",
                 "kind": "building",
-                "bbox": [0, 0, 10, 10],
+                "bbox": [0, 0, 0, 10, 10, 10],
                 "label": "Hall",
+                "render_batch_id": 1,
             },
         ],
     }
@@ -127,14 +129,28 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
             ("kind", "building"),
             ("bbox", "0"),
             ("bbox", "0"),
-            ("bbox", "10"),
-            ("bbox", "10"),
+            ("bbox", "0"),
+            ("bbox", "5"),
+            ("bbox", "5"),
+            ("bbox", "5"),
             ("label", "Hall"),
         ],
     )
     assert result.status_code == 200, result.text
     assert [feature["label"] for feature in result.json()["features"]] == ["Hall"]
+    assert result.json()["place_id"] == str(source.place_id)
+    assert result.json()["geographic_frame"]["name"] == "grid"
+    assert result.json()["coordinate_scale"] == 1000
+    assert result.json()["features"][0]["render_batch_id"] == 1
     assert result.headers["cache-control"] == "private, no-store"
+
+    wrong_dimensions = deployment.as_owner(
+        "GET",
+        f"/environment-resources/sources/{source.admission_id}/features",
+        params=[("bbox", "0"), ("bbox", "0"), ("bbox", "10"), ("bbox", "10")],
+    )
+    assert wrong_dimensions.status_code == 422
+    assert wrong_dimensions.json()["code"] == "invalid_filter"
 
 
 def test_route_hides_foreign_indexes_and_reports_withdrawal(deployment, repository, tmp_path):
@@ -147,7 +163,7 @@ def test_route_hides_foreign_indexes_and_reports_withdrawal(deployment, reposito
                 {
                     "provider_feature_id": "feature",
                     "kind": "terrain",
-                    "bbox": [0, 0, 10, 10],
+                    "bbox": [0, 0, 0, 10, 10, 10],
                 },
             ),
         ),

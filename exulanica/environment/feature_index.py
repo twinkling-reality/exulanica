@@ -18,6 +18,10 @@ FEATURE_INDEX_ENVELOPE = "exulanica.environment-feature-index-envelope/v1"
 FEATURE_INDEX_DERIVATION = "environment-feature-index"
 
 
+class InvalidEnvironmentFeatureFilter(ValueError):
+    pass
+
+
 class EnvironmentFeatureKind(StrEnum):
     BUILDING = "building"
     TERRAIN = "terrain"
@@ -36,6 +40,7 @@ class EnvironmentFeatureInput(BaseModel):
     kind: EnvironmentFeatureKind
     bbox: tuple[int, ...]
     label: Annotated[str, Field(min_length=1, max_length=512)] | None = None
+    render_batch_id: Annotated[int, Field(ge=0, le=2_147_483_647)] | None = None
 
     @field_validator("provider_feature_id", "label")
     @classmethod
@@ -71,6 +76,13 @@ class FeatureIndexPublication(BaseModel):
         identifiers = [feature.provider_feature_id for feature in self.features]
         if len(identifiers) != len(set(identifiers)):
             raise ValueError("provider feature identifiers must be unique within an admission")
+        batch_ids = [
+            feature.render_batch_id
+            for feature in self.features
+            if feature.render_batch_id is not None
+        ]
+        if len(batch_ids) != len(set(batch_ids)):
+            raise ValueError("render batch identifiers must be unique within a catalog")
         return self
 
 
@@ -80,14 +92,16 @@ def segment_id(
     provider_original_id: str,
     provider_revision: str,
     provider_feature_id: str,
+    source_sha256: str,
 ) -> str:
-    """Derive a stable segment identifier from immutable provider identity."""
+    """Derive a segment identifier from provider identity and exact admitted source bytes."""
     identity = {
         "profile": "exulanica.environment-provider-feature/v1",
         "provider_key": provider_key,
         "provider_original_id": provider_original_id,
         "provider_revision": provider_revision,
         "provider_feature_id": provider_feature_id,
+        "source_sha256": source_sha256,
     }
     return hashlib.sha256(canonical_json(identity)).hexdigest()[:32]
 
@@ -96,6 +110,7 @@ def build_feature_index(
     value: FeatureIndexPublication,
     *,
     admission_id: uuid.UUID,
+    place_id: uuid.UUID,
     provider_key: str,
     provider_original_id: str,
     provider_revision: str,
@@ -106,6 +121,9 @@ def build_feature_index(
     geographic_frame: GeographicFrame,
     geographic_bounds: GeographicBounds,
 ) -> bytes:
+    dimensions = len(geographic_frame.axis_order)
+    if any(len(feature.bbox) != dimensions * 2 for feature in value.features):
+        raise ValueError("every feature bbox must match the admitted geographic frame dimensions")
     features = [
         {
             "id": segment_id(
@@ -113,11 +131,13 @@ def build_feature_index(
                 provider_original_id=provider_original_id,
                 provider_revision=provider_revision,
                 provider_feature_id=feature.provider_feature_id,
+                source_sha256=source_sha256,
             ),
             "provider_feature_id": feature.provider_feature_id,
             "kind": feature.kind.value,
             "bbox": list(feature.bbox),
             "label": feature.label,
+            "render_batch_id": feature.render_batch_id,
         }
         for feature in value.features
     ]
@@ -125,6 +145,7 @@ def build_feature_index(
     payload = {
         "profile": FEATURE_INDEX_PROFILE,
         "admission_id": str(admission_id),
+        "place_id": str(place_id),
         "provider": {
             "key": provider_key,
             "original_id": provider_original_id,
@@ -140,6 +161,7 @@ def build_feature_index(
             "receipt_sha256": render_receipt_sha256,
         },
         "geographic_frame": geographic_frame.model_dump(mode="json"),
+        "coordinate_scale": geographic_bounds.coordinate_scale,
         "geographic_bounds": geographic_bounds.model_dump(mode="json"),
         "features": features,
     }
@@ -155,6 +177,7 @@ def validate_feature_index(
     data: bytes,
     *,
     admission_id: uuid.UUID,
+    place_id: uuid.UUID,
     source_sha256: str,
     source_receipt_sha256: str,
     render_asset_id: uuid.UUID,
@@ -174,10 +197,12 @@ def validate_feature_index(
     if set(payload) != {
         "profile",
         "admission_id",
+        "place_id",
         "provider",
         "source",
         "render_asset",
         "geographic_frame",
+        "coordinate_scale",
         "geographic_bounds",
         "features",
     }:
@@ -186,6 +211,7 @@ def validate_feature_index(
         raise ValueError("the environment feature index payload disagrees with its digest")
     expected = {
         "admission_id": str(admission_id),
+        "place_id": str(place_id),
         "source": {
             "content_sha256": source_sha256,
             "receipt_sha256": source_receipt_sha256,
@@ -204,6 +230,7 @@ def validate_feature_index(
     bounds = GeographicBounds.model_validate(payload.get("geographic_bounds"))
     if (
         bounds.frame_name != frame.name
+        or payload.get("coordinate_scale") != bounds.coordinate_scale
         or not isinstance(provider, dict)
         or set(provider) != {"key", "original_id", "revision"}
         or any(not isinstance(provider[key], str) or not provider[key] for key in provider)
@@ -221,6 +248,7 @@ def validate_feature_index(
             "kind",
             "bbox",
             "label",
+            "render_batch_id",
         }:
             raise ValueError("an environment feature record is malformed")
         feature = EnvironmentFeatureInput.model_validate(
@@ -229,6 +257,7 @@ def validate_feature_index(
                 "kind": raw["kind"],
                 "bbox": raw["bbox"],
                 "label": raw["label"],
+                "render_batch_id": raw["render_batch_id"],
             }
         )
         expected_id = segment_id(
@@ -236,15 +265,27 @@ def validate_feature_index(
             provider_original_id=str(provider["original_id"]),
             provider_revision=str(provider["revision"]),
             provider_feature_id=feature.provider_feature_id,
+            source_sha256=source_sha256,
         )
         if raw["id"] != expected_id:
             raise ValueError("an environment feature id is not provider-derived")
         identifiers.append(expected_id)
         provider_ids.append(feature.provider_feature_id)
+        if len(feature.bbox) != len(frame.axis_order) * 2:
+            raise ValueError(
+                "an environment feature bbox disagrees with the geographic frame dimensions"
+            )
     if identifiers != sorted(identifiers) or len(identifiers) != len(set(identifiers)):
         raise ValueError("environment features must be sorted and unique")
     if len(provider_ids) != len(set(provider_ids)):
         raise ValueError("provider feature identifiers must be unique")
+    batch_ids = [
+        feature["render_batch_id"]
+        for feature in raw_features
+        if feature["render_batch_id"] is not None
+    ]
+    if len(batch_ids) != len(set(batch_ids)):
+        raise ValueError("render batch identifiers must be unique")
     return payload
 
 
@@ -255,13 +296,28 @@ def filter_features(
     kind: EnvironmentFeatureKind | None = None,
     bbox: tuple[int, ...] | None = None,
     label: str | None = None,
+    dimensions: int,
 ) -> list[dict[str, Any]]:
-    """Apply typed exact filters; bbox means exact integer-coordinate equality."""
+    """Apply exact identity filters and inclusive spatial bbox intersection."""
+    if bbox is not None and len(bbox) != dimensions * 2:
+        raise InvalidEnvironmentFeatureFilter(
+            "query bbox dimensionality must match the catalog geographic frame"
+        )
+
+    def intersects(feature_bbox: list[int]) -> bool:
+        if bbox is None:
+            return True
+        return all(
+            feature_bbox[axis] <= bbox[axis + dimensions]
+            and bbox[axis] <= feature_bbox[axis + dimensions]
+            for axis in range(dimensions)
+        )
+
     return [
         feature
         for feature in features
         if (feature_id is None or feature["id"] == feature_id)
         and (kind is None or feature["kind"] == kind.value)
-        and (bbox is None or tuple(feature["bbox"]) == bbox)
+        and intersects(feature["bbox"])
         and (label is None or feature["label"] == label)
     ]
