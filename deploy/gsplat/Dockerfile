@@ -27,6 +27,27 @@ RUN python -c 'import os,re; assert re.fullmatch("[0-9a-f]{40}", os.environ["EXU
 COPY exulanica /app/exulanica
 COPY LICENSE THIRD_PARTY_NOTICES.md /app/
 ENV PYTHONPATH=/app
+# Exercise the production pixel path: importing the runner alone leaves decoder imports lazy.
+RUN python - <<'PY'
+import io
+import tempfile
+from pathlib import Path
+
+from PIL import Image
+
+from exulanica.reconstruction.gsplat_runner import decode_rgb_uint8
+
+with tempfile.TemporaryDirectory() as directory:
+    path = Path(directory) / "generated-pixel-smoke.png"
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 6), (17, 34, 51)).save(buffer, format="PNG")
+    path.write_bytes(buffer.getvalue())
+    pixels = decode_rgb_uint8({"path": path})
+    assert pixels.shape == (6, 8, 3)
+    assert str(pixels.dtype) == "uint8"
+    assert (pixels == [17, 34, 51]).all()
+print("Production generated-pixel decode passed")
+PY
 RUN python -m pip freeze > /opt/runtime-requirements.txt \
     && chmod -R a+rX /opt/torch-cache /opt/gsplat /app
 WORKDIR /app
