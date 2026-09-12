@@ -17,6 +17,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.graph.asset_read_policy import evaluation_time, image_source
 from exulanica.graph.wire_numbers import decimal_string, decimal_strings
 from exulanica.reconstruction.placement import recovered_camera_records
+from exulanica.reconstruction.source_lineage import verify_decoded_receipt
 from exulanica.store.base import ContentAddressedStore
 
 PROFILE = "exulanica.world-read-view/v1"
@@ -165,6 +166,16 @@ def descriptor(
             and lineage["read_sha256"] == frame["sha256"],
             "view_source_lineage_unavailable",
         )
+        decoded = lineage.get("decoded_source")
+        if decoded is not None:
+            verify_decoded_receipt(
+                decoded, source_sha256=original, output_sha256=decoded["record"]["output_sha256"]
+            )
+            if lineage["mode"] == "decoded":
+                require(
+                    frame["sha256"] == decoded["record"]["output_sha256"],
+                    "view_decoded_source_mismatch",
+                )
         if lineage["mode"] == "masked":
             require(
                 lineage["mask_manifest"]["state"] == "available"
@@ -188,6 +199,12 @@ def descriptor(
         ).fetchone()
         require(span is not None, "view_evidence_span_missing")
         facts = image_facts(store.get(BlobId(selected)), selected.hex())
+        if decoded is not None:
+            grid = decoded["record"]["pixel_grid"]
+            require(
+                (facts["width"], facts["height"]) == (grid["width"], grid["height"]),
+                "view_decoded_pixel_grid_mismatch",
+            )
         check_pixels(facts, view["camera"])
         body = {
             "profile": PROFILE,
@@ -201,7 +218,7 @@ def descriptor(
             "pose_receipt_sha256": pose["sha256"],
             "recorded_evidence_sha256": evidence["evidence_sha256"],
             "consent_binding_sha256": consent_binding(connection, workspace, view["capture_id"]),
-            "kind": "original" if original == selected.hex() else "masked",
+            "kind": lineage["mode"],
             "pixel_transform": "identity_no_crop_no_resize_no_orientation",
             "camera": view["camera"],
         }
@@ -311,11 +328,21 @@ def verify_view(view: dict[str, Any], record: dict[str, Any], data: bytes | None
             and value["sha256"] == value["pose_input_sha256"] == frame["sha256"],
             "view_source_lineage_mismatch",
         )
-        require(
-            value["kind"]
-            == ("original" if value["sha256"] == value["source_sha256"] else "masked"),
-            "view_kind_mismatch",
-        )
+        point = next(p for p in record["point_maps"] if p["capture_id"] == view["capture_id"])
+        lineage = point["lineage"]
+        require(value["kind"] == lineage["mode"], "view_kind_mismatch")
+        decoded = lineage.get("decoded_source")
+        if decoded is not None:
+            verify_decoded_receipt(
+                decoded,
+                source_sha256=value["source_sha256"],
+                output_sha256=decoded["record"]["output_sha256"],
+            )
+            if lineage["mode"] == "decoded":
+                require(
+                    value["sha256"] == decoded["record"]["output_sha256"],
+                    "view_decoded_source_mismatch",
+                )
         require(data is not None, "downloaded_view_missing")
         facts = image_facts(data, value["sha256"])
         require(
@@ -324,6 +351,12 @@ def verify_view(view: dict[str, Any], record: dict[str, Any], data: bytes | None
             ),
             "view_decoded_metadata_mismatch",
         )
+        if decoded is not None:
+            grid = decoded["record"]["pixel_grid"]
+            require(
+                (facts["width"], facts["height"]) == (grid["width"], grid["height"]),
+                "view_decoded_pixel_grid_mismatch",
+            )
         check_pixels(facts, value["camera"])
         return {
             "state": "verified",

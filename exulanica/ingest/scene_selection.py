@@ -12,6 +12,7 @@ from exulanica.ingest.privacy import admit_reconstruction_scene
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.scene_splat import SceneSplatRequest
 from exulanica.ingest.scenes import SceneGroup
+from exulanica.ingest.source_inputs import decoded_source_declarations, training_decoded_lineage
 from exulanica.ingest.stages import stage
 
 __all__ = [
@@ -112,6 +113,7 @@ def _enqueue_capture_set(
     # when a declared one has gone stale: an unready scene is not the same thing as a scene whose
     # privacy inputs and derivatives disagree, and only the second is worth an operator's attention.
     masked_sources = masked_source_declarations(repository, capture_ids)
+    decoded_sources = decoded_source_declarations(repository, capture_ids)
     build_inputs = {
         "profile": "exulanica.reconstruction-scene-build-input/v1",
         "point_maps": [
@@ -133,6 +135,7 @@ def _enqueue_capture_set(
         # therefore the job id, which is exactly the design's requirement that a consent change
         # produce a new build rather than mutate an accepted one.
         **({"masked_sources": masked_sources} if masked_sources else {}),
+        **({"decoded_sources": decoded_sources} if decoded_sources else {}),
         "stages": [
             {
                 "key": key,
@@ -167,6 +170,9 @@ def _enqueue_capture_set(
         # hashes are a subset of the training sources is left exactly as strict as it was.
         splat_training = splat_training.bind_masked_sources(
             masked_source_remap(repository, masked_sources), sources=tuple(source_hashes)
+        )
+        splat_training = splat_training.bind_decoded_sources(
+            training_decoded_lineage(decoded_sources), sources=tuple(source_hashes)
         )
         build_inputs["splat_training"] = splat_training.as_payload()
     return repository.enqueue_reconstruction_scene(

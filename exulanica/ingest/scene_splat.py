@@ -24,6 +24,7 @@ from exulanica.errors import TombstonedError
 from exulanica.ingest.stages import STAGES
 from exulanica.reconstruction.gsplat_protocol import GSPLAT_REVISION
 from exulanica.reconstruction.pose import CommandResult, PoseBuildManifest
+from exulanica.reconstruction.source_lineage import decoded_training_sources
 from exulanica.reconstruction.splat import SplatBuildManifest
 
 
@@ -200,6 +201,7 @@ class SceneSplatRequest:
     #: Derived from current privacy inputs at enqueue by :meth:`bind_masked_sources` and never
     #: declared by an operator, who cannot know a derivative digest that does not exist yet.
     masked_source_remap: tuple[tuple[str, str, str], ...] = ()
+    decoded_source_lineage: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         for name, value in asdict(self).items():
@@ -209,6 +211,7 @@ class SceneSplatRequest:
                 "dependency_inventory",
                 "heldout_source_sha256",
                 "masked_source_remap",
+                "decoded_source_lineage",
             }:
                 continue
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -236,6 +239,7 @@ class SceneSplatRequest:
         ):
             raise ValueError("training request needs exact held-out source hashes")
         _validate_remap(self.masked_source_remap)
+        decoded_training_sources(self.decoded_source_lineage, self.masked_source_remap)
 
     def validate_sources(self, sources: tuple[str, ...]) -> None:
         heldout = set(self.heldout_source_sha256)
@@ -286,6 +290,10 @@ class SceneSplatRequest:
             }
         else:
             value.pop("masked_source_remap")
+        if self.decoded_source_lineage:
+            value["decoded_source_lineage"] = list(self.decoded_source_lineage)
+        else:
+            value.pop("decoded_source_lineage")
         canonical_json(value)  # Reject floats or other noncanonical queue input.
         return value
 
@@ -299,9 +307,11 @@ class SceneSplatRequest:
                 raise ValueError(f"training request {key} must be a list")
             arguments[key] = tuple(arguments[key])
         if "masked_source_remap" in arguments:
-            arguments["masked_source_remap"] = _remap_from_payload(
-                arguments["masked_source_remap"]
-            )
+            arguments["masked_source_remap"] = _remap_from_payload(arguments["masked_source_remap"])
+        if "decoded_source_lineage" in arguments:
+            if not isinstance(arguments["decoded_source_lineage"], list):
+                raise ValueError("decoded source lineage must be a list")
+            arguments["decoded_source_lineage"] = tuple(arguments["decoded_source_lineage"])
         try:
             request = cls(**arguments)
         except TypeError as error:
@@ -345,6 +355,21 @@ class SceneSplatRequest:
             raise ValueError("a masked source remap collapses two held-out photographs into one")
         return replace(self, heldout_source_sha256=heldout, masked_source_remap=entries)
 
+    def bind_decoded_sources(
+        self, lineage: tuple[dict[str, Any], ...], *, sources: tuple[str, ...]
+    ) -> SceneSplatRequest:
+        if self.decoded_source_lineage:
+            raise ValueError("decoded source lineage is derived at enqueue, never declared")
+        resolved = decoded_training_sources(lineage, self.masked_source_remap)
+        if any(original not in sources for original, _, _ in resolved.values()):
+            raise ValueError("decoded source lineage is outside the admitted scene")
+        remap = {original: selected for original, selected, _ in resolved.values()}
+        return replace(
+            self,
+            decoded_source_lineage=lineage,
+            heldout_source_sha256=tuple(remap.get(d, d) for d in self.heldout_source_sha256),
+        )
+
     def manifest(self, pose: PoseBuildManifest) -> SplatBuildManifest:
         """Bind the frozen remap to the frames this build will stage, or refuse the build.
 
@@ -362,12 +387,18 @@ class SceneSplatRequest:
                     "the frozen masked source remap does not bind the derivative this scene's "
                     "pose frames carry; rebuild the mask and re-admit the scene"
                 )
+        for capture_ref, (_, selected, _) in decoded_training_sources(
+            self.decoded_source_lineage, self.masked_source_remap
+        ).items():
+            if carried.get(capture_ref) != selected:
+                raise ValueError("decoded source lineage disagrees with exact pose frame")
         return SplatBuildManifest(
             scene_ref=pose.scene_ref,
             code_revision=pose.code_revision,
             pose_manifest_digest=pose.digest,
             source_sha256=tuple(frame.sha256 for frame in pose.frames),
             masked_source_remap=self.masked_source_remap,
+            decoded_source_lineage=self.decoded_source_lineage,
             gsplat_revision=GSPLAT_REVISION,
             execution_image=self.execution_image,
             requested_gpu=self.requested_gpu,

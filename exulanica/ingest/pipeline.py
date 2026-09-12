@@ -42,7 +42,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final
 
@@ -50,6 +50,7 @@ from PIL import Image
 
 from exulanica.canonical import sha256_digest
 from exulanica.consent.regions import PersonDetector, Silhouette
+from exulanica.epistemics.source_images import normalized_image
 from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence import EvidenceAddress
 from exulanica.evidence.blob import BlobId
@@ -58,7 +59,6 @@ from exulanica.ingest.committed_store import committed_writes as flush_committed
 from exulanica.ingest.decode import UNREADABLE, open_upright
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger, StageRecorder
-from exulanica.ingest.masking import mask_image
 from exulanica.ingest.person_receipts import consent_state_digest, region_set_digest
 from exulanica.ingest.person_state import region_state_for_capture
 from exulanica.ingest.report import IngestOutcome, IngestReport
@@ -69,6 +69,7 @@ from exulanica.ingest.stages import (
     artifact_id_for,
     pipeline_digest,
 )
+from exulanica.ingest.stages import decoded_source as decoded_source_stage
 from exulanica.ingest.stages import depth as depth_stage
 from exulanica.ingest.stages import intake as intake_stage
 from exulanica.ingest.stages import masked_source as masked_source_stage
@@ -90,7 +91,9 @@ from exulanica.store.base import ContentAddressedStore
 
 __all__ = ["SUPPORTED_SUFFIXES", "PhotoIngestPipeline"]
 
-SUPPORTED_SUFFIXES: Final = frozenset({".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"})
+SUPPORTED_SUFFIXES: Final = frozenset(
+    {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".heic", ".heif"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +111,8 @@ class _Prepared:
     intake: StageResult
     upright: Image.Image
     facts: ExifFacts
+    decoded: StageResult | None = None
+    decoded_receipt_sha256: bytes | None = None
 
 
 class PhotoIngestPipeline:
@@ -510,13 +515,39 @@ class PhotoIngestPipeline:
         )
         ledger.attach_capture(capture_id)
         outcome.capture_id = capture_id
-        return _Prepared(
+        prepared = _Prepared(
             blob_id=blob_id,
             capture_id=capture_id,
             image_span_id=image_span_id,
             intake=intake,
             upright=upright,
             facts=facts,
+        )
+        return self._decoded_source(prepared, ledger, outcome)
+
+    def _decoded_source(
+        self, prepared: _Prepared, ledger: Ledger, outcome: IngestOutcome
+    ) -> _Prepared:
+        if prepared.facts.codec != "HEIF" or prepared.decoded is not None:
+            return prepared
+        decoded = decoded_source_stage.run(
+            self, prepared.blob_id, prepared.upright, prepared.intake, ledger, outcome
+        )
+        image, _ = open_upright(self._store.get(BlobId(decoded.content_sha256)))
+        selected = normalized_image(
+            self._repository.connection, self._repository.workspace_id, prepared.blob_id.digest
+        )
+        if (
+            selected is None
+            or selected.decoded is None
+            or selected.sha256 != decoded.content_sha256
+        ):
+            raise ValueError("decoded source no longer matches current decoder inventory")
+        return replace(
+            prepared,
+            upright=image,
+            decoded=decoded,
+            decoded_receipt_sha256=bytes.fromhex(selected.decoded["record_sha256"]),
         )
 
     def _derivatives(
@@ -527,8 +558,16 @@ class PhotoIngestPipeline:
         *,
         privacy_screening_id: uuid.UUID | None,
     ) -> None:
+        prepared = self._decoded_source(prepared, ledger, outcome)
         rendition = rendition_stage.run(
-            self, prepared.blob_id, prepared.upright, prepared.intake, ledger, outcome
+            self,
+            prepared.blob_id,
+            prepared.upright,
+            prepared.intake,
+            ledger,
+            outcome,
+            decoded=prepared.decoded,
+            decoded_receipt_sha256=prepared.decoded_receipt_sha256,
         )
         vision = vision_stage.run(
             self,
@@ -579,6 +618,8 @@ class PhotoIngestPipeline:
             outcome,
             privacy_screening_id,
             masked=masked,
+            decoded=prepared.decoded,
+            decoded_receipt_sha256=prepared.decoded_receipt_sha256,
             masked_image=masked_image,
             consent_digests=consent_digests,
         )
@@ -599,6 +640,8 @@ class PhotoIngestPipeline:
             outcome,
             privacy_screening_id,
             masked=masked,
+            decoded=prepared.decoded,
+            decoded_receipt_sha256=prepared.decoded_receipt_sha256,
             masked_image=masked_image,
             consent_digests=consent_digests,
             person_outlines=people,
@@ -641,15 +684,14 @@ class PhotoIngestPipeline:
             prepared.intake,
             ledger,
             outcome,
+            decoded=prepared.decoded,
+            decoded_receipt_sha256=prepared.decoded_receipt_sha256,
         )
         if masked is None:
             return None, None, digests, people
-        hidden = masked_source_stage.hidden_outlines(state.outlines, state.resolved)
-        image = mask_image(
-            prepared.upright,
-            hidden,
-            dilation_millionths=int(STAGES["masked_source"].params["dilation_millionths"]),
-        )
+        # Load the exact persisted JPEG that pose will stage. Recomputing the fill in memory
+        # would hand depth different pixels from the lossy encoded mask named by its receipt.
+        image, _ = open_upright(self._store.get(BlobId(masked.content_sha256)))
         return masked, image, digests, people
 
 

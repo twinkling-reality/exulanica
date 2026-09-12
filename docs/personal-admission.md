@@ -296,3 +296,33 @@ uv run python -m exulanica.ingest.personal_admission_command --schema exulanica_
 ```sh
 EXULANICA_DATABASE_URL='dbname=exulanica_spine_test host=localhost port=5433 hostaddr=127.0.0.1 options=-csearch_path=exulanica_personal_evidence_5f20ec58ae9948bfafc6e102fa88b063,public' uv run python -m exulanica.orchestration.cli preflight --manifest docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-manifest.json --photo-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/photos --data-dir docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/data --output docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/frontier-output --private-key docs/evaluation/artifacts/2026-09-08-command-personal-admission-flow/not-supplied.pem
 ```
+
+
+## HEIC source lineage
+
+HEIC/HEIF intake retains the exact uploaded bytes and evidence address. It also records an
+immutable `decoded_source` PNG artifact, binding the original SHA-256, output SHA-256, actual
+decoder inventory, conversion options, and display pixel grid. The pinned decoder and its
+LGPL components are documented in [the license matrix](license-matrix.md#11-heic-decoder-inspection-and-pin-2026-09-12).
+Only single-frame images within the common pixel limit are accepted. Conversion normalizes
+to RGB8, removes metadata, discards alpha, and does not perform ICC color management.
+
+The source inventory and viewer route select that PNG with `image/png` and explicit decoded
+provenance. The evidence route continues to return the camera original when current permissions
+allow it. A conversion receipt grants no detection, likeness, or geometry permission. Human
+screening and current consent still govern geometry; a capture needing privacy masking uses a
+separate JPEG mask whose receipt binds the normalized predecessor and its decoder receipt.
+Depth and segmentation load those exact persisted bytes, as pose and training do.
+
+Decoder inventory or conversion-option changes invalidate normalized inputs and dependent masks,
+even when a new decoder produces the same PNG bytes. Queued work must be rebuilt and admitted
+again when these bindings move. Depth and segmentation version 2 also invalidate earlier cache
+entries that named a mask JPEG but consumed pixels before its JPEG encoding. No existing artifact
+is relabelled. Splat manifests carry decoded lineage separately from privacy masks and preserve
+the original identity of held-out photographs. Offline readers verify the receipt and selected
+image grid before accepting training inputs or downloaded views.
+
+Migration 0045 is exercised only in owned scratch schemas in this repair. Advancing the running
+API database is an integration operation; the retained first-place database remains untouched.
+Synthetic HEIC tests use local model doubles. They do not establish real model quality or hosted
+vision acceptance, and no paid model call is authorized by this document.

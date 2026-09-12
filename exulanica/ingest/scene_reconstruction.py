@@ -428,10 +428,10 @@ class SceneReconstructionProcessor:
                     )
                     registrations = [
                         (
-                            member.capture_id,
-                            _filename(member.ordinal, member.media_type) in registered_names,
+                            uuid.UUID(frame.capture_ref),
+                            frame.filename in registered_names,
                         )
-                        for member in claimed.members
+                        for frame in manifest.frames
                     ]
                     # The projection is written last because it binds all three receipts, and
                     # inside the gate stage because `_accept` needs every recorder still open.

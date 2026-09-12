@@ -48,7 +48,20 @@ class FakeRepository:
 
     current: dict[uuid.UUID, CaptureArtifactRow]
     exact: dict[uuid.UUID, CaptureArtifactRow]
-    captures: dict[uuid.UUID, object] = field(default_factory=dict)
+    captures: dict[uuid.UUID, object] = field(
+        default_factory=lambda: {
+            CAPTURE_A: FakeCapture(ORIGINAL_A),
+            CAPTURE_B: FakeCapture(ORIGINAL_B),
+        }
+    )
+
+    def execute(self, sql, params):
+        assert "select media_type from blob" in sql
+        assert params[0] in {ORIGINAL_A.digest, ORIGINAL_B.digest}
+        return self
+
+    def fetchone(self):
+        return {"media_type": "image/jpeg"}
 
     def current_capture_artifacts(self, *, capture_ids, kind):
         assert kind == "masked_source"
@@ -117,7 +130,7 @@ def _declared():
                 "capture_ref": str(CAPTURE_A),
                 "artifact_ref": str(ARTIFACT_A),
                 "content_sha256": MASKED_A.hex,
-                "media_type": "image/png",
+                "media_type": "image/jpeg",
                 "stage_version": 1,
                 "stage_params_sha256": "00" * 32,
             }
@@ -156,7 +169,7 @@ def test_reconstruction_reads_the_masked_derivative_not_the_original():
     rebound = apply_masked_sources(repository, _job(_declared()))
     by_capture = {member.capture_id: member for member in rebound.members}
     assert by_capture[CAPTURE_A].blob_id == MASKED_A
-    assert by_capture[CAPTURE_A].media_type == "image/png"
+    assert by_capture[CAPTURE_A].media_type == "image/jpeg"
 
 
 def test_a_member_with_nobody_hidden_still_reads_its_original():
@@ -261,3 +274,13 @@ def test_a_withdrawn_masked_member_has_no_original_to_remap_onto():
     declared = masked_source_declarations(repository, [CAPTURE_A])
     with pytest.raises(PrivacyAdmissionError, match="absent or deleted"):
         masked_source_remap(repository, declared)
+
+
+def test_a_mask_with_a_forged_media_type_is_refused():
+    repository = FakeRepository(
+        current={}, exact={CAPTURE_A: _row(CAPTURE_A, ARTIFACT_A, MASKED_A)}
+    )
+    declared = _declared()
+    declared["masked_sources"][0]["media_type"] = "image/png"
+    with pytest.raises(PrivacyAdmissionError, match="wrong media type"):
+        apply_masked_sources(repository, _job(declared))

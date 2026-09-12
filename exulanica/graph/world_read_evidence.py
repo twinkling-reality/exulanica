@@ -11,6 +11,7 @@ from typing import Any
 import psycopg
 
 from exulanica.canonical import sha256_of_canonical
+from exulanica.epistemics.source_images import decoded_for_artifact
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store import ContentAddressedStore
@@ -135,13 +136,25 @@ def recorded_evidence(
             else:
                 original = _hex(row["source_blob_sha256"])
                 read = _hex(row["read_source_sha256"]) or original
+                try:
+                    decoded = decoded_for_artifact(
+                        connection, workspace, uuid.UUID(point["artifact_ref"])
+                    )
+                except ValueError:
+                    decoded = None
+                normalized = decoded["record"]["output_sha256"] if decoded else None
                 lineage = {
                     "state": "available",
                     "source_sha256": original,
                     "read_sha256": read,
-                    "mode": "original" if read == original else "masked",
+                    "mode": "original"
+                    if read == original
+                    else "decoded"
+                    if read == normalized
+                    else "masked",
+                    **({"decoded_source": decoded} if decoded is not None else {}),
                 }
-                if read != original:
+                if lineage["mode"] == "masked":
                     # Search retained manifests by their actual content, never a current key.
                     candidates = connection.execute(
                         "select content_sha256 from artifact where workspace_id=%s "
@@ -173,7 +186,7 @@ def recorded_evidence(
                             **unavailable("exact_mask_manifest_unavailable"),
                             "candidate_reasons": sorted(candidate_reasons),
                         }
-                if read != original:
+                if lineage["mode"] == "masked":
                     lineage["mask_build"] = _mask_build(
                         connection, workspace, row["privacy_screening_id"], original, read
                     )
@@ -340,7 +353,19 @@ def _mask_build(
         (workspace, original),
     ).fetchall()
     inputs = record["privacy_inputs"]
+    try:
+        decoded = decoded_for_artifact(connection, workspace, mask_artifact_id)
+    except ValueError:
+        return unavailable("mask_decoded_predecessor_ambiguous")
     return {
+        **(
+            {
+                "predecessor_sha256": decoded["record"]["output_sha256"],
+                "decoded_receipt_sha256": decoded["record_sha256"],
+            }
+            if decoded
+            else {}
+        ),
         "state": "available",
         "screening_id": str(screening_id),
         "mask_artifact_id": masks[0]["artifact_id"],
@@ -428,6 +453,11 @@ def receipt_problem(value: object, expected_profile: str) -> str | None:
         return "receipt_unsupported_profile"
     if not _shape(value, schema):
         return "receipt_unsupported_shape"
-    if set(value) != set(schema):
+    optional = (
+        {"predecessor_sha256", "decoded_receipt_sha256"}
+        if expected_profile == MASK_PROFILE
+        else set()
+    )
+    if set(value) - set(schema) not in (set(), optional):
         return "receipt_unsupported_fields"
     return None

@@ -28,6 +28,7 @@ from typing import Any
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.source_inputs import verify_decoded_sources
 from exulanica.ingest.spine.privacy import current_inputs, mask_is_current, selected_masks
 from exulanica.ingest.spine.reconstruction_jobs import ClaimedSceneJob
 from exulanica.ingest.spine.scope import WorkspaceScope
@@ -169,6 +170,8 @@ def verify_masked_sources(
         ):
             raise PrivacyAdmissionError("the declared masked source is stale; rebuild and re-admit")
         digest, media_type = expected[capture_id]
+        if media_type != "image/jpeg":
+            raise PrivacyAdmissionError("a masked source declaration has the wrong media type")
         if row.content_sha256.hex() != digest:
             raise PrivacyAdmissionError(
                 f"the masked derivative for capture {capture_id} is not the bytes this job "
@@ -184,7 +187,8 @@ def apply_masked_sources(repository: IngestRepository, claimed: ClaimedSceneJob)
     A copy, never a mutation. The caller keeps the original ``claimed`` for the deletion and
     tombstone boundary; see the module docstring for why those two must not move.
     """
-    resolved = verify_masked_sources(repository, claimed)
+    resolved = verify_decoded_sources(repository, claimed)
+    resolved.update(verify_masked_sources(repository, claimed))
     if not resolved:
         return claimed
     members = tuple(

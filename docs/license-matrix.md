@@ -566,32 +566,44 @@ All primary sources retrieved **2026-08-27**. No claim in this document has been
 catalog entry, not an observed response.
 
 
-## 11. HEIC decoder candidate review, 2026-09-11
+## 11. HEIC decoder inspection and pin, 2026-09-12
 
-**Candidate only, not installed or added to the lock.** `pi-heif==1.4.0` provides a decode-only
-alternative to Pillow-Heif. The inspected Python 3.11 macOS arm64 wheel contains BSD-3-Clause
-wrapper code and declares LGPLv3 for bundled libheif and libde265. Its bundled notice lists no
-x265 encoder. The Python wrapper's BSD metadata alone would therefore be an incomplete license
-claim. [Package and wheel inventory](https://pypi.org/project/pi-heif/1.4.0/).
+`pi-heif==1.4.0` is pinned in the backend dependency lock. The installed Python 3.11 macOS
+arm64 wheel has BSD-3-Clause wrapper code and LGPLv3 bundled libheif/libde265. This is
+not a BSD-only dependency. The wrapper LICENSE and bundled notices were read in full;
+the inspection record retains their text and hashes. [Package inventory](https://pypi.org/project/pi-heif/1.4.0/).
 
 Inspected wheel: `pi_heif-1.4.0-cp311-cp311-macosx_11_0_arm64.whl`, SHA-256
 `dafa2ea7e7ff594f64fa60e0cd25b3dea9d200277d7aed9fb2b73835fa41fb6d`.
-The wheel's `LICENSE.txt` digest is
-`9e2635f155b00af5a46cb2f2c9b052072ec546d59837ee74efc9cba2cbb83f3d`; its
+The installed `LICENSE.txt` digest is
+`9e2635f155b00af5a46cb2f2c9b052072ec546d59837ee74efc9cba2cbb83f3d`; the
 `LICENSES_bundled.txt` digest is
 `8155948291bc988b17fa600308e359be32111c1a22aef1dab7b330f17b8106d3`.
 
-The bundled notice points to [libheif v1.18.1 COPYING](https://github.com/strukturag/libheif/blob/v1.18.1/COPYING)
-and [libde265 v1.0.15 COPYING](https://github.com/strukturag/libde265/blob/v1.0.15/COPYING).
-Those primary texts were read, including LGPLv3's additional permissions and its incorporated GPLv3
-terms. LGPLv3 permits application use under separate terms, subject to its conditions. Distribution
-requires the applicable notices and license texts, plus a suitable replaceable shared-library
-mechanism or corresponding source and relinking material. Runtime use is not a finding that
-binary redistribution obligations have been fulfilled. These notices name source versions; the
-actual compiled library versions and Linux wheel contents remain unverified.
+Runtime inspection reports **libheif 1.23.0 and libde265 1.1.0**. The bundled notice links
+older source versions (libheif 1.18.1 and libde265 1.0.15); that mismatch is recorded rather
+than treating the notice as an actual binary-version inventory. The matching primary
+[libheif 1.23.0 COPYING](https://github.com/strukturag/libheif/blob/v1.23.0/COPYING) and
+[libde265 1.1.0 COPYING](https://github.com/strukturag/libde265/blob/v1.1.0/COPYING)
+were also read, including the incorporated GPLv3 text. LGPLv3 permits application use
+under separate terms subject to its conditions. Distribution requires applicable notices
+and license texts plus the appropriate library replacement/relinking and source provisions.
+This local decoder inspection does not establish fulfilled binary redistribution obligations.
+Linux wheel contents and behavior remain unmeasured. The actual installed runtime reports
+no HEIF or AVIF encoder, and only the built-in mask encoder; no x265 dependency was added.
 
-This is evidence for a viable LGPL decoder candidate, not evidence that no license-clean decoder
-exists. No decoder has been approved for redistribution. The current implementation blocker is
-separate: the writable set excludes dependency pins and ingest stage wiring, and migration 0040
-requires any non-null geometry `read_source_sha256` to resolve to a current masked-source artifact.
-A distinct format conversion must not bypass that guard or masquerade as a privacy mask.
+The common decoder opens one frame under the existing 64-million-pixel limit. libheif applies
+HEIF container transformations; its Pillow adapter removes consumed EXIF orientation. The
+normalized artifact stores metadata-free RGB8 PNG pixels with compression level 6. HDR is
+converted to 8 bits by the decoder; alpha is discarded and no ICC color transformation is
+applied. This is a lossless PNG encoding of those decoded RGB pixels, not preservation of HDR,
+alpha, color-management semantics, or original encoded bytes. Actual decoder/library/Pillow
+versions and these options are bound into the stage registry and each immutable receipt.
+The earlier JPEG memory measurements do not measure HEIC conversion's peak memory.
+
+The retained fixture is original synthetic four-quadrant artwork, converted with macOS `sips`;
+no encoder package was installed. It contains no personal photographs. See the
+[fixture manifest](../tests/fixtures/personal-heic/manifest.json) and
+[decoder inspection](evaluation/artifacts/2026-09-11-heic-source-lineage/decoder-inspection.json).
+Conversion lineage is separate from privacy masking. Migration 0045 requires a current
+normalized predecessor and, when consent requires it, a current mask of that predecessor.

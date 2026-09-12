@@ -55,6 +55,8 @@ def run(
     outcome: IngestOutcome,
     privacy_screening_id: uuid.UUID | None,
     masked: StageResult | None = None,
+    decoded: StageResult | None = None,
+    decoded_receipt_sha256: bytes | None = None,
     masked_image: Image.Image | None = None,
     consent_digests: tuple[bytes, ...] = (),
 ) -> None:
@@ -82,7 +84,14 @@ def run(
     # existing point map by key and reuse it, and the person who withdrew would stay in the
     # geometry while every receipt said they had gone.
     input_digest = input_digest_of(
-        [intake.content_sha256, screening.receipt_digest, *consent_digests]
+        [
+            intake.content_sha256,
+            screening.receipt_digest,
+            *consent_digests,
+            *([masked.content_sha256] if masked is not None else []),
+            *([decoded.content_sha256] if decoded is not None else []),
+            *([decoded_receipt_sha256] if decoded_receipt_sha256 is not None else []),
+        ]
     )
     key = idempotency_key(blob_id, spec, input_digest, binding=binding)
     existing = writes.repository.find_artifact(key)
@@ -92,7 +101,13 @@ def run(
         return
 
     with ledger.stage(
-        spec, input_artifact_ids=[intake.artifact_id], input_blob=blob_id
+        spec,
+        input_artifact_ids=[
+            intake.artifact_id,
+            *([decoded.artifact_id] if decoded else []),
+            *([masked.artifact_id] if masked else []),
+        ],
+        input_blob=blob_id,
     ) as recorder:
         # The masked derivative when anybody in this photograph is hidden, the original otherwise.
         # This is the line that makes "mask before, not only after" true: a person who never
@@ -159,13 +174,20 @@ def run(
                 input_digest=input_digest,
                 payload=payload,
                 recorder=recorder,
+                produced_by_event=recorder.stage_started_event,
                 outcome=outcome,
                 pending=pending,
                 privacy_screening_id=screening.screening_id,
                 # Names the exact bytes the model read. Migration 0037's trigger refuses this row
                 # when the capture requires masking and this is null or names anything but a real
                 # masked derivative of it.
-                read_source_sha256=(None if masked is None else masked.content_sha256),
+                read_source_sha256=(
+                    masked.content_sha256
+                    if masked is not None
+                    else decoded.content_sha256
+                    if decoded is not None
+                    else None
+                ),
             )
             _record_rung(writes, capture_id, image_span_id, decision, result, prediction, ledger)
     # `persist_artifact` already recorded the stage as run. Appending it here as well is what

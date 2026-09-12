@@ -48,6 +48,7 @@ import psycopg
 from fastapi import APIRouter, Header, HTTPException, Path, Query, Request, Response
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
+from exulanica.epistemics.source_images import selected_image
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import EvidenceAddress, parse_uri
 from exulanica.evidence.blob import BlobId
@@ -143,9 +144,10 @@ def masked(
         data = resolve_original_bytes(address, store)
         _authorize_original(connection, session, address, media_type)
         return _ranged(data, media_type, range_header, clock)
-    selected = image_source(
+    selection = selected_image(
         connection, session.workspace_id, address.blob_id.digest, evaluation_time(connection)
     )
+    selected = selection.sha256 if selection is not None else None
     if selected is None:
         raise HTTPException(409, "current viewer image is unavailable")
     try:
@@ -161,13 +163,24 @@ def masked(
             raise HTTPException(409, str(error)) from error
     with final_check(connection) as at:
         _check_span(connection, session, address, at)
-        if image_source(connection, session.workspace_id, address.blob_id.digest, at) != selected:
+        if (
+            selected_image(connection, session.workspace_id, address.blob_id.digest, at)
+            != selection
+        ):
             raise HTTPException(409, "viewer image permission changed")
         if bound is not None and (
             not current_binding(connection, session.workspace_id, bound, at)
             or not scene_allowed(connection, session.workspace_id, view_scene, dependencies, at)
         ):
             raise HTTPException(409, "posed view permission or lineage changed; refresh bundle")
+    clock = {
+        **clock,
+        "X-Exulanica-View-SHA256": selected.hex(),
+        "X-Exulanica-Source-SHA256": address.blob_id.hex,
+        "X-Exulanica-View-Kind": selection.kind,
+    }
+    if selection.decoded is not None:
+        clock["X-Exulanica-Decoded-Receipt"] = selection.decoded["record_sha256"]
     if bound is not None:
         media_type = bound["media_type"]
         clock = {
@@ -177,7 +190,7 @@ def masked(
         }
     return _ranged(
         data,
-        media_type if selected == address.blob_id.digest else "image/jpeg",
+        selection.media_type,
         range_header,
         clock,
     )

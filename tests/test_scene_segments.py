@@ -520,7 +520,7 @@ def _add_person(repository, captures, subject, area=PERSON, *, only_last=False):
         )
 
 
-def _published_with_person(repository, tmp_path, worker):
+def _published_with_person(repository, tmp_path, worker, *, hidden=False):
     """A published scene whose person was reviewed BEFORE the screening its point maps bind.
 
     The order production follows and `_published` cannot: a synthetic exemption is refused for a
@@ -548,6 +548,7 @@ def _published_with_person(repository, tmp_path, worker):
         repository, subject_id=subject, actor=ACTOR, consent_scope="likeness", decision="granted"
     )
     captures = []
+    unconsented = create_subject(repository, actor=ACTOR) if hidden else None
     for index in range(3):
         path = write_photo(
             photos, f"{index}.jpg", when=f"2026:09:04 12:0{index}:00", size=(160 + index, 100)
@@ -556,6 +557,13 @@ def _published_with_person(repository, tmp_path, worker):
         assert outcome.error is None, outcome.error
         captures.append(outcome.capture_id)
         _add_person(repository, captures, subject, only_last=True)
+        if hidden:
+            _add_person(
+                repository, captures, unconsented, area=((-2.0, 2.0), (-4.0, 4.0)), only_last=True
+            )
+            _add_person(
+                repository, captures, None, area=((24.0, 27.0), (-4.0, 4.0)), only_last=True
+            )
         authorization = authorize_synthetic_capture(
             repository,
             capture_id=outcome.capture_id,
@@ -566,19 +574,41 @@ def _published_with_person(repository, tmp_path, worker):
             },
             authorization_scope={"purpose": "scene segment person path"},
         )
+        if hidden:
+            from exulanica.ingest.privacy import record_person_detection_screening
+
+            detection = record_person_detection_screening(
+                repository,
+                authorization_id=authorization.authorization_id,
+                authorized_by=ACTOR,
+                purpose="Synthetic person masking test",
+            )
+            masked = pipeline.ingest_derivatives(
+                outcome.capture_id, privacy_screening_id=detection.screening_id
+            )
+            assert masked.error is None, masked.error
         screening = record_human_screening(
             repository,
             authorization_id=authorization.authorization_id,
             reviewed_by=ACTOR,
             sensitive_regions=review_list(repository, outcome.capture_id),
         )
-        write_point_map(
-            repository,
-            store,
-            BlobId.of_bytes(path.read_bytes()),
-            payload=_numeric_point_map(index),
-            privacy_screening_id=screening.screening_id,
-        )
+        if hidden:
+            from test_decoded_source_lineage import PlaneDepth
+
+            depth_pipeline = PhotoIngestPipeline(repository, store, depth=PlaneDepth())
+            depth_result = depth_pipeline.ingest_derivatives(
+                outcome.capture_id, privacy_screening_id=screening.screening_id
+            )
+            assert depth_result.error is None, depth_result.error
+        else:
+            write_point_map(
+                repository,
+                store,
+                BlobId.of_bytes(path.read_bytes()),
+                payload=_numeric_point_map(index),
+                privacy_screening_id=screening.screening_id,
+            )
     assert len(run_scene_grouping(repository).reconstruction_jobs) == 1
     claimed = repository.claim_reconstruction_scene(worker=worker, lease_seconds=60)
     executor = FakeColmap(registered=3, camera_spacing=SPACING)
@@ -665,16 +695,10 @@ def test_a_purged_point_map_withholds_the_segments_it_rests_on(repository, tmp_p
 def test_only_a_reviewed_and_shown_person_is_lifted_and_a_withdrawal_takes_them_back(
     repository, tmp_path
 ):
-    store, captures, _points, scene_id = _published(repository, tmp_path, "lift-person")
-    _segment_members(repository, store, captures, SceneSegmenter())
-    shown = create_subject(repository, actor=ACTOR)
-    record_consent(
-        repository, subject_id=shown, actor=ACTOR, consent_scope="likeness", decision="granted"
+    store, captures, shown, scene_id = _published_with_person(
+        repository, tmp_path, "lift-person", hidden=True
     )
-    _add_person(repository, captures, shown)
-    unconsented = create_subject(repository, actor=ACTOR)
-    _add_person(repository, captures, unconsented, area=((-2.0, 2.0), (-4.0, 4.0)))
-    _add_person(repository, captures, None, area=((24.0, 27.0), (-4.0, 4.0)))
+    _segment_members(repository, store, captures, SceneSegmenter())
 
     written = lift.publish_scene_segments(repository, store, scene_id)
     assert written["action"] == "written", written
@@ -697,9 +721,16 @@ def test_only_a_reviewed_and_shown_person_is_lifted_and_a_withdrawal_takes_them_
     assert [segment["kind"] for segment in after.segments] == ["object"]
     assert after.withheld_segment_count == 1
     rebuilt = lift.publish_scene_segments(repository, store, scene_id)
-    assert rebuilt["person_regions"] == 0
-    payload = json.loads(store.get(BlobId.from_hex(rebuilt["segments_sha256"])))
-    assert all(item["kind"] != "person" for item in payload["segments"]["segments"])
+    assert rebuilt["action"] == "skipped"
+    assert "point map" in rebuilt["reason"]
+
+
+def test_new_person_state_refuses_lift_until_inputs_are_rebuilt(repository, tmp_path):
+    store, captures, _points, scene_id = _published(repository, tmp_path, "stale-person")
+    _segment_members(repository, store, captures, SceneSegmenter())
+    _add_person(repository, captures, None)
+    refused = lift.publish_scene_segments(repository, store, scene_id)
+    assert refused["action"] == "skipped" and "point map" in refused["reason"], refused
 
 
 def _retarget(repository, store, written, mutate):

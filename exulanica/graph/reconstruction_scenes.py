@@ -1531,6 +1531,7 @@ select distinct on (c.capture_id)
   join artifact a on a.workspace_id = c.workspace_id and a.source_blob_sha256 = c.blob_sha256
  where c.workspace_id = %s and c.capture_id = any(%s) and a.kind = %s
    and a.purged_at is null and not a.needs_repair and a.content_sha256 is not null
+   and (a.read_source_sha256 is null or a.stage_version >= 2)
    and a.byte_size is not null and not tombstone_blocks_capture(c.workspace_id, c.capture_id)
  order by c.capture_id, a.created_at desc, a.artifact_id desc
 """
