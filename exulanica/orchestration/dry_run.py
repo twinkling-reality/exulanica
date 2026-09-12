@@ -24,6 +24,7 @@ from exulanica.canonical import canonical_json
 from exulanica.corpus import build_plan
 from exulanica.corpus.photograph import compose, encode_jpeg
 from exulanica.db import Database, apply_pending, provision_workspace
+from exulanica.db.reference_target import COPY_DATABASE, COPY_URL, writable_reference_url
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.privacy import authorize_synthetic_capture, record_synthetic_exemption
 from exulanica.ingest.repository import IngestRepository
@@ -33,10 +34,9 @@ from exulanica.orchestration.demonstration import (
     run_frontier_demonstration,
 )
 from exulanica.orchestration.manifest import load_build_manifest
-from exulanica.orchestration.preflight import permitted_database_url
 from exulanica.store.local import LocalContentAddressedStore
 
-PERMITTED_DATABASE_URL = "postgresql://localhost:5433/exulanica_spine_test"
+PERMITTED_DATABASE_URL = COPY_URL
 _REQUIRED_EXTENSIONS = {"vector", "pgcrypto", "pg_trgm", "btree_gist"}
 
 
@@ -49,9 +49,9 @@ def _scratch_database() -> Iterator[tuple[Database, str]]:
     also prevents a rehearsal tombstone from reaching retained captures.
     """
     schema = f"exulanica_frontier_dry_{uuid.uuid4().hex}"
-    url = permitted_database_url(PERMITTED_DATABASE_URL)
+    url = writable_reference_url()
     with psycopg.connect(url, autocommit=True) as owner:
-        if owner.info.dbname != "exulanica_spine_test" or owner.info.server_version < 180000:
+        if owner.info.dbname != COPY_DATABASE or owner.info.server_version < 180000:
             raise FrontierDemonstrationError(
                 "dry_run_database", "Use the permitted PostgreSQL 18 reference database."
             )
@@ -104,6 +104,8 @@ def run_dry_run(output: Path) -> dict[str, Any]:
         raise FrontierDemonstrationError(
             "output_boundary", "Choose a new output directory for this synthetic rehearsal."
         )
+    # Refuse an unsafe target before producing any rehearsal files.
+    writable_reference_url()
     output.mkdir(parents=True, mode=0o700)
     photos = output / "photos"
     photos.mkdir()

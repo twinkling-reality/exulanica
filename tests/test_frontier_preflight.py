@@ -158,13 +158,16 @@ def test_preflight_rejects_store_symlink_into_original_photos(tmp_path, monkeypa
 def test_libpq_environment_cannot_redirect_the_permitted_database(name, monkeypatch):
     monkeypatch.setenv(name, "unexpected-route")
     with pytest.raises(ValueError, match="Unset"):
-        permitted_database_url("postgresql://localhost:5433/exulanica_spine_test")
+        permitted_database_url("postgresql://localhost:5433/exulanica_inspect_test")
 
 
 def test_pinned_database_configuration_can_be_checked_again(monkeypatch):
+    monkeypatch.setenv(
+        "EXULANICA_REFERENCE_DATABASE_URL", "postgresql://localhost:5433/exulanica_inspect_test"
+    )
     for name in ("PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE"):
         monkeypatch.delenv(name, raising=False)
-    pinned = permitted_database_url("postgresql://localhost:5433/exulanica_spine_test")
+    pinned = permitted_database_url("postgresql://localhost:5433/exulanica_inspect_test")
     from psycopg.conninfo import conninfo_to_dict
 
     assert conninfo_to_dict(permitted_database_url(pinned)) == conninfo_to_dict(pinned)

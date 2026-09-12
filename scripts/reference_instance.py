@@ -9,45 +9,31 @@ import re
 import secrets
 import subprocess
 import sys
-import urllib.parse
 import uuid
 from pathlib import Path
 
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
 from exulanica.db import Database, provision_workspace
+from exulanica.db.reference_target import writable_reference_url
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / ".exulanica/reference-baseline/runtime"
 CONFIG = STATE / "access.json"
-DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
-OVERRIDE = "EXULANICA_REFERENCE_DATABASE_URL"
 
 
 def resolve_database() -> str:
-    """Return the database every subcommand runs against.
-
-    The default stays the retained spine. Setting EXULANICA_REFERENCE_DATABASE_URL points the
-    whole reference instance at an isolated migrated copy instead, so HEAD can be inspected
-    without applying a pending migration to retained rows. Only a database whose name contains
-    "test" is accepted, which keeps the override from reaching a personal deployment. The URL is
-    never printed: a connection string carries credentials, so only the bare database name, which
-    cannot, appears in the refusal.
-    """
-    override = os.environ.get(OVERRIDE)
-    if not override:
-        return DATABASE
-    name = urllib.parse.urlparse(override).path.lstrip("/")
-    if "test" not in name:
-        raise SystemExit(
-            f"{OVERRIDE} names the database {name!r}, which is not a test database. Refusing to"
-            " run the retained reference against it."
-        )
-    return override
+    """Require the explicit writable copy for every reference-instance subcommand."""
+    try:
+        return writable_reference_url()
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
 
 
 def readonly_url(database: str) -> str:
-    """Return the read-only form of a database URL, preserving any query the URL already has."""
-    separator = "&" if "?" in database else "?"
-    return f"{database}{separator}options=-crole%3Dexulanica_ro"
+    """Retain connection options while selecting the existing read-only role."""
+    options = conninfo_to_dict(database).get("options", "")
+    return make_conninfo(database, options=options + " -crole=exulanica_ro")
 
 
 def main():

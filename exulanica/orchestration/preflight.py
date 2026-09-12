@@ -13,10 +13,15 @@ from pathlib import Path
 from typing import Any
 
 import psycopg
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from exulanica.db.migrate import applied_migrations
+from exulanica.db.reference_target import (
+    COPY_URL,
+    validate_reference_url,
+    writable_reference_url,
+)
 from exulanica.env import env_get
 from exulanica.evidence.address import EvidenceAddress
 from exulanica.evidence.blob import BlobId
@@ -27,30 +32,15 @@ from exulanica.models.manifest import load_manifest
 from exulanica.orchestration.manifest import BuildManifest, load_build_manifest
 from exulanica.world_package.package import load_private_key
 
-PERMITTED_DATABASE = "postgresql://localhost:5433/exulanica_spine_test"
+PERMITTED_DATABASE = COPY_URL
 _GIB = 1024**3
 
 
 def permitted_database_url(url: str | None) -> str:
+    """Validate the caller's writable destination against the explicit reference copy."""
     if not url:
-        raise ValueError(f"Set EXULANICA_DATABASE_URL={PERMITTED_DATABASE}.")
-    try:
-        parts = conninfo_to_dict(url)
-    except psycopg.Error:
-        raise ValueError(f"Set EXULANICA_DATABASE_URL={PERMITTED_DATABASE}.") from None
-    if (
-        parts.get("host") != "localhost"
-        or parts.get("port") != "5433"
-        or parts.get("dbname") != "exulanica_spine_test"
-        or parts.get("hostaddr") not in (None, "127.0.0.1")
-        or parts.get("service")
-    ):
-        raise ValueError(f"Use only {PERMITTED_DATABASE}; other databases are refused.")
-    if any(os.environ.get(name) for name in ("PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE")):
-        raise ValueError("Unset PGHOSTADDR, PGSERVICE and PGSERVICEFILE before this local run.")
-    return make_conninfo(
-        url, hostaddr="127.0.0.1", options=parts.get("options", "-csearch_path=public")
-    )
+        raise ValueError("Set EXULANICA_DATABASE_URL to the explicitly selected reference copy.")
+    return writable_reference_url(url)
 
 
 def validate_layout(
@@ -90,7 +80,7 @@ def _ancestor(path: Path) -> Path:
 def inspect_database(url: str, manifest: BuildManifest | None) -> dict[str, Any]:
     """Verify schema history and authority without provisioning or applying migrations."""
     with psycopg.connect(
-        permitted_database_url(url),
+        validate_reference_url(url, read_only=True),
         row_factory=dict_row,
         connect_timeout=5,
         application_name="exulanica-frontier-preflight",
@@ -100,7 +90,7 @@ def inspect_database(url: str, manifest: BuildManifest | None) -> dict[str, Any]
         identity = connection.execute(
             "select current_database() name, inet_server_port() port, current_schema() schema"
         ).fetchone()
-        if identity["name"] != "exulanica_spine_test" or identity["port"] != 5433:
+        if identity["name"] != conninfo_to_dict(url)["dbname"] or identity["port"] != 5433:
             raise ValueError("Connect to the permitted local reference database on port 5433.")
         known = applied_migrations(connection)
         verify_applied(known)

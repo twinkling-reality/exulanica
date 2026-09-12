@@ -6,9 +6,10 @@ import stat
 
 import psycopg
 import pytest
+from exulanica.db.reference_target import writable_reference_url
 from exulanica.env import env_get
 from exulanica.orchestration.demonstration import FrontierDemonstrationError
-from exulanica.orchestration.dry_run import PERMITTED_DATABASE_URL, run_dry_run
+from exulanica.orchestration.dry_run import run_dry_run
 from exulanica.world_package import verify_package
 from exulanica.world_package.package import load_private_key
 
@@ -21,7 +22,7 @@ pytestmark = [
 def _public_state():
     # Observe retained rows without writing fixtures into public. The scratch lifecycle must
     # leave their exact values unchanged, including deletion state and screening authority.
-    with psycopg.connect(PERMITTED_DATABASE_URL) as connection:
+    with psycopg.connect(writable_reference_url()) as connection:
         connection.execute("set transaction read only")
         result = {}
         for table in (
@@ -45,7 +46,7 @@ def test_dry_run_keeps_public_and_sources_and_emits_three_verifiable_packages(tm
     result = run_dry_run(output)
     assert _public_state() == before
     assert result["isolated_schema_removed"] is True
-    with psycopg.connect(PERMITTED_DATABASE_URL) as connection:
+    with psycopg.connect(writable_reference_url()) as connection:
         assert (
             connection.execute(
                 "select 1 from pg_namespace where nspname=%s", (result["isolated_schema"],)
@@ -92,7 +93,7 @@ def test_failed_rehearsal_drops_only_its_owned_schema(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="deliberate failure"):
         run_dry_run(output)
     assert schema and schema.startswith("exulanica_frontier_dry_")
-    with psycopg.connect(PERMITTED_DATABASE_URL) as connection:
+    with psycopg.connect(writable_reference_url()) as connection:
         assert (
             connection.execute("select 1 from pg_namespace where nspname=%s", (schema,)).fetchone()
             is None
