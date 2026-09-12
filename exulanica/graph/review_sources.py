@@ -9,6 +9,7 @@ from typing import Any
 
 import psycopg
 
+from exulanica.epistemics.source_images import selected_image
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.asset_read_policy import evaluation_time, image_source
 from exulanica.graph.payload import ReviewSourceRow
@@ -53,7 +54,8 @@ def review_source_rows(
     result = []
     for row in rows:
         address_from_span_row(row)  # Verify the immutable evidence address before offering it.
-        selected = image_source(connection, workspace, bytes(row["blob_sha256"]), at)
+        selection = selected_image(connection, workspace, bytes(row["blob_sha256"]), at)
+        selected = selection.sha256 if selection is not None else None
         available = selected is not None and store is not None and store.exists(BlobId(selected))
         result.append(
             ReviewSourceRow(
@@ -61,11 +63,7 @@ def review_source_rows(
                 capture_id=row["capture_id"],
                 evidence_span_id=row["span_id"],
                 captured_at=row["started_at"].isoformat() if row["started_at"] else None,
-                media_type=(
-                    row["media_type"]
-                    if selected in (None, bytes(row["blob_sha256"]))
-                    else "image/jpeg"
-                ),
+                media_type=row["media_type"] if selection is None else selection.media_type,
                 state="available" if available else "unavailable_asset",
                 reason=None if available else "Current authorized viewer bytes are unavailable.",
                 evidence_path=f"/evidence/{row['span_id']}/masked" if available else None,

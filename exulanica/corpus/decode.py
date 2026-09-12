@@ -2,8 +2,10 @@
 
 "The one place" is a claim about call sites and it is checkable: ``Image.open`` appears in this
 shared corpus module and nowhere else under ``exulanica/``. Ingest calls its compatibility
-facade to apply EXIF orientation; reconstruction reads raw sensor pixels so COLMAP calibration
-keeps its original pixel coordinate convention. Both paths share this exact budget and
+facade to apply EXIF orientation; reconstruction reads raw sensor pixels for JPEG/PNG and
+recorded normalized PNGs for HEIF,
+so COLMAP calibration keeps the exact staged pixel coordinate convention. Both paths share this
+exact budget and
 single-frame policy. It has not always been true. ``ingest/resolve.py``
 used to open and load an original itself, on the path of a synchronous route, with no budget
 comparison in front of it, and it was protected only by the process-wide state below happening
@@ -88,10 +90,14 @@ reads files a person chose off their own disk.
 from __future__ import annotations
 
 import io
+import re
 import warnings
 from typing import Final
 
+from pi_heif import __version__ as heif_version
+from pi_heif import libheif_info, register_heif_opener
 from PIL import Image, UnidentifiedImageError
+from PIL import __version__ as pillow_version
 
 __all__ = ["MAX_PIXELS", "UNREADABLE", "open_sensor", "probe"]
 
@@ -100,6 +106,11 @@ __all__ = ["MAX_PIXELS", "UNREADABLE", "open_sensor", "probe"]
 #: rather than loosens, and about 512 MB at peak to decode and turn upright. That last number is
 #: measured, at 4 bytes per pixel twice over rather than the 3 an RGB frame looks like it costs.
 MAX_PIXELS: Final = 64_000_000
+
+# libheif applies HEIF container transforms; its Pillow adapter clears consumed EXIF
+# orientation. Do not restore that tag or apply the container transform a second time.
+# No thumbnail, auxiliary/depth-image decoding or encoder registration is needed.
+register_heif_opener(thumbnails=False, depth_images=False, aux_images=False, decode_threads=1)
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -140,10 +151,13 @@ def probe(data: bytes) -> tuple[int, int]:
 
 
 def open_sensor(data: bytes) -> Image.Image:
-    """Decode one bounded photograph without rotating or mirroring its stored pixels.
+    """Decode one bounded photograph in the decoder's native pixel grid.
 
-    The returned image is fully loaded and retains its EXIF metadata. Its pixel grid is the
-    encoded sensor grid used by COLMAP calibration; callers must not implicitly transpose it.
+    JPEG/PNG retain the encoded sensor grid and EXIF metadata. HEIF is different: libheif
+    applies container transforms and its Pillow adapter clears consumed EXIF orientation.
+    Those pixels are already in the transformed display grid, not an unrotated sensor grid.
+    HEIF must reach pose through its recorded normalized PNG, whose orientation is one.
+    Callers must not restore consumed orientation or implicitly transpose these pixels.
     The caller owns the image and should close it (or use it as a context manager). Ingest's
     compatibility facade applies its existing explicit orientation transform after this call.
 
@@ -154,6 +168,7 @@ def open_sensor(data: bytes) -> Image.Image:
     try:
         _within_budget(opened)
         opened.load()
+        _within_budget(opened)
     except BaseException:
         opened.close()
         raise
@@ -198,3 +213,17 @@ def _within_budget(image: Image.Image) -> tuple[int, int]:
             f"of {MAX_PIXELS} pixels"
         )
     return width, height
+
+
+def decoder_inventory() -> dict[str, str]:
+    """Actual compiled decoder identities, bound into the normalized stage registry and receipt."""
+    libraries = libheif_info()
+    version = re.search(r"version ([0-9][^ ]*)", libraries["decoders"].get("libde265", ""))
+    if heif_version != "1.4.0" or version is None:
+        raise ValueError("the reviewed HEIF decoder is unavailable")
+    return {
+        "pi-heif": heif_version,
+        "libheif": libraries["libheif"],
+        "libde265": version[1],
+        "pillow": pillow_version,
+    }

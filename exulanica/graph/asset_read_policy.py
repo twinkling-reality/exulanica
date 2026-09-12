@@ -20,6 +20,7 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.epistemics.source_images import image_digest
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -71,11 +72,7 @@ def image_source(
     *,
     original: bool = False,
 ) -> bytes | None:
-    row = connection.execute(
-        "select asset_image_source(%s,%s,%s,%s) as digest",
-        (workspace, digest, at, original),
-    ).fetchone()
-    return bytes(row["digest"]) if row["digest"] is not None else None
+    return image_digest(connection, workspace, digest, at, original=original)
 
 
 _SCENE_BINDING = """

@@ -15,6 +15,7 @@ from exulanica.graph.world_read_evidence import (
     TRAINED_PROFILE,
     receipt_problem,
 )
+from exulanica.reconstruction.source_lineage import verify_decoded_receipt
 
 
 class EvidenceError(ValueError):
@@ -180,6 +181,17 @@ def _verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) -
             if frames:
                 require(source["read_sha256"] == frames[key], "point_pose_source_mismatch")
                 status = {"state": "available"}
+            decoded = source.get("decoded_source")
+            normalized = None
+            if decoded is not None:
+                try:
+                    normalized = verify_decoded_receipt(
+                        decoded,
+                        source_sha256=source["source_sha256"],
+                        output_sha256=decoded["record"]["output_sha256"],
+                    )
+                except (ValueError, KeyError, TypeError) as error:
+                    raise EvidenceError("decoded_source_receipt_invalid") from error
             if source["mode"] == "masked":
                 mask = receipt(source["mask_manifest"], MASK_PROFILE)
                 if mask is None:
@@ -192,6 +204,18 @@ def _verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) -
                         and mask["capture_id"] == key,
                         "mask_source_mismatch",
                     )
+                    if normalized is not None:
+                        require(
+                            mask.get("predecessor_sha256") == normalized["output_sha256"]
+                            and mask.get("decoded_receipt_sha256") == decoded["record_sha256"],
+                            "mask_decoded_predecessor_mismatch",
+                        )
+                    else:
+                        require(
+                            "predecessor_sha256" not in mask
+                            and "decoded_receipt_sha256" not in mask,
+                            "mask_decoded_predecessor_missing",
+                        )
                     build = source["mask_build"]
                     if build["state"] != "available":
                         status = {"state": "unavailable", "reason": build["reason"]}
@@ -204,8 +228,15 @@ def _verify(envelope: dict[str, Any], *, at: str, expected_bundle_sha256: str) -
                     )
             else:
                 require(
-                    source["mode"] == "original"
-                    and source["read_sha256"] == source["source_sha256"],
+                    (
+                        source["mode"] == "original"
+                        and source["read_sha256"] == source["source_sha256"]
+                    )
+                    or (
+                        source["mode"] == "decoded"
+                        and normalized is not None
+                        and source["read_sha256"] == normalized["output_sha256"]
+                    ),
                     "original_source_mismatch",
                 )
                 if any(r["masked"] for r in evaluated[key]):
@@ -316,10 +347,28 @@ def check_mask_build(
             ],
         }
     ).hex()
+    require(
+        build.get("predecessor_sha256") == manifest.get("predecessor_sha256")
+        and build.get("decoded_receipt_sha256") == manifest.get("decoded_receipt_sha256"),
+        "mask_predecessor_commitment_mismatch",
+    )
     matches = [
         digest
         for digest in build["intake_sha256"]
-        if sha256_of_canonical(sorted([digest, region_digest, state_digest])).hex()
+        if sha256_of_canonical(
+            sorted(
+                [
+                    digest,
+                    region_digest,
+                    state_digest,
+                    *(
+                        [build["predecessor_sha256"], build["decoded_receipt_sha256"]]
+                        if "predecessor_sha256" in build
+                        else []
+                    ),
+                ]
+            )
+        ).hex()
         == build["input_sha256"]
     ]
     require(len(matches) == 1, "mask_input_commitment_mismatch")

@@ -245,6 +245,8 @@ def masked_source_manifest(
     stage_version: int,
     dilation_millionths: int,
     masks: Sequence[tuple[bytes, uuid.UUID | None, str]],
+    predecessor_sha256: str | None = None,
+    decoded_receipt_sha256: str | None = None,
 ) -> tuple[uuid.UUID, dict[str, Any], bytes, bytes]:
     """Which person each mask belongs to, bound to the exact derivative bytes.
 
@@ -257,6 +259,12 @@ def masked_source_manifest(
         "capture_id": str(capture_id),
         "source_sha256": source_sha256,
         "masked_sha256": masked_sha256,
+        **({"predecessor_sha256": predecessor_sha256} if predecessor_sha256 is not None else {}),
+        **(
+            {"decoded_receipt_sha256": decoded_receipt_sha256}
+            if decoded_receipt_sha256 is not None
+            else {}
+        ),
         "stage_version": stage_version,
         "dilation_millionths": dilation_millionths,
         "fill": "neutral-flat",

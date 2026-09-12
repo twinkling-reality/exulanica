@@ -856,11 +856,12 @@ select s.scene_id, j.job_id,
 #: question, so an artifact written after these segments is how it knows they are stale.
 _OBJECT_MASKS = """
 select distinct on (c.capture_id)
-       c.capture_id, a.artifact_id, a.content_sha256
+       c.capture_id, a.artifact_id, a.content_sha256, a.source_blob_sha256, a.read_source_sha256
   from capture c
   join artifact a on a.workspace_id = c.workspace_id and a.source_blob_sha256 = c.blob_sha256
  where c.workspace_id = %s and c.capture_id = any(%s) and a.kind = %s
    and a.purged_at is null and not a.needs_repair and a.content_sha256 is not null
+   and (a.read_source_sha256 is null or a.stage_version >= 2)
    and a.byte_size is not null and not tombstone_blocks_capture(c.workspace_id, c.capture_id)
  order by c.capture_id, a.created_at desc, a.artifact_id desc
 """
@@ -882,12 +883,13 @@ select r.capture_id, encode(r.region_key, 'hex') as region_key, r.silhouette, r.
 """
 
 _POINT_MAP = """
-select a.artifact_id from artifact a
+select a.artifact_id,a.source_blob_sha256,a.read_source_sha256 from artifact a
   join capture c on c.workspace_id = a.workspace_id and c.capture_id = %s
    and c.blob_sha256 = a.source_blob_sha256
  where a.workspace_id = %s and a.artifact_id = %s and a.kind = 'point_map'
    and a.content_sha256 = %s and a.byte_size is not null and a.purged_at is null
    and not tombstone_blocks_capture(a.workspace_id, c.capture_id)
+   and asset_point_allows(a.workspace_id,a.artifact_id,statement_timestamp())
 """
 
 
@@ -1126,6 +1128,12 @@ def _lift_and_write(
         placement_bytes = _stored(store, placement_digest, "a scene receipt")
 
     point_maps: dict[str, PointMapInput] = {}
+    pose_frames = {
+        frame["capture_ref"]: frame for frame in json.loads(pose_bytes)["manifest"]["frames"]
+    }
+    cameras = validated_receipt_cameras(pose_bytes)
+    point_grids = {}
+    point_reads = {}
     for item in json.loads(placement_bytes)["placement"]["point_map_inputs"]:
         capture_ref, artifact_ref = str(item["capture_ref"]), str(item["artifact_ref"])
         digest = str(item["content_sha256"])
@@ -1140,6 +1148,21 @@ def _lift_and_write(
         content = build.point_maps.get(capture_ref) if build is not None else None
         if content is None:
             content = _stored(store, digest, "a point map")
+        selected = bytes(live["read_source_sha256"] or live["source_blob_sha256"]).hex()
+        if capture_ref not in pose_frames or pose_frames[capture_ref]["sha256"] != selected:
+            raise _LiftRefused("point map and pose read different image bytes")
+        try:
+            length = int.from_bytes(content[4:8], "little")
+            source = json.loads(content[8 : 8 + length])["sourceImage"]
+            grid = (source["width"], source["height"])
+        except (KeyError, ValueError, TypeError) as error:
+            raise _LiftRefused("point map has no verifiable source pixel grid") from error
+        if capture_ref in cameras:
+            calibration = cameras[capture_ref]["calibration"]
+            if grid != (calibration["width"], calibration["height"]):
+                raise _LiftRefused("point map and pose use different pixel grids")
+        point_grids[capture_ref] = grid
+        point_reads[capture_ref] = selected
         point_maps[capture_ref] = PointMapInput(capture_ref, artifact_ref, digest, content)
     placement_started = time.monotonic()
     placement = (
@@ -1165,6 +1188,20 @@ def _lift_and_write(
         digest = bytes(mask["content_sha256"]).hex()
         capture_ref = str(mask["capture_id"])
         data = _stored(store, digest, "an object mask artifact")
+        try:
+            source = json.loads(data)["source"]
+            read = source["read_sha256"] or source["blob_sha256"]
+            grid = (source["display"]["w"], source["display"]["h"])
+        except (KeyError, ValueError, TypeError) as error:
+            raise _LiftRefused("object masks have no exact source/grid binding") from error
+        if (
+            read != point_reads.get(capture_ref)
+            or grid != point_grids.get(capture_ref)
+            or read != bytes(mask["read_source_sha256"] or mask["source_blob_sha256"]).hex()
+        ):
+            raise _LiftRefused(
+                "object masks, depth and pose disagree on source bytes or pixel grid"
+            )
         regions.extend(object_regions_from_artifact(capture_ref, str(mask["artifact_id"]), data))
         mask_inputs.append((capture_ref, str(mask["artifact_id"]), digest))
     missing = sorted(set(members) - {capture for capture, _, _ in mask_inputs})

@@ -31,6 +31,11 @@ from typing import Any, Literal, Protocol
 
 from exulanica.reconstruction.gsplat_protocol import TRAINING_PROTOCOL
 from exulanica.reconstruction.pose import CommandResult
+from exulanica.reconstruction.source_lineage import (
+    decoded_training_sources,
+    verify_decoded_training_files,
+    verify_decoded_training_inputs,
+)
 
 __all__ = [
     "SplatBuildManifest",
@@ -111,6 +116,7 @@ class SplatBuildManifest:
     #: scene with nobody hidden in it, and omitted from the payload then, so those builds keep the
     #: manifest digest and job directory they had before this existed.
     masked_source_remap: tuple[tuple[str, str, str], ...] = ()
+    decoded_source_lineage: tuple[dict[str, object], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.scene_ref or not self.requested_gpu:
@@ -138,6 +144,9 @@ class SplatBuildManifest:
         if self.checkpoint_every > self.max_iterations:
             raise ValueError("checkpoint_every cannot exceed max_iterations")
         self._check_masked_source_remap()
+        verify_decoded_training_inputs(
+            self.decoded_source_lineage, self.masked_source_remap, self.source_sha256
+        )
         if (
             not self.heldout_source_sha256
             or len(set(self.heldout_source_sha256)) != len(self.heldout_source_sha256)
@@ -209,6 +218,14 @@ class SplatBuildManifest:
         that photograph, or hold it, to find out.
         """
         originals = {masked: original for _, original, masked in self.masked_source_remap}
+        originals.update(
+            {
+                selected: original
+                for original, selected, _ in decoded_training_sources(
+                    self.decoded_source_lineage, self.masked_source_remap
+                ).values()
+            }
+        )
         return tuple(originals.get(digest, digest) for digest in self.heldout_source_sha256)
 
     def as_payload(self) -> dict[str, object]:
@@ -235,6 +252,11 @@ class SplatBuildManifest:
                 "gaussian_cap": self.gaussian_cap,
                 "heldout_every": self.heldout_every,
                 "heldout_source_sha256": list(self.heldout_source_sha256),
+                **(
+                    {"decoded_source_lineage": list(self.decoded_source_lineage)}
+                    if self.decoded_source_lineage
+                    else {}
+                ),
                 **(
                     {
                         "masked_source_remap": {
@@ -489,9 +511,18 @@ def masked_training_binding(manifest: SplatBuildManifest) -> dict[str, object]:
     ``split.json`` bytes it wrote before this existed, so its runtime digest binding, its retained
     evaluation bundle and every receipt downstream of them reproduce exactly.
     """
+    decoded = (
+        {
+            "decoded_source_lineage": list(manifest.decoded_source_lineage),
+            "heldout_original_source_sha256": list(manifest.heldout_original_source_sha256),
+        }
+        if manifest.decoded_source_lineage
+        else {}
+    )
     if not manifest.masked_source_remap:
-        return {}
+        return decoded
     return {
+        **decoded,
         "masked_source_remap": [
             {
                 "capture_ref": capture_ref,
@@ -522,6 +553,12 @@ def verify_masked_training_sources(manifest: SplatBuildManifest, dataset_dir: Pa
     nothing: it has no remap to re-derive, and `_verify_dataset_sources` has already proved its
     staged bytes are exactly the manifest's sources.
     """
+    if manifest.decoded_source_lineage:
+        verify_decoded_training_files(
+            manifest.decoded_source_lineage,
+            manifest.masked_source_remap,
+            sorted(path for path in (dataset_dir / "images").rglob("*") if path.is_file()),
+        )
     if not manifest.masked_source_remap:
         return
     staged = {_digest_file(path) for path in (dataset_dir / "images").rglob("*") if path.is_file()}

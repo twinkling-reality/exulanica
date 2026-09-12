@@ -28,9 +28,17 @@ def run(
     intake: StageResult,
     ledger: Ledger,
     outcome: IngestOutcome,
+    decoded: StageResult | None = None,
+    decoded_receipt_sha256: bytes | None = None,
 ) -> StageResult:
     spec = stage("rendition")
-    input_digest = input_digest_of([intake.content_sha256])
+    input_digest = input_digest_of(
+        [
+            intake.content_sha256,
+            *([decoded.content_sha256] if decoded is not None else []),
+            *([decoded_receipt_sha256] if decoded_receipt_sha256 is not None else []),
+        ]
+    )
     key = idempotency_key(blob_id, spec, input_digest)
     existing = writes.repository.find_artifact(key)
     if (
@@ -50,7 +58,9 @@ def run(
             reused=True,
         )
     with ledger.stage(
-        spec, input_artifact_ids=[intake.artifact_id], input_blob=blob_id
+        spec,
+        input_artifact_ids=[intake.artifact_id, *([decoded.artifact_id] if decoded else [])],
+        input_blob=blob_id,
     ) as recorder:
         encoded = render(upright, spec)
         with writes.committed_writes() as pending:

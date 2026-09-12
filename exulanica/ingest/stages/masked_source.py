@@ -65,6 +65,8 @@ def masked_source_input_digest(
     blob_id: BlobId,
     regions: Mapping[bytes, Silhouette],
     resolved: Mapping[bytes, ResolvedPresentation],
+    predecessor_sha256: bytes | None = None,
+    decoded_receipt_sha256: bytes | None = None,
 ) -> bytes:
     """The three inputs that decide whether a derivative is still the right one, folded.
 
@@ -74,6 +76,8 @@ def masked_source_input_digest(
     return input_digest_of(
         [
             intake_sha256,
+            *([predecessor_sha256] if predecessor_sha256 is not None else []),
+            *([decoded_receipt_sha256] if decoded_receipt_sha256 is not None else []),
             region_set_digest(capture_id=capture_id, source_sha256=blob_id.hex, regions=regions),
             consent_state_digest(
                 capture_id=capture_id, source_sha256=blob_id.hex, resolved=resolved
@@ -89,6 +93,8 @@ def masked_source_key(
     blob_id: BlobId,
     regions: Mapping[bytes, Silhouette],
     resolved: Mapping[bytes, ResolvedPresentation],
+    predecessor_sha256: bytes | None = None,
+    decoded_receipt_sha256: bytes | None = None,
 ) -> bytes:
     """The key the derivative for this photograph must carry to be the CURRENT one.
 
@@ -112,6 +118,8 @@ def masked_source_key(
             blob_id=blob_id,
             regions=regions,
             resolved=resolved,
+            predecessor_sha256=predecessor_sha256,
+            decoded_receipt_sha256=decoded_receipt_sha256,
         ),
     )
 
@@ -127,6 +135,9 @@ def run(
     intake: StageResult,
     ledger: Ledger,
     outcome: IngestOutcome,
+    *,
+    decoded: StageResult | None = None,
+    decoded_receipt_sha256: bytes | None = None,
 ) -> StageResult | None:
     """Produce the masked derivative and its manifest, or nothing when nobody is hidden."""
     spec = stage("masked_source")
@@ -139,6 +150,8 @@ def run(
         blob_id=blob_id,
         regions=regions,
         resolved=resolved,
+        predecessor_sha256=None if decoded is None else decoded.content_sha256,
+        decoded_receipt_sha256=decoded_receipt_sha256,
     )
     key = idempotency_key(blob_id, spec, input_digest)
     existing = writes.repository.find_artifact(key)
@@ -156,7 +169,9 @@ def run(
             reused=True,
         )
     with ledger.stage(
-        spec, input_artifact_ids=[intake.artifact_id], input_blob=blob_id
+        spec,
+        input_artifact_ids=[intake.artifact_id, *([decoded.artifact_id] if decoded else [])],
+        input_blob=blob_id,
     ) as recorder:
         payload = encode_masked_source(
             mask_image(
@@ -175,6 +190,7 @@ def run(
                 outcome=outcome,
                 pending=pending,
                 produced_by_event=recorder.stage_started_event,
+                read_source_sha256=None if decoded is None else decoded.content_sha256,
             )
     _manifest(
         writes,
@@ -184,6 +200,8 @@ def run(
         regions=regions,
         resolved=resolved,
         subjects=subjects,
+        predecessor_sha256=None if decoded is None else decoded.content_sha256,
+        decoded_receipt_sha256=decoded_receipt_sha256,
         ledger=ledger,
         outcome=outcome,
     )
@@ -199,6 +217,8 @@ def _manifest(
     regions: Mapping[bytes, Silhouette],
     resolved: Mapping[bytes, ResolvedPresentation],
     subjects: Mapping[bytes, uuid.UUID | None],
+    predecessor_sha256: bytes | None,
+    decoded_receipt_sha256: bytes | None,
     ledger: Ledger,
     outcome: IngestOutcome,
 ) -> StageResult:
@@ -228,6 +248,10 @@ def _manifest(
         capture_id=capture_id,
         source_sha256=blob_id.hex,
         masked_sha256=masked.content_sha256.hex(),
+        predecessor_sha256=None if predecessor_sha256 is None else predecessor_sha256.hex(),
+        decoded_receipt_sha256=None
+        if decoded_receipt_sha256 is None
+        else decoded_receipt_sha256.hex(),
         stage_version=masked_spec.version,
         dilation_millionths=int(masked_spec.params["dilation_millionths"]),
         masks=[

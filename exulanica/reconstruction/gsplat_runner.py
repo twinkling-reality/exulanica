@@ -83,6 +83,10 @@ def read_manifest(path: Path) -> SplatBuildManifest:
         **value["parameters"],
         "heldout_source_sha256": tuple(value["parameters"]["heldout_source_sha256"]),
     }
+    if "decoded_source_lineage" in parameters:
+        if not isinstance(parameters["decoded_source_lineage"], list):
+            raise ValueError("manifest decoded_source_lineage must be a list")
+        parameters["decoded_source_lineage"] = tuple(parameters["decoded_source_lineage"])
     if "masked_source_remap" in parameters:
         parameters["masked_source_remap"] = _read_masked_source_remap(
             parameters["masked_source_remap"]

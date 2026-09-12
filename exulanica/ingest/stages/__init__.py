@@ -37,10 +37,12 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.corpus.decode import decoder_inventory
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.vision import SCHEMA_VERSION, prompt_digest
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
 from exulanica.reconstruction.place_alignment import PLACE_ALIGNMENT_POLICY
+from exulanica.reconstruction.source_lineage import DECODED_PARAMS
 
 __all__ = [
     "ARTIFACT_NAMESPACE",
@@ -221,6 +223,13 @@ STAGES: Final[dict[str, StageSpec]] = {
             "probe_version": 1,
         },
     ),
+    "decoded_source": StageSpec(
+        key="decoded_source",
+        version=1,
+        output_kind="decoded_source",
+        deterministic=True,
+        params={**DECODED_PARAMS, "decoder_inventory": decoder_inventory()},
+    ),
     "rendition": StageSpec(
         key="rendition",
         # Version 2 disables libjpeg's optional entropy-table optimisation. Version 1 always
@@ -263,7 +272,8 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "depth": StageSpec(
         key="depth",
-        version=1,
+        # Version 2 reads exact persisted mask bytes instead of an in-memory pre-encode mask.
+        version=2,
         output_kind="point_map",
         # A neural depth model is not deterministic in the sense this flag means: the same
         # weights on the same bytes can differ across accelerators and across library versions.
@@ -295,7 +305,8 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "segmentation": StageSpec(
         key="segmentation",
-        version=1,
+        # Version 2 consumes the same exact persisted input as depth and pose.
+        version=2,
         output_kind="object_mask_list",
         # A neural forward pass differs across accelerators and library versions, so a content
         # difference here is not a fault (ADR-0017). No `model_role`, for the reason

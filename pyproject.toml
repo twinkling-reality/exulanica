@@ -38,6 +38,7 @@ dependencies = [
   "httpx>=0.27",
   "jsonschema>=4.23",
   "pillow>=12.3.0",
+  "pi-heif==1.4.0",  # decode-only HEIF wheel; bundled LGPL libraries in license matrix
   "psycopg[binary]>=3.2",
   "pydantic>=2.9",
   # `POST /intake` is multipart, and Starlette parses multipart only when this is installed. It

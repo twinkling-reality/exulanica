@@ -352,6 +352,8 @@ def run(
     privacy_screening_id: uuid.UUID | None,
     *,
     masked: StageResult | None = None,
+    decoded: StageResult | None = None,
+    decoded_receipt_sha256: bytes | None = None,
     masked_image: Image.Image | None = None,
     consent_digests: tuple[bytes, ...] = (),
     person_outlines: tuple[Silhouette, ...] = (),
@@ -406,6 +408,8 @@ def run(
     input_digest = input_digest_of(
         [
             intake.content_sha256,
+            *([decoded.content_sha256] if decoded is not None else []),
+            *([decoded_receipt_sha256] if decoded_receipt_sha256 is not None else []),
             *([masked.content_sha256] if masked is not None else []),
             *consent_digests,
             offered,
@@ -431,7 +435,7 @@ def run(
     detection_policy, outline_policy = _policies(spec.params)
     source = masked_image if masked_image is not None else upright
     working = _fit(source.convert("RGB"), int(spec.params["max_edge_px"]))
-    inputs = [intake.artifact_id]
+    inputs = [intake.artifact_id, *([decoded.artifact_id] if decoded else [])]
     if vision is not None and hosted:
         inputs.append(vision.artifact_id)
     if masked is not None:
@@ -512,7 +516,13 @@ def run(
                 "blob_sha256": blob_id.hex,
                 # The masked derivative's digest when one was read, and null when the segmenter
                 # read the upright original, which ``blob_sha256`` already names.
-                "read_sha256": None if masked is None else masked.content_sha256.hex(),
+                "read_sha256": (
+                    masked.content_sha256.hex()
+                    if masked is not None
+                    else decoded.content_sha256.hex()
+                    if decoded is not None
+                    else None
+                ),
                 "masked": masked is not None,
                 "display": {"w": display.w, "h": display.h},
                 "working": {"w": working.width, "h": working.height},
@@ -562,7 +572,13 @@ def run(
                 pending=pending,
                 produced_by_event=recorder.stage_started_event,
                 privacy_screening_id=screening.screening_id,
-                read_source_sha256=None if masked is None else masked.content_sha256,
+                read_source_sha256=(
+                    masked.content_sha256
+                    if masked is not None
+                    else decoded.content_sha256
+                    if decoded is not None
+                    else None
+                ),
             )
             emitted: list[uuid.UUID] = []
             for record, address, (_prompt_index, prompt, mask) in zip(
