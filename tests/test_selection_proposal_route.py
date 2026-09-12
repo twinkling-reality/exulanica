@@ -503,6 +503,7 @@ def test_the_proposal_becomes_a_companion_preview_through_the_world_style_lifecy
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     assert proposal_api.current()["current"]["version_id"] == initial["current"]["version_id"]
 
