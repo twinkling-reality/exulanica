@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**131 documents**, excluding `docs/evaluation/`.
+**132 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-23 documents.
+24 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -140,6 +140,7 @@ What was intended, written before the work.
 - [2026-09-11-heic-source-lineage](briefs/2026-09-11-heic-source-lineage.md) : approved repair wave; implement after artifact identity repair. Migration 0045 reserved
 - [2026-09-11-one-viewpoint-is-not-a-place](briefs/2026-09-11-one-viewpoint-is-not-a-place.md) : decision needed from the owner. Filed 2026-09-11 from the first-place run, after the
 - [2026-09-11-personal-path-first-run](briefs/2026-09-11-personal-path-first-run.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-4 to FP-7
+- [2026-09-11-repair-wave-integration](briefs/2026-09-11-repair-wave-integration.md) : The operator approved the repair wave on 2026-09-11. Start from trial integration
 - [2026-09-11-review-source-inventory](briefs/2026-09-11-review-source-inventory.md) : approved repair wave. Database tests require the orchestrator's slot
 - [2026-09-11-scene-segments](briefs/2026-09-11-scene-segments.md) : proposed, not dispatched. Recorded 2026-09-11 after the wave-3 integration
 - [2026-09-11-structural-snapshot-sources](briefs/2026-09-11-structural-snapshot-sources.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-8 in
