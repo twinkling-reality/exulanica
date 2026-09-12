@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**127 documents**, excluding `docs/evaluation/`.
+**131 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-19 documents.
+23 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -133,10 +133,14 @@ What was intended, written before the work.
 - [2026-09-08-retained-activation](briefs/2026-09-08-retained-activation.md) : proposed, not dispatched. No retained operation is authorized by this document
 - [2026-09-08-stale-screening-policy](briefs/2026-09-08-stale-screening-policy.md) : completed and integrated at 53039d4; see
 - [2026-09-08-world-read-evidence](briefs/2026-09-08-world-read-evidence.md) : completed and integrated at 3352627 after independent corrected-head gates. See
+- [2026-09-11-artifact-workspace-identity](briefs/2026-09-11-artifact-workspace-identity.md) : approved for implementation; database test slot requires coordination
+- [2026-09-11-caption-vector-lifecycle](briefs/2026-09-11-caption-vector-lifecycle.md) : approved for implementation; database test slot requires coordination
 - [2026-09-11-companion-question-matching](briefs/2026-09-11-companion-question-matching.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-3 in
-- [2026-09-11-copy-only-test-routing](briefs/2026-09-11-copy-only-test-routing.md) : proposed corrective scope, not dispatched or implemented. The operator's
+- [2026-09-11-copy-only-test-routing](briefs/2026-09-11-copy-only-test-routing.md) : approved by the operator on 2026-09-11. Run the full suite on the copy
+- [2026-09-11-heic-source-lineage](briefs/2026-09-11-heic-source-lineage.md) : approved repair wave; implement after artifact identity repair. Migration 0045 reserved
 - [2026-09-11-one-viewpoint-is-not-a-place](briefs/2026-09-11-one-viewpoint-is-not-a-place.md) : decision needed from the owner. Filed 2026-09-11 from the first-place run, after the
 - [2026-09-11-personal-path-first-run](briefs/2026-09-11-personal-path-first-run.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-4 to FP-7
+- [2026-09-11-review-source-inventory](briefs/2026-09-11-review-source-inventory.md) : approved repair wave. Database tests require the orchestrator's slot
 - [2026-09-11-scene-segments](briefs/2026-09-11-scene-segments.md) : proposed, not dispatched. Recorded 2026-09-11 after the wave-3 integration
 - [2026-09-11-structural-snapshot-sources](briefs/2026-09-11-structural-snapshot-sources.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defect FP-8 in
 - [2026-09-11-unposed-rung-three](briefs/2026-09-11-unposed-rung-three.md) : proposed, not dispatched. Filed 2026-09-11 from the first-place run, defects FP-1 and FP-2
