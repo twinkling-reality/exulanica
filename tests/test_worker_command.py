@@ -256,3 +256,80 @@ def test_the_main_guard_comes_after_every_definition():
     """
     body = ast.parse(Path(worker_command.__file__).read_text()).body
     assert [index for index, node in enumerate(body) if _is_main_guard(node)] == [len(body) - 1]
+
+
+@pytest.mark.parametrize(
+    "enabled,vision_budget,embedding_budget", [(False, 40, 90), (True, 40, 90), (True, 90, 40)]
+)
+def test_both_worker_constructors_share_the_client_and_cover_each_model_gap(
+    monkeypatch, tmp_path, enabled, vision_budget, embedding_budget
+):
+    from exulanica.api import services
+    from exulanica.models.manifest import Role
+    from exulanica.selection.embeddings import embed_capture
+
+    class Database:
+        @classmethod
+        def from_env(cls, environ):
+            return cls()
+
+        @contextmanager
+        def unscoped(self):
+            yield None
+
+    client = SimpleNamespace(
+        worst_case_seconds=lambda role: {
+            Role.VISION: vision_budget,
+            Role.EMBEDDING: embedding_budget,
+        }[role]
+    )
+    clients_built = []
+
+    def make_client(**kwargs):
+        clients_built.append(kwargs)
+        return client
+
+    built = {}
+    depth, detector, segmenter = object(), object(), object()
+    monkeypatch.setattr(worker_command, "Database", Database)
+    monkeypatch.setattr(worker_command, "verify_schema", lambda database: None)
+    monkeypatch.setattr(worker_command, "assert_runtime_role", lambda connection: None)
+    monkeypatch.setattr(worker_command, "ModelClient", make_client)
+    monkeypatch.setattr(worker_command, "_build_depth", lambda environ: depth)
+    monkeypatch.setattr(worker_command, "_build_detector", lambda environ: detector)
+    monkeypatch.setattr(worker_command, "_build_segmenter", lambda environ: segmenter)
+    for module in (worker_command, services):
+        monkeypatch.setattr(module, "NebiusVisionModel", lambda client: client)
+        monkeypatch.setattr(
+            module, "DerivativeWorker", lambda *args, **kwargs: built.update(kwargs)
+        )
+    args = SimpleNamespace(workspace=[str(uuid.uuid4())], name="scripted", poll_seconds=2.0)
+    environ = {worker_command.DATA_DIR_ENV: str(tmp_path)}
+    if enabled:
+        environ[worker_command.MODEL_KEY_ENV] = "scripted-key"
+    worker_command._build_worker(args, environ)
+    assert clients_built == ([{"max_attempts": 1}] if enabled else [])
+    assert (built["depth"], built["detector"], built["segmenter"]) == (depth, detector, segmenter)
+
+    def check_contract():
+        assert built["lease_seconds"] == (180 if enabled else 60)
+        assert built["vision"] is (client if enabled else None)
+        if enabled:
+            assert built["embedding_pass"].func is embed_capture
+            assert built["embedding_pass"].keywords == {"client": client}
+        else:
+            assert built["embedding_pass"] is None
+
+    check_contract()
+    built.clear()
+    services.Services(
+        database=Database(),
+        readonly_database=Database(),
+        store=None,
+        tokens=SimpleNamespace(workspaces=frozenset()),
+        executor_shares_the_write_role=True,
+        model_client=client if enabled else None,
+        runs_derivative_worker=True,
+    ).build_derivative_worker()
+    check_contract()
+    assert clients_built == ([{"max_attempts": 1}] if enabled else [])

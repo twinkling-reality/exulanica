@@ -92,8 +92,9 @@ MINIMUM_LEASE_SECONDS: Final = 60.0
 def lease_seconds_for(vision_budget_seconds: float | None) -> float:
     """How long a claimant may be silent, given the model budget in one gap between beats.
 
-    ``None`` means there is no vision model, which is a configuration rather than a fault, and
-    the answer is :data:`MINIMUM_LEASE_SECONDS`.
+    The caller supplies the maximum vision or embedding budget: a beat separates those
+    passes. ``None`` means there is no model client, which is a configuration rather than a fault.
+    The answer is then :data:`MINIMUM_LEASE_SECONDS`.
 
     Otherwise the budget is doubled. The gap a lease has to cover is a rendition decode, a vision
     walk, a depth forward and, in the last gap, ``run_continuity``, and exactly one of those has a
@@ -236,8 +237,8 @@ class DerivativeWorker:
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
         segmenter: ObjectSegmenter | None = None,
-        embedding_pass: Callable[[psycopg.Connection, uuid.UUID, uuid.UUID],
-                                 EmbeddingResult | None] | None = None,
+        embedding_pass: Callable[[psycopg.Connection, uuid.UUID, uuid.UUID], EmbeddingResult | None]
+        | None = None,
         name: str = "derivatives",
         poll_seconds: float = _POLL_SECONDS,
         lease_seconds: float = MINIMUM_LEASE_SECONDS,
@@ -679,7 +680,9 @@ class DerivativeWorker:
                 if self._embedding_pass is not None:
                     self._beat(repository, claimed, keeper)
                     embedded = self._embedding_pass(
-                        repository.connection, repository.workspace_id, capture_id,
+                        repository.connection,
+                        repository.workspace_id,
+                        capture_id,
                     )
                     if embedded is not None:
                         outcome.model_calls += 1

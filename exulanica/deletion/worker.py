@@ -221,6 +221,12 @@ class PurgeWorker:
     ) -> None:
         if target.target_kind == "embedding":
             with connection.transaction():
+                authorized = connection.execute(
+                    "select caption_vector_purge_is_authorized(%s,%s,%s) as allowed",
+                    (target.workspace_id, target.tombstone_id, uuid.UUID(target.target_ref)),
+                ).fetchone()
+                if authorized is None or not authorized["allowed"]:
+                    raise ValueError("the tombstone does not authorize this vector purge")
                 deleted = connection.execute(
                     "delete from embedding where workspace_id = %s and embedding_id = %s",
                     (target.workspace_id, uuid.UUID(target.target_ref)),

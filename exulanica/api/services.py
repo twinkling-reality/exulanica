@@ -27,12 +27,14 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Final
 
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
+from exulanica.epistemics.caption_embeddings import embed_capture
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
@@ -131,12 +133,14 @@ class Services:
         is therefore rung 4 until a reconstruction pass runs, which ``warnings`` states rather
         than leaves to be discovered.
 
-        **The lease is computed here because this is the only place that can compute it.** How
+        **The constructor computes the lease from the configured client.** How
         long a claimant may be silent depends on the longest model call it can be inside, and
         that is a property of the client rather than of the role: this builds ``ModelClient()``
         with a 180 second timeout and one attempt while ``exulanica-ingest`` builds one with three,
-        so a lease typed as a constant would be right for one of them. The same expression
-        decides whether there is a vision model at all, so the two cannot disagree: no client
+        so a lease typed as a constant would be right for one of them.
+        A beat precedes the caption vector pass, so the lease covers the maximum vision or
+        caption vector budget per gap, rather than their sum. The same expression
+        decides whether there is a model at all, so the two cannot disagree: no client
         means no vision model and the floor, and that is a stated deployment rather than an
         oversight. Reading a budget off the vision model instead would mean widening a protocol
         whose whole point is that the pipeline needs two things from a model, and would break
@@ -149,8 +153,16 @@ class Services:
             self.store,
             self.tokens.workspaces,
             vision=NebiusVisionModel(self.model_client) if self.model_client else None,
+            embedding_pass=partial(embed_capture, client=self.model_client)
+            if self.model_client
+            else None,
             lease_seconds=lease_seconds_for(
-                self.model_client.worst_case_seconds(Role.VISION) if self.model_client else None
+                max(
+                    self.model_client.worst_case_seconds(role)
+                    for role in (Role.VISION, Role.EMBEDDING)
+                )
+                if self.model_client
+                else None
             ),
         )
 

@@ -131,7 +131,7 @@ def test_nothing_in_the_package_writes_an_embedding():
     The old name predates caption retrieval and no longer means there is no writer anywhere.
     This test now proves the default worker has no injected embedding pass and that the sole
     permitted writer stays in the audited caption module. Biometric writers remain forbidden.
-    The caption tests separately expose the unresolved physical-purge acceptance failure.
+    The caption lifecycle tests separately verify physical purge under the purge role.
     """
     from exulanica.ingest.worker import DerivativeWorker
 
@@ -141,7 +141,7 @@ def test_nothing_in_the_package_writes_an_embedding():
     writers = []
     for path in sorted([*_PACKAGE.rglob("*.py"), *_PACKAGE.rglob("*.sql")]):
         text = path.read_text(encoding="utf-8")
-        if path == _PACKAGE / "selection" / "embeddings.py":
+        if path == _PACKAGE / "epistemics" / "caption_embeddings.py":
             continue  # Authorized caption vectors, runtime scope pinned in test_companion_matching.
         for match in _EMBEDDING_WRITER.finditer(text):
             line = text[: match.start()].count("\n") + 1
