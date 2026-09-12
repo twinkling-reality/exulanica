@@ -340,6 +340,10 @@ layers = [
   # The HTTP surface depends on everything and nothing depends on it. That is the definition of
   # a thin API: routes validate and delegate, so a route has nothing another module could want.
   "api",
+  # Environment source admission composes scoped persistence, content-addressed storage and the
+  # graph's established read-finalization discipline. Query, placement and rendering remain
+  # outside it, and none of the lower workflows imports this admission boundary.
+  "environment",
   # The three top-level workflows, and none of them may import another: ingesting a photograph,
   # answering a question about one, and reading the whole graph back are separate concerns that
   # happen to share a database, and a dependency in any direction would be the first step to the

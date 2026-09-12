@@ -62,6 +62,13 @@ PUBLIC_ROUTES: dict[str, str] = {
 ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/graph"): {},
     ("GET", "/graph/sources"): {},
+    ("POST", "/environment-resources/sources"): {"json": {}},
+    ("GET", "/environment-resources/{kind}/{resource_id}"): {
+        "params": {"operation": "display"}
+    },
+    ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): {
+        "params": {"operation": "display"}
+    },
     ("GET", "/geometry"): {},
     ("GET", "/geometry/{artifact_id}"): {},
     ("GET", "/scene-geometry/{artifact_id}"): {},
@@ -338,6 +345,8 @@ class Deployment:
             # putting a conversation in the fixture. Leaving the literal placeholder here would
             # ask the uuid parser about it and report a 422 the sweep would read as a refusal.
             .replace("{answer_id}", str(uuid.uuid4()))
+            .replace("{kind}", "source")
+            .replace("{resource_id}", str(uuid.uuid4()))
         )
 
 
@@ -413,6 +422,7 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
         tokens=load_token_directory(),
         executor_shares_the_write_role=True,
         model_client=None,
+        environment_admission_root=tmp_path,
     )
     app = create_app(services, verify=False)
     with TestClient(app) as client:
