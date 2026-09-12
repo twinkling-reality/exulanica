@@ -1,6 +1,6 @@
 # Product roadmap
 
-Updated 2026-09-08. This roadmap defines delivery milestones and their acceptance criteria.
+Updated 2026-09-12. This roadmap defines delivery milestones and their acceptance criteria.
 Implementation status is recorded below; API and package contracts remain authoritative for
 supported capabilities.
 
@@ -42,6 +42,31 @@ The inventory below identifies existing code and the extensions required by each
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
+
+### Measured experience work on September 12
+
+The experience candidate is under integration; the dated reports distinguish implemented
+contracts, executed fixture checks and remaining personal-source acceptance.
+
+- [Personal browser intake](evaluation/2026-09-12-personal-browser.json) implements original
+  upload, explicit batch selection, person linking, region correction and atomic request
+  recovery. The corrected selection path was exercised against an inventory of 201 images.
+  Real-photo admission with actual human review and inference remains pending.
+- [Saved world controls](evaluation/2026-09-12-world-browser.json) passed authenticated browser
+  version creation, appearance changes, object add/move/remove/undo, bounded motion, reload and
+  second-client conflict recovery using explicitly synthetic geometry. Appearance remains
+  workspace-wide, not isolated per alternate version. Personal-place registration remains
+  unproved. Desktop controls were checked at 1280 and 1000 pixels; mobile retains its existing
+  desktop-only boundary, and a narrow-screen segment-panel overlap remains.
+- [Companion quality preparation](evaluation/2026-09-12-companion-quality.json) adds evidence
+  currency checks and a digest-bound evaluation corpus. Scripted retrieval tests passed;
+  actual model answers, accessible citations and human quality judgments are still pending.
+
+The operator authorized necessary Brev GPU work on September 12. The
+[trainer validation brief](briefs/2026-09-12-place-compute-readiness.md) scopes a generated-data
+packaging and CUDA execution check. GPU authorization does not supply a usable walk-around
+capture or establish place coverage. The first personal-place demonstration and the complete
+scene-to-Companion rehearsal remain acceptance gates before calling the experience complete.
 
 ## World state contract
 

@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**144 documents**, excluding `docs/evaluation/`.
+**150 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -55,7 +55,7 @@ How the system works now. Edited as the system changes.
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
-- [product-direction](product-direction.md) : Updated 2026-09-08. This roadmap defines delivery milestones and their acceptance criteria
+- [product-direction](product-direction.md) : Updated 2026-09-12. This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-36 documents.
+42 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -148,6 +148,7 @@ What was intended, written before the work.
 - [2026-09-11-wave-integration](briefs/2026-09-11-wave-integration.md) : integration preparation; no implementation branch has been accepted
 - [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
+- [2026-09-12-experience-integration](briefs/2026-09-12-experience-integration.md) : root execution brief, 2026-09-12. The scratch integration worktree is
 - [2026-09-12-experience-wave-coordination](briefs/2026-09-12-experience-wave-coordination.md) : active orchestration amendment, 2026-09-12. The operator started all four prepared
 - [2026-09-12-experience-wave](briefs/2026-09-12-experience-wave.md) : prepared on 2026-09-12, not dispatched. This packet proposes four parallel tasks and
 - [2026-09-12-frozen-brief-heading](briefs/2026-09-12-frozen-brief-heading.md) : measured follow-up, 2026-09-12. Comparing all four actual frozen briefs with their
@@ -155,8 +156,13 @@ What was intended, written before the work.
 - [2026-09-12-personal-browser-recovery](briefs/2026-09-12-personal-browser-recovery.md) : measured scope amendment for personal-browser, 2026-09-12. Keep its original brief
 - [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
 - [2026-09-12-place-acceptance](briefs/2026-09-12-place-acceptance.md) : prepared, not dispatched. Branch: codex/place-acceptance
+- [2026-09-12-place-compute-readiness](briefs/2026-09-12-place-compute-readiness.md) : operator-authorized successor to the immutable place-acceptance report
+- [2026-09-12-world-api-registry-integration](briefs/2026-09-12-world-api-registry-integration.md) : measured root integration repair, 2026-09-12. The combined focused backend
 - [2026-09-12-world-browser-fixture](briefs/2026-09-12-world-browser-fixture.md) : executable handoff to world-browser, 2026-09-12. Candidate
 - [2026-09-12-world-browser-registry](briefs/2026-09-12-world-browser-registry.md) : measured amendment for world-browser, 2026-09-12. The owner reproduced a registry
+- [2026-09-12-world-browser-synthetic-geometry](briefs/2026-09-12-world-browser-synthetic-geometry.md) : measured extension of the world-browser fixture handoff, 2026-09-12
+- [2026-09-12-world-browser-undo-access](briefs/2026-09-12-world-browser-undo-access.md) : measured world-browser amendment, 2026-09-12. The owner reports that the
+- [2026-09-12-world-browser-undo-fixture](briefs/2026-09-12-world-browser-undo-fixture.md) : root lease handoff, 2026-09-12. The prior schema
 - [2026-09-12-world-browser](briefs/2026-09-12-world-browser.md) : prepared, not dispatched. Branch: codex/world-browser
 
 ## Dated records
