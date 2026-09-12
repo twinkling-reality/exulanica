@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**139 documents**, excluding `docs/evaluation/`.
+**141 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-31 documents.
+33 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -150,6 +150,8 @@ What was intended, written before the work.
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
 - [2026-09-12-experience-wave-coordination](briefs/2026-09-12-experience-wave-coordination.md) : active orchestration amendment, 2026-09-12. The operator started all four prepared
 - [2026-09-12-experience-wave](briefs/2026-09-12-experience-wave.md) : prepared on 2026-09-12, not dispatched. This packet proposes four parallel tasks and
+- [2026-09-12-frozen-brief-links](briefs/2026-09-12-frozen-brief-links.md) : measured integration repair, 2026-09-12. The place-acceptance owner ran the existing
+- [2026-09-12-personal-browser-recovery](briefs/2026-09-12-personal-browser-recovery.md) : measured scope amendment for personal-browser, 2026-09-12. Keep its original brief
 - [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
 - [2026-09-12-place-acceptance](briefs/2026-09-12-place-acceptance.md) : prepared, not dispatched. Branch: codex/place-acceptance
 - [2026-09-12-world-browser](briefs/2026-09-12-world-browser.md) : prepared, not dispatched. Branch: codex/world-browser

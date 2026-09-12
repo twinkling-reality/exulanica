@@ -116,13 +116,47 @@ def test_every_documentation_path_named_anywhere_in_the_repository_resolves():
     )
 
 
+def _relative_link_origin(path: Path, brief_origins: dict[bytes, Path]) -> Path:
+    """An exact frozen prompt retains the source document's relative-link context.
+
+    Only artifact brief.md copies qualify, and complete byte equality verifies their
+    origin. A changed copy or an ordinary document must resolve from its own directory.
+    """
+    if path.name == "brief.md" and path.is_relative_to(ROOT / "docs/evaluation/artifacts"):
+        return brief_origins.get(path.read_bytes(), path.parent)
+    return path.parent
+
+
+@pytest.mark.parametrize("location,changed,uses_source", [
+    ("evaluation/artifacts/run", False, True),
+    ("evaluation/artifacts/run", True, False),
+    ("ordinary", False, False),
+])
+def test_frozen_brief_link_context_requires_exact_source_bytes(
+    tmp_path, monkeypatch, location, changed, uses_source,
+):
+    monkeypatch.setitem(globals(), "ROOT", tmp_path)
+    source = tmp_path / "docs/briefs" / "source.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("[Wave](wave.md)\n")
+    (source.parent / "wave.md").write_text("The wave\n")
+    frozen = tmp_path / "docs" / location / "brief.md"
+    frozen.parent.mkdir(parents=True)
+    frozen.write_bytes(source.read_bytes() + (b"Changed\n" if changed else b""))
+    origin = _relative_link_origin(frozen, {source.read_bytes(): source.parent})
+    assert (origin / "wave.md").exists() is uses_source
+
+
 def test_relative_links_between_documents_resolve():
     """Rule 3, the form the documentation actually uses most."""
     broken = []
+    brief_origins = {
+        path.read_bytes(): path.parent for path in (ROOT / "docs/briefs").glob("*.md")
+    }
     for path in ROOT.rglob("docs/**/*.md"):
         if any(part in _SKIP_DIRS for part in path.parts):
             continue
-        base = path.parent
+        base = _relative_link_origin(path, brief_origins)
         for target in _MD_LINK.findall(path.read_text(encoding="utf-8", errors="replace")):
             resolved = (base / target).resolve()
             if not resolved.exists():
