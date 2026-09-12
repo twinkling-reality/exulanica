@@ -133,6 +133,7 @@ def test_catalog_and_current_state_expose_references_not_renderer_programs(world
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     text = catalog.text.lower()
     for forbidden in ("javascript", '"css"', '"shader"', '"layout"', "https://"):
@@ -299,6 +300,7 @@ def test_companion_recipe_proposals_preserve_provenance_and_refinement(world_api
         "aeroheart-optics-v1",
         "registered-surface-v1",
         "bounded-tempo-v1",
+        "source-light-v1",
     ]
     assert record["capability_mapping"]["surface-finish"] == "surface.finish"
 
