@@ -38,7 +38,7 @@ import datetime as dt
 import uuid
 from collections.abc import Mapping
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Final
 
 import psycopg
@@ -50,7 +50,9 @@ from exulanica.models.results import ChatResult, EmbeddingResult
 from exulanica.selection.answer import (
     Abstention,
     Answer,
+    AnswerClause,
     AnswerRejected,
+    ClauseType,
     abstain,
     abstain_without_a_selection,
     render_deterministic_answer,
@@ -240,14 +242,18 @@ class ModelCall:
         return cls(
             role=str(call.role),
             requested_model=call.model_id,
-            served_model=call.served_model_id,
+            # ChatResult fills an absent echo with the requested model for compatibility.
+            # Measurement must read the wire, otherwise a missing observation looks verified.
+            served_model=(call.raw.get("model") if isinstance(call.raw.get("model"), str)
+                          and call.raw.get("model") else None),
             used_fallback=call.used_fallback,
             attempts=call.attempts,
             latency_ms=round(call.usage.latency_s * 1000),
             prompt_tokens=_reported(usage, "prompt_tokens"),
             completion_tokens=_reported(usage, "completion_tokens"),
             reasoning_tokens=_reported(details, "reasoning_tokens"),
-            usd=str(call.usage.usd),
+            usd=(str(call.usage.usd) if _reported(usage, "prompt_tokens") is not None
+                 and _reported(usage, "completion_tokens") is not None else None),
         )
 
 
@@ -752,6 +758,29 @@ def answer_question(
         )
 
     answer, deterministic, rejections = compose_answer(client, question, packet, log=log)
+    # Composition can take seconds. Re-run the validated dimensions as well as span/claim
+    # loading so a withdrawal, deletion or changed count during that wait cannot support the
+    # final answer. Reuse the query vector; this check makes no further model call.
+    try:
+        current_result = execute(connection, validate(connection, plan, session),
+                                 query_embedding=query_vector)
+        current_packet = build_packet(connection, current_result,
+                                      workspace_id=session.workspace_id, now=now)
+        unchanged = current_result == result and _same_evidence(packet, current_packet)
+    except SelectionRejected as rejected:
+        if rejected.code is not RejectionCode.UNKNOWN_REFERENCE:
+            raise
+        unchanged = False
+    if not unchanged:
+        return AnsweredQuestion(
+            answer=Answer(clauses=[AnswerClause(
+                text="The evidence changed while I was answering. Please ask again so I can "
+                     "use the current evidence.",
+                type=ClauseType.META,
+            )]),
+            plan=plan, abstention=Abstention.AMBIGUOUS,
+            rejections=(*rejections, "evidence_changed_during_composition"), calls=log.calls,
+        )
     return AnsweredQuestion(
         answer=answer,
         plan=plan,
@@ -761,6 +790,13 @@ def answer_question(
         deterministic=deterministic,
         rejections=rejections,
         calls=log.calls,
+    )
+
+
+def _same_evidence(before: EvidencePacket, after: EvidencePacket) -> bool:
+    """Fresh tokens are random; every source, claim, trust and computed value must agree."""
+    return replace(before, items=tuple(replace(i, token="") for i in before.items)) == replace(
+        after, items=tuple(replace(i, token="") for i in after.items)
     )
 
 
