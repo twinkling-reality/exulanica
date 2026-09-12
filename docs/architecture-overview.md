@@ -1,5 +1,14 @@
 # Architecture overview
 
+**Current direction, 2026-09-12:** read [product-direction.md](product-direction.md)
+and [world-composition-contract.md](world-composition-contract.md) before using the
+historical architecture below. The intended system combines memories, permitted
+real-world selections and authored/fantasy variations in one interactive and
+queryable world. The production renderer is PlayCanvas; earlier statements below
+that renderer selection is open are historical. The composition contract identifies
+unimplemented geography, retrieval and editing extensions; it does not change
+existing API or package compatibility by itself.
+
 - Status: mixed, labelled per claim. See `README.md` for the status convention.
 - Date: 2026-08-27
 - Source: promoted from the reconciled research report, Part D, with the disagreements in Part C

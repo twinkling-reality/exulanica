@@ -15,6 +15,12 @@ That direction supersedes the earlier reconstruction-only and competitive "state
 framing. The numbered work below preserves the existing engineering history and dependencies;
 it is not the complete creative-world delivery sequence.
 
+The [unified composition contract](world-composition-contract.md), added
+2026-09-12, makes imported geography, personal memories and authored/fantasy
+variations part of one editable, queryable world. Its Iceland example and staged
+acceptance supersede a separate Earth-viewer interpretation. Current code and
+scoped evaluation records still determine implementation status.
+
 The next product milestone is a reconstructed place, an alternate version, one created object,
 and one bounded interaction, with saved state and a concrete developer read/edit path. See the
 [new delivery gates](product-direction.md#first-milestone).

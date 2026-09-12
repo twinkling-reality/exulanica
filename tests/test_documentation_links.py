@@ -40,6 +40,10 @@ _TEMPLATE = "template text in the document's own instructions"
 
 #: A reference this tree cannot satisfy today, and why it is not a defect to be fixed here.
 ALLOWED_DANGLING: dict[str, str] = {
+    "docs/evaluation/2026-09-12-earth-interactive-foundation.json": (
+        "reserved successor output in the immutable dispatched Earth correction brief; "
+        "the unaccepted Earth lane has not been integrated. Do not invent a result to fill it."
+    ),
     "docs/evaluation/NEW-asset-read-currency.json": _TEMPLATE,
     "docs/evaluation/NEW-personal-admission-flow.json": _TEMPLATE,
     "docs/evaluation/NEW-screening-currency.json": _TEMPLATE,

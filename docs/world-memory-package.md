@@ -14,6 +14,13 @@ live store, a backup, a consent grant, or an executable world. An exported copy 
 After a deletion, a new export has a new root and the semantic diff is the durable account of what
 was removed or recomputed.
 
+**Planned composition extension:** [world-composition-contract.md](world-composition-contract.md)
+defines future imported geography, selected subsets, place relationships, source-use
+rights and authored placement. These are not silently added to WMP 1.0 or the
+existing authored-world extension. Scope a versioned contract and verifier/receiver
+capabilities first; a signed package does not grant source reuse rights, carry
+missing asset bytes or establish a runnable import.
+
 ## Standards and compatibility boundary
 
 `wmp/profile.json` is the versioned Exulanica profile. The identifier is `exulanica-wmp-1.0`.

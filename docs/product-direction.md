@@ -15,6 +15,23 @@ material, and combine it with their experiences. Simulation adds movement and in
 Memory, creation, and simulation share the same world state. The Companion provides a conversational
 interface; the World Memory Package describes a portable snapshot for developers.
 
+Real-world places selected from permitted external sources join those memories
+and creations as reusable world content. A person should be able to bring an
+Icelandic landscape into their own world, combine it with their Iceland memories,
+and ask for a fantasy variation while retaining source identity and undoable
+history. "Show everything related to Iceland" should find the imported landscape,
+supported personal memories and derived creations together, with origin/place/time
+filters and explicit match reasons. Moving content into a fictional arrangement
+must not rewrite where it originated or imply a personal visit.
+
+The [unified world composition and retrieval contract](world-composition-contract.md)
+defines the required relationships, source-use rights, typed queries and edits,
+visual acceptance and implementation gaps. Future Earth, memory, creation, search
+and package briefs must follow that contract. This is the intended product, not a
+claim that extraction, unified content search or general NLP scene editing already
+works. The World Memory Model is the system architecture and world representation;
+it does not imply an already-trained universal world-generation model.
+
 ## Relationship to the engineering roadmap
 
 This document supersedes narrower product definitions in product-specification.md and the
@@ -32,13 +49,13 @@ The inventory below identifies existing code and the extensions required by each
 
 | Area | Existing basis | New work for this direction |
 | --- | --- | --- |
-| Reconstruction and memory | Reconstruction modules, scene graph, identity decisions | Select and validate one personally meaningful place for the demonstration |
-| Appearance | Reviewed capabilities and preview/apply/rollback contracts | Verify the selected look on the demonstration place; do not equate style with object creation |
-| World Read | `exulanica/api/routes/world_read.py` serves scene/place bundles | Define reads for an authored world version and its created objects |
-| World Write | `exulanica/api/routes/world_write.py` records generated-scene receipts | Persist actual editable object state and asset references; integrate rendering and user acceptance |
-| Package | `exulanica/world_package/cli.py` and profile `exulanica-wmp-1.0` | Versioned support for creative state and behavior references after the data contract is settled |
-| World versions | Existing versioned topology, placement, and appearance | Explicit alternate-world lineage; existing component snapshots do not establish complete world branching |
-| Simulation | No general simulation capability established by this review | One bounded behavior first; physical and multi-entity simulation later |
+| Reconstruction and memory | Reconstruction modules, scene graph, identity decisions and lifted scene segments | Validate a personal scene; reusable complete-object extraction and cross-source alignment remain separate work |
+| Appearance and language | Reviewed appearance capabilities and bounded conversational preview/apply/rollback proposals | General structural edits, geometry blending and generated-asset creation through typed operations |
+| World Read and Selection | Scene/place reads and capture/entity Selection with place, time and text constraints | Unified authorized reads/queries for memories, imported geography, assets and authored versions with explainable matches |
+| Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo and bounded motion; synthetic browser acceptance recorded below | Reusable Earth selections, persistent environment/anchor contracts and real-scene acceptance; arbitrary world branching is not established |
+| Earth and source admission | Experimental frontend environment work; current visual result unaccepted | Detailed usable sources permitted for extraction/indexing/remix, explicit geographic identity and first-person coexistence |
+| Package | WMP 1.0 and opt-in authored-world extension describe existing state | Versioned geographic selection/anchor/rights support and permitted asset resolution; no automatic runnable import |
+| Simulation | Reviewed bounded object behaviors; no general simulation capability established | Supported physics and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -82,6 +99,13 @@ the globe-navigation and separate-handoff outcome in the original
 [Earth wave](briefs/2026-09-12-earth-wave.md) and lane brief. That original scope
 misunderstood the requested product. The orbital implementation is not accepted
 or integrated.
+
+The subsequent ground-level native prototype was also rejected for visual quality.
+An untextured block city and a synthetic interaction marker do not satisfy the
+requested rendered world. Assess detailed ground-level appearance and reuse rights
+alongside integration, geometry and performance; a reference-only photorealistic
+feed cannot silently become the editable corpus. Neither rejected prototype has
+been accepted as completion of the Earth product requirement.
 
 Earth is an optional environment inside Exulanica's interactive world. The person
 stands on its streamed terrain, moves with the existing first-person controls,
@@ -327,6 +351,14 @@ not mandate a new runtime, an infrastructure framework, or a benchmark campaign 
 the scene's observed bottleneck.
 
 ## Subsequent milestones
+
+The [composition delivery sequence](world-composition-contract.md#existing-implementation-and-staged-delivery)
+connects these milestones: permitted source admission and shared identity, durable
+composition with unified retrieval, natural-language structural creation, then
+compatible transfer and expansion. Frontend Earth rendering is one dependency;
+it does not complete extraction, searchable world integration or persistent edits.
+Each stage needs an exact scoped brief and measured acceptance, without changing
+active tasks' ownership through roadmap prose.
 
 1. **Creative composition:** more editable assets, blending places into authored arrangements,
    explicit source versus created content, alternate versions, undo, and persistence. A composed

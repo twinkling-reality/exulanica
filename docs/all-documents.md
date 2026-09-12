@@ -8,15 +8,15 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**157 documents**, excluding `docs/evaluation/`.
+**160 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-58 documents.
+59 documents.
 
-- [architecture-overview](architecture-overview.md) : - Status: mixed, labelled per claim. See README.md for the status convention
+- [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
 - [atlas-frontend-integration](atlas-frontend-integration.md) : IMPLEMENTED for the global world-appearance lifecycle, production source-media
 - [atlas-reconstruction-inspection](atlas-reconstruction-inspection.md) : The production Atlas reads scene identity, ordered capture membership, quality gates
@@ -69,6 +69,7 @@ How the system works now. Edited as the system changes.
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
+- [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
 - [world-objects-contract](world-objects-contract.md) : DECISION and IMPLEMENTED for alternate world versions, authored object add/move/
 - [world-read-posed-views](world-read-posed-views.md) : Design contract written before implementation, 2026-09-08. Migration: NONE
@@ -85,7 +86,7 @@ Written for somebody choosing to use it, not build it.
 - [scene-reconstruction](capabilities/scene-reconstruction.md) : Build 3D places from the media associated with your experiences
 - [simulation](capabilities/simulation.md) : Give created objects movement, interactions, and rules for responding to the world
 - [world-api](capabilities/world-api.md) : Connect tools to personal world state through authenticated read and write interfaces
-- [world-creation](capabilities/world-creation.md) : Change the look of your world, add objects, and combine places into your own creations
+- [world-creation](capabilities/world-creation.md) : Build an interactive world from your memories, selected real-world places and
 
 ## Decision records
 
@@ -120,7 +121,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-49 documents.
+51 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -149,6 +150,7 @@ What was intended, written before the work.
 - [2026-09-12-companion-preview-binding](briefs/2026-09-12-companion-preview-binding.md) : measured root follow-up, 2026-09-12. The repaired failure-area run passed
 - [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
+- [2026-09-12-cursor-orchestrator-handoff](briefs/2026-09-12-cursor-orchestrator-handoff.md) : operator-requested handoff, 2026-09-12. Read this as a continuation prompt
 - [2026-09-12-earth-experience-correction](briefs/2026-09-12-earth-experience-correction.md) : corrected product contract and bounded frontend implementation amendment
 - [2026-09-12-earth-foundation](briefs/2026-09-12-earth-foundation.md) : prepared for operator dispatch. Branch: codex/earth-foundation
 - [2026-09-12-earth-wave](briefs/2026-09-12-earth-wave.md) : prepared for operator dispatch on 2026-09-12; no lane has been started by
@@ -171,6 +173,7 @@ What was intended, written before the work.
 - [2026-09-12-world-browser-undo-access](briefs/2026-09-12-world-browser-undo-access.md) : measured world-browser amendment, 2026-09-12. The owner reports that the
 - [2026-09-12-world-browser-undo-fixture](briefs/2026-09-12-world-browser-undo-fixture.md) : root lease handoff, 2026-09-12. The prior schema
 - [2026-09-12-world-browser](briefs/2026-09-12-world-browser.md) : prepared, not dispatched. Branch: codex/world-browser
+- [2026-09-12-world-composition-contract](briefs/2026-09-12-world-composition-contract.md) : authorized documentation update, 2026-09-12
 
 ## Dated records
 
