@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**150 documents**, excluding `docs/evaluation/`.
+**151 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -120,7 +120,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-42 documents.
+43 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -148,6 +148,7 @@ What was intended, written before the work.
 - [2026-09-11-wave-integration](briefs/2026-09-11-wave-integration.md) : integration preparation; no implementation branch has been accepted
 - [2026-09-12-companion-quality](briefs/2026-09-12-companion-quality.md) : prepared, not dispatched. Branch: codex/companion-quality
 - [2026-09-12-copy-activation](briefs/2026-09-12-copy-activation.md) : ready to execute by the orchestrator, 2026-09-12. Base main is
+- [2026-09-12-experience-activation](briefs/2026-09-12-experience-activation.md) : root preparation, 2026-09-12. Execute database mutations only after the full
 - [2026-09-12-experience-integration](briefs/2026-09-12-experience-integration.md) : root execution brief, 2026-09-12. The scratch integration worktree is
 - [2026-09-12-experience-wave-coordination](briefs/2026-09-12-experience-wave-coordination.md) : active orchestration amendment, 2026-09-12. The operator started all four prepared
 - [2026-09-12-experience-wave](briefs/2026-09-12-experience-wave.md) : prepared on 2026-09-12, not dispatched. This packet proposes four parallel tasks and
