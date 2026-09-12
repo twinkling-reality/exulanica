@@ -63,9 +63,9 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/graph"): {},
     ("GET", "/graph/sources"): {},
     ("POST", "/environment-resources/sources"): {"json": {}},
-    ("GET", "/environment-resources/{kind}/{resource_id}"): {
-        "params": {"operation": "display"}
-    },
+    ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): {"json": {}},
+    ("GET", "/environment-resources/sources/{admission_id}/features"): {},
+    ("GET", "/environment-resources/{kind}/{resource_id}"): {"params": {"operation": "display"}},
     ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): {
         "params": {"operation": "display"}
     },
@@ -156,9 +156,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/world/versions"): {
         "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())}
     },
-    ("POST", "/world/versions/bootstrap"): {
-        "json": {"base_topology_digest": "0" * 64}
-    },
+    ("POST", "/world/versions/bootstrap"): {"json": {"base_topology_digest": "0" * 64}},
     ("POST", "/world/versions/{version_id}/objects"): {
         "json": {
             "base_state_sha256": "0" * 64,

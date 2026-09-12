@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,14 +12,25 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from exulanica.canonical import canonical_json
 from exulanica.db.session import set_workspace
 from exulanica.environment.admission import (
     MAX_ENVIRONMENT_PAYLOAD_BYTES,
     DerivedEnvironmentAsset,
     EnvironmentOperation,
+    GeographicBounds,
+    GeographicFrame,
     SourceAdmission,
     derived_receipt,
     source_receipt,
+)
+from exulanica.environment.feature_index import (
+    FEATURE_INDEX_DERIVATION,
+    EnvironmentFeatureKind,
+    FeatureIndexPublication,
+    build_feature_index,
+    filter_features,
+    validate_feature_index,
 )
 from exulanica.errors import ExulanicaError, IntegrityError
 from exulanica.evidence.blob import BlobId
@@ -70,6 +82,28 @@ class EnvironmentResource:
 class AuthorizedEnvironmentBytes:
     data: bytes
     media_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentFeatureCatalog:
+    publication_id: uuid.UUID
+    admission_id: uuid.UUID
+    index_asset_id: uuid.UUID
+    render_asset_id: uuid.UUID
+    receipt: dict[str, Any]
+    receipt_sha256: str
+    features: tuple[dict[str, Any], ...]
+
+    def document(self) -> dict[str, Any]:
+        return {
+            "publication_id": str(self.publication_id),
+            "admission_id": str(self.admission_id),
+            "index_asset_id": str(self.index_asset_id),
+            "render_asset_id": str(self.render_asset_id),
+            "receipt": self.receipt,
+            "receipt_sha256": self.receipt_sha256,
+            "features": list(self.features),
+        }
 
 
 class EnvironmentRepository:
@@ -193,6 +227,207 @@ class EnvironmentRepository:
             )
         return self.read_metadata("asset", value.asset_id, EnvironmentOperation.PERSIST)
 
+    def publish_feature_index(
+        self,
+        admission_id: uuid.UUID,
+        value: FeatureIndexPublication,
+        *,
+        actor: uuid.UUID,
+    ) -> EnvironmentFeatureCatalog:
+        self._authorized_row("source", admission_id, EnvironmentOperation.INDEX)
+        self._authorized_row("asset", value.render_asset_id, EnvironmentOperation.INDEX)
+        source_record = self.connection.execute(
+            """
+            select provider_key,provider_original_id,provider_revision,source_sha256,
+                   receipt_sha256,geographic_frame,geographic_bounds,operation_rights,
+                   attribution
+              from environment_source_admission
+             where workspace_id=%s and admission_id=%s
+            """,
+            (self.workspace_id, admission_id),
+        ).fetchone()
+        render_record = self.connection.execute(
+            """
+            select admission_id,content_sha256,receipt_sha256,operation_rights
+              from derived_environment_asset
+             where workspace_id=%s and asset_id=%s
+            """,
+            (self.workspace_id, value.render_asset_id),
+        ).fetchone()
+        if (
+            source_record is None
+            or render_record is None
+            or render_record["admission_id"] != admission_id
+        ):
+            raise UnknownEnvironmentResource("no such environment resource")
+
+        source_hex = bytes(source_record["source_sha256"]).hex()
+        render_hex = bytes(render_record["content_sha256"]).hex()
+        source_receipt_hex = bytes(source_record["receipt_sha256"]).hex()
+        render_receipt_hex = bytes(render_record["receipt_sha256"]).hex()
+        frame = source_record["geographic_frame"]
+        bounds = source_record["geographic_bounds"]
+        data = build_feature_index(
+            value,
+            admission_id=admission_id,
+            provider_key=source_record["provider_key"],
+            provider_original_id=source_record["provider_original_id"],
+            provider_revision=source_record["provider_revision"],
+            source_sha256=source_hex,
+            source_receipt_sha256=source_receipt_hex,
+            render_sha256=render_hex,
+            render_receipt_sha256=render_receipt_hex,
+            geographic_frame=self._frame(frame),
+            geographic_bounds=self._bounds(bounds),
+        )
+        stored = self.store.put_bytes(data)
+        rights = {
+            operation.value: bool(
+                source_record["operation_rights"][operation.value]
+                and render_record["operation_rights"][operation.value]
+            )
+            for operation in EnvironmentOperation
+        }
+        index_asset = DerivedEnvironmentAsset(
+            admission_id=admission_id,
+            parent_asset_id=value.render_asset_id,
+            expected_sha256=stored.blob_id.hex,
+            expected_byte_size=stored.byte_size,
+            media_type="application/vnd.exulanica.environment-feature-index+json",
+            derivation_kind=FEATURE_INDEX_DERIVATION,
+            derivation_lineage={
+                "method": "exulanica.environment-feature-index/v1",
+                "input_sha256": [source_hex, render_hex],
+            },
+            geographic_frame=self._frame(frame),
+            geographic_bounds=self._bounds(bounds),
+            operation_rights=rights,
+            attribution=source_record["attribution"],
+            modification_notice="Generated feature catalog; source and render bytes are unchanged.",
+            local_path=Path("<generated-environment-feature-index>"),
+        )
+        index_record, index_encoded, index_receipt_digest = derived_receipt(
+            index_asset, source_sha256=source_hex
+        )
+        publication_record = {
+            "profile": "exulanica.environment-feature-index-publication/v1",
+            "publication_id": str(value.publication_id),
+            "admission_id": str(admission_id),
+            "index_asset_id": str(index_asset.asset_id),
+            "render_asset_id": str(value.render_asset_id),
+            "source_sha256": source_hex,
+            "source_receipt_sha256": source_receipt_hex,
+            "index_sha256": stored.blob_id.hex,
+            "index_receipt_sha256": index_receipt_digest.hex(),
+            "render_sha256": render_hex,
+            "render_receipt_sha256": render_receipt_hex,
+        }
+        publication_encoded = canonical_json(publication_record)
+        publication_digest = hashlib.sha256(publication_encoded).digest()
+        with self.connection.transaction():
+            self.connection.execute(
+                """
+                insert into derived_environment_asset(
+                  workspace_id,asset_id,admission_id,parent_asset_id,source_sha256,
+                  content_sha256,media_type,byte_size,derivation_kind,derivation_lineage,
+                  geographic_frame,geographic_bounds,operation_rights,attribution,
+                  modification_notice,receipt_record,receipt_canonical,receipt_sha256,created_by)
+                values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    self.workspace_id,
+                    index_asset.asset_id,
+                    admission_id,
+                    value.render_asset_id,
+                    source_record["source_sha256"],
+                    stored.blob_id.digest,
+                    index_asset.media_type,
+                    stored.byte_size,
+                    index_asset.derivation_kind,
+                    Jsonb(index_asset.derivation_lineage),
+                    Jsonb(frame),
+                    Jsonb(bounds),
+                    Jsonb(rights),
+                    index_asset.attribution,
+                    index_asset.modification_notice,
+                    Jsonb(index_record),
+                    index_encoded,
+                    index_receipt_digest,
+                    actor,
+                ),
+            )
+            self.connection.execute(
+                """
+                insert into environment_feature_index_publication(
+                  workspace_id,publication_id,admission_id,index_asset_id,render_asset_id,
+                  source_sha256,source_receipt_sha256,index_sha256,index_receipt_sha256,
+                  render_sha256,render_receipt_sha256,receipt_record,receipt_canonical,
+                  receipt_sha256,published_by)
+                values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    self.workspace_id,
+                    value.publication_id,
+                    admission_id,
+                    index_asset.asset_id,
+                    value.render_asset_id,
+                    source_record["source_sha256"],
+                    source_record["receipt_sha256"],
+                    stored.blob_id.digest,
+                    index_receipt_digest,
+                    render_record["content_sha256"],
+                    render_record["receipt_sha256"],
+                    Jsonb(publication_record),
+                    publication_encoded,
+                    publication_digest,
+                    actor,
+                ),
+            )
+        return self.read_features(admission_id)
+
+    def read_features(
+        self,
+        admission_id: uuid.UUID,
+        *,
+        feature_id: str | None = None,
+        kind: EnvironmentFeatureKind | None = None,
+        bbox: tuple[int, ...] | None = None,
+        label: str | None = None,
+    ) -> EnvironmentFeatureCatalog:
+        row = self._authorized_publication(admission_id)
+        data = self.store.get(BlobId(bytes(row["index_sha256"])))
+        try:
+            payload = validate_feature_index(
+                data,
+                admission_id=admission_id,
+                source_sha256=bytes(row["source_sha256"]).hex(),
+                source_receipt_sha256=bytes(row["source_receipt_sha256"]).hex(),
+                render_asset_id=row["render_asset_id"],
+                render_sha256=bytes(row["render_sha256"]).hex(),
+                render_receipt_sha256=bytes(row["render_receipt_sha256"]).hex(),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise IntegrityError(f"stored environment feature index is invalid: {exc}") from exc
+        selected = filter_features(
+            payload["features"],
+            feature_id=feature_id,
+            kind=kind,
+            bbox=bbox,
+            label=label,
+        )
+        with final_check(self.connection) as at:
+            current = self._publication_row(admission_id, at=at)
+            self._require_publication_current(row, current)
+        return EnvironmentFeatureCatalog(
+            publication_id=row["publication_id"],
+            admission_id=admission_id,
+            index_asset_id=row["index_asset_id"],
+            render_asset_id=row["render_asset_id"],
+            receipt=row["publication_receipt"],
+            receipt_sha256=bytes(row["publication_receipt_sha256"]).hex(),
+            features=tuple(selected),
+        )
+
     def read_metadata(
         self, kind: ResourceKind, resource_id: uuid.UUID, operation: EnvironmentOperation
     ) -> EnvironmentResource:
@@ -271,9 +506,9 @@ class EnvironmentRepository:
         *,
         at: Any | None = None,
     ) -> dict[str, Any] | None:
-        timestamp = at or self.connection.execute(
-            "select statement_timestamp() as at"
-        ).fetchone()["at"]
+        timestamp = (
+            at or self.connection.execute("select statement_timestamp() as at").fetchone()["at"]
+        )
         if kind == "source":
             return self.connection.execute(
                 """
@@ -315,6 +550,116 @@ class EnvironmentRepository:
             if current[key] != buffered[key]:
                 raise EnvironmentOperationDenied("environment resource changed during read")
 
+    def _authorized_publication(self, admission_id: uuid.UUID) -> dict[str, Any]:
+        row = self._publication_row(admission_id)
+        if row is None:
+            raise UnknownEnvironmentResource("no such environment feature index")
+        if any(
+            row[key] is not None
+            for key in ("source_withdrawn_at", "index_withdrawn_at", "render_withdrawn_at")
+        ):
+            raise EnvironmentResourceWithdrawn("environment feature index was withdrawn")
+        if not row["source_allowed"] or not row["index_allowed"] or not row["render_allowed"]:
+            raise EnvironmentOperationDenied("index is not permitted")
+        self._require_publication_bindings(row)
+        return row
+
+    def _publication_row(
+        self, admission_id: uuid.UUID, *, at: Any | None = None
+    ) -> dict[str, Any] | None:
+        timestamp = (
+            at or self.connection.execute("select statement_timestamp() as at").fetchone()["at"]
+        )
+        return self.connection.execute(
+            """
+            select p.publication_id,p.admission_id,p.index_asset_id,p.render_asset_id,
+                   p.source_sha256,p.source_receipt_sha256,p.index_sha256,
+                   p.index_receipt_sha256,p.render_sha256,p.render_receipt_sha256,
+                   p.receipt_record as publication_receipt,
+                   p.receipt_sha256 as publication_receipt_sha256,
+                   s.source_sha256 as live_source_sha256,
+                   s.receipt_sha256 as live_source_receipt_sha256,
+                   i.content_sha256 as live_index_sha256,
+                   i.receipt_sha256 as live_index_receipt_sha256,
+                   r.content_sha256 as live_render_sha256,
+                   r.receipt_sha256 as live_render_receipt_sha256,
+                   s.withdrawn_at as source_withdrawn_at,
+                   i.withdrawn_at as index_withdrawn_at,
+                   r.withdrawn_at as render_withdrawn_at,
+                   environment_resource_allows(
+                     %s,'source',p.admission_id,'index',%s) as source_allowed,
+                   environment_resource_allows(
+                     %s,'asset',p.index_asset_id,'index',%s) as index_allowed,
+                   environment_resource_allows(
+                     %s,'asset',p.render_asset_id,'index',%s) as render_allowed
+              from environment_feature_index_publication p
+              join environment_source_admission s
+                on s.workspace_id=p.workspace_id and s.admission_id=p.admission_id
+              join derived_environment_asset i
+                on i.workspace_id=p.workspace_id and i.asset_id=p.index_asset_id
+              join derived_environment_asset r
+                on r.workspace_id=p.workspace_id and r.asset_id=p.render_asset_id
+             where p.workspace_id=%s and p.admission_id=%s
+             order by p.published_at desc,p.publication_id desc
+             limit 1
+            """,
+            (
+                self.workspace_id,
+                timestamp,
+                self.workspace_id,
+                timestamp,
+                self.workspace_id,
+                timestamp,
+                self.workspace_id,
+                admission_id,
+            ),
+        ).fetchone()
+
+    def _require_publication_current(
+        self, buffered: dict[str, Any], current: dict[str, Any] | None
+    ) -> None:
+        if current is None:
+            raise UnknownEnvironmentResource("environment feature index became unavailable")
+        if any(
+            current[key] is not None
+            for key in ("source_withdrawn_at", "index_withdrawn_at", "render_withdrawn_at")
+        ):
+            raise EnvironmentResourceWithdrawn("environment feature index was withdrawn")
+        if not all(current[key] for key in ("source_allowed", "index_allowed", "render_allowed")):
+            raise EnvironmentOperationDenied("index is not permitted")
+        self._require_publication_bindings(current)
+        for key in (
+            "publication_id",
+            "index_asset_id",
+            "render_asset_id",
+            "source_sha256",
+            "source_receipt_sha256",
+            "index_sha256",
+            "index_receipt_sha256",
+            "render_sha256",
+            "render_receipt_sha256",
+            "publication_receipt_sha256",
+        ):
+            if current[key] != buffered[key]:
+                raise EnvironmentOperationDenied(
+                    "environment feature publication changed during read"
+                )
+
+    @staticmethod
+    def _require_publication_bindings(row: dict[str, Any]) -> None:
+        for published, live in (
+            ("source_sha256", "live_source_sha256"),
+            ("source_receipt_sha256", "live_source_receipt_sha256"),
+            ("index_sha256", "live_index_sha256"),
+            ("index_receipt_sha256", "live_index_receipt_sha256"),
+            ("render_sha256", "live_render_sha256"),
+            ("render_receipt_sha256", "live_render_receipt_sha256"),
+        ):
+            if row[published] != row[live]:
+                raise EnvironmentOperationDenied(
+                    "environment feature publication digest binding changed"
+                )
+
     @staticmethod
     def _resource(
         kind: ResourceKind, resource_id: uuid.UUID, row: dict[str, Any]
@@ -334,3 +679,11 @@ class EnvironmentRepository:
         if kind == "asset":
             return "derived_environment_asset", "asset_id"
         raise ValueError("environment resource kind must be source or asset")
+
+    @staticmethod
+    def _frame(value: dict[str, Any]) -> GeographicFrame:
+        return GeographicFrame.model_validate(value)
+
+    @staticmethod
+    def _bounds(value: dict[str, Any]) -> GeographicBounds:
+        return GeographicBounds.model_validate(value)
