@@ -299,6 +299,17 @@ export function adaptSnapshot(
 
   return {
     stateVersion: payload.state_version,
+    reviewSources: (payload.review_sources ?? []).map((source) => ({
+      kind: source.kind, captureId: source.capture_id, evidenceSpanId: source.evidence_span_id,
+      capturedAtMs: toMs(source.captured_at), mediaType: source.media_type,
+      state: source.state, reason: source.reason, evidencePath: source.evidence_path,
+      contentSha256: source.content_sha256,
+      personReviewState: source.person_review_state,
+      personRegions: source.person_regions.map((region) => ({
+        regionId: region.region_id, state: region.state, silhouettePpm: region.silhouette_ppm,
+        displayName: region.display_name, subjectId: region.subject_id,
+      })),
+    })),
     entities,
     occurrences,
     islands: buildIslands(payload, toIsland),

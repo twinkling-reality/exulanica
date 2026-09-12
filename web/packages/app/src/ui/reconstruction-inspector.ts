@@ -1,4 +1,5 @@
 import type { SourceMediaDescriptor } from '@exulanica/atlas-react/playcanvas';
+import type { GraphSnapshot } from '@exulanica/graph-client';
 import { el, replace } from './dom.js';
 
 export interface ReconstructionInspectionOption {
@@ -15,6 +16,8 @@ export interface ReconstructionInspectionOption {
    * where there is no single photograph a review could be of.
    */
   readonly captureId?: string | null;
+  readonly personRegions?: NonNullable<GraphSnapshot['reviewSources']>[number]['personRegions'];
+  readonly personReviewState?: NonNullable<GraphSnapshot['reviewSources']>[number]['personReviewState'];
 }
 
 /** One photograph that recorded the selected point, as the panel needs to show it. */
@@ -165,13 +168,16 @@ export function buildReconstructionInspector(options: {
     previous.disabled = index === 0;
     next.disabled = index === views.length - 1;
     state.textContent = view.kind === 'source-only'
-      ? 'Original photograph. Reconstructed camera inspection is unavailable for this scene.'
+      ? 'Authorized photograph. No reconstructed camera is implied.'
       : view.kind === 'source-camera'
       ? (view.projection === 'pinhole-approximation'
         ? 'Recovered camera with calibrated focal lengths and principal point. Lens distortion is approximated by a pinhole projection.'
         : view.projection === 'pinhole' ? 'Recovered camera with its calibrated pinhole projection.'
           : 'Recovered source camera using the point-map field-of-view estimate.')
       : 'Midpoint between consecutive recovered cameras. This is an unobserved viewpoint, not measured geometry or a validated route.';
+    root.dataset.captureId = view.captureId ?? '';
+    root.dataset.personReviewState = view.personReviewState ?? '';
+    root.dataset.personRegionCount = String(view.personRegions?.length ?? 0);
     source.hidden = false;
     source.open = view.kind === 'source-only';
     if (view.source?.available && view.source.url !== null) {
@@ -323,10 +329,16 @@ export function buildReconstructionInspector(options: {
       const sourceOnly = choices[0]!.kind === 'source-only';
       title.textContent = sourceOnly ? 'Source photographs' : 'Reconstruction views';
       disclosure.textContent = sourceOnly
-        ? 'Authorized original evidence. No reconstructed surface or measured route is implied.'
+        ? 'Authorized source evidence. No reconstructed surface or measured route is implied.'
         : 'Camera inspection · fitted relative scale · physical scale unverified. These views do not establish a walkable surface.';
       select.setAttribute('aria-label', sourceOnly ? 'Source photograph' : 'Inspection viewpoint');
-      root.dataset.sceneId = id;
+      if (sourceOnly) {
+        delete root.dataset.sceneId;
+        root.dataset.sourceCollection = id;
+      } else {
+        delete root.dataset.sourceCollection;
+        root.dataset.sceneId = id;
+      }
       replace(select, choices.map((view) => el('option', { value: view.id, text: view.label })));
       root.hidden = false;
       showView(Math.min(Math.max(0, initialIndex), choices.length - 1));

@@ -535,8 +535,24 @@ export interface IslandRecord {
  * connection, because both must be reproducible in a test with no transport, and because
  * `stateVersion` is what expires an update proposal (5.1).
  */
+/** Admitted media inventory, kept separate from the spatial scene and island lists. */
+export interface ReviewSourceRecord {
+  readonly kind: 'admitted_capture';
+  readonly captureId: string;
+  readonly evidenceSpanId: string;
+  readonly capturedAtMs: number | null;
+  readonly mediaType: string;
+  readonly state: 'available' | 'unavailable_asset';
+  readonly reason: string | null;
+  readonly evidencePath: string | null;
+  readonly contentSha256: string | null;
+  readonly personRegions: readonly PersonRegionRecord[];
+  readonly personReviewState: PersonReviewState;
+}
+
 export interface GraphSnapshot {
   readonly stateVersion: number;
+  readonly reviewSources?: readonly ReviewSourceRecord[];
   readonly entities: readonly EntityRecord[];
   readonly occurrences: readonly OccurrenceRecord[];
   /**

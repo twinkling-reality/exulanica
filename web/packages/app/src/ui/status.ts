@@ -43,6 +43,8 @@ export interface StatusInput {
   readonly onInspectScene?: (sceneId: string) => void;
   readonly onInspectSources?: (sceneId: string) => void;
   /** Live photograph groups before a reconstruction job has created a scene receipt. */
+  readonly admittedSourceCount?: number;
+  readonly onInspectAdmittedSources?: () => void;
   readonly sourceRegions?: readonly { readonly regionId: string; readonly captureCount: number }[];
   /** Explicit reconstruction-review presentation; counts are the exact inspector inventories. */
   readonly reconstructionFocus?: {
@@ -134,6 +136,16 @@ function counted(count: number, singular: string, plural: string): string {
 
 export function buildStatus(input: StatusInput): HTMLElement {
   const bar = el('footer', { class: 'status' });
+  if ((input.admittedSourceCount ?? 0) > 0) {
+    const sources = el('section', { 'aria-label': 'Admitted photographs' });
+    sources.append(el('p', { text: counted(input.admittedSourceCount!, 'admitted photograph', 'admitted photographs') }));
+    if (input.onInspectAdmittedSources !== undefined) {
+      const inspect = el('button', { type: 'button', text: 'Inspect admitted photographs' });
+      inspect.addEventListener('click', input.onInspectAdmittedSources);
+      sources.append(inspect);
+    }
+    bar.append(sources);
+  }
   const sourceOnly = input.reconstructionFocus !== undefined
     && !(input.reconstructionScenes ?? []).some((scene) => scene.renderingSubstrate !== 'source_photographs');
   if (sourceOnly) {
@@ -144,7 +156,9 @@ export function buildStatus(input: StatusInput): HTMLElement {
       el('h2', { text: 'No 3D reconstruction is loaded' }),
       el('p', { text: collections.length > 0
         ? 'The landscape is authored. Use the source inspector to view the original photographs.'
-        : 'The landscape is authored. No source photographs are available in this session.' }),
+        : (input.admittedSourceCount ?? 0) > 0
+          ? 'Admitted photographs are available in the source inspector.'
+          : 'No source photographs are available in this session.' }),
     );
     for (const [index, collection] of collections.entries()) {
       const row = el('div', { class: 'reconstruction-availability-collection' });

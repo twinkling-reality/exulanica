@@ -20,7 +20,8 @@ from exulanica.graph.asset_read_policy import (
     scene_allowed,
     scene_inputs,
 )
-from exulanica.graph.payload import ReconstructionSceneRow
+from exulanica.graph.payload import ReconstructionSceneRow, ReviewSourceRow
+from exulanica.graph.review_sources import reauthorize_review_sources, review_source_rows
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
@@ -74,6 +75,9 @@ def snapshot(
     # Scene rows embed recovered camera/placement geometry. Reauthorize those buffered
     # dependencies after the snapshot; denied rows retain review identity but no geometry.
     with final_check(connection) as at:
+        sources = reauthorize_review_sources(
+            connection, session.workspace_id, payload.review_sources, at
+        )
         allowed = {
             key
             for key in allowed
@@ -83,4 +87,19 @@ def snapshot(
         scene if scene.scene_id in allowed else withhold_scene_geometry(scene)
         for scene in payload.reconstruction_scenes
     ]
-    return payload.model_copy(update={"reconstruction_scenes": scenes})
+    return payload.model_copy(update={"reconstruction_scenes": scenes, "review_sources": sources})
+
+
+@router.get("/sources", summary="Live admitted photographs for review before reconstruction.")
+def sources(
+    response: Response,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> list[ReviewSourceRow]:
+    response.headers["Cache-Control"] = "private, no-store"
+    with connection.transaction():
+        connection.execute("set transaction isolation level repeatable read read only")
+        buffered = review_source_rows(connection, session.workspace_id, services.store)
+    with final_check(connection) as at:
+        return reauthorize_review_sources(connection, session.workspace_id, buffered, at)

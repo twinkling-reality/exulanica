@@ -37,6 +37,7 @@ describe('production source media boundary', () => {
     const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
       const path = new URL(String(input)).pathname;
       requests.push({ path, init });
+      if (path.endsWith('/graph/sources')) return json([]);
       if (path.endsWith('/world/source-media')) return json([source()]);
       return new Response(new Uint8Array([0xff, 0xd8]), {
         status: 200, headers: { 'content-type': 'image/jpeg' },
@@ -52,7 +53,7 @@ describe('production source media boundary', () => {
       regionId: 'region-a', captureIds: ['capture-1'],
     });
     expect(requests.map((request) => request.path)).toEqual([
-      '/api/world/source-media', '/api/evidence/span-1',
+      '/api/graph/sources', '/api/world/source-media', '/api/evidence/span-1',
     ]);
     expect((requests[1]!.init.headers as Record<string, string>).authorization)
       .toBe('Bearer private-token');
@@ -79,6 +80,7 @@ describe('production source media boundary', () => {
     ];
     const fetch = vi.fn(async (input: string | URL | Request) => {
       const path = new URL(String(input)).pathname;
+      if (path.endsWith('/graph/sources')) return json([]);
       if (path.endsWith('/world/source-media')) return json(values);
       return json({ code: 'not_authenticated', detail: 'token expired' }, 401);
     });
@@ -94,7 +96,7 @@ describe('production source media boundary', () => {
   });
 
   it('rejects remote or mismatched asset references before fetching bytes', async () => {
-    const fetch = vi.fn(async () => json([source({
+    const fetch = vi.fn(async (input: string | URL | Request) => new URL(String(input)).pathname.endsWith('/graph/sources') ? json([]) : json([source({
       evidence_path: 'https://assets.example.test/private.jpg',
       asset_reference: {
         href: 'https://assets.example.test/private.jpg',
@@ -106,7 +108,7 @@ describe('production source media boundary', () => {
       baseUrl: 'https://exulanica.test/api', token: 't', fetch,
       createObjectURL: () => 'never', revokeObjectURL: vi.fn(),
     }).load('#7c71b5');
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(session.issues[0]).toMatchObject({ state: 'error' });
     expect(session.catalog.get('span-1')).toMatchObject({ available: false, url: null });
   });
@@ -117,5 +119,76 @@ describe('production source media boundary', () => {
       fetch: vi.fn(async () => { throw new TypeError('network offline'); }),
     });
     await expect(client.load('#7c71b5')).rejects.toThrow('network offline');
+  });
+});
+
+const imageBytes = new Uint8Array([0xff, 0xd8]);
+async function admitted(overrides: Record<string, unknown> = {}) {
+  const digest = await crypto.subtle.digest('SHA-256', imageBytes);
+  return {
+    kind: 'admitted_capture', capture_id: 'capture-1', evidence_span_id: 'span-1',
+    state: 'available', reason: null, evidence_path: '/evidence/span-1/masked',
+    media_type: 'image/jpeg', captured_at: null, person_regions: [], person_review_state: 'unscreened',
+    content_sha256: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join(''),
+    ...overrides,
+  };
+}
+
+describe('admitted sources before composition', () => {
+  it('loads authenticated inventory without a world and clears every URL at session disposal', async () => {
+    const row = await admitted();
+    const revoke = vi.fn();
+    const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>).authorization).toBe('Bearer review-token');
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/graph/sources')) return json([row]);
+      if (path.endsWith('/world/source-media')) return json({ code: 'world_not_configured', detail: 'No world' }, 409);
+      expect(path).toBe('/api/evidence/span-1/masked');
+      return new Response(imageBytes, { headers: { 'content-type': 'image/jpeg' } });
+    });
+    const session = await new SourceMediaClient({ baseUrl: 'https://example.test/api', token: 'review-token', fetch,
+      createObjectURL: () => 'blob:admitted', revokeObjectURL: revoke }).load('blue');
+    expect(session.catalog.get('capture-1')).toMatchObject({ regionId: null, captureIds: ['capture-1'], available: true });
+    session.dispose();
+    session.dispose();
+    expect(session.catalog.size).toBe(0);
+    expect(revoke).toHaveBeenCalledOnce();
+    expect(revoke).toHaveBeenCalledWith('blob:admitted');
+  });
+
+  it('deduplicates bytes by evidence while preserving topology aliases', async () => {
+    const row = await admitted();
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/graph/sources')) return json([row]);
+      if (path.endsWith('/world/source-media')) return json([source(), source({ source_id: 'second-slot' })]);
+      return new Response(imageBytes, { headers: { 'content-type': 'image/jpeg' } });
+    });
+    const create = vi.fn(() => 'blob:shared');
+    const session = await new SourceMediaClient({ baseUrl: 'https://example.test', token: 't', fetch,
+      createObjectURL: create, revokeObjectURL: vi.fn() }).load('blue');
+    expect(create).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    for (const key of ['capture-1', 'span-1', 'source-1', 'second-slot']) expect(session.catalog.get(key)?.url).toBe('blob:shared');
+    expect(session.catalog.get('source-1')?.regionId).toBe('region-a');
+  });
+
+  it.each(['withdrawn', 'missing', 'changed', 'denied', 'cross-workspace'])('withholds %s source bytes', async (condition) => {
+    const rows = condition === 'withdrawn' ? [] : [await admitted(condition === 'missing'
+      ? { state: 'unavailable_asset', evidence_path: null, content_sha256: null } : {})];
+    const create = vi.fn(() => 'never');
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/graph/sources')) return json(rows);
+      if (path.endsWith('/world/source-media')) return json([]);
+      if (condition === 'denied') return json({ code: 'not_authenticated', detail: 'Session expired' }, 401);
+      if (condition === 'cross-workspace') return json({ code: 'not_found', detail: 'No evidence' }, 404);
+      return new Response(new Uint8Array([0]), { headers: { 'content-type': 'image/jpeg' } });
+    });
+    const session = await new SourceMediaClient({ baseUrl: 'https://example.test', token: 't', fetch,
+      createObjectURL: create, revokeObjectURL: vi.fn() }).load('blue');
+    expect(create).not.toHaveBeenCalled();
+    expect([...session.catalog.values()].every((entry) => !entry.available)).toBe(true);
+    if (condition === 'withdrawn' || condition === 'missing') expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
