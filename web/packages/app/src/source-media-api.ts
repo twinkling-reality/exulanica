@@ -33,6 +33,7 @@ interface SourceMediaWire {
   readonly evidencePath: string | null;
   readonly mediaType: string | null;
   readonly capturedAt: string | null;
+  readonly contentSha256?: string | null;
   readonly assetReference: {
     readonly href: string;
     readonly authorization: 'workspace-bearer';
@@ -58,15 +59,43 @@ export class SourceMediaClient {
   }
 
   async load(accent: string): Promise<SourceMediaSession> {
-    const values = parseSourceList(
-      await this.#transport.getJson<unknown>('/world/source-media'),
-    );
+    const inventory = parseInventory(await this.#transport.getJson<unknown>('/graph/sources'));
+    let topology: readonly SourceMediaWire[];
+    try {
+      topology = parseSourceList(await this.#transport.getJson<unknown>('/world/source-media'));
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== 'world_not_configured') throw error;
+      topology = [];
+    }
+    // Inventory permission wins for shared evidence; topology retains its own slot aliases.
+    const byEvidence = new Map(inventory.map((source) => [source.evidenceSpanId, source]));
+    const values = [...inventory, ...topology.map((source) => {
+      const admitted = byEvidence.get(source.evidenceSpanId);
+      return admitted === undefined ? source : {
+        ...source, state: admitted.state, reason: admitted.reason,
+        evidencePath: admitted.evidencePath, mediaType: admitted.mediaType,
+        contentSha256: admitted.contentSha256 ?? null,
+        assetReference: admitted.assetReference === null ? null : {
+          ...admitted.assetReference,
+          provenance: { sourceId: source.sourceId, evidenceSpanId: admitted.evidenceSpanId! },
+        },
+      };
+    })];
     const catalog = new Map<string, SourceMediaDescriptor>();
     const issues: SourceMediaIssue[] = [];
     const held: string[] = [];
+    const loaded = new Map<string, SourceMediaDescriptor>();
     for (const source of values) {
       const title = humanize(source.slotKey);
       const key = source.evidenceSpanId ?? source.sourceId;
+      const prior = loaded.get(key);
+      if (prior !== undefined) {
+        installDescriptor(catalog, source, Object.freeze({
+          ...prior, regionId: source.regionId, captureIds: source.captureIds, title,
+          capturedLabel: source.capturedAt?.slice(0, 10) ?? prior.capturedLabel,
+        }));
+        continue;
+      }
       const unavailable = (state: SourceMediaIssueState, reason: string): void => {
         const descriptor = Object.freeze({
           evidenceRef: key,
@@ -80,6 +109,7 @@ export class SourceMediaClient {
           alt: `${title} source is unavailable: ${reason}`,
         });
         installDescriptor(catalog, source, descriptor);
+        loaded.set(key, descriptor);
         issues.push(Object.freeze({
           sourceId: source.sourceId,
           slotKey: source.slotKey,
@@ -119,6 +149,14 @@ export class SourceMediaClient {
           unavailable('error', 'The authorized source response was not an image.');
           continue;
         }
+        if (source.contentSha256 != null) {
+          const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+          const actual = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+          if (actual !== source.contentSha256 || blob.type !== source.mediaType) {
+            unavailable('error', 'The current viewer bytes changed; refresh the source inventory.');
+            continue;
+          }
+        }
         const url = this.#createObjectUrl(blob);
         held.push(url);
         installDescriptor(catalog, source, Object.freeze({
@@ -132,6 +170,7 @@ export class SourceMediaClient {
           accent,
           alt: `${title} source evidence`,
         }));
+        loaded.set(key, catalog.get(key)!);
       } catch (error) {
         unavailable(
           error instanceof ApiError && error.isUnauthenticated ? 'unauthorized' : 'error',
@@ -148,6 +187,7 @@ export class SourceMediaClient {
         disposed = true;
         for (const url of held) this.#revokeObjectUrl(url);
         catalog.clear();
+        loaded.clear();
       },
     });
   }
@@ -201,6 +241,35 @@ function parseSourceList(value: unknown): readonly SourceMediaWire[] {
       assetReference,
     });
   }));
+}
+
+/** Sources retain capture identities and never acquire a topology slot. */
+function parseInventory(value: unknown): readonly SourceMediaWire[] {
+  if (!Array.isArray(value)) throw new TypeError('The server returned an invalid admitted source list.');
+  return value.map((item) => {
+    const source = asRecord(item, 'admitted source');
+    if (source['kind'] !== 'admitted_capture') throw new TypeError('Unknown admitted source kind.');
+    const captureId = requiredText(source['capture_id'], 'capture ID');
+    const evidenceSpanId = requiredText(source['evidence_span_id'], 'evidence span ID');
+    const evidencePath = optionalText(source['evidence_path'], 'evidence path');
+    const contentSha256 = optionalText(source['content_sha256'], 'viewer digest');
+    const state = source['state'];
+    if (state !== 'available' && state !== 'unavailable_asset') throw new TypeError('Unknown admitted source state.');
+    if (state === 'available' && (evidencePath !== `/evidence/${evidenceSpanId}/masked`
+      || contentSha256 === null || !/^[a-f0-9]{64}$/.test(contentSha256))) {
+      throw new TypeError('Invalid admitted source evidence binding.');
+    }
+    return {
+      sourceId: captureId, slotKey: 'Admitted photograph', regionId: null, captureIds: [captureId],
+      state, reason: optionalText(source['reason'], 'source reason'), evidenceSpanId, evidencePath,
+      mediaType: requiredText(source['media_type'], 'viewer media type'),
+      capturedAt: optionalText(source['captured_at'], 'capture time'), contentSha256,
+      assetReference: evidencePath === null ? null : {
+        href: evidencePath, authorization: 'workspace-bearer',
+        provenance: { sourceId: captureId, evidenceSpanId },
+      },
+    };
+  });
 }
 
 function parseCaptureIds(value: unknown): readonly string[] {

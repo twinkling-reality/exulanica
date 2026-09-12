@@ -499,11 +499,19 @@ export function mountStatusAndInspector(
     }
   };
 
+  const inspectAdmittedSources = (): void => {
+    state.atlas?.binding.endSceneInspection();
+    deps.showWorld();
+    reconstructionInspector.open('admitted-captures', admittedSourceChoices(current, state.previewSourceMedia));
+  };
+
   const renderedPreviewRegions = new Set<string>();
   const renderReconstructionStatus = (): HTMLElement => buildStatus({
     omittedRegionCount: deps.built.omitted.length, undrawable: deps.built.undrawable,
     notices: [...state.sourceMediaNotices, ...state.geometryNotices],
     reconstructionScenes: state.reconstructionRungs,
+    admittedSourceCount: current.reviewSources?.length ?? 0,
+    onInspectAdmittedSources: inspectAdmittedSources,
     sourceRegions: current.islands
       .filter((island) => !renderedPreviewRegions.has(island.islandId)
         && !current.reconstructionScenes?.some((scene) => scene.islandId === island.islandId))
@@ -552,6 +560,23 @@ export function mountStatusAndInspector(
     inspectSceneSources,
     resolveEvidenceAt,
     loadPersonReview,
-    dispose: () => undefined,
+    dispose: () => {
+      idleGeneration = ++evidenceGeneration;
+      ++reviewGeneration;
+      state.reviewCaptureId = null;
+      reconstructionInspector.hide();
+    },
   };
+}
+
+/** Capture review remains available independently of scene and island inventories. */
+export function admittedSourceChoices(
+  snapshot: import('@exulanica/graph-client').GraphSnapshot,
+  media: import('@exulanica/atlas-react/playcanvas').SourceMediaCatalog | null | undefined,
+): readonly import('../ui/reconstruction-inspector.js').ReconstructionInspectionOption[] {
+  return (snapshot.reviewSources ?? []).map((source, index) => ({
+    id: `capture:${source.captureId}`, kind: 'source-only', label: `Photograph ${index + 1}`,
+    source: source.state === 'available' ? media?.get(source.evidenceSpanId) ?? null : null,
+    captureId: source.captureId, personRegions: source.personRegions, personReviewState: source.personReviewState,
+  }));
 }

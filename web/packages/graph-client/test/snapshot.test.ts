@@ -329,3 +329,23 @@ describe('an entity is counted once per island, not once per capture', () => {
     expect(adaptSnapshot(twoGroups).entities[0]!.islandIds).toEqual(['g1', 'g2']);
   });
 });
+
+describe('admitted source inventory', () => {
+  it('accepts old graph payloads without inventing sources', () => {
+    expect(adaptSnapshot(PAYLOAD).reviewSources).toEqual([]);
+  });
+  it('keeps intake-only captures separate from islands and reconstruction rungs', () => {
+    const snapshot = adaptSnapshot({ ...PAYLOAD, entities: [], occurrences: [], scene_groups: [],
+      reconstruction_scenes: [], review_sources: [{
+        kind: 'admitted_capture', capture_id: 'real-capture', evidence_span_id: 'real-span',
+        captured_at: null, media_type: 'image/jpeg', state: 'unavailable_asset', reason: 'Mask pending',
+        evidence_path: null, content_sha256: null, person_review_state: 'screened',
+        person_regions: [{ region_id: 'region', state: 'unknown', silhouette_ppm: [[0, 0], [100, 0], [0, 100]],
+          display_name: null, subject_id: null }],
+      }] });
+    expect(snapshot.islands).toEqual([]);
+    expect(snapshot.reconstructionScenes).toEqual([]);
+    expect(snapshot.reviewSources?.[0]).toMatchObject({ captureId: 'real-capture', evidenceSpanId: 'real-span',
+      personReviewState: 'screened', personRegions: [{ regionId: 'region', state: 'unknown' }] });
+  });
+});

@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "AssertionRow",
@@ -267,6 +267,24 @@ class MemberPersonRegionRow(BaseModel):
     subject_id: uuid.UUID | None
 
 
+class ReviewSourceRow(BaseModel):
+    """An admitted photograph, not a reconstruction scene or a composition slot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["admitted_capture"]
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+    captured_at: str | None
+    media_type: str
+    state: Literal["available", "unavailable_asset"]
+    reason: str | None
+    evidence_path: str | None
+    content_sha256: str | None
+    person_regions: list[MemberPersonRegionRow]
+    person_review_state: Literal["unscreened", "screened", "stale"]
+
+
 class ReconstructionSceneMemberRow(BaseModel):
     """One immutable member and its exact placement or explicit exclusion."""
 
@@ -407,6 +425,7 @@ class GraphPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     state_version: int
+    review_sources: list[ReviewSourceRow] = Field(default_factory=list)
     entities: list[EntityRow]
     occurrences: list[OccurrenceRow]
     proposals: list[ProposalRow]

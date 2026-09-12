@@ -199,9 +199,25 @@ export interface ReconstructionScenePayload {
   }[];
 }
 
+/** A real admitted source; no scene, topology slot, position or reconstruction rung. */
+export interface ReviewSourcePayload {
+  readonly kind: 'admitted_capture';
+  readonly capture_id: string;
+  readonly evidence_span_id: string;
+  readonly captured_at: string | null;
+  readonly media_type: string;
+  readonly state: 'available' | 'unavailable_asset';
+  readonly reason: string | null;
+  readonly evidence_path: string | null;
+  readonly content_sha256: string | null;
+  readonly person_regions: ReconstructionScenePayload['members'][number]['person_regions'];
+  readonly person_review_state: 'unscreened' | 'screened' | 'stale';
+}
+
 /** What the API's `GET /graph` answers with. Server terms, not read-model terms. */
 export interface GraphPayload {
   readonly state_version: number;
+  readonly review_sources?: readonly ReviewSourcePayload[];
   readonly entities: readonly {
     readonly entity_id: string;
     readonly entity_class: string;
