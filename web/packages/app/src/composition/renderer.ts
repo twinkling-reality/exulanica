@@ -17,7 +17,7 @@ import type { AtlasScene } from '@exulanica/atlas-core';
 import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
-import { sourcePresentation } from '../config.js';
+import { googlePhotorealisticTiles, sourcePresentation } from '../config.js';
 import { themeForPreferences } from '../theme.js';
 import { el } from '../ui/dom.js';
 import type { FirstUseGuidance } from '../ui/first-use-guidance.js';
@@ -129,6 +129,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       sourcePresentation: sourcePresentation(),
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
+      googleTiles: googlePhotorealisticTiles(),
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {
         scenes: current.reconstructionScenes ?? [],

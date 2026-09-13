@@ -97,6 +97,11 @@ import {
   type CameraState,
   type InputMode,
 } from './controls.js';
+import type { GoogleTilesConfig } from './google-tiles-config.js';
+import {
+  createGoogleTilesEnvironment,
+  type GoogleTilesEnvironment,
+} from './google-tiles-environment.js';
 import {
   SOURCE_VEIL_HEIGHT,
   createSourceFirstGrove,
@@ -342,6 +347,8 @@ export interface AtlasBindingOptions {
   readonly residencyBudget?: number;
   /** Ceiling on the backing-store pixel ratio. Never raises a display above its own ratio. */
   readonly maxPixelRatio?: number;
+  /** Optional visualization-only Google reference. It never participates in Atlas interaction. */
+  readonly googleTiles?: GoogleTilesConfig;
 }
 
 export interface FrameReport {
@@ -405,6 +412,8 @@ export class AtlasBinding {
   readonly segmentOverlay: SegmentOverlayRuntime;
   readonly neighborhoodIndex: NeighborhoodIndex;
   readonly renderRoot: pc.Entity;
+  /** Null unless explicitly feature-flagged with a key by the application. */
+  googleTiles: GoogleTilesEnvironment<unknown> | null = null;
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
@@ -869,7 +878,7 @@ export class AtlasBinding {
       renderRoot.addChild(moteEntity);
     }
 
-    return new AtlasBinding(
+    const binding = new AtlasBinding(
       app,
       camera,
       controls,
@@ -898,6 +907,20 @@ export class AtlasBinding {
       options.sourcePresentation ?? 'world',
       objectRoots,
     );
+    if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
+      binding.googleTiles = createGoogleTilesEnvironment(
+        app,
+        renderRoot,
+        options.overlayParent,
+        options.googleTiles,
+        {
+          invalidate: () => binding.invalidate(),
+          unavailable: () => binding.invalidate(),
+        },
+      ) as GoogleTilesEnvironment<unknown>;
+      void binding.googleTiles.attach();
+    }
+    return binding;
   }
 
   setTheme(theme: PresentationTheme): void {
@@ -1709,6 +1732,11 @@ export class AtlasBinding {
     this.field.update(nowMs);
 
     this.centred = this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
+    this.googleTiles?.update(
+      [s.x, s.y, s.z],
+      Math.max(1, this.device.height),
+      this.camera.camera?.fov ?? 70,
+    );
     const cameraComponent = this.camera.camera;
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
       this.overlay.update({
@@ -1769,6 +1797,8 @@ export class AtlasBinding {
   }
 
   destroy(): void {
+    this.googleTiles?.dispose();
+    this.googleTiles = null;
     this.controls.destroy();
     this.overlay?.destroy();
     this.mapOverlay?.destroy();

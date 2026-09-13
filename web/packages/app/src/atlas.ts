@@ -39,6 +39,7 @@ import type {
   SourceMediaCatalog,
   TrainedSceneGeometry,
   RecoveredSceneCamera,
+  GoogleTilesConfig,
 } from '@exulanica/atlas-react/playcanvas';
 import { AtlasBinding } from '@exulanica/atlas-react/playcanvas';
 
@@ -69,6 +70,7 @@ export async function mountAtlas(
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
     readonly trainedGeometry?: readonly TrainedSceneGeometry[];
     readonly recoveredCameras?: readonly RecoveredSceneCamera[];
+    readonly googleTiles?: GoogleTilesConfig;
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -83,6 +85,7 @@ export async function mountAtlas(
     ...(presentation?.placedPointMaps === undefined
       ? {}
       : { placedPointMaps: presentation.placedPointMaps }),
+    ...(presentation?.googleTiles === undefined ? {} : { googleTiles: presentation.googleTiles }),
     ...(presentation === undefined
       ? {}
       : {
