@@ -1,8 +1,32 @@
 # Exulanica documentation
 
-The developer documentation covers world state, reconstruction, creation, API contracts, and
-runtime capabilities. The [product roadmap](product-direction.md) records delivery milestones and
-implementation status. [Development setup](development-setup.md) contains operating instructions.
+Developer documentation for world state, reconstruction, creation, API contracts, and
+runtime capabilities. Start from the [product roadmap](product-direction.md) and
+[development setup](development-setup.md). The generated [catalog](all-documents.md)
+lists the living contracts, capability guides, and decision records.
+
+## Start here
+
+**Product.** [product-direction.md](product-direction.md) is the roadmap and delivery
+order. [world-composition-contract.md](world-composition-contract.md) is the intended
+world semantics: memories, permitted real-world selections, and authored variations
+in one interactive world. [product-specification.md](product-specification.md)
+sections 1 to 4 and 11 retain research-backed limits. Those pages are subordinate
+to the roadmap.
+
+**Use the product.** The [capability guides](#capability-guides) describe what exists
+and what remains. [world-memory-package.md](world-memory-package.md) is the portable
+package profile.
+
+**Build or extend it.** [architecture-overview.md](architecture-overview.md) sections
+1 to 3 for system shape. [model-and-service-selection.md](model-and-service-selection.md)
+section 0 for the implemented model stack; sections 1 to 8 are historical rationale.
+[domain-and-evidence-model.md](domain-and-evidence-model.md) sections 1 and 4 for the
+evidence address and schema. [runtime-verification.md](runtime-verification.md) before
+client code: it records platform behaviour that otherwise causes silent bugs.
+
+**Decisions.** The [decision records](#decision-records) in number order, then
+[license-matrix.md](license-matrix.md) for ship and do-not-ship verdicts.
 
 ## Capability guides
 
@@ -15,94 +39,72 @@ implementation status. [Development setup](development-setup.md) contains operat
 
 ## Capability status
 
-The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate opt-in training
-dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned simulation runtime.
-World Read serves scene/place
-bundles; World Write records generation receipts. General object editing, alternate-world versions,
-and simulation require the extensions in the roadmap. The application preview does not demonstrate
-those extensions. This status describes the current implementation separately from the product
-experience presented in the root README.
+The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate opt-in
+training dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned
+simulation runtime. World Read serves scene and place bundles; World Write records
+generation receipts. Authored object add, move, remove, undo, and alternate versions
+have code and synthetic checks. General structural language editing and simulation
+remain roadmap work. This status describes the current implementation separately from
+the product experience in the root README.
 
-## Start here
+## Contracts
 
-**Evaluating the project.** Read [product-direction.md](product-direction.md) first, then [product-specification.md](product-specification.md) sections 1 to 4 for
-what the product is and what the demonstration shows, then section 11 for the known limitations,
-and then [runtime-verification.md](runtime-verification.md) for what the platform actually did when
-it was called.
+These are the living specifications. Edit them when the system changes.
 
-**Running or extending it.** [architecture-overview.md](architecture-overview.md) sections 1 to 3 for
-system shape, the platform split and the deployment topology; then
-[model-and-service-selection.md](model-and-service-selection.md) section 2 for the exact model
-identifiers, their fallbacks and the routing rules; then
-[domain-and-evidence-model.md](domain-and-evidence-model.md) sections 1 and 4 for the evidence
-address and the schema the migration creates. Read
-[runtime-verification.md](runtime-verification.md) before writing client code: it records the
-platform behaviours that will otherwise cause silent bugs, including the reasoning-token floor on
-every call and the one structured-output mechanism that is actually honoured.
+| Document | Role |
+| --- | --- |
+| [world-composition-contract.md](world-composition-contract.md) | Memories, imported geography, and authored variations |
+| [world-objects-contract.md](world-objects-contract.md) | Alternate versions and authored objects |
+| [world-memory-package.md](world-memory-package.md) | Portable signed world snapshot |
+| [personal-admission.md](personal-admission.md) | `POST /intake` and screening |
+| [privacy-consent-threat-model.md](privacy-consent-threat-model.md) | Consent, deletion, and threat model |
+| [domain-and-evidence-model.md](domain-and-evidence-model.md) | Evidence address and schema |
+| [architecture-overview.md](architecture-overview.md) | Modular monolith and deployment shape |
+| [interaction-model.md](interaction-model.md) | Spatial and interaction design |
+| [deployment.md](deployment.md) | Deployment topology |
+| [evaluation-methodology.md](evaluation-methodology.md) | How measurements are defined |
+| [evaluation-corpus-contract.md](evaluation-corpus-contract.md) | Private evaluation input boundary |
+| [evaluation-harness.md](evaluation-harness.md) | Replay and archive commands |
 
-**Reviewing the technology choices.** The [decision records](#decision-records) in number order, then
-[model-and-service-selection.md](model-and-service-selection.md) for the model and service matrix,
-[license-matrix.md](license-matrix.md) for ship and do-not-ship verdicts per component, and
-[runtime-verification.md](runtime-verification.md) for the measurements that settled the open
-questions in both.
+Scene, Atlas, screening, and reconstruction wire contracts live at `docs/` root and
+appear in the [catalog](all-documents.md).
 
-## Where things live
+## How documents are filed
 
-Documents are filed by **how they change over time**, not by subject. A subject folder decays
-because a document can belong to two subjects; "does this get edited later" has exactly one answer.
+Documents are filed by how they change over time.
 
-| Directory | What is in it | May it be edited later? |
+| Directory | Contents | Later edits |
 | --- | --- | --- |
-| `docs/` | Living contracts and reference tables | Yes, freely, as the system changes |
-| `capabilities/` | Guides for somebody choosing to use it, not build it | Yes |
-| `adr/` | Numbered decisions with their alternatives | Status may change; the number never does |
-| `briefs/` | What was intended, written before the work | Only while the work is undispatched |
-| `evaluation/` | Machine-written, digest-bound evidence | **Never.** See below |
-| `artifacts/`, `patches/` | Images and patches that documents point at | Only by the document that owns them |
+| `docs/` | Living contracts and reference | Yes |
+| `capabilities/` | Guides for people choosing to use the product | Yes |
+| `adr/` | Numbered decisions with alternatives | Status may change; the number never does |
+| `evaluation/` | Digest-bound evidence | Never |
 
 **Where a new document goes**, first yes wins:
 
-1. Machine-readable evidence with a digest? `evaluation/`, and a script writes it, not you.
-2. A numbered architectural decision? `adr/`, next free number, never reusing one.
-3. A plan for work not yet done? `briefs/YYYY-MM-DD-slug.md`.
-4. Would editing it in a month falsify an account of what happened on a date? It is a record. Do not
-   edit it afterwards: append a dated `CORRECTED` note, or write a new document that cites it.
-5. Written for somebody deciding whether to use the product rather than build it? `capabilities/`.
-6. Otherwise it is a living contract or a reference table, and it belongs at `docs/` root.
+1. Machine-readable evidence with a digest? A script writes `evaluation/`. Do not
+   hand-edit a record.
+2. A numbered architectural decision? `adr/`, next free number, never reused.
+3. Written for somebody choosing to use the product? `capabilities/`.
+4. Otherwise it is a living contract or reference table at `docs/` root.
 
-The distinction step 4 turns on, and the one most easily got wrong: **a record is closed, a log is
-open.** [engineering-log.md](engineering-log.md), [runtime-verification.md](runtime-verification.md),
-[reconstruction-findings.md](reconstruction-findings.md) and
-[platform-findings.md](platform-findings.md) are appended to and read as current evidence, so they
-stay at root even though their content is dated.
+**`evaluation/` is immutable.** Records bind their predecessor and cited artifacts by
+sha256. Correcting a path inside a record would change its digest and cascade through
+the chain. A document named inside a record is pinned at that path. Measured
+2026-09-12: 75 non-evaluation paths.
+[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails if a
+pinned path disappears.
 
-### Two things that cannot move
-
-**`evaluation/` is immutable.** Its records bind their predecessor and every artifact they cite by
-sha256, so correcting a path inside one would change its digest, which the next record binds in
-turn, cascading through the chain. There is no way to fix a record after the fact, which is the
-point of it.
-
-**A document named inside a record is pinned at that path.** Thirty-four documents are pinned this
-way today: 19 at root, 14 decision records and one patch.
-[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails, naming the records
-that would be stranded, if one of them moves. Moving such a document is not forbidden, but it is a
-decision to leave a record permanently wrong, and the test makes you take it deliberately.
-
-### The full inventory
-
-[all-documents.md](all-documents.md) lists every document in the tree with a one-line summary. It is
-generated by `scripts/generate_docs_index.py` and a test fails if it drifts, because the table this
-section replaced was hand-maintained, covered 45 of 111 files, and never mentioned `briefs/` at all.
+The [catalog](all-documents.md) is generated by `scripts/generate_docs_index.py`.
+A test fails if it drifts. It lists living contracts, capability guides, and decision
+records. It does not list evaluation artifacts.
 
 ## Decision records
 
-`adr/` holds the decisions expensive enough to be worth recording with their alternatives and their
-consequences, so a later reader can tell a considered choice from an inherited default. The number
-is the identifier: ADR-0010 is cited symbolically 85 times against 3 citations by filename, so a
-number is never reused and never reassigned.
-[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails if a record is
-missing from this table.
+`adr/` holds the decisions expensive enough to record with their alternatives. The
+number is the identifier and is never reused.
+[tests/test_documentation_links.py](../tests/test_documentation_links.py) fails if a
+record is missing from this table.
 
 | Record | Decision | Status |
 | --- | --- | --- |
@@ -131,49 +133,30 @@ missing from this table.
 
 ## Current state
 
-A real call to `nvidia/Nemotron-3_5-Lightning` on Nebius Token Factory returned HTTP 200 with the
-model identifier echoed in the response body, and a real Tavily search returned HTTP 200 with its
-request payload retained as evidence of data minimisation. Both were executed on 2026-08-27 and are
-recorded in [runtime-verification.md](runtime-verification.md), which overrides every other document
-on conflict.
-
-The evidence spine is implemented rather than only specified: migration
-`exulanica/migrations/0001_spine.sql` and the `exulanica/evidence/` modules, with tests. Building it
-found errors in the committed design, and those are corrected in place and marked **CORRECTED**
-rather than left for the next reader to trip over. MEASURED 2026-09-09 at `fd84627`, against the documented target of PostgreSQL 18 with pgvector
-and nothing substituted for either: **2,200 passed, 14 failed, 4 skipped**. Every one of the
-fourteen is a missing optional dependency in the plain environment rather than a defect, and
-they are named in [reconstruction-throughput.md](reconstruction-throughput.md). The count in
-this paragraph previously said 1,447 tests of which 1,445 passed, which was stale and
-internally inconsistent. Quote a suite count with the date and the head it was measured at, or
-do not quote one. The SQLite mirror the ingest path used to write is deleted:
-there is one schema.
-
-The browser renderer is decided: PlayCanvas Engine 2.21.4, on matched-resolution measurement
-([adr/0003-renderer-selection.md](adr/0003-renderer-selection.md)).
+[runtime-verification.md](runtime-verification.md) overrides every other document on
+conflict about executed platform behaviour. The evidence spine is implemented:
+migration `exulanica/migrations/0001_spine.sql` and the `exulanica/evidence/` modules.
+The browser renderer is PlayCanvas Engine 2.21.4
+([adr/0003-renderer-selection.md](adr/0003-renderer-selection.md)). Delivery status
+belongs in [product-direction.md](product-direction.md). Quote a suite count only with
+a date and a commit, or do not quote one.
 
 ## Conventions
 
-Every claim in this documentation set carries exactly one epistemic status, and the status is part of
-the claim:
+Every claim carries exactly one epistemic status:
 
-- **VERIFIED** cites a primary source URL and the date it was retrieved, or, where the fact is about
-  runtime behaviour, the execution that produced it.
-- **DECISION** records a choice together with the alternative that was rejected and why.
-- **ASSUMPTION** is unvalidated, and names the experiment that would settle it.
-- **OPEN** is unresolved, and says what would resolve it.
-- **CLOSED** marks an item that was OPEN and no longer is, naming the ADR that settled it, the
-  artefact that enforces it, and the test that fails when it is violated. A decision recorded only
-  in prose is not CLOSED.
-- **CORRECTED** marks a claim rewritten against what was actually built, naming the artefact and the
-  test that forced the correction.
+- **VERIFIED** cites a primary source URL and the retrieval date, or the execution
+  that produced a runtime fact.
+- **DECISION** records a choice together with the rejected alternative.
+- **ASSUMPTION** is unvalidated and names the experiment that would settle it.
+- **OPEN** is unresolved and says what would resolve it.
+- **CLOSED** names the ADR that settled it, the artefact that enforces it, and the
+  test that fails when it is violated. A decision recorded only in prose is not CLOSED.
+- **CORRECTED** marks a claim rewritten against what was built, naming the artefact
+  and the test that forced the correction.
 
-Two rules govern how those statuses are assigned:
+Two rules govern those statuses:
 
 - Every consequential technical claim cites a primary source with a retrieval date.
-- **Agreement between sources is not evidence.** Two summaries repeating an unverified claim leave it
-  unverified, and it is marked as unverified until a primary source or an execution settles it.
-
-Some documents reference stored artifacts that are not in this repository, such as archived API
-responses. Those hold account-identifying response headers and, in places, personal media, so they
-are deliberately not committed; where a field in one of them matters, the document quotes it.
+- Agreement between sources is not evidence. Two summaries repeating an unverified
+  claim leave it unverified until a primary source or an execution settles it.

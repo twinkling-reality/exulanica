@@ -4,9 +4,12 @@ Status: current implementation reviewed 2026-09-12; model upgrades require task-
 
 ## 0. Current stack and selection decision
 
-This section supersedes the routing and deployment descriptions in sections 1–8 below. Those
-sections retain the August research, its prices and rejected alternatives; they are historical
-rationale, not a current runtime inventory. Inspect actual call sites as well as the manifest:
+This section supersedes the routing and deployment descriptions in sections 1-8 below, and
+it is the living correction of [ADR-0002](adr/0002-model-routing.md). ADR-0002 remains the
+accepted original decision (Nemotron Lightning as the reasoning core). The Companion caller
+implemented today is Nemotron 3 Nano 30B-A3B with Lightning as fallback. The ADR number is
+not reused. Sections 1-8 retain the August research, its prices and rejected alternatives;
+they are historical rationale, not a current runtime inventory. Inspect actual call sites as well as the manifest:
 its `structured_extraction` rationale still says reserved although product code uses that role.
 The [product roadmap](product-direction.md#model-selection-and-compute-priorities) records the
 ordered work and adoption gates. No model configuration changes are made by this review.

@@ -1,7 +1,8 @@
 # Unified world composition and retrieval
 
 Status: **DECISION** for product and architecture direction; **PARTIAL** implementation.
-Updated 2026-09-12 following the operator's Iceland selection and fantasy-world example.
+Updated 2026-09-12. The Iceland journey is the product example: import a permitted
+place, combine it with personal memories, and create a fantasy variation.
 
 ## Purpose and authority
 

@@ -229,13 +229,7 @@ def test_each_allowed_dangling_reference_is_still_dangling(ref: str, reason: str
 
 
 def test_the_generated_inventory_matches_the_tree():
-    """`docs/all-documents.md` is generated, so it can only be complete if nothing regenerates it.
-
-    MEASURED 2026-09-09: the hand-maintained table this replaced listed 45 documents against 111 in
-    the tree and never mentioned `docs/briefs/`. An index that is allowed to drift decays to
-    whatever somebody last remembered to add, which is why the exhaustive half is generated and this
-    test refuses a stale copy.
-    """
+    """`docs/all-documents.md` is generated. A catalog that is allowed to drift decays."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -250,6 +244,11 @@ def test_the_generated_inventory_matches_the_tree():
     assert target.read_text(encoding="utf-8") == module.render(), (
         "docs/all-documents.md is out of date. Run: uv run python scripts/generate_docs_index.py"
     )
+    catalog = target.read_text(encoding="utf-8")
+    assert "](briefs/" not in catalog
+    assert "](records/" not in catalog
+    assert "](patches/" not in catalog
+    assert "](evaluation/" not in catalog
 
 
 def test_every_decision_record_appears_in_the_readme_table():

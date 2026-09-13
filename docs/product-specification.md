@@ -1,13 +1,16 @@
 # Product specification
 
+Authority: [product-direction.md](product-direction.md) owns product scope and delivery
+order. This page keeps research-backed limits and earlier decisions.
+
 Status: mixed. Every claim carries exactly one label, per the convention in
 [README.md](README.md): **VERIFIED** (primary source URL and retrieval date), **DECISION** (with the
 alternative rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**.
 
 Retrieval date for every VERIFIED claim on this page: **2026-08-27**, except the two deprecation
 notices cited in section 8, which were re-read on **2026-08-28** and carry that date inline.
-Promoted from the reconciled research in `.exulanica/` (reconciliation date 2026-08-27). Where the
-research recorded a disagreement as unresolved, it is preserved here as unresolved.
+Promoted from reconciled research dated 2026-08-27. Where that research recorded a
+disagreement as unresolved, it is preserved here as unresolved.
 
 Companion document: [interaction-model.md](interaction-model.md) covers the spatial and interaction
 design. This page covers what the product is, what it does, and what it deliberately does not do.

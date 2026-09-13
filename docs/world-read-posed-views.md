@@ -1,6 +1,7 @@
 # World Read posed image bytes
 
-Design contract written before implementation, 2026-09-08. Migration: NONE.
+Wire contract for posed image bytes. Written 2026-09-08; byte delivery is implemented.
+Migration: NONE.
 Release remains internal_only. Generated fixtures and scripted pose outputs establish
 byte delivery, not reconstruction quality, training permission or redistribution rights.
 

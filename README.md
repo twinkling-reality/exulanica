@@ -10,6 +10,7 @@ you wish, and create something of your own.
 - [Scene Reconstruction](docs/capabilities/scene-reconstruction.md): Build 3D places from your experiences.
 - [World Creation](docs/capabilities/world-creation.md): Change the look, add objects, and combine places into your own creations.
 - [Companion](docs/capabilities/companion.md): Someone to share your world with, who gets to know you through what you create and experience together.
+
 ## Build With Exulanica
 
 - [Simulation Runtime](docs/capabilities/simulation.md): Give your creations movement, interactions, and rules.
@@ -50,9 +51,11 @@ See [development setup](docs/development-setup.md) for the authenticated API and
 
 ## Documentation
 
+- [Product roadmap](docs/product-direction.md)
+- [World composition](docs/world-composition-contract.md)
 - [World Memory Package](docs/world-memory-package.md)
-- [Development Setup](docs/development-setup.md)
-- [Documentation Index](docs/README.md)
+- [Development setup](docs/development-setup.md)
+- [Documentation hub](docs/README.md)
 
 ## License
 

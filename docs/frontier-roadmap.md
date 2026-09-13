@@ -1,11 +1,11 @@
 # Frontier roadmap: adaptive personal world memory
 
-Status: **DECISION and IMPLEMENTATION PLAN**. This document orders existing Exulanica decisions
-(the product was formerly Orimera) into one exit-gated delivery plan. It does not turn an
-assumption into a shipping claim. Where the research is unresolved, the roadmap names the
-experiment that must settle it.
+Status: engineering archive. [product-direction.md](product-direction.md) owns product
+scope and delivery order. This page keeps the earlier exit-gated engineering sequence
+and dependencies. It does not turn an assumption into a shipping claim.
 
-Last reconciled: 2026-08-31.
+Last reconciled: 2026-08-31. The composition contract and product roadmap were updated
+2026-09-12; read those first.
 
 ## 1. North-star output
 

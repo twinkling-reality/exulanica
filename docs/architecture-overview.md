@@ -64,8 +64,9 @@ Two of these boundaries are load-bearing and the rest follow from them:
   renderer question in ADR-0003 survivable: a renderer switch touches `atlas-core` and `atlas-react`
   and nothing else. Without the contract the blast radius is the entire front end.
 
-`atlas-react` is named for a renderer binding layer, not for a specific engine. Which engine sits
-under it is **OPEN**: see [adr/0003-renderer-selection.md](adr/0003-renderer-selection.md).
+`atlas-react` is named for a renderer binding layer, not for a specific engine.
+**CORRECTED 2026-09-12:** ADR-0003 is accepted for PlayCanvas Engine 2.21.4. The
+OPEN line below this heading was the 2026-08-27 research state.
 
 ### 1.2 Replaceable interfaces
 
@@ -75,7 +76,7 @@ These four qualify. Nothing else in the system is abstracted for the sake of abs
 | Interface | What it hides | The event it must survive | Evidence |
 | --- | --- | --- | --- |
 | Model manifest | every model id, and a declared fallback id in the same region tier for every role | **VERIFIED:** Nebius removed 11 models from Token Factory Serverless on 2026-06-22 and 10 more on 2026-08-31, two rounds in ten weeks. Sources: https://docs.tokenfactory.nebius.com/june-2026-deprecation-notice , https://docs.tokenfactory.nebius.com/august-2026-deprecation-notice | See section 7.2 |
-| Renderer binding | scene graph and camera control behind `atlas-core` | **OPEN:** ADR-0003 is unresolved and settles at end of week 3 | ADR-0003 |
+| Renderer binding | scene graph and camera control behind `atlas-core` | **CLOSED:** ADR-0003 accepted PlayCanvas Engine 2.21.4 on matched-resolution measurement | ADR-0003 |
 | Reconstruction rung | which of four reconstruction rungs produced a region, with the earned rung displayed to the user rather than hidden | **VERIFIED:** casual and egocentric footage breaks structure-from-motion at severe rates. BANMo registered 18 of 811 images on a motion-dominated casual clip. Source: https://arxiv.org/pdf/2112.12761 | Reconstruction is never in the live demo path |
 | External lookup | the public-entity lookup provider, behind a server-side query constructor | **DECISION:** the feature is on the cut list. If its egress gate does not pass red-teaming, it is cut entirely rather than shipped leaky | Section 6.3 |
 
@@ -559,10 +560,10 @@ section 2.1.
 
 | Question | Where it lives |
 | --- | --- |
-| Which browser renderer | [adr/0003-renderer-selection.md](adr/0003-renderer-selection.md). **OPEN**, settles at end of week 3 |
-| The evidence address, the epistemic model and the assertion log | Domain and evidence model document, not yet written |
-| Consent scopes, deletion cascade and the misuse guards | Privacy, consent and threat model document, not yet written |
-| Model selection and routing | Validated technology and model selection document, not yet written |
+| Which browser renderer | [adr/0003-renderer-selection.md](adr/0003-renderer-selection.md). **CLOSED:** PlayCanvas Engine 2.21.4 |
+| The evidence address, the epistemic model and the assertion log | [domain-and-evidence-model.md](domain-and-evidence-model.md) |
+| Consent scopes, deletion cascade and the misuse guards | [privacy-consent-threat-model.md](privacy-consent-threat-model.md) |
+| Model selection and routing | [model-and-service-selection.md](model-and-service-selection.md) section 0 |
 | Reconstruction rungs and their quality bar | [reconstruction-findings.md](reconstruction-findings.md) for the measurements, [adr/0009-the-ladder-above-rung-3.md](adr/0009-the-ladder-above-rung-3.md) for how the rungs above 3 are earned |
 | The domain and deployment account | **OPEN** |
 | Who owns the weekly uptime check | **OPEN** |
