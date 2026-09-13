@@ -149,4 +149,176 @@ describe('mounted NYC semantic selection lifecycle', () => {
     expect(controls.onInteract).toBe(newer);
     expect(destroy).toHaveBeenCalledTimes(1);
   });
+
+  it('shows an exact typed preview, captures role, discards, and applies only after confirmation', async () => {
+    const controls = {
+      state: { x: 0, y: 1.68, z: 0 },
+      onInteract: null as (() => void) | null,
+    };
+    const binding = {
+      controls,
+      camera: { forward: { x: 0, y: -1, z: 0 } },
+      device: {},
+      renderRoot: {},
+      invalidate: vi.fn(),
+    };
+    const feature = {
+      ...catalog.features[0]!,
+      localFootprint: [[[[1, 2], [3, 2], [1, 2]]]],
+    };
+    const apply = vi.fn(async (proposal) => ({ kind: 'stale', current: {
+      ...version, stateSha256: '2'.repeat(64), editSeq: 1,
+    }, proposal }));
+    const deterministicPlace = vi.fn((base, heldCatalog, request) => ({
+      operation: 'place_selected_feature',
+      versionId: base.versionId,
+      baseStateSha256: base.stateSha256,
+      instanceId: request.instanceId,
+      admissionId: heldCatalog.admissionId,
+      renderAssetId: heldCatalog.renderAssetId,
+      publicationId: heldCatalog.publicationId,
+      featureId: request.feature.id,
+      renderBatchId: request.feature.renderBatchId,
+      sourceAnchorFrameName: heldCatalog.frameName,
+      sourceAnchorCoordinateScale: heldCatalog.coordinateScale,
+      sourceAnchorCoordinates: request.sourceAnchor,
+      regionId: request.regionId,
+      transform: request.transform,
+      originRole: request.originRole,
+      modelId: null,
+      promptVersion: 'deterministic-environment-preview-1',
+    }));
+    const propose = vi.fn(async (base, heldCatalog, placement) => ({
+      kind: 'proposed',
+      proposal: deterministicPlace(base, heldCatalog, placement),
+    }));
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(),
+      admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: {
+        catalog: vi.fn(async () => catalog),
+        deterministicPlace,
+        propose,
+        apply,
+      } as never,
+      worldClient: { connect: vi.fn(async () => ({ assets: [], version })) } as never,
+      createOverlay: () => ({ pick: () => feature as never, destroy: vi.fn() }),
+    });
+    await mounted.begin();
+    controls.onInteract?.();
+    const buttons = [...mounted.root.querySelectorAll('button')];
+    const button = (label: string) => buttons.find((held) => held.textContent === label)!;
+    const role = mounted.root.querySelector('select')!;
+    role.value = 'personal';
+    role.dispatchEvent(new Event('change'));
+
+    button('Preview placement').click();
+    expect(apply).not.toHaveBeenCalled();
+    expect(mounted.root.textContent).toContain('Proposed operation: place_selected_feature');
+    expect(mounted.root.textContent).toContain(catalog.publicationId);
+    expect(mounted.root.textContent).toContain('Connected to something I experienced');
+    expect(button('Apply').disabled).toBe(false);
+
+    button('Discard').click();
+    expect(apply).not.toHaveBeenCalled();
+    expect(mounted.root.textContent).toContain('Proposal discarded. Nothing changed.');
+
+    const input = mounted.root.querySelector('input')!;
+    input.value = 'place this building';
+    input.dispatchEvent(new Event('input'));
+    button('Preview request').click();
+    await vi.waitFor(() => expect(propose).toHaveBeenCalledTimes(1));
+    button('Apply').click();
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(apply.mock.calls[0]![0].originRole).toBe('personal');
+    expect(button('Apply').disabled).toBe(true);
+    expect(mounted.root.textContent).toContain('The preview is stale. Request a fresh proposal.');
+  });
+
+  it('invalidates a preview when role changes and enables honest global latest-edit undo', async () => {
+    const controls = {
+      state: { x: 0, y: 1.68, z: 0 },
+      onInteract: null as (() => void) | null,
+    };
+    const binding = {
+      controls,
+      camera: { forward: { x: 0, y: -1, z: 0 } },
+      device: {},
+      renderRoot: {},
+      invalidate: vi.fn(),
+    };
+    const versionWithObjectEdit = {
+      ...version,
+      editSeq: 1,
+      edits: [{
+        editId: 'edit-object',
+        editSeq: 1,
+        kind: 'add_object',
+        objectId: 'marker',
+        elementId: null,
+        environmentInstanceId: null,
+        undoneEditId: null,
+        baseStateSha256: '0'.repeat(64),
+        resultStateSha256: version.stateSha256,
+        actor: 'actor',
+        recordedAt: '2026-09-12T00:00:00Z',
+      }],
+    } satisfies AlternateVersion;
+    const feature = {
+      ...catalog.features[0]!,
+      localFootprint: [[[[1, 2], [3, 2], [1, 2]]]],
+    };
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(),
+      admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: {
+        catalog: vi.fn(async () => catalog),
+        deterministicPlace: vi.fn((base, heldCatalog, request) => ({
+          operation: 'place_selected_feature',
+          versionId: base.versionId,
+          baseStateSha256: base.stateSha256,
+          instanceId: request.instanceId,
+          admissionId: heldCatalog.admissionId,
+          renderAssetId: heldCatalog.renderAssetId,
+          publicationId: heldCatalog.publicationId,
+          featureId: request.feature.id,
+          renderBatchId: request.feature.renderBatchId,
+          sourceAnchorFrameName: heldCatalog.frameName,
+          sourceAnchorCoordinateScale: heldCatalog.coordinateScale,
+          sourceAnchorCoordinates: request.sourceAnchor,
+          regionId: request.regionId,
+          transform: request.transform,
+          originRole: request.originRole,
+          modelId: null,
+          promptVersion: 'deterministic-environment-preview-1',
+        })),
+      } as never,
+      worldClient: {
+        connect: vi.fn(async () => ({ assets: [], version: versionWithObjectEdit })),
+      } as never,
+      createOverlay: () => ({ pick: () => feature as never, destroy: vi.fn() }),
+    });
+    await mounted.begin();
+    controls.onInteract?.();
+    const buttons = [...mounted.root.querySelectorAll('button')];
+    const button = (label: string) => buttons.find((held) => held.textContent === label)!;
+    expect(button('Preview undo latest edit').disabled).toBe(false);
+    button('Preview undo latest edit').click();
+    expect(mounted.root.textContent).toContain('Proposed operation: undo_latest_version_edit');
+
+    button('Preview placement').click();
+    const role = mounted.root.querySelector('select')!;
+    role.value = 'personal';
+    role.dispatchEvent(new Event('change'));
+    expect(button('Apply').disabled).toBe(true);
+    expect(mounted.root.textContent).toContain('The role changed. Request a fresh proposal.');
+  });
 });

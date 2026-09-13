@@ -26,6 +26,9 @@ from exulanica.identity import IdentityRepository, confirm_link, name_occurrence
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.spine.scope import WorkspaceScope
+from exulanica.models.budget import BudgetGuard
+from exulanica.models.client import ModelClient
+from exulanica.models.transport import HttpResponse
 from exulanica.selection import (
     ContentScope,
     ContentSelector,
@@ -57,7 +60,15 @@ from exulanica.world import (
 )
 from fastapi.testclient import TestClient
 
-from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
+from conftest import (
+    DEFAULT_PAYLOAD,
+    TEST_CEILING_USD,
+    TEST_MAX_CALLS,
+    CountingVisionModel,
+    ingest_observed,
+    write_photo,
+)
+from model_fakes import FakeTransport, chat_body
 from pg_harness import open_scratch_connection
 from tests_support_api import scratch_database
 from world_structure_fixtures import structural_candidate
@@ -532,6 +543,172 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         )
         assert undo.status_code == 200, undo.text
         assert not undo.json()["environment_instances"][0]["removed"]
+
+
+def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
+    composed, spine_schema, monkeypatch
+) -> None:
+    token = "environment-proposal-owner-token"
+    stranger_token = "environment-proposal-stranger-token"
+    stranger = uuid.uuid4()
+    monkeypatch.setenv(
+        "EXULANICA_API_TOKENS",
+        json.dumps(
+            {
+                token: {
+                    "workspace_id": str(composed.worlds.workspace_id),
+                    "actor": str(uuid.uuid4()),
+                },
+                stranger_token: {
+                    "workspace_id": str(stranger),
+                    "actor": str(uuid.uuid4()),
+                },
+            }
+        ),
+    )
+    composed.worlds.connection.commit()
+    transport = FakeTransport(
+        [
+            HttpResponse(
+                status_code=200,
+                text=json.dumps(chat_body(json.dumps({"operation": "place_selected_feature"}))),
+            )
+        ]
+    )
+    _psycopg, scratch = spine_schema
+    database = scratch_database(scratch)
+    services = Services(
+        database=database,
+        readonly_database=database,
+        store=composed.store,
+        tokens=load_token_directory(),
+        executor_shares_the_write_role=True,
+        model_client=ModelClient(
+            api_key="test-key-not-real",
+            transport=transport,
+            budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        ),
+    )
+    body = {
+        "utterance": "place this building",
+        "version_id": str(composed.version.version_id),
+        "base_state_sha256": composed.version.state_sha256,
+        "admission_id": str(composed.source.admission_id),
+        "selected_feature_id": composed.feature_id,
+        "region_id": "region-a",
+        "transform": {
+            "x_mm": 10,
+            "y_mm": 0,
+            "z_mm": 20,
+            "yaw_microradians": 0,
+            "scale_milli": 1000,
+        },
+        "origin_role": "personal",
+    }
+    headers = {"Authorization": f"Bearer {token}"}
+    stranger_headers = {"Authorization": f"Bearer {stranger_token}"}
+    with TestClient(create_app(services, verify=False)) as client:
+        before = client.get(
+            f"/world/versions/{composed.version.version_id}", headers=headers
+        ).json()
+        response = client.post("/selection/environment", headers=headers, json=body)
+        assert response.status_code == 200, response.text
+        proposal = response.json()["proposal"]
+        assert proposal["operation"] == "place_selected_feature"
+        assert proposal["base_state_sha256"] == composed.version.state_sha256
+        assert proposal["admission_id"] == str(composed.source.admission_id)
+        assert proposal["render_asset_id"] == str(composed.render.asset_id)
+        assert proposal["publication_id"] == str(composed.publication.publication_id)
+        assert proposal["feature_id"] == composed.feature_id
+        assert proposal["render_batch_id"] == 7
+        assert proposal["origin_role"] == "personal"
+        assert (
+            client.get(f"/world/versions/{composed.version.version_id}", headers=headers).json()
+            == before
+        )
+
+        foreign = client.post("/selection/environment", headers=stranger_headers, json=body)
+        absent = client.post(
+            "/selection/environment",
+            headers=stranger_headers,
+            json={**body, "version_id": str(uuid.uuid4())},
+        )
+        assert foreign.status_code == absent.status_code == 404
+
+    sent = json.dumps(transport.requests[0]["payload"])
+    for protected in (
+        str(composed.source.admission_id),
+        str(composed.publication.publication_id),
+        composed.feature_id,
+        str(composed.render.asset_id),
+        "region-a",
+        "personal",
+    ):
+        assert protected not in sent
+
+
+def test_environment_proposal_refuses_missing_selection_and_stale_base_without_model(
+    composed, spine_schema, monkeypatch
+) -> None:
+    token = "environment-proposal-closed-token"
+    monkeypatch.setenv(
+        "EXULANICA_API_TOKENS",
+        json.dumps(
+            {
+                token: {
+                    "workspace_id": str(composed.worlds.workspace_id),
+                    "actor": str(uuid.uuid4()),
+                }
+            }
+        ),
+    )
+    composed.worlds.connection.commit()
+    transport = FakeTransport()
+    _psycopg, scratch = spine_schema
+    database = scratch_database(scratch)
+    services = Services(
+        database=database,
+        readonly_database=database,
+        store=composed.store,
+        tokens=load_token_directory(),
+        executor_shares_the_write_role=True,
+        model_client=ModelClient(
+            api_key="test-key-not-real",
+            transport=transport,
+            budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        ),
+    )
+    body = {
+        "utterance": "place it",
+        "version_id": str(composed.version.version_id),
+        "base_state_sha256": composed.version.state_sha256,
+        "admission_id": str(composed.source.admission_id),
+        "selected_feature_id": composed.feature_id,
+        "region_id": "region-a",
+        "transform": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0,
+            "yaw_microradians": 0,
+            "scale_milli": 1000,
+        },
+        "origin_role": "fictional",
+    }
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(create_app(services, verify=False)) as client:
+        missing = client.post(
+            "/selection/environment",
+            headers=headers,
+            json={**body, "selected_feature_id": None},
+        )
+        stale = client.post(
+            "/selection/environment",
+            headers=headers,
+            json={**body, "base_state_sha256": "f" * 64},
+        )
+    assert missing.json()["refusal"]["code"] == "no_selected_feature"
+    assert stale.json()["refusal"]["code"] == "stale_version"
+    assert transport.call_count == 0
 
 
 @dataclass

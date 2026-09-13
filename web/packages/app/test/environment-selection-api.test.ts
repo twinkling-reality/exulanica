@@ -121,4 +121,64 @@ describe('NYC environment selection API', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]!.path).toContain(`/world/versions/${VERSION['version_id'] as string}`);
   });
+
+  it('captures the selected binding and role in a deterministic preview, then applies exactly it', async () => {
+    const response = structuredClone(VERSION);
+    response['environment_instances'] = [];
+    const { client, calls } = subject([
+      new Response(JSON.stringify(response), { status: 201 }),
+    ]);
+    const parsed = parseVersion(VERSION);
+    const selected = parseEnvironmentCatalog(catalogBody);
+    const proposal = client.deterministicPlace(parsed, selected, {
+      instanceId: 'nyc-open-data:doitt_id-2327',
+      feature: selected.features[0]!,
+      sourceAnchor: [-739903374, 407239184],
+      regionId: 'region-a',
+      transform: { xMm: 10, yMm: 0, zMm: 20, yawMicroradians: 0, scaleMilli: 1000 },
+      originRole: 'personal',
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(proposal.originRole).toBe('personal');
+    await client.apply(proposal);
+    expect(calls[0]!.body).toMatchObject({
+      base_state_sha256: VERSION['state_sha256'],
+      admission_id: ADMISSION,
+      publication_id: PUBLICATION,
+      render_asset_id: RENDER,
+      origin_role: 'personal',
+      selection: {
+        feature_id: '0123456789abcdef0123456789abcdef',
+        render_batch_id: 0,
+      },
+    });
+  });
+
+  it('serializes mutations so two applies cannot race on one held base', async () => {
+    let releaseFirst!: (value: Response) => void;
+    const first = new Promise<Response>((resolve) => { releaseFirst = resolve; });
+    let calls = 0;
+    const fetch = vi.fn(() => {
+      calls += 1;
+      return calls === 1
+        ? first
+        : Promise.resolve(new Response(JSON.stringify(VERSION), { status: 200 }));
+    });
+    const client = new EnvironmentSelectionClient({
+      baseUrl: 'https://example.test',
+      token: 'token',
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    });
+    const held = parseVersion(VERSION);
+
+    const one = client.undo(held);
+    const two = client.undo(held);
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    releaseFirst(new Response(JSON.stringify(VERSION), { status: 200 }));
+    await one;
+    await two;
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });

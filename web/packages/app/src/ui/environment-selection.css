@@ -38,6 +38,30 @@
   gap: 0.4rem;
 }
 
+.environment-selection-language,
+.environment-selection-preview-controls {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.45rem 0;
+}
+
+.environment-selection-language input {
+  min-width: 0;
+  flex: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+  padding: 0.3rem;
+}
+
+.environment-selection-preview {
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--edge);
+  font-size: 0.78rem;
+}
+
 .environment-selection-controls select {
   flex: 1 1 100%;
   color: var(--ink);
