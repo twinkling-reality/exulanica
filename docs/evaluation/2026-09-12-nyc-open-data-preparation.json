@@ -1,0 +1,127 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.nyc-open-data-preparation-evidence/v1",
+    "date": "2026-09-12",
+    "status": "bounded_semantic_source_prepared",
+    "base": "8fdd996d03ea0930d4b97b7c8cde46571e4def89",
+    "brief_commit": "4f9063f1e44bcd3d7169d8a6ae0564f0fefc0c99",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-12-environment-source-admission.json",
+      "record_sha256": "5a62feb1176bc14bebcba1a4eafdb8fa71e63bf14ddf09947ee1d1a10b0188ad"
+    },
+    "source": {
+      "provider": "NYC Open Data",
+      "agency": "Office of Technology and Innovation (OTI)",
+      "dataset": "BUILDING",
+      "dataset_id": "5zhs-2jue",
+      "provider_revision": "2026-09-07T15:51:51Z",
+      "retrieved_at": "2026-09-13T01:21:21Z",
+      "public_no_token": true,
+      "bounded_rows": 445,
+      "response_byte_size": 338220,
+      "response_sha256": "d3bae3d6d3bc0d635e64ab6826621657ef478f3015f4cc855965c4ae46e9045a",
+      "commercial_visual_input": false
+    },
+    "canonical_output": {
+      "coordinate_frame": "OGC:CRS84 longitude latitude",
+      "coordinate_scale": 10000000,
+      "provider_feature_identity": "doitt_id:<positive canonical base-10 integer>",
+      "identity_fallback": null,
+      "feature_count": 445,
+      "shard_count": 1,
+      "source_shard_byte_size": 317405,
+      "source_shard_sha256": "8b3d25f46867579cca332b47df620102559458d6b83be933568463d30c1339fe",
+      "index_input_byte_size": 65637,
+      "index_input_sha256": "c26f2b3ec7ae98d090ffd3feb24ae48c5e01f92cc1baed2b560bde7ea90e0a05",
+      "admission_id": "9d152259-13d1-5025-8f72-8bcb639a6438",
+      "one_publication_per_admission": true,
+      "all_payloads_under_64_mib": true,
+      "all_publications_at_most_512_features": true,
+      "large_generated_payloads_committed": false
+    },
+    "rights": {
+      "primary_terms_and_metadata_retained": true,
+      "public_access_established": true,
+      "operation_rights_status": "legal_review_required_before_admission",
+      "reason": "primary portal terms do not enumerate the environment contract operation vocabulary",
+      "attribution": "NYC Open Data, Office of Technology and Innovation (OTI), BUILDING dataset 5zhs-2jue"
+    },
+    "artifacts": [
+      {
+        "path": "docs/briefs/2026-09-12-nyc-open-data-preparation.md",
+        "byte_size": 8750,
+        "sha256": "51551df6c601be46a1a68565435332ce0efaff93eb7a7bc18f1971184843be5f"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-12-nyc-open-data-preparation/admission-index-plan.json",
+        "byte_size": 2640,
+        "sha256": "e4a4807ae4266aa3a9d0cf7e44aaa19f24aeea7629a760b938a1f6f9de0f34b3"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-12-nyc-open-data-preparation/canonical-manifest.json",
+        "byte_size": 2143,
+        "sha256": "e81ba50335fbcccf4fcb02f46e05da627a031ce2f4bceec6ec67ff78e73cab86"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-12-nyc-open-data-preparation/checks.log.txt",
+        "byte_size": 3587,
+        "sha256": "56d3b8e7fff3a81cbff06ff34447d5bc6d3b1190d0c3baf39e8c4e4fe4f84f99"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-12-nyc-open-data-preparation/fixture-manifest.json",
+        "byte_size": 759,
+        "sha256": "8194de925e22bdacecdd7afb1faf84a91d02af2eaf9792f6901c0d35ced2c5f8"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-12-nyc-open-data-preparation/source-inventory.json",
+        "byte_size": 6080,
+        "sha256": "0002474ccbf98d83aa221819db3c38d17b6069c81a56da232bae1b3039786191"
+      },
+      {
+        "path": "tests/fixtures/nyc-open-data-building-footprints.geojson",
+        "byte_size": 2431,
+        "sha256": "b078aae35730f14ef131a2400c3c963d60b9213e5de5b9e80975eee1b28d4040"
+      }
+    ],
+    "checks": {
+      "focused_python": {
+        "passed": 16,
+        "failed": 0
+      },
+      "ruff": "passed",
+      "format": "passed",
+      "import_contracts": {
+        "kept": 4,
+        "broken": 0
+      },
+      "documentation": {
+        "passed": 22,
+        "failed": 0
+      },
+      "retained_record_digest": "passed",
+      "whitespace": "passed"
+    },
+    "executed": {
+      "bounded_public_fetch": true,
+      "deterministic_preprocessing": true,
+      "fixture_only_committed_source_bytes": true,
+      "database_write": false,
+      "provider_write": false,
+      "paid_request": false
+    },
+    "unexecuted": [
+      "Legal approval of environment operation rights",
+      "Place identity resolution",
+      "Environment source admission",
+      "Render asset registration",
+      "Environment feature-index publication",
+      "Live rendering and visual acceptance",
+      "World placement and unified query",
+      "Selection and Companion integration",
+      "WMP or package projection",
+      "Deployment and public release"
+    ]
+  },
+  "record_sha256": "ea19c73db192f4dc71ea31e2a9428ae16e1545b5293694ad3723016df0b16d10"
+}

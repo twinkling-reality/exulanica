@@ -1,0 +1,18 @@
+{
+  "profile": "exulanica.nyc-open-data-fixture-manifest/v1",
+  "fixture": {
+    "path": "tests/fixtures/nyc-open-data-building-footprints.geojson",
+    "byte_size": 2431,
+    "sha256": "b078aae35730f14ef131a2400c3c963d60b9213e5de5b9e80975eee1b28d4040",
+    "feature_count": 2,
+    "provider_feature_ids": ["doitt_id:2327", "doitt_id:3385"]
+  },
+  "source_response": {
+    "dataset_id": "5zhs-2jue",
+    "retrieved_at": "2026-09-13T01:16:36Z",
+    "byte_size": 338220,
+    "sha256": "d3bae3d6d3bc0d635e64ab6826621657ef478f3015f4cc855965c4ae46e9045a"
+  },
+  "extraction": "first two features from the provider-ordered bounded response; JSON whitespace and object-key order changed; property and geometry values unchanged",
+  "full_response_committed": false
+}

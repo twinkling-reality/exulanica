@@ -1,0 +1,122 @@
+{
+  "profile": "exulanica.nyc-open-data-source-inventory/v1",
+  "source_count": 1,
+  "sources": [
+    {
+      "provider": "NYC Open Data",
+      "agency": "Office of Technology and Innovation (OTI)",
+      "dataset_name": "BUILDING",
+      "dataset_id": "5zhs-2jue",
+      "official": true,
+      "access": "public_no_token",
+      "update_frequency": "weekly",
+      "provider_revision": {
+        "soda_truth_last_modified": "2026-09-07T15:51:51Z",
+        "metadata_rows_updated_at": "2026-09-07T15:51:52Z"
+      },
+      "retrievals": {
+        "dataset_metadata": {
+          "url": "https://data.cityofnewyork.us/api/views/5zhs-2jue",
+          "retrieved_at": "2026-09-13T01:15:20Z",
+          "byte_size": 28830,
+          "sha256": "e175ec88963838555410e98476b599c77e8cdec63e6c0046ffacdbb29f1c076a"
+        },
+        "field_documentation": {
+          "url": "https://raw.githubusercontent.com/CityOfNewYork/nyc-geo-metadata/master/Metadata/Metadata_BuildingFootprints.md",
+          "retrieved_at": "2026-09-13T01:15:39Z",
+          "byte_size": 12973,
+          "sha256": "520c8ef5bb687ea75945db749f061febd075965f2ca338945b6a392dd62afd27"
+        },
+        "terms": {
+          "url": "https://opendata.cityofnewyork.us/overview/#termsofuse",
+          "retrieved_at": "2026-09-13T01:15:20Z",
+          "byte_size": 64053,
+          "sha256": "3c77c5c41e6f9246c29b6c8c14c6f937a913ceeb9820811b735d18e6c1b473c8"
+        },
+        "bounded_count": {
+          "url": "https://data.cityofnewyork.us/resource/5zhs-2jue.json",
+          "parameters": {
+            "$select": "count(*) as count",
+            "$where": "within_box(the_geom,40.724,-73.993,40.720,-73.984)"
+          },
+          "retrieved_at": "2026-09-13T01:15:21Z",
+          "row_count": 445,
+          "byte_size": 19,
+          "sha256": "ba80cfdfc86a8eb127681b01a8f60181236a69753e64f929ed3fb69a3fc982bf"
+        },
+        "bounded_geojson": {
+          "url": "https://data.cityofnewyork.us/resource/5zhs-2jue.geojson",
+          "parameters": {
+            "$select": "the_geom,name,bin,doitt_id,base_bbl,construction_year,feature_code,geom_source,ground_elevation,height_roof,last_edited_date,last_status_type",
+            "$where": "within_box(the_geom,40.724,-73.993,40.720,-73.984)",
+            "$order": "doitt_id",
+            "$limit": "1000"
+          },
+          "retrieved_at": "2026-09-13T01:19:52Z",
+          "truth_last_modified": "2026-09-07T15:51:51Z",
+          "data_out_of_date": false,
+          "row_count": 445,
+          "byte_size": 338220,
+          "sha256": "d3bae3d6d3bc0d635e64ab6826621657ef478f3015f4cc855965c4ae46e9045a"
+        }
+      },
+      "geography": {
+        "source_geojson_crs": "EPSG:4326",
+        "serialized_frame": "OGC:CRS84",
+        "axis_order": ["longitude", "latitude"],
+        "horizontal_unit": "degree",
+        "coordinate_scale": 10000000,
+        "bounds_integer": [-739930000, 407200000, -739840000, 407240000],
+        "selection": "inclusive validated geometry bbox intersection",
+        "geometry_modification": "none beyond integer quantization and canonical ordering"
+      },
+      "identity": {
+        "provider_feature_id": "doitt_id:<positive canonical base-10 integer>",
+        "primary_field": "DOITT_ID",
+        "collision": "reject the complete input",
+        "fallback": "none",
+        "bin_role": "nullable metadata only",
+        "bin_caveat": "BIN can be duplicated and borough-million values are unknown"
+      },
+      "fields": {
+        "the_geom": "top-down building perimeter; Polygon or MultiPolygon",
+        "name": "limited commonly known name; not actively maintained",
+        "bin": "Department of City Planning building identifier with documented duplicate and unknown values",
+        "doitt_id": "consistent unique OTI building identifier",
+        "base_bbl": "tax lot physically containing the footprint, subject to synchronization caveats",
+        "construction_year": "completion year; zero or null means unavailable",
+        "feature_code": "official building feature classification including placeholder value 1003",
+        "geom_source": "photogrammetric or manual geometry provenance",
+        "ground_elevation": "lowest ground-level elevation with source-dependent accuracy",
+        "height_roof": "roof height above ground; zero or null means unavailable; output unit not asserted",
+        "last_edited_date": "feature modification timestamp",
+        "last_status_type": "official feature status"
+      },
+      "excluded_fields": {
+        "shape_area": "official documentation says do not use",
+        "shape_length": "official documentation says do not use",
+        "objectid": "synthetic key; official documentation directs users to DOITT_ID"
+      },
+      "rights": {
+        "public_access": true,
+        "use_limitations": "NYC Open Data policies and restrictions apply",
+        "terms_summary": "informational use; no warranty of completeness, accuracy, content, or fitness; agencies retain version control and may update, correct, or refresh data",
+        "additional_dataset_terms_observed": false,
+        "attribution": "NYC Open Data, Office of Technology and Innovation (OTI), BUILDING dataset 5zhs-2jue",
+        "operation_rights_status": "legal_review_required_before_admission",
+        "operation_rights_reason": "the primary portal terms do not enumerate the environment contract operation vocabulary"
+      },
+      "caveats": [
+        "footprints do not contain street-facing facades or complete-object geometry",
+        "photogrammetric updates are estimated at plus or minus two feet while manual updates may be less accurate",
+        "rare placeholder triangles use feature code 1003",
+        "source data may change between weekly revisions",
+        "roof height is preserved as source decimal text and is not used for extrusion or altitude"
+      ]
+    }
+  ],
+  "road_or_place_dataset": {
+    "included": false,
+    "reason": "no additional official dataset materially improves this lane's building identity or footprint selection"
+  }
+}
