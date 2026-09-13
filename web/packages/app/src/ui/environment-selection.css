@@ -1,0 +1,52 @@
+.environment-selection {
+  position: fixed;
+  z-index: 2;
+  left: var(--gap);
+  bottom: 2.6rem;
+  width: min(24rem, calc(100vw - 2 * var(--gap)));
+  padding: 0.85rem;
+  color: var(--ink);
+  background: var(--material-instrument);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(var(--blur-system));
+}
+
+.environment-selection h2,
+.environment-selection p {
+  margin: 0 0 0.45rem;
+}
+
+.environment-selection h2 {
+  font: 600 0.9rem/1.3 var(--companion-utility-font);
+}
+
+.environment-selection-source,
+.environment-selection-reason {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.environment-selection-selected {
+  font-size: 0.82rem;
+}
+
+.environment-selection-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.environment-selection-controls select {
+  flex: 1 1 100%;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-control);
+  padding: 0.3rem;
+}
+
+.environment-selection[data-state='unavailable'] {
+  border-left-color: var(--edge);
+}

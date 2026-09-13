@@ -113,6 +113,7 @@ export interface VersionEdit {
   readonly kind: string;
   readonly objectId: string | null;
   readonly elementId: string | null;
+  readonly environmentInstanceId?: string | null;
   readonly undoneEditId: string | null;
   readonly baseStateSha256: string;
   readonly resultStateSha256: string;
@@ -138,7 +139,18 @@ export interface AlternateVersion {
   readonly createdAt: string;
   readonly objects: readonly AuthoredObject[];
   readonly elementOverrides: readonly ElementOverride[];
+  readonly environmentInstances?: readonly EnvironmentInstance[];
   readonly edits: readonly VersionEdit[];
+}
+
+export interface EnvironmentInstance {
+  readonly instanceId: string;
+  readonly source: Readonly<Record<string, unknown>>;
+  readonly regionId: string;
+  readonly transform: ObjectTransform;
+  readonly origin: { readonly kind: string; readonly role: ObjectRole };
+  readonly removed: boolean;
+  readonly availability: string;
 }
 
 export class WorldObjectsContractError extends Error {
@@ -538,11 +550,33 @@ function parseEdit(value: unknown): VersionEdit {
     kind: text(row['kind'], 'version edit kind'),
     objectId: optionalText(row['object_id'], 'version edit object'),
     elementId: optionalText(row['element_id'], 'version edit element'),
+    environmentInstanceId: optionalText(
+      row['environment_instance_id'], 'version edit environment instance',
+    ),
     undoneEditId: optionalText(row['undone_edit_id'], 'version edit undone id'),
     baseStateSha256: digest(row['base_state_sha256'], 'version edit base hash'),
     resultStateSha256: digest(row['result_state_sha256'], 'version edit result hash'),
     actor: text(row['actor'], 'version edit actor'),
     recordedAt: text(row['recorded_at'], 'version edit timestamp'),
+  });
+}
+
+function parseEnvironmentInstance(value: unknown): EnvironmentInstance {
+  const row = record(value, 'environment instance');
+  const origin = record(row['origin'], 'environment instance origin');
+  const role = text(origin['role'], 'environment instance role');
+  if (!OBJECT_ROLES.includes(role as ObjectRole)) throw invalid('environment instance role');
+  return Object.freeze({
+    instanceId: text(row['instance_id'], 'environment instance id'),
+    source: Object.freeze({ ...record(row['source'], 'environment instance source') }),
+    regionId: text(row['region_id'], 'environment instance region'),
+    transform: parseTransform(row['transform']),
+    origin: Object.freeze({
+      kind: text(origin['kind'], 'environment instance origin kind'),
+      role: role as ObjectRole,
+    }),
+    removed: flag(row['removed'], 'environment instance removal'),
+    availability: text(row['availability'], 'environment instance availability'),
   });
 }
 
@@ -569,6 +603,10 @@ export function parseVersion(value: unknown): AlternateVersion {
     objects: Object.freeze(objects),
     elementOverrides: Object.freeze(
       array(row['element_overrides'], 'element override list').map(parseOverride),
+    ),
+    environmentInstances: Object.freeze(
+      array(row['environment_instances'] ?? [], 'environment instance list')
+        .map(parseEnvironmentInstance),
     ),
     edits: Object.freeze(array(row['edits'], 'version edit list').map(parseEdit)),
   });

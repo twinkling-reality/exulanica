@@ -37,6 +37,7 @@ import './style.css';
 import './appearance.css';
 import './unified-interface.css';
 import './ui/object-placement.css';
+import './ui/environment-selection.css';
 import './ui/scene-segments.css';
 
 import { ApiError } from '@exulanica/graph-client';
@@ -64,6 +65,7 @@ import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './wor
 import { mountPersonalIntake } from './composition/personal-intake.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
+import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
@@ -354,6 +356,13 @@ async function mount(): Promise<void> {
     isWorldPrimary: () => shellState.primary === 'world',
     hideWritePathConfirm: () => writePath.confirm.hide(),
   });
+  const environmentSelection = mountEnvironmentSelection({
+    env,
+    state,
+    credentials: currentCredentials,
+    scene: built.scene,
+    showStatus: (message, kind) => showTravelStatus(message, kind),
+  });
 
   // Scene segments. Mounted after the write path because naming a segment stages on that path and
   // shows its confirmation panel; it reads `state.atlas` late and applies its overlay in `begin`.
@@ -558,6 +567,7 @@ async function mount(): Promise<void> {
     writePath.confirm.root,
     objects.panel.root,
     objects.confirm.root,
+    environmentSelection.root,
     commandBar.root,
     mapCaption,
     travelStatus,
@@ -680,6 +690,7 @@ async function mount(): Promise<void> {
     reflectFirstUse: () => reflectFirstUse(),
     applyPreferences: (next) => appearance.applyPreferences(next),
   });
+  void environmentSelection.begin();
 
   // Nothing is asked unprompted. The Companion arrives when it is called, and until then the
   // world is the whole of what is on screen.

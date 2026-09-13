@@ -257,10 +257,27 @@ def test_manifest_plan_and_writes_are_reproducible_and_digest_bound(tmp_path):
     assert plan["entries"][0]["admission"]["operation_rights"]["status"] == (
         "legal_review_required"
     )
-    assert plan["entries"][0]["publication"]["status"] == "blocked"
+    publication = plan["entries"][0]["publication"]
+    assert publication["status"] == "blocked"
+    assert publication["render_asset"]["derivation_kind"] == (
+        "nyc-open-data-semantic-footprint-proxy"
+    )
+    proxy = json.loads(first.semantic_proxies[0].data)
+    index = json.loads(first.index_inputs[0].data)
+    assert proxy["disclosure"].startswith("Neutral flat semantic proxies")
+    assert proxy["features"][0]["provider_feature_id"] == "doitt_id:2327"
+    assert proxy["features"][0]["render_batch_id"] == 0
+    assert index["features"][0]["footprint"] == proxy["features"][0]["footprint"]
+    assert index["features"][0]["semantic_properties"]["bin"] == "bin:1006070"
 
     write_prepared(first, tmp_path)
-    for artifact in (*first.shards, *first.index_inputs, first.plan, first.manifest):
+    for artifact in (
+        *first.shards,
+        *first.semantic_proxies,
+        *first.index_inputs,
+        first.plan,
+        first.manifest,
+    ):
         assert (tmp_path / artifact.path).read_bytes() == artifact.data
 
 

@@ -41,6 +41,8 @@ class EnvironmentFeatureInput(BaseModel):
     bbox: tuple[int, ...]
     label: Annotated[str, Field(min_length=1, max_length=512)] | None = None
     render_batch_id: Annotated[int, Field(ge=0, le=2_147_483_647)] | None = None
+    footprint: dict[str, Any] | None = None
+    semantic_properties: dict[str, str | None] = Field(default_factory=dict, max_length=32)
 
     @field_validator("provider_feature_id", "label")
     @classmethod
@@ -58,6 +60,59 @@ class EnvironmentFeatureInput(BaseModel):
         if any(value[index] > value[index + dimensions] for index in range(dimensions)):
             raise ValueError("feature bbox minimum must not exceed its maximum")
         return value
+
+    @field_validator("semantic_properties")
+    @classmethod
+    def _semantic_properties(
+        cls, value: dict[str, str | None]
+    ) -> dict[str, str | None]:
+        for key, held in value.items():
+            if not key or key != key.strip() or len(key) > 100:
+                raise ValueError("semantic property names must be bounded trimmed text")
+            if held is not None and (held != held.strip() or not held or len(held) > 512):
+                raise ValueError("semantic property values must be null or bounded trimmed text")
+        return value
+
+    @model_validator(mode="after")
+    def _footprint_matches_bbox(self) -> EnvironmentFeatureInput:
+        if self.footprint is None:
+            return self
+        if len(self.bbox) != 4:
+            raise ValueError("a footprint requires a two-dimensional bbox")
+        points = _footprint_points(self.footprint)
+        extent = (
+            min(point[0] for point in points),
+            min(point[1] for point in points),
+            max(point[0] for point in points),
+            max(point[1] for point in points),
+        )
+        if extent != self.bbox:
+            raise ValueError("feature footprint extent must equal its bbox")
+        return self
+
+
+def _footprint_points(value: dict[str, Any]) -> list[tuple[int, int]]:
+    if set(value) != {"type", "coordinates"} or value["type"] != "MultiPolygon":
+        raise ValueError("feature footprint must be an integer MultiPolygon")
+    polygons = value["coordinates"]
+    if not isinstance(polygons, list) or not polygons:
+        raise ValueError("feature footprint must contain a polygon")
+    points: list[tuple[int, int]] = []
+    for polygon in polygons:
+        if not isinstance(polygon, list) or not polygon:
+            raise ValueError("feature footprint polygon must contain a ring")
+        for ring in polygon:
+            if not isinstance(ring, list) or len(ring) < 4 or ring[0] != ring[-1]:
+                raise ValueError("feature footprint rings must be explicitly closed")
+            for point in ring:
+                if (
+                    not isinstance(point, list)
+                    or len(point) != 2
+                    or any(isinstance(axis, bool) or not isinstance(axis, int) for axis in point)
+                ):
+                    raise ValueError("feature footprint coordinates must be integer pairs")
+                points.append((point[0], point[1]))
+    return points
 
 
 class FeatureIndexPublication(BaseModel):
@@ -138,6 +193,8 @@ def build_feature_index(
             "bbox": list(feature.bbox),
             "label": feature.label,
             "render_batch_id": feature.render_batch_id,
+            "footprint": feature.footprint,
+            "semantic_properties": feature.semantic_properties,
         }
         for feature in value.features
     ]
@@ -242,14 +299,23 @@ def validate_feature_index(
     identifiers: list[str] = []
     provider_ids: list[str] = []
     for raw in raw_features:
-        if not isinstance(raw, dict) or set(raw) != {
+        if not isinstance(raw, dict) or set(raw) not in ({
             "id",
             "provider_feature_id",
             "kind",
             "bbox",
             "label",
             "render_batch_id",
-        }:
+        }, {
+            "id",
+            "provider_feature_id",
+            "kind",
+            "bbox",
+            "label",
+            "render_batch_id",
+            "footprint",
+            "semantic_properties",
+        }):
             raise ValueError("an environment feature record is malformed")
         feature = EnvironmentFeatureInput.model_validate(
             {
@@ -258,6 +324,8 @@ def validate_feature_index(
                 "bbox": raw["bbox"],
                 "label": raw["label"],
                 "render_batch_id": raw["render_batch_id"],
+                "footprint": raw.get("footprint"),
+                "semantic_properties": raw.get("semantic_properties", {}),
             }
         )
         expected_id = segment_id(

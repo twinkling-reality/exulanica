@@ -223,3 +223,25 @@ def test_segment_identity_binds_source_bytes_and_render_batch_ids_are_optional_u
         .render_batch_id
         is None
     )
+
+
+def test_integer_footprint_and_semantic_identity_are_bbox_bound():
+    footprint = {
+        "type": "MultiPolygon",
+        "coordinates": [[[[0, 0], [10, 0], [10, 20], [0, 20], [0, 0]]]],
+    }
+    feature = EnvironmentFeatureInput(
+        provider_feature_id="doitt_id:2327",
+        kind="building",
+        bbox=(0, 0, 10, 20),
+        render_batch_id=0,
+        footprint=footprint,
+        semantic_properties={"bin": "bin:1006070", "name": None},
+    )
+    assert feature.footprint == footprint
+    assert feature.semantic_properties["bin"] == "bin:1006070"
+
+    with pytest.raises(ValidationError, match="extent"):
+        EnvironmentFeatureInput.model_validate(
+            {**feature.model_dump(), "bbox": (0, 0, 9, 20)}
+        )

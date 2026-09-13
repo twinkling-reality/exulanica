@@ -33,17 +33,17 @@ def _setup(deployment, repository, tmp_path):
     frame = GeographicFrame(
         name="grid",
         crs="EPSG:6697",
-        axis_order=("east", "north", "height"),
+        axis_order=("east", "north"),
         horizontal_unit="metre",
-        vertical_unit="metre",
+        vertical_unit="not_applicable",
         orientation="right-handed",
-        altitude_reference="JGD2011",
+        altitude_reference="not_applicable_2d",
     )
     bounds = GeographicBounds(
         kind="bbox",
         frame_name="grid",
         coordinate_scale=1000,
-        coordinates=(0, 0, 0, 100, 100, 100),
+        coordinates=(0, 0, 100, 100),
     )
     place_id = uuid.uuid4()
     repository.connection.execute(
@@ -103,16 +103,21 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
             {
                 "provider_feature_id": "b-2",
                 "kind": "water",
-                "bbox": [20, 20, 0, 30, 30, 10],
+                "bbox": [20, 20, 30, 30],
                 "label": "Canal",
                 "render_batch_id": 2,
             },
             {
                 "provider_feature_id": "b-1",
                 "kind": "building",
-                "bbox": [0, 0, 0, 10, 10, 10],
+                "bbox": [0, 0, 10, 10],
                 "label": "Hall",
                 "render_batch_id": 1,
+                "footprint": {
+                    "type": "MultiPolygon",
+                    "coordinates": [[[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+                },
+                "semantic_properties": {"bin": "bin:1000001", "name": "Hall"},
             },
         ],
     }
@@ -129,8 +134,6 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
             ("kind", "building"),
             ("bbox", "0"),
             ("bbox", "0"),
-            ("bbox", "0"),
-            ("bbox", "5"),
             ("bbox", "5"),
             ("bbox", "5"),
             ("label", "Hall"),
@@ -142,12 +145,21 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
     assert result.json()["geographic_frame"]["name"] == "grid"
     assert result.json()["coordinate_scale"] == 1000
     assert result.json()["features"][0]["render_batch_id"] == 1
+    assert result.json()["features"][0]["semantic_properties"]["bin"] == "bin:1000001"
+    assert result.json()["features"][0]["footprint"]["type"] == "MultiPolygon"
     assert result.headers["cache-control"] == "private, no-store"
 
     wrong_dimensions = deployment.as_owner(
         "GET",
         f"/environment-resources/sources/{source.admission_id}/features",
-        params=[("bbox", "0"), ("bbox", "0"), ("bbox", "10"), ("bbox", "10")],
+        params=[
+            ("bbox", "0"),
+            ("bbox", "0"),
+            ("bbox", "0"),
+            ("bbox", "10"),
+            ("bbox", "10"),
+            ("bbox", "10"),
+        ],
     )
     assert wrong_dimensions.status_code == 422
     assert wrong_dimensions.json()["code"] == "invalid_filter"
@@ -163,7 +175,7 @@ def test_route_hides_foreign_indexes_and_reports_withdrawal(deployment, reposito
                 {
                     "provider_feature_id": "feature",
                     "kind": "terrain",
-                    "bbox": [0, 0, 0, 10, 10, 10],
+                    "bbox": [0, 0, 10, 10],
                 },
             ),
         ),

@@ -96,6 +96,7 @@ class PreparedNYCOpenData:
     source_byte_size: int
     feature_count: int
     shards: tuple[PreparedArtifact, ...]
+    semantic_proxies: tuple[PreparedArtifact, ...]
     index_inputs: tuple[PreparedArtifact, ...]
     plan: PreparedArtifact
     manifest: PreparedArtifact
@@ -457,6 +458,7 @@ def prepare(
         max_bytes=max_bytes,
     )
     shards: list[PreparedArtifact] = []
+    proxies: list[PreparedArtifact] = []
     indexes: list[PreparedArtifact] = []
     plan_entries: list[dict[str, Any]] = []
     for ordinal, encoded in enumerate(shard_bytes):
@@ -465,6 +467,34 @@ def prepare(
         shard = PreparedArtifact(path=f"sources/{stem}.json", data=encoded)
         shards.append(shard)
         shard_document = json.loads(encoded)
+        proxy_payload = {
+            "profile": "exulanica.nyc-open-data-semantic-footprint-proxy/v1",
+            "source_sha256": digest,
+            "geographic_frame": shard_document["geographic_frame"],
+            "coordinate_scale": shard_document["coordinate_scale"],
+            "attribution": ATTRIBUTION,
+            "disclosure": (
+                "Neutral flat semantic proxies generated only from official NYC Open Data "
+                "footprints. They are not Google buildings and contain no inferred surfaces."
+            ),
+            "features": [
+                {
+                    "provider_feature_id": feature["provider_feature_id"],
+                    "render_batch_id": batch_id,
+                    "footprint": feature["geometry"],
+                    "semantic_properties": {
+                        "bin": feature["properties"]["bin"],
+                        "name": feature["properties"]["name"],
+                    },
+                }
+                for batch_id, feature in enumerate(shard_document["features"])
+            ],
+        }
+        proxy_data = canonical_json(proxy_payload) + b"\n"
+        if len(proxy_data) > MAX_ENVIRONMENT_PAYLOAD_BYTES:
+            raise InvalidNYCOpenData("semantic proxy exceeds the 64 MiB payload limit")
+        proxy = PreparedArtifact(path=f"proxies/{stem}.semantic-proxy.json", data=proxy_data)
+        proxies.append(proxy)
         index_payload = {
             "profile": "exulanica.environment-feature-index-input/v1",
             "source_sha256": digest,
@@ -474,9 +504,14 @@ def prepare(
                     "kind": "building",
                     "bbox": feature["bbox"],
                     "label": feature["properties"]["name"],
-                    "render_batch_id": None,
+                    "render_batch_id": batch_id,
+                    "footprint": feature["geometry"],
+                    "semantic_properties": {
+                        "bin": feature["properties"]["bin"],
+                        "name": feature["properties"]["name"],
+                    },
                 }
-                for feature in shard_document["features"]
+                for batch_id, feature in enumerate(shard_document["features"])
             ],
         }
         index_data = canonical_json(index_payload) + b"\n"
@@ -499,6 +534,7 @@ def prepare(
                 "admission_id": admission_id,
                 "source": _artifact_record(shard),
                 "feature_index_input": _artifact_record(index),
+                "semantic_proxy": _artifact_record(proxy),
                 "feature_count": len(index_payload["features"]),
                 "limits": {
                     "source_under_64_mib": shard.byte_size <= MAX_ENVIRONMENT_PAYLOAD_BYTES,
@@ -543,7 +579,19 @@ def prepare(
                 },
                 "publication": {
                     "status": "blocked",
-                    "reason": "an exact separately admitted render_asset_id is required",
+                    "reason": (
+                        "place identity and operation rights require integration review before "
+                        "the generated semantic proxy can be registered as render_asset_id"
+                    ),
+                    "render_asset": {
+                        **_artifact_record(proxy),
+                        "media_type": (
+                            "application/vnd.exulanica.nyc-semantic-footprint-proxy+json"
+                        ),
+                        "derivation_kind": "nyc-open-data-semantic-footprint-proxy",
+                        "method": "exulanica.nyc-open-data-semantic-footprint-proxy/v1",
+                        "input_sha256": [digest],
+                    },
                     "publications_for_admission": 1,
                 },
             }
@@ -600,6 +648,7 @@ def prepare(
         "feature_count": len(features),
         "artifacts": [
             *(_artifact_record(artifact) for artifact in shards),
+            *(_artifact_record(artifact) for artifact in proxies),
             *(_artifact_record(artifact) for artifact in indexes),
             _artifact_record(plan),
         ],
@@ -610,6 +659,7 @@ def prepare(
         source_byte_size=len(data),
         feature_count=len(features),
         shards=tuple(shards),
+        semantic_proxies=tuple(proxies),
         index_inputs=tuple(indexes),
         plan=plan,
         manifest=manifest,
@@ -618,7 +668,13 @@ def prepare(
 
 def write_prepared(value: PreparedNYCOpenData, destination: Path) -> None:
     """Write prepared artifacts only after checking every declared digest and size."""
-    artifacts = (*value.shards, *value.index_inputs, value.plan, value.manifest)
+    artifacts = (
+        *value.shards,
+        *value.semantic_proxies,
+        *value.index_inputs,
+        value.plan,
+        value.manifest,
+    )
     for artifact in artifacts:
         if artifact.byte_size > MAX_ENVIRONMENT_PAYLOAD_BYTES:
             raise InvalidNYCOpenData(f"{artifact.path} exceeds the 64 MiB payload limit")

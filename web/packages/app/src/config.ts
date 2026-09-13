@@ -78,6 +78,17 @@ export function googlePhotorealisticTiles(): GoogleTilesConfig {
   return googleTilesConfig(import.meta.env);
 }
 
+/** One explicitly admitted NYC Open Data source. Empty means the semantic workflow is unavailable. */
+export function nycOpenDataAdmissionId(
+  environment: Readonly<Record<string, unknown>> = import.meta.env,
+): string | null {
+  const value = environment['VITE_NYC_OPEN_DATA_ADMISSION_ID'];
+  return typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
 /** Credentials for the Vite-only preview route. No user credential is read or persisted. */
 export function previewCredentials(origin: string): Credentials {
   return { baseUrl: `${origin}${PREVIEW_API_PATH}`, token: PREVIEW_TOKEN };

@@ -117,6 +117,20 @@ export {
   PlayCanvasGoogleTileHost,
   createGoogleTilesEnvironment,
 } from './google-tiles-environment.js';
+export {
+  NYCSemanticOverlay,
+  NYC_SEMANTIC_REFERENCE_ORIGIN,
+  crs84IntegerToLocal,
+  featureAlongReticle,
+  featureAtLocalPoint,
+  localizeNYCFeatures,
+} from './nyc-semantic-overlay.js';
+export type {
+  GeographicLocalFrame,
+  NYCLocalFeature,
+  NYCSemanticFeature,
+  SemanticFootprint,
+} from './nyc-semantic-overlay.js';
 
 export type { AnchorMotes, AnchorMotesOptions } from './anchor-motes.js';
 export {
