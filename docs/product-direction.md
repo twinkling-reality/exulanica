@@ -60,6 +60,47 @@ The inventory below identifies existing code and the extensions required by each
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
 
+## Future research: autonomous synthetic life
+
+A personal world memory model may contain persistent synthetic inhabitants and responsive authored
+objects. This is a strong product direction when it makes the world feel inhabited and lets a
+person's creations continue developing between visits. It must remain a simulation plane, not a
+claim about the people or events preserved in personal memories.
+
+The current deterministic society is a foundation only. It establishes synthetic identities,
+roles, schedules, relationships, needs, positions, bounded memory, fixed ticks and replayable
+events. It does not yet establish independently reasoning inhabitants, meaningful navigation,
+conversation, object use or emergent social behavior.
+
+Research the next layer as a bounded agent-and-affordance system:
+
+- Each synthetic inhabitant converts needs and relationships into goals, bounded plans and typed
+  actions. Decisions persist as replayable state and events rather than disappearing in animation.
+- Authored objects advertise reviewed affordances such as sit, open, carry, repair, visit, trade or
+  cultivate. Inhabitants may use only declared affordances with validated parameters.
+- Movement follows district navigation and collision, with destinations and visible activity
+  derived from authoritative simulation state. Rendering interpolates snapshots but never invents
+  canonical positions.
+- Inhabitants remember a bounded set of simulated interactions, form and change relationships, and
+  react to authored world edits, resources, weather and other synthetic inhabitants.
+- A person can inspect, address or interact with an inhabitant or object through stable semantic
+  identity. The Companion can explain behavior from cited simulation state and events.
+- Deterministic state machines, utility scoring or bounded planners run the ordinary population.
+  A model may be evaluated for rare high-level decisions or dialogue, but never once per inhabitant
+  or frame and never without a deterministic fallback, cost ceiling and recorded result.
+
+Synthetic inhabitants must never reuse a real person's identity, imply that a simulated event
+happened in the source world, or turn a memory-derived observation into a fictional biography.
+Memory evidence, authored state and simulated history remain separate truth classes even when they
+share one place.
+
+Before adopting this direction, evaluate whether inhabitants produce legible purposeful behavior
+rather than random motion; whether object affordances compose without unsafe or incoherent loops;
+whether replay, reload and undo remain exact; and whether a bounded nearby render set can make a
+population feel alive within the measured frame budget. Acceptance requires a live sequence in
+which several inhabitants pursue explainable goals, use objects, react to a world edit, persist the
+result, and answer a grounded Companion question after reload.
+
 ### Measured experience work on September 12
 
 The four experience lanes are integrated on main. The
