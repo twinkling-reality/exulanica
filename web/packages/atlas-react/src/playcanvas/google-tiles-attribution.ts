@@ -55,35 +55,40 @@ export class GoogleAttributionLedger {
       this.visible.delete(tileId);
       return;
     }
-    if (!this.firstVisible.has(tileId)) this.firstVisible.set(tileId, this.sequence++);
-    this.visible.set(tileId, Object.freeze([...values]));
+    const firstVisible = this.sequence++;
+    const normalized = [...new Set(values.map((value) => value.trim())
+      .filter((value) => value.length > 0))];
+    for (const value of normalized) {
+      if (!this.firstVisible.has(value)) this.firstVisible.set(value, firstVisible);
+    }
+    this.visible.set(tileId, Object.freeze(normalized));
   }
 
   remove(tileId: string): void {
     this.visible.delete(tileId);
-    this.firstVisible.delete(tileId);
   }
 
   values(): readonly string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    const tiles = [...this.visible].sort((left, right) =>
-      (this.firstVisible.get(left[0]) ?? 0) - (this.firstVisible.get(right[0]) ?? 0));
-    for (const [, values] of tiles) {
+    const counts = new Map<string, number>();
+    for (const values of this.visible.values()) {
       for (const value of values) {
-        const normalized = value.trim();
-        if (normalized.length > 0 && !seen.has(normalized)) {
-          seen.add(normalized);
-          result.push(normalized);
-        }
+        counts.set(value, (counts.get(value) ?? 0) + 1);
       }
     }
-    return Object.freeze(result);
+    return Object.freeze([...counts.keys()].sort((left, right) => {
+      const byCount = counts.get(right)! - counts.get(left)!;
+      if (byCount !== 0) return byCount;
+      const byFirstVisible = (this.firstVisible.get(left) ?? 0) -
+        (this.firstVisible.get(right) ?? 0);
+      if (byFirstVisible !== 0) return byFirstVisible;
+      return left < right ? -1 : left > right ? 1 : 0;
+    }));
   }
 
   clear(): void {
     this.visible.clear();
     this.firstVisible.clear();
+    this.sequence = 0;
   }
 }
 
@@ -102,6 +107,8 @@ export class GoogleAttributionSurface {
     provider.textContent = 'Google Maps';
     this.copyright = document.createElement('span');
     this.copyright.className = 'google-tiles-copyright';
+    this.copyright.setAttribute('aria-label', 'Visible tile copyright');
+    this.copyright.style.marginLeft = '0.45rem';
     const navigation = document.createElement('span');
     navigation.textContent = ' · Visual reference only; movement uses Atlas navigation, not Google street collision.';
 
@@ -123,7 +130,7 @@ export class GoogleAttributionSurface {
 
   update(visible: boolean, values: readonly string[]): void {
     this.root.hidden = !visible;
-    this.copyright.textContent = values.length === 0 ? '' : ` · ${values.join(' · ')}`;
+    this.copyright.textContent = values.join('; ');
   }
 
   destroy(): void {

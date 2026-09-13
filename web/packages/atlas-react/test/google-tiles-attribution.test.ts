@@ -35,24 +35,34 @@ describe('visible Google tile attribution', () => {
     }))).toThrow('External Google tile resources');
   });
 
-  it('deduplicates in stable first-visible tile order', () => {
+  it('orders unique visible attribution by frequency, first visibility, then lexical value', () => {
     const ledger = new GoogleAttributionLedger();
-    ledger.setVisible('later-id', ['B', 'Shared'], true);
-    ledger.setVisible('earlier-id', ['A', 'Shared'], true);
-    expect(ledger.values()).toEqual(['B', 'Shared', 'A']);
-    ledger.setVisible('later-id', [], false);
+    ledger.setVisible('tile-a', ['Shared', 'B', 'B'], true);
+    ledger.setVisible('tile-b', ['Shared', 'A'], true);
+    ledger.setVisible('tile-c', ['A'], true);
+    expect(ledger.values()).toEqual(['Shared', 'A', 'B']);
+
+    ledger.setVisible('tile-a', [], false);
     expect(ledger.values()).toEqual(['A', 'Shared']);
-    ledger.setVisible('later-id', ['B'], true);
-    expect(ledger.values()).toEqual(['B', 'A', 'Shared']);
+    ledger.setVisible('tile-a', ['Shared', 'B'], true);
+    expect(ledger.values()).toEqual(['Shared', 'A', 'B']);
+
+    ledger.remove('tile-b');
+    expect(ledger.values()).toEqual(['B', 'Shared', 'A']);
+    ledger.remove('tile-c');
+    expect(ledger.values()).toEqual(['B', 'Shared']);
+    ledger.remove('tile-a');
+    expect(ledger.values()).toEqual([]);
   });
 
   it('keeps Google attribution and end-user links in a distinct surface', () => {
     const surface = new GoogleAttributionSurface(document.body);
-    surface.update(true, ['Source A']);
+    surface.update(true, ['Source A', 'Source B']);
     expect(surface.root.hidden).toBe(false);
     expect(surface.root.getAttribute('aria-label')).toBe('Google Maps attribution');
     expect(surface.root.textContent).toContain('Google Maps');
-    expect(surface.root.textContent).toContain('Source A');
+    expect(surface.root.querySelector('.google-tiles-copyright')?.textContent)
+      .toBe('Source A; Source B');
     expect(surface.root.textContent).toContain('not Google street collision');
     expect(Array.from(surface.root.querySelectorAll('a')).map((link) => link.href)).toEqual([
       'https://maps.google.com/help/terms_maps/',
