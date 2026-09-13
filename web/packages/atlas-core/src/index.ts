@@ -180,6 +180,7 @@ export type {
   NavigationRegion,
   NavigationSurface,
   NavigationWorld,
+  PolygonObstacle,
   OpenTraversalRule,
   RegionTraversalRule,
   SemanticTrace,
@@ -188,6 +189,14 @@ export type {
   SurfaceNormal,
   SurfaceSample,
 } from './navigation.js';
+
+export type {
+  OwnedDistrict,
+  OwnedDistrictBuilding,
+  OwnedDistrictMaterial,
+  OwnedDistrictSidewalk,
+} from './owned-district.js';
+export { ownedDistrictNavigation, parseOwnedDistrict } from './owned-district.js';
 export {
   DEFAULT_CAMERA_RADIUS_AU,
   DEFAULT_EYE_HEIGHT_AU,

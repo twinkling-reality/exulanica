@@ -17,6 +17,7 @@ import type {
   NeighborhoodId,
   NeighborhoodIndex,
   NavigationPose,
+  OwnedDistrict,
   ResidencyAction,
   ResidencyAsset,
   ResidencyCost,
@@ -47,11 +48,13 @@ import {
   buildAnchorTable,
   buildNeighborhoodIndex,
   buildNavigationWorld,
+  ownedDistrictNavigation,
   classifySpatialPhase,
   enterAtlasMap,
   exitAtlasMap,
   focusDirectly,
   isNavigationLineVisible,
+  isNavigationPositionClear,
   latchFocus,
   localDirectionToAtlas,
   localToAtlas,
@@ -77,6 +80,7 @@ import {
   frameFraction,
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
+import { OwnedDistrictRuntime } from './owned-district-runtime.js';
 import {
   DAWN_THEME,
   DEFAULT_WORLD_ART_PROFILE,
@@ -349,6 +353,11 @@ export interface AtlasBindingOptions {
   readonly maxPixelRatio?: number;
   /** Optional visualization-only Google reference. It never participates in Atlas interaction. */
   readonly googleTiles?: GoogleTilesConfig;
+  /** Admitted owned geography. One semantic document drives rendering and collision. */
+  readonly ownedDistrict?: {
+    readonly document: OwnedDistrict;
+    readonly residentBytes: number;
+  };
 }
 
 export interface FrameReport {
@@ -416,6 +425,7 @@ export class AtlasBinding {
   readonly renderRoot: pc.Entity;
   /** Null unless explicitly feature-flagged with a key by the application. */
   googleTiles: GoogleTilesEnvironment<unknown> | null = null;
+  readonly ownedDistrict: OwnedDistrictRuntime | null;
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
@@ -530,6 +540,7 @@ export class AtlasBinding {
     residencyBudget: number,
     sourcePresentation: 'world' | 'inspection',
     objectRoots: ReadonlyMap<IslandId, pc.Entity>,
+    ownedDistrict: OwnedDistrictRuntime | null,
   ) {
     this.app = app;
     this.device = app.graphicsDevice;
@@ -566,6 +577,7 @@ export class AtlasBinding {
     this.neighborhoodIndex = neighborhoodIndex;
     this.environmentRoot = environmentRoot;
     this.renderRoot = renderRoot;
+    this.ownedDistrict = ownedDistrict;
     this.setClearColours(initialProfile);
     this.residencyCatalog = residencyCatalog;
     this.residencyBudget = residencyBudget;
@@ -581,7 +593,8 @@ export class AtlasBinding {
   static async create(options: AtlasBindingOptions): Promise<AtlasBinding> {
     const theme = options.theme ?? DAWN_THEME;
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
-    const cityActive = options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0;
+    const cityActive = options.ownedDistrict !== undefined ||
+      (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0);
     const device = await pc.createGraphicsDevice(options.canvas, {
       deviceTypes: [...(options.deviceTypes ?? ['webgl2'])],
       antialias: true,
@@ -666,7 +679,17 @@ export class AtlasBinding {
     app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
-    const navigationWorld = buildNavigationWorld(options.scene, atlasLandscapeSurface());
+    const navigationWorld = options.ownedDistrict === undefined
+      ? buildNavigationWorld(options.scene, atlasLandscapeSurface())
+      : ownedDistrictNavigation(options.ownedDistrict.document);
+    const ownedDistrict = options.ownedDistrict === undefined
+      ? null
+      : new OwnedDistrictRuntime(
+        device,
+        environmentRoot,
+        options.ownedDistrict.document,
+        options.ownedDistrict.residentBytes,
+      );
     const neighborhoodIndex = buildNeighborhoodIndex(options.scene);
     const explicitPointMaps = options.placedPointMaps ?? [];
     const explicitlyPlacedIslands = new Set(explicitPointMaps.map((value) => value.islandId));
@@ -863,15 +886,17 @@ export class AtlasBinding {
       }
     }
 
-    const start = cityActive
-      ? cityCameraState('overview')
-      : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
+    const start = options.ownedDistrict !== undefined
+      ? ownedDistrictCameraState(navigationWorld)
+      : cityActive
+        ? cityCameraState('overview')
+        : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
 
     const controls = new FirstPersonControls(
       options.canvas,
       start,
       cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 32, sprintMultiplier: 3.2 } : DEFAULT_CONTROLS,
-      cityActive ? null : navigationWorld,
+      navigationWorld,
     );
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
     const overlay =
@@ -929,6 +954,7 @@ export class AtlasBinding {
       residencyBudget,
       options.sourcePresentation ?? 'world',
       objectRoots,
+      ownedDistrict,
     );
     if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
       binding.renderRoot.enabled = false;
@@ -957,8 +983,15 @@ export class AtlasBinding {
   }
 
   setCityView(view: 'overview' | 'street'): void {
-    if (this.googleTiles === null) return;
-    Object.assign(this.controls.state, cityCameraState(view));
+    if (this.googleTiles === null && this.ownedDistrict === null) return;
+    Object.assign(
+      this.controls.state,
+      this.ownedDistrict === null
+        ? cityCameraState(view)
+        : view === 'overview'
+          ? { x: -45, y: 180, z: 390, yaw: Math.PI, pitch: -0.42 }
+          : ownedDistrictCameraState(this.navigationWorld),
+    );
     this.invalidate();
   }
 
@@ -1839,6 +1872,7 @@ export class AtlasBinding {
   }
 
   destroy(): void {
+    this.ownedDistrict?.destroy();
     this.googleTiles?.dispose();
     this.googleTiles = null;
     this.controls.destroy();
@@ -1924,6 +1958,25 @@ export function cityCameraState(view: 'overview' | 'street'): CameraState {
   return view === 'street'
     ? { x: -25, y: 60, z: -280, yaw: Math.PI, pitch: -0.35 }
     : { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
+}
+
+/** Deterministic clear spawn on visible owned support, never an invisible safety floor. */
+export function ownedDistrictCameraState(world: NavigationWorld): CameraState {
+  for (let z = 240; z >= -240; z -= 8) {
+    for (let x = -240; x <= 240; x += 8) {
+      const position = atlasVec3(x, world.eyeHeight, z);
+      if (world.surface.sample(x, z) !== null && isNavigationPositionClear(world, position)) {
+        return { x, y: world.eyeHeight, z, yaw: Math.PI, pitch: 0 };
+      }
+    }
+  }
+  return {
+    x: world.centre.x,
+    y: world.eyeHeight,
+    z: world.centre.z,
+    yaw: Math.PI,
+    pitch: 0,
+  };
 }
 
 /**

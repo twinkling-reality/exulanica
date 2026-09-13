@@ -29,6 +29,11 @@ import {
   googleTilesConfig,
   type GoogleTilesConfig,
 } from '@exulanica/atlas-react/playcanvas';
+import {
+  parseOwnedDistrict,
+  type OwnedDistrict,
+} from '@exulanica/atlas-core';
+import ownedDistrictAsset from '../../../../assets/owned-world/flatiron/flatiron-owned-district.json?url';
 
 const API_PATH = '/api';
 const PREVIEW_API_PATH = '/preview-api';
@@ -77,6 +82,17 @@ export function applicationTitle(preview: boolean): string {
 /** Optional visualization-only provider configuration. Never persisted or logged. */
 export function googlePhotorealisticTiles(): GoogleTilesConfig {
   return googleTilesConfig(import.meta.env);
+}
+
+export async function ownedDistrict(): Promise<{
+  readonly document: OwnedDistrict;
+  readonly residentBytes: number;
+}> {
+  const response = await fetch(ownedDistrictAsset, { credentials: 'same-origin' });
+  if (!response.ok) throw new Error(`Owned district unavailable: HTTP ${response.status}`);
+  const bytes = await response.arrayBuffer();
+  const document = parseOwnedDistrict(JSON.parse(new TextDecoder().decode(bytes)));
+  return Object.freeze({ document, residentBytes: bytes.byteLength });
 }
 
 /** One explicitly admitted NYC Open Data source. Empty means the semantic workflow is unavailable. */

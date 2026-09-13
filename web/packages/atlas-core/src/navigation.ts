@@ -76,6 +76,12 @@ export interface CircleObstacle {
   readonly radius: number;
 }
 
+export interface PolygonObstacle {
+  readonly id: string;
+  /** Closed exterior rings in Atlas x/z units. */
+  readonly rings: readonly (readonly AtlasVec3[])[];
+}
+
 export interface NavigationRegion {
   readonly islandId: IslandId;
   readonly centre: AtlasVec3;
@@ -106,6 +112,7 @@ export interface NavigationWorld {
   readonly surfaceSampleSpacing: number;
   readonly regions: readonly NavigationRegion[];
   readonly obstacles: readonly CircleObstacle[];
+  readonly polygonObstacles?: readonly PolygonObstacle[];
   readonly traces: readonly SemanticTrace[];
 }
 
@@ -120,6 +127,8 @@ export function isNavigationPositionClear(
 ): boolean {
   return world.obstacles.every(
     (obstacle) => groundDistance(position, obstacle.centre) >= obstacle.radius + radius,
+  ) && (world.polygonObstacles ?? []).every(
+    (obstacle) => !polygonContainsOrTouches(obstacle, position, radius),
   );
 }
 
@@ -319,6 +328,133 @@ function collideAndSlide(
   return Object.freeze({ position: start, collided });
 }
 
+function pointSegmentDistance(
+  point: AtlasVec3,
+  a: AtlasVec3,
+  b: AtlasVec3,
+): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const length2 = dx * dx + dz * dz;
+  const t = length2 < 1e-12 ? 0 : Math.max(
+    0,
+    Math.min(1, ((point.x - a.x) * dx + (point.z - a.z) * dz) / length2),
+  );
+  return Math.hypot(point.x - (a.x + t * dx), point.z - (a.z + t * dz));
+}
+
+function pointInRing(point: AtlasVec3, ring: readonly AtlasVec3[]): boolean {
+  let inside = false;
+  for (let index = 0, prior = ring.length - 1; index < ring.length; prior = index++) {
+    const a = ring[index]!;
+    const b = ring[prior]!;
+    if (
+      (a.z > point.z) !== (b.z > point.z) &&
+      point.x < (b.x - a.x) * (point.z - a.z) / (b.z - a.z) + a.x
+    ) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonContainsOrTouches(
+  obstacle: PolygonObstacle,
+  point: AtlasVec3,
+  radius: number,
+): boolean {
+  for (const ring of obstacle.rings) {
+    if (pointInRing(point, ring)) return true;
+    for (let index = 1; index < ring.length; index += 1) {
+      if (pointSegmentDistance(point, ring[index - 1]!, ring[index]!) < radius) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Conservative swept capsule resolution against exact footprint edges.
+ *
+ * Sampling is bounded to at most half a capsule radius, so a move cannot tunnel through an edge.
+ * The final binary search places the capsule immediately before first contact and preserves a
+ * tangential slide on the remaining displacement.
+ */
+function collidePolygonsAndSlide(
+  startInput: AtlasVec3,
+  targetInput: AtlasVec3,
+  obstacles: readonly PolygonObstacle[],
+  radius: number,
+): CollisionResult {
+  let start = startInput;
+  let target = targetInput;
+  let collided = false;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const distance = groundDistance(start, target);
+    const steps = Math.max(1, Math.ceil(distance / Math.max(radius * 0.5, 0.05)));
+    let hitStep = -1;
+    let hitObstacle: PolygonObstacle | null = null;
+    for (let step = 1; step <= steps && hitStep < 0; step += 1) {
+      const t = step / steps;
+      const sample = atlasVec3(
+        start.x + (target.x - start.x) * t,
+        target.y,
+        start.z + (target.z - start.z) * t,
+      );
+      for (const obstacle of obstacles) {
+        if (polygonContainsOrTouches(obstacle, sample, radius)) {
+          hitStep = step;
+          hitObstacle = obstacle;
+          break;
+        }
+      }
+    }
+    if (hitStep < 0 || hitObstacle === null) return Object.freeze({ position: target, collided });
+    collided = true;
+    let low = (hitStep - 1) / steps;
+    let high = hitStep / steps;
+    for (let iteration = 0; iteration < 12; iteration += 1) {
+      const middle = (low + high) / 2;
+      const sample = atlasVec3(
+        start.x + (target.x - start.x) * middle,
+        target.y,
+        start.z + (target.z - start.z) * middle,
+      );
+      if (polygonContainsOrTouches(hitObstacle, sample, radius)) high = middle;
+      else low = middle;
+    }
+    const contact = atlasVec3(
+      start.x + (target.x - start.x) * low,
+      target.y,
+      start.z + (target.z - start.z) * low,
+    );
+    let nearestA: AtlasVec3 | null = null;
+    let nearestB: AtlasVec3 | null = null;
+    let nearest = Infinity;
+    for (const ring of hitObstacle.rings) {
+      for (let index = 1; index < ring.length; index += 1) {
+        const a = ring[index - 1]!;
+        const b = ring[index]!;
+        const value = pointSegmentDistance(contact, a, b);
+        if (value < nearest) {
+          nearest = value;
+          nearestA = a;
+          nearestB = b;
+        }
+      }
+    }
+    if (nearestA === null || nearestB === null) return Object.freeze({ position: contact, collided });
+    const edgeX = nearestB.x - nearestA.x;
+    const edgeZ = nearestB.z - nearestA.z;
+    const edgeLength = Math.max(Math.hypot(edgeX, edgeZ), 1e-9);
+    const tangentX = edgeX / edgeLength;
+    const tangentZ = edgeZ / edgeLength;
+    const remainingX = target.x - contact.x;
+    const remainingZ = target.z - contact.z;
+    const along = remainingX * tangentX + remainingZ * tangentZ;
+    start = contact;
+    target = atlasVec3(contact.x + tangentX * along, target.y, contact.z + tangentZ * along);
+  }
+  return Object.freeze({ position: start, collided });
+}
+
 function nearestRegionEntry(world: NavigationWorld, from: AtlasVec3): AtlasVec3 {
   let nearest = world.regions[0];
   let distance = Infinity;
@@ -406,7 +542,13 @@ export function isNavigationPathClear(
 ): boolean {
   if (groundDistance(to, world.centre) > world.fieldRadius) return false;
   if (surfacePathFailure(world, from, to) !== null) return false;
-  return !collideAndSlide(from, to, world.obstacles, world.cameraRadius).collided;
+  if (collideAndSlide(from, to, world.obstacles, world.cameraRadius).collided) return false;
+  return !collidePolygonsAndSlide(
+    from,
+    to,
+    world.polygonObstacles ?? [],
+    world.cameraRadius,
+  ).collided;
 }
 
 /** Resolve one intended planar move against surface, coarse blockers, soft bounds, and recovery. */
@@ -452,7 +594,22 @@ export function resolveGroundMovement(
       recoveryReason: pathFailure ?? 'no-surface',
     });
   }
-  const collision = collideAndSlide(input.current, target, world.obstacles, world.cameraRadius);
+  const circleCollision = collideAndSlide(
+    input.current,
+    target,
+    world.obstacles,
+    world.cameraRadius,
+  );
+  const polygonCollision = collidePolygonsAndSlide(
+    input.current,
+    circleCollision.position,
+    world.polygonObstacles ?? [],
+    world.cameraRadius,
+  );
+  const collision = Object.freeze({
+    position: polygonCollision.position,
+    collided: circleCollision.collided || polygonCollision.collided,
+  });
   const resolvedPathFailure = surfacePathFailure(world, input.current, collision.position);
   if (resolvedPathFailure !== null) {
     const fallback = input.lastSafe ?? nearestRegionEntry(world, input.current);

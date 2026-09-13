@@ -17,7 +17,11 @@ import type { AtlasScene } from '@exulanica/atlas-core';
 import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
-import { googlePhotorealisticTiles, sourcePresentation } from '../config.js';
+import {
+  googlePhotorealisticTiles,
+  ownedDistrict,
+  sourcePresentation,
+} from '../config.js';
 import { themeForPreferences } from '../theme.js';
 import { el } from '../ui/dom.js';
 import type { FirstUseGuidance } from '../ui/first-use-guidance.js';
@@ -82,6 +86,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   env.shell.append(rendererLoading);
   env.shell.setAttribute('aria-busy', 'true');
   try {
+    const district = await ownedDistrict();
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
       if (lastMoving !== report.moving) {
         lastMoving = report.moving;
@@ -130,6 +135,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
       googleTiles: googlePhotorealisticTiles(),
+      ownedDistrict: district,
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {
         scenes: current.reconstructionScenes ?? [],

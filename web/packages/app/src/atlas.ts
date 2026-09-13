@@ -25,7 +25,7 @@
  * running it.
  */
 
-import type { AtlasScene, IslandId } from '@exulanica/atlas-core';
+import type { AtlasScene, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
 import type {
   PresentationTheme,
   WorldArtProfile,
@@ -71,6 +71,10 @@ export async function mountAtlas(
     readonly trainedGeometry?: readonly TrainedSceneGeometry[];
     readonly recoveredCameras?: readonly RecoveredSceneCamera[];
     readonly googleTiles?: GoogleTilesConfig;
+    readonly ownedDistrict?: {
+      readonly document: OwnedDistrict;
+      readonly residentBytes: number;
+    };
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -86,6 +90,9 @@ export async function mountAtlas(
       ? {}
       : { placedPointMaps: presentation.placedPointMaps }),
     ...(presentation?.googleTiles === undefined ? {} : { googleTiles: presentation.googleTiles }),
+    ...(presentation?.ownedDistrict === undefined
+      ? {}
+      : { ownedDistrict: presentation.ownedDistrict }),
     ...(presentation === undefined
       ? {}
       : {
@@ -105,6 +112,12 @@ export async function mountAtlas(
   canvas.dataset.worldProfile = binding.composedWorld.profileId;
   canvas.dataset.worldTopology = binding.topology.topologyDigest;
   canvas.dataset.worldModules = String(binding.topology.instances.length);
+  if (binding.ownedDistrict !== null) {
+    canvas.dataset.ownedDistrict = binding.ownedDistrict.district.district_id;
+    canvas.dataset.ownedBuildings = String(binding.ownedDistrict.metrics.logicalBuildings);
+    canvas.dataset.ownedDrawCalls = String(binding.ownedDistrict.metrics.drawCalls);
+    canvas.dataset.ownedResidentBytes = String(binding.ownedDistrict.metrics.residentBytes);
+  }
 
   if (onFrame !== undefined) binding.onFrame = onFrame;
   // The engine drives the clock. The binding's own update runs before the render, which is the
@@ -138,6 +151,10 @@ export async function mountAtlas(
       delete canvas.dataset.worldProfile;
       delete canvas.dataset.worldTopology;
       delete canvas.dataset.worldModules;
+      delete canvas.dataset.ownedDistrict;
+      delete canvas.dataset.ownedBuildings;
+      delete canvas.dataset.ownedDrawCalls;
+      delete canvas.dataset.ownedResidentBytes;
       binding.destroy();
     },
   };

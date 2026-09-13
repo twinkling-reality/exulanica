@@ -12,11 +12,11 @@ const NYC_PLACE_ID = 'd08f61bb-ef6d-4f5d-8bd8-a596da51f971';
 const NYC_RENDER_ASSET_ID = '8fb48be4-f696-48aa-b551-cd80186479e3';
 const NYC_PROVIDER_KEY = 'nyc-open-data';
 const NYC_PROVIDER_ORIGINAL_ID = '5zhs-2jue';
-const NYC_PROVIDER_REVISION = 'soda-query-v1';
+const NYC_PROVIDER_REVISION = 'Sun, 13 Sep 2026 15:49:22 GMT';
 const NYC_SOURCE_URL = 'https://data.cityofnewyork.us/resource/5zhs-2jue.geojson?'
   + new URLSearchParams({
     '$select': 'the_geom,name,bin,doitt_id',
-    '$where': 'within_box(the_geom,40.724,-73.993,40.720,-73.984)',
+    '$where': 'within_box(the_geom,40.745,-73.994,40.739,-73.986)',
     '$order': 'doitt_id',
     '$limit': '1000',
   });

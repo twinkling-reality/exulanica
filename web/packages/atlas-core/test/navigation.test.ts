@@ -78,6 +78,31 @@ describe('the grounded memory field', () => {
     )).toBeGreaterThanOrEqual(obstacle.radius + DEFAULT_CAMERA_RADIUS_AU - 1e-3);
   });
 
+  it('sweeps a capsule against exact building rings without tunnelling', () => {
+    const base = buildNavigationWorld(scene([baseIsland()]));
+    const world = {
+      ...base,
+      obstacles: [],
+      polygonObstacles: [{
+        id: 'building',
+        rings: [[
+          atlasVec3(-1, 0, -3),
+          atlasVec3(1, 0, -3),
+          atlasVec3(1, 0, 3),
+          atlasVec3(-1, 0, 3),
+          atlasVec3(-1, 0, -3),
+        ]],
+      }],
+    };
+    const result = resolveGroundMovement(world, {
+      current: atlasVec3(-5, world.eyeHeight, 0),
+      desired: atlasVec3(5, world.eyeHeight, 0),
+      lastSafe: atlasVec3(-5, world.eyeHeight, 0),
+    });
+    expect(result.collided).toBe(true);
+    expect(result.position.x).toBeLessThanOrEqual(-1 - DEFAULT_CAMERA_RADIUS_AU + 0.01);
+  });
+
   it('uses the source-first blocker for focus visibility as well as locomotion', () => {
     const original = baseIsland();
     const world = buildNavigationWorld(scene([makeIsland({ ...original, rung: 4 })]));

@@ -29,10 +29,10 @@ const feature: NYCSemanticFeature = {
 
 describe('independent NYC Open Data semantic geometry', () => {
   it('converts pinned CRS84 integers into the reference local east/south frame', () => {
-    expect(crs84IntegerToLocal(-739_885_000, 407_220_000, 10_000_000, frame))
+    expect(crs84IntegerToLocal(-739_900_000, 407_420_000, 10_000_000, frame))
       .toEqual([expect.closeTo(0, 5), expect.closeTo(0, 5)]);
-    const east = crs84IntegerToLocal(-739_884_000, 407_220_000, 10_000_000, frame);
-    const north = crs84IntegerToLocal(-739_885_000, 407_221_000, 10_000_000, frame);
+    const east = crs84IntegerToLocal(-739_899_000, 407_420_000, 10_000_000, frame);
+    const north = crs84IntegerToLocal(-739_900_000, 407_421_000, 10_000_000, frame);
     expect(east[0]).toBeGreaterThan(8);
     expect(north[1]).toBeLessThan(-10);
   });
