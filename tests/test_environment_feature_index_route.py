@@ -147,6 +147,9 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
     assert result.json()["features"][0]["render_batch_id"] == 1
     assert result.json()["features"][0]["semantic_properties"]["bin"] == "bin:1000001"
     assert result.json()["features"][0]["footprint"]["type"] == "MultiPolygon"
+    assert result.json()["receipt"]["profile"] == (
+        "exulanica.environment-feature-index-publication/v1"
+    )
     assert result.headers["cache-control"] == "private, no-store"
 
     wrong_dimensions = deployment.as_owner(

@@ -14,7 +14,11 @@ from exulanica.environment.admission import (
 from exulanica.environment.feature_index import (
     FEATURE_INDEX_DERIVATION,
     FEATURE_INDEX_ENVELOPE,
+    FEATURE_INDEX_ENVELOPE_V1,
+    FEATURE_INDEX_ENVELOPE_V2,
     FEATURE_INDEX_PROFILE,
+    FEATURE_INDEX_PROFILE_V1,
+    FEATURE_INDEX_PROFILE_V2,
     MAX_ENVIRONMENT_FEATURES,
     EnvironmentFeatureInput,
     EnvironmentFeatureKind,
@@ -40,7 +44,11 @@ from exulanica.environment.repository import (
 __all__ = [
     "FEATURE_INDEX_DERIVATION",
     "FEATURE_INDEX_ENVELOPE",
+    "FEATURE_INDEX_ENVELOPE_V1",
+    "FEATURE_INDEX_ENVELOPE_V2",
     "FEATURE_INDEX_PROFILE",
+    "FEATURE_INDEX_PROFILE_V1",
+    "FEATURE_INDEX_PROFILE_V2",
     "MAX_ENVIRONMENT_FEATURES",
     "MAX_ENVIRONMENT_PAYLOAD_BYTES",
     "AuthorizedEnvironmentBytes",

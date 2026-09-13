@@ -1,3 +1,5 @@
+import { NYC_REFERENCE_FRAME } from './nyc-reference-frame.js';
+
 export interface GoogleTilesConfig {
   readonly enabled: boolean;
   readonly apiKey: string;
@@ -11,11 +13,7 @@ export interface GoogleTilesEnvironment {
   readonly VITE_GOOGLE_MAP_TILES_API_KEY?: string;
 }
 
-export const GOOGLE_REFERENCE_ORIGIN = Object.freeze({
-  longitude: -73.9885,
-  latitude: 40.722,
-  altitude: 0,
-});
+export const GOOGLE_REFERENCE_ORIGIN = NYC_REFERENCE_FRAME;
 
 /** Fail closed. A key alone never turns the provider on. */
 export function googleTilesConfig(environment: GoogleTilesEnvironment): GoogleTilesConfig {

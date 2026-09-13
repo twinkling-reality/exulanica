@@ -313,7 +313,7 @@ class EnvironmentRepository:
             media_type="application/vnd.exulanica.environment-feature-index+json",
             derivation_kind=FEATURE_INDEX_DERIVATION,
             derivation_lineage={
-                "method": "exulanica.environment-feature-index/v1",
+                "method": "exulanica.environment-feature-index/v2",
                 "input_sha256": [source_hex, render_hex],
             },
             geographic_frame=self._frame(frame),

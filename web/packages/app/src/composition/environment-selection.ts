@@ -2,7 +2,7 @@ import type { AtlasScene } from '@exulanica/atlas-core';
 import {
   localizeNYCFeatures,
   NYCSemanticOverlay,
-  NYC_SEMANTIC_REFERENCE_ORIGIN,
+  NYC_REFERENCE_FRAME,
   type NYCLocalFeature,
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
@@ -29,11 +29,21 @@ export interface EnvironmentSelectionDependencies {
   readonly admissionId?: string | null;
   readonly environmentClient?: EnvironmentSelectionClient;
   readonly worldClient?: WorldObjectsClient;
+  readonly createOverlay?: (
+    features: readonly NYCLocalFeature[],
+  ) => {
+    pick(
+      origin: readonly [number, number, number],
+      direction: readonly [number, number, number],
+    ): NYCLocalFeature | null;
+    destroy(): void;
+  };
 }
 
 export interface MountedEnvironmentSelection {
   readonly root: HTMLElement;
   begin(): Promise<void>;
+  dispose(): void;
 }
 
 const instanceId = (feature: NYCLocalFeature): string =>
@@ -69,6 +79,18 @@ export function mountEnvironmentSelection(
   let catalog: EnvironmentCatalog | null = null;
   let current: AlternateVersion | null = null;
   let chosen: NYCLocalFeature | null = null;
+  let phase: 'idle' | 'attaching' | 'attached' | 'disposed' = 'idle';
+  let beginPromise: Promise<void> | null = null;
+  let overlay: {
+    pick(
+      origin: readonly [number, number, number],
+      direction: readonly [number, number, number],
+    ): NYCLocalFeature | null;
+    destroy(): void;
+  } | null = null;
+  let installedInteract: (() => void) | null = null;
+  let priorInteract: (() => void) | null = null;
+  let attachedControls: { onInteract: (() => void) | null } | null = null;
 
   function reportSelection(feature: NYCLocalFeature): void {
     chosen = feature;
@@ -162,46 +184,75 @@ export function mountEnvironmentSelection(
     }
   })());
 
+  async function attach(): Promise<void> {
+    if (admissionId === null) {
+      root.dataset['state'] = 'unavailable';
+      reason.textContent = 'No admitted NYC Open Data catalog is configured.';
+      return;
+    }
+    const atlas = deps.state.atlas?.binding;
+    if (atlas === undefined || deps.scene.islands.length === 0) return;
+    try {
+      [catalog, current] = await Promise.all([
+        environmentClient.catalog(admissionId),
+        worldClient.connect().then((connected) => connected.version),
+      ]);
+      if (phase === 'disposed') return;
+      const features = localizeNYCFeatures(
+        catalog.features,
+        catalog.coordinateScale,
+        NYC_REFERENCE_FRAME,
+      );
+      overlay = deps.createOverlay?.(features)
+        ?? new NYCSemanticOverlay(atlas.device, atlas.renderRoot, features);
+      attachedControls = atlas.controls;
+      priorInteract = atlas.controls.onInteract;
+      installedInteract = () => {
+        const position = atlas.controls.state;
+        const forward = atlas.camera.forward;
+        const hit = overlay!.pick(
+          [position.x, position.y, position.z],
+          [forward.x, forward.y, forward.z],
+        );
+        if (hit === null) priorInteract?.();
+        else reportSelection(hit);
+      };
+      atlas.controls.onInteract = installedInteract;
+      phase = 'attached';
+      root.dataset['state'] = 'ready';
+      reason.textContent = `${catalog.attribution}. ${features.length} authorized features loaded.`;
+      reflectVersion();
+      atlas.invalidate();
+    } catch (error) {
+      root.dataset['state'] = 'unavailable';
+      reason.textContent = error instanceof Error ? error.message : String(error);
+      if (phase !== 'disposed') phase = 'idle';
+    }
+  }
+
   return {
     root,
-    begin: async () => {
-      if (admissionId === null) {
-        root.dataset['state'] = 'unavailable';
-        reason.textContent = 'No admitted NYC Open Data catalog is configured.';
-        return;
+    begin: () => {
+      if (phase === 'disposed') {
+        return Promise.reject(new Error('NYC environment selection mount is disposed'));
       }
-      const atlas = deps.state.atlas?.binding;
-      if (atlas === undefined || deps.scene.islands.length === 0) return;
-      try {
-        [catalog, current] = await Promise.all([
-          environmentClient.catalog(admissionId),
-          worldClient.connect().then((connected) => connected.version),
-        ]);
-        const features = localizeNYCFeatures(
-          catalog.features,
-          catalog.coordinateScale,
-          NYC_SEMANTIC_REFERENCE_ORIGIN,
-        );
-        const overlay = new NYCSemanticOverlay(atlas.device, atlas.renderRoot, features);
-        const priorInteract = atlas.controls.onInteract;
-        atlas.controls.onInteract = () => {
-          const position = atlas.camera.getPosition();
-          const forward = atlas.camera.forward;
-          const hit = overlay.pick(
-            [position.x, position.y, position.z],
-            [forward.x, forward.y, forward.z],
-          );
-          if (hit === null) priorInteract?.();
-          else reportSelection(hit);
-        };
-        root.dataset['state'] = 'ready';
-        reason.textContent = `${catalog.attribution}. ${features.length} authorized features loaded.`;
-        reflectVersion();
-        atlas.invalidate();
-      } catch (error) {
-        root.dataset['state'] = 'unavailable';
-        reason.textContent = error instanceof Error ? error.message : String(error);
+      if (beginPromise !== null) return beginPromise;
+      phase = 'attaching';
+      beginPromise = attach();
+      return beginPromise;
+    },
+    dispose: () => {
+      if (phase === 'disposed') return;
+      phase = 'disposed';
+      if (attachedControls !== null) {
+        attachedControls.onInteract = priorInteract;
       }
+      installedInteract = null;
+      priorInteract = null;
+      attachedControls = null;
+      overlay?.destroy();
+      overlay = null;
+      root.remove();
     },
   };
 }

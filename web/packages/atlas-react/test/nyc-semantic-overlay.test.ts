@@ -7,8 +7,9 @@ import {
   localizeNYCFeatures,
   type NYCSemanticFeature,
 } from '../src/playcanvas/nyc-semantic-overlay.js';
+import { NYC_REFERENCE_FRAME } from '../src/playcanvas/nyc-reference-frame.js';
 
-const frame = { longitude: -73.9885, latitude: 40.722, altitude: 0 };
+const frame = NYC_REFERENCE_FRAME;
 const feature: NYCSemanticFeature = {
   id: '0123456789abcdef0123456789abcdef',
   providerFeatureId: 'doitt_id:2327',

@@ -13,8 +13,14 @@ from exulanica.canonical import canonical_json
 from exulanica.environment.admission import GeographicBounds, GeographicFrame
 
 MAX_ENVIRONMENT_FEATURES = 512
-FEATURE_INDEX_PROFILE = "exulanica.environment-feature-index/v1"
-FEATURE_INDEX_ENVELOPE = "exulanica.environment-feature-index-envelope/v1"
+FEATURE_INDEX_PROFILE_V1 = "exulanica.environment-feature-index/v1"
+FEATURE_INDEX_PROFILE_V2 = "exulanica.environment-feature-index/v2"
+FEATURE_INDEX_ENVELOPE_V1 = "exulanica.environment-feature-index-envelope/v1"
+FEATURE_INDEX_ENVELOPE_V2 = "exulanica.environment-feature-index-envelope/v2"
+# Unqualified names identify what new builders emit. Version-specific names remain available
+# because validation deliberately continues to accept immutable v1 artifacts.
+FEATURE_INDEX_PROFILE = FEATURE_INDEX_PROFILE_V2
+FEATURE_INDEX_ENVELOPE = FEATURE_INDEX_ENVELOPE_V2
 FEATURE_INDEX_DERIVATION = "environment-feature-index"
 
 
@@ -246,11 +252,19 @@ def validate_feature_index(
     document = json.loads(data)
     if not isinstance(document, dict) or set(document) != {"profile", "payload_sha256", "index"}:
         raise ValueError("the environment feature index envelope is malformed")
-    if document["profile"] != FEATURE_INDEX_ENVELOPE:
+    envelope_profile = document["profile"]
+    if envelope_profile not in (FEATURE_INDEX_ENVELOPE_V1, FEATURE_INDEX_ENVELOPE_V2):
         raise ValueError("the environment feature index envelope version is unsupported")
     payload = document["index"]
-    if not isinstance(payload, dict) or payload.get("profile") != FEATURE_INDEX_PROFILE:
+    if not isinstance(payload, dict):
         raise ValueError("the environment feature index version is unsupported")
+    payload_profile = payload.get("profile")
+    expected_pair = {
+        FEATURE_INDEX_ENVELOPE_V1: FEATURE_INDEX_PROFILE_V1,
+        FEATURE_INDEX_ENVELOPE_V2: FEATURE_INDEX_PROFILE_V2,
+    }
+    if payload_profile != expected_pair[envelope_profile]:
+        raise ValueError("the environment feature index envelope and payload versions disagree")
     if set(payload) != {
         "profile",
         "admission_id",
@@ -299,14 +313,15 @@ def validate_feature_index(
     identifiers: list[str] = []
     provider_ids: list[str] = []
     for raw in raw_features:
-        if not isinstance(raw, dict) or set(raw) not in ({
+        v1_keys = {
             "id",
             "provider_feature_id",
             "kind",
             "bbox",
             "label",
             "render_batch_id",
-        }, {
+        }
+        v2_keys = {
             "id",
             "provider_feature_id",
             "kind",
@@ -315,7 +330,9 @@ def validate_feature_index(
             "render_batch_id",
             "footprint",
             "semantic_properties",
-        }):
+        }
+        expected_keys = v1_keys if payload_profile == FEATURE_INDEX_PROFILE_V1 else v2_keys
+        if not isinstance(raw, dict) or set(raw) != expected_keys:
             raise ValueError("an environment feature record is malformed")
         feature = EnvironmentFeatureInput.model_validate(
             {

@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GOOGLE_REFERENCE_ORIGIN,
   googleTilesConfig,
   googleTilesConfigured,
 } from '../src/playcanvas/google-tiles-config.js';
+import { NYC_REFERENCE_FRAME } from '../src/playcanvas/nyc-reference-frame.js';
 
 describe('Google tiles configuration', () => {
+  it('uses the one independently chosen NYC reference frame', () => {
+    expect(GOOGLE_REFERENCE_ORIGIN).toBe(NYC_REFERENCE_FRAME);
+  });
+
   it('requires both the explicit feature flag and a key', () => {
     expect(googleTilesConfigured(googleTilesConfig({}))).toBe(false);
     expect(googleTilesConfigured(googleTilesConfig({

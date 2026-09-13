@@ -88,7 +88,11 @@ const state = createSessionState();
 const segmentSession = createSegmentSession();
 const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewArtProfile } = env;
 
-window.addEventListener('pagehide', () => state.sourceMediaSession?.dispose(), { once: true });
+window.addEventListener('pagehide', () => {
+  state.disposeEnvironmentSelection?.();
+  state.disposeEnvironmentSelection = null;
+  state.sourceMediaSession?.dispose();
+}, { once: true });
 systemReducedMotion.addEventListener('change', (event) => {
   state.atlas?.binding.setReducedMotion(event.matches);
 });
@@ -186,6 +190,8 @@ async function mount(): Promise<void> {
   ) {
     return;
   }
+  state.disposeEnvironmentSelection?.();
+  state.disposeEnvironmentSelection = null;
 
   // Geometry, re-read here rather than once at start-up. See `loadGeometry`: the list is what
   // carries a deletion to the renderer, and the bytes are not re-fetched. The preview fills the
@@ -363,6 +369,7 @@ async function mount(): Promise<void> {
     scene: built.scene,
     showStatus: (message, kind) => showTravelStatus(message, kind),
   });
+  state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 
   // Scene segments. Mounted after the write path because naming a segment stages on that path and
   // shows its confirmation panel; it reads `state.atlas` late and applies its overlay in `begin`.

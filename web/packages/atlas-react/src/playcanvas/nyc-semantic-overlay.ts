@@ -27,13 +27,6 @@ export interface GeographicLocalFrame {
 const WGS84_A = 6_378_137;
 const WGS84_E2 = 6.6943799901413165e-3;
 
-/** Publicly configured East Village/Lower East Side render origin, independent of tile content. */
-export const NYC_SEMANTIC_REFERENCE_ORIGIN = Object.freeze({
-  longitude: -73.9885,
-  latitude: 40.722,
-  altitude: 0,
-});
-
 function ecef(longitude: number, latitude: number, altitude: number): readonly [number, number, number] {
   const lon = longitude * Math.PI / 180;
   const lat = latitude * Math.PI / 180;

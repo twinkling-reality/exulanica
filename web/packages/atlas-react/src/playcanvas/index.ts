@@ -119,12 +119,12 @@ export {
 } from './google-tiles-environment.js';
 export {
   NYCSemanticOverlay,
-  NYC_SEMANTIC_REFERENCE_ORIGIN,
   crs84IntegerToLocal,
   featureAlongReticle,
   featureAtLocalPoint,
   localizeNYCFeatures,
 } from './nyc-semantic-overlay.js';
+export { NYC_REFERENCE_FRAME } from './nyc-reference-frame.js';
 export type {
   GeographicLocalFrame,
   NYCLocalFeature,

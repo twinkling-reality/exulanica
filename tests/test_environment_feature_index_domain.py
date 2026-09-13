@@ -7,6 +7,10 @@ import uuid
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.environment import (
+    FEATURE_INDEX_ENVELOPE_V1,
+    FEATURE_INDEX_ENVELOPE_V2,
+    FEATURE_INDEX_PROFILE_V1,
+    FEATURE_INDEX_PROFILE_V2,
     MAX_ENVIRONMENT_FEATURES,
     EnvironmentFeatureInput,
     EnvironmentFeatureKind,
@@ -67,6 +71,36 @@ def _bytes(value: FeatureIndexPublication) -> bytes:
     )
 
 
+def _bytes_2d(value: FeatureIndexPublication) -> bytes:
+    return build_feature_index(
+        value,
+        admission_id=uuid.UUID("8d1566cb-37cd-43db-b60a-b59023566d13"),
+        place_id=uuid.UUID("22c1d8ac-79b3-44b8-b72c-5967aed94f99"),
+        provider_key="nyc-open-data",
+        provider_original_id="buildings",
+        provider_revision="2026",
+        source_sha256="1" * 64,
+        source_receipt_sha256="2" * 64,
+        render_sha256="3" * 64,
+        render_receipt_sha256="4" * 64,
+        geographic_frame=GeographicFrame(
+            name="nyc-open-data-crs84",
+            crs="OGC:CRS84",
+            axis_order=("longitude", "latitude"),
+            horizontal_unit="degree",
+            vertical_unit="not_applicable",
+            orientation="east-north",
+            altitude_reference="not_applicable_2d",
+        ),
+        geographic_bounds=GeographicBounds(
+            kind="bbox",
+            frame_name="nyc-open-data-crs84",
+            coordinate_scale=10_000_000,
+            coordinates=(0, 0, 10, 20),
+        ),
+    )
+
+
 def _validate(data: bytes):
     return validate_feature_index(
         data,
@@ -96,6 +130,9 @@ def test_catalog_is_bounded_sorted_unique_and_provider_derived():
         render_batch_id=1,
     )
     payload = _validate(_bytes(_publication(first, second)))
+    built = json.loads(_bytes(_publication(first, second)))
+    assert built["profile"] == FEATURE_INDEX_ENVELOPE_V2
+    assert built["index"]["profile"] == FEATURE_INDEX_PROFILE_V2
     identifiers = [feature["id"] for feature in payload["features"]]
     assert identifiers == sorted(identifiers)
     assert payload["place_id"] == "22c1d8ac-79b3-44b8-b72c-5967aed94f99"
@@ -245,3 +282,87 @@ def test_integer_footprint_and_semantic_identity_are_bbox_bound():
         EnvironmentFeatureInput.model_validate(
             {**feature.model_dump(), "bbox": (0, 0, 9, 20)}
         )
+
+
+def test_exact_legacy_v1_shape_remains_accepted_and_versions_cannot_mix():
+    document = json.loads(
+        _bytes(
+            _publication(
+                EnvironmentFeatureInput(
+                    provider_feature_id="legacy",
+                    kind="building",
+                    bbox=(0, 0, 0, 10, 10, 10),
+                    label="Legacy",
+                    render_batch_id=1,
+                )
+            )
+        )
+    )
+    document["profile"] = FEATURE_INDEX_ENVELOPE_V1
+    document["index"]["profile"] = FEATURE_INDEX_PROFILE_V1
+    for feature in document["index"]["features"]:
+        del feature["footprint"]
+        del feature["semantic_properties"]
+    document["payload_sha256"] = hashlib.sha256(canonical_json(document["index"])).hexdigest()
+    legacy_bytes = canonical_json(document) + b"\n"
+
+    assert _validate(legacy_bytes)["features"][0] == {
+        "bbox": [0, 0, 0, 10, 10, 10],
+        "id": segment_id(
+            provider_key="plateau",
+            provider_original_id="shibuya",
+            provider_revision="2023",
+            provider_feature_id="legacy",
+            source_sha256="1" * 64,
+        ),
+        "kind": "building",
+        "label": "Legacy",
+        "provider_feature_id": "legacy",
+        "render_batch_id": 1,
+    }
+
+    mixed = json.loads(legacy_bytes)
+    mixed["profile"] = FEATURE_INDEX_ENVELOPE_V2
+    with pytest.raises(ValueError, match="versions disagree"):
+        _validate(canonical_json(mixed))
+
+    unknown = json.loads(legacy_bytes)
+    unknown["profile"] = "exulanica.environment-feature-index-envelope/v99"
+    with pytest.raises(ValueError, match="unsupported"):
+        _validate(canonical_json(unknown))
+
+
+def test_v2_extended_payload_is_deterministic_digest_bound_and_exact():
+    feature = EnvironmentFeatureInput(
+        provider_feature_id="doitt_id:2327",
+        kind="building",
+        bbox=(0, 0, 10, 20),
+        render_batch_id=0,
+        footprint={
+            "type": "MultiPolygon",
+            "coordinates": [[[[0, 0], [10, 0], [10, 20], [0, 20], [0, 0]]]],
+        },
+        semantic_properties={"bin": "bin:1006070", "name": None},
+    )
+    first = _bytes_2d(_publication(feature))
+    second = _bytes_2d(_publication(feature))
+    assert first == second
+    document = json.loads(first)
+    assert document["payload_sha256"] == hashlib.sha256(
+        canonical_json(document["index"])
+    ).hexdigest()
+    assert set(document["index"]["features"][0]) == {
+        "id",
+        "provider_feature_id",
+        "kind",
+        "bbox",
+        "label",
+        "render_batch_id",
+        "footprint",
+        "semantic_properties",
+    }
+
+    document["index"]["features"][0]["unknown"] = True
+    document["payload_sha256"] = hashlib.sha256(canonical_json(document["index"])).hexdigest()
+    with pytest.raises(ValueError, match="malformed"):
+        _validate(canonical_json(document))

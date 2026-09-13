@@ -1342,8 +1342,17 @@ class WorldObjectRepository:
             document = json.loads(data)
             payload = document["index"]
             if (
-                document.get("profile")
-                != "exulanica.environment-feature-index-envelope/v1"
+                (document.get("profile"), payload.get("profile"))
+                not in (
+                    (
+                        "exulanica.environment-feature-index-envelope/v1",
+                        "exulanica.environment-feature-index/v1",
+                    ),
+                    (
+                        "exulanica.environment-feature-index-envelope/v2",
+                        "exulanica.environment-feature-index/v2",
+                    ),
+                )
                 or document.get("payload_sha256")
                 != hashlib.sha256(canonical_json(payload)).hexdigest()
                 or payload.get("admission_id") != str(publication["admission_id"])
