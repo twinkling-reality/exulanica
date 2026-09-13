@@ -1653,6 +1653,7 @@ export class AtlasBinding {
       this.renderOriginState = nextOrigin;
       const origin = nextOrigin.origin;
       this.renderRoot.setPosition(-origin.x, -origin.y, -origin.z);
+      this.environmentRoot.setPosition(-origin.x, -origin.y, -origin.z);
       this.field.setRenderOrigin(origin.x, origin.z);
       this.pose.position.set(s.x - origin.x, s.y - origin.y, s.z - origin.z);
       this.camera.setPosition(this.pose.position);
