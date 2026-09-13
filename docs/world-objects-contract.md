@@ -2,8 +2,10 @@
 
 Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
 remove/undo, durable environment placement, the reviewed asset registry, and the bounded
-object-behaviour registry. The renderer integration, unified retrieval, the conversational
-authoring service, and the package extension do not exist.
+object-behaviour registry. Object rendering and bounded-motion controls have synthetic browser
+coverage, and the authored-world 1.0 package extension is built. Unified retrieval, the
+conversational authoring service, environment-instance package projection, and complete
+personal-scene visual acceptance remain open.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
 The three that exist are appearance ([world-style-backend.md](world-style-backend.md), migrations
@@ -419,28 +421,25 @@ are load-bearing: `canonical_delta_document` sorts by the same keys, so the stat
 computed over exactly that sequence. `edits[]` is sorted by `edit_seq` ascending, which the digest
 does not cover at all; it is ordered because a log read backwards is a log misread.
 
-## 8. What a later package extension would need
+## 8. Package projection
 
-`exulanica-wmp-1.0` is untouched. `REQUIRED_PAYLOAD_PATHS` in `exulanica/world_package/package.py`
-is an exact frozen set and `world_package_export.profile_version` is checked equal to
-`exulanica-wmp-1.0` by migration 0028, so adding a payload path to the current profile would
-invalidate every existing export. A later profile, `exulanica-wmp-1.1`, would need:
+**CORRECTED 2026-09-13.** The earlier section proposed a new WMP 1.1 profile and said authored
+state was absent. The implementation instead preserves `exulanica-wmp-1.0` byte compatibility and
+adds the opt-in `exulanica-wmp-ext-authored-world` 1.0 extension. It exports alternate versions,
+source snapshots, authored objects, element overrides, edit chains, reviewed asset descriptors and
+bounded behavior references. Asset bytes and runtime code remain excluded.
 
-1. two new required payload paths, `world/versions.json` and `world/objects.json`, holding the
-   alternate versions and their deltas in the canonical order above;
-2. a reviewed-asset section listing `asset_key`, `content_sha256`, `media_type`, `byte_size`,
-   `licence_id` and `licence_sha256`. Asset **bytes** stay out of the package: the package is a
-   descriptor set with a Merkle manifest, and `.glb` bytes belong in the content-addressed store
-   the descriptors reference;
-3. a behaviour section pinning `behaviour_key` and `behaviour_version` against the registry, so a
-   verifier can refuse a package naming a behaviour it does not know;
-4. a verifier rule that an alternate version's `source_snapshot_id` resolves to a snapshot in the
-   same package, and that its `state_sha256` re-derives from the exported delta;
-5. a decision, which this document does not make, about whether an exported alternate version whose
-   source snapshot was invalidated by deletion is exportable at all.
+The verifier re-derives every version state digest, closes edit and parent chains, validates source
+and region references, checks asset and behavior declarations, and withholds versions whose source
+snapshot deletion invalidated. `import-check` reports receiver capabilities; it does not load the
+world.
 
-Until that profile exists, `GET /world/versions` is the only way to read this state, and the
-package must not claim to carry it.
+The canonical contract, layout, compatibility behavior, and tests are in
+[World Memory Package: Authored-world extension 1.0](world-memory-package.md#authored-world-extension-10).
+That extension predates durable `environment_instances` in delta schema v2 and does not export
+them. Society state is also outside it. Either addition requires a separately versioned extension
+change and an explicit receiver contract; neither may be inferred from the signed authored object
+state.
 
 ## 9. Verification
 
@@ -570,6 +569,9 @@ also remains allowed after withdrawal, including undoing a removal; a restored i
 reports `withdrawn` and remains unavailable for rendering. This permits history correction without
 turning undo into renewed source authorization.
 
-This slice implements no renderer or `AtlasBinding` change, unified Selection, Companion editing,
-WMP projection, extraction job, retained-database write or visual acceptance claim. The existing
-reviewed CC0 asset registry and its byte semantics are unchanged.
+At the migration-0050 delivery point this slice implemented no renderer or `AtlasBinding` change,
+unified Selection, Companion editing, WMP projection, extraction job, retained-database write or
+visual acceptance claim. The browser now reads and draws available environment instances through
+the existing owned-district binding, but unified Selection, WMP projection, extraction and accepted
+real-scene visual quality remain open. The existing reviewed CC0 asset registry and its byte
+semantics are unchanged.

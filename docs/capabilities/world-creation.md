@@ -19,6 +19,9 @@ have code and synthetic browser checks. See the
 [object contract](../world-objects-contract.md) and
 [saved-world evaluation](../evaluation/2026-09-12-world-browser.json).
 These checks do not prove the complete personal-world journey or visual quality.
+The bounded Flatiron implementation, its admitted source data, and the line between source facts
+and renderer completion are specified in
+[owned district and source admission](../owned-district-and-admission.md).
 
 ## What remains
 

@@ -12,8 +12,19 @@ Exulanica remains a Personal World Memory Model. Personal experiences supply mea
 people, objects, and context. Creation lets a person reshape that world, introduce fictional
 material, and combine it with their experiences. Simulation adds movement and interaction governed by physical or fictional rules.
 
-Memory, creation, and simulation share the same world state. The Companion provides a conversational
-interface; the World Memory Package describes a portable snapshot for developers.
+The technical meaning of that name is fixed by the
+[world-memory model architecture](world-memory-model.md). Exulanica composes observations,
+interpretations, spatial state, authored alternatives, generated artifacts and simulated events
+without giving them one truth status or treating any mesh, splat, graph, video, or latent tensor as
+the whole world. It currently implements an evidence-grounded descriptive world-memory substrate,
+not a learned general predictive world model. Prediction becomes a supported claim only after
+action-conditioned held-out evaluation earns it.
+
+Memory, creation, and simulation belong to one workspace-scoped world model with shared identities
+and explicit cross-plane references. Their authorities remain separate: evidence, authored state
+and simulated history do not become one truth class, and the runtime scene graph is a derived view.
+The Companion provides a conversational interface; the World Memory Package describes a partial,
+capability-declared portable snapshot for developers.
 
 Real-world places selected from permitted external sources join those memories
 and creations as reusable world content. A person should be able to bring an
@@ -52,10 +63,10 @@ The inventory below identifies existing code and the extensions required by each
 | Reconstruction and memory | Reconstruction modules, scene graph, identity decisions and lifted scene segments | Validate a personal scene; reusable complete-object extraction and cross-source alignment remain separate work |
 | Appearance and language | Reviewed appearance capabilities and bounded conversational preview/apply/rollback proposals | General structural edits, geometry blending and generated-asset creation through typed operations |
 | World Read and Selection | Scene/place reads and capture/entity Selection with place, time and text constraints | Unified authorized reads/queries for memories, imported geography, assets and authored versions with explainable matches |
-| Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo and bounded motion; synthetic browser acceptance recorded below | Reusable Earth selections, persistent environment/anchor contracts and real-scene acceptance; arbitrary world branching is not established |
-| Earth and source admission | Experimental frontend environment work; current visual result unaccepted | Detailed usable sources permitted for extraction/indexing/remix, explicit geographic identity and first-person coexistence |
-| Package | WMP 1.0 and opt-in authored-world extension describe existing state | Versioned geographic selection/anchor/rights support and permitted asset resolution; no automatic runnable import |
-| Simulation | Reviewed bounded object behaviors; no general simulation capability established | Supported physics and fictional rules through measured scenarios |
+| Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
+| Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; current visual result unaccepted | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
+| Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
+| Simulation | Reviewed bounded object behaviors and a persisted deterministic synthetic society; no learned or general simulation capability established | Spatial goals, navigation, supported physics, calibrated learned dynamics and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -93,6 +104,11 @@ Synthetic inhabitants must never reuse a real person's identity, imply that a si
 happened in the source world, or turn a memory-derived observation into a fictional biography.
 Memory evidence, authored state and simulated history remain separate truth classes even when they
 share one place.
+
+The population is canonical simulation state; visible avatars are a representation of it. A
+renderer cap, including the current 24-nearby limit, must never truncate population persistence,
+queries, events, or model-facing state. Conversely, a visible walk cycle or interpolated position
+must not create a simulation event that the runtime did not record.
 
 Before adopting this direction, evaluate whether inhabitants produce legible purposeful behavior
 rather than random motion; whether object affordances compose without unsafe or incoherent loops;

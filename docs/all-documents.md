@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules, which is what keeps it 
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**75 documents** in the public catalog.
+**79 documents** in the public catalog.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-48 documents.
+51 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -38,6 +38,7 @@ How the system works now. Edited as the system changes.
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-12; model upgrades require task-specific evidence
+- [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY ACCEPTANCE OPEN
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
 - [physical-streaming-runtime](physical-streaming-runtime.md) : RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate
@@ -56,7 +57,9 @@ How the system works now. Edited as the system changes.
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
+- [synthetic-society-contract](synthetic-society-contract.md) : IMPLEMENTED BOUNDED SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
+- [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
 - [world-objects-contract](world-objects-contract.md) : DECISION and IMPLEMENTED for alternate world versions, authored object add/move/
 - [world-read-posed-views](world-read-posed-views.md) : Wire contract for posed image bytes. Written 2026-09-08; byte delivery is implemented
@@ -79,7 +82,7 @@ Written for somebody choosing to use the product.
 
 Numbered, and the number is the identifier. Never renumbered.
 
-22 documents.
+23 documents.
 
 - [0002-model-routing](adr/0002-model-routing.md) : - Status: Accepted
 - [0003-renderer-selection](adr/0003-renderer-selection.md) : - Status: ACCEPTED, PlayCanvas Engine 2.21.4. Resolved 2026-08-28 by matched-resolution
@@ -102,4 +105,5 @@ Numbered, and the number is the identifier. Never renumbered.
 - [0020-manifest-gold-question-evaluation](adr/0020-manifest-gold-question-evaluation.md) : - Status: Accepted
 - [0021-observed-recomputation-scope](adr/0021-observed-recomputation-scope.md) : - Status: Accepted
 - [0022-withdrawal-at-evidence-serving](adr/0022-withdrawal-at-evidence-serving.md) : - Status: Accepted
+- [0023-epistemically-typed-world-memory](adr/0023-epistemically-typed-world-memory.md) : ACCEPTED AS ARCHITECTURE; RESEARCH CLAIMS OPEN
 - [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) : Date: 2026-09-05. Status: accepted for implementation; CUDA execution remains unverified

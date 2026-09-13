@@ -62,8 +62,9 @@ Positive:
 
 Costs and open work:
 
-- complete World Memory Package export remains Phase 7 work, while spatial package projection is
-  now emitted per snapshot;
+- **CORRECTED 2026-09-13:** WMP 1.0 and its opt-in authored-world 1.0 extension are built. Runtime
+  import, durable environment-instance projection, society projection, and the planned geographic
+  composition extension remain open;
 - structural customization has a protected backend diff preview but remains an internal reviewed
   composer workflow rather than a public appearance control;
 - readable stable element IDs are now durable backend identities; snapshot and migration records

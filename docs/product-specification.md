@@ -22,7 +22,10 @@ design. This page covers what the product is, what it does, and what it delibera
 **DECISION, updated 2026-09-08.** Exulanica is a Personal World Memory Model for building a
 customizable world from personal experiences and extending it through creation. Movement and
 interaction are the longer-term simulation ambition. The current authority for product scope and
-delivery order is [product-direction.md](product-direction.md).
+delivery order is [product-direction.md](product-direction.md). The canonical technical meaning
+of World Memory Model is [world-memory-model.md](world-memory-model.md): epistemically typed,
+temporal, branching state with multiple task representations. The present system is a descriptive
+world-memory substrate, not yet a learned general predictive world model.
 
 The remaining sections retain earlier implementation decisions and research. Still-image intake
 is a current implementation boundary, not the product identity. The earlier memory-exploration MVP

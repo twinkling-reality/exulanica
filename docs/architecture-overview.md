@@ -9,6 +9,14 @@ that renderer selection is open are historical. The composition contract identif
 unimplemented geography, retrieval and editing extensions; it does not change
 existing API or package compatibility by itself.
 
+**World-model authority, 2026-09-13:** read
+[world-memory-model.md](world-memory-model.md) for the canonical technical meaning
+of Personal World Memory Model. No renderer scene, mesh, splat, semantic graph,
+embedding, generated video or latent tensor is the whole world. Consequential state
+is epistemically typed and addressable; task representations are derived artifacts
+with declared preserved properties and permitted uses. The current implementation
+is not yet a learned general predictive world model.
+
 - Status: mixed, labelled per claim. See `README.md` for the status convention.
 - Date: 2026-08-27
 - Source: promoted from the reconciled research report, Part D, with the disagreements in Part C

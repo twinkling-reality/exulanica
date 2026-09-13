@@ -189,6 +189,13 @@ The export receipt's `export_policy` records the extension; the package root doe
 - **Asset bytes and runtime code.** An asset is a digest an authorized resolver supplies; a
   behaviour is an identifier with bounded parameters. Embedding reviewed CC0 bytes would be a new,
   separately versioned opt-in, and this version refuses any file it does not name.
+- **Environment instances and society.** The extension was frozen against authored delta schema
+  version 1. Durable `environment_instances` select schema version 2 and are not projected by
+  `exulanica/world_package/authored.py`. Deterministic society state and events are also absent.
+  A receiver therefore cannot reconstruct an imported district placement or resume its synthetic
+  society from this extension. Either capability requires a separately versioned extension update,
+  verifier rules, loader declarations, and source-rights behavior; it is never inferred from the
+  presence of authored objects.
 
 ### Verifier rules
 

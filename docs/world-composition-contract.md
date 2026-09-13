@@ -25,6 +25,9 @@ The World Memory Model is the system's representation and behavior across memory
 creation and interaction. It is not a claim that one trained neural network
 already understands or generates an entire world. WMP is a signed projection of
 authorized state, not the live database or a runnable scene by itself.
+The canonical technical doctrine is
+[world-memory-model.md](world-memory-model.md): every consequential feature is
+addressable, but disposable render primitives are not promoted to world entities.
 
 ## Reference user journey
 
@@ -63,6 +66,15 @@ The table names responsibilities, not new SQL tables or wire field names. Preser
 current authority, transactional writes, dependency invalidation and replaceable
 renderer/model interfaces. Shared public place definitions must not expose private
 associations, trip history or derived personal content across workspaces.
+
+A rendered representation must declare which properties it preserves and which
+operations it supports. Visual fidelity does not authorize collision; a semantic
+graph does not establish free space; an embedding does not establish identity; and
+a generated completion does not establish observation. Roads, vegetation, street
+furniture, facade elements and inhabitants that are selectable, editable,
+simulated, queryable or promised to persist require shared subject identities or a
+versioned parametric interpretation record. They may not exist only as browser mesh
+loops.
 
 ## Geography, placement and time
 

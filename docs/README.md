@@ -14,6 +14,11 @@ in one interactive world. [product-specification.md](product-specification.md)
 sections 1 to 4 and 11 retain research-backed limits. Those pages are subordinate
 to the roadmap.
 
+**World-memory architecture.** [world-memory-model.md](world-memory-model.md) defines
+what Personal World Memory Model means technically: epistemically typed, temporal,
+branching state with multiple task-specific representations. It also defines the
+experiments required before Exulanica may claim a learned predictive world model.
+
 **Use the product.** The [capability guides](#capability-guides) describe what exists
 and what remains. [world-memory-package.md](world-memory-package.md) is the portable
 package profile.
@@ -36,16 +41,19 @@ client code: it records platform behaviour that otherwise causes silent bugs.
 - [Simulation runtime](capabilities/simulation.md)
 - [World API](capabilities/world-api.md)
 - [World Memory Package](world-memory-package.md)
+- [Owned district and source admission](owned-district-and-admission.md)
+- [Synthetic society contract](synthetic-society-contract.md)
 
 ## Capability status
 
 The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate opt-in
 training dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned
-simulation runtime. World Read serves scene and place bundles; World Write records
+general learned simulation runtime or the bounded deterministic society. World Read serves scene and place bundles; World Write records
 generation receipts. Authored object add, move, remove, undo, and alternate versions
-have code and synthetic checks. General structural language editing and simulation
-remain roadmap work. This status describes the current implementation separately from
-the product experience in the root README.
+have code and synthetic checks. A deterministic synthetic society is persisted and rendered as a
+bounded simulation; learned dynamics and complete social behavior remain roadmap work. General
+structural language editing also remains open. This status describes the current implementation
+separately from the product experience in the root README.
 
 ## Contracts
 
@@ -53,9 +61,12 @@ These are the living specifications. Edit them when the system changes.
 
 | Document | Role |
 | --- | --- |
+| [world-memory-model.md](world-memory-model.md) | Canonical world-memory architecture and research program |
 | [world-composition-contract.md](world-composition-contract.md) | Memories, imported geography, and authored variations |
 | [world-objects-contract.md](world-objects-contract.md) | Alternate versions and authored objects |
 | [world-memory-package.md](world-memory-package.md) | Portable signed world snapshot |
+| [owned-district-and-admission.md](owned-district-and-admission.md) | Licensed geographic source, interpretation, and renderer boundary |
+| [synthetic-society-contract.md](synthetic-society-contract.md) | Synthetic identity, replay, retrieval, and representation limits |
 | [personal-admission.md](personal-admission.md) | `POST /intake` and screening |
 | [privacy-consent-threat-model.md](privacy-consent-threat-model.md) | Consent, deletion, and threat model |
 | [domain-and-evidence-model.md](domain-and-evidence-model.md) | Evidence address and schema |
@@ -132,6 +143,7 @@ record is missing from this table.
 | [adr/0020-manifest-gold-question-evaluation.md](adr/0020-manifest-gold-question-evaluation.md) | Gold answers are derived from the manifest before retrieval, and model and declared-plan measurements stay separate | ACCEPTED |
 | [adr/0021-observed-recomputation-scope.md](adr/0021-observed-recomputation-scope.md) | Exactness belongs to observed content; the wider closure stays open | ACCEPTED |
 | [adr/0022-withdrawal-at-evidence-serving.md](adr/0022-withdrawal-at-evidence-serving.md) | Every evidence entrypoint checks withdrawal before reading stored bytes | ACCEPTED |
+| [adr/0023-epistemically-typed-world-memory.md](adr/0023-epistemically-typed-world-memory.md) | World memory is epistemically typed state; no mesh, graph, field, or latent representation is the whole world | ACCEPTED as architecture; research claims open |
 | [adr/gsplat-training-and-recorded-rung.md](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and the recorded scene rung are separate decisions, so a nonmetric scene can be trained honestly | ACCEPTED for implementation; unnumbered, deliberately |
 
 ## Current state

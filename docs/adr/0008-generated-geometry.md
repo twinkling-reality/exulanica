@@ -9,6 +9,12 @@
   three judges on truth-guarantee, deletion-and-consent, and product-experience lenses. All three
   judges chose the refusal, at 29, 27 and 27 of 30 against 16, 19 and 18 for the appearance layer.
 - Supersedes: nothing.
+- Superseded in part by
+  [ADR-0023](0023-epistemically-typed-world-memory.md): the refusal still governs the recorded
+  reconstruction ladder, evidence, navigation, collision, and unlabeled rendering. A generated
+  receipt may now enter the artifact and read models as explicitly generated, non-citable,
+  non-rung metadata. Generated geometry bytes remain unserved and unrendered until separately
+  admitted.
 - Related: [product-specification.md](../product-specification.md) section 5;
   [atlas-spatial-architecture.md](../atlas-spatial-architecture.md) section 5;
   [atlas-visual-language.md](../atlas-visual-language.md) sections 2, 4 and 5;
