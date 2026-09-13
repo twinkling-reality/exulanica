@@ -1,8 +1,12 @@
-import type { AtlasScene } from '@exulanica/atlas-core';
+import {
+  type AtlasScene,
+  type OwnedDistrict,
+} from '@exulanica/atlas-core';
 import {
   localizeNYCFeatures,
   NYCSemanticOverlay,
   NYC_REFERENCE_FRAME,
+  type OwnedSocietyState,
   type NYCLocalFeature,
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
@@ -22,6 +26,37 @@ import {
   type ObjectRole,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
+
+const PREVIEW_ROLES = ['baker', 'designer', 'gardener', 'student', 'steward', 'teacher'] as const;
+
+function previewSociety(district: OwnedDistrict): OwnedSocietyState {
+  const sidewalkPoints = district.sidewalks.map((sidewalk) => {
+    const ring = sidewalk.polygons[0]?.[0] ?? [];
+    const points = ring.slice(0, -1);
+    if (points.length === 0) return [0, 0] as const;
+    const sum = points.reduce(
+      (held, point) => [held[0] + point[0], held[1] + point[1]] as const,
+      [0, 0] as const,
+    );
+    return [Math.round(sum[0] * 10 / points.length), Math.round(sum[1] * 10 / points.length)] as const;
+  });
+  return Object.freeze({
+    tick: 0,
+    inhabitants: Object.freeze(Array.from({ length: 128 }, (_, index) => {
+      const point = sidewalkPoints[index % Math.max(1, sidewalkPoints.length)] ?? [0, 0];
+      const orbit = Math.floor(index / Math.max(1, sidewalkPoints.length));
+      return Object.freeze({
+        id: `preview-synthetic-inhabitant-${index}`,
+        synthetic: true as const,
+        role: PREVIEW_ROLES[index % PREVIEW_ROLES.length]!,
+        position_mm: [
+          point[0] + ((orbit % 3) - 1) * 850,
+          point[1] + ((Math.floor(orbit / 3) % 3) - 1) * 850,
+        ] as const,
+      });
+    })),
+  });
+}
 
 export interface EnvironmentSelectionDependencies {
   readonly env: AppEnvironment;
@@ -440,7 +475,11 @@ export function mountEnvironmentSelection(
           catalog.placeId,
           String(deps.scene.islands[0]!.islandId),
         );
-        const rendered = atlas.ownedDistrict.setSociety(society.state);
+        const rendered = atlas.ownedDistrict.setSociety(
+          society.state,
+          24,
+          [atlas.controls.state.x, atlas.controls.state.z],
+        );
         deps.env.canvas.dataset.societyPopulation = String(society.populationSize);
         deps.env.canvas.dataset.societyRendered = String(rendered);
         deps.env.canvas.dataset.societyTick = String(society.currentTick);
@@ -449,7 +488,11 @@ export function mountEnvironmentSelection(
           if (phase === 'disposed' || society === null) return;
           try {
             society = await societyClient.advance(society);
-            atlas.ownedDistrict?.setSociety(society.state);
+            atlas.ownedDistrict?.setSociety(
+              society.state,
+              24,
+              [atlas.controls.state.x, atlas.controls.state.z],
+            );
             deps.env.canvas.dataset.societyTick = String(society.currentTick);
             atlas.invalidate();
           } finally {
@@ -459,6 +502,18 @@ export function mountEnvironmentSelection(
           }
         };
         societyTimer = window.setTimeout(() => void advance(), 2_000);
+      } else if (atlas.ownedDistrict != null && deps.env.preview) {
+        const previewState = previewSociety(atlas.ownedDistrict.district);
+        const rendered = atlas.ownedDistrict.setSociety(
+          previewState,
+          24,
+          [atlas.controls.state.x, atlas.controls.state.z],
+        );
+        deps.env.canvas.dataset.societyPopulation = String(previewState.inhabitants.length);
+        deps.env.canvas.dataset.societyRendered = String(rendered);
+        deps.env.canvas.dataset.societyTick = String(previewState.tick);
+        reason.textContent += ` ${previewState.inhabitants.length} synthetic inhabitants; `
+          + `${rendered} nearby.`;
       }
       atlas.invalidate();
     } catch (error) {

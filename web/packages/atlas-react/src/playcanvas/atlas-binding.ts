@@ -639,39 +639,39 @@ export class AtlasBinding {
       nearClip: cityActive ? 0.2 : 0.08,
       farClip: cityActive ? 15_000 : 1200,
       clearColor: cityActive
-        ? new pc.Color(0.43, 0.62, 0.74, 1)
+        ? new pc.Color(0.62, 0.76, 0.82, 1)
         : new pc.Color(skyR, skyG, skyB, 1),
     });
     if (camera.camera !== undefined && camera.camera !== null) {
-      camera.camera.toneMapping = cityActive ? pc.TONEMAP_LINEAR : pc.TONEMAP_ACES;
+      camera.camera.toneMapping = pc.TONEMAP_ACES;
     }
     app.root.addChild(camera);
 
     const [hazeR, hazeG, hazeB] = unitRgb(initialArtProfile.palette.haze);
     app.scene.ambientLight = cityActive
-      ? new pc.Color(0.28, 0.3, 0.33)
+      ? new pc.Color(0.62, 0.64, 0.64)
       : new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    app.scene.exposure = cityActive ? 1 : 1.06;
+    app.scene.exposure = cityActive ? 1.32 : 1.06;
     app.scene.fog.type = pc.FOG_LINEAR;
     app.scene.fog.color.set(
-      cityActive ? 0.66 : hazeR,
-      cityActive ? 0.72 : hazeG,
+      cityActive ? 0.68 : hazeR,
+      cityActive ? 0.75 : hazeG,
       cityActive ? 0.78 : hazeB,
     );
-    app.scene.fog.start = cityActive ? 2_400 : 46;
-    app.scene.fog.end = cityActive ? 9_000 : 220;
+    app.scene.fog.start = cityActive ? 420 : 46;
+    app.scene.fog.end = cityActive ? 1_350 : 220;
 
     const worldLight = new pc.Entity('atlas-directional-light');
     const [lr, lg, lb] = unitRgb(initialArtProfile.palette.sun);
     worldLight.addComponent('light', {
       type: 'directional',
       color: new pc.Color(lr, lg, lb),
-      intensity: cityActive ? 1.05 : 1.65,
+      intensity: cityActive ? 1.55 : 1.65,
       castShadows: true,
       shadowDistance: cityActive ? 650 : 72,
       shadowResolution: 2048,
     });
-    worldLight.setEulerAngles(48, 132, 0);
+    worldLight.setEulerAngles(52, -38, 0);
     app.root.addChild(worldLight);
 
     const table = buildAnchorTable(options.scene);
@@ -888,7 +888,7 @@ export class AtlasBinding {
     }
 
     const start = options.ownedDistrict !== undefined
-      ? ownedDistrictCameraState(navigationWorld)
+      ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
       : cityActive
         ? cityCameraState('overview')
         : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
@@ -991,7 +991,7 @@ export class AtlasBinding {
         ? cityCameraState(view)
         : view === 'overview'
           ? { x: -45, y: 150, z: 300, yaw: -0.15, pitch: -0.46 }
-          : ownedDistrictCameraState(this.navigationWorld),
+          : ownedDistrictCameraState(this.navigationWorld, this.ownedDistrict.district),
     );
     this.invalidate();
   }
@@ -1962,20 +1962,100 @@ export function cityCameraState(view: 'overview' | 'street'): CameraState {
 }
 
 /** Deterministic clear spawn on visible owned support, never an invisible safety floor. */
-export function ownedDistrictCameraState(world: NavigationWorld): CameraState {
-  for (const [x, z] of [[-25, 110], [-40, 90], [-30, 140]] as const) {
-    const position = atlasVec3(x, world.eyeHeight, z);
-    if (world.surface.sample(x, z) !== null && isNavigationPositionClear(world, position)) {
-      return { x, y: world.eyeHeight, z, yaw: -Math.PI / 2, pitch: 0 };
-    }
-  }
-  for (let z = 240; z >= -240; z -= 8) {
-    for (let x = -240; x <= 240; x += 8) {
+export function ownedDistrictCameraState(
+  world: NavigationWorld,
+  district?: OwnedDistrict,
+): CameraState {
+  const landmark = district?.buildings
+    .filter((building) => building.name !== null)
+    .map((building) => {
+      const width = Math.max(1, building.bbox_cm[2] - building.bbox_cm[0]);
+      const depth = Math.max(1, building.bbox_cm[3] - building.bbox_cm[1]);
+      const slenderness = Math.max(width, depth) / Math.min(width, depth);
+      return { building, score: building.height_cm * slenderness };
+    })
+    .sort((a, b) => b.score - a.score || a.building.id.localeCompare(b.building.id))[0]?.building;
+  if (landmark !== undefined) {
+    const [west, north, east, south] = landmark.bbox_cm.map((value) => value / 100) as [
+      number, number, number, number,
+    ];
+    const targetX = (west + east) / 2;
+    const targetZ = (north + south) / 2;
+    for (const [offsetX, offsetZ] of [
+      [0, -45], [-38, -34], [38, -34], [-48, 34], [46, 36],
+    ] as const) {
+      const x = targetX + offsetX;
+      const z = targetZ + offsetZ;
       const position = atlasVec3(x, world.eyeHeight, z);
-      if (world.surface.sample(x, z) !== null && isNavigationPositionClear(world, position)) {
-        return { x, y: world.eyeHeight, z, yaw: -Math.PI / 2, pitch: 0 };
+      if (
+        isNavigationPositionClear(world, position) &&
+        world.surface.sample(x - 3, z) !== null &&
+        world.surface.sample(x + 3, z) !== null &&
+        world.surface.sample(x, z - 3) !== null &&
+        world.surface.sample(x, z + 3) !== null
+      ) {
+        return {
+          x,
+          y: world.eyeHeight,
+          z,
+          yaw: Math.atan2(-(targetX - x), -(targetZ - z)),
+          pitch: 0.08,
+        };
       }
     }
+  }
+  const segmentDistance = (
+    x: number,
+    z: number,
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+  ): number => {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const denominator = dx * dx + dz * dz;
+    const t = denominator === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / denominator));
+    return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+  };
+  let best: { x: number; z: number; score: number } | null = null;
+  const extent = Math.min(340, Math.ceil(world.fieldRadius));
+  for (let z = world.centre.z - extent; z <= world.centre.z + extent; z += 10) {
+    for (let x = world.centre.x - extent; x <= world.centre.x + extent; x += 10) {
+      const position = atlasVec3(x, world.eyeHeight, z);
+      if (
+        !isNavigationPositionClear(world, position) ||
+        world.surface.sample(x - 8, z) === null ||
+        world.surface.sample(x + 8, z) === null ||
+        world.surface.sample(x, z - 8) === null ||
+        world.surface.sample(x, z + 8) === null
+      ) continue;
+      let clearance = 60;
+      for (const obstacle of world.polygonObstacles ?? []) {
+        for (const ring of obstacle.rings) {
+          for (let index = 1; index < ring.length; index += 1) {
+            const a = ring[index - 1]!;
+            const b = ring[index]!;
+            clearance = Math.min(clearance, segmentDistance(x, z, a.x, a.z, b.x, b.z));
+          }
+        }
+      }
+      const score = clearance - Math.hypot(x - world.centre.x, z - world.centre.z) * 0.015;
+      if (best === null || score > best.score) best = { x, z, score };
+    }
+  }
+  if (best !== null) {
+    const dx = world.centre.x - best.x;
+    const dz = world.centre.z - best.z;
+    return {
+      x: best.x,
+      y: world.eyeHeight,
+      z: best.z,
+      yaw: Math.atan2(-dx, -dz),
+      pitch: -0.045,
+    };
   }
   return {
     x: world.centre.x,

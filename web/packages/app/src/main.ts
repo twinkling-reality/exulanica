@@ -690,7 +690,9 @@ async function mount(): Promise<void> {
     reflectShell: () => reflectShell(),
     showTravelStatus,
   });
-  if (renderer.atlas.binding.googleTiles !== null) {
+  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null ||
+    renderer.atlas.binding.googleTiles !== null;
+  if (geographicDistrict) {
     segments.root.hidden = true;
     segments.root.style.display = 'none';
   }
@@ -731,7 +733,7 @@ async function mount(): Promise<void> {
 
   // After the renderer, because every object it draws needs a binding to draw into.
   void objects.begin();
-  if (renderer.atlas.binding.googleTiles === null) void segments.begin();
+  if (!geographicDistrict) void segments.begin();
 
 }
 

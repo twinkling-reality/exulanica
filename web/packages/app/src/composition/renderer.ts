@@ -18,7 +18,6 @@ import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
 import {
-  googlePhotorealisticTiles,
   ownedDistrict,
   sourcePresentation,
 } from '../config.js';
@@ -137,7 +136,6 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       sourcePresentation: sourcePresentation(),
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
-      googleTiles: googlePhotorealisticTiles(),
       ownedDistrict: district,
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {
