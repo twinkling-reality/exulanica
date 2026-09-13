@@ -1,6 +1,6 @@
 # Owned district and source admission
 
-Status: **IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY ACCEPTANCE OPEN**.
+Status: **IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS**.
 
 The bounded Flatiron district is Exulanica's first owned geographic environment. “Owned” means the
 runtime possesses a local, versioned artifact admitted for the declared operations. It does not
@@ -53,7 +53,7 @@ The `exulanica.owned-district/v1` browser contract contains:
 
 The same building polygons drive mass extrusion, semantic building picking and polygon collision.
 The same district bounds drive visible support and navigation recovery. This shared input is a
-real strength: selection and collision do not infer identity from PlayCanvas entity names.
+contract invariant: selection and collision do not infer identity from PlayCanvas entity names.
 
 ## What it does not authoritatively contain
 
@@ -68,7 +68,7 @@ Version 1 contains no explicit:
 - photogrammetric appearance.
 
 The browser currently completes several of those visually with deterministic mesh-generation
-rules. Those meshes are a prototype representation, not source records or accepted world-memory
+rules. Those meshes are a provisional representation, not source records or validated world-memory
 interpretations. In particular, the full-bounds asphalt plane is visible ground beneath other
 geometry; it is not road data.
 
@@ -104,10 +104,9 @@ its source location.
 The current authored-world package extension does not export these environment instances.
 Selection across imported geography, personal memory and authored versions remains partial.
 
-## Acceptance
+## Validation
 
-The path is not accepted as a complete district merely because the JSON parses, buildings extrude,
-or tests pass. Acceptance requires:
+Complete-district validation requires:
 
 1. source and derived features inspectable through the world-memory contract;
 2. roads, ground, facades, roofs and civic objects represented at their honest authority;
@@ -117,5 +116,5 @@ or tests pass. Acceptance requires:
 6. bounded CPU, GPU, memory, draw-call and resident-byte measurements; and
 7. no use of reference-only data outside its admitted operations.
 
-The dated local proof is partial and records `accepted: false`. That status remains until these
-gates are executed.
+The current evaluation record covers only part of this matrix and therefore does not establish
+complete-district validation.

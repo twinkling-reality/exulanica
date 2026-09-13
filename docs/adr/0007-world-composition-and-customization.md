@@ -62,9 +62,9 @@ Positive:
 
 Costs and open work:
 
-- **CORRECTED 2026-09-13:** WMP 1.0 and its opt-in authored-world 1.0 extension are built. Runtime
-  import, durable environment-instance projection, society projection, and the planned geographic
-  composition extension remain open;
+- WMP 1.0 and its opt-in authored-world 1.0 extension are implemented; runtime import, durable
+  environment-instance projection, society projection, and the geographic composition extension
+  remain future work;
 - structural customization has a protected backend diff preview but remains an internal reviewed
   composer workflow rather than a public appearance control;
 - readable stable element IDs are now durable backend identities; snapshot and migration records

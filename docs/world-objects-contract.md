@@ -423,11 +423,10 @@ does not cover at all; it is ordered because a log read backwards is a log misre
 
 ## 8. Package projection
 
-**CORRECTED 2026-09-13.** The earlier section proposed a new WMP 1.1 profile and said authored
-state was absent. The implementation instead preserves `exulanica-wmp-1.0` byte compatibility and
-adds the opt-in `exulanica-wmp-ext-authored-world` 1.0 extension. It exports alternate versions,
-source snapshots, authored objects, element overrides, edit chains, reviewed asset descriptors and
-bounded behavior references. Asset bytes and runtime code remain excluded.
+Package projection preserves `exulanica-wmp-1.0` byte compatibility and uses the opt-in
+`exulanica-wmp-ext-authored-world` 1.0 extension. It exports alternate versions, source snapshots,
+authored objects, element overrides, edit chains, reviewed asset descriptors and bounded behavior
+references. Asset bytes and runtime code remain excluded.
 
 The verifier re-derives every version state digest, closes edit and parent chains, validates source
 and region references, checks asset and behavior declarations, and withholds versions whose source
@@ -569,9 +568,7 @@ also remains allowed after withdrawal, including undoing a removal; a restored i
 reports `withdrawn` and remains unavailable for rendering. This permits history correction without
 turning undo into renewed source authorization.
 
-At the migration-0050 delivery point this slice implemented no renderer or `AtlasBinding` change,
-unified Selection, Companion editing, WMP projection, extraction job, retained-database write or
-visual acceptance claim. The browser now reads and draws available environment instances through
-the existing owned-district binding, but unified Selection, WMP projection, extraction and accepted
-real-scene visual quality remain open. The existing reviewed CC0 asset registry and its byte
-semantics are unchanged.
+The browser reads and draws available environment instances through the existing owned-district
+binding. Unified Selection, Companion editing, WMP projection, extraction, retained-database writes
+and real-scene visual validation are outside the implemented environment-instance scope. The
+existing reviewed CC0 asset registry and its byte semantics are unchanged.

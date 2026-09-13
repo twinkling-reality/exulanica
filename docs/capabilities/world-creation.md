@@ -31,7 +31,7 @@ asset creation require the extensions in the
 [composition contract](../world-composition-contract.md). A segmentation mask is
 not automatically a complete editable object, and a map's display permission is
 not permission to extract and remix its content. The current Earth prototype is
-not accepted as the requested detailed environment.
+an incomplete visualization path rather than a validated detailed environment.
 
 Read the [product roadmap](../product-direction.md) for delivery order, the
 [appearance contract](../atlas-world-customization-contract.md) for supported

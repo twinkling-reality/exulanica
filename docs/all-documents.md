@@ -38,7 +38,7 @@ How the system works now. Edited as the system changes.
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-12; model upgrades require task-specific evidence
-- [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY ACCEPTANCE OPEN
+- [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
 - [physical-streaming-runtime](physical-streaming-runtime.md) : RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate

@@ -76,8 +76,9 @@ back to the simulation subject.
 
 Current movement is a visualization of stored or previewed positions, not route planning on a
 street graph. Home and work nodes are labels rather than spatial destinations; motion is a seeded
-random walk bounded to the district. It is therefore incorrect to describe present behavior as
-purposeful commuting, emergent social life, or physically grounded navigation.
+random walk bounded to the district. The implemented capability is therefore described as
+deterministic synthetic motion, not purposeful commuting, emergent social life, or physically
+grounded navigation.
 
 ## Training boundary
 
@@ -103,9 +104,9 @@ extension must define:
 - privacy/deletion behavior for any evidence-linked characters; and
 - a receiver capability declaration for resuming versus inspecting a simulation.
 
-## Acceptance gates
+## Validation gates
 
-The bounded society may be called accepted only after proving:
+Complete bounded-society validation requires:
 
 1. deterministic initialization and transition replay across supported runtimes;
 2. stale-write refusal, reload continuity and event/state lineage;
@@ -115,5 +116,5 @@ The bounded society may be called accepted only after proving:
 6. measured frame-time and memory bounds; and
 7. visible behavior evaluated from live captures.
 
-Until spatial destinations, walkable routes and action affordances exist as data, improving the
-appearance of motion must not be presented as improving the underlying society model.
+Visual motion changes do not expand the underlying society-model capability unless spatial
+destinations, walkable routes and action affordances are represented in simulation state.
