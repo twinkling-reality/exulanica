@@ -244,7 +244,7 @@ export function mountEnvironmentSelection(
     dispose: () => {
       if (phase === 'disposed') return;
       phase = 'disposed';
-      if (attachedControls !== null) {
+      if (attachedControls !== null && attachedControls.onInteract === installedInteract) {
         attachedControls.onInteract = priorInteract;
       }
       installedInteract = null;

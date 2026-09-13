@@ -118,11 +118,49 @@ export function featureAlongReticle(
   ]);
 }
 
+export interface FootprintLineGeometry {
+  readonly primitive: 'lines';
+  readonly positions: readonly number[];
+  readonly indices: readonly number[];
+}
+
+/** Build explicit closed line edges for every exterior and interior ring, with no fill topology. */
+export function footprintLineGeometry(
+  footprint: SemanticFootprint,
+  y = 0.08,
+): FootprintLineGeometry {
+  if (!Number.isFinite(y)) throw new RangeError('Invalid semantic outline height');
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const polygon of footprint) {
+    for (const ring of polygon) {
+      if (ring.length < 4 ||
+        ring[0]![0] !== ring.at(-1)![0] ||
+        ring[0]![1] !== ring.at(-1)![1]) {
+        throw new Error('Semantic outline ring must be explicitly closed');
+      }
+      const first = positions.length / 3;
+      const vertexCount = ring.length - 1;
+      for (const point of ring.slice(0, -1)) positions.push(point[0], y, point[1]);
+      for (let index = 0; index < vertexCount; index++) {
+        indices.push(first + index, first + ((index + 1) % vertexCount));
+      }
+    }
+  }
+  return Object.freeze({
+    primitive: 'lines' as const,
+    positions: Object.freeze(positions),
+    indices: Object.freeze(indices),
+  });
+}
+
 /** Renderer for neutral footprint-only proxies. It owns no provider tile handle. */
 export class NYCSemanticOverlay {
   readonly root = new pc.Entity('nyc-open-data-semantic-overlay');
   readonly features: readonly NYCLocalFeature[];
   private readonly material = new pc.StandardMaterial();
+  private readonly meshes: pc.Mesh[] = [];
+  private destroyed = false;
 
   constructor(
     device: pc.GraphicsDevice,
@@ -139,20 +177,18 @@ export class NYCSemanticOverlay {
     this.material.cull = pc.CULLFACE_NONE;
     this.material.update();
     for (const feature of features) {
-      for (const polygon of feature.localFootprint) {
-        const ring = polygon[0];
-        if (ring === undefined || ring.length < 4) continue;
-        const geometry = new pc.Geometry();
-        geometry.positions = ring.slice(0, -1).flatMap((point) => [point[0], 0.08, point[1]]);
-        geometry.indices = Array.from({ length: ring.length - 3 }, (_, index) =>
-          [0, index + 1, index + 2]).flat();
-        const entity = new pc.Entity(`nyc-open-data:${feature.id}`);
-        const mesh = pc.Mesh.fromGeometry(device, geometry);
-        entity.addComponent('render', {
-          meshInstances: [new pc.MeshInstance(mesh, this.material, entity)],
-        });
-        this.root.addChild(entity);
-      }
+      const geometry = footprintLineGeometry(feature.localFootprint);
+      if (geometry.indices.length === 0) continue;
+      const entity = new pc.Entity(`nyc-open-data:${feature.id}`);
+      const mesh = new pc.Mesh(device);
+      mesh.setPositions([...geometry.positions]);
+      mesh.setIndices([...geometry.indices]);
+      mesh.update(pc.PRIMITIVE_LINES);
+      this.meshes.push(mesh);
+      entity.addComponent('render', {
+        meshInstances: [new pc.MeshInstance(mesh, this.material, entity)],
+      });
+      this.root.addChild(entity);
     }
     parent.addChild(this.root);
   }
@@ -163,7 +199,11 @@ export class NYCSemanticOverlay {
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
     this.root.destroy();
+    for (const mesh of this.meshes) mesh.destroy();
+    this.meshes.length = 0;
     this.material.destroy();
   }
 }

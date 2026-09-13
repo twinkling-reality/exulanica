@@ -4,6 +4,7 @@ import {
   crs84IntegerToLocal,
   featureAlongReticle,
   featureAtLocalPoint,
+  footprintLineGeometry,
   localizeNYCFeatures,
   type NYCSemanticFeature,
 } from '../src/playcanvas/nyc-semantic-overlay.js';
@@ -63,5 +64,27 @@ describe('independent NYC Open Data semantic geometry', () => {
       'utf8',
     );
     expect(implementation).not.toMatch(/google-tiles|GoogleTile|googleTiles/);
+  });
+
+  it('builds only exact closed line edges for a concave exterior and its hole', () => {
+    const geometry = footprintLineGeometry([[
+      [[0, 0], [4, 0], [4, 4], [2, 2], [0, 4], [0, 0]],
+      [[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]],
+    ]], 0.25);
+
+    expect(geometry.primitive).toBe('lines');
+    expect(geometry.indices).toEqual([
+      0, 1, 1, 2, 2, 3, 3, 4, 4, 0,
+      5, 6, 6, 7, 7, 8, 8, 5,
+    ]);
+    expect(geometry.positions).toEqual([
+      0, 0.25, 0, 4, 0.25, 0, 4, 0.25, 4, 2, 0.25, 2, 0, 0.25, 4,
+      1, 0.25, 1, 2, 0.25, 1, 2, 0.25, 2, 1, 0.25, 2,
+    ]);
+    expect(geometry.indices).toHaveLength(9 * 2);
+    const edges = Array.from({ length: geometry.indices.length / 2 }, (_, index) =>
+      geometry.indices.slice(index * 2, index * 2 + 2));
+    expect(edges).not.toContainEqual([0, 2]);
+    expect(edges).not.toContainEqual([0, 3]);
   });
 });

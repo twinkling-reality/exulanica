@@ -114,4 +114,39 @@ describe('mounted NYC semantic selection lifecycle', () => {
     await expect(mounted.begin()).rejects.toThrow(/disposed/);
     expect(createOverlay).toHaveBeenCalledTimes(1);
   });
+
+  it('does not clobber a newer interaction owner during teardown', async () => {
+    const prior = vi.fn();
+    const newer = vi.fn();
+    const controls = {
+      state: { x: 0, y: 1.68, z: 0 },
+      onInteract: prior as (() => void) | null,
+    };
+    const binding = {
+      controls,
+      camera: { forward: { x: 0, y: -1, z: 0 } },
+      device: {},
+      renderRoot: {},
+      invalidate: vi.fn(),
+    };
+    const destroy = vi.fn();
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(),
+      admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: { catalog: vi.fn(async () => catalog) } as never,
+      worldClient: { connect: vi.fn(async () => ({ assets: [], version })) } as never,
+      createOverlay: () => ({ pick: () => null, destroy }),
+    });
+
+    await mounted.begin();
+    expect(controls.onInteract).not.toBe(prior);
+    controls.onInteract = newer;
+    mounted.dispose();
+    expect(controls.onInteract).toBe(newer);
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
 });

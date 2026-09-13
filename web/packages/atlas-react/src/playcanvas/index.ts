@@ -122,11 +122,13 @@ export {
   crs84IntegerToLocal,
   featureAlongReticle,
   featureAtLocalPoint,
+  footprintLineGeometry,
   localizeNYCFeatures,
 } from './nyc-semantic-overlay.js';
 export { NYC_REFERENCE_FRAME } from './nyc-reference-frame.js';
 export type {
   GeographicLocalFrame,
+  FootprintLineGeometry,
   NYCLocalFeature,
   NYCSemanticFeature,
   SemanticFootprint,
