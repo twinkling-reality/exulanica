@@ -8,7 +8,7 @@ rather than documents, it is immutable, and `tests/test_retained_evaluation_reco
 already inventories it. Start from [README.md](README.md) for the reading paths and the
 rule about where a new document goes.
 
-**165 documents**, excluding `docs/evaluation/`.
+**166 documents**, excluding `docs/evaluation/`.
 
 ## Living contracts and reference
 
@@ -121,7 +121,7 @@ Numbered, and the number is the identifier. Never renumbered.
 
 What was intended, written before the work.
 
-56 documents.
+57 documents.
 
 - [2026-09-08-asset-read-currency](briefs/2026-09-08-asset-read-currency.md) : completed and integrated at 188e20c after independent final gates. See
 - [2026-09-08-consent-timestamp-consistency](briefs/2026-09-08-consent-timestamp-consistency.md) : completed and integrated at d72c4f8 after independent gates. See
@@ -166,6 +166,7 @@ What was intended, written before the work.
 - [2026-09-12-frozen-brief-links](briefs/2026-09-12-frozen-brief-links.md) : measured integration repair, 2026-09-12. The place-acceptance owner ran the existing
 - [2026-09-12-helsinki-terminal-lod-successor](briefs/2026-09-12-helsinki-terminal-lod-successor.md) : bounded successor implementation brief
 - [2026-09-12-helsinki-visual-feasibility](briefs/2026-09-12-helsinki-visual-feasibility.md) : bounded implementation brief
+- [2026-09-12-melbourne-c4-29-visual-feasibility](briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md) : bounded implementation brief
 - [2026-09-12-personal-browser-recovery](briefs/2026-09-12-personal-browser-recovery.md) : measured scope amendment for personal-browser, 2026-09-12. Keep its original brief
 - [2026-09-12-personal-browser](briefs/2026-09-12-personal-browser.md) : prepared, not dispatched. Branch: codex/personal-browser
 - [2026-09-12-personal-place-training](briefs/2026-09-12-personal-place-training.md) : prepared for operator dispatch. Branch: codex/personal-place-training
