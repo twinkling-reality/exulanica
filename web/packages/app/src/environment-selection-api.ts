@@ -217,6 +217,20 @@ export class EnvironmentSelectionClient {
     );
   }
 
+  move(
+    base: AlternateVersion,
+    instanceId: string,
+    transform: TransformInput,
+  ): Promise<ObjectWriteResult> {
+    return this.write(
+      base.versionId,
+      base.stateSha256,
+      `/world/versions/${encodeURIComponent(base.versionId)}/environment-instances/`
+        + `${encodeURIComponent(instanceId)}/move`,
+      { transform: wireTransform(transform) },
+    );
+  }
+
   undo(base: AlternateVersion): Promise<ObjectWriteResult> {
     return this.write(
       base.versionId,

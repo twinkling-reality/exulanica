@@ -226,7 +226,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     role.value = 'personal';
     role.dispatchEvent(new Event('change'));
 
-    button('Preview placement').click();
+    button('Bring into my world').click();
     expect(apply).not.toHaveBeenCalled();
     expect(mounted.root.textContent).toContain('Proposed operation: place_selected_feature');
     expect(mounted.root.textContent).toContain(catalog.publicationId);
@@ -326,7 +326,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     button('Preview undo latest edit').click();
     expect(mounted.root.textContent).toContain('Proposed operation: undo_latest_version_edit');
 
-    button('Preview placement').click();
+    button('Bring into my world').click();
     const role = mounted.root.querySelector('select')!;
     role.value = 'personal';
     role.dispatchEvent(new Event('change'));

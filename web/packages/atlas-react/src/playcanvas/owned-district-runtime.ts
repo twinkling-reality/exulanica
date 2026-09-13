@@ -13,6 +13,20 @@ export interface OwnedDistrictMetrics {
   readonly visibleTiles: number;
 }
 
+export interface OwnedAuthoredEnvironmentInstance {
+  readonly instanceId: string;
+  readonly transform: {
+    readonly xMm: number;
+    readonly yMm: number;
+    readonly zMm: number;
+    readonly yawMicroradians: number;
+    readonly scaleMilli: number;
+  };
+  readonly origin: { readonly role: string };
+  readonly removed: boolean;
+  readonly availability: string;
+}
+
 interface Batch {
   readonly positions: number[];
   readonly normals: number[];
@@ -152,18 +166,20 @@ function addGround(
 /** PlayCanvas representation only. The document remains the world authority. */
 export class OwnedDistrictRuntime {
   readonly root = new pc.Entity('owned-district');
+  readonly authoredRoot = new pc.Entity('owned-district-authored-instances');
   readonly metrics: OwnedDistrictMetrics;
   private readonly meshes: pc.Mesh[] = [];
   private readonly materials: pc.Material[] = [];
   private destroyed = false;
 
   constructor(
-    device: pc.GraphicsDevice,
+    private readonly device: pc.GraphicsDevice,
     parent: pc.Entity,
     readonly district: OwnedDistrict,
     sourceBytes: number,
   ) {
     parent.addChild(this.root);
+    parent.addChild(this.authoredRoot);
     const asphalt = new pc.StandardMaterial();
     asphalt.diffuse = new pc.Color(0.055, 0.075, 0.09);
     asphalt.gloss = 0.18;
@@ -223,10 +239,83 @@ export class OwnedDistrictRuntime {
     });
   }
 
+  setAuthoredInstances(instances: readonly OwnedAuthoredEnvironmentInstance[]): void {
+    for (const child of [...this.authoredRoot.children]) child.destroy();
+    for (const instance of instances) {
+      if (instance.removed || instance.availability !== 'available') continue;
+      const providerId = instance.instanceId.match(/doitt_id[-:]([1-9][0-9]*)/)?.[1];
+      const building = this.district.buildings.find(
+        (candidate) => candidate.id === `doitt_id:${providerId}`,
+      );
+      if (building === undefined) continue;
+      const [west, north, east, south] = building.bbox_cm;
+      const cx = (west + east) / 2;
+      const cz = (north + south) / 2;
+      const local: OwnedDistrictBuilding = {
+        ...building,
+        polygons: building.polygons.map((polygon) => polygon.map((ring) => ring.map(
+          ([x, z]) => [x - cx, z - cz] as const,
+        ))),
+      };
+      const source = batch();
+      addBuilding(source, local);
+      const geometry = mesh(this.device, source);
+      if (geometry === null) continue;
+      const surface = new pc.StandardMaterial();
+      surface.diffuse = instance.origin.role === 'fictional'
+        ? new pc.Color(0.12, 0.34, 0.4)
+        : new pc.Color(0.74, 0.66, 0.55);
+      surface.emissive = instance.origin.role === 'fictional'
+        ? new pc.Color(0.05, 0.58, 0.68)
+        : new pc.Color(0.08, 0.04, 0.02);
+      surface.emissiveIntensity = instance.origin.role === 'fictional' ? 0.55 : 0.12;
+      surface.metalness = 0.22;
+      surface.gloss = 0.72;
+      surface.useMetalness = true;
+      surface.update();
+      const entity = new pc.Entity(`authored-${instance.instanceId}`);
+      entity.addComponent('render', {
+        meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
+        castShadows: true,
+        receiveShadows: true,
+      });
+      entity.setPosition(
+        instance.transform.xMm / 1000,
+        instance.transform.yMm / 1000,
+        instance.transform.zMm / 1000,
+      );
+      entity.setEulerAngles(0, instance.transform.yawMicroradians * 180 / Math.PI / 1_000_000, 0);
+      entity.setLocalScale(
+        instance.transform.scaleMilli / 1000,
+        instance.transform.scaleMilli / 1000,
+        instance.transform.scaleMilli / 1000,
+      );
+      if (instance.origin.role === 'fictional') {
+        const lanternMesh = pc.createCone(this.device, {
+          baseRadius: 4,
+          peakRadius: 0,
+          height: 10,
+        });
+        const lantern = new pc.Entity('authored-fantasy-sky-lantern');
+        lantern.addComponent('render', {
+          meshInstances: [new pc.MeshInstance(lanternMesh, surface, lantern)],
+          castShadows: false,
+        });
+        lantern.setPosition(0, building.height_cm / 100 + 8, 0);
+        entity.addChild(lantern);
+        this.meshes.push(lanternMesh);
+      }
+      this.meshes.push(geometry);
+      this.materials.push(surface);
+      this.authoredRoot.addChild(entity);
+    }
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.root.destroy();
+    this.authoredRoot.destroy();
     for (const value of this.meshes) value.destroy();
     for (const value of this.materials) value.destroy();
   }

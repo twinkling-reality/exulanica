@@ -174,7 +174,10 @@ export {
   ownedDistrictCameraState,
   sourceFirstArrivalPose,
 } from './atlas-binding.js';
-export type { OwnedDistrictMetrics } from './owned-district-runtime.js';
+export type {
+  OwnedAuthoredEnvironmentInstance,
+  OwnedDistrictMetrics,
+} from './owned-district-runtime.js';
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
 
 export type {

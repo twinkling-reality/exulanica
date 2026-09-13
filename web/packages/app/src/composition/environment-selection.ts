@@ -91,10 +91,13 @@ export function mountEnvironmentSelection(
     placeholder: 'Try “place this building”',
   });
   const ask = el('button', { type: 'button', text: 'Preview request', disabled: true });
-  const place = el('button', { type: 'button', text: 'Preview placement', disabled: true });
+  const place = el('button', { type: 'button', text: 'Bring into my world', disabled: true });
+  const modify = el('button', { type: 'button', text: 'Lift and illuminate', disabled: true });
   const remove = el('button', { type: 'button', text: 'Preview removal', disabled: true });
   const undo = el('button', { type: 'button', text: 'Preview undo latest edit', disabled: true });
-  const controls = el('div', { class: 'environment-selection-controls' }, [role, place, remove, undo]);
+  const controls = el('div', {
+    class: 'environment-selection-controls',
+  }, [role, place, modify, remove, undo]);
   const language = el('div', { class: 'environment-selection-language' }, [request, ask]);
   const previewText = el('p', {
     class: 'environment-selection-preview',
@@ -167,6 +170,7 @@ export function mountEnvironmentSelection(
     reflectRequestButton();
     remove.disabled = current?.environmentInstances?.some((held) =>
       held.instanceId === instanceId(feature) && !held.removed) !== true;
+    modify.disabled = remove.disabled;
   }
 
   function reflectVersion(): void {
@@ -176,6 +180,9 @@ export function mountEnvironmentSelection(
     undo.disabled = current === null || !current.edits.some((edit) =>
       edit.kind !== 'undo' && !undone.has(edit.editId));
     if (chosen !== null) reportSelection(chosen);
+    deps.state.atlas?.binding.ownedDistrict?.setAuthoredInstances(
+      current?.environmentInstances ?? [],
+    );
   }
 
   function reflectRequestButton(): void {
@@ -221,20 +228,15 @@ export function mountEnvironmentSelection(
     if (chosen === null) return null;
     const west = chosen.bbox[0], south = chosen.bbox[1];
     const east = chosen.bbox[2], north = chosen.bbox[3];
-    const centre = chosen.localFootprint[0]?.[0]?.reduce(
-      (sum, point) => [sum[0] + point[0], sum[1] + point[1]] as [number, number],
-      [0, 0],
-    );
-    const count = chosen.localFootprint[0]?.[0]?.length ?? 1;
     return {
       instanceId: instanceId(chosen),
       feature: chosen,
       sourceAnchor: [Math.round((west + east) / 2), Math.round((south + north) / 2)],
       regionId: String(deps.scene.islands[0]!.islandId),
       transform: {
-        xMm: Math.round((centre?.[0] ?? 0) * 1000 / count),
+        xMm: -270_000,
         yMm: 0,
-        zMm: Math.round((centre?.[1] ?? 0) * 1000 / count),
+        zMm: 260_000,
         yawMicroradians: 0,
         scaleMilli: 1000,
       },
@@ -285,6 +287,30 @@ export function mountEnvironmentSelection(
       promptVersion: 'deterministic-environment-preview-1',
     });
   });
+
+  modify.addEventListener('click', () => void (async () => {
+    if (current === null || chosen === null) return;
+    const selectedInstanceId = instanceId(chosen);
+    const instance = current.environmentInstances?.find(
+      (held) => held.instanceId === selectedInstanceId && !held.removed,
+    );
+    if (instance === undefined) return;
+    try {
+      const ok = await applyResult(await environmentClient.move(
+        current,
+        instance.instanceId,
+        {
+          ...instance.transform,
+          yMm: 6_000,
+          yawMicroradians: 260_000,
+          scaleMilli: 1120,
+        },
+      ));
+      if (ok) deps.showStatus('Lifted and illuminated. Reload and undo preserve the source.');
+    } catch (error) {
+      deps.showStatus(objectWriteFailure(error), 'failure');
+    }
+  })());
 
   undo.addEventListener('click', () => {
     if (current === null) return;
