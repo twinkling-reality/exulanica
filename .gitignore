@@ -102,3 +102,6 @@ venv/
 
 # Local agent tooling config, not part of the project
 .claude/
+.cursor/
+AGENTS.md
+CLAUDE.md
