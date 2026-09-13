@@ -1,8 +1,13 @@
 import { ApiError } from '@exulanica/graph-client';
 import { el } from './dom.js';
+import { buildThinkingStatus } from './thinking-status.js';
 
 export function buildStartupState(error?: unknown): HTMLElement {
   const failed = error !== undefined;
+  if (!failed) return buildThinkingStatus(
+    'Opening Atlas',
+    'Loading the library, its source photographs, and verified reconstructions…',
+  );
   const panel = el('section', { class: 'gate', role: failed ? 'alert' : 'status' });
   panel.append(el('h1', { text: failed ? 'Atlas could not open' : 'Opening Atlas' }));
   const reason = error instanceof ApiError && error.isUnauthenticated
@@ -12,8 +17,7 @@ export function buildStartupState(error?: unknown): HTMLElement {
       || (error instanceof DOMException && ['NetworkError', 'TimeoutError'].includes(error.name))
       ? 'The Atlas service is unavailable. Please retry in a moment.'
       : error instanceof Error ? error.message
-      : failed ? 'The library could not load. Please retry.'
-        : 'Loading the library, its source photographs, and verified reconstructions…';
+      : 'The library could not load. Please retry.';
   panel.append(el('p', { class: failed ? 'gate-failure' : 'gate-note', text: reason }));
   if (failed) {
     const retry = el('button', { type: 'button', text: 'Retry opening Atlas' });

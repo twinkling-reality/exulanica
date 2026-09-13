@@ -230,37 +230,260 @@ body {
 /* ------------------------------------------------------------------ the credential gate */
 
 .gate {
-  grid-column: 1 / -1;
-  align-self: center;
-  justify-self: center;
-  max-width: 34rem;
+  position: fixed;
+  inset: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  padding: 2rem;
-  background: var(--panel);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  backdrop-filter: blur(var(--blur-system));
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: clamp(1.5rem, 8vw, 4rem);
+  background: var(--ui-light-canvas);
+  color: var(--ui-light-ink);
+  text-align: center;
+  border: 0;
+  border-radius: 0;
+  backdrop-filter: none;
 }
 
 .gate h1 {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.gate-wordmark {
+  margin: 0;
+  color: var(--ui-light-ink);
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  font-weight: 200;
+  line-height: 0.9;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  text-transform: uppercase;
+}
+
+.credential-gate {
+  align-items: center;
+  justify-content: center;
+  gap: 2.25rem;
+  text-align: center;
+}
+
+.credential-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.credential-controls {
+  --credential-control-height: 2.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.credential-action > .gate-failure {
+  margin: 0;
 }
 
 .gate-note {
   margin: 0;
-  color: var(--ink-faint);
-  font-size: 0.88rem;
+  width: min(25rem, 100%);
+  color: var(--ui-light-ink-faint);
+  font-size: 0.86rem;
+  font-weight: 300;
+  line-height: 1.65;
+  text-wrap: balance;
 }
 
 .gate-failure {
   margin: 0;
   color: var(--error);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
+}
+
+.credential-entry {
+  width: min(21rem, 54vw);
+  height: var(--credential-control-height);
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: color-mix(in srgb, var(--ui-light-ink) 5%, var(--ui-light-canvas));
+  border-radius: var(--radius-pill);
+  transition:
+    background-color var(--motion-standard) var(--motion-easing),
+    box-shadow var(--motion-standard) var(--motion-easing);
+}
+
+.credential-entry:focus-within {
+  background: color-mix(in srgb, var(--ui-light-ink) 7%, var(--ui-light-canvas));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-light-ink) 24%, transparent);
+}
+
+.credential-entry input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.58rem 0;
+  color: var(--ui-light-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+}
+
+.credential-entry input::placeholder {
+  color: var(--ui-light-ink-faint);
+}
+
+.credential-entry input:focus-visible {
+  outline: 0;
+}
+
+.credential-submit {
+  width: var(--credential-control-height);
+  height: var(--credential-control-height);
+  flex: 0 0 var(--credential-control-height);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink-faint) 34%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ui-light-ink-faint);
+  transition:
+    background-color var(--motion-standard) var(--motion-easing),
+    border-color var(--motion-standard) var(--motion-easing),
+    transform var(--motion-standard) var(--motion-easing);
+}
+
+.credential-submit:not(:disabled) {
+  border-color: var(--ui-light-ink);
+  background: var(--ui-light-ink);
+  color: var(--ui-light-canvas);
+  cursor: pointer;
+}
+
+.credential-submit:not(:disabled):hover {
+  transform: scale(1.06);
+}
+
+.credential-submit:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
+.credential-submit span {
+  display: block;
+  font-size: 1rem;
+  line-height: 1;
+  transform: translateY(-0.04em);
+}
+
+.startup-thinking {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.15rem;
+  padding: clamp(1.5rem, 8vw, 4rem);
+  background: var(--ui-light-canvas);
+  color: var(--ui-light-ink);
+}
+
+.thinking-orb {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.startup-thinking-copy {
+  display: grid;
+  gap: 0.32rem;
+  text-align: left;
+}
+
+.startup-thinking-label,
+.startup-thinking-detail {
+  margin: 0;
+}
+
+.startup-thinking-label {
+  width: max-content;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: linear-gradient(
+    100deg,
+    var(--ui-light-ink-soft) 22%,
+    color-mix(in srgb, var(--ui-light-ink-faint) 66%, var(--ui-light-canvas)) 42%,
+    var(--ui-light-ink) 58%,
+    var(--ui-light-ink-soft) 78%
+  );
+  background-size: 240% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-text-shimmer 2.4s ease-in-out infinite;
+}
+
+.startup-thinking-detail {
+  max-width: 30rem;
+  color: var(--ui-light-ink-faint);
+  font-size: 0.82rem;
+  font-weight: 300;
+}
+
+@keyframes thinking-text-shimmer {
+  0%, 16% { background-position: 100% 50%; }
+  84%, 100% { background-position: 0% 50%; }
+}
+
+@media (max-width: 32rem) {
+  .credential-gate {
+    align-items: center;
+    gap: 2rem;
+    padding-inline: 1.5rem;
+    text-align: center;
+  }
+
+  .credential-action {
+    align-items: center;
+  }
+
+  .credential-entry {
+    width: auto;
+    flex: 1;
+  }
+
+  .credential-controls {
+    width: min(22rem, calc(100vw - 3rem));
+  }
+
+  .startup-thinking {
+    flex-direction: column;
+  }
+
+  .startup-thinking-copy {
+    text-align: center;
+  }
+
+  .startup-thinking-label {
+    margin-inline: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-thinking-label {
+    background: none;
+    color: var(--ui-light-ink);
+    animation: none;
+  }
 }
 
 input {
@@ -1252,7 +1475,7 @@ kbd {
     visibility: hidden;
   }
 
-  #shell > :not(.viewport-boundary):not(.gate):not(.reconstruction-loading):not(.atlas-empty) {
+  #shell > :not(.viewport-boundary):not(.gate):not(.startup-thinking):not(.reconstruction-loading):not(.atlas-empty) {
     display: none !important;
   }
 

@@ -141,31 +141,41 @@ async function boot(): Promise<void> {
  * transport and is not written to storage, a cookie or the URL.
  */
 function askForToken(): void {
-  const form = el('form', { class: 'gate' });
+  const form = el('form', { class: 'gate credential-gate' });
   const input = el('input', {
     type: 'password',
     autocomplete: 'off',
     'aria-label': 'Access token',
-    placeholder: 'Access token',
+    placeholder: 'Paste access token',
   });
   const failure = el('p', { class: 'gate-failure' });
   failure.hidden = true;
+  const submit = el('button', {
+    type: 'submit',
+    class: 'credential-submit',
+    'aria-label': 'Open Atlas',
+    disabled: true,
+  }, [el('span', { 'aria-hidden': 'true', text: '→' })]);
+  input.addEventListener('input', () => {
+    submit.disabled = input.value.trim().length === 0;
+  });
 
   form.append(
-    el('h1', { text: 'Exulanica' }),
-    el('p', { class: 'gate-note' }, [
-      'This instance authenticates with a bearer token the operator configures. There is no ' +
-        'account system, no registration and no password reset. The token is held for this tab ' +
-        'only and is never stored.',
+    el('p', { class: 'gate-wordmark', text: 'Exulanica' }),
+    el('div', { class: 'credential-action' }, [
+      el('div', { class: 'credential-controls' }, [
+        el('div', { class: 'credential-entry' }, [input]),
+        submit,
+      ]),
+      failure,
     ]),
-    input,
-    el('button', { type: 'submit', class: 'primary', text: 'Open the library' }),
-    failure,
   );
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    const token = input.value.trim();
+    if (token.length === 0) return;
     failure.hidden = true;
-    void start(input.value.trim()).catch((error: unknown) => {
+    void start(token).catch((error: unknown) => {
       failure.hidden = false;
       failure.textContent =
         error instanceof ApiError && error.isUnauthenticated

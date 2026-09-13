@@ -5,6 +5,13 @@
 :root {
   color-scheme: light;
 
+  /* Shared signed-out light plane, matched to the public landing surface. */
+  --ui-light-canvas: #f7f9f7;
+  --ui-light-ink: #121715;
+  --ui-light-ink-soft: #35413b;
+  --ui-light-ink-faint: #59655f;
+  --ui-light-focus: #235c43;
+
   --dawn-ground: #dce5df;
   --dawn-field-key: #f1d394;
   --dawn-field-crosslight: #d6c2a5;

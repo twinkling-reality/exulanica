@@ -50,6 +50,9 @@ importers:
       '@exulanica/world-index':
         specifier: workspace:*
         version: link:../world-index
+      thinking-orbs:
+        specifier: 0.3.1
+        version: 0.3.1(react@19.3.0)
     devDependencies:
       vite:
         specifier: ^6
@@ -1257,6 +1260,10 @@ packages:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
 
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+    engines: {node: '>=0.10.0'}
+
   rechoir@0.8.0:
     resolution: {integrity: sha512-/vxpCXddiX8NGfGO/mTafwjq4aFa/71pvamip0++IQk3zG8cbCj0fifNPrjjF1XMXUne91jL9OoxmdykoEtifQ==}
     engines: {node: '>= 10.13.0'}
@@ -1326,6 +1333,11 @@ packages:
 
   teamcity-service-messages@0.1.14:
     resolution: {integrity: sha512-29aQwaHqm8RMX74u2o/h1KbMLP89FjNiMxD9wbF2BbWOnbM+q+d1sCEC+MqCc4QW3NJykn77OMpTFw/xTHIc0w==}
+
+  thinking-orbs@0.3.1:
+    resolution: {integrity: sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw==}
+    peerDependencies:
+      react: '>=18.0.0'
 
   three@0.185.1:
     resolution: {integrity: sha512-5aojFCXKwnjBRZvUnt3WFfEcvUJgkN5LlijRFN95hMy8WVkG4I0QNcJE+OuWvuJ0bOdStrbfXn0pkd6/QyiAlg==}
@@ -2325,6 +2337,8 @@ snapshots:
       kleur: 3.0.3
       sisteransi: 1.0.5
 
+  react@19.3.0: {}
+
   rechoir@0.8.0:
     dependencies:
       resolve: 1.22.12
@@ -2420,6 +2434,10 @@ snapshots:
   tapable@2.3.3: {}
 
   teamcity-service-messages@0.1.14: {}
+
+  thinking-orbs@0.3.1(react@19.3.0):
+    dependencies:
+      react: 19.3.0
 
   three@0.185.1: {}
 

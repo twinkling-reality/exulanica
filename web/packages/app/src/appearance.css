@@ -142,8 +142,7 @@ body {
 }
 
 /* System sheets: choices about the Atlas, separate from evidence without becoming a glass card. */
-.system-overlay,
-.gate {
+.system-overlay {
   background: var(--material-system);
   border-radius: var(--radius-panel);
   backdrop-filter: blur(var(--blur-system));

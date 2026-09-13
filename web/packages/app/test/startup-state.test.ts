@@ -19,6 +19,8 @@ describe('visible Atlas startup states', () => {
     const loading = buildStartupState();
     expect(loading.getAttribute('role')).toBe('status');
     expect(loading.textContent).toContain('Loading the library');
+    expect(loading.classList.contains('startup-thinking')).toBe(true);
+    expect(loading.querySelector('canvas.thinking-orb')).not.toBeNull();
     const failure = buildStartupState(new Error('The world topology is not configured.'));
     expect(failure.getAttribute('role')).toBe('alert');
     expect(failure.textContent).toContain('The world topology is not configured.');

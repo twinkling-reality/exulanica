@@ -10,7 +10,8 @@
     "@exulanica/formation": "workspace:*",
     "@exulanica/graph-client": "workspace:*",
     "@exulanica/presentation": "workspace:*",
-    "@exulanica/world-index": "workspace:*"
+    "@exulanica/world-index": "workspace:*",
+    "thinking-orbs": "0.3.1"
   },
   "devDependencies": {
     "vite": "^6"
