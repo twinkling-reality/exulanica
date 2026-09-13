@@ -27,6 +27,15 @@ export interface OwnedAuthoredEnvironmentInstance {
   readonly availability: string;
 }
 
+export interface OwnedSocietyState {
+  readonly tick: number;
+  readonly inhabitants: readonly {
+    readonly id: string;
+    readonly synthetic: true;
+    readonly position_mm: readonly [number, number];
+  }[];
+}
+
 interface Batch {
   readonly positions: number[];
   readonly normals: number[];
@@ -167,6 +176,7 @@ function addGround(
 export class OwnedDistrictRuntime {
   readonly root = new pc.Entity('owned-district');
   readonly authoredRoot = new pc.Entity('owned-district-authored-instances');
+  readonly societyRoot = new pc.Entity('owned-district-society');
   readonly metrics: OwnedDistrictMetrics;
   private readonly meshes: pc.Mesh[] = [];
   private readonly materials: pc.Material[] = [];
@@ -180,6 +190,7 @@ export class OwnedDistrictRuntime {
   ) {
     parent.addChild(this.root);
     parent.addChild(this.authoredRoot);
+    parent.addChild(this.societyRoot);
     const asphalt = new pc.StandardMaterial();
     asphalt.diffuse = new pc.Color(0.055, 0.075, 0.09);
     asphalt.gloss = 0.18;
@@ -311,11 +322,61 @@ export class OwnedDistrictRuntime {
     }
   }
 
+  setSociety(state: OwnedSocietyState, visibleCap = 24): number {
+    for (const child of [...this.societyRoot.children]) child.destroy();
+    const visible = state.inhabitants
+      .filter((inhabitant) => inhabitant.synthetic === true)
+      .slice(0, Math.max(0, Math.min(visibleCap, 24)));
+    const source = batch();
+    for (const inhabitant of visible) {
+      const [x, z] = inhabitant.position_mm;
+      const cx = x / 1000;
+      const cz = z / 1000;
+      const radius = 0.28;
+      const base = source.positions.length / 3;
+      source.positions.push(
+        cx - radius, 0, cz - radius,
+        cx + radius, 0, cz - radius,
+        cx + radius, 0, cz + radius,
+        cx - radius, 0, cz + radius,
+        cx, 1.72, cz,
+      );
+      source.normals.push(
+        0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+      );
+      source.indices.push(
+        base, base + 1, base + 4,
+        base + 1, base + 2, base + 4,
+        base + 2, base + 3, base + 4,
+        base + 3, base, base + 4,
+      );
+    }
+    const geometry = mesh(this.device, source);
+    if (geometry === null) return 0;
+    const surface = new pc.StandardMaterial();
+    surface.diffuse = new pc.Color(0.82, 0.31, 0.16);
+    surface.emissive = new pc.Color(0.18, 0.035, 0.012);
+    surface.emissiveIntensity = 0.35;
+    surface.gloss = 0.48;
+    surface.update();
+    const entity = new pc.Entity(`synthetic-inhabitants-tick-${state.tick}`);
+    entity.addComponent('render', {
+      meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
+      castShadows: true,
+      receiveShadows: true,
+    });
+    this.meshes.push(geometry);
+    this.materials.push(surface);
+    this.societyRoot.addChild(entity);
+    return visible.length;
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.root.destroy();
     this.authoredRoot.destroy();
+    this.societyRoot.destroy();
     for (const value of this.meshes) value.destroy();
     for (const value of this.materials) value.destroy();
   }

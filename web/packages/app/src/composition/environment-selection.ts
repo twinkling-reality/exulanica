@@ -6,6 +6,7 @@ import {
   type NYCLocalFeature,
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
+import { SocietyClient, type SocietySnapshot } from '../society-api.js';
 import {
   EnvironmentSelectionClient,
   type EnvironmentCatalog,
@@ -35,6 +36,7 @@ export interface EnvironmentSelectionDependencies {
   readonly admissionId?: string | null;
   readonly environmentClient?: EnvironmentSelectionClient;
   readonly worldClient?: WorldObjectsClient;
+  readonly societyClient?: SocietyClient;
   readonly createOverlay?: (
     features: readonly NYCLocalFeature[],
   ) => {
@@ -125,6 +127,7 @@ export function mountEnvironmentSelection(
   const admissionId = deps.admissionId === undefined ? nycOpenDataAdmissionId() : deps.admissionId;
   const environmentClient = deps.environmentClient ?? new EnvironmentSelectionClient(deps.credentials);
   const worldClient = deps.worldClient ?? new WorldObjectsClient(deps.credentials);
+  const societyClient = deps.societyClient ?? new SocietyClient(deps.credentials);
   let catalog: EnvironmentCatalog | null = null;
   let current: AlternateVersion | null = null;
   let chosen: NYCLocalFeature | null = null;
@@ -142,6 +145,8 @@ export function mountEnvironmentSelection(
   } | null = null;
   let installedInteract: (() => void) | null = null;
   let priorInteract: (() => void) | null = null;
+  let societyTimer: number | null = null;
+  let society: SocietySnapshot | null = null;
   let attachedControls: { onInteract: (() => void) | null } | null = null;
 
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
@@ -423,6 +428,32 @@ export function mountEnvironmentSelection(
       root.dataset['state'] = 'ready';
       reason.textContent = `${catalog.attribution}. ${features.length} authorized features loaded.`;
       reflectVersion();
+      if (atlas.ownedDistrict != null && current !== null) {
+        society = await societyClient.connect(
+          current.versionId,
+          catalog.placeId,
+          String(deps.scene.islands[0]!.islandId),
+        );
+        const rendered = atlas.ownedDistrict.setSociety(society.state);
+        deps.env.canvas.dataset.societyPopulation = String(society.populationSize);
+        deps.env.canvas.dataset.societyRendered = String(rendered);
+        deps.env.canvas.dataset.societyTick = String(society.currentTick);
+        reason.textContent += ` ${society.populationSize} synthetic inhabitants; ${rendered} nearby.`;
+        const advance = async (): Promise<void> => {
+          if (phase === 'disposed' || society === null) return;
+          try {
+            society = await societyClient.advance(society);
+            atlas.ownedDistrict?.setSociety(society.state);
+            deps.env.canvas.dataset.societyTick = String(society.currentTick);
+            atlas.invalidate();
+          } finally {
+            if ((phase as string) !== 'disposed') {
+              societyTimer = window.setTimeout(() => void advance(), 2_000);
+            }
+          }
+        };
+        societyTimer = window.setTimeout(() => void advance(), 2_000);
+      }
       atlas.invalidate();
     } catch (error) {
       root.dataset['state'] = 'unavailable';
@@ -453,6 +484,14 @@ export function mountEnvironmentSelection(
       installedInteract = null;
       priorInteract = null;
       attachedControls = null;
+      if (societyTimer !== null) window.clearTimeout(societyTimer);
+      societyTimer = null;
+      const canvas = deps.env.canvas;
+      if (canvas !== undefined) {
+        delete canvas.dataset.societyPopulation;
+        delete canvas.dataset.societyRendered;
+        delete canvas.dataset.societyTick;
+      }
       overlay?.destroy();
       overlay = null;
       deps.onSelect?.(null);

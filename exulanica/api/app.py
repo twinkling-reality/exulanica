@@ -60,6 +60,7 @@ from exulanica.api.routes import (
     reconstruction_admission,
     scene_segments,
     selection,
+    society,
     world,
     world_read,
     world_write,
@@ -90,8 +91,10 @@ from exulanica.world import (
     InvalidStyleData,
     ProtectedTopologyConflict,
     StaleInteractionPolicy,
+    StaleSocietyState,
     StaleStyleVersion,
     UnavailableAsset,
+    UnknownSociety,
     UnknownWorldResource,
     WorldNotConfigured,
     seed_reviewed_assets,
@@ -177,6 +180,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(geometry.scene_router)
     app.include_router(scene_segments.router)
     app.include_router(selection.router)
+    app.include_router(society.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)
     app.include_router(identity.router)
@@ -311,6 +315,14 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(UnknownWorldResource)
     async def _unknown_world(_request: Request, _exc: UnknownWorldResource) -> JSONResponse:
         return _problem(404, "unknown_reference", "no such world resource")
+
+    @app.exception_handler(UnknownSociety)
+    async def _unknown_society(_request: Request, _exc: UnknownSociety) -> JSONResponse:
+        return _problem(404, "unknown_reference", "no such society")
+
+    @app.exception_handler(StaleSocietyState)
+    async def _stale_society(_request: Request, exc: StaleSocietyState) -> JSONResponse:
+        return _problem(409, "stale_society_state", str(exc))
 
     @app.exception_handler(InvalidPreviewState)
     async def _preview_state(_request: Request, exc: InvalidPreviewState) -> JSONResponse:

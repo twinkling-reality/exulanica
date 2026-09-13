@@ -177,6 +177,7 @@ export {
 export type {
   OwnedAuthoredEnvironmentInstance,
   OwnedDistrictMetrics,
+  OwnedSocietyState,
 } from './owned-district-runtime.js';
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
 

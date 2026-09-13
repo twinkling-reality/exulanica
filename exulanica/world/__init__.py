@@ -88,6 +88,13 @@ from exulanica.world.objects import (
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
 from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.society import (
+    SOCIETY_ENGINE_VERSION,
+    SOCIETY_POPULATION,
+    StaleSocietyState,
+    UnknownSociety,
+)
+from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.structure import (
     PlacementMigration,
     SpatialCandidate,
@@ -107,6 +114,8 @@ __all__ = [
     "MAX_SCALE_MILLI",
     "MAX_YAW_MICRORADIANS",
     "OBJECT_ID_PATTERN",
+    "SOCIETY_ENGINE_VERSION",
+    "SOCIETY_POPULATION",
     "STYLE_REGISTRY",
     "AlternateVersion",
     "AuthoredObject",
@@ -144,6 +153,7 @@ __all__ = [
     "ProtectedTopologyConflict",
     "ReviewedAsset",
     "ReviewedAssetRow",
+    "SocietyRepository",
     "SourceAnchor",
     "SourceMediaState",
     "SpatialCandidate",
@@ -152,6 +162,7 @@ __all__ = [
     "SpatialSnapshot",
     "StaleInteractionPolicy",
     "StaleObjectBase",
+    "StaleSocietyState",
     "StaleStructuralBase",
     "StaleStyleVersion",
     "StylePreview",
@@ -165,6 +176,7 @@ __all__ = [
     "TopologySourceSlot",
     "Transform",
     "UnavailableAsset",
+    "UnknownSociety",
     "UnknownWorldResource",
     "VersionEdit",
     "WorldInteractionPolicyRepository",
