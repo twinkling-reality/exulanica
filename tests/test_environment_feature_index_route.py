@@ -141,7 +141,7 @@ def test_route_publishes_and_filters_the_current_catalog(deployment, repository,
     )
     assert result.status_code == 200, result.text
     assert [feature["label"] for feature in result.json()["features"]] == ["Hall"]
-    assert result.json()["provider_key"] == "provider"
+    assert "provider_key" not in result.json()
     assert result.json()["place_id"] == str(source.place_id)
     assert result.json()["geographic_frame"]["name"] == "grid"
     assert result.json()["coordinate_scale"] == 1000

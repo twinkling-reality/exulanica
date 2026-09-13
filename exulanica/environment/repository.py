@@ -102,7 +102,6 @@ class EnvironmentFeatureCatalog:
         return {
             "publication_id": str(self.publication_id),
             "admission_id": str(self.admission_id),
-            "provider_key": self.provider_key,
             "place_id": str(self.place_id),
             "index_asset_id": str(self.index_asset_id),
             "render_asset_id": str(self.render_asset_id),

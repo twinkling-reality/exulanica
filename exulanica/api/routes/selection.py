@@ -978,7 +978,13 @@ def environment_proposal(
             source_anchor_coordinate_scale=source.anchor.coordinate_scale,
             source_anchor_coordinates=source.anchor.coordinates,
             region_id=validated.region_id,
-            transform=body.transform,
+            transform=EnvironmentTransformContext(
+                x_mm=validated.transform.x_mm,
+                y_mm=validated.transform.y_mm,
+                z_mm=validated.transform.z_mm,
+                yaw_microradians=validated.transform.yaw_microradians,
+                scale_milli=validated.transform.scale_milli,
+            ),
             origin_role=validated.origin.role,
             **common,
         )
