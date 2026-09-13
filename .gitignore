@@ -105,3 +105,19 @@ venv/
 .cursor/
 AGENTS.md
 CLAUDE.md
+
+# Operator process. Kept on disk for evidence tests. Not published.
+docs/briefs/
+docs/records/
+docs/patches/
+docs/first-place-2026-09-11.md
+docs/judge-access.md
+docs/infrastructure-backlog.md
+docs/engineering-log.md
+docs/engineering-log-reconstructed.md
+docs/goal-brief-2026-09-05-unblocked-backend-program.md
+docs/goal-brief-2026-09-08-remaining-work.md
+docs/phase-10-tickets.md
+docs/reference-gpu-compute.md
+docs/frontier-demonstration.md
+docs/reconstruction-throughput.md

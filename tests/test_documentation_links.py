@@ -68,7 +68,7 @@ ALLOWED_DANGLING: dict[str, str] = {
     ),
 }
 
-_SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", "dist"}
+_SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", "dist", ".orimera", ".exulanica"}
 _TEXT_SUFFIXES = {
     ".py", ".md", ".toml", ".json", ".mjs", ".js", ".ts", ".tsx", ".cjs", ".yml", ".yaml",
 }

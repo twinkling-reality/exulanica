@@ -82,11 +82,14 @@ Documents are filed by how they change over time.
 
 **Where a new document goes**, first yes wins:
 
-1. Machine-readable evidence with a digest? A script writes `evaluation/`. Do not
-   hand-edit a record.
-2. A numbered architectural decision? `adr/`, next free number, never reused.
-3. Written for somebody choosing to use the product? `capabilities/`.
-4. Otherwise it is a living contract or reference table at `docs/` root.
+1. Dispatch brief, handoff, procurement, or personal-run note? `.orimera/briefs/`,
+   not this git tree.
+2. Machine-readable evidence with a digest? A script may write `evaluation/` on
+   disk. Do not hand-edit a record. Do not `git add` a new campaign unless it
+   belongs on the public catalog.
+3. A numbered architectural decision? `adr/`, next free number, never reused.
+4. Written for somebody choosing to use the product? `capabilities/`.
+5. Otherwise it is a living contract or reference table at `docs/` root.
 
 **`evaluation/` is immutable.** Records bind their predecessor and cited artifacts by
 sha256. Correcting a path inside a record would change its digest and cascade through
