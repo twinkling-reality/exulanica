@@ -957,6 +957,7 @@ export class AtlasBinding {
       objectRoots,
       ownedDistrict,
     );
+    if (options.ownedDistrict !== undefined) binding.renderRoot.enabled = false;
     if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
       binding.renderRoot.enabled = false;
       binding.googleTiles = createGoogleTilesEnvironment(

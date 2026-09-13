@@ -145,7 +145,11 @@ function addOctahedron(
   }
 }
 
-function addBuilding(target: Batch, building: OwnedDistrictBuilding): void {
+function addBuilding(
+  target: Batch,
+  building: OwnedDistrictBuilding,
+  includeRoof = true,
+): void {
   const height = building.height_cm / 100;
   for (const polygon of building.polygons) {
     const ring = polygon[0];
@@ -158,9 +162,11 @@ function addBuilding(target: Batch, building: OwnedDistrictBuilding): void {
     }
     cx /= ring.length - 1;
     cz /= ring.length - 1;
-    const roofCentre = target.positions.length / 3;
-    target.positions.push(cx, height, cz);
-    target.normals.push(0, 1, 0);
+    const roofCentre = includeRoof ? target.positions.length / 3 : -1;
+    if (includeRoof) {
+      target.positions.push(cx, height, cz);
+      target.normals.push(0, 1, 0);
+    }
     for (let index = 1; index < ring.length; index += 1) {
       const [ax, az] = ring[index - 1]!;
       const [bx, bz] = ring[index]!;
@@ -172,12 +178,19 @@ function addBuilding(target: Batch, building: OwnedDistrictBuilding): void {
       const dz = b[2] - a[2];
       const length = Math.max(Math.hypot(dx, dz), 1e-6);
       quad(target, a, b, c, d, [-dz / length, 0, dx / length]);
-      const roofA = target.positions.length / 3;
-      target.positions.push(d[0], height, d[2], c[0], height, c[2]);
-      target.normals.push(0, 1, 0, 0, 1, 0);
-      target.indices.push(roofCentre, roofA, roofA + 1);
+      if (includeRoof) {
+        const roofA = target.positions.length / 3;
+        target.positions.push(d[0], height, d[2], c[0], height, c[2]);
+        target.normals.push(0, 1, 0, 0, 1, 0);
+        target.indices.push(roofCentre, roofA, roofA + 1);
+      }
     }
   }
+}
+
+function addRoof(target: Batch, building: OwnedDistrictBuilding): void {
+  const height = building.height_cm / 100 + 0.008;
+  addFlatPolygon(target, building.polygons, height);
 }
 
 function addWindows(target: Batch, building: OwnedDistrictBuilding): void {
@@ -392,17 +405,28 @@ function addGround(
   device: pc.GraphicsDevice,
   parent: pc.Entity,
   materialValue: pc.Material,
+  boundsCm: readonly [number, number, number, number],
 ): pc.Mesh {
+  const [west, north, east, south] = boundsCm.map((value) => value / 100) as [
+    number, number, number, number,
+  ];
+  const source = batch();
+  quad(
+    source,
+    [west, 0, north],
+    [west, 0, south],
+    [east, 0, south],
+    [east, 0, north],
+    [0, 1, 0],
+  );
+  const geometry = mesh(device, source);
+  if (geometry === null) throw new Error('Owned district ground bounds produced no geometry');
   const ground = new pc.Entity('owned-district-visible-support');
-  const geometry = pc.createBox(device, {
-    halfExtents: new pc.Vec3(340, 0.2, 334),
-  });
   ground.addComponent('render', {
     meshInstances: [new pc.MeshInstance(geometry, materialValue, ground)],
     castShadows: false,
     receiveShadows: true,
   });
-  ground.setPosition(0, -0.2, 0);
   parent.addChild(ground);
   return geometry;
 }
@@ -437,7 +461,7 @@ export class OwnedDistrictRuntime {
     asphalt.useMetalness = true;
     asphalt.update();
     this.materials.push(asphalt);
-    this.meshes.push(addGround(device, this.root, asphalt));
+    this.meshes.push(addGround(device, this.root, asphalt, district.bounds_cm));
 
     const sidewalkBatch = batch();
     for (const sidewalk of district.sidewalks) {
@@ -463,11 +487,13 @@ export class OwnedDistrictRuntime {
     }
 
     const batches = district.materials.map(() => batch());
+    const roofBatch = batch();
     const windowsBatch = batch();
     const facadeBandBatch = batch();
     const architecturalDetailBatch = batch();
     for (const building of district.buildings) {
-      addBuilding(batches[building.material % batches.length]!, building);
+      addBuilding(batches[building.material % batches.length]!, building, false);
+      addRoof(roofBatch, building);
       addWindows(windowsBatch, building);
       addFacadeBands(facadeBandBatch, building);
       addArchitecturalDetails(architecturalDetailBatch, building);
@@ -486,6 +512,24 @@ export class OwnedDistrictRuntime {
       this.meshes.push(geometry);
       this.materials.push(surface);
       this.root.addChild(entity);
+      drawCalls += 1;
+    }
+    const roofMesh = mesh(device, roofBatch);
+    if (roofMesh !== null) {
+      const roofMaterial = new pc.StandardMaterial();
+      roofMaterial.diffuse = new pc.Color(0.18, 0.195, 0.19);
+      roofMaterial.emissive = new pc.Color(0.008, 0.009, 0.008);
+      roofMaterial.gloss = 0.14;
+      roofMaterial.update();
+      const roofs = new pc.Entity('owned-building-roofs');
+      roofs.addComponent('render', {
+        meshInstances: [new pc.MeshInstance(roofMesh, roofMaterial, roofs)],
+        castShadows: true,
+        receiveShadows: true,
+      });
+      this.meshes.push(roofMesh);
+      this.materials.push(roofMaterial);
+      this.root.addChild(roofs);
       drawCalls += 1;
     }
     const windowsMesh = mesh(device, windowsBatch);
