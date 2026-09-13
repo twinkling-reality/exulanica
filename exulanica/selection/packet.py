@@ -51,9 +51,12 @@ from exulanica.store.resolve import address_from_span_row
 __all__ = [
     "MAX_PACKET_ITEMS",
     "TOKEN_LENGTH",
+    "ContentEvidenceItem",
+    "ContentEvidencePacket",
     "EvidenceItem",
     "EvidencePacket",
     "ValueReference",
+    "build_content_packet",
     "build_packet",
 ]
 
@@ -163,6 +166,52 @@ class EvidencePacket:
     @property
     def truncated(self) -> bool:
         return self.total_matched > len({item.capture_id for item in self.items})
+
+
+@dataclass(frozen=True, slots=True)
+class ContentEvidenceItem:
+    """Packet-scoped handle to one immutable typed content lineage."""
+
+    token: str
+    truth_class: str
+    result_kind: str
+    source_id: str
+    lineage_ids: tuple[str, ...]
+    label: str | None
+    personal_visit_evidence: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ContentEvidencePacket:
+    items: tuple[ContentEvidenceItem, ...]
+    total_matched: int
+
+    def resolve(self, token: str) -> ContentEvidenceItem | None:
+        normalized = token.strip().strip("[]")
+        return next((item for item in self.items if item.token == normalized), None)
+
+
+def build_content_packet(result: SelectionResult) -> ContentEvidencePacket:
+    """Bound source, memory, authored, and simulated records without merging truth classes."""
+    taken: set[str] = set()
+    items = tuple(
+        ContentEvidenceItem(
+            token=_token(taken),
+            truth_class={
+                "personal": "authorized_memory",
+                "imported": "admitted_source",
+                "authored": "authored_version",
+                "simulated": "simulation",
+            }.get(item.origin_kind, "other"),
+            result_kind=item.result_kind,
+            source_id=item.source_id,
+            lineage_ids=item.lineage_ids,
+            label=item.label,
+            personal_visit_evidence=item.personal_visit_evidence,
+        )
+        for item in result.content[:MAX_PACKET_ITEMS]
+    )
+    return ContentEvidencePacket(items=items, total_matched=result.total_matched)
 
 
 def _token(taken: set[str]) -> str:

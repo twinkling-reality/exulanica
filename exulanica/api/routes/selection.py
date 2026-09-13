@@ -64,6 +64,7 @@ from exulanica.selection.environment_proposal import (
     EnvironmentOperation,
     draft_environment_operation,
 )
+from exulanica.selection.packet import build_content_packet
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import PROMPT_VERSION, ModelCall, answer_question, propose_plan
@@ -288,6 +289,10 @@ class AnswerView(BaseModel):
     citations: dict[str, str] = Field(
         description="Citation token to the permalink it resolves to, for this response only."
     )
+    grounding: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Packet-scoped typed source, memory, authored, or simulation lineages.",
+    )
     abstained: Abstention | None
     #: True when the composer's output was discarded and the deterministic answer used instead.
     deterministic: bool
@@ -441,6 +446,22 @@ def ask(
             if outcome.packet is None
             else {item.token: item.uri for item in outcome.packet.items}
         ),
+        grounding=(
+            []
+            if outcome.content_packet is None
+            else [
+                {
+                    "token": item.token,
+                    "truth_class": item.truth_class,
+                    "result_kind": item.result_kind,
+                    "source_id": item.source_id,
+                    "lineage_ids": list(item.lineage_ids),
+                    "label": item.label,
+                    "personal_visit_evidence": item.personal_visit_evidence,
+                }
+                for item in outcome.content_packet.items
+            ]
+        ),
         abstained=outcome.abstention,
         deterministic=outcome.deterministic,
         repaired=outcome.repaired,
@@ -534,6 +555,26 @@ def packet(
     """
     validated = validate(connection, plan, session)
     result = execute(connection, validated)
+    if result.intent is Intent.CONTENT:
+        content = build_content_packet(result)
+        return {
+            "citable": True,
+            "total_matched": content.total_matched,
+            "truncated": content.total_matched > len(content.items),
+            "items": [
+                {
+                    "token": item.token,
+                    "truth_class": item.truth_class,
+                    "result_kind": item.result_kind,
+                    "source_id": item.source_id,
+                    "lineage_ids": list(item.lineage_ids),
+                    "label": item.label,
+                    "personal_visit_evidence": item.personal_visit_evidence,
+                }
+                for item in content.items
+            ],
+            "values": [],
+        }
     built = build_packet(connection, result, workspace_id=session.workspace_id)
     return {
         "citable": built.citable,

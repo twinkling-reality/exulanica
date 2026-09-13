@@ -370,6 +370,42 @@ select 'authored_environment_instance','authored','environment_instance',i.origi
       and environment_resource_allows(
             %(workspace)s,'asset',p.index_asset_id,'compose',statement_timestamp()))
    )
+union all
+select 'synthetic_inhabitant','simulated','inhabitant',null::text,
+       'simulated_at','scheduled_presence',
+       selected.entity_id,s.place_id,s.world_id,s.version_id,
+       inhabitant->>'id',
+       array[
+         'society:'||s.society_id::text,
+         'inhabitant:'||(inhabitant->>'id'),
+         'world-version:'||s.world_id||':'||s.version_id::text
+       ]::text[],
+       (inhabitant->>'display_name')||' · synthetic '||(inhabitant->>'role'),
+       false,4,s.created_at,
+       'inhabitant:'||(inhabitant->>'id'),
+       null::bytea,null::bytea,null::bytea
+  from world_society s
+  join selected_places selected on selected.place_id=s.place_id
+  cross join lateral jsonb_array_elements(s.state->'inhabitants') inhabitant
+ where s.workspace_id=%(workspace)s
+union all
+select 'simulation_event','simulated','event',null::text,
+       'simulated_at','recorded_simulation_event',
+       selected.entity_id,e.place_id,s.world_id,s.version_id,
+       e.event_id::text,
+       array[
+         'society:'||s.society_id::text,
+         'event:'||e.event_id::text,
+         'inhabitant:'||e.subject_id::text
+       ]::text[],
+       e.document->>'summary',false,5,e.recorded_at,
+       'event:'||e.event_id::text,
+       null::bytea,null::bytea,null::bytea
+  from world_society_event e
+  join world_society s
+    on s.workspace_id=e.workspace_id and s.society_id=e.society_id
+  join selected_places selected on selected.place_id=e.place_id
+ where e.workspace_id=%(workspace)s
 """
 )
 

@@ -59,8 +59,13 @@ from exulanica.selection.answer import (
     validate_answer,
 )
 from exulanica.selection.embeddings import embed_query, has_embeddings
-from exulanica.selection.executor import SelectionResult, execute
-from exulanica.selection.packet import EvidencePacket, build_packet
+from exulanica.selection.executor import SelectedContent, SelectionResult, execute
+from exulanica.selection.packet import (
+    ContentEvidencePacket,
+    EvidencePacket,
+    build_content_packet,
+    build_packet,
+)
 from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.validation import (
     RejectionCode,
@@ -78,6 +83,7 @@ __all__ = [
     "answer_question",
     "compose_answer",
     "propose_plan",
+    "render_content_answer",
 ]
 
 #: Bumped when either prompt changes. It is an input to the response cache key, so an edit that
@@ -266,6 +272,41 @@ def _reported(usage: Mapping[str, Any], key: str) -> int | None:
     return int(value)
 
 
+def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
+    """Render typed truth classes without sending personal or simulated state to a model."""
+    clauses = []
+    for item in content[:8]:
+        label = item.label or item.source_id
+        if item.result_kind == "memory_capture":
+            text = f"Authorized memory evidence: {label}."
+        elif item.result_kind == "admitted_environment_source":
+            text = f"Admitted source record: {label}."
+        elif item.result_kind == "admitted_environment_feature":
+            text = f"Source-derived feature: {label}."
+        elif item.result_kind == "authored_environment_instance":
+            text = (
+                f"Authored {item.authored_role or 'world'} change: {label}. "
+                "This modifies a version, not its source record."
+            )
+        elif item.result_kind == "synthetic_inhabitant":
+            text = f"Simulated inhabitant: {label}. This is not a real resident."
+        elif item.result_kind == "simulation_event":
+            text = f"Persisted simulation event: {label}. This is not a real-world visit."
+        else:
+            text = f"Authorized related content: {label}."
+        clauses.append(AnswerClause(text=text, type=ClauseType.META))
+    clauses.append(
+        AnswerClause(
+            text=(
+                "Only memory captures can support a personal visit. Imported, authored, "
+                "and simulated records cannot."
+            ),
+            type=ClauseType.META,
+        )
+    )
+    return Answer(clauses=clauses)
+
+
 class CallLog:
     """The calls one question made, in order.
 
@@ -336,6 +377,7 @@ class AnsweredQuestion:
     #: ``None`` when nothing was executed, which is not the same as an empty packet: an empty
     #: packet is a search that found nothing, and this is no search at all.
     packet: EvidencePacket | None = None
+    content_packet: ContentEvidencePacket | None = None
     #: Set when the composer failed validation once and was asked again.
     repaired: bool = False
     #: Set when the model's output was discarded and the deterministic answer used instead.
@@ -767,19 +809,10 @@ def answer_question(
                 calls=log.calls,
             )
         return AnsweredQuestion(
-            answer=Answer(
-                clauses=[
-                    AnswerClause(
-                        text=(
-                            "The typed selection below contains the related content. Imported "
-                            "and authored items are not evidence of a personal visit."
-                        ),
-                        type=ClauseType.META,
-                    )
-                ]
-            ),
+            answer=render_content_answer(result.content),
             plan=plan,
             result=result,
+            content_packet=build_content_packet(result),
             deterministic=True,
             calls=log.calls,
         )

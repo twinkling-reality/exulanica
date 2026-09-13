@@ -97,7 +97,7 @@ class ContentPageCursor(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind_order: Annotated[int, Field(ge=0, le=3)]
+    kind_order: Annotated[int, Field(ge=0, le=5)]
     sort_time: dt.datetime
     result_key: Annotated[str, Field(min_length=1, max_length=700)]
 
