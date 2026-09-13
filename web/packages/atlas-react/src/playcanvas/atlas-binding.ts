@@ -1642,6 +1642,7 @@ export class AtlasBinding {
     const navigating = this.navigationTransition !== null;
     if (navigating) this.advanceDirectNavigation(dt * 1000);
     else if (this.inspection === null) this.controls.update(dt);
+    this.ownedDistrict?.tickSociety(nowMs);
 
     const s = this.controls.state;
     this.pose.position.set(

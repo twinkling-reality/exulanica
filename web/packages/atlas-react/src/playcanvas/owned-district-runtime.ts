@@ -43,6 +43,18 @@ interface Batch {
   readonly indices: number[];
 }
 
+interface SocietyAnimation {
+  readonly startedAtMs: number;
+  readonly durationMs: number;
+  readonly inhabitants: readonly {
+    readonly id: string;
+    readonly role: string;
+    readonly ordinal: number;
+    readonly from: readonly [number, number];
+    readonly to: readonly [number, number];
+  }[];
+}
+
 const batch = (): Batch => ({ positions: [], normals: [], indices: [] });
 
 function color(hex: string): pc.Color {
@@ -441,6 +453,9 @@ export class OwnedDistrictRuntime {
   private readonly materials: pc.Material[] = [];
   private societyMeshes: pc.Mesh[] = [];
   private societyMaterials: pc.Material[] = [];
+  private readonly societyMeshesByRole = new Map<string, pc.Mesh>();
+  private readonly societyPositions = new Map<string, readonly [number, number]>();
+  private societyAnimation: SocietyAnimation | null = null;
   private destroyed = false;
 
   constructor(
@@ -737,6 +752,7 @@ export class OwnedDistrictRuntime {
     for (const held of this.societyMaterials) held.destroy();
     this.societyMeshes = [];
     this.societyMaterials = [];
+    this.societyMeshesByRole.clear();
     const visible = [...state.inhabitants]
       .filter((inhabitant) => inhabitant.synthetic === true)
       .sort((a, b) => observer === undefined ? 0 :
@@ -745,12 +761,18 @@ export class OwnedDistrictRuntime {
       .slice(0, Math.max(0, Math.min(visibleCap, 24)));
     const roleOrder = ['baker', 'designer', 'gardener', 'student', 'steward', 'teacher'] as const;
     const batches = new Map<string, Batch>(roleOrder.map((role) => [role, batch()]));
-    visible.forEach((inhabitant, ordinal) => {
-      const [x, z] = inhabitant.position_mm;
+    const animated = visible.map((inhabitant, ordinal) => {
       const role = roleOrder.includes(inhabitant.role as typeof roleOrder[number])
         ? inhabitant.role!
         : roleOrder[ordinal % roleOrder.length]!;
-      addInhabitant(batches.get(role)!, x / 1000, z / 1000, ordinal);
+      const to = [
+        inhabitant.position_mm[0] / 1000,
+        inhabitant.position_mm[1] / 1000,
+      ] as const;
+      const from = this.societyPositions.get(inhabitant.id) ?? to;
+      this.societyPositions.set(inhabitant.id, to);
+      addInhabitant(batches.get(role)!, from[0], from[1], ordinal);
+      return { id: inhabitant.id, role, ordinal, from, to };
     });
     const roleColors: Readonly<Record<string, pc.Color>> = {
       baker: new pc.Color(0.67, 0.42, 0.24),
@@ -776,10 +798,44 @@ export class OwnedDistrictRuntime {
         receiveShadows: true,
       });
       this.societyMeshes.push(geometry);
+      this.societyMeshesByRole.set(role, geometry);
       this.societyMaterials.push(surface);
       this.societyRoot.addChild(entity);
     }
+    this.societyAnimation = {
+      startedAtMs: performance.now(),
+      durationMs: 1_850,
+      inhabitants: animated,
+    };
     return visible.length;
+  }
+
+  /** Interpolate display meshes only; authoritative endpoints remain the society snapshots. */
+  tickSociety(nowMs: number): void {
+    const animation = this.societyAnimation;
+    if (animation === null) return;
+    const linear = Math.max(0, Math.min(1, (nowMs - animation.startedAtMs) / animation.durationMs));
+    const progress = linear * linear * (3 - 2 * linear);
+    const batches = new Map<string, Batch>();
+    for (const inhabitant of animation.inhabitants) {
+      const target = batches.get(inhabitant.role) ?? batch();
+      batches.set(inhabitant.role, target);
+      addInhabitant(
+        target,
+        inhabitant.from[0] + (inhabitant.to[0] - inhabitant.from[0]) * progress,
+        inhabitant.from[1] + (inhabitant.to[1] - inhabitant.from[1]) * progress,
+        inhabitant.ordinal,
+      );
+    }
+    for (const [role, source] of batches) {
+      const geometry = this.societyMeshesByRole.get(role);
+      if (geometry === undefined) continue;
+      geometry.setPositions(source.positions);
+      geometry.setNormals(source.normals);
+      geometry.setIndices(source.indices);
+      geometry.update(pc.PRIMITIVE_TRIANGLES);
+    }
+    if (linear >= 1) this.societyAnimation = null;
   }
 
   /** Exact semantic hit against admitted extruded footprints, independent of mesh names. */
