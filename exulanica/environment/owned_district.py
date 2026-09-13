@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import uuid
 from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
@@ -16,6 +17,8 @@ from exulanica.canonical import canonical_json
 
 PROFILE: Final = "exulanica.owned-district/v1"
 GENERATOR: Final = "flatiron-district-compiler/1"
+PLACE_ID: Final = "d08f61bb-ef6d-4f5d-8bd8-a596da51f971"
+ADMISSION_NAMESPACE: Final = uuid.UUID("7e79ce7d-8efc-478b-95c3-bdfc7bb4592d")
 COORDINATE_SCALE: Final = 100
 BOUNDS: Final = (-73.994, 40.739, -73.986, 40.745)
 ORIGIN: Final = (-73.99, 40.742)
@@ -57,6 +60,7 @@ class DownloadedLayer:
 class CompiledDistrict:
     data: bytes
     manifest: bytes
+    admission_plan: bytes
     buildings: int
     sidewalks: int
 
@@ -187,17 +191,24 @@ def _buildings(document: dict[str, Any]) -> list[dict[str, Any]]:
                 "material": int(identity) % 7,
             }
         )
-    return sorted(result, key=lambda item: item["id"])
+    ordered = sorted(result, key=lambda item: item["id"])
+    return [{**item, "render_batch_id": index} for index, item in enumerate(ordered)]
 
 
 def _sidewalks(document: dict[str, Any]) -> list[dict[str, Any]]:
     result = []
-    for ordinal, feature in enumerate(document["features"]):
+    seen: set[str] = set()
+    for feature in document["features"]:
         properties = feature.get("properties", {})
         polygons = _polygons(feature["geometry"])
+        identity = hashlib.sha256(canonical_json(polygons)).hexdigest()
+        if identity in seen:
+            raise ValueError("duplicate canonical sidewalk geometry")
+        seen.add(identity)
         result.append(
             {
-                "id": f"sidewalk:{properties.get('source_id') or ordinal}",
+                "id": f"sidewalk_geometry_sha256:{identity}",
+                "source_id": properties.get("source_id"),
                 "status": properties.get("status"),
                 "polygons": polygons,
                 "bbox_cm": _bbox(polygons),
@@ -315,9 +326,57 @@ def compile_district(
         "source_records": source_records,
         "counts": {"buildings": len(buildings), "sidewalks": len(sidewalks)},
     }
+    admissions = {
+        "profile": "exulanica.owned-district-admission-plan/v1",
+        "place_id": PLACE_ID,
+        "status": "ready_to_admit",
+        "sources": [
+            {
+                "admission_id": str(
+                    uuid.uuid5(
+                        ADMISSION_NAMESPACE,
+                        f"{record['dataset_id']}:{record['provider_revision']}:{record['sha256']}",
+                    )
+                ),
+                "place_id": PLACE_ID,
+                "provider_key": "nyc-open-data",
+                "provider_original_id": record["dataset_id"],
+                "provider_revision": record["provider_revision"],
+                "expected_sha256": record["sha256"],
+                "expected_byte_size": record["byte_size"],
+                "source_path": record["source_url"],
+                "local_path": (
+                    "source/buildings.geojson"
+                    if record["dataset_id"] == BUILDING_DATASET
+                    else "source/sidewalks.geojson"
+                ),
+                "media_type": "application/geo+json",
+                "geographic_frame": {
+                    "name": "crs84",
+                    "crs": "OGC:CRS84",
+                    "axis_order": ["longitude", "latitude"],
+                    "horizontal_unit": "degree",
+                    "vertical_unit": "metre",
+                    "orientation": "east-north-up",
+                    "altitude_reference": "not_supplied",
+                },
+                "geographic_bounds": {
+                    "kind": "bbox",
+                    "frame_name": "crs84",
+                    "coordinate_scale": 10_000_000,
+                    "coordinates": [int(value * 10_000_000) for value in BOUNDS],
+                },
+                "operation_rights": RIGHTS,
+                "attribution": ATTRIBUTION,
+                "modification_notice": MODIFICATION_NOTICE,
+            }
+            for record in source_records
+        ],
+    }
     return CompiledDistrict(
         data=data,
         manifest=canonical_json(manifest) + b"\n",
+        admission_plan=canonical_json(admissions) + b"\n",
         buildings=len(buildings),
         sidewalks=len(sidewalks),
     )
@@ -336,3 +395,4 @@ def write_bundle(
     (source / "sidewalks.geojson").write_bytes(sidewalk.data)
     (destination / "flatiron-owned-district.json").write_bytes(compiled.data)
     (destination / "manifest.json").write_bytes(compiled.manifest)
+    (destination / "admission-plan.json").write_bytes(compiled.admission_plan)

@@ -153,6 +153,44 @@ function mesh(device: pc.GraphicsDevice, source: Batch): pc.Mesh | null {
   return result;
 }
 
+function inside(
+  point: readonly [number, number],
+  ring: readonly (readonly [number, number])[],
+): boolean {
+  let value = false;
+  for (let index = 0, prior = ring.length - 1; index < ring.length; prior = index++) {
+    const a = ring[index]!;
+    const b = ring[prior]!;
+    if (
+      (a[1] > point[1]) !== (b[1] > point[1]) &&
+      point[0] < (b[0] - a[0]) * (point[1] - a[1]) / (b[1] - a[1]) + a[0]
+    ) value = !value;
+  }
+  return value;
+}
+
+function rayBox(
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  minimum: readonly [number, number, number],
+  maximum: readonly [number, number, number],
+): number | null {
+  let near = 0;
+  let far = Number.POSITIVE_INFINITY;
+  for (let axis = 0; axis < 3; axis += 1) {
+    if (Math.abs(direction[axis]!) < 1e-9) {
+      if (origin[axis]! < minimum[axis]! || origin[axis]! > maximum[axis]!) return null;
+      continue;
+    }
+    const first = (minimum[axis]! - origin[axis]!) / direction[axis]!;
+    const second = (maximum[axis]! - origin[axis]!) / direction[axis]!;
+    near = Math.max(near, Math.min(first, second));
+    far = Math.min(far, Math.max(first, second));
+    if (near > far) return null;
+  }
+  return far >= 0 ? near : null;
+}
+
 function addGround(
   device: pc.GraphicsDevice,
   parent: pc.Entity,
@@ -369,6 +407,38 @@ export class OwnedDistrictRuntime {
     this.materials.push(surface);
     this.societyRoot.addChild(entity);
     return visible.length;
+  }
+
+  /** Exact semantic hit against admitted extruded footprints, independent of mesh names. */
+  pickBuilding(
+    origin: readonly [number, number, number],
+    direction: readonly [number, number, number],
+  ): OwnedDistrictBuilding | null {
+    let selected: { building: OwnedDistrictBuilding; distance: number } | null = null;
+    for (const building of this.district.buildings) {
+      const [west, north, east, south] = building.bbox_cm.map((value) => value / 100) as [
+        number, number, number, number,
+      ];
+      const distance = rayBox(
+        origin,
+        direction,
+        [west, 0, north],
+        [east, building.height_cm / 100, south],
+      );
+      if (distance === null || (selected !== null && distance >= selected.distance)) continue;
+      const sampleDistance = distance + 0.01;
+      const point: [number, number] = [
+        (origin[0] + direction[0] * sampleDistance) * 100,
+        (origin[2] + direction[2] * sampleDistance) * 100,
+      ];
+      const hit = building.polygons.some((polygon) => {
+        const exterior = polygon[0];
+        return exterior !== undefined && inside(point, exterior) &&
+          polygon.slice(1).every((hole) => !inside(point, hole));
+      });
+      if (hit) selected = { building, distance };
+    }
+    return selected?.building ?? null;
   }
 
   destroy(): void {

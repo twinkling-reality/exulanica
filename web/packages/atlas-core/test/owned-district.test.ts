@@ -28,6 +28,7 @@ const fixture = {
     construction_year: null,
     height_cm: 1000,
     material: 0,
+    render_batch_id: 0,
     bbox_cm: [-100, -300, 100, 300],
     polygons: [[[[-100, -300], [100, -300], [100, 300], [-100, 300], [-100, -300]]]],
   }],

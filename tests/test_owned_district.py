@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from exulanica.environment.admission import SourceAdmission
 from exulanica.environment.owned_district import (
     BUILDING_DATASET,
     SIDEWALK_DATASET,
@@ -63,6 +64,7 @@ def test_compiler_is_deterministic_engine_neutral_and_lineage_bound(tmp_path):
     second = compile_district(buildings, sidewalks)
     document = json.loads(first.data)
     manifest = json.loads(first.manifest)
+    admission_plan = json.loads(first.admission_plan)
 
     assert first == second
     assert document["profile"] == "exulanica.owned-district/v1"
@@ -70,13 +72,23 @@ def test_compiler_is_deterministic_engine_neutral_and_lineage_bound(tmp_path):
     assert document["road_completion"]["generated"] is True
     assert document["navigation"]["collision"] == "building-exterior-rings"
     assert document["buildings"][0]["id"].startswith("doitt_id:")
+    assert [held["render_batch_id"] for held in document["buildings"]] == [0, 1]
     assert len(document["materials"]) == 7
     assert all(record["operation_rights"]["modify"] for record in document["source_records"])
     assert manifest["artifact"]["sha256"] == hashlib.sha256(first.data).hexdigest()
+    admissions = [
+        SourceAdmission.model_validate(source) for source in admission_plan["sources"]
+    ]
+    assert {value.provider_original_id for value in admissions} == {
+        BUILDING_DATASET,
+        SIDEWALK_DATASET,
+    }
+    assert all(value.operation_rights.modify for value in admissions)
 
     write_bundle(tmp_path, buildings, sidewalks, first)
     assert (tmp_path / "flatiron-owned-district.json").read_bytes() == first.data
     assert (tmp_path / "source" / "buildings.geojson").read_bytes() == buildings.data
+    assert (tmp_path / "admission-plan.json").read_bytes() == first.admission_plan
 
 
 def test_compiler_rejects_wrong_layer_identity():

@@ -8,6 +8,7 @@ export interface OwnedDistrictBuilding {
   readonly construction_year: string | null;
   readonly height_cm: number;
   readonly material: number;
+  readonly render_batch_id: number;
   readonly bbox_cm: readonly [number, number, number, number];
   readonly polygons: readonly (readonly (readonly (readonly [number, number])[])[])[];
 }
@@ -79,6 +80,7 @@ export function parseOwnedDistrict(value: unknown): OwnedDistrict {
       typeof building.id !== 'string' ||
       !building.id.startsWith('doitt_id:') ||
       !Number.isSafeInteger(building.height_cm) ||
+      !Number.isSafeInteger(building.render_batch_id) ||
       building.height_cm < 0 ||
       !isIntegerTuple(building.bbox_cm, 4) ||
       !Array.isArray(building.polygons)

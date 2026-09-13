@@ -416,10 +416,16 @@ export function mountEnvironmentSelection(
       installedInteract = () => {
         const position = atlas.controls.state;
         const forward = atlas.controls.forward?.() ?? atlas.camera.forward;
-        const hit = overlay!.pick(
+        const owned = atlas.ownedDistrict?.pickBuilding(
           [position.x, position.y, position.z],
           [forward.x, forward.y, forward.z],
         );
+        const hit = owned == null
+          ? overlay!.pick(
+            [position.x, position.y, position.z],
+            [forward.x, forward.y, forward.z],
+          )
+          : features.find((feature) => feature.providerFeatureId === owned.id) ?? null;
         if (hit === null) priorInteract?.();
         else reportSelection(hit);
       };
