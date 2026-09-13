@@ -61,13 +61,14 @@ from exulanica.selection.answer import (
 from exulanica.selection.embeddings import embed_query, has_embeddings
 from exulanica.selection.executor import SelectionResult, execute
 from exulanica.selection.packet import EvidencePacket, build_packet
-from exulanica.selection.plan import SelectionPlan
+from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.validation import (
     RejectionCode,
     SelectionRejected,
     Session,
     validate,
 )
+from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
     "AnsweredQuestion",
@@ -116,7 +117,7 @@ __all__ = [
 #:     uncitable and the answer was an ``UNANSWERABLE_AMBIGUOUS`` abstention telling the user to
 #:     "confirm them, or ask again for confirmed matches only" about a question that had nothing
 #:     to do with confidence. Another field filled because the form had a slot for it.
-PROMPT_VERSION: Final = "selection-4"
+PROMPT_VERSION: Final = "selection-5"
 
 #: How many entities the planner may be shown. A bound, because the catalogue goes into a prompt
 #: and a library with a thousand named people would otherwise cost more than the answer.
@@ -408,6 +409,11 @@ id, or none, the only valid mode is 'any'. A form with one id and mode 'all' is 
 and the question goes unanswered.
 - Choose intent 'entities' when the question asks WHO or WHAT appears, and 'captures' when it \
 asks WHICH photographs.
+- Choose intent 'content' only for a request to find related material across memories, imported \
+geography, and authored versions. It requires a place id and a `content` selector. Use scope \
+'related' for the broad union and 'memories_only' when the request explicitly asks only for \
+personal memories. A content selection cannot carry entity, time, capture, or semantic-text \
+filters; leave those empty.
 - Times are absolute instants with an offset. `time` is a LIST of windows and it is NOT \
 nullable: when the question gives no time, the answer is the empty list [], never null and never \
 a window standing in for one.
@@ -423,7 +429,8 @@ nothing reached that way may be cited, so choosing it on an ordinary question tu
 question into one the system has to decline.
 
 The form requires every field to be PRESENT. It does not require every field to be FILLED, and \
-the empty answer differs by field: `entities`, `place`, `capture` and `semantic_query` take null, \
+the empty answer differs by field: `entities`, `place`, `capture`, `content` and \
+`semantic_query` take null, \
 `time` takes [], and null is the right answer whenever the question does not constrain that \
 dimension. A field filled in because the form has a slot for it is a filter the question did not \
 ask for."""
@@ -683,6 +690,7 @@ def answer_question(
     *,
     plan: SelectionPlan | None = None,
     now: dt.datetime | None = None,
+    store: ContentAddressedStore | None = None,
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
 
@@ -740,7 +748,41 @@ def answer_question(
         # An unavailable vector role leaves lexical retrieval usable.
         with suppress(ModelError):
             query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)
-    result = execute(connection, validated, query_embedding=query_vector)
+    result = execute(connection, validated, query_embedding=query_vector, store=store)
+    if plan.intent is Intent.CONTENT:
+        if result.is_empty:
+            return AnsweredQuestion(
+                answer=Answer(
+                    clauses=[
+                        AnswerClause(
+                            text="No authorized content matches that confirmed place relationship.",
+                            type=ClauseType.META,
+                        )
+                    ]
+                ),
+                plan=plan,
+                result=result,
+                deterministic=True,
+                abstention=Abstention.NOT_CAPTURED,
+                calls=log.calls,
+            )
+        return AnsweredQuestion(
+            answer=Answer(
+                clauses=[
+                    AnswerClause(
+                        text=(
+                            "The typed selection below contains the related content. Imported "
+                            "and authored items are not evidence of a personal visit."
+                        ),
+                        type=ClauseType.META,
+                    )
+                ]
+            ),
+            plan=plan,
+            result=result,
+            deterministic=True,
+            calls=log.calls,
+        )
     packet = build_packet(connection, result, workspace_id=session.workspace_id, now=now)
 
     if packet.is_empty:
@@ -763,7 +805,7 @@ def answer_question(
     # final answer. Reuse the query vector; this check makes no further model call.
     try:
         current_result = execute(connection, validate(connection, plan, session),
-                                 query_embedding=query_vector)
+                                 query_embedding=query_vector, store=store)
         current_packet = build_packet(connection, current_result,
                                       workspace_id=session.workspace_id, now=now)
         unchanged = current_result == result and _same_evidence(packet, current_packet)

@@ -314,6 +314,12 @@ def test_place_narrows_to_the_captures_confirmed_at_it(library):
     assert library.matched(plan) == {"alone_b", "empty"}
 
 
+def test_place_selector_rejects_an_entity_of_the_wrong_class(library):
+    with pytest.raises(SelectionRejected) as rejected:
+        library.run(_plan(place=PlaceSelector(ids=[library.entities["A"]])))
+    assert rejected.value.code is RejectionCode.UNKNOWN_REFERENCE
+
+
 def test_dimensions_combine_with_and(library):
     """A at Gullfoss in March is one photograph, not the union of three filters."""
     plan = _plan(

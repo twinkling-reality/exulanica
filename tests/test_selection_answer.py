@@ -588,7 +588,7 @@ def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
     }
     arrays = {name for name, spec in properties.items() if "items" in spec}
 
-    assert nullable == {"entities", "place", "capture", "semantic_query"}
+    assert nullable == {"entities", "place", "capture", "content", "semantic_query"}
     assert arrays == {"time"}, "a new list field needs its own empty value in the prompt"
 
     paragraph = next(
@@ -629,7 +629,7 @@ def test_planner_content_examples_fit_the_schema(question, terms):
     assert plan.semantic_query == terms
     assert f'"{question}" -> "{terms}"' in _PLANNER_SYSTEM
     assert "Never copy the whole question" in _PLANNER_SYSTEM
-    assert PROMPT_VERSION == "selection-4"
+    assert PROMPT_VERSION == "selection-5"
 
 
 def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant():

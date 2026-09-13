@@ -287,6 +287,16 @@ class EnvironmentRepository:
             geographic_frame=self._frame(frame),
             geographic_bounds=self._bounds(bounds),
         )
+        projected = validate_feature_index(
+            data,
+            admission_id=admission_id,
+            place_id=source_record["place_id"],
+            source_sha256=source_hex,
+            source_receipt_sha256=source_receipt_hex,
+            render_asset_id=value.render_asset_id,
+            render_sha256=render_hex,
+            render_receipt_sha256=render_receipt_hex,
+        )
         stored = self.store.put_bytes(data)
         rights = {
             operation.value: bool(
@@ -390,6 +400,27 @@ class EnvironmentRepository:
                     actor,
                 ),
             )
+            for feature in projected["features"]:
+                self.connection.execute(
+                    """
+                    insert into environment_feature_index_entry(
+                      workspace_id,publication_id,admission_id,place_id,feature_id,
+                      provider_feature_id,feature_kind,label,render_batch_id,bbox)
+                    values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        self.workspace_id,
+                        value.publication_id,
+                        admission_id,
+                        source_record["place_id"],
+                        feature["id"],
+                        feature["provider_feature_id"],
+                        feature["kind"],
+                        feature["label"],
+                        feature["render_batch_id"],
+                        Jsonb(feature["bbox"]),
+                    ),
+                )
         return self.read_features(admission_id)
 
     def read_features(

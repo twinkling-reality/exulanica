@@ -39,11 +39,20 @@ from exulanica.selection.embeddings import (
     QueryEmbedding,
     text_match_query,
 )
-from exulanica.selection.plan import EntityMode, EpistemicScope, Intent, ProcessingState
+from exulanica.selection.plan import (
+    ContentPageCursor,
+    ContentScope,
+    EntityMode,
+    EpistemicScope,
+    Intent,
+    ProcessingState,
+)
 from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
+from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
     "SelectedCapture",
+    "SelectedContent",
     "SelectedEntity",
     "SelectionResult",
     "Support",
@@ -109,6 +118,27 @@ class SelectedEntity:
 
 
 @dataclass(frozen=True, slots=True)
+class SelectedContent:
+    """One authorized member of a unified, place-related result page."""
+
+    result_kind: str
+    origin_kind: str
+    content_kind: str
+    authored_role: str | None
+    place_relationship: str
+    match_reason: str
+    memory_place_entity_id: uuid.UUID
+    canonical_place_id: uuid.UUID | None
+    world_id: str | None
+    version_id: uuid.UUID | None
+    source_id: str
+    lineage_ids: tuple[str, ...]
+    label: str | None
+    availability: str
+    personal_visit_evidence: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SelectionResult:
     """What a Selection resolved to. Deterministic given the same plan and the same data."""
 
@@ -121,14 +151,18 @@ class SelectionResult:
     #: True when the plan's epistemic scope admitted unconfirmed links. Carried on the result so
     #: a downstream caller cannot lose it between here and the citation validator.
     includes_proposals: bool
+    content: tuple[SelectedContent, ...] = ()
+    next_page: ContentPageCursor | None = None
 
     @property
     def truncated(self) -> bool:
+        if self.intent is Intent.CONTENT:
+            return self.next_page is not None
         return self.total_matched > len(self.captures)
 
     @property
     def is_empty(self) -> bool:
-        return not self.captures and not self.entities
+        return not self.captures and not self.entities and not self.content
 
 
 def execute(
@@ -136,6 +170,7 @@ def execute(
     validated: ValidatedPlan,
     *,
     query_embedding: QueryEmbedding | None = None,
+    store: ContentAddressedStore | None = None,
 ) -> SelectionResult:
     """Run a validated plan. The only function in this package that touches data."""
     plan = validated.plan
@@ -144,19 +179,297 @@ def execute(
             sql.SQL("set local statement_timeout = {}").format(sql.Literal(STATEMENT_TIMEOUT_MS))
         )
         connection.execute("set local transaction read only")
-        capture_ids, total = _matching_captures(connection, validated, query_embedding)
-        captures = _describe_captures(connection, validated, capture_ids)
-        entities = (
-            _describe_entities(connection, validated, capture_ids)
-            if plan.intent is Intent.ENTITIES
-            else ()
-        )
+        if plan.intent is Intent.CONTENT:
+            content, total, next_page = _matching_content(connection, validated, store)
+            captures: tuple[SelectedCapture, ...] = ()
+            entities: tuple[SelectedEntity, ...] = ()
+        else:
+            capture_ids, total = _matching_captures(connection, validated, query_embedding)
+            captures = _describe_captures(connection, validated, capture_ids)
+            entities = (
+                _describe_entities(connection, validated, capture_ids)
+                if plan.intent is Intent.ENTITIES
+                else ()
+            )
+            content = ()
+            next_page = None
     return SelectionResult(
         intent=plan.intent,
         captures=captures,
         entities=entities,
         total_matched=total,
         includes_proposals=plan.epistemic is EpistemicScope.INCLUDE_PROPOSALS,
+        content=content,
+        next_page=next_page,
+    )
+
+
+_MEMORY_CONTENT_SQL: Final = """
+with selected_places as (
+  select entity_id,place_id
+    from confirmed_place_entity_bridge
+   where workspace_id=%(workspace)s and entity_id=any(%(place_ids)s::uuid[])
+), memory_candidates as (
+select distinct on(c.capture_id)
+       'memory_capture'::text result_kind,
+       'personal'::text origin_kind,
+       'capture'::text content_kind,
+       null::text authored_role,
+       'captured_at'::text place_relationship,
+       'confirmed_memory_place'::text match_reason,
+       l.entity_id memory_place_entity_id,
+       selected.place_id canonical_place_id,
+       null::text world_id,
+       null::uuid version_id,
+       c.capture_id::text source_id,
+       array[
+         'capture:'||c.capture_id::text,
+         'blob:'||encode(c.blob_sha256,'hex'),
+         'place-entity:'||l.entity_id::text
+       ]::text[] lineage_ids,
+       null::text label,
+       true personal_visit_evidence,
+       0::integer kind_order,
+       coalesce(c.started_at,c.created_at) sort_time,
+       'memory:'||c.capture_id::text result_key,
+       c.blob_sha256 source_sha256,
+       null::bytea render_sha256,
+       null::bytea index_sha256
+  from capture c
+  join occurrence o
+    on o.workspace_id=c.workspace_id and o.capture_id=c.capture_id and o.class='place'
+  join entity_link l
+    on l.workspace_id=o.workspace_id and l.occurrence_id=o.occurrence_id
+   and l.state='confirmed'
+  left join selected_places selected on selected.entity_id=l.entity_id
+ where c.workspace_id=%(workspace)s
+   and c.deleted_at is null
+   and l.entity_id=any(%(place_ids)s::uuid[])
+   and not tombstone_blocks_capture(c.workspace_id,c.capture_id)
+   and not tombstone_blocks_any_span(o.workspace_id,o.span_ids)
+ order by c.capture_id,l.entity_id
+)
+select * from memory_candidates
+"""
+
+_RELATED_CONTENT_SQL: Final = (
+    _MEMORY_CONTENT_SQL
+    + """
+union all
+select 'admitted_environment_source','imported','environment_source',null::text,
+       'admitted_for','canonical_place_bridge',
+       selected.entity_id,s.place_id,null::text,null::uuid,
+       s.admission_id::text,
+       array[
+         'admission:'||s.admission_id::text,
+         'provider:'||s.provider_key||':'||s.provider_original_id||':'||s.provider_revision,
+         'source-receipt:'||encode(s.receipt_sha256,'hex')
+       ]::text[],
+       s.attribution,false,1,s.admitted_at,
+       'source:'||s.admission_id::text,
+       s.source_sha256,null::bytea,null::bytea
+  from environment_source_admission s
+  join selected_places selected on selected.place_id=s.place_id
+ where s.workspace_id=%(workspace)s
+   and s.withdrawn_at is null
+   and environment_resource_allows(
+         %(workspace)s,'source',s.admission_id,'display',statement_timestamp())
+union all
+select 'admitted_environment_feature','imported','environment_feature',null::text,
+       'admitted_for','canonical_place_bridge',
+       selected.entity_id,f.place_id,null::text,null::uuid,
+       f.publication_id::text||':'||f.feature_id,
+       array[
+         'admission:'||f.admission_id::text,
+         'publication:'||f.publication_id::text,
+         'feature:'||f.feature_id,
+         'index-asset:'||p.index_asset_id::text,
+         'render-asset:'||p.render_asset_id::text
+       ]::text[],
+       f.label,false,2,p.published_at,
+       'feature:'||f.publication_id::text||':'||f.feature_id,
+       p.source_sha256,p.render_sha256,p.index_sha256
+  from environment_feature_index_entry f
+  join selected_places selected on selected.place_id=f.place_id
+  join environment_feature_index_publication p
+    on p.workspace_id=f.workspace_id and p.publication_id=f.publication_id
+  join environment_source_admission s
+    on s.workspace_id=p.workspace_id and s.admission_id=p.admission_id
+  join derived_environment_asset idx
+    on idx.workspace_id=p.workspace_id and idx.asset_id=p.index_asset_id
+  join derived_environment_asset render
+    on render.workspace_id=p.workspace_id and render.asset_id=p.render_asset_id
+ where f.workspace_id=%(workspace)s
+   and s.withdrawn_at is null and idx.withdrawn_at is null and render.withdrawn_at is null
+   and p.publication_id=(
+     select newest.publication_id
+       from environment_feature_index_publication newest
+      where newest.workspace_id=p.workspace_id and newest.admission_id=p.admission_id
+      order by newest.published_at desc,newest.publication_id desc limit 1)
+   and environment_resource_allows(
+         %(workspace)s,'source',p.admission_id,'index',statement_timestamp())
+   and environment_resource_allows(
+         %(workspace)s,'asset',p.index_asset_id,'index',statement_timestamp())
+   and environment_resource_allows(
+         %(workspace)s,'asset',p.render_asset_id,'index',statement_timestamp())
+union all
+select 'authored_environment_instance','authored','environment_instance',i.origin_role,
+       'derived_from','authored_from_canonical_place',
+       selected.entity_id,i.source_place_id,i.world_id,i.version_id,
+       i.world_id||':'||i.version_id::text||':'||i.instance_id,
+       array_remove(array[
+         'admission:'||i.admission_id::text,
+         'render-asset:'||i.render_asset_id::text,
+         case when i.publication_id is null then null
+              else 'publication:'||i.publication_id::text end,
+         case when i.feature_id is null then null else 'feature:'||i.feature_id end,
+         'world-version:'||i.world_id||':'||i.version_id::text
+       ]::text[],null),
+       null::text,false,3,v.created_at,
+       'authored:'||i.world_id||':'||i.version_id::text||':'||i.instance_id,
+       i.source_sha256,i.render_sha256,i.index_sha256
+  from world_alternate_environment_instance i
+  join world_alternate_version v
+    on v.workspace_id=i.workspace_id and v.world_id=i.world_id and v.version_id=i.version_id
+  join selected_places selected on selected.place_id=i.source_place_id
+  join environment_source_admission s
+    on s.workspace_id=i.workspace_id and s.admission_id=i.admission_id
+  join derived_environment_asset render
+    on render.workspace_id=i.workspace_id and render.asset_id=i.render_asset_id
+  left join environment_feature_index_publication p
+    on p.workspace_id=i.workspace_id and p.publication_id=i.publication_id
+  left join derived_environment_asset idx
+    on idx.workspace_id=p.workspace_id and idx.asset_id=p.index_asset_id
+ where i.workspace_id=%(workspace)s and not i.removed
+   and s.withdrawn_at is null and render.withdrawn_at is null
+   and s.place_id=i.source_place_id
+   and s.source_sha256=i.source_sha256 and s.receipt_sha256=i.source_receipt_sha256
+   and render.content_sha256=i.render_sha256
+   and render.receipt_sha256=i.render_receipt_sha256
+   and environment_resource_allows(
+         %(workspace)s,'source',i.admission_id,'compose',statement_timestamp())
+   and environment_resource_allows(
+         %(workspace)s,'asset',i.render_asset_id,'compose',statement_timestamp())
+   and (
+     (i.selection_kind='whole_asset' and i.publication_id is null)
+     or
+     (i.selection_kind='feature'
+      and p.publication_id is not null and idx.withdrawn_at is null
+      and p.source_sha256=i.source_sha256
+      and p.source_receipt_sha256=i.source_receipt_sha256
+      and p.render_sha256=i.render_sha256
+      and p.render_receipt_sha256=i.render_receipt_sha256
+      and p.index_sha256=i.index_sha256
+      and p.index_receipt_sha256=i.index_receipt_sha256
+      and p.receipt_sha256=i.publication_receipt_sha256
+      and p.publication_id=(
+        select newest.publication_id
+          from environment_feature_index_publication newest
+         where newest.workspace_id=p.workspace_id and newest.admission_id=p.admission_id
+         order by newest.published_at desc,newest.publication_id desc limit 1)
+      and environment_resource_allows(
+            %(workspace)s,'asset',p.index_asset_id,'compose',statement_timestamp()))
+   )
+"""
+)
+
+
+def _matching_content(
+    connection: psycopg.Connection,
+    validated: ValidatedPlan,
+    store: ContentAddressedStore | None,
+) -> tuple[tuple[SelectedContent, ...], int, ContentPageCursor | None]:
+    plan = validated.plan
+    assert plan.content is not None
+    candidate_sql = sql.SQL(
+        _MEMORY_CONTENT_SQL
+        if plan.content.scope is ContentScope.MEMORIES_ONLY
+        else _RELATED_CONTENT_SQL
+    )
+    parameters: dict[str, object] = {
+        "workspace": validated.workspace_id,
+        "place_ids": list(validated.place_ids),
+    }
+    total_row = connection.execute(
+        sql.SQL("select count(*) total from ({}) candidates").format(candidate_sql),
+        parameters,
+    ).fetchone()
+    assert total_row is not None
+    total = int(total_row["total"])
+
+    cursor = plan.content.after
+    parameters.update(
+        {
+            "cursor_kind": None if cursor is None else cursor.kind_order,
+            "cursor_time": None if cursor is None else cursor.sort_time,
+            "cursor_key": None if cursor is None else cursor.result_key,
+            "page_size": plan.limit + 1,
+        }
+    )
+    statement = sql.SQL(
+        """
+        select * from ({}) candidates
+         where %(cursor_kind)s::integer is null
+            or kind_order>%(cursor_kind)s
+            or (kind_order=%(cursor_kind)s and sort_time<%(cursor_time)s)
+            or (kind_order=%(cursor_kind)s and sort_time=%(cursor_time)s
+                and result_key>%(cursor_key)s)
+         order by kind_order,sort_time desc,result_key
+         limit %(page_size)s
+        """
+    ).format(candidate_sql)
+    rows = connection.execute(statement, parameters).fetchall()
+    has_more = len(rows) > plan.limit
+    visible_rows = rows[: plan.limit]
+    results = tuple(_content_from_row(row, store) for row in visible_rows)
+    next_page = None
+    if has_more and visible_rows:
+        last = visible_rows[-1]
+        next_page = ContentPageCursor(
+            kind_order=last["kind_order"],
+            sort_time=last["sort_time"],
+            result_key=last["result_key"],
+        )
+    return results, total, next_page
+
+
+def _content_from_row(
+    row: dict[str, object], store: ContentAddressedStore | None
+) -> SelectedContent:
+    availability = "unknown"
+    if store is not None:
+        digests = [
+            value
+            for value in (
+                row["source_sha256"],
+                row["render_sha256"],
+                row["index_sha256"],
+            )
+            if value is not None
+        ]
+        availability = (
+            "available"
+            if all(store.exists(BlobId(bytes(value))) for value in digests)
+            else "unavailable_bytes"
+        )
+    return SelectedContent(
+        result_kind=str(row["result_kind"]),
+        origin_kind=str(row["origin_kind"]),
+        content_kind=str(row["content_kind"]),
+        authored_role=(
+            row["authored_role"] if isinstance(row["authored_role"], str) else None
+        ),
+        place_relationship=str(row["place_relationship"]),
+        match_reason=str(row["match_reason"]),
+        memory_place_entity_id=row["memory_place_entity_id"],  # type: ignore[arg-type]
+        canonical_place_id=row["canonical_place_id"],  # type: ignore[arg-type]
+        world_id=row["world_id"] if isinstance(row["world_id"], str) else None,
+        version_id=row["version_id"],  # type: ignore[arg-type]
+        source_id=str(row["source_id"]),
+        lineage_ids=tuple(row["lineage_ids"]),  # type: ignore[arg-type]
+        label=row["label"] if isinstance(row["label"], str) else None,
+        availability=availability,
+        personal_visit_evidence=bool(row["personal_visit_evidence"]),
     )
 
 

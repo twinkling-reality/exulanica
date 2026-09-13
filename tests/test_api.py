@@ -80,6 +80,14 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
         "params": {"capture_id": str(uuid.uuid4()), "u": "10", "v": "20"}
     },
     ("GET", "/world-read/places/{place_id}"): {},
+    ("POST", "/world/versions/{version_id}/environment-instances"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/environment-instances/undo"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): {
+        "json": {}
+    },
+    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): {
+        "json": {}
+    },
     ("POST", "/world-write/scenes/{scene_id}/generated"): {
         "json": {
             "model": {"provider": "p", "model_id": "m", "model_version": "v"},
@@ -92,7 +100,10 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
         }
     },
     ("GET", "/selection/catalogue"): {},
+    ("GET", "/selection/place-bridges"): {},
     ("POST", "/selection"): {"json": {"intent": "captures"}},
+    ("POST", "/selection/place-bridges"): {"json": {}},
+    ("POST", "/selection/place-bridges/{decision_id}/revoke"): {"json": {}},
     ("POST", "/selection/packet"): {"json": {"intent": "captures"}},
     ("POST", "/selection/plan"): {"json": {"question": "where was I?"}},
     ("POST", "/selection/ask"): {"json": {"question": "where was I?"}},

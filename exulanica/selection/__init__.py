@@ -34,15 +34,20 @@ from exulanica.selection.answer import (
 )
 from exulanica.selection.executor import (
     SelectedCapture,
+    SelectedContent,
     SelectedEntity,
     SelectionResult,
     Support,
     execute,
 )
 from exulanica.selection.packet import EvidenceItem, EvidencePacket, ValueReference, build_packet
+from exulanica.selection.place_bridge import PlaceBridgeDecision, PlaceBridgeRepository
 from exulanica.selection.plan import (
     CaptureSelector,
     CaptureWindow,
+    ContentPageCursor,
+    ContentScope,
+    ContentSelector,
     EntityMode,
     EntitySelector,
     EpistemicScope,
@@ -82,6 +87,9 @@ __all__ = [
     "CaptureSelector",
     "CaptureWindow",
     "ClauseType",
+    "ContentPageCursor",
+    "ContentScope",
+    "ContentSelector",
     "EntityChoice",
     "EntityMode",
     "EntitySelector",
@@ -90,10 +98,13 @@ __all__ = [
     "EvidencePacket",
     "Intent",
     "ModelCall",
+    "PlaceBridgeDecision",
+    "PlaceBridgeRepository",
     "PlaceSelector",
     "ProcessingState",
     "RejectionCode",
     "SelectedCapture",
+    "SelectedContent",
     "SelectedEntity",
     "SelectionPlan",
     "SelectionRejected",

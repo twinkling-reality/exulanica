@@ -220,11 +220,15 @@ def _resolve(
     """
     if not ids:
         return ()
-    row = connection.execute(
+    statement = (
         "select count(*) as visible from entity "
-        "where workspace_id = %s and entity_id = any(%s::uuid[]) and deleted_at is null",
-        (session.workspace_id, list(ids)),
-    ).fetchone()
+        "where workspace_id = %s and entity_id = any(%s::uuid[]) and deleted_at is null "
+        "and class = 'place' and merged_into is null"
+        if kind == "place"
+        else "select count(*) as visible from entity "
+        "where workspace_id = %s and entity_id = any(%s::uuid[]) and deleted_at is null"
+    )
+    row = connection.execute(statement, (session.workspace_id, list(ids))).fetchone()
     assert row is not None
     visible = row["visible"] if isinstance(row, dict) else row[0]
     if visible != len(set(ids)):

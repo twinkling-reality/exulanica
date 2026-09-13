@@ -46,6 +46,9 @@ __all__ = [
     "MAX_TIME_WINDOWS",
     "CaptureSelector",
     "CaptureWindow",
+    "ContentPageCursor",
+    "ContentScope",
+    "ContentSelector",
     "EntityMode",
     "EntitySelector",
     "EpistemicScope",
@@ -77,6 +80,41 @@ class Intent(StrEnum):
     CAPTURES = "captures"
     #: The entities that appear within a Selection. The World Index's "who was on this trip".
     ENTITIES = "entities"
+    #: Personal memories, admitted geography, and authored variants related through a confirmed
+    #: place bridge.
+    CONTENT = "content"
+
+
+class ContentScope(StrEnum):
+    """Which origin classes a cross-content Selection may return."""
+
+    RELATED = "related"
+    MEMORIES_ONLY = "memories_only"
+
+
+class ContentPageCursor(BaseModel):
+    """A keyset cursor emitted by the executor, never an offset."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind_order: Annotated[int, Field(ge=0, le=3)]
+    sort_time: dt.datetime
+    result_key: Annotated[str, Field(min_length=1, max_length=700)]
+
+    @model_validator(mode="after")
+    def _aware_time(self) -> ContentPageCursor:
+        if self.sort_time.tzinfo is None:
+            raise ValueError("a content page cursor timestamp must carry an offset")
+        return self
+
+
+class ContentSelector(BaseModel):
+    """Origin scope and bounded keyset page for unified place retrieval."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: ContentScope
+    after: ContentPageCursor | None = None
 
 
 class EntityMode(StrEnum):
@@ -232,6 +270,7 @@ class SelectionPlan(BaseModel):
     )
     place: PlaceSelector | None = None
     capture: CaptureSelector | None = None
+    content: ContentSelector | None = None
     epistemic: EpistemicScope = EpistemicScope.CONFIRMED
 
     semantic_query: Annotated[str | None, Field(max_length=MAX_SEMANTIC_QUERY_CHARS)] = Field(
@@ -262,6 +301,19 @@ class SelectionPlan(BaseModel):
                 f"mode {self.entities.mode!s} is a statement about several entities and needs "
                 "at least two of them; over one entity it is the same query as 'any'"
             )
+        if self.intent is Intent.CONTENT:
+            if self.content is None or self.place is None:
+                raise ValueError("content selections require both content and place selectors")
+            if self.entities is not None or self.time or self.capture is not None:
+                raise ValueError(
+                    "entity, time, and capture filters do not apply to cross-content selections"
+                )
+            if self.semantic_query is not None:
+                raise ValueError(
+                    "cross-content place membership is relational and does not use semantic text"
+                )
+        elif self.content is not None:
+            raise ValueError("the content selector applies only to the content intent")
         return self
 
     @property
@@ -272,5 +324,6 @@ class SelectionPlan(BaseModel):
             and not self.time
             and self.place is None
             and self.capture is None
+            and self.content is None
             and self.semantic_query is None
         )

@@ -22,14 +22,22 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, get_services
+from exulanica.api.dependencies import (
+    CurrentSession,
+    ReadOnlyConnection,
+    ScopedConnection,
+    get_services,
+)
 from exulanica.models.client import ModelClient
 from exulanica.selection import (
     Abstention,
     Answer,
+    ContentPageCursor,
+    PlaceBridgeDecision,
+    PlaceBridgeRepository,
     SelectionPlan,
     SelectionResult,
     build_packet,
@@ -72,6 +80,26 @@ class EntityView(BaseModel):
     capture_count: int
 
 
+class ContentView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    result_kind: str
+    origin_kind: str
+    content_kind: str
+    authored_role: str | None
+    place_relationship: str
+    match_reason: str
+    memory_place_entity_id: uuid.UUID
+    canonical_place_id: uuid.UUID | None
+    world_id: str | None
+    version_id: uuid.UUID | None
+    source_id: str
+    lineage_ids: list[str]
+    label: str | None
+    availability: str
+    personal_visit_evidence: bool
+
+
 class SelectionView(BaseModel):
     """What a Selection resolved to.
 
@@ -87,6 +115,35 @@ class SelectionView(BaseModel):
     total_matched: int
     truncated: bool
     includes_proposals: bool
+    content: list[ContentView]
+    next_page: ContentPageCursor | None
+
+
+class PlaceBridgeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    canonical_place_id: uuid.UUID
+    memory_place_entity_id: uuid.UUID
+    reason: Annotated[str | None, Field(min_length=1, max_length=1000)] = None
+
+
+class PlaceBridgeRevocationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Annotated[str | None, Field(min_length=1, max_length=1000)] = None
+
+
+class PlaceBridgeView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision_id: uuid.UUID
+    canonical_place_id: uuid.UUID
+    memory_place_entity_id: uuid.UUID
+    decision: str
+    supersedes_decision_id: uuid.UUID | None
+    decided_by: uuid.UUID
+    reason: str | None
+    decided_at: str
 
 
 class QuestionRequest(BaseModel):
@@ -195,10 +252,56 @@ class AnswerView(BaseModel):
 
 @router.post("", summary="Resolve a Selection to captures, entities and evidence.")
 def resolve_selection(
-    plan: SelectionPlan, connection: ReadOnlyConnection, session: CurrentSession
+    plan: SelectionPlan,
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
 ) -> SelectionView:
     validated = validate(connection, plan, session)
-    return _view(execute(connection, validated))
+    return _view(execute(connection, validated, store=get_services(request).store))
+
+
+@router.get("/place-bridges", summary="List confirmed canonical-to-memory place bridges.")
+def place_bridges(connection: ReadOnlyConnection, session: CurrentSession) -> list[PlaceBridgeView]:
+    return [
+        _place_bridge_view(decision)
+        for decision in PlaceBridgeRepository(connection, session.workspace_id).confirmed()
+    ]
+
+
+@router.post(
+    "/place-bridges",
+    status_code=status.HTTP_201_CREATED,
+    summary="Confirm a canonical-to-memory place bridge.",
+)
+def confirm_place_bridge(
+    body: PlaceBridgeRequest,
+    connection: ScopedConnection,
+    session: CurrentSession,
+) -> PlaceBridgeView:
+    decision = PlaceBridgeRepository(connection, session.workspace_id).confirm(
+        place_id=body.canonical_place_id,
+        entity_id=body.memory_place_entity_id,
+        actor=session.actor,
+        reason=body.reason,
+    )
+    return _place_bridge_view(decision)
+
+
+@router.post(
+    "/place-bridges/{decision_id}/revoke",
+    summary="Revoke a confirmed canonical-to-memory place bridge.",
+)
+def revoke_place_bridge(
+    decision_id: uuid.UUID,
+    body: PlaceBridgeRevocationRequest,
+    connection: ScopedConnection,
+    session: CurrentSession,
+) -> PlaceBridgeView:
+    decision = PlaceBridgeRepository(connection, session.workspace_id).revoke(
+        decision_id, actor=session.actor, reason=body.reason
+    )
+    return _place_bridge_view(decision)
 
 
 @router.get("/catalogue", summary="The named entities this session may filter by.")
@@ -238,7 +341,14 @@ def ask(
     session: CurrentSession,
 ) -> AnswerView:
     client = _require_model(request)
-    outcome = answer_question(connection, client, body.question, session, plan=body.plan)
+    outcome = answer_question(
+        connection,
+        client,
+        body.question,
+        session,
+        plan=body.plan,
+        store=get_services(request).store,
+    )
     return AnswerView(
         answer=outcome.answer,
         plan=outcome.plan,
@@ -369,6 +479,40 @@ def _view(result: SelectionResult) -> SelectionView:
         total_matched=result.total_matched,
         truncated=result.truncated,
         includes_proposals=result.includes_proposals,
+        content=[
+            ContentView(
+                result_kind=item.result_kind,
+                origin_kind=item.origin_kind,
+                content_kind=item.content_kind,
+                authored_role=item.authored_role,
+                place_relationship=item.place_relationship,
+                match_reason=item.match_reason,
+                memory_place_entity_id=item.memory_place_entity_id,
+                canonical_place_id=item.canonical_place_id,
+                world_id=item.world_id,
+                version_id=item.version_id,
+                source_id=item.source_id,
+                lineage_ids=list(item.lineage_ids),
+                label=item.label,
+                availability=item.availability,
+                personal_visit_evidence=item.personal_visit_evidence,
+            )
+            for item in result.content
+        ],
+        next_page=result.next_page,
+    )
+
+
+def _place_bridge_view(decision: PlaceBridgeDecision) -> PlaceBridgeView:
+    return PlaceBridgeView(
+        decision_id=decision.decision_id,
+        canonical_place_id=decision.place_id,
+        memory_place_entity_id=decision.entity_id,
+        decision=decision.decision,
+        supersedes_decision_id=decision.supersedes_decision_id,
+        decided_by=decision.decided_by,
+        reason=decision.reason,
+        decided_at=decision.decided_at,
     )
 
 

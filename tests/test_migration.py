@@ -277,6 +277,8 @@ def test_every_migration_is_a_single_transaction_with_no_down_path(migration):
         "place",
         "place_version",
         "place_alignment",
+        "place_entity_bridge_decision",
+        "environment_feature_index_entry",
     ],
 )
 def test_every_required_table_exists(table):

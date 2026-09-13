@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import uuid
@@ -19,8 +20,25 @@ from exulanica.environment import (
     OperationRights,
     SourceAdmission,
 )
+from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.evidence.blob import BlobId
+from exulanica.identity import IdentityRepository, confirm_link, name_occurrence
+from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.spine.scope import WorkspaceScope
+from exulanica.selection import (
+    ContentScope,
+    ContentSelector,
+    Intent,
+    PlaceBridgeRepository,
+    PlaceSelector,
+    RejectionCode,
+    SelectionPlan,
+    SelectionRejected,
+    Session,
+    execute,
+    validate,
+)
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import (
     EnvironmentBindingDrift,
@@ -39,6 +57,7 @@ from exulanica.world import (
 )
 from fastapi.testclient import TestClient
 
+from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
 from pg_harness import open_scratch_connection
 from tests_support_api import scratch_database
 from world_structure_fixtures import structural_candidate
@@ -199,9 +218,7 @@ def composed(repository, tmp_path) -> Composed:
         actor=actor,
     )
     feature_id = publication.features[0]["id"]
-    worlds = WorldObjectRepository(
-        repository.connection, repository.workspace_id, store=store
-    )
+    worlds = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
     version = worlds.create_version(
         source_snapshot_id=snapshot.snapshot_id,
         title="Environment study",
@@ -292,9 +309,7 @@ def test_add_rechecks_authorization_at_commit_and_rolls_back(monkeypatch, compos
         composed.environments.withdraw("asset", composed.render.asset_id)
         original(instance)
 
-    monkeypatch.setattr(
-        composed.worlds, "_final_environment_authorization", withdraw_before_final
-    )
+    monkeypatch.setattr(composed.worlds, "_final_environment_authorization", withdraw_before_final)
     with pytest.raises(EnvironmentSourceWithdrawn):
         _add(composed, composed.placement("environment:final-check"))
     unchanged = composed.worlds.version(composed.version.version_id)
@@ -302,14 +317,10 @@ def test_add_rechecks_authorization_at_commit_and_rolls_back(monkeypatch, compos
     assert unchanged.edit_seq == 0
 
 
-def test_rights_denial_stale_publication_and_wrong_segment_fail_closed(
-    composed, tmp_path
-) -> None:
+def test_rights_denial_stale_publication_and_wrong_segment_fail_closed(composed, tmp_path) -> None:
     existing = _add(composed, composed.placement("environment:indexed", feature=True))
     wrong_segment = composed.placement("environment:wrong", feature=True)
-    wrong_segment = replace(
-        wrong_segment, selection=EnvironmentSelection("feature", "0" * 32, 7)
-    )
+    wrong_segment = replace(wrong_segment, selection=EnvironmentSelection("feature", "0" * 32, 7))
     with pytest.raises(InvalidEnvironmentData, match="feature and render batch"):
         composed.worlds.add_environment(
             composed.version.version_id,
@@ -504,9 +515,7 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         assert version["environment_instances"][0]["source"] == source
         assert version["environment_instances"][0]["transform"]["x_mm"] == 2500
 
-        reread = client.get(
-            f"/world/versions/{composed.version.version_id}", headers=headers
-        )
+        reread = client.get(f"/world/versions/{composed.version.version_id}", headers=headers)
         assert reread.json() == version
         remove = client.post(
             f"{path}/environment:api/remove",
@@ -523,3 +532,378 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
         )
         assert undo.status_code == 200, undo.text
         assert not undo.json()["environment_instances"][0]["removed"]
+
+
+@dataclass
+class MemoryPlace:
+    composed: Composed
+    entity_id: uuid.UUID
+    capture_ids: tuple[uuid.UUID, ...]
+    actor: uuid.UUID
+
+    @property
+    def session(self) -> Session:
+        return Session(self.composed.worlds.workspace_id, self.actor)
+
+    def plan(
+        self,
+        scope: ContentScope = ContentScope.RELATED,
+        *,
+        limit: int = 24,
+        after=None,
+        entity_id: uuid.UUID | None = None,
+    ) -> SelectionPlan:
+        return SelectionPlan(
+            intent=Intent.CONTENT,
+            place=PlaceSelector(ids=[entity_id or self.entity_id]),
+            content=ContentSelector(scope=scope, after=after),
+            limit=limit,
+        )
+
+    def run(self, plan: SelectionPlan | None = None):
+        selected = plan or self.plan()
+        return execute(
+            self.composed.worlds.connection,
+            validate(self.composed.worlds.connection, selected, self.session),
+            store=self.composed.store,
+        )
+
+
+def _memory_capture(
+    composed: Composed,
+    photo_dir,
+    *,
+    index: int,
+    actor: uuid.UUID,
+    entity_id: uuid.UUID | None = None,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    repository = IngestRepository(composed.worlds.connection, composed.worlds.workspace_id)
+    payload = copy.deepcopy(DEFAULT_PAYLOAD)
+    payload["proposed_place"]["label"] = "Iceland"
+    pipeline = PhotoIngestPipeline(
+        repository,
+        composed.store,
+        vision=CountingVisionModel(payload=payload),
+    )
+    outcome = ingest_observed(
+        pipeline,
+        repository,
+        write_photo(
+            photo_dir,
+            f"iceland-memory-{index}.jpg",
+            when=f"2026:06:{index + 1:02d} 10:00:00",
+            size=(160 + index, 100),
+        ),
+    )
+    assert outcome.error is None, outcome.error
+    occurrence = composed.worlds.connection.execute(
+        "select occurrence_id from occurrence "
+        "where workspace_id=%s and capture_id=%s and class='place'",
+        (composed.worlds.workspace_id, outcome.capture_id),
+    ).fetchone()
+    assert occurrence is not None
+    identity = IdentityRepository(composed.worlds.connection, composed.worlds.workspace_id)
+    if entity_id is None:
+        named = name_occurrence(
+            identity,
+            AssertionWriter(composed.worlds.connection, composed.worlds.workspace_id),
+            occurrence_id=occurrence["occurrence_id"],
+            display_name="Iceland",
+            actor=actor,
+        )
+        entity_id = named.entity_id
+    else:
+        confirm_link(
+            identity,
+            occurrence_id=occurrence["occurrence_id"],
+            entity_id=entity_id,
+            actor=actor,
+        )
+    return outcome.capture_id, entity_id
+
+
+@pytest.fixture
+def memory_place(composed, photo_dir) -> MemoryPlace:
+    actor = uuid.uuid4()
+    first, entity_id = _memory_capture(composed, photo_dir, index=1, actor=actor)
+    second, confirmed = _memory_capture(
+        composed,
+        photo_dir,
+        index=2,
+        actor=actor,
+        entity_id=entity_id,
+    )
+    assert confirmed == entity_id
+    return MemoryPlace(composed, entity_id, (first, second), actor)
+
+
+def _confirm_bridge(memory: MemoryPlace):
+    return PlaceBridgeRepository(
+        memory.composed.worlds.connection, memory.composed.worlds.workspace_id
+    ).confirm(
+        place_id=memory.composed.source.place_id,
+        entity_id=memory.entity_id,
+        actor=memory.actor,
+        reason="The account holder confirmed these identities refer to the same place.",
+    )
+
+
+def test_place_bridge_is_confirmed_readable_revocable_and_append_only(memory_place) -> None:
+    repository = PlaceBridgeRepository(
+        memory_place.composed.worlds.connection,
+        memory_place.composed.worlds.workspace_id,
+    )
+    confirmed = _confirm_bridge(memory_place)
+    assert confirmed.place_id != confirmed.entity_id
+    assert repository.confirmed() == (confirmed,)
+
+    revoked = repository.revoke(
+        confirmed.decision_id,
+        actor=memory_place.actor,
+        reason="The account holder corrected the place identity.",
+    )
+    assert revoked.decision == "revoked"
+    assert revoked.supersedes_decision_id == confirmed.decision_id
+    assert repository.confirmed() == ()
+    assert [
+        item.decision
+        for item in repository.history(place_id=confirmed.place_id, entity_id=confirmed.entity_id)
+    ] == ["confirmed", "revoked"]
+    with pytest.raises(SelectionRejected) as stale:
+        repository.revoke(confirmed.decision_id, actor=memory_place.actor)
+    assert stale.value.code is RejectionCode.UNKNOWN_REFERENCE
+
+
+def test_place_bridge_rejects_wrong_class_equal_ids_and_foreign_rows(memory_place) -> None:
+    repository = PlaceBridgeRepository(
+        memory_place.composed.worlds.connection,
+        memory_place.composed.worlds.workspace_id,
+    )
+    object_id = uuid.uuid4()
+    memory_place.composed.worlds.connection.execute(
+        "insert into entity(entity_id,workspace_id,class) values(%s,%s,'object')",
+        (object_id, memory_place.composed.worlds.workspace_id),
+    )
+    with pytest.raises(SelectionRejected) as wrong_class:
+        repository.confirm(
+            place_id=memory_place.composed.source.place_id,
+            entity_id=object_id,
+            actor=memory_place.actor,
+        )
+    assert wrong_class.value.code is RejectionCode.MALFORMED_PLAN
+    with pytest.raises(SelectionRejected, match="must remain distinct"):
+        repository.confirm(
+            place_id=memory_place.composed.source.place_id,
+            entity_id=memory_place.composed.source.place_id,
+            actor=memory_place.actor,
+        )
+
+
+def test_bridge_and_related_results_are_hidden_across_workspaces(
+    memory_place, spine_schema
+) -> None:
+    decision = _confirm_bridge(memory_place)
+    memory_place.composed.worlds.connection.commit()
+    psycopg_module, scratch = spine_schema
+    connection = open_scratch_connection(psycopg_module, scratch)
+    stranger = uuid.uuid4()
+    WorkspaceScope(connection, stranger)
+    try:
+        repository = PlaceBridgeRepository(connection, stranger)
+        assert repository.confirmed() == ()
+        with pytest.raises(SelectionRejected) as hidden:
+            repository.revoke(decision.decision_id, actor=uuid.uuid4())
+        assert hidden.value.code is RejectionCode.UNKNOWN_REFERENCE
+    finally:
+        connection.close()
+
+
+def test_unconfirmed_same_name_does_not_bridge_by_label(memory_place, photo_dir) -> None:
+    _confirm_bridge(memory_place)
+    _capture, ambiguous_entity = _memory_capture(
+        memory_place.composed,
+        photo_dir,
+        index=3,
+        actor=memory_place.actor,
+    )
+    assert ambiguous_entity != memory_place.entity_id
+    result = memory_place.run(memory_place.plan(entity_id=ambiguous_entity))
+    assert {item.result_kind for item in result.content} == {"memory_capture"}
+    assert all(item.canonical_place_id is None for item in result.content)
+
+
+def test_broad_related_place_selection_unions_memories_imports_and_authored_versions(
+    memory_place,
+) -> None:
+    _confirm_bridge(memory_place)
+    _add(memory_place.composed, memory_place.composed.placement("environment:whole"))
+    _add(
+        memory_place.composed,
+        memory_place.composed.placement("environment:feature", feature=True),
+    )
+    result = memory_place.run()
+    kinds = {item.result_kind for item in result.content}
+    assert kinds == {
+        "memory_capture",
+        "admitted_environment_source",
+        "admitted_environment_feature",
+        "authored_environment_instance",
+    }
+    assert sum(item.result_kind == "memory_capture" for item in result.content) == 2
+    assert sum(item.result_kind == "authored_environment_instance" for item in result.content) == 2
+    authored = [
+        item for item in result.content if item.result_kind == "authored_environment_instance"
+    ]
+    assert all(item.match_reason == "authored_from_canonical_place" for item in authored)
+    assert all(item.world_id and item.version_id for item in authored)
+    assert all(
+        any(value.startswith("admission:") for value in item.lineage_ids) for item in authored
+    )
+
+
+def test_memories_only_excludes_imports_and_fantasy_and_never_infers_a_visit(
+    memory_place,
+) -> None:
+    _confirm_bridge(memory_place)
+    _add(memory_place.composed, memory_place.composed.placement("environment:fantasy"))
+    broad = memory_place.run()
+    assert all(
+        item.personal_visit_evidence == (item.result_kind == "memory_capture")
+        for item in broad.content
+    )
+    fantasy = [
+        item for item in broad.content if item.result_kind == "authored_environment_instance"
+    ]
+    assert [item.authored_role for item in fantasy] == ["fictional"]
+    memories = memory_place.run(memory_place.plan(ContentScope.MEMORIES_ONLY))
+    assert len(memories.content) == 2
+    assert {item.result_kind for item in memories.content} == {"memory_capture"}
+    assert {item.origin_kind for item in memories.content} == {"personal"}
+
+
+def test_unavailable_bytes_are_labeled_but_withdrawn_metadata_and_counts_are_hidden(
+    memory_place,
+) -> None:
+    _confirm_bridge(memory_place)
+    _add(memory_place.composed, memory_place.composed.placement("environment:available"))
+    render_digest = BlobId.from_hex(memory_place.composed.render.expected_sha256)
+    render_path = memory_place.composed.store.root / memory_place.composed.store.key_for(
+        render_digest
+    )
+    render_path.unlink()
+    unavailable = memory_place.run()
+    by_kind = {item.result_kind: item.availability for item in unavailable.content}
+    assert by_kind["admitted_environment_source"] == "available"
+    assert by_kind["admitted_environment_feature"] == "unavailable_bytes"
+    assert by_kind["authored_environment_instance"] == "unavailable_bytes"
+
+    memory_place.composed.environments.withdraw("source", memory_place.composed.source.admission_id)
+    hidden = memory_place.run()
+    assert hidden.total_matched == 2
+    assert {item.result_kind for item in hidden.content} == {"memory_capture"}
+
+
+def test_content_pages_are_bounded_stable_and_do_not_collapse_distinct_items(
+    memory_place,
+) -> None:
+    _confirm_bridge(memory_place)
+    _add(memory_place.composed, memory_place.composed.placement("environment:variation-a"))
+    _add(memory_place.composed, memory_place.composed.placement("environment:variation-b"))
+    page = memory_place.run(memory_place.plan(limit=2))
+    total = page.total_matched
+    seen: list[tuple[str, str]] = []
+    while True:
+        seen.extend((item.result_kind, item.source_id) for item in page.content)
+        if page.next_page is None:
+            break
+        page = memory_place.run(memory_place.plan(limit=2, after=page.next_page))
+        assert page.total_matched == total
+    assert total == 6
+    assert len(seen) == total
+    assert len(set(seen)) == total
+    assert sum(kind == "memory_capture" for kind, _source in seen) == 2
+    assert sum(kind == "authored_environment_instance" for kind, _source in seen) == 2
+
+
+def test_revoked_bridge_immediately_stops_canonical_and_authored_traversal(memory_place) -> None:
+    decision = _confirm_bridge(memory_place)
+    _add(memory_place.composed, memory_place.composed.placement("environment:revoked-link"))
+    assert memory_place.run().total_matched > len(memory_place.capture_ids)
+    PlaceBridgeRepository(
+        memory_place.composed.worlds.connection,
+        memory_place.composed.worlds.workspace_id,
+    ).revoke(decision.decision_id, actor=memory_place.actor)
+    current = memory_place.run()
+    assert current.total_matched == len(memory_place.capture_ids)
+    assert {item.result_kind for item in current.content} == {"memory_capture"}
+    assert all(item.canonical_place_id is None for item in current.content)
+
+
+def test_authenticated_place_bridge_routes_create_list_and_revoke(
+    memory_place, spine_schema, monkeypatch
+) -> None:
+    token = "unified-place-bridge-owner-token"
+    monkeypatch.setenv(
+        "EXULANICA_API_TOKENS",
+        json.dumps(
+            {
+                token: {
+                    "workspace_id": str(memory_place.composed.worlds.workspace_id),
+                    "actor": str(memory_place.actor),
+                }
+            }
+        ),
+    )
+    _add(
+        memory_place.composed,
+        memory_place.composed.placement("environment:api-retrieval"),
+    )
+    memory_place.composed.worlds.connection.commit()
+    _psycopg, scratch = spine_schema
+    database = scratch_database(scratch)
+    services = Services(
+        database=database,
+        readonly_database=database,
+        store=memory_place.composed.store,
+        tokens=load_token_directory(),
+        executor_shares_the_write_role=True,
+        model_client=None,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {
+        "canonical_place_id": str(memory_place.composed.source.place_id),
+        "memory_place_entity_id": str(memory_place.entity_id),
+        "reason": "Confirmed by the account holder.",
+    }
+    with TestClient(create_app(services, verify=False)) as client:
+        assert client.post("/selection/place-bridges", json=body).status_code in {401, 403}
+        created = client.post("/selection/place-bridges", json=body, headers=headers)
+        assert created.status_code == 201, created.text
+        decision = created.json()
+        selected = client.post(
+            "/selection",
+            json={
+                "intent": "content",
+                "place": {"ids": [str(memory_place.entity_id)]},
+                "content": {"scope": "related"},
+            },
+            headers=headers,
+        )
+        assert selected.status_code == 200, selected.text
+        assert {item["result_kind"] for item in selected.json()["content"]} == {
+            "memory_capture",
+            "admitted_environment_source",
+            "admitted_environment_feature",
+            "authored_environment_instance",
+        }
+        listed = client.get("/selection/place-bridges", headers=headers)
+        assert listed.status_code == 200
+        assert listed.json() == [decision]
+        revoked = client.post(
+            f"/selection/place-bridges/{decision['decision_id']}/revoke",
+            json={"reason": "Corrected by the account holder."},
+            headers=headers,
+        )
+        assert revoked.status_code == 200, revoked.text
+        assert revoked.json()["decision"] == "revoked"
+        assert client.get("/selection/place-bridges", headers=headers).json() == []
