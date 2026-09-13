@@ -12,8 +12,8 @@ export interface GoogleTilesEnvironment {
 }
 
 export const GOOGLE_REFERENCE_ORIGIN = Object.freeze({
-  longitude: -74.006,
-  latitude: 40.7128,
+  longitude: -73.9885,
+  latitude: 40.722,
   altitude: 0,
 });
 

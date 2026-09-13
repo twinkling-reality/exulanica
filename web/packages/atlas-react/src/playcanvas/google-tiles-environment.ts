@@ -6,6 +6,7 @@ import {
   IDENTITY_MATRIX,
   localTileTransform,
   multiplyMatrices,
+  wgs84ToEcef,
   type GoogleLocalFrame,
   type Matrix4,
   type Triple,
@@ -14,7 +15,11 @@ import { GoogleTilesProvider } from './google-tiles-provider.js';
 import { GoogleTileRequestQueue, GoogleTileResidency } from './google-tiles-residency.js';
 
 interface GoogleTileContent { readonly uri?: unknown; readonly url?: unknown }
-interface GoogleBoundingVolume { readonly sphere?: unknown; readonly box?: unknown }
+interface GoogleBoundingVolume {
+  readonly sphere?: unknown;
+  readonly box?: unknown;
+  readonly region?: unknown;
+}
 interface GoogleTile {
   readonly boundingVolume?: GoogleBoundingVolume;
   readonly geometricError?: unknown;
@@ -123,7 +128,15 @@ export class GoogleTilesEnvironment<T> {
     }
     const selected = new Map<string, RuntimeTile>();
     try {
-      selectTiles(this.root, camera, viewportHeight, fieldOfViewDegrees, selected, this.frame);
+      selectTiles(
+        this.root,
+        camera,
+        viewportHeight,
+        fieldOfViewDegrees,
+        selected,
+        this.frame,
+        this.residency.maximumTiles,
+      );
     } catch {
       this.unavailable = true;
       this.options.attribution.update(false, []);
@@ -291,7 +304,10 @@ function transformedPoint(matrix: Matrix4, point: Triple): Triple {
   ];
 }
 
-function tileDistance(tile: RuntimeTile, frame: GoogleLocalFrame, camera: Triple): number {
+function tileCentreAndRadius(
+  tile: RuntimeTile,
+  frame: GoogleLocalFrame,
+): { readonly centre: Triple; readonly radius: number } | null {
   const sphere = tile.source.boundingVolume?.sphere;
   const box = tile.source.boundingVolume?.box;
   let centre: Triple;
@@ -302,49 +318,101 @@ function tileDistance(tile: RuntimeTile, frame: GoogleLocalFrame, camera: Triple
   } else if (Array.isArray(box) && box.length === 12 && box.every(Number.isFinite)) {
     centre = transformedPoint(tile.transform, [box[0], box[1], box[2]]);
     radius = Math.hypot(...box.slice(3));
+  } else if (
+    Array.isArray(tile.source.boundingVolume?.region) &&
+    tile.source.boundingVolume.region.length === 6 &&
+    tile.source.boundingVolume.region.every(Number.isFinite)
+  ) {
+    const [west, south, east, north, minimumHeight, maximumHeight] =
+      tile.source.boundingVolume.region;
+    if (
+      Math.abs(west) > Math.PI ||
+      Math.abs(east) > Math.PI ||
+      Math.abs(south) > Math.PI / 2 ||
+      Math.abs(north) > Math.PI / 2 ||
+      south > north ||
+      minimumHeight > maximumHeight
+    ) {
+      throw new Error('Invalid Google tile bounds');
+    }
+    const longitudeSpan = east >= west ? east - west : east + 2 * Math.PI - west;
+    const longitude = west + longitudeSpan / 2;
+    const latitude = (south + north) / 2;
+    const height = (minimumHeight + maximumHeight) / 2;
+    centre = wgs84ToEcef(
+      (longitude > Math.PI ? longitude - 2 * Math.PI : longitude) * 180 / Math.PI,
+      latitude * 180 / Math.PI,
+      height,
+    );
+    const horizontalRadius = 6_378_137 * Math.hypot(
+      longitudeSpan * Math.cos(latitude),
+      north - south,
+    ) / 2;
+    radius = Math.hypot(horizontalRadius, (maximumHeight - minimumHeight) / 2);
   } else {
-    return 0;
+    return null;
   }
   const local = localTileTransform(frame, [
     1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
     centre[0], centre[1], centre[2], 1,
   ]);
+  return { centre: [local[12], local[13], local[14]], radius };
+}
+
+function tileDistance(tile: RuntimeTile, frame: GoogleLocalFrame, camera: Triple): number {
+  const bounds = tileCentreAndRadius(tile, frame);
+  if (bounds === null) return 0;
   return Math.max(1, Math.hypot(
-    local[12] - camera[0],
-    local[13] - camera[1],
-    local[14] - camera[2],
-  ) - radius);
+    bounds.centre[0] - camera[0],
+    bounds.centre[1] - camera[1],
+    bounds.centre[2] - camera[2],
+  ) - bounds.radius);
+}
+
+function tileCentreDistance(tile: RuntimeTile, frame: GoogleLocalFrame, camera: Triple): number {
+  const bounds = tileCentreAndRadius(tile, frame);
+  if (bounds === null) return Number.POSITIVE_INFINITY;
+  return Math.hypot(
+    bounds.centre[0] - camera[0],
+    bounds.centre[1] - camera[1],
+    bounds.centre[2] - camera[2],
+  );
 }
 
 function selectTiles(
-  tile: RuntimeTile,
+  root: RuntimeTile,
   camera: Triple,
   viewportHeight: number,
   fieldOfViewDegrees: number,
   selected: Map<string, RuntimeTile>,
   frame?: GoogleLocalFrame,
+  maximumSelectedTiles = 48,
 ): void {
-  if (selected.size >= 48) return;
   const activeFrame = frame ?? googleLocalFrame(-74.006, 40.7128, 0);
-  const children = childrenOf(tile);
-  const error = typeof tile.source.geometricError === 'number' &&
-    Number.isFinite(tile.source.geometricError) ? tile.source.geometricError : 0;
-  const distance = tileDistance(tile, activeFrame, camera);
-  const pixels = error * viewportHeight /
-    (2 * Math.max(1, distance) * Math.tan(fieldOfViewDegrees * Math.PI / 360));
-  if (tile.externalRoot !== undefined || (children.length > 0 && pixels > 16)) {
-    // Request only the nearest runtime branches. This is view-driven traversal,
-    // never a whole-tree warmup or an offline/prefetch pass.
-    const nearest = children
-      .map((child) => ({ child, distance: tileDistance(child, activeFrame, camera) }))
-      .sort((left, right) => left.distance - right.distance)
-      .slice(0, 4);
-    for (const { child } of nearest) selectTiles(
-      child, camera, viewportHeight, fieldOfViewDegrees, selected, activeFrame,
-    );
-    return;
+  const queue: RuntimeTile[] = [root];
+  let visited = 0;
+  while (queue.length > 0 && selected.size < maximumSelectedTiles && visited < 4096) {
+    queue.sort((left, right) => {
+      const difference = tileCentreDistance(right, activeFrame, camera) -
+        tileCentreDistance(left, activeFrame, camera);
+      return difference === 0 ? right.id.localeCompare(left.id) : difference;
+    });
+    const tile = queue.pop()!;
+    visited++;
+    const children = childrenOf(tile);
+    const error = typeof tile.source.geometricError === 'number' &&
+      Number.isFinite(tile.source.geometricError) ? tile.source.geometricError : 0;
+    const distance = tileDistance(tile, activeFrame, camera);
+    const pixels = error * viewportHeight /
+      (2 * Math.max(1, distance) * Math.tan(fieldOfViewDegrees * Math.PI / 360));
+    if (tile.externalRoot !== undefined || (children.length > 0 && pixels > 16)) {
+      // Keep one global camera-distance queue. A depth-first walk can exhaust the
+      // residency budget inside a distant sibling before it reaches the viewer.
+      queue.push(...children);
+    } else if (tileUri(tile.source) !== null) {
+      selected.set(tile.id, tile);
+    }
   }
-  if (tileUri(tile.source) !== null) selected.set(tile.id, tile);
 }
 
 interface PlayCanvasTileHandle {
@@ -353,8 +421,23 @@ interface PlayCanvasTileHandle {
   readonly entity: pc.Entity;
 }
 
+const PLAYCANVAS_GLTF_TO_ECEF: Matrix4 = [
+  1, 0, 0, 0,
+  0, 0, 1, 0,
+  0, -1, 0, 0,
+  0, 0, 0, 1,
+];
+
+export function playCanvasGltfTileTransform(transform: Matrix4): Matrix4 {
+  return multiplyMatrices(transform, PLAYCANVAS_GLTF_TO_ECEF);
+}
+
 export class PlayCanvasGoogleTileHost implements GoogleTileHost<PlayCanvasTileHandle> {
-  constructor(private readonly app: pc.AppBase, private readonly root: pc.Entity) {}
+  constructor(
+    private readonly app: pc.AppBase,
+    private readonly root: pc.Entity,
+    private readonly createWrapper: (name: string) => pc.Entity = (name) => new pc.Entity(name),
+  ) {}
 
   async load(id: string, bytes: ArrayBuffer, signal: AbortSignal): Promise<PlayCanvasTileHandle> {
     signal.throwIfAborted();
@@ -381,8 +464,10 @@ export class PlayCanvasGoogleTileHost implements GoogleTileHost<PlayCanvasTileHa
         if (signal.aborted) aborted();
       });
       signal.throwIfAborted();
-      const entity = (asset.resource as pc.ContainerResource).instantiateRenderEntity() as pc.Entity;
+      const content = (asset.resource as pc.ContainerResource).instantiateRenderEntity() as pc.Entity;
+      const entity = this.createWrapper(`google-tile:${id}`);
       entity.enabled = false;
+      entity.addChild(content);
       this.root.addChild(entity);
       return { id, asset, entity };
     } catch (error) {
@@ -394,7 +479,7 @@ export class PlayCanvasGoogleTileHost implements GoogleTileHost<PlayCanvasTileHa
 
   setTransform(handle: PlayCanvasTileHandle, transform: Matrix4): void {
     const matrix = new pc.Mat4();
-    matrix.set([...transform]);
+    matrix.set([...playCanvasGltfTileTransform(transform)]);
     handle.entity.setLocalPosition(matrix.getTranslation());
     handle.entity.setLocalEulerAngles(matrix.getEulerAngles());
     handle.entity.setLocalScale(matrix.getScale());

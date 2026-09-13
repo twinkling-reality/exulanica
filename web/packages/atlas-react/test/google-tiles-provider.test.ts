@@ -58,11 +58,18 @@ describe('Google tiles provider admission', () => {
   });
 
   it('uses ordinary HTTP caching and never requests offline persistence or prefetch', async () => {
+    let receiver: unknown;
     const fetcher = vi.fn(async (_url: string, _init: RequestInit) =>
-      response('{}', 'application/json'));
+      response('{}', 'application/json')).mockImplementation(
+      async function (this: unknown, _url: string, _init: RequestInit) {
+        receiver = this;
+        return response('{}', 'application/json');
+      },
+    );
     const provider = new GoogleTilesProvider(config, fetcher);
     await provider.openRoot(new AbortController().signal);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(receiver).toBe(globalThis);
     expect(fetcher.mock.calls[0]![1]).toMatchObject({
       cache: 'default',
       credentials: 'omit',

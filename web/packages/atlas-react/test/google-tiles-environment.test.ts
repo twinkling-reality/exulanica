@@ -1,11 +1,16 @@
+import * as pc from 'playcanvas';
 import { describe, expect, it, vi } from 'vitest';
 import { GOOGLE_REFERENCE_ORIGIN } from '../src/playcanvas/google-tiles-config.js';
 import {
   GoogleTilesEnvironment,
+  PlayCanvasGoogleTileHost,
+  playCanvasGltfTileTransform,
   type GoogleTileHost,
   type GoogleTilesAttribution,
 } from '../src/playcanvas/google-tiles-environment.js';
-import { googleLocalFrame } from '../src/playcanvas/google-tiles-frame.js';
+import {
+  googleLocalFrame,
+} from '../src/playcanvas/google-tiles-frame.js';
 import { GoogleTilesProvider } from '../src/playcanvas/google-tiles-provider.js';
 
 interface Handle { readonly id: string }
@@ -78,6 +83,21 @@ async function settle(): Promise<void> {
 }
 
 describe('Google tiles environment lifecycle', () => {
+  it('undoes the PlayCanvas glTF axis conversion before applying ECEF transforms', () => {
+    const matrix = playCanvasGltfTileTransform([
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]);
+    const playCanvasPoint = [1, 3, -2] as const;
+    const converted = [0, 1, 2].map((row) =>
+      matrix[row]! * playCanvasPoint[0] +
+      matrix[4 + row]! * playCanvasPoint[1] +
+      matrix[8 + row]! * playCanvasPoint[2]);
+    expect(converted).toEqual([1, 2, 3]);
+  });
+
   it('loads only after an explicit view update and tears every runtime resource down', async () => {
     const test = fixture();
     await test.environment.attach();
@@ -129,5 +149,117 @@ describe('Google tiles environment lifecycle', () => {
     environment.update([0, 1.62, 0]);
     expect(test.host.load).not.toHaveBeenCalled();
     environment.dispose();
+  });
+
+  it('prioritizes nearby region centres instead of source order', async () => {
+    const config = { enabled: true, apiKey: 'fixture-key', ...GOOGLE_REFERENCE_ORIGIN };
+    const frame = googleLocalFrame(config.longitude, config.latitude);
+    const longitudeOffsets = [20, 15, 10, 5, 0];
+    const radians = (degrees: number): number => degrees * Math.PI / 180;
+    const root = JSON.stringify({
+      root: {
+        geometricError: 1000,
+        boundingVolume: { sphere: [...frame.ecefOrigin, 10_000_000] },
+        children: longitudeOffsets.map((offset) => ({
+          geometricError: 0,
+          boundingVolume: {
+            region: [
+              radians(config.longitude + offset - 0.01),
+              radians(config.latitude - 0.01),
+              radians(config.longitude + offset + 0.01),
+              radians(config.latitude + 0.01),
+              0,
+              100,
+            ],
+          },
+          content: { uri: `tile-${offset}.glb?session=fixture-session` },
+        })),
+      },
+    });
+    const requested: string[] = [];
+    const fetcher = vi.fn(async (url: string) => {
+      requested.push(url);
+      return url.includes('root.json')
+        ? new Response(root, { headers: { 'content-type': 'application/json' } })
+        : new Response(glb('Fixture source'), {
+          headers: { 'content-type': 'model/gltf-binary' },
+        });
+    });
+    const host: GoogleTileHost<Handle> = {
+      load: vi.fn(async (id: string) => ({ id })),
+      setTransform: vi.fn(),
+      setVisible: vi.fn(),
+      release: vi.fn(),
+    };
+    const environment = new GoogleTilesEnvironment({
+      config,
+      provider: new GoogleTilesProvider(config, fetcher),
+      host,
+      attribution: { update: vi.fn(), destroy: vi.fn() },
+      maximumTiles: 4,
+    });
+
+    await environment.attach();
+    environment.update([0, 1.62, 0]);
+    await settle();
+
+    expect(requested.some((url) => url.includes('tile-0.glb'))).toBe(true);
+    expect(requested.some((url) => url.includes('tile-20.glb'))).toBe(false);
+    environment.dispose();
+  });
+
+  it('preserves the glTF root transform beneath the local-frame wrapper', async () => {
+    const content = { name: 'source-root' };
+    const wrapper = {
+      name: '',
+      enabled: true,
+      children: [] as unknown[],
+      position: [0, 0, 0],
+      addChild(child: unknown) { this.children.push(child); },
+      setLocalPosition(value: pc.Vec3) { this.position = [value.x, value.y, value.z]; },
+      setLocalEulerAngles: vi.fn(),
+      setLocalScale: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const root = {
+      addChild: vi.fn(),
+    };
+    const registry = { fire: vi.fn(), _loader: { clearCache: vi.fn() } };
+    const assets = {
+      add: vi.fn((asset: pc.Asset) => {
+        (asset as { registry: unknown }).registry = registry;
+      }),
+      remove: vi.fn(),
+      load: vi.fn((asset: pc.Asset) => {
+        asset.resource = {
+          instantiateRenderEntity: () => content,
+          destroy: vi.fn(),
+        } as never;
+        asset.fire('load', asset);
+      }),
+    };
+    const host = new PlayCanvasGoogleTileHost(
+      { assets } as unknown as pc.AppBase,
+      root as unknown as pc.Entity,
+      (name) => {
+        wrapper.name = name;
+        return wrapper as unknown as pc.Entity;
+      },
+    );
+
+    const handle = await host.load('fixture', glb('Fixture source'), new AbortController().signal);
+    host.setTransform(handle, [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      10, 20, 30, 1,
+    ]);
+
+    expect(handle.entity.name).toBe('google-tile:fixture');
+    expect(wrapper.children).toEqual([content]);
+    expect(wrapper.position).toEqual([10, 20, 30]);
+    expect(root.addChild).toHaveBeenCalledWith(wrapper);
+    host.release(handle);
+    expect(wrapper.destroy).toHaveBeenCalledTimes(1);
   });
 });

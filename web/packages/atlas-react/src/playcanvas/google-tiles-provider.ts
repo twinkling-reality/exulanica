@@ -100,7 +100,7 @@ export class GoogleTilesProvider {
   private async request(url: URL, signal: AbortSignal): Promise<GoogleTilesResponse> {
     signal.throwIfAborted();
     try {
-      const response = await this.fetcher(admitGoogleTilesUrl(url).href, {
+      const response = await this.fetcher.call(globalThis, admitGoogleTilesUrl(url).href, {
         method: 'GET',
         signal,
         credentials: 'omit',
