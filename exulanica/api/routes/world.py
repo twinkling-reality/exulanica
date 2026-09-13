@@ -43,7 +43,14 @@ from exulanica.world import (
     STYLE_REGISTRY,
     AlternateVersion,
     AuthoredObject,
+    EnvironmentBindingDrift,
+    EnvironmentCompositionDenied,
+    EnvironmentPlacement,
+    EnvironmentSelection,
+    EnvironmentSourceWithdrawn,
     InvalidatedSourceVersion,
+    InvalidEnvironmentData,
+    InvalidEnvironmentState,
     InvalidObjectData,
     InvalidObjectState,
     InvalidStructuralData,
@@ -52,6 +59,7 @@ from exulanica.world import (
     ProposalOrigin,
     ProposalProvenance,
     ReviewedAssetRow,
+    SourceAnchor,
     StaleObjectBase,
     StaleStructuralBase,
     StyleProposal,
@@ -657,6 +665,55 @@ class AddObjectBody(BaseModel):
     behaviour: BehaviourBody | None = None
 
 
+class SourceAnchorBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    frame_name: str = Field(min_length=1, max_length=200)
+    coordinate_scale: StrictInt = Field(gt=0)
+    coordinates: tuple[StrictInt, ...] = Field(min_length=2, max_length=3)
+
+    def domain(self) -> SourceAnchor:
+        return SourceAnchor(self.frame_name, self.coordinate_scale, self.coordinates)
+
+
+class EnvironmentSelectionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["whole_asset", "feature"]
+    feature_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    render_batch_id: StrictInt | None = Field(default=None, ge=0, le=2_147_483_647)
+
+    @model_validator(mode="after")
+    def complete(self) -> EnvironmentSelectionBody:
+        if self.kind == "feature" and (
+            self.feature_id is None or self.render_batch_id is None
+        ):
+            raise ValueError("feature selection requires feature_id and render_batch_id")
+        if self.kind == "whole_asset" and (
+            self.feature_id is not None or self.render_batch_id is not None
+        ):
+            raise ValueError("whole-asset selection cannot name a feature or render batch")
+        return self
+
+    def domain(self) -> EnvironmentSelection:
+        return EnvironmentSelection(self.kind, self.feature_id, self.render_batch_id)
+
+
+class AddEnvironmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    instance_id: str = Field(min_length=1, max_length=200)
+    admission_id: uuid.UUID
+    render_asset_id: uuid.UUID
+    publication_id: uuid.UUID | None = None
+    selection: EnvironmentSelectionBody
+    source_anchor: SourceAnchorBody
+    region_id: str = Field(min_length=1, max_length=500)
+    transform: TransformBody
+    origin_role: Literal["fictional", "personal"]
+
+
 class MoveObjectBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -739,6 +796,7 @@ class VersionEditView(BaseModel):
     kind: str
     object_id: str | None
     element_id: str | None
+    environment_instance_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str
@@ -764,19 +822,24 @@ class AlternateVersionView(BaseModel):
     created_at: str
     objects: list[AuthoredObjectView]
     element_overrides: list[ElementOverrideView]
+    environment_instances: list[dict[str, JsonValue]]
     edits: list[VersionEditView]
 
 
 def object_read_repository(
-    connection: ReadOnlyConnection, session: CurrentSession
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> WorldObjectRepository:
-    return WorldObjectRepository(connection, session.workspace_id)
+    return WorldObjectRepository(connection, session.workspace_id, store=services.store)
 
 
 def object_write_repository(
-    connection: ScopedConnection, session: CurrentSession
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> WorldObjectRepository:
-    return WorldObjectRepository(connection, session.workspace_id)
+    return WorldObjectRepository(connection, session.workspace_id, store=services.store)
 
 
 ReadObjects = Annotated[WorldObjectRepository, Depends(object_read_repository)]
@@ -786,6 +849,11 @@ WriteObjects = Annotated[WorldObjectRepository, Depends(object_write_repository)
 #: classes are absent on purpose: `UnknownWorldResource` and `UnavailableAsset` already have
 #: application-wide handlers and must keep answering identically here.
 _OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
+    (InvalidEnvironmentData, 422, "invalid_environment_data"),
+    (InvalidEnvironmentState, 409, "invalid_environment_state"),
+    (EnvironmentBindingDrift, 409, "environment_binding_drift"),
+    (EnvironmentSourceWithdrawn, 410, "withdrawn"),
+    (EnvironmentCompositionDenied, 403, "operation_denied"),
     (InvalidObjectData, 422, "invalid_object_data"),
     (InvalidStructuralData, 422, "invalid_structural_data"),
     (StaleStructuralBase, 409, "stale_structural_base"),
@@ -825,7 +893,7 @@ def _alternate_version_view(
 ) -> AlternateVersionView:
     """``assets`` is keyed by content digest, which is how an object names one."""
     return AlternateVersionView(
-        schema_version=1,
+        schema_version=2 if version.environment_instances else 1,
         version_id=version.version_id,
         world_id=version.world_id,
         source_snapshot_id=version.source_snapshot_id,
@@ -868,6 +936,20 @@ def _alternate_version_view(
             )
             for override in version.element_overrides
         ],
+        environment_instances=[
+            {
+                **{
+                    "instance_id": instance.instance_id,
+                    "source": instance.source.document(),
+                    "region_id": instance.region_id,
+                    "transform": instance.transform.document(),
+                    "origin": instance.origin.document(),
+                    "removed": instance.removed,
+                },
+                "availability": instance.availability,
+            }
+            for instance in version.environment_instances
+        ],
         edits=[
             VersionEditView(
                 edit_id=edit.edit_id,
@@ -875,6 +957,7 @@ def _alternate_version_view(
                 kind=edit.kind,
                 object_id=edit.object_id,
                 element_id=edit.element_id,
+                environment_instance_id=edit.environment_instance_id,
                 undone_edit_id=edit.undone_edit_id,
                 base_state_sha256=edit.base_state_sha256,
                 result_state_sha256=edit.result_state_sha256,
@@ -1066,6 +1149,114 @@ def alternate_version(
     request: Request,
 ) -> AlternateVersionView:
     return _rendered(repository, repository.version(version_id), get_services(request).store)
+
+
+@router.post(
+    "/versions/{version_id}/environment-instances",
+    response_model=AlternateVersionView,
+    status_code=201,
+    summary="Place one exact environment asset or feature against the current version state.",
+)
+def add_environment_instance(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: AddEnvironmentBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    placement = EnvironmentPlacement(
+        instance_id=body.instance_id,
+        admission_id=body.admission_id,
+        render_asset_id=body.render_asset_id,
+        publication_id=body.publication_id,
+        selection=body.selection.domain(),
+        source_anchor=body.source_anchor.domain(),
+        region_id=body.region_id,
+        transform=body.transform.domain(),
+        origin=ObjectOrigin("authored", body.origin_role),
+    )
+    return _edit(
+        request,
+        repository,
+        lambda: repository.add_environment(
+            version_id,
+            placement,
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/environment-instances/{instance_id}/move",
+    response_model=AlternateVersionView,
+    summary="Move an available, still-authorized environment instance without changing its source.",
+)
+def move_environment_instance(
+    version_id: Annotated[uuid.UUID, Path()],
+    instance_id: Annotated[str, Path(max_length=200)],
+    body: MoveObjectBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.move_environment(
+            version_id,
+            instance_id,
+            body.transform.domain(),
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/environment-instances/{instance_id}/remove",
+    response_model=AlternateVersionView,
+    summary="Store a removal, including when the pinned source has since been withdrawn.",
+)
+def remove_environment_instance(
+    version_id: Annotated[uuid.UUID, Path()],
+    instance_id: Annotated[str, Path(max_length=200)],
+    body: BaseStateBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.remove_environment(
+            version_id,
+            instance_id,
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
+        ),
+    )
+
+
+@router.post(
+    "/versions/{version_id}/environment-instances/undo",
+    response_model=AlternateVersionView,
+    summary="Undo the newest authored edit from stored history, even after source withdrawal.",
+)
+def undo_environment_edit(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: BaseStateBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.undo(
+            version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+    )
 
 
 @router.post(

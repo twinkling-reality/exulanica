@@ -1,8 +1,9 @@
 # Authored world versions and created objects
 
 Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
-remove/undo, the reviewed asset registry, and the bounded object-behaviour registry. The renderer
-integration, the conversational authoring service, and the package extension do not exist.
+remove/undo, durable environment placement, the reviewed asset registry, and the bounded
+object-behaviour registry. The renderer integration, unified retrieval, the conversational
+authoring service, and the package extension do not exist.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
 The three that exist are appearance ([world-style-backend.md](world-style-backend.md), migrations
@@ -13,7 +14,8 @@ the discipline and not the lifecycle, for the reasons in section 1. It implement
 contract in [product-direction.md](product-direction.md) and steps 2, 3 and 4 of the first
 milestone. The implementation is migration `0042_authored_world_objects.sql`,
 `exulanica/world/objects.py`, `exulanica/world/object_repository.py`,
-`exulanica/world/assets.py`, and the `/world/versions` and `/world/assets` routes.
+`exulanica/world/assets.py`, migration `0050_durable_environment_composition.sql`,
+`exulanica/world/environment_instances.py`, and the `/world/versions` and `/world/assets` routes.
 
 ## 1. The decision: a new plane, bound to the snapshot the way appearance is
 
@@ -512,3 +514,62 @@ opening the alternate rolls back the snapshot and its preview as well.
 Verification is in `tests/test_world_bootstrap.py`, using PostgreSQL and the HTTP surface. No
 migration is required. UI scope: only `web/packages/app/src/composition/objects.ts` changes, reusing
 the existing placement button and confirmation surface.
+
+## 11. Durable environment instances
+
+Migration 0050 adds one workspace-scoped relation,
+`world_alternate_environment_instance`. It is current authored state inside the existing alternate
+version plane, not a second version system and not a claim about rendered quality. Its foreign keys
+bind it to the owning alternate version, one admitted environment source, one derived render asset,
+and, for a feature placement, one exact feature-index publication. Every foreign key includes the
+workspace; the relation enables and forces row-level security.
+
+The source side is immutable. It pins the admission, render asset and optional publication IDs;
+source, render, index and receipt digests; source place; geographic frame and bounds; a
+person-supplied integer anchor in that frame; and either `whole_asset` or an exact
+feature ID/render-batch pair. A later provider revision or feature publication is never substituted.
+The destination side is the source snapshot's region ID plus the same fixed-point region-local
+transform used for authored objects. `origin.kind` remains `authored`, and the person must choose
+`fictional` or `personal`; neither is inferred from geography or asset bytes.
+
+Adding a whole asset requires current `compose` rights on the admitted source and render asset.
+Adding a feature also requires the named publication to be current, the exact feature to name the
+stored render batch, `compose` on its index asset, and `index` on the source, render and index
+assets. All referenced content-addressed bytes must verify as present. The repository repeats the
+binding and authorization checks under `asset_read_lock()` immediately before transaction commit,
+so a concurrent withdrawal cannot pass an earlier check and then commit. New publications do not
+rewrite existing placement history.
+
+Availability is read separately from canonical authored state:
+
+- `available`: every pinned binding is still current and all exact bytes are present;
+- `unavailable_bytes`: the rows and bindings remain, but at least one pinned blob is absent;
+- `withdrawn`: the admission, render asset or pinned index asset has been withdrawn;
+- `binding_drift`: the pinned publication is no longer current or its exact binding no longer
+  agrees with the live rows.
+
+Availability does not participate in `state_sha256`, because a blob disappearing must not pretend
+that the person authored a new version. When there are no environment rows,
+`canonical_delta_document` retains the exact schema-version-1 bytes and digest. The presence of any
+environment row selects schema version 2 and adds `environment_instances`, sorted by
+`instance_id`.
+
+Environment add, move and remove append to `world_alternate_version_edit` and use the existing
+version `state_sha256` compare-and-swap. The HTTP routes are:
+
+- `POST /world/versions/{version_id}/environment-instances`
+- `POST /world/versions/{version_id}/environment-instances/{instance_id}/move`
+- `POST /world/versions/{version_id}/environment-instances/{instance_id}/remove`
+- `POST /world/versions/{version_id}/environment-instances/undo`
+
+Move is continued composition. It succeeds only while the exact pinned binding remains current,
+authorized and byte-available, and it changes only the destination transform. After withdrawal,
+unavailability or binding drift it fails without changing state. Remove is a local authored
+cleanup and remains allowed after withdrawal. Undo restores the stored prior authored document and
+also remains allowed after withdrawal, including undoing a removal; a restored instance still
+reports `withdrawn` and remains unavailable for rendering. This permits history correction without
+turning undo into renewed source authorization.
+
+This slice implements no renderer or `AtlasBinding` change, unified Selection, Companion editing,
+WMP projection, extraction job, retained-database write or visual acceptance claim. The existing
+reviewed CC0 asset registry and its byte semantics are unchanged.

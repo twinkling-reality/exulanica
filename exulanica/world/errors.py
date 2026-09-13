@@ -10,6 +10,11 @@ from __future__ import annotations
 from exulanica.errors import ExulanicaError
 
 __all__ = [
+    "EnvironmentBindingDrift",
+    "EnvironmentCompositionDenied",
+    "EnvironmentSourceWithdrawn",
+    "InvalidEnvironmentData",
+    "InvalidEnvironmentState",
     "InvalidInteractionData",
     "InvalidInteractionPreviewState",
     "InvalidObjectData",
@@ -101,3 +106,23 @@ class InvalidObjectState(WorldStyleError):
 
 class InvalidatedSourceVersion(WorldStyleError):
     """The alternate version's source snapshot was invalidated by a committed deletion."""
+
+
+class InvalidEnvironmentData(WorldStyleError):
+    """An environment source, selection, anchor, destination, or role is malformed."""
+
+
+class InvalidEnvironmentState(WorldStyleError):
+    """A valid environment edit cannot apply to the instance's current state."""
+
+
+class EnvironmentCompositionDenied(WorldStyleError):
+    """Current operation rights do not authorize this environment composition."""
+
+
+class EnvironmentSourceWithdrawn(WorldStyleError):
+    """A pinned source, render asset, or feature index has been withdrawn."""
+
+
+class EnvironmentBindingDrift(WorldStyleError):
+    """A feature placement no longer names the current exact publication."""

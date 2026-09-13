@@ -185,8 +185,10 @@ promise uniform global or street-level coverage from a city-specific sample.
 
 At the reviewed main source d32d0e7c1013f3ce2d569adce59133896575a6a7:
 - [Authored objects and alternate versions](world-objects-contract.md) support
-  bounded editing and history; arbitrary Earth extraction and persistent geographic
-  anchors are not part of that contract.
+  bounded editing and history. Migration 0050 also supports backend-only durable placement of
+  exact admitted environment assets or indexed features with persistent geographic anchors,
+  availability states and the same version history. Arbitrary Earth extraction and rendering
+  remain outside that contract.
 - `exulanica/selection/plan.py` and `executor.py` resolve captures/entities through
   place/entity/time/text constraints, not the unified content kinds above.
 - `exulanica/selection/proposal.py` drafts bounded appearance proposals, not general

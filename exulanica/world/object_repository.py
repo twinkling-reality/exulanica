@@ -22,6 +22,8 @@ is never necessary and an edit whose inverse is ambiguous cannot exist.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from collections.abc import Mapping
 from typing import Any, Final
@@ -29,12 +31,30 @@ from typing import Any, Final
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.canonical import canonical_json
+from exulanica.errors import BlobNotFoundError, IntegrityError
+from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.environment_instances import (
+    EnvironmentInstance,
+    EnvironmentPlacement,
+    EnvironmentSelection,
+    EnvironmentSourceBinding,
+    SourceAnchor,
+    environment_instance_document,
+    validate_environment_instance,
+)
 from exulanica.world.errors import (
+    EnvironmentBindingDrift,
+    EnvironmentCompositionDenied,
+    EnvironmentSourceWithdrawn,
     InvalidatedSourceVersion,
+    InvalidEnvironmentData,
+    InvalidEnvironmentState,
     InvalidObjectData,
     InvalidObjectState,
     StaleObjectBase,
+    UnavailableAsset,
     UnknownWorldResource,
 )
 from exulanica.world.models import DEFAULT_WORLD_ID
@@ -96,10 +116,12 @@ class WorldObjectRepository:
         workspace_id: uuid.UUID,
         *,
         world_id: str = DEFAULT_WORLD_ID,
+        store: ContentAddressedStore | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.world_id = world_id
+        self.store = store
 
     # -- reviewed catalogs ------------------------------------------------------------------
 
@@ -176,12 +198,13 @@ class WorldObjectRepository:
                 source_snapshot_id = parent["source_snapshot_id"]
                 objects = self._objects(parent_version_id)
                 overrides = self._overrides(parent_version_id)
+                environments = self._environment_instances(parent_version_id)
             else:
-                objects, overrides = (), ()
+                objects, overrides, environments = (), (), ()
             self._require_snapshot(source_snapshot_id)
             self._require_style_version(style_version_id)
             version_id = uuid.uuid4()
-            state = delta_sha256(objects, overrides)
+            state = delta_sha256(objects, overrides, environments)
             self.connection.execute(
                 "insert into world_alternate_version (version_id,workspace_id,world_id,"
                 "source_snapshot_id,parent_version_id,title,origin,style_version_id,"
@@ -206,6 +229,13 @@ class WorldObjectRepository:
             for override in overrides:
                 self._insert_override(
                     version_id, override, self._override_edit_id(parent_version_id, override)
+                )
+            for instance in environments:
+                self._require_pinned_environment_current(instance, require_bytes=True)
+                self._insert_environment(
+                    version_id,
+                    instance,
+                    self._environment_edit_ids(parent_version_id, instance.instance_id),
                 )
         return self.version(version_id)
 
@@ -233,6 +263,7 @@ class WorldObjectRepository:
         """
         objects = self._objects(version_id)
         overrides = self._overrides(version_id)
+        environments = self._environment_instances(version_id)
         row = self._version_row(version_id)
         return AlternateVersion(
             version_id=row["version_id"],
@@ -241,15 +272,146 @@ class WorldObjectRepository:
             parent_version_id=row["parent_version_id"],
             title=row["title"],
             style_version_id=row["style_version_id"],
-            state_sha256=delta_sha256(objects, overrides),
+            state_sha256=delta_sha256(objects, overrides, environments),
             edit_seq=row["edit_seq"],
             source_invalidated=self._source_invalidated(row["source_snapshot_id"]),
             created_by=row["created_by"],
             created_at=row["created_at"].isoformat(),
             objects=objects,
             element_overrides=overrides,
+            environment_instances=environments,
             edits=self._edits(version_id),
         )
+
+    # -- environment edits ------------------------------------------------------------------
+
+    def add_environment(
+        self,
+        version_id: uuid.UUID,
+        placement: EnvironmentPlacement,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            if any(
+                instance.instance_id == placement.instance_id
+                for instance in self._environment_instances(version_id)
+            ):
+                raise InvalidEnvironmentState(
+                    f"{placement.instance_id} already exists in this version"
+                )
+            source = self._resolve_environment_source(placement)
+            instance = validate_environment_instance(
+                EnvironmentInstance(
+                    instance_id=placement.instance_id,
+                    source=source,
+                    region_id=placement.region_id,
+                    transform=placement.transform,
+                    origin=placement.origin,
+                ),
+                region_ids=self._source_region_ids(row["source_snapshot_id"]),
+            )
+            edit_id = uuid.uuid4()
+            self._insert_environment(version_id, instance, (edit_id, edit_id))
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="add_environment",
+                environment_instance_id=instance.instance_id,
+                before=None,
+                after=environment_instance_document(instance),
+                actor=actor,
+            )
+            self._final_environment_authorization(instance)
+        return self.version(version_id)
+
+    def move_environment(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        transform: Transform,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_environment(version_id, instance_id)
+            if current.removed:
+                raise InvalidEnvironmentState(f"{instance_id} is removed in this version")
+            try:
+                validate_transform(transform)
+            except InvalidObjectData as exc:
+                raise InvalidEnvironmentData(str(exc)) from exc
+            self._require_pinned_environment_current(current, require_bytes=True)
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_environment_instance "
+                "set x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,scale_milli=%s,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (
+                    transform.x_mm,
+                    transform.y_mm,
+                    transform.z_mm,
+                    transform.yaw_microradians,
+                    transform.scale_milli,
+                    edit_id,
+                    self.workspace_id,
+                    self.world_id,
+                    version_id,
+                    instance_id,
+                ),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="move_environment",
+                environment_instance_id=instance_id,
+                before=environment_instance_document(current),
+                after=environment_instance_document(
+                    self._require_environment(version_id, instance_id)
+                ),
+                actor=actor,
+            )
+            self._final_environment_authorization(
+                self._require_environment(version_id, instance_id)
+            )
+        return self.version(version_id)
+
+    def remove_environment(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        """Store a removal even when the immutable source has since been withdrawn."""
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_environment(version_id, instance_id)
+            if current.removed:
+                raise InvalidEnvironmentState(f"{instance_id} is already removed in this version")
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_environment_instance set removed=true,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="remove_environment",
+                environment_instance_id=instance_id,
+                before=environment_instance_document(current),
+                after=environment_instance_document(
+                    self._require_environment(version_id, instance_id)
+                ),
+                actor=actor,
+            )
+        return self.version(version_id)
 
     # -- object edits -----------------------------------------------------------------------
 
@@ -382,7 +544,7 @@ class WorldObjectRepository:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             newest = self.connection.execute(
-                "select edit_id,kind,object_id,element_id,before_document "
+                "select edit_id,kind,object_id,element_id,environment_instance_id,before_document "
                 "from world_alternate_version_edit e "
                 "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
                 "and e.kind <> 'undo' "
@@ -398,6 +560,14 @@ class WorldObjectRepository:
             before = newest["before_document"]
             if newest["kind"] in {"add_object", "move_object", "remove_object"}:
                 subject, after = self._undo_object(version_id, newest["object_id"], before, edit_id)
+            elif newest["kind"] in {
+                "add_environment",
+                "move_environment",
+                "remove_environment",
+            }:
+                subject, after = self._undo_environment(
+                    version_id, newest["environment_instance_id"], before, edit_id
+                )
             else:
                 subject, after = self._undo_override(
                     version_id, newest["element_id"], before, edit_id
@@ -408,6 +578,7 @@ class WorldObjectRepository:
                 kind="undo",
                 object_id=newest["object_id"],
                 element_id=newest["element_id"],
+                environment_instance_id=newest["environment_instance_id"],
                 before=subject,
                 after=after,
                 actor=actor,
@@ -455,6 +626,27 @@ class WorldObjectRepository:
         return (
             None if current is None else override_document(current),
             override_document({o.element_id: o for o in self._overrides(version_id)}[element_id]),
+        )
+
+    def _undo_environment(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        before: Mapping[str, Any] | None,
+        edit_id: uuid.UUID,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        """Restore stored authored state without re-authorizing withdrawn source use."""
+        current = self._require_environment(version_id, instance_id)
+        if before is None:
+            self.connection.execute(
+                "delete from world_alternate_environment_instance "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (self.workspace_id, self.world_id, version_id, instance_id),
+            )
+            return environment_instance_document(current), None
+        self._restore_environment(version_id, before, edit_id)
+        return environment_instance_document(current), environment_instance_document(
+            self._require_environment(version_id, instance_id)
         )
 
     # -- element overrides ------------------------------------------------------------------
@@ -527,20 +719,26 @@ class WorldObjectRepository:
         *,
         edit_id: uuid.UUID,
         kind: str,
-        object_id: str | None,
+        object_id: str | None = None,
         before: Mapping[str, Any] | None,
         after: Mapping[str, Any] | None,
         actor: uuid.UUID,
         element_id: str | None = None,
+        environment_instance_id: str | None = None,
         undone_edit_id: uuid.UUID | None = None,
     ) -> None:
         version_id = row["version_id"]
-        result = delta_sha256(self._objects(version_id), self._overrides(version_id))
+        result = delta_sha256(
+            self._objects(version_id),
+            self._overrides(version_id),
+            self._environment_instances(version_id),
+        )
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
-            "edit_seq,kind,object_id,element_id,undone_edit_id,base_state_sha256,"
+            "edit_seq,kind,object_id,element_id,environment_instance_id,undone_edit_id,"
+            "base_state_sha256,"
             "result_state_sha256,before_document,after_document,actor) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 edit_id,
                 self.workspace_id,
@@ -550,6 +748,7 @@ class WorldObjectRepository:
                 kind,
                 object_id,
                 element_id,
+                environment_instance_id,
                 undone_edit_id,
                 row["state_sha256"],
                 result,
@@ -641,6 +840,100 @@ class WorldObjectRepository:
                 self.world_id,
                 version_id,
                 obj.object_id,
+            ),
+        )
+
+    def _insert_environment(
+        self,
+        version_id: uuid.UUID,
+        instance: EnvironmentInstance,
+        edit_ids: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        source = instance.source
+        selection = source.selection
+        created_edit_id, last_edit_id = edit_ids
+        self.connection.execute(
+            """
+            insert into world_alternate_environment_instance(
+              workspace_id,world_id,version_id,instance_id,admission_id,render_asset_id,
+              publication_id,selection_kind,feature_id,render_batch_id,source_sha256,
+              source_receipt_sha256,render_sha256,render_receipt_sha256,index_sha256,
+              index_receipt_sha256,publication_receipt_sha256,source_place_id,source_frame,
+              source_bounds,source_anchor,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,
+              origin_kind,origin_role,removed,created_edit_id,last_edit_id)
+            values(
+              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """,
+            (
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                instance.instance_id,
+                source.admission_id,
+                source.render_asset_id,
+                source.publication_id,
+                selection.kind,
+                selection.feature_id,
+                selection.render_batch_id,
+                bytes.fromhex(source.source_sha256),
+                bytes.fromhex(source.source_receipt_sha256),
+                bytes.fromhex(source.render_sha256),
+                bytes.fromhex(source.render_receipt_sha256),
+                None if source.index_sha256 is None else bytes.fromhex(source.index_sha256),
+                None
+                if source.index_receipt_sha256 is None
+                else bytes.fromhex(source.index_receipt_sha256),
+                None
+                if source.publication_receipt_sha256 is None
+                else bytes.fromhex(source.publication_receipt_sha256),
+                source.place_id,
+                Jsonb(dict(source.frame)),
+                Jsonb(dict(source.bounds)),
+                Jsonb(source.anchor.document()),
+                instance.region_id,
+                instance.transform.x_mm,
+                instance.transform.y_mm,
+                instance.transform.z_mm,
+                instance.transform.yaw_microradians,
+                instance.transform.scale_milli,
+                instance.origin.kind,
+                instance.origin.role,
+                instance.removed,
+                created_edit_id,
+                last_edit_id,
+            ),
+        )
+
+    def _restore_environment(
+        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    ) -> None:
+        current = self._require_environment(version_id, document["instance_id"])
+        current_document = environment_instance_document(current)
+        if (
+            current_document["source"] != document["source"]
+            or current_document["origin"] != document["origin"]
+        ):
+            raise InvalidEnvironmentState("stored undo source binding disagrees with current state")
+        transform = document["transform"]
+        self.connection.execute(
+            "update world_alternate_environment_instance "
+            "set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,scale_milli=%s,"
+            "removed=%s,last_edit_id=%s "
+            "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+            (
+                document["region_id"],
+                transform["x_mm"],
+                transform["y_mm"],
+                transform["z_mm"],
+                transform["yaw_microradians"],
+                transform["scale_milli"],
+                document["removed"],
+                edit_id,
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                document["instance_id"],
             ),
         )
 
@@ -743,9 +1036,85 @@ class WorldObjectRepository:
             for r in rows
         )
 
+    def _environment_instances(self, version_id: uuid.UUID) -> tuple[EnvironmentInstance, ...]:
+        rows = self.connection.execute(
+            """
+            select instance_id,admission_id,render_asset_id,publication_id,selection_kind,
+                   feature_id,render_batch_id,source_sha256,source_receipt_sha256,render_sha256,
+                   render_receipt_sha256,index_sha256,index_receipt_sha256,
+                   publication_receipt_sha256,source_place_id,source_frame,source_bounds,
+                   source_anchor,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,
+                   origin_kind,origin_role,removed
+              from world_alternate_environment_instance
+             where workspace_id=%s and world_id=%s and version_id=%s
+             order by instance_id
+            """,
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchall()
+        return tuple(self._environment_from_row(row) for row in rows)
+
+    def _environment_from_row(self, row: Mapping[str, Any]) -> EnvironmentInstance:
+        source = EnvironmentSourceBinding(
+            admission_id=row["admission_id"],
+            render_asset_id=row["render_asset_id"],
+            publication_id=row["publication_id"],
+            source_sha256=bytes(row["source_sha256"]).hex(),
+            source_receipt_sha256=bytes(row["source_receipt_sha256"]).hex(),
+            render_sha256=bytes(row["render_sha256"]).hex(),
+            render_receipt_sha256=bytes(row["render_receipt_sha256"]).hex(),
+            index_sha256=(
+                None if row["index_sha256"] is None else bytes(row["index_sha256"]).hex()
+            ),
+            index_receipt_sha256=(
+                None
+                if row["index_receipt_sha256"] is None
+                else bytes(row["index_receipt_sha256"]).hex()
+            ),
+            publication_receipt_sha256=(
+                None
+                if row["publication_receipt_sha256"] is None
+                else bytes(row["publication_receipt_sha256"]).hex()
+            ),
+            place_id=row["source_place_id"],
+            frame=row["source_frame"],
+            bounds=row["source_bounds"],
+            anchor=SourceAnchor(
+                row["source_anchor"]["frame_name"],
+                row["source_anchor"]["coordinate_scale"],
+                tuple(row["source_anchor"]["coordinates"]),
+            ),
+            selection=EnvironmentSelection(
+                row["selection_kind"], row["feature_id"], row["render_batch_id"]
+            ),
+        )
+        instance = EnvironmentInstance(
+            instance_id=row["instance_id"],
+            source=source,
+            region_id=row["region_id"],
+            transform=Transform(
+                row["x_mm"],
+                row["y_mm"],
+                row["z_mm"],
+                row["yaw_microradians"],
+                row["scale_milli"],
+            ),
+            origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
+            removed=row["removed"],
+        )
+        return EnvironmentInstance(
+            instance_id=instance.instance_id,
+            source=instance.source,
+            region_id=instance.region_id,
+            transform=instance.transform,
+            origin=instance.origin,
+            removed=instance.removed,
+            availability=self._environment_availability(instance),
+        )
+
     def _edits(self, version_id: uuid.UUID) -> tuple[VersionEdit, ...]:
         rows = self.connection.execute(
-            "select edit_id,edit_seq,kind,object_id,element_id,undone_edit_id,base_state_sha256,"
+            "select edit_id,edit_seq,kind,object_id,element_id,environment_instance_id,"
+            "undone_edit_id,base_state_sha256,"
             "result_state_sha256,actor,recorded_at from world_alternate_version_edit "
             "where workspace_id=%s and world_id=%s and version_id=%s order by edit_seq",
             (self.workspace_id, self.world_id, version_id),
@@ -757,6 +1126,7 @@ class WorldObjectRepository:
                 kind=r["kind"],
                 object_id=r["object_id"],
                 element_id=r["element_id"],
+                environment_instance_id=r["environment_instance_id"],
                 undone_edit_id=r["undone_edit_id"],
                 base_state_sha256=r["base_state_sha256"],
                 result_state_sha256=r["result_state_sha256"],
@@ -771,6 +1141,14 @@ class WorldObjectRepository:
             if obj.object_id == object_id:
                 return obj
         raise UnknownWorldResource("no such authored object")
+
+    def _require_environment(
+        self, version_id: uuid.UUID, instance_id: str
+    ) -> EnvironmentInstance:
+        for instance in self._environment_instances(version_id):
+            if instance.instance_id == instance_id:
+                return instance
+        raise UnknownWorldResource("no such environment instance")
 
     def _object_edit_ids(
         self, version_id: uuid.UUID, obj: AuthoredObject
@@ -789,6 +1167,365 @@ class WorldObjectRepository:
             (self.workspace_id, self.world_id, version_id, override.element_id),
         ).fetchone()
         return row["last_edit_id"]
+
+    def _environment_edit_ids(
+        self, version_id: uuid.UUID, instance_id: str
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        row = self.connection.execute(
+            "select created_edit_id,last_edit_id from world_alternate_environment_instance "
+            "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+            (self.workspace_id, self.world_id, version_id, instance_id),
+        ).fetchone()
+        return (row["created_edit_id"], row["last_edit_id"])
+
+    # -- environment source authorization ---------------------------------------------------
+
+    def _resolve_environment_source(
+        self, placement: EnvironmentPlacement
+    ) -> EnvironmentSourceBinding:
+        if self.store is None:
+            raise UnavailableAsset("environment composition requires the content-addressed store")
+        row = self.connection.execute(
+            """
+            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
+                   s.withdrawn_at as source_withdrawn_at,
+                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
+                   s.geographic_frame,s.geographic_bounds,
+                   r.withdrawn_at as render_withdrawn_at,
+                   environment_resource_allows(
+                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
+                   environment_resource_allows(
+                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
+              from environment_source_admission s
+              join derived_environment_asset r
+                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
+             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
+            """,
+            (
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                placement.admission_id,
+                placement.render_asset_id,
+            ),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such environment source and render binding")
+        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
+            raise EnvironmentSourceWithdrawn("the environment source or render asset is withdrawn")
+        if not row["source_compose"] or not row["render_compose"]:
+            raise EnvironmentCompositionDenied(
+                "compose is not permitted for the source and render asset"
+            )
+        self._require_environment_bytes(
+            row["source_sha256"], row["render_sha256"], None
+        )
+
+        bounds = row["geographic_bounds"]
+        publication = None
+        if placement.selection.kind == "feature":
+            publication = self._current_publication(
+                placement.admission_id,
+                placement.render_asset_id,
+                placement.publication_id,
+                require_rights=True,
+            )
+            index = self._read_feature(
+                publication, placement.selection.feature_id, placement.selection.render_batch_id
+            )
+            bounds = {
+                "kind": "bbox",
+                "frame_name": row["geographic_frame"]["name"],
+                "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
+                "coordinates": index["bbox"],
+            }
+        elif placement.selection.kind != "whole_asset" or placement.publication_id is not None:
+            raise InvalidEnvironmentData("whole-asset placement cannot name a publication")
+
+        return EnvironmentSourceBinding(
+            admission_id=placement.admission_id,
+            render_asset_id=placement.render_asset_id,
+            publication_id=None if publication is None else publication["publication_id"],
+            source_sha256=bytes(row["source_sha256"]).hex(),
+            source_receipt_sha256=bytes(row["source_receipt_sha256"]).hex(),
+            render_sha256=bytes(row["render_sha256"]).hex(),
+            render_receipt_sha256=bytes(row["render_receipt_sha256"]).hex(),
+            index_sha256=(
+                None if publication is None else bytes(publication["index_sha256"]).hex()
+            ),
+            index_receipt_sha256=(
+                None if publication is None else bytes(publication["index_receipt_sha256"]).hex()
+            ),
+            publication_receipt_sha256=(
+                None
+                if publication is None
+                else bytes(publication["publication_receipt_sha256"]).hex()
+            ),
+            place_id=row["place_id"],
+            frame=row["geographic_frame"],
+            bounds=bounds,
+            anchor=placement.source_anchor,
+            selection=placement.selection,
+        )
+
+    def _current_publication(
+        self,
+        admission_id: uuid.UUID,
+        render_asset_id: uuid.UUID,
+        publication_id: uuid.UUID | None,
+        *,
+        require_rights: bool,
+    ) -> Mapping[str, Any]:
+        row = self.connection.execute(
+            """
+            select p.publication_id,p.admission_id,p.render_asset_id,
+                   p.source_sha256,p.source_receipt_sha256,
+                   p.render_sha256,p.render_receipt_sha256,p.index_sha256,
+                   p.index_receipt_sha256,p.receipt_sha256 as publication_receipt_sha256,
+                   p.index_asset_id,i.withdrawn_at as index_withdrawn_at,
+                   s.place_id,s.geographic_frame,s.geographic_bounds,
+                   (select newest.publication_id
+                      from environment_feature_index_publication newest
+                     where newest.workspace_id=p.workspace_id
+                       and newest.admission_id=p.admission_id
+                     order by newest.published_at desc,newest.publication_id desc limit 1)
+                     as current_publication_id,
+                   environment_resource_allows(
+                     %s,'source',p.admission_id,'index',statement_timestamp()) source_index,
+                   environment_resource_allows(
+                     %s,'asset',p.render_asset_id,'index',statement_timestamp()) render_index,
+                   environment_resource_allows(
+                     %s,'asset',p.index_asset_id,'index',statement_timestamp()) index_index,
+                   environment_resource_allows(
+                     %s,'asset',p.index_asset_id,'compose',statement_timestamp()) index_compose
+              from environment_feature_index_publication p
+              join environment_source_admission s
+                on s.workspace_id=p.workspace_id and s.admission_id=p.admission_id
+              join derived_environment_asset i
+                on i.workspace_id=p.workspace_id and i.asset_id=p.index_asset_id
+             where p.workspace_id=%s and p.admission_id=%s and p.publication_id=%s
+            """,
+            (
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                admission_id,
+                publication_id,
+            ),
+        ).fetchone()
+        if row is None or row["render_asset_id"] != render_asset_id:
+            raise UnknownWorldResource("no such environment feature publication")
+        if row["index_withdrawn_at"] is not None:
+            raise EnvironmentSourceWithdrawn("the environment feature index is withdrawn")
+        if row["publication_id"] != row["current_publication_id"]:
+            raise EnvironmentBindingDrift("the named feature publication is no longer current")
+        if require_rights and not all(
+            row[key] for key in ("source_index", "render_index", "index_index", "index_compose")
+        ):
+            raise EnvironmentCompositionDenied(
+                "feature placement requires index and compose rights on its exact binding"
+            )
+        return row
+
+    def _read_feature(
+        self,
+        publication: Mapping[str, Any],
+        feature_id: str | None,
+        render_batch_id: int | None,
+    ) -> Mapping[str, Any]:
+        if self.store is None:
+            raise UnavailableAsset("environment composition requires the content-addressed store")
+        try:
+            data = self.store.get(BlobId(bytes(publication["index_sha256"])))
+            document = json.loads(data)
+            payload = document["index"]
+            if (
+                document.get("profile")
+                != "exulanica.environment-feature-index-envelope/v1"
+                or document.get("payload_sha256")
+                != hashlib.sha256(canonical_json(payload)).hexdigest()
+                or payload.get("admission_id") != str(publication["admission_id"])
+                or payload.get("place_id") != str(publication["place_id"])
+                or payload.get("source")
+                != {
+                    "content_sha256": bytes(publication["source_sha256"]).hex(),
+                    "receipt_sha256": bytes(publication["source_receipt_sha256"]).hex(),
+                }
+                or payload.get("render_asset")
+                != {
+                    "asset_id": str(publication["render_asset_id"]),
+                    "content_sha256": bytes(publication["render_sha256"]).hex(),
+                    "receipt_sha256": bytes(publication["render_receipt_sha256"]).hex(),
+                }
+                or payload.get("geographic_frame") != publication["geographic_frame"]
+                or payload.get("geographic_bounds") != publication["geographic_bounds"]
+            ):
+                raise IntegrityError(
+                    "the pinned environment feature index binding is malformed"
+                )
+            features = payload["features"]
+        except BlobNotFoundError as exc:
+            raise UnavailableAsset("the pinned environment index bytes are unavailable") from exc
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise IntegrityError("the pinned environment feature index is malformed") from exc
+        matches = [
+            feature
+            for feature in features
+            if isinstance(feature, dict) and feature.get("id") == feature_id
+        ]
+        if len(matches) != 1 or matches[0].get("render_batch_id") != render_batch_id:
+            raise InvalidEnvironmentData(
+                "the feature and render batch do not match the exact publication"
+            )
+        return matches[0]
+
+    def _require_environment_bytes(
+        self, source_sha256: bytes, render_sha256: bytes, index_sha256: bytes | None
+    ) -> None:
+        if self.store is None:
+            raise UnavailableAsset("environment composition requires the content-addressed store")
+        try:
+            for digest in (source_sha256, render_sha256, index_sha256):
+                if digest is not None:
+                    self.store.get(BlobId(bytes(digest)))
+        except BlobNotFoundError as exc:
+            raise UnavailableAsset("the exact pinned environment bytes are unavailable") from exc
+
+    def _require_pinned_environment_current(
+        self,
+        instance: EnvironmentInstance,
+        *,
+        require_bytes: bool,
+        validate_feature_bytes: bool = True,
+    ) -> None:
+        source = instance.source
+        row = self.connection.execute(
+            """
+            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
+                   s.withdrawn_at as source_withdrawn_at,
+                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
+                   s.geographic_frame,s.geographic_bounds,
+                   r.withdrawn_at as render_withdrawn_at,
+                   environment_resource_allows(
+                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
+                   environment_resource_allows(
+                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
+              from environment_source_admission s
+              join derived_environment_asset r
+                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
+             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
+            """,
+            (
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                source.admission_id,
+                source.render_asset_id,
+            ),
+        ).fetchone()
+        if row is None:
+            raise EnvironmentBindingDrift("the pinned environment binding no longer resolves")
+        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
+            raise EnvironmentSourceWithdrawn("the pinned environment source is withdrawn")
+        if not row["source_compose"] or not row["render_compose"]:
+            raise EnvironmentCompositionDenied("compose is no longer permitted")
+        expected = (
+            source.place_id,
+            source.source_sha256,
+            source.source_receipt_sha256,
+            source.render_sha256,
+            source.render_receipt_sha256,
+            dict(source.frame),
+            dict(source.bounds) if source.selection.kind == "whole_asset" else None,
+        )
+        actual = (
+            row["place_id"],
+            bytes(row["source_sha256"]).hex(),
+            bytes(row["source_receipt_sha256"]).hex(),
+            bytes(row["render_sha256"]).hex(),
+            bytes(row["render_receipt_sha256"]).hex(),
+            row["geographic_frame"],
+            row["geographic_bounds"] if source.selection.kind == "whole_asset" else None,
+        )
+        if actual != expected:
+            raise EnvironmentBindingDrift("the pinned environment source binding drifted")
+        index_digest = None
+        if source.publication_id is not None:
+            publication = self._current_publication(
+                source.admission_id,
+                source.render_asset_id,
+                source.publication_id,
+                require_rights=True,
+            )
+            published = (
+                bytes(publication["source_sha256"]).hex(),
+                bytes(publication["source_receipt_sha256"]).hex(),
+                bytes(publication["render_sha256"]).hex(),
+                bytes(publication["render_receipt_sha256"]).hex(),
+                bytes(publication["index_sha256"]).hex(),
+                bytes(publication["index_receipt_sha256"]).hex(),
+                bytes(publication["publication_receipt_sha256"]).hex(),
+            )
+            pinned = (
+                source.source_sha256,
+                source.source_receipt_sha256,
+                source.render_sha256,
+                source.render_receipt_sha256,
+                source.index_sha256,
+                source.index_receipt_sha256,
+                source.publication_receipt_sha256,
+            )
+            if published != pinned:
+                raise EnvironmentBindingDrift("the pinned feature publication binding drifted")
+            if validate_feature_bytes:
+                feature = self._read_feature(
+                    publication,
+                    source.selection.feature_id,
+                    source.selection.render_batch_id,
+                )
+                feature_bounds = {
+                    "kind": "bbox",
+                    "frame_name": row["geographic_frame"]["name"],
+                    "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
+                    "coordinates": feature["bbox"],
+                }
+                if feature_bounds != dict(source.bounds):
+                    raise EnvironmentBindingDrift("the pinned feature bounds drifted")
+            index_digest = publication["index_sha256"]
+        if require_bytes:
+            self._require_environment_bytes(
+                row["source_sha256"], row["render_sha256"], index_digest
+            )
+
+    def _final_environment_authorization(self, instance: EnvironmentInstance) -> None:
+        self.connection.execute("select asset_read_lock()")
+        self._require_pinned_environment_current(
+            instance, require_bytes=False, validate_feature_bytes=False
+        )
+
+    def _environment_availability(self, instance: EnvironmentInstance) -> str:
+        try:
+            self._require_pinned_environment_current(instance, require_bytes=False)
+        except EnvironmentSourceWithdrawn:
+            return "withdrawn"
+        except UnavailableAsset:
+            return "unavailable_bytes"
+        except (EnvironmentBindingDrift, EnvironmentCompositionDenied, UnknownWorldResource):
+            return "binding_drift"
+        if self.store is None:
+            return "unknown"
+        try:
+            source = instance.source
+            self._require_environment_bytes(
+                bytes.fromhex(source.source_sha256),
+                bytes.fromhex(source.render_sha256),
+                None if source.index_sha256 is None else bytes.fromhex(source.index_sha256),
+            )
+        except UnavailableAsset:
+            return "unavailable_bytes"
+        return "available"
 
     # -- the source snapshot ----------------------------------------------------------------
 

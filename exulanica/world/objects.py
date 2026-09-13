@@ -18,10 +18,13 @@ import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.world.errors import InvalidObjectData
+
+if TYPE_CHECKING:
+    from exulanica.world.environment_instances import EnvironmentInstance
 
 __all__ = [
     "MAX_SCALE_MILLI",
@@ -144,6 +147,7 @@ class VersionEdit:
     kind: str
     object_id: str | None
     element_id: str | None
+    environment_instance_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str
@@ -166,6 +170,7 @@ class AlternateVersion:
     created_at: str
     objects: tuple[AuthoredObject, ...] = ()
     element_overrides: tuple[ElementOverride, ...] = ()
+    environment_instances: tuple[EnvironmentInstance, ...] = ()
     edits: tuple[VersionEdit, ...] = ()
 
 
@@ -195,7 +200,9 @@ def override_document(override: ElementOverride) -> dict[str, Any]:
 
 
 def canonical_delta_document(
-    objects: Sequence[AuthoredObject], overrides: Sequence[ElementOverride]
+    objects: Sequence[AuthoredObject],
+    overrides: Sequence[ElementOverride],
+    environment_instances: Sequence[EnvironmentInstance] = (),
 ) -> dict[str, Any]:
     """The whole delta, in the one order its digest is defined over.
 
@@ -203,18 +210,31 @@ def canonical_delta_document(
     token, and a token that depended on the order rows came back in would make two identical
     worlds disagree the first time a query plan changed.
     """
-    return {
+    document = {
         "schema_version": 1,
         "element_overrides": [
             override_document(o) for o in sorted(overrides, key=lambda o: o.element_id)
         ],
         "objects": [object_document(o) for o in sorted(objects, key=lambda o: o.object_id)],
     }
+    if environment_instances:
+        from exulanica.world.environment_instances import environment_instance_document
+
+        document["schema_version"] = 2
+        document["environment_instances"] = [
+            environment_instance_document(instance)
+            for instance in sorted(environment_instances, key=lambda value: value.instance_id)
+        ]
+    return document
 
 
-def delta_sha256(objects: Sequence[AuthoredObject], overrides: Sequence[ElementOverride]) -> str:
+def delta_sha256(
+    objects: Sequence[AuthoredObject],
+    overrides: Sequence[ElementOverride],
+    environment_instances: Sequence[EnvironmentInstance] = (),
+) -> str:
     """The state token: SHA-256 over the canonical delta, hex."""
-    document = canonical_delta_document(objects, overrides)
+    document = canonical_delta_document(objects, overrides, environment_instances)
     # Round-trips through canonical_json first so a value the digest could not represent raises
     # here, where the message names this plane, rather than inside the hashing helper.
     canonical_json(document)
