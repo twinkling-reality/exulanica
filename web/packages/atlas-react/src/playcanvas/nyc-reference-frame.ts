@@ -8,5 +8,7 @@
 export const NYC_REFERENCE_FRAME = Object.freeze({
   longitude: -73.9885,
   latitude: 40.722,
-  altitude: 0,
+  // A local display datum near the corridor's public ground elevations. It keeps the camera and
+  // independent semantic plane above the streamed terrain without deriving a surface from Google.
+  altitude: 12,
 });

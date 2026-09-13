@@ -28,6 +28,10 @@ export interface EnvironmentSelectionDependencies {
   readonly scene: AtlasScene;
   readonly credentials: { readonly baseUrl: string; readonly token: string };
   readonly showStatus: (message: string, kind?: 'progress' | 'failure') => void;
+  readonly onSelect?: (context: {
+    readonly admissionId: string;
+    readonly featureId: string;
+  } | null) => void;
   readonly admissionId?: string | null;
   readonly environmentClient?: EnvironmentSelectionClient;
   readonly worldClient?: WorldObjectsClient;
@@ -68,6 +72,15 @@ export function mountEnvironmentSelection(
     text: 'Aim at a teal footprint and use the interact control.',
   });
   const reason = el('p', { class: 'environment-selection-reason' });
+  const overview = el('button', { type: 'button', text: 'City overview' });
+  const street = el('button', { type: 'button', text: 'Neighborhood view' });
+  const memoryLayer = el('label', { class: 'environment-selection-layer' }, [
+    el('input', { type: 'checkbox' }),
+    document.createTextNode(' Compose memory layer'),
+  ]);
+  const cityControls = el('div', {
+    class: 'environment-selection-city-controls',
+  }, [overview, street, memoryLayer]);
   const role = el('select', { 'aria-label': 'Authored role' });
   for (const value of ['fictional', 'personal'] as const) {
     role.append(el('option', { value, text: OBJECT_ROLE_LABELS[value] }));
@@ -94,7 +107,17 @@ export function mountEnvironmentSelection(
     class: 'environment-selection-preview-controls',
     hidden: true,
   }, [apply, discard]);
-  root.append(title, source, selected, reason, language, controls, previewText, previewControls);
+  root.append(
+    title,
+    source,
+    selected,
+    reason,
+    language,
+    cityControls,
+    controls,
+    previewText,
+    previewControls,
+  );
 
   const admissionId = deps.admissionId === undefined ? nycOpenDataAdmissionId() : deps.admissionId;
   const environmentClient = deps.environmentClient ?? new EnvironmentSelectionClient(deps.credentials);
@@ -118,15 +141,28 @@ export function mountEnvironmentSelection(
   let priorInteract: (() => void) | null = null;
   let attachedControls: { onInteract: (() => void) | null } | null = null;
 
+  overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
+  street.addEventListener('click', () => deps.state.atlas?.binding.setCityView('street'));
+  const memoryCheckbox = memoryLayer.querySelector('input') as HTMLInputElement;
+  memoryCheckbox.addEventListener('change', () => {
+    deps.state.atlas?.binding.setMemoryLayerVisible(memoryCheckbox.checked);
+    source.textContent = memoryCheckbox.checked
+      ? 'City and memory layers are intentionally composed. Purple memory forms are not city semantics.'
+      : 'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.';
+  });
+
   function reportSelection(feature: NYCLocalFeature): void {
     if (chosen?.id !== feature.id) {
       invalidateProposal('The selection changed. Request a fresh proposal.');
     }
     chosen = feature;
+    if (catalog !== null) {
+      deps.onSelect?.({ admissionId: catalog.admissionId, featureId: feature.id });
+    }
     const doitt = feature.providerFeatureId.replace('doitt_id:', '');
     selected.textContent = `DOITT_ID ${doitt} · BIN ${feature.bin?.replace('bin:', '') ?? 'not supplied'}`
       + ` · ${feature.name ?? 'Unnamed building'}`;
-    reason.textContent = 'Match: reticle intersects the independently sourced NYC footprint.';
+    reason.textContent = 'Match: reticle resolves the nearest independently sourced NYC footprint.';
     place.disabled = false;
     reflectRequestButton();
     remove.disabled = current?.environmentInstances?.some((held) =>
@@ -327,10 +363,14 @@ export function mountEnvironmentSelection(
     const atlas = deps.state.atlas?.binding;
     if (atlas === undefined || deps.scene.islands.length === 0) return;
     try {
-      [catalog, current] = await Promise.all([
-        environmentClient.catalog(admissionId),
-        worldClient.connect().then((connected) => connected.version),
-      ]);
+      catalog = await environmentClient.catalog(admissionId);
+      try {
+        current = (await worldClient.connect()).version;
+      } catch {
+        // Semantic city reading remains available in the read-only development preview and
+        // whenever authored-world state is temporarily unavailable.
+        current = null;
+      }
       if (phase === 'disposed') return;
       const features = localizeNYCFeatures(
         catalog.features,
@@ -338,12 +378,13 @@ export function mountEnvironmentSelection(
         NYC_REFERENCE_FRAME,
       );
       overlay = deps.createOverlay?.(features)
-        ?? new NYCSemanticOverlay(atlas.device, atlas.renderRoot, features);
+        ?? new NYCSemanticOverlay(atlas.device, atlas.environmentRoot, features);
+      memoryCheckbox.checked = atlas.memoryLayerVisible;
       attachedControls = atlas.controls;
       priorInteract = atlas.controls.onInteract;
       installedInteract = () => {
         const position = atlas.controls.state;
-        const forward = atlas.camera.forward;
+        const forward = atlas.controls.forward?.() ?? atlas.camera.forward;
         const hit = overlay!.pick(
           [position.x, position.y, position.z],
           [forward.x, forward.y, forward.z],
@@ -388,6 +429,7 @@ export function mountEnvironmentSelection(
       attachedControls = null;
       overlay?.destroy();
       overlay = null;
+      deps.onSelect?.(null);
       root.remove();
     },
   };

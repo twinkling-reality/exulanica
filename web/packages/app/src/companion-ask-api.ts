@@ -243,6 +243,11 @@ export interface CompanionAskOptions extends TransportOptions {
   readonly now?: () => number;
 }
 
+export interface CompanionCityContext {
+  readonly admissionId: string;
+  readonly featureId: string;
+}
+
 export class CompanionAskClient {
   readonly #where: CompanionAskOptions;
 
@@ -275,11 +280,17 @@ export class CompanionAskClient {
    * that opens nothing, so those entries carry a null handle and the surface renders them as
    * unavailable rather than pretending.
    */
-  async ask(question: string): Promise<CompanionAnswer> {
+  async ask(question: string, cityContext: CompanionCityContext | null = null): Promise<CompanionAnswer> {
     let body: WireAnswer;
     try {
       body = await this.#transport(ASK_TIMEOUT_MS).postJson<WireAnswer>('/selection/ask', {
         question,
+        ...(cityContext === null ? {} : {
+          city_context: {
+            admission_id: cityContext.admissionId,
+            feature_id: cityContext.featureId,
+          },
+        }),
       });
     } catch (error) {
       throw asAskFailure(error);

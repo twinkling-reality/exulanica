@@ -50,7 +50,7 @@ export class GoogleTilesProvider {
   constructor(
     private readonly config: GoogleTilesConfig,
     private readonly fetcher: GoogleTilesFetch = fetch,
-    private readonly maximumResponseBytes = 16 * 1024 * 1024,
+    private readonly maximumResponseBytes = 32 * 1024 * 1024,
   ) {
     if (!config.enabled || config.apiKey.length === 0) throw new Error('Google tiles are disabled');
     if (!Number.isSafeInteger(maximumResponseBytes) || maximumResponseBytes < 1) {

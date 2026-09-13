@@ -43,11 +43,19 @@ import './ui/scene-segments.css';
 import { ApiError } from '@exulanica/graph-client';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
 import { FACET_KEYS, encodeFacets, type IndexFacets } from '@exulanica/world-index';
-import { applicationTitle, developmentToken } from './config.js';
+import {
+  applicationTitle,
+  developmentToken,
+  PREVIEW_NYC_OPEN_DATA_ADMISSION_ID,
+} from './config.js';
 import { buildScene } from './scene.js';
 import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
-import { CompanionAskClient, CompanionProposalClient } from './companion-ask-api.js';
+import {
+  CompanionAskClient,
+  CompanionProposalClient,
+  type CompanionCityContext,
+} from './companion-ask-api.js';
 import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
 import type { PersistedMemory } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
@@ -290,6 +298,7 @@ async function mount(): Promise<void> {
   // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
   // about the library, and this is the only place holding the credential it takes to ask one.
   const companionAsk = new CompanionAskClient(currentCredentials);
+  let companionCityContext: CompanionCityContext | null = null;
 
   // The one thing the Companion may DO, and it is still not a write. `POST /selection/appearance`
   // reads an utterance as a bounded proposal drawn from the reviewed style catalogue; the world
@@ -320,7 +329,7 @@ async function mount(): Promise<void> {
     state,
     engine: currentCompanion,
     evidence: currentEvidence,
-    ask: (question) => companionAsk.ask(question),
+    ask: (question) => companionAsk.ask(question, companionCityContext),
     proposeAppearance: (utterance) => companionPropose.propose(utterance),
     persistedMemory,
     rememberAnswer: async (answer) => {
@@ -368,6 +377,8 @@ async function mount(): Promise<void> {
     credentials: currentCredentials,
     scene: built.scene,
     showStatus: (message, kind) => showTravelStatus(message, kind),
+    ...(env.preview ? { admissionId: PREVIEW_NYC_OPEN_DATA_ADMISSION_ID } : {}),
+    onSelect: (context) => { companionCityContext = context; },
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 
@@ -669,6 +680,10 @@ async function mount(): Promise<void> {
     reflectShell: () => reflectShell(),
     showTravelStatus,
   });
+  if (renderer.atlas.binding.googleTiles !== null) {
+    segments.root.hidden = true;
+    segments.root.style.display = 'none';
+  }
 
   // -- the two input modes, and the one key that calls the Companion ----------------------
   //
@@ -706,7 +721,7 @@ async function mount(): Promise<void> {
 
   // After the renderer, because every object it draws needs a binding to draw into.
   void objects.begin();
-  void segments.begin();
+  if (renderer.atlas.binding.googleTiles === null) void segments.begin();
 
 }
 

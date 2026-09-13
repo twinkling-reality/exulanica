@@ -1172,6 +1172,22 @@ def test_authenticated_place_bridge_routes_create_list_and_revoke(
     }
     with TestClient(create_app(services, verify=False)) as client:
         assert client.post("/selection/place-bridges", json=body).status_code in {401, 403}
+        unlinked = client.post(
+            "/selection/ask",
+            json={
+                "question": "What building is this?",
+                "city_context": {
+                    "admission_id": str(memory_place.composed.source.admission_id),
+                    "feature_id": memory_place.composed.feature_id,
+                },
+            },
+            headers=headers,
+        )
+        assert unlinked.status_code == 200, unlinked.text
+        assert unlinked.json()["deterministic"] is True
+        assert unlinked.json()["execution"]["calls"] == []
+        assert "Google supplied no identity" in unlinked.json()["answer"]["clauses"][0]["text"]
+        assert "no confirmed memory-place bridge" in unlinked.json()["answer"]["clauses"][1]["text"]
         created = client.post("/selection/place-bridges", json=body, headers=headers)
         assert created.status_code == 201, created.text
         decision = created.json()

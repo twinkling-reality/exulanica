@@ -43,9 +43,15 @@ from exulanica.models.client import ModelClient
 from exulanica.selection import (
     Abstention,
     Answer,
+    AnswerClause,
+    ClauseType,
     ContentPageCursor,
+    ContentScope,
+    ContentSelector,
+    Intent,
     PlaceBridgeDecision,
     PlaceBridgeRepository,
+    PlaceSelector,
     SelectionPlan,
     SelectionResult,
     build_packet,
@@ -177,12 +183,22 @@ class PlaceBridgeView(BaseModel):
     decided_at: str
 
 
+class CityContextRequest(BaseModel):
+    """A reticle selection from the independently admitted semantic city layer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    admission_id: uuid.UUID
+    feature_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+
+
 class QuestionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     question: Annotated[str, Field(min_length=1, max_length=1000)]
     #: A plan the user has already seen and approved. When absent the model proposes one.
     plan: SelectionPlan | None = None
+    city_context: CityContextRequest | None = None
 
 
 class ModelCallView(BaseModel):
@@ -371,17 +387,53 @@ def ask(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> AnswerView:
+    plan = body.plan
+    city_clause: AnswerClause | None = None
+    if body.city_context is not None:
+        plan, city_clause = _city_selection(
+            body.city_context,
+            request=request,
+            connection=connection,
+            session=session,
+            supplied_plan=plan,
+        )
+        if plan is None:
+            return AnswerView(
+                answer=Answer(
+                    clauses=[
+                        city_clause,
+                        AnswerClause(
+                            text=(
+                                "Unified place retrieval was not run because this admitted NYC "
+                                "place has no confirmed memory-place bridge. No memory is claimed "
+                                "to belong to the selected building."
+                            ),
+                            type=ClauseType.META,
+                        ),
+                    ]
+                ),
+                plan=None,
+                selection=None,
+                citations={},
+                abstained=None,
+                deterministic=True,
+                repaired=False,
+                execution=_execution((), ()),
+            )
     client = _require_model(request)
     outcome = answer_question(
         connection,
         client,
         body.question,
         session,
-        plan=body.plan,
+        plan=plan,
         store=get_services(request).store,
     )
+    answer = outcome.answer
+    if city_clause is not None:
+        answer = Answer(clauses=[city_clause, *answer.clauses[:7]])
     return AnswerView(
-        answer=outcome.answer,
+        answer=answer,
         plan=outcome.plan,
         selection=None if outcome.result is None else _view(outcome.result),
         citations=(
@@ -393,6 +445,80 @@ def ask(
         deterministic=outcome.deterministic,
         repaired=outcome.repaired,
         execution=_execution(outcome.calls, outcome.rejections),
+    )
+
+
+def _city_selection(
+    context: CityContextRequest,
+    *,
+    request: Request,
+    connection: Any,
+    session: Any,
+    supplied_plan: SelectionPlan | None,
+) -> tuple[SelectionPlan | None, AnswerClause]:
+    """Resolve semantic identity and its place bridge without consulting Google content."""
+    try:
+        catalog = EnvironmentRepository(
+            connection, session.workspace_id, get_services(request).store
+        ).read_features(context.admission_id, feature_id=context.feature_id)
+    except UnknownEnvironmentResource as exc:
+        raise HTTPException(status_code=404, detail="no such semantic city selection") from exc
+    except EnvironmentResourceWithdrawn as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except EnvironmentOperationDenied as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if catalog.provider_key != NYC_OPEN_DATA_PROVIDER_KEY or len(catalog.features) != 1:
+        raise HTTPException(
+            status_code=422,
+            detail="the city selection is not admitted NYC Open Data",
+        )
+    feature = catalog.features[0]
+    provider_feature_id = feature.get("provider_feature_id")
+    properties = feature.get("semantic_properties")
+    if (
+        not isinstance(provider_feature_id, str)
+        or re.fullmatch(r"doitt_id:[1-9][0-9]*", provider_feature_id) is None
+        or not isinstance(properties, dict)
+    ):
+        raise HTTPException(status_code=422, detail="the semantic city feature is malformed")
+    bridges = PlaceBridgeRepository(connection, session.workspace_id).confirmed()
+    bridge = next((held for held in bridges if held.place_id == catalog.place_id), None)
+    if bridge is None:
+        if supplied_plan is not None:
+            raise HTTPException(
+                status_code=422,
+                detail="the supplied plan cannot be verified without a confirmed place bridge",
+            )
+        plan = None
+    else:
+        if supplied_plan is not None and (
+            supplied_plan.intent is not Intent.CONTENT
+            or supplied_plan.place is None
+            or bridge.entity_id not in supplied_plan.place.ids
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="the supplied plan does not match the selected semantic city place",
+            )
+        plan = supplied_plan or SelectionPlan(
+            intent=Intent.CONTENT,
+            place=PlaceSelector(ids=[bridge.entity_id]),
+            content=ContentSelector(scope=ContentScope.RELATED),
+        )
+    name = properties.get("name")
+    bin_value = properties.get("bin")
+    label = name if isinstance(name, str) and name else "an unnamed NYC building footprint"
+    bin_text = (
+        bin_value.removeprefix("bin:")
+        if isinstance(bin_value, str) and bin_value.startswith("bin:")
+        else "not supplied"
+    )
+    return plan, AnswerClause(
+        text=(
+            f"{label} is selected from official NYC BUILDING data. Its semantic identifiers "
+            f"are {provider_feature_id.upper()} and BIN {bin_text}; Google supplied no identity."
+        ),
+        type=ClauseType.META,
     )
 
 

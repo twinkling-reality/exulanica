@@ -107,15 +107,48 @@ export function featureAlongReticle(
   features: readonly NYCLocalFeature[],
   origin: readonly [number, number, number],
   direction: readonly [number, number, number],
-  planeY = 0.08,
+  planeY = 0.35,
 ): NYCLocalFeature | null {
   if (Math.abs(direction[1]) < 1e-8) return null;
   const distance = (planeY - origin[1]) / direction[1];
   if (distance <= 0) return null;
-  return featureAtLocalPoint(features, [
+  const point: SemanticPoint = [
     origin[0] + direction[0] * distance,
     origin[2] + direction[2] * distance,
-  ]);
+  ];
+  return featureAtLocalPoint(features, point) ?? nearestFeature(features, point, 14);
+}
+
+function nearestFeature(
+  features: readonly NYCLocalFeature[],
+  point: SemanticPoint,
+  maximumDistance: number,
+): NYCLocalFeature | null {
+  let nearest: { readonly feature: NYCLocalFeature; readonly distance: number } | null = null;
+  for (const feature of features) {
+    for (const polygon of feature.localFootprint) {
+      for (const ring of polygon) {
+        for (let index = 1; index < ring.length; index++) {
+          const distance = pointToSegmentDistance(point, ring[index - 1]!, ring[index]!);
+          if (distance <= maximumDistance && (nearest === null || distance < nearest.distance)) {
+            nearest = { feature, distance };
+          }
+        }
+      }
+    }
+  }
+  return nearest?.feature ?? null;
+}
+
+function pointToSegmentDistance(point: SemanticPoint, a: SemanticPoint, b: SemanticPoint): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point[0] - a[0], point[1] - a[1]);
+  const t = Math.max(0, Math.min(1, (
+    (point[0] - a[0]) * dx + (point[1] - a[1]) * dy
+  ) / lengthSquared));
+  return Math.hypot(point[0] - (a[0] + t * dx), point[1] - (a[1] + t * dy));
 }
 
 export interface FootprintLineGeometry {
@@ -127,7 +160,7 @@ export interface FootprintLineGeometry {
 /** Build explicit closed line edges for every exterior and interior ring, with no fill topology. */
 export function footprintLineGeometry(
   footprint: SemanticFootprint,
-  y = 0.08,
+  y = 0.35,
 ): FootprintLineGeometry {
   if (!Number.isFinite(y)) throw new RangeError('Invalid semantic outline height');
   const positions: number[] = [];
@@ -169,26 +202,32 @@ export class NYCSemanticOverlay {
   ) {
     this.features = features;
     this.material.useLighting = false;
-    this.material.emissive = new pc.Color(0.1, 0.82, 0.78);
-    this.material.emissiveIntensity = 1;
-    this.material.opacity = 0.42;
+    this.material.emissive = new pc.Color(0.02, 0.62, 0.54);
+    this.material.emissiveIntensity = 0.7;
+    this.material.opacity = 0.65;
     this.material.blendType = pc.BLEND_NORMAL;
     this.material.depthWrite = false;
+    this.material.depthTest = true;
     this.material.cull = pc.CULLFACE_NONE;
     this.material.update();
+    const positions: number[] = [];
+    const indices: number[] = [];
     for (const feature of features) {
       const geometry = footprintLineGeometry(feature.localFootprint);
       if (geometry.indices.length === 0) continue;
-      const entity = new pc.Entity(`nyc-open-data:${feature.id}`);
+      const vertexOffset = positions.length / 3;
+      positions.push(...geometry.positions);
+      indices.push(...geometry.indices.map((index) => index + vertexOffset));
+    }
+    if (indices.length > 0) {
       const mesh = new pc.Mesh(device);
-      mesh.setPositions([...geometry.positions]);
-      mesh.setIndices([...geometry.indices]);
+      mesh.setPositions(positions);
+      mesh.setIndices(indices);
       mesh.update(pc.PRIMITIVE_LINES);
       this.meshes.push(mesh);
-      entity.addComponent('render', {
-        meshInstances: [new pc.MeshInstance(mesh, this.material, entity)],
+      this.root.addComponent('render', {
+        meshInstances: [new pc.MeshInstance(mesh, this.material, this.root)],
       });
-      this.root.addChild(entity);
     }
     parent.addChild(this.root);
   }

@@ -411,6 +411,8 @@ export class AtlasBinding {
   /** Scene segments, one region at a time. Installs nothing until a surface applies one. */
   readonly segmentOverlay: SegmentOverlayRuntime;
   readonly neighborhoodIndex: NeighborhoodIndex;
+  /** Geographic display layers use their own root and never inherit Atlas origin rebasing. */
+  readonly environmentRoot: pc.Entity;
   readonly renderRoot: pc.Entity;
   /** Null unless explicitly feature-flagged with a key by the application. */
   googleTiles: GoogleTilesEnvironment<unknown> | null = null;
@@ -521,6 +523,7 @@ export class AtlasBinding {
     regionRelief: RegionRelief,
     customization: WorldCustomizationController,
     neighborhoodIndex: NeighborhoodIndex,
+    environmentRoot: pc.Entity,
     renderRoot: pc.Entity,
     initialProfile: WorldArtProfile,
     residencyCatalog: readonly ResidencyAsset[],
@@ -561,6 +564,7 @@ export class AtlasBinding {
     this.regionRelief = regionRelief;
     this.customization = customization;
     this.neighborhoodIndex = neighborhoodIndex;
+    this.environmentRoot = environmentRoot;
     this.renderRoot = renderRoot;
     this.setClearColours(initialProfile);
     this.residencyCatalog = residencyCatalog;
@@ -577,6 +581,7 @@ export class AtlasBinding {
   static async create(options: AtlasBindingOptions): Promise<AtlasBinding> {
     const theme = options.theme ?? DAWN_THEME;
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
+    const cityActive = options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0;
     const device = await pc.createGraphicsDevice(options.canvas, {
       deviceTypes: [...(options.deviceTypes ?? ['webgl2'])],
       antialias: true,
@@ -618,37 +623,47 @@ export class AtlasBinding {
     const [skyR, skyG, skyB] = unitRgb(initialArtProfile.palette.sky);
     camera.addComponent('camera', {
       fov: options.fov ?? 70,
-      nearClip: 0.08,
-      farClip: 1200,
-      clearColor: new pc.Color(skyR, skyG, skyB, 1),
+      nearClip: cityActive ? 0.2 : 0.08,
+      farClip: cityActive ? 15_000 : 1200,
+      clearColor: cityActive
+        ? new pc.Color(0.43, 0.62, 0.74, 1)
+        : new pc.Color(skyR, skyG, skyB, 1),
     });
     if (camera.camera !== undefined && camera.camera !== null) {
-      camera.camera.toneMapping = pc.TONEMAP_ACES;
+      camera.camera.toneMapping = cityActive ? pc.TONEMAP_LINEAR : pc.TONEMAP_ACES;
     }
     app.root.addChild(camera);
 
     const [hazeR, hazeG, hazeB] = unitRgb(initialArtProfile.palette.haze);
-    app.scene.ambientLight = new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    app.scene.exposure = 1.06;
+    app.scene.ambientLight = cityActive
+      ? new pc.Color(0.28, 0.3, 0.33)
+      : new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
+    app.scene.exposure = cityActive ? 1 : 1.06;
     app.scene.fog.type = pc.FOG_LINEAR;
-    app.scene.fog.color.set(hazeR, hazeG, hazeB);
-    app.scene.fog.start = 46;
-    app.scene.fog.end = 220;
+    app.scene.fog.color.set(
+      cityActive ? 0.66 : hazeR,
+      cityActive ? 0.72 : hazeG,
+      cityActive ? 0.78 : hazeB,
+    );
+    app.scene.fog.start = cityActive ? 2_400 : 46;
+    app.scene.fog.end = cityActive ? 9_000 : 220;
 
     const worldLight = new pc.Entity('atlas-directional-light');
     const [lr, lg, lb] = unitRgb(initialArtProfile.palette.sun);
     worldLight.addComponent('light', {
       type: 'directional',
       color: new pc.Color(lr, lg, lb),
-      intensity: 1.65,
+      intensity: cityActive ? 1.05 : 1.65,
       castShadows: true,
-      shadowDistance: 72,
+      shadowDistance: cityActive ? 650 : 72,
       shadowResolution: 2048,
     });
     worldLight.setEulerAngles(48, 132, 0);
     app.root.addChild(worldLight);
 
     const table = buildAnchorTable(options.scene);
+    const environmentRoot = new pc.Entity('geographic-environment');
+    app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
     const navigationWorld = buildNavigationWorld(options.scene, atlasLandscapeSurface());
@@ -848,9 +863,16 @@ export class AtlasBinding {
       }
     }
 
-    const start = initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
+    const start = cityActive
+      ? cityCameraState('overview')
+      : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
 
-    const controls = new FirstPersonControls(options.canvas, start, DEFAULT_CONTROLS, navigationWorld);
+    const controls = new FirstPersonControls(
+      options.canvas,
+      start,
+      cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 32, sprintMultiplier: 3.2 } : DEFAULT_CONTROLS,
+      cityActive ? null : navigationWorld,
+    );
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
     const overlay =
       options.overlay === false ? null : new AnchorOverlay(options.overlayParent);
@@ -900,6 +922,7 @@ export class AtlasBinding {
       regionRelief,
       customization,
       neighborhoodIndex,
+      environmentRoot,
       renderRoot,
       initialArtProfile,
       Object.freeze(residencyCatalog),
@@ -908,9 +931,10 @@ export class AtlasBinding {
       objectRoots,
     );
     if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
+      binding.renderRoot.enabled = false;
       binding.googleTiles = createGoogleTilesEnvironment(
         app,
-        renderRoot,
+        environmentRoot,
         options.overlayParent,
         options.googleTiles,
         {
@@ -921,6 +945,21 @@ export class AtlasBinding {
       void binding.googleTiles.attach();
     }
     return binding;
+  }
+
+  setMemoryLayerVisible(visible: boolean): void {
+    this.renderRoot.enabled = visible;
+    this.invalidate();
+  }
+
+  get memoryLayerVisible(): boolean {
+    return this.renderRoot.enabled;
+  }
+
+  setCityView(view: 'overview' | 'street'): void {
+    if (this.googleTiles === null) return;
+    Object.assign(this.controls.state, cityCameraState(view));
+    this.invalidate();
   }
 
   setTheme(theme: PresentationTheme): void {
@@ -1732,10 +1771,12 @@ export class AtlasBinding {
     this.field.update(nowMs);
 
     this.centred = this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
+    const tileForward = this.controls.forward();
     this.googleTiles?.update(
       [s.x, s.y, s.z],
       Math.max(1, this.device.height),
       this.camera.camera?.fov ?? 70,
+      [tileForward.x, tileForward.y, tileForward.z],
     );
     const cameraComponent = this.camera.camera;
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
@@ -1875,6 +1916,13 @@ export function initialAtlasCameraState(
           pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
         };
       })();
+}
+
+/** Deliberate NYC viewpoints in the independent local metre frame. */
+export function cityCameraState(view: 'overview' | 'street'): CameraState {
+  return view === 'street'
+    ? { x: -25, y: 60, z: -280, yaw: Math.PI, pitch: -0.35 }
+    : { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
 }
 
 /**

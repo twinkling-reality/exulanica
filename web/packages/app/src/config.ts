@@ -33,6 +33,7 @@ import {
 const API_PATH = '/api';
 const PREVIEW_API_PATH = '/preview-api';
 const PREVIEW_TOKEN = 'atlas-preview-read-only';
+export const PREVIEW_NYC_OPEN_DATA_ADMISSION_ID = '9d152259-13d1-5025-8f72-8bcb639a6438';
 const PRODUCT_TITLE = 'Exulanica';
 const PREVIEW_TITLE = 'Exulanica: synthetic read-only development preview';
 

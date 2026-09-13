@@ -134,6 +134,49 @@ describe('Google tiles environment lifecycle', () => {
     }
   });
 
+  it('keeps additive parent content visible while children refine', async () => {
+    const config = { enabled: true, apiKey: 'fixture-key', ...GOOGLE_REFERENCE_ORIGIN };
+    const origin = googleLocalFrame(config.longitude, config.latitude).ecefOrigin;
+    const root = JSON.stringify({ root: {
+      geometricError: 100,
+      refine: 'ADD',
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, origin[0], origin[1], origin[2], 1],
+      boundingVolume: { sphere: [0, 0, 0, 100] },
+      content: { uri: 'parent.glb?session=fixture-session' },
+      children: [{
+        geometricError: 0,
+        boundingVolume: { sphere: [0, 0, 0, 50] },
+        content: { uri: 'child.glb?session=fixture-session' },
+      }],
+    } });
+    const host: GoogleTileHost<Handle> = {
+      load: vi.fn(async (id: string) => ({ id })),
+      setTransform: vi.fn(),
+      setVisible: vi.fn(),
+      release: vi.fn(),
+    };
+    const provider = new GoogleTilesProvider(config, vi.fn(async (url: string) =>
+      url.includes('root.json')
+        ? new Response(root, { headers: { 'content-type': 'application/json' } })
+        : new Response(glb('Fixture source'), { headers: { 'content-type': 'model/gltf-binary' } })));
+    const environment = new GoogleTilesEnvironment({
+      config,
+      provider,
+      host,
+      attribution: { update: vi.fn(), destroy: vi.fn() },
+    });
+
+    await environment.attach();
+    environment.update([0, 1.62, 0]);
+    await settle();
+    expect(host.load).toHaveBeenCalledWith('root', expect.any(ArrayBuffer), expect.any(AbortSignal));
+    environment.update([0, 1.62, 0]);
+    expect(host.setVisible).toHaveBeenCalledWith({ id: 'root' }, true);
+    await settle();
+    expect(host.load).toHaveBeenCalledWith('root/0', expect.any(ArrayBuffer), expect.any(AbortSignal));
+    environment.dispose();
+  });
+
   it('fails closed when the mocked provider network is unavailable', async () => {
     const test = fixture();
     const unavailable = vi.fn();

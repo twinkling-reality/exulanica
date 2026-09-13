@@ -23,6 +23,7 @@ interface GoogleBoundingVolume {
 interface GoogleTile {
   readonly boundingVolume?: GoogleBoundingVolume;
   readonly geometricError?: unknown;
+  readonly refine?: unknown;
   readonly transform?: unknown;
   readonly content?: GoogleTileContent;
   readonly children?: unknown;
@@ -33,6 +34,7 @@ interface RuntimeTile {
   readonly source: GoogleTile;
   readonly transform: Matrix4;
   readonly children: readonly RuntimeTile[];
+  readonly parent?: RuntimeTile;
   readonly scope?: URL;
   externalRoot?: RuntimeTile;
 }
@@ -77,9 +79,11 @@ export class GoogleTilesEnvironment<T> {
   private readonly queue: GoogleTileRequestQueue;
   private readonly residency: GoogleTileResidency<LoadedTile<T>>;
   private readonly pending = new Map<string, AbortController>();
+  private readonly failed = new Set<string>();
   private readonly ledger = new GoogleAttributionLedger();
   private root: RuntimeTile | null = null;
   private desired = new Set<string>();
+  private visible = new Set<string>();
   private unavailable = false;
   private disposed = false;
 
@@ -120,7 +124,12 @@ export class GoogleTilesEnvironment<T> {
     }
   }
 
-  update(camera: Triple, viewportHeight = 800, fieldOfViewDegrees = 60): void {
+  update(
+    camera: Triple,
+    viewportHeight = 800,
+    fieldOfViewDegrees = 60,
+    forward?: Triple,
+  ): void {
     if (this.disposed || this.root === null || this.unavailable) return;
     if (![...camera, viewportHeight, fieldOfViewDegrees].every(Number.isFinite) ||
         viewportHeight <= 0 || fieldOfViewDegrees <= 0 || fieldOfViewDegrees >= 180) {
@@ -136,6 +145,7 @@ export class GoogleTilesEnvironment<T> {
         selected,
         this.frame,
         this.residency.maximumTiles,
+        forward,
       );
     } catch {
       this.unavailable = true;
@@ -144,14 +154,29 @@ export class GoogleTilesEnvironment<T> {
       return;
     }
     this.desired = new Set(selected.keys());
-
-    for (const [id, controller] of this.pending) {
-      if (!this.desired.has(id)) {
-        controller.abort();
-        this.pending.delete(id);
+    const retained = new Set(this.desired);
+    const visible = new Set<string>();
+    for (const tile of selected.values()) {
+      const exact = this.residency.get(tile.id);
+      if (exact !== undefined) {
+        visible.add(tile.id);
+        continue;
+      }
+      const fallback = this.residentAncestor(tile);
+      if (fallback !== null) {
+        retained.add(fallback);
+        visible.add(fallback);
       }
     }
-    this.residency.retain(this.desired);
+    this.residency.retain(retained);
+    for (const id of this.visible) {
+      if (visible.has(id)) continue;
+      const resident = this.residency.get(id);
+      if (resident !== undefined) {
+        this.options.host.setVisible(resident.handle, false);
+        this.ledger.setVisible(id, resident.copyright, false);
+      }
+    }
     for (const [id, tile] of selected) {
       const resident = this.residency.get(id);
       if (resident !== undefined) {
@@ -159,14 +184,51 @@ export class GoogleTilesEnvironment<T> {
           resident.handle,
           localTileTransform(this.frame, resident.sourceTransform),
         );
-        this.options.host.setVisible(resident.handle, true);
-        this.ledger.setVisible(id, resident.copyright, true);
-      } else if (!this.pending.has(id)) {
+        const shown = visible.has(id);
+        this.options.host.setVisible(resident.handle, shown);
+        this.ledger.setVisible(id, resident.copyright, shown);
+      } else if (!this.pending.has(id) && !this.failed.has(id)) {
         this.load(tile);
       }
     }
+    for (const id of visible) {
+      if (selected.has(id)) continue;
+      const resident = this.residency.get(id);
+      if (resident !== undefined) {
+        this.options.host.setVisible(resident.handle, true);
+        this.ledger.setVisible(id, resident.copyright, true);
+      }
+    }
+    this.visible = visible;
+    this.trimStaleRequests();
     const values = this.ledger.values();
-    this.options.attribution.update(this.residency.size > 0, values);
+    this.options.attribution.update(this.visible.size > 0, values);
+  }
+
+  private residentAncestor(tile: RuntimeTile): string | null {
+    let ancestor = tile.parent;
+    while (ancestor !== undefined) {
+      if (this.residency.has(ancestor.id)) return ancestor.id;
+      ancestor = ancestor.parent;
+    }
+    return null;
+  }
+
+  /*
+   * Completing a nearby external tileset is useful even if another completion changed the
+   * frontier first. Cancelling every request not present in that one transient frontier caused
+   * a starvation loop in the live Google hierarchy: JSON branches repeatedly replaced one
+   * another and no GLB leaf survived long enough to load.
+   */
+  private trimStaleRequests(): void {
+    const maximumPending = Math.max(this.residency.maximumTiles * 2, 32);
+    if (this.pending.size <= maximumPending) return;
+    for (const [id, controller] of this.pending) {
+      if (this.desired.has(id)) continue;
+      controller.abort();
+      this.pending.delete(id);
+      if (this.pending.size <= maximumPending) return;
+    }
   }
 
   private load(tile: RuntimeTile): void {
@@ -185,13 +247,14 @@ export class GoogleTilesEnvironment<T> {
           `${tile.id}/external`,
           tile.transform,
           response.scope,
+          tile,
         );
         this.options.invalidate?.();
         return;
       }
       const metadata = googleGltfMetadata(response.bytes);
       const handle = await this.options.host.load(tile.id, response.bytes, signal);
-      if (signal.aborted || this.disposed || !this.desired.has(tile.id)) {
+      if (signal.aborted || this.disposed) {
         this.options.host.release(handle);
         return;
       }
@@ -203,12 +266,17 @@ export class GoogleTilesEnvironment<T> {
       this.rememberHandle(handle, tile.id);
       this.residency.put(tile.id, loaded, response.bytes.byteLength);
       this.options.host.setTransform(handle, localTileTransform(this.frame, tile.transform));
-      this.options.host.setVisible(handle, true);
-      this.ledger.setVisible(tile.id, metadata.copyright, true);
-      this.options.attribution.update(true, this.ledger.values());
+      const shown = this.desired.has(tile.id);
+      this.options.host.setVisible(handle, shown);
+      if (shown) this.visible.add(tile.id);
+      this.ledger.setVisible(tile.id, metadata.copyright, shown);
+      this.options.attribution.update(this.visible.size > 0, this.ledger.values());
       this.options.invalidate?.();
     }).catch(() => {
-      if (!signal.aborted) this.options.onUnavailable?.();
+      if (!signal.aborted) {
+        this.failed.add(tile.id);
+        this.options.onUnavailable?.();
+      }
     }).finally(() => {
       if (this.pending.get(tile.id) === controller) this.pending.delete(tile.id);
     });
@@ -245,6 +313,8 @@ export class GoogleTilesEnvironment<T> {
     this.queue.dispose();
     this.residency.clear();
     this.ledger.clear();
+    this.visible.clear();
+    this.failed.clear();
     this.options.attribution.update(false, []);
     this.options.attribution.destroy();
     this.root = null;
@@ -266,19 +336,32 @@ function parseMatrix(value: unknown): Matrix4 {
   return value as unknown as Matrix4;
 }
 
-function runtimeTile(source: GoogleTile, id: string, parent: Matrix4, scope?: URL): RuntimeTile {
-  const transform = multiplyMatrices(parent, parseMatrix(source.transform));
+function runtimeTile(
+  source: GoogleTile,
+  id: string,
+  parentTransform: Matrix4,
+  scope?: URL,
+  parent?: RuntimeTile,
+): RuntimeTile {
+  const transform = multiplyMatrices(parentTransform, parseMatrix(source.transform));
+  const tile = {
+    id,
+    source,
+    transform,
+    children: [] as RuntimeTile[],
+    ...(scope === undefined ? {} : { scope }),
+    ...(parent === undefined ? {} : { parent }),
+  };
   const children = Array.isArray(source.children) ? source.children.map((value, index) => {
     if (typeof value !== 'object' || value === null) throw new Error('Invalid Google tile');
-    return runtimeTile(value as GoogleTile, `${id}/${index}`, transform, scope);
+    return runtimeTile(value as GoogleTile, `${id}/${index}`, transform, scope, tile);
   }) : [];
-  return scope === undefined
-    ? { id, source, transform, children }
-    : { id, source, transform, children, scope };
+  tile.children = children;
+  return tile;
 }
 
 function childrenOf(tile: RuntimeTile): readonly RuntimeTile[] {
-  return tile.externalRoot === undefined ? tile.children : [tile.externalRoot];
+  return tile.externalRoot === undefined ? tile.children : [...tile.children, tile.externalRoot];
 }
 
 function tileUri(tile: GoogleTile): string | null {
@@ -314,10 +397,11 @@ function tileCentreAndRadius(
   let radius = 0;
   if (Array.isArray(sphere) && sphere.length === 4 && sphere.every(Number.isFinite)) {
     centre = transformedPoint(tile.transform, [sphere[0], sphere[1], sphere[2]]);
-    radius = Math.abs(sphere[3]);
+    radius = Math.abs(sphere[3]) * maximumLinearScale(tile.transform);
   } else if (Array.isArray(box) && box.length === 12 && box.every(Number.isFinite)) {
     centre = transformedPoint(tile.transform, [box[0], box[1], box[2]]);
-    radius = Math.hypot(...box.slice(3));
+    const halfAxes = [box.slice(3, 6), box.slice(6, 9), box.slice(9, 12)] as const;
+    radius = halfAxes.reduce((total, axis) => total + transformedVectorLength(tile.transform, axis), 0);
   } else if (
     Array.isArray(tile.source.boundingVolume?.region) &&
     tile.source.boundingVolume.region.length === 6 &&
@@ -359,6 +443,22 @@ function tileCentreAndRadius(
   return { centre: [local[12], local[13], local[14]], radius };
 }
 
+function transformedVectorLength(matrix: Matrix4, vector: readonly number[]): number {
+  return Math.hypot(
+    matrix[0] * vector[0]! + matrix[4] * vector[1]! + matrix[8] * vector[2]!,
+    matrix[1] * vector[0]! + matrix[5] * vector[1]! + matrix[9] * vector[2]!,
+    matrix[2] * vector[0]! + matrix[6] * vector[1]! + matrix[10] * vector[2]!,
+  );
+}
+
+function maximumLinearScale(matrix: Matrix4): number {
+  return Math.max(
+    transformedVectorLength(matrix, [1, 0, 0]),
+    transformedVectorLength(matrix, [0, 1, 0]),
+    transformedVectorLength(matrix, [0, 0, 1]),
+  );
+}
+
 function tileDistance(tile: RuntimeTile, frame: GoogleLocalFrame, camera: Triple): number {
   const bounds = tileCentreAndRadius(tile, frame);
   if (bounds === null) return 0;
@@ -387,6 +487,7 @@ function selectTiles(
   selected: Map<string, RuntimeTile>,
   frame?: GoogleLocalFrame,
   maximumSelectedTiles = 48,
+  forward?: Triple,
 ): void {
   const activeFrame = frame ?? googleLocalFrame(-74.006, 40.7128, 0);
   const queue: RuntimeTile[] = [root];
@@ -399,13 +500,16 @@ function selectTiles(
     });
     const tile = queue.pop()!;
     visited++;
+    if (!tileIntersectsView(tile, activeFrame, camera, fieldOfViewDegrees, forward)) continue;
     const children = childrenOf(tile);
     const error = typeof tile.source.geometricError === 'number' &&
       Number.isFinite(tile.source.geometricError) ? tile.source.geometricError : 0;
     const distance = tileDistance(tile, activeFrame, camera);
     const pixels = error * viewportHeight /
       (2 * Math.max(1, distance) * Math.tan(fieldOfViewDegrees * Math.PI / 360));
-    if (tile.externalRoot !== undefined || (children.length > 0 && pixels > 16)) {
+    const refine = tile.source.refine === 'ADD' ? 'ADD' : 'REPLACE';
+    if (tile.externalRoot !== undefined || (children.length > 0 && pixels > 32)) {
+      if (refine === 'ADD' && tileUri(tile.source) !== null) selected.set(tile.id, tile);
       // Keep one global camera-distance queue. A depth-first walk can exhaust the
       // residency budget inside a distant sibling before it reaches the viewer.
       queue.push(...children);
@@ -413,6 +517,37 @@ function selectTiles(
       selected.set(tile.id, tile);
     }
   }
+}
+
+function tileIntersectsView(
+  tile: RuntimeTile,
+  frame: GoogleLocalFrame,
+  camera: Triple,
+  fieldOfViewDegrees: number,
+  forward?: Triple,
+): boolean {
+  if (forward === undefined) return true;
+  const forwardLength = Math.hypot(...forward);
+  const bounds = tileCentreAndRadius(tile, frame);
+  if (forwardLength < 1e-8 || bounds === null) return true;
+  const delta: Triple = [
+    bounds.centre[0] - camera[0],
+    bounds.centre[1] - camera[1],
+    bounds.centre[2] - camera[2],
+  ];
+  const distance = Math.hypot(...delta);
+  // Continental and global hierarchy bounds are traversal containers, not useful view culls.
+  // Culling them by a local camera ray can discard the NYC descendant before it is discovered.
+  if (bounds.radius > 50_000) return true;
+  if (distance <= bounds.radius || distance < 1) return true;
+  const directionCosine = (
+    delta[0] * forward[0] + delta[1] * forward[1] + delta[2] * forward[2]
+  ) / (distance * forwardLength);
+  const angularRadius = Math.asin(Math.min(1, bounds.radius / distance));
+  // Horizontal FOV is normally wider than vertical. The margin keeps edge tiles resident while
+  // turning, avoiding a visible unload/reload seam without spending the budget behind the viewer.
+  const halfAngle = fieldOfViewDegrees * Math.PI / 360 + angularRadius + 0.35;
+  return directionCosine >= Math.cos(Math.min(Math.PI, halfAngle));
 }
 
 interface PlayCanvasTileHandle {
@@ -526,5 +661,8 @@ export function createGoogleTilesEnvironment(
     attribution,
     invalidate: callbacks.invalidate,
     onUnavailable: callbacks.unavailable,
+    maximumTiles: 160,
+    maximumResidentBytes: 512 * 1024 * 1024,
+    concurrency: 8,
   });
 }

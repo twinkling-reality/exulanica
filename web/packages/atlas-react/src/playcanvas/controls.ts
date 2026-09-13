@@ -258,7 +258,8 @@ export class FirstPersonControls {
     );
     if (this.navigationWorld === null) {
       this.state.x = desired.x;
-      this.state.y = this.config.eyeHeight;
+      // A free geographic display view may deliberately be above street height. There is no
+      // provider-derived collision surface here, so movement preserves that explicit altitude.
       this.state.z = desired.z;
       return;
     }
