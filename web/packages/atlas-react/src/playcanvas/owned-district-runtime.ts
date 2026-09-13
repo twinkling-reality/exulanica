@@ -56,10 +56,13 @@ function color(hex: string): pc.Color {
 function material(source: OwnedDistrictMaterial): pc.StandardMaterial {
   const result = new pc.StandardMaterial();
   result.diffuse = color(source.base);
+  result.emissive = color(source.base);
+  result.emissiveIntensity = 0.22;
   result.metalness = source.metalness_milli / 1000;
   result.gloss = 1 - source.roughness_milli / 1000;
   result.useMetalness = true;
   result.useSkybox = true;
+  result.cull = pc.CULLFACE_NONE;
   result.update();
   return result;
 }
@@ -109,6 +112,44 @@ function addBuilding(target: Batch, building: OwnedDistrictBuilding): void {
       target.positions.push(d[0], height, d[2], c[0], height, c[2]);
       target.normals.push(0, 1, 0, 0, 1, 0);
       target.indices.push(roofCentre, roofA, roofA + 1);
+    }
+  }
+}
+
+function addWindows(target: Batch, building: OwnedDistrictBuilding): void {
+  if (building.name === null && building.render_batch_id % 7 !== 0) return;
+  const height = building.height_cm / 100;
+  for (const polygon of building.polygons) {
+    const ring = polygon[0];
+    if (ring === undefined) continue;
+    for (let edge = 1; edge < ring.length; edge += 1) {
+      const [ax, az] = ring[edge - 1]!.map((value) => value / 100) as [number, number];
+      const [bx, bz] = ring[edge]!.map((value) => value / 100) as [number, number];
+      const dx = bx - ax;
+      const dz = bz - az;
+      const length = Math.hypot(dx, dz);
+      const columns = Math.floor(length / 4);
+      if (columns < 1) continue;
+      const nx = -dz / length;
+      const nz = dx / length;
+      const levels = Math.min(22, Math.floor((height - 2.5) / 3.2));
+      for (let level = 0; level < levels; level += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const centre = (column + 0.5) / columns;
+          const half = Math.min(0.75 / length, 0.3 / columns);
+          const y = 2.2 + level * 3.2;
+          // NYC rings are retained with provider winding; this offset follows their exterior.
+          const front = -0.055;
+          quad(
+            target,
+            [ax + dx * (centre - half) + nx * front, y, az + dz * (centre - half) + nz * front],
+            [ax + dx * (centre + half) + nx * front, y, az + dz * (centre + half) + nz * front],
+            [ax + dx * (centre + half) + nx * front, y + 1.65, az + dz * (centre + half) + nz * front],
+            [ax + dx * (centre - half) + nx * front, y + 1.65, az + dz * (centre - half) + nz * front],
+            [nx, 0, nz],
+          );
+        }
+      }
     }
   }
 }
@@ -230,7 +271,9 @@ export class OwnedDistrictRuntime {
     parent.addChild(this.authoredRoot);
     parent.addChild(this.societyRoot);
     const asphalt = new pc.StandardMaterial();
-    asphalt.diffuse = new pc.Color(0.055, 0.075, 0.09);
+    asphalt.diffuse = new pc.Color(0.095, 0.125, 0.14);
+    asphalt.emissive = new pc.Color(0.018, 0.028, 0.035);
+    asphalt.emissiveIntensity = 0.4;
     asphalt.gloss = 0.18;
     asphalt.metalness = 0.08;
     asphalt.useMetalness = true;
@@ -245,7 +288,9 @@ export class OwnedDistrictRuntime {
     const sidewalkMesh = mesh(device, sidewalkBatch);
     if (sidewalkMesh !== null) {
       const sidewalkMaterial = new pc.StandardMaterial();
-      sidewalkMaterial.diffuse = new pc.Color(0.58, 0.6, 0.57);
+      sidewalkMaterial.diffuse = new pc.Color(0.68, 0.69, 0.64);
+      sidewalkMaterial.emissive = new pc.Color(0.14, 0.14, 0.12);
+      sidewalkMaterial.emissiveIntensity = 0.35;
       sidewalkMaterial.gloss = 0.15;
       sidewalkMaterial.update();
       const sidewalks = new pc.Entity('owned-sidewalks');
@@ -260,8 +305,10 @@ export class OwnedDistrictRuntime {
     }
 
     const batches = district.materials.map(() => batch());
+    const windowsBatch = batch();
     for (const building of district.buildings) {
       addBuilding(batches[building.material % batches.length]!, building);
+      addWindows(windowsBatch, building);
     }
     let drawCalls = sidewalkMesh === null ? 1 : 2;
     for (let index = 0; index < batches.length; index += 1) {
@@ -277,6 +324,25 @@ export class OwnedDistrictRuntime {
       this.meshes.push(geometry);
       this.materials.push(surface);
       this.root.addChild(entity);
+      drawCalls += 1;
+    }
+    const windowsMesh = mesh(device, windowsBatch);
+    if (windowsMesh !== null) {
+      const windowsMaterial = new pc.StandardMaterial();
+      windowsMaterial.diffuse = new pc.Color(0.18, 0.42, 0.5);
+      windowsMaterial.emissive = new pc.Color(0.3, 0.78, 0.9);
+      windowsMaterial.emissiveIntensity = 1.4;
+      windowsMaterial.gloss = 0.88;
+      windowsMaterial.cull = pc.CULLFACE_NONE;
+      windowsMaterial.update();
+      const windows = new pc.Entity('owned-building-memory-windows');
+      windows.addComponent('render', {
+        meshInstances: [new pc.MeshInstance(windowsMesh, windowsMaterial, windows)],
+        castShadows: false,
+      });
+      this.meshes.push(windowsMesh);
+      this.materials.push(windowsMaterial);
+      this.root.addChild(windows);
       drawCalls += 1;
     }
     this.metrics = Object.freeze({

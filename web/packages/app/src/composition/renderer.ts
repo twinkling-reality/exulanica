@@ -88,6 +88,9 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   try {
     const district = await ownedDistrict();
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
+      if (state.atlas?.binding.ownedDistrict !== null) {
+        env.canvas.dataset.ownedFrameMs = (report.dt * 1000).toFixed(2);
+      }
       if (lastMoving !== report.moving) {
         lastMoving = report.moving;
         env.shell.setAttribute('data-moving', report.moving ? 'true' : 'false');

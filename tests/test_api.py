@@ -80,11 +80,15 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
         "params": {"capture_id": str(uuid.uuid4()), "u": "10", "v": "20"}
     },
     ("GET", "/world-read/places/{place_id}"): {},
+    ("POST", "/selection/environment"): {"json": {}},
+    ("GET", "/world/versions/{version_id}/society"): {},
+    ("GET", "/world/versions/{version_id}/society/events"): {},
+    ("GET", "/world/versions/{version_id}/society/replay"): {},
+    ("POST", "/world/versions/{version_id}/society"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/society/steps"): {"json": {}},
     ("POST", "/world/versions/{version_id}/environment-instances"): {"json": {}},
     ("POST", "/world/versions/{version_id}/environment-instances/undo"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): {
-        "json": {}
-    },
+    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): {"json": {}},
     ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): {
         "json": {}
     },
@@ -1073,6 +1077,7 @@ def test_a_model_invented_entity_id_abstains_instead_of_reporting_a_missing_one(
             "time": [],
             "place": None,
             "capture": None,
+            "content": None,
             "epistemic": "confirmed",
             "semantic_query": None,
             "limit": 10,

@@ -36,7 +36,7 @@ def test_feature_publication_is_forced_scoped_append_only_and_has_no_feature_row
                 "select count(*) n from information_schema.tables "
                 "where table_schema=current_schema() and table_name like 'environment_feature%'"
             ).fetchone()["n"]
-            == 1
+            == 2
         )
     finally:
         connection.close()

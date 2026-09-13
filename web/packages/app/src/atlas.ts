@@ -155,6 +155,7 @@ export async function mountAtlas(
       delete canvas.dataset.ownedBuildings;
       delete canvas.dataset.ownedDrawCalls;
       delete canvas.dataset.ownedResidentBytes;
+      delete canvas.dataset.ownedFrameMs;
       binding.destroy();
     },
   };

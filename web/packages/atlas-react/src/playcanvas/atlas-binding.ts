@@ -759,6 +759,7 @@ export class AtlasBinding {
       theme,
       options.reducedMotion ?? false,
     );
+    if (options.ownedDistrict !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);
     const sourceFirst = createSourceFirstGrove(
       app,
@@ -989,7 +990,7 @@ export class AtlasBinding {
       this.ownedDistrict === null
         ? cityCameraState(view)
         : view === 'overview'
-          ? { x: -45, y: 180, z: 390, yaw: Math.PI, pitch: -0.42 }
+          ? { x: -45, y: 150, z: 300, yaw: -0.15, pitch: -0.46 }
           : ownedDistrictCameraState(this.navigationWorld),
     );
     this.invalidate();
@@ -1962,11 +1963,17 @@ export function cityCameraState(view: 'overview' | 'street'): CameraState {
 
 /** Deterministic clear spawn on visible owned support, never an invisible safety floor. */
 export function ownedDistrictCameraState(world: NavigationWorld): CameraState {
+  for (const [x, z] of [[-25, 110], [-40, 90], [-30, 140]] as const) {
+    const position = atlasVec3(x, world.eyeHeight, z);
+    if (world.surface.sample(x, z) !== null && isNavigationPositionClear(world, position)) {
+      return { x, y: world.eyeHeight, z, yaw: -Math.PI / 2, pitch: 0 };
+    }
+  }
   for (let z = 240; z >= -240; z -= 8) {
     for (let x = -240; x <= 240; x += 8) {
       const position = atlasVec3(x, world.eyeHeight, z);
       if (world.surface.sample(x, z) !== null && isNavigationPositionClear(world, position)) {
-        return { x, y: world.eyeHeight, z, yaw: Math.PI, pitch: 0 };
+        return { x, y: world.eyeHeight, z, yaw: -Math.PI / 2, pitch: 0 };
       }
     }
   }
@@ -1974,7 +1981,7 @@ export function ownedDistrictCameraState(world: NavigationWorld): CameraState {
     x: world.centre.x,
     y: world.eyeHeight,
     z: world.centre.z,
-    yaw: Math.PI,
+    yaw: 0,
     pitch: 0,
   };
 }

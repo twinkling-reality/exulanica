@@ -289,10 +289,6 @@ class AnswerView(BaseModel):
     citations: dict[str, str] = Field(
         description="Citation token to the permalink it resolves to, for this response only."
     )
-    grounding: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Packet-scoped typed source, memory, authored, or simulation lineages.",
-    )
     abstained: Abstention | None
     #: True when the composer's output was discarded and the deterministic answer used instead.
     deterministic: bool
@@ -445,22 +441,6 @@ def ask(
             {}
             if outcome.packet is None
             else {item.token: item.uri for item in outcome.packet.items}
-        ),
-        grounding=(
-            []
-            if outcome.content_packet is None
-            else [
-                {
-                    "token": item.token,
-                    "truth_class": item.truth_class,
-                    "result_kind": item.result_kind,
-                    "source_id": item.source_id,
-                    "lineage_ids": list(item.lineage_ids),
-                    "label": item.label,
-                    "personal_visit_evidence": item.personal_visit_evidence,
-                }
-                for item in outcome.content_packet.items
-            ]
         ),
         abstained=outcome.abstention,
         deterministic=outcome.deterministic,

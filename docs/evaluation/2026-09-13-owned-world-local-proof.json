@@ -1,0 +1,93 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.owned-world-local-proof/v1",
+    "date": "2026-09-13",
+    "baseline_commit": "95bd85ea11257e02053f6552869aa9eef30327c6",
+    "status": "implementation_complete_live_acceptance_partial",
+    "environment": {
+      "host": "Apple Darwin 25.5.0",
+      "compute": "local CPU and software WebGL only",
+      "cloud_services": false,
+      "paid_compute": false,
+      "google_apple_corpus_input": false,
+      "disposable_database": "orimera_owned_world_test on localhost port 5433"
+    },
+    "district": {
+      "id": "nyc-flatiron-owned-v1",
+      "buildings": 400,
+      "sidewalks": 32,
+      "logical_source_bytes": 545869,
+      "runtime_artifact_bytes": 232452,
+      "runtime_artifact_sha256": "7d9a0c2fb8dbe4d875cbf61b162caa8484fa962b2b8841cdeba9bf657f540782",
+      "source_admissions": 2,
+      "material_batches": 7,
+      "browser_draw_calls": 10,
+      "browser_frame_ms_software_webgl": "33.30",
+      "browser_resident_bytes": 232452
+    },
+    "compiler_benchmark": {
+      "wall_ms": 690,
+      "user_ms": 390,
+      "system_ms": 70,
+      "maximum_resident_set_bytes": 63012864,
+      "output_rebuild_byte_identical": true
+    },
+    "society": {
+      "population": 128,
+      "visible_avatar_cap": 24,
+      "tick_seconds": 60,
+      "pure_replay_tested": true,
+      "migration_executed_on_disposable_database": true,
+      "workspace_tables_under_force_rls": 2
+    },
+    "checks": {
+      "focused_python": "passed",
+      "focused_postgresql": "passed",
+      "web_tests": {
+        "passed": 1282,
+        "failed": 0
+      },
+      "web_typecheck": "passed",
+      "web_app_build": "passed",
+      "full_python": {
+        "passed": 1535,
+        "failed": 0,
+        "skipped": 1593,
+        "note": "The broad non-database run used the required reference preflight URL without connecting to or altering that protected database. PostgreSQL coverage for this slice ran separately against the disposable database."
+      }
+    },
+    "demonstrated": [
+      "bounded source-derived district loaded with Google disabled",
+      "400 stable semantic building identities",
+      "continuous footprint collision and safe-stop tests",
+      "street-level exact prism picking contract",
+      "Bring into my world proposal, apply, visible transform, remove, reload and undo tests",
+      "128 deterministic synthetic inhabitants with schedules, needs, relationships, movement and bounded memory",
+      "society migration, deterministic replay and 24-avatar render cap",
+      "typed Companion grounding across source, memory, authored and simulated truth classes",
+      "production asset bundling and local software-WebGL rendering"
+    ],
+    "unmet_live_gates": [
+      "A single clean-start browser session did not execute authenticated add, reload, modify and undo against the disposable database.",
+      "The browser preview is intentionally read-only, so persisted society avatars and events were proven by code and database checks rather than captured in the retained screenshot.",
+      "No live Companion model call was made; deterministic typed grounding and abstention were tested locally.",
+      "The retained visual is source-derived procedural massing, not a claim of photorealism.",
+      "Software-WebGL frame time is evidence for the fallback renderer only, not Apple GPU performance."
+    ],
+    "accepted": false,
+    "artifacts": [
+      {
+        "path": "docs/evaluation/2026-09-13-owned-world-street.png",
+        "byte_size": 465016,
+        "sha256": "5f25b925ee32601abf7bd054ae853f109fce38592b0e214c3769a45cdf115b8d"
+      },
+      {
+        "path": "assets/owned-world/flatiron/flatiron-owned-district.json",
+        "byte_size": 232452,
+        "sha256": "7d9a0c2fb8dbe4d875cbf61b162caa8484fa962b2b8841cdeba9bf657f540782"
+      }
+    ]
+  },
+  "record_sha256": "aebbde9e2d0d8d641c9fe1618842fcc87166785ce308129bb5d7d8e9550e3fd0"
+}
