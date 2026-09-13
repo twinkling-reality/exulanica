@@ -63,7 +63,10 @@ export function mountEnvironmentSelection(
     class: 'environment-selection-source',
     text: 'Official BUILDING footprints. Neutral semantic overlays are separate from Google imagery.',
   });
-  const selected = el('p', { class: 'environment-selection-selected', text: 'Aim at a teal footprint and press E.' });
+  const selected = el('p', {
+    class: 'environment-selection-selected',
+    text: 'Aim at a teal footprint and use the interact control.',
+  });
   const reason = el('p', { class: 'environment-selection-reason' });
   const role = el('select', { 'aria-label': 'Authored role' });
   for (const value of ['fictional', 'personal'] as const) {
@@ -100,6 +103,8 @@ export function mountEnvironmentSelection(
   let current: AlternateVersion | null = null;
   let chosen: NYCLocalFeature | null = null;
   let proposal: EnvironmentProposal | null = null;
+  let contextEpoch = 0;
+  let requestPending = false;
   let phase: 'idle' | 'attaching' | 'attached' | 'disposed' = 'idle';
   let beginPromise: Promise<void> | null = null;
   let overlay: {
@@ -114,14 +119,16 @@ export function mountEnvironmentSelection(
   let attachedControls: { onInteract: (() => void) | null } | null = null;
 
   function reportSelection(feature: NYCLocalFeature): void {
-    if (chosen?.id !== feature.id) clearProposal();
+    if (chosen?.id !== feature.id) {
+      invalidateProposal('The selection changed. Request a fresh proposal.');
+    }
     chosen = feature;
     const doitt = feature.providerFeatureId.replace('doitt_id:', '');
     selected.textContent = `DOITT_ID ${doitt} · BIN ${feature.bin?.replace('bin:', '') ?? 'not supplied'}`
       + ` · ${feature.name ?? 'Unnamed building'}`;
     reason.textContent = 'Match: reticle intersects the independently sourced NYC footprint.';
     place.disabled = false;
-    ask.disabled = request.value.trim().length === 0;
+    reflectRequestButton();
     remove.disabled = current?.environmentInstances?.some((held) =>
       held.instanceId === instanceId(feature) && !held.removed) !== true;
   }
@@ -135,12 +142,23 @@ export function mountEnvironmentSelection(
     if (chosen !== null) reportSelection(chosen);
   }
 
+  function reflectRequestButton(): void {
+    ask.disabled = requestPending || chosen === null || request.value.trim().length === 0;
+  }
+
   function clearProposal(message = 'No edit is waiting for review.'): void {
     proposal = null;
     previewText.textContent = message;
     previewControls.hidden = true;
     apply.disabled = true;
     discard.disabled = true;
+  }
+
+  function invalidateProposal(message: string): void {
+    contextEpoch += 1;
+    requestPending = false;
+    clearProposal(message);
+    reflectRequestButton();
   }
 
   function showProposal(value: EnvironmentProposal): void {
@@ -158,6 +176,9 @@ export function mountEnvironmentSelection(
     } else {
       previewText.textContent = 'Proposed operation: undo_latest_version_edit · latest edit.';
     }
+    previewText.textContent += value.promptVersion === 'deterministic-environment-preview-1'
+      ? ' Deterministic preview; no model ran.'
+      : ` Model: ${value.modelId ?? 'not reported'} · prompt: ${value.promptVersion}.`;
   }
 
   function placementRequest(): EnvironmentPlacementRequest | null {
@@ -187,6 +208,8 @@ export function mountEnvironmentSelection(
 
   async function applyResult(result: Awaited<ReturnType<EnvironmentSelectionClient['add']>>):
     Promise<boolean> {
+    contextEpoch += 1;
+    requestPending = false;
     current = result.kind === 'recorded' ? result.version : result.current;
     reflectVersion();
     if (result.kind === 'stale') {
@@ -198,9 +221,9 @@ export function mountEnvironmentSelection(
   }
 
   request.addEventListener('input', () => {
-    ask.disabled = chosen === null || request.value.trim().length === 0;
+    invalidateProposal('The request changed. Submit it again for a fresh proposal.');
   });
-  role.addEventListener('change', () => clearProposal(
+  role.addEventListener('change', () => invalidateProposal(
     'The role changed. Request a fresh proposal.',
   ));
 
@@ -210,11 +233,13 @@ export function mountEnvironmentSelection(
       deps.showStatus('Open an authored version and select a feature before previewing.', 'failure');
       return;
     }
+    invalidateProposal('Preparing deterministic placement preview.');
     showProposal(environmentClient.deterministicPlace(current, catalog, placement));
   });
 
   remove.addEventListener('click', () => {
     if (current === null || chosen === null) return;
+    invalidateProposal('Preparing deterministic removal preview.');
     showProposal({
       operation: 'remove_selected_authored_instance',
       versionId: current.versionId,
@@ -227,6 +252,7 @@ export function mountEnvironmentSelection(
 
   undo.addEventListener('click', () => {
     if (current === null) return;
+    invalidateProposal('Preparing deterministic undo preview.');
     showProposal({
       operation: 'undo_latest_version_edit',
       versionId: current.versionId,
@@ -237,12 +263,20 @@ export function mountEnvironmentSelection(
   });
 
   ask.addEventListener('click', () => void (async () => {
+    if (requestPending) return;
     const placement = placementRequest();
     if (catalog === null || current === null || placement === null) return;
+    const epoch = ++contextEpoch;
+    requestPending = true;
+    clearProposal('Requesting a typed environment proposal…');
+    reflectRequestButton();
     try {
       const result = await environmentClient.propose(
         current, catalog, placement, request.value.trim(),
       );
+      if (epoch !== contextEpoch || phase === 'disposed') return;
+      requestPending = false;
+      reflectRequestButton();
       if (result.kind === 'refused') {
         clearProposal(`No proposal: ${result.detail}`);
         deps.showStatus(`No environment proposal: ${result.detail}`, 'failure');
@@ -250,11 +284,15 @@ export function mountEnvironmentSelection(
         showProposal(result.proposal);
       }
     } catch (error) {
+      if (epoch !== contextEpoch || phase === 'disposed') return;
+      requestPending = false;
+      reflectRequestButton();
       deps.showStatus(objectWriteFailure(error), 'failure');
     }
   })());
 
-  discard.addEventListener('click', () => clearProposal('Proposal discarded. Nothing changed.'));
+  discard.addEventListener('click', () =>
+    invalidateProposal('Proposal discarded. Nothing changed.'));
 
   apply.addEventListener('click', () => void (async () => {
     if (proposal === null) return;
@@ -339,6 +377,8 @@ export function mountEnvironmentSelection(
     },
     dispose: () => {
       if (phase === 'disposed') return;
+      contextEpoch += 1;
+      requestPending = false;
       phase = 'disposed';
       if (attachedControls !== null && attachedControls.onInteract === installedInteract) {
         attachedControls.onInteract = priorInteract;

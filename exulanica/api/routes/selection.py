@@ -19,6 +19,7 @@ logic:
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -37,6 +38,7 @@ from exulanica.environment import (
     EnvironmentResourceWithdrawn,
     UnknownEnvironmentResource,
 )
+from exulanica.environment.nyc_open_data import PROVIDER_KEY as NYC_OPEN_DATA_PROVIDER_KEY
 from exulanica.models.client import ModelClient
 from exulanica.selection import (
     Abstention,
@@ -60,7 +62,20 @@ from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSI
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import PROMPT_VERSION, ModelCall, answer_question, propose_plan
 from exulanica.world import (
+    EnvironmentBindingDrift,
+    EnvironmentCompositionDenied,
+    EnvironmentPlacement,
+    EnvironmentSelection,
+    EnvironmentSourceWithdrawn,
+    InvalidatedSourceVersion,
+    InvalidEnvironmentData,
+    InvalidEnvironmentState,
+    ObjectOrigin,
+    SourceAnchor,
+    StaleObjectBase,
     StyleReference,
+    Transform,
+    UnavailableAsset,
     WorldNotConfigured,
     WorldObjectRepository,
     WorldStyleRepository,
@@ -829,16 +844,60 @@ def environment_proposal(
         )
     feature = catalog.features[0]
     provider_feature_id = feature.get("provider_feature_id")
-    if not isinstance(provider_feature_id, str):
+    if (
+        catalog.provider_key != NYC_OPEN_DATA_PROVIDER_KEY
+        or not isinstance(provider_feature_id, str)
+        or re.fullmatch(r"doitt_id:[1-9][0-9]*", provider_feature_id) is None
+    ):
         return EnvironmentProposalResponse(
             proposal=None,
             refusal=AppearanceRefusalView(
-                code="unsupported",
-                detail="the selected feature has no authoritative provider identifier",
+                code="unsupported_source",
+                detail="the selected feature is not from the admitted NYC Open Data source",
             ),
             execution=empty_execution,
         )
     instance_id = f"nyc-open-data:{provider_feature_id.replace(':', '-')}"
+    bbox = feature.get("bbox")
+    render_batch_id = feature.get("render_batch_id")
+    frame_name = catalog.geographic_frame.get("name")
+    if (
+        not isinstance(bbox, list)
+        or len(bbox) not in (4, 6)
+        or any(isinstance(value, bool) or not isinstance(value, int) for value in bbox)
+        or isinstance(render_batch_id, bool)
+        or not isinstance(render_batch_id, int)
+        or not isinstance(frame_name, str)
+    ):
+        return EnvironmentProposalResponse(
+            proposal=None,
+            refusal=AppearanceRefusalView(
+                code="unsupported", detail="the selected feature binding is malformed"
+            ),
+            execution=empty_execution,
+        )
+    dimensions = len(bbox) // 2
+    placement = EnvironmentPlacement(
+        instance_id=instance_id,
+        admission_id=catalog.admission_id,
+        render_asset_id=catalog.render_asset_id,
+        publication_id=catalog.publication_id,
+        selection=EnvironmentSelection("feature", body.selected_feature_id, render_batch_id),
+        source_anchor=SourceAnchor(
+            frame_name,
+            catalog.coordinate_scale,
+            tuple((bbox[index] + bbox[index + dimensions] + 1) // 2 for index in range(dimensions)),
+        ),
+        region_id=body.region_id,
+        transform=Transform(
+            body.transform.x_mm,
+            body.transform.y_mm,
+            body.transform.z_mm,
+            body.transform.yaw_microradians,
+            body.transform.scale_milli,
+        ),
+        origin=ObjectOrigin("authored", body.origin_role),
+    )
     selected_instance = next(
         (
             instance
@@ -847,6 +906,28 @@ def environment_proposal(
         ),
         None,
     )
+    validated = None
+    if selected_instance is None:
+        try:
+            validated = objects.validate_environment_placement(
+                body.version_id,
+                placement,
+                base_state_sha256=body.base_state_sha256,
+            )
+        except (InvalidEnvironmentData, InvalidEnvironmentState) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except (
+            StaleObjectBase,
+            InvalidatedSourceVersion,
+            EnvironmentBindingDrift,
+        ) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except EnvironmentSourceWithdrawn as exc:
+            raise HTTPException(status_code=410, detail=str(exc)) from exc
+        except EnvironmentCompositionDenied as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except UnavailableAsset as exc:
+            raise HTTPException(status_code=424, detail=str(exc)) from exc
     operations = [
         (
             EnvironmentOperation.REMOVE_SELECTED_AUTHORED_INSTANCE
@@ -880,41 +961,25 @@ def environment_proposal(
     elif decision.operation is EnvironmentOperation.UNDO_LATEST_VERSION_EDIT:
         proposal = UndoEnvironmentProposalView(operation=decision.operation.value, **common)
     else:
-        bbox = feature.get("bbox")
-        render_batch_id = feature.get("render_batch_id")
-        frame_name = catalog.geographic_frame.get("name")
-        if (
-            not isinstance(bbox, list)
-            or len(bbox) not in (4, 6)
-            or any(isinstance(value, bool) or not isinstance(value, int) for value in bbox)
-            or isinstance(render_batch_id, bool)
-            or not isinstance(render_batch_id, int)
-            or not isinstance(frame_name, str)
-        ):
-            return EnvironmentProposalResponse(
-                proposal=None,
-                refusal=AppearanceRefusalView(
-                    code="unsupported", detail="the selected feature binding is malformed"
-                ),
-                execution=execution,
-            )
-        dimensions = len(bbox) // 2
+        assert validated is not None
+        source = validated.source
+        assert source.publication_id is not None
+        assert source.selection.feature_id is not None
+        assert source.selection.render_batch_id is not None
         proposal = PlaceEnvironmentProposalView(
             operation=decision.operation.value,
-            instance_id=instance_id,
-            admission_id=catalog.admission_id,
-            render_asset_id=catalog.render_asset_id,
-            publication_id=catalog.publication_id,
-            feature_id=body.selected_feature_id,
-            render_batch_id=render_batch_id,
-            source_anchor_frame_name=frame_name,
-            source_anchor_coordinate_scale=catalog.coordinate_scale,
-            source_anchor_coordinates=tuple(
-                (bbox[index] + bbox[index + dimensions] + 1) // 2 for index in range(dimensions)
-            ),
-            region_id=body.region_id,
+            instance_id=validated.instance_id,
+            admission_id=source.admission_id,
+            render_asset_id=source.render_asset_id,
+            publication_id=source.publication_id,
+            feature_id=source.selection.feature_id,
+            render_batch_id=source.selection.render_batch_id,
+            source_anchor_frame_name=source.anchor.frame_name,
+            source_anchor_coordinate_scale=source.anchor.coordinate_scale,
+            source_anchor_coordinates=source.anchor.coordinates,
+            region_id=validated.region_id,
             transform=body.transform,
-            origin_role=body.origin_role,
+            origin_role=validated.origin.role,
             **common,
         )
     return EnvironmentProposalResponse(proposal=proposal, refusal=None, execution=execution)

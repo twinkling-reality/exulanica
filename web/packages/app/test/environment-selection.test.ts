@@ -7,6 +7,12 @@ import type { EnvironmentCatalog } from '../src/environment-selection-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 const version = {
   schemaVersion: 2,
   versionId: 'version',
@@ -190,7 +196,11 @@ describe('mounted NYC semantic selection lifecycle', () => {
     }));
     const propose = vi.fn(async (base, heldCatalog, placement) => ({
       kind: 'proposed',
-      proposal: deterministicPlace(base, heldCatalog, placement),
+      proposal: {
+        ...deterministicPlace(base, heldCatalog, placement),
+        modelId: 'served/model',
+        promptVersion: 'environment-proposal-1',
+      },
     }));
     const mounted = mountEnvironmentSelection({
       env: {} as AppEnvironment,
@@ -221,6 +231,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     expect(mounted.root.textContent).toContain('Proposed operation: place_selected_feature');
     expect(mounted.root.textContent).toContain(catalog.publicationId);
     expect(mounted.root.textContent).toContain('Connected to something I experienced');
+    expect(mounted.root.textContent).toContain('Deterministic preview; no model ran.');
     expect(button('Apply').disabled).toBe(false);
 
     button('Discard').click();
@@ -231,7 +242,8 @@ describe('mounted NYC semantic selection lifecycle', () => {
     input.value = 'place this building';
     input.dispatchEvent(new Event('input'));
     button('Preview request').click();
-    await vi.waitFor(() => expect(propose).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(mounted.root.textContent).toContain('Model: served/model'));
+    expect(mounted.root.textContent).toContain('prompt: environment-proposal-1');
     button('Apply').click();
     await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
     expect(apply.mock.calls[0]![0].originRole).toBe('personal');
@@ -320,5 +332,124 @@ describe('mounted NYC semantic selection lifecycle', () => {
     role.dispatchEvent(new Event('change'));
     expect(button('Apply').disabled).toBe(true);
     expect(mounted.root.textContent).toContain('The role changed. Request a fresh proposal.');
+  });
+
+  it('never restores superseded model responses after role, feature, request, or disposal changes', async () => {
+    const controls = {
+      state: { x: 0, y: 1.68, z: 0 },
+      onInteract: null as (() => void) | null,
+    };
+    const binding = {
+      controls,
+      camera: { forward: { x: 0, y: -1, z: 0 } },
+      device: {},
+      renderRoot: {},
+      invalidate: vi.fn(),
+    };
+    const firstFeature = {
+      ...catalog.features[0]!,
+      localFootprint: [[[[1, 2], [3, 2], [1, 2]]]],
+    };
+    const secondFeature = {
+      ...firstFeature,
+      id: 'fedcba9876543210fedcba9876543210',
+      providerFeatureId: 'doitt_id:9999',
+    };
+    let picked = firstFeature;
+    const requests = [
+      deferred<never>(), deferred<never>(), deferred<never>(), deferred<never>(), deferred<never>(),
+      deferred<never>(),
+    ];
+    let proposalCall = 0;
+    const propose = vi.fn(() => requests[proposalCall++]!.promise);
+    const proposalFor = (
+      featureId: string,
+      role: 'fictional' | 'personal',
+      model: string | null,
+    ) => ({
+      kind: 'proposed' as const,
+      proposal: {
+        operation: 'place_selected_feature' as const,
+        versionId: version.versionId,
+        baseStateSha256: version.stateSha256,
+        instanceId: `nyc-open-data:${featureId}`,
+        admissionId: catalog.admissionId,
+        renderAssetId: catalog.renderAssetId,
+        publicationId: catalog.publicationId,
+        featureId,
+        renderBatchId: 0,
+        sourceAnchorFrameName: catalog.frameName,
+        sourceAnchorCoordinateScale: catalog.coordinateScale,
+        sourceAnchorCoordinates: [0, 0] as const,
+        regionId: 'region-a',
+        transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000 },
+        originRole: role,
+        modelId: model,
+        promptVersion: 'environment-proposal-1',
+      },
+    });
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(),
+      admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: { catalog: vi.fn(async () => catalog), propose } as never,
+      worldClient: { connect: vi.fn(async () => ({ assets: [], version })) } as never,
+      createOverlay: () => ({ pick: () => picked as never, destroy: vi.fn() }),
+    });
+    await mounted.begin();
+    const buttons = [...mounted.root.querySelectorAll('button')];
+    const button = (label: string) => buttons.find((held) => held.textContent === label)!;
+    const input = mounted.root.querySelector('input')!;
+    const role = mounted.root.querySelector('select')!;
+    const submit = (text: string) => {
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+      button('Preview request').click();
+    };
+
+    controls.onInteract?.();
+    submit('place this building');
+    expect(button('Preview request').disabled).toBe(true);
+    button('Preview request').click();
+    expect(propose).toHaveBeenCalledTimes(1);
+    role.value = 'personal';
+    role.dispatchEvent(new Event('change'));
+    requests[0]!.resolve(proposalFor(firstFeature.id, 'fictional', 'old-role-model') as never);
+    await Promise.resolve();
+    expect(mounted.root.textContent).not.toContain('old-role-model');
+    expect(button('Apply').disabled).toBe(true);
+
+    submit('place this building');
+    picked = secondFeature;
+    controls.onInteract?.();
+    requests[1]!.resolve(proposalFor(firstFeature.id, 'personal', 'old-feature-model') as never);
+    await Promise.resolve();
+    expect(mounted.root.textContent).not.toContain('old-feature-model');
+    expect(button('Apply').disabled).toBe(true);
+
+    submit('place the second building');
+    submit('place this selected building');
+    expect(propose).toHaveBeenCalledTimes(4);
+    requests[3]!.resolve(proposalFor(secondFeature.id, 'personal', 'newer-model') as never);
+    await vi.waitFor(() => expect(mounted.root.textContent).toContain('newer-model'));
+    requests[2]!.resolve(proposalFor(secondFeature.id, 'personal', 'older-model') as never);
+    await Promise.resolve();
+    expect(mounted.root.textContent).toContain('newer-model');
+    expect(mounted.root.textContent).not.toContain('older-model');
+
+    submit('place with unreported model');
+    requests[4]!.resolve(proposalFor(secondFeature.id, 'personal', null) as never);
+    await vi.waitFor(() => expect(mounted.root.textContent).toContain('Model: not reported'));
+    expect(mounted.root.textContent).not.toContain('no model ran');
+
+    submit('place after this');
+    const previewText = mounted.root.querySelector('.environment-selection-preview')!;
+    mounted.dispose();
+    requests[5]!.resolve(proposalFor(secondFeature.id, 'personal', 'disposed-model') as never);
+    await Promise.resolve();
+    expect(previewText.textContent).not.toContain('disposed-model');
   });
 });

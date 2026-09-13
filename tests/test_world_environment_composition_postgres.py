@@ -54,6 +54,7 @@ from exulanica.world import (
     SourceAnchor,
     StaleObjectBase,
     Transform,
+    UnavailableAsset,
     UnknownWorldResource,
     WorldObjectRepository,
     WorldStructureRepository,
@@ -179,7 +180,7 @@ def composed(repository, tmp_path) -> Composed:
     source_path.write_bytes(source_bytes)
     source = SourceAdmission(
         place_id=place_id,
-        provider_key="fixture-nyc",
+        provider_key="nyc-open-data",
         provider_original_id="corridor",
         provider_revision="2026-09-12",
         expected_sha256=hashlib.sha256(source_bytes).hexdigest(),
@@ -218,7 +219,7 @@ def composed(repository, tmp_path) -> Composed:
             render_asset_id=render.asset_id,
             features=(
                 EnvironmentFeatureInput(
-                    provider_feature_id="building-1",
+                    provider_feature_id="doitt_id:1",
                     kind="building",
                     bbox=(0, 0, 0, 100, 100, 100),
                     label="Fixture building",
@@ -328,6 +329,34 @@ def test_add_rechecks_authorization_at_commit_and_rolls_back(monkeypatch, compos
     assert unchanged.edit_seq == 0
 
 
+def test_read_only_environment_validation_reuses_add_checks_without_editing(composed) -> None:
+    placement = composed.placement("environment:preview", feature=True)
+    before = composed.worlds.version(composed.version.version_id)
+
+    validated = composed.worlds.validate_environment_placement(
+        composed.version.version_id,
+        placement,
+        base_state_sha256=composed.version.state_sha256,
+    )
+
+    assert validated.source.selection.feature_id == composed.feature_id
+    assert composed.worlds.version(composed.version.version_id) == before
+
+    with pytest.raises(InvalidEnvironmentData, match="not a region"):
+        composed.worlds.validate_environment_placement(
+            composed.version.version_id,
+            replace(placement, region_id="region-that-does-not-exist"),
+            base_state_sha256=composed.version.state_sha256,
+        )
+    with pytest.raises(InvalidEnvironmentData, match="x_mm"):
+        composed.worlds.validate_environment_placement(
+            composed.version.version_id,
+            replace(placement, transform=Transform(1_000_000_001, 0, 0, 0, 1000)),
+            base_state_sha256=composed.version.state_sha256,
+        )
+    assert composed.worlds.version(composed.version.version_id) == before
+
+
 def test_rights_denial_stale_publication_and_wrong_segment_fail_closed(composed, tmp_path) -> None:
     existing = _add(composed, composed.placement("environment:indexed", feature=True))
     wrong_segment = composed.placement("environment:wrong", feature=True)
@@ -349,6 +378,12 @@ def test_rights_denial_stale_publication_and_wrong_segment_fail_closed(composed,
     )
     drifted = composed.worlds.version(existing.version_id)
     assert drifted.environment_instances[0].availability == "binding_drift"
+    with pytest.raises(EnvironmentBindingDrift):
+        composed.worlds.validate_environment_placement(
+            composed.version.version_id,
+            composed.placement("environment:stale-preview", feature=True, publication_id=old),
+            base_state_sha256=composed.version.state_sha256,
+        )
     with pytest.raises(EnvironmentBindingDrift):
         composed.worlds.add_environment(
             composed.version.version_id,
@@ -391,6 +426,12 @@ def test_rights_denial_stale_publication_and_wrong_segment_fail_closed(composed,
         origin=placement.origin,
     )
     with pytest.raises(EnvironmentCompositionDenied):
+        composed.worlds.validate_environment_placement(
+            composed.version.version_id,
+            placement,
+            base_state_sha256=composed.version.state_sha256,
+        )
+    with pytest.raises(EnvironmentCompositionDenied):
         composed.worlds.add_environment(
             composed.version.version_id,
             placement,
@@ -421,6 +462,12 @@ def test_withdrawal_retains_history_allows_remove_and_undo_but_refuses_move(comp
     reread = composed.worlds.version(version.version_id)
     assert reread.environment_instances[0].availability == "withdrawn"
     with pytest.raises(EnvironmentSourceWithdrawn):
+        composed.worlds.validate_environment_placement(
+            version.version_id,
+            composed.placement("environment:withdrawn-preview", feature=True),
+            base_state_sha256=version.state_sha256,
+        )
+    with pytest.raises(EnvironmentSourceWithdrawn):
         composed.worlds.move_environment(
             version.version_id,
             "environment:withdrawn",
@@ -450,6 +497,14 @@ def test_missing_exact_bytes_are_reported_without_substitution(composed) -> None
     reread = composed.worlds.version(version.version_id)
     assert reread.environment_instances[0].availability == "unavailable_bytes"
     assert reread.environment_instances[0].source.render_sha256 == composed.render.expected_sha256
+    before_seq = reread.edit_seq
+    with pytest.raises(UnavailableAsset):
+        composed.worlds.validate_environment_placement(
+            version.version_id,
+            composed.placement("environment:missing-preview", feature=True),
+            base_state_sha256=version.state_sha256,
+        )
+    assert composed.worlds.version(version.version_id).edit_seq == before_seq
 
 
 def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
@@ -627,6 +682,30 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
             == before
         )
 
+        original_read = EnvironmentRepository.read_features
+
+        def non_nyc(repository, admission_id, **filters):
+            catalog = original_read(repository, admission_id, **filters)
+            return replace(catalog, provider_key="not-nyc-open-data")
+
+        with monkeypatch.context() as scoped:
+            scoped.setattr(EnvironmentRepository, "read_features", non_nyc)
+            unsupported = client.post("/selection/environment", headers=headers, json=body)
+        assert unsupported.status_code == 200
+        assert unsupported.json()["refusal"]["code"] == "unsupported_source"
+        assert transport.call_count == 1
+
+        def non_doitt(repository, admission_id, **filters):
+            catalog = original_read(repository, admission_id, **filters)
+            feature = {**catalog.features[0], "provider_feature_id": "building-1"}
+            return replace(catalog, features=(feature,))
+
+        with monkeypatch.context() as scoped:
+            scoped.setattr(EnvironmentRepository, "read_features", non_doitt)
+            unsupported_id = client.post("/selection/environment", headers=headers, json=body)
+        assert unsupported_id.json()["refusal"]["code"] == "unsupported_source"
+        assert transport.call_count == 1
+
         foreign = client.post("/selection/environment", headers=stranger_headers, json=body)
         absent = client.post(
             "/selection/environment",
@@ -696,6 +775,9 @@ def test_environment_proposal_refuses_missing_selection_and_stale_base_without_m
     }
     headers = {"Authorization": f"Bearer {token}"}
     with TestClient(create_app(services, verify=False)) as client:
+        before = client.get(
+            f"/world/versions/{composed.version.version_id}", headers=headers
+        ).json()
         missing = client.post(
             "/selection/environment",
             headers=headers,
@@ -706,8 +788,44 @@ def test_environment_proposal_refuses_missing_selection_and_stale_base_without_m
             headers=headers,
             json={**body, "base_state_sha256": "f" * 64},
         )
+        invalid_region = client.post(
+            "/selection/environment",
+            headers=headers,
+            json={**body, "region_id": "not-a-source-region"},
+        )
+        invalid_transform = client.post(
+            "/selection/environment",
+            headers=headers,
+            json={
+                **body,
+                "transform": {**body["transform"], "x_mm": 1_000_000_001},
+            },
+        )
+        validation_failures = (
+            (EnvironmentCompositionDenied("compose denied"), 403),
+            (EnvironmentSourceWithdrawn("source withdrawn"), 410),
+            (EnvironmentBindingDrift("publication drift"), 409),
+        )
+        for failure, expected_status in validation_failures:
+            with monkeypatch.context() as scoped:
+                scoped.setattr(
+                    WorldObjectRepository,
+                    "validate_environment_placement",
+                    lambda *_args, refused=failure, **_kwargs: (_ for _ in ()).throw(refused),
+                )
+                refused = client.post("/selection/environment", headers=headers, json=body)
+            assert refused.status_code == expected_status
+        render_digest = BlobId.from_hex(composed.render.expected_sha256)
+        render_path = composed.store.root / composed.store.key_for(render_digest)
+        render_path.unlink()
+        unavailable = client.post("/selection/environment", headers=headers, json=body)
+        after = client.get(f"/world/versions/{composed.version.version_id}", headers=headers).json()
     assert missing.json()["refusal"]["code"] == "no_selected_feature"
     assert stale.json()["refusal"]["code"] == "stale_version"
+    assert invalid_region.status_code == 422
+    assert invalid_transform.status_code == 422
+    assert unavailable.status_code == 424
+    assert after == before
     assert transport.call_count == 0
 
 

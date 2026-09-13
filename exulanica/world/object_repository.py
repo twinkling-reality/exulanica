@@ -295,24 +295,7 @@ class WorldObjectRepository:
     ) -> AlternateVersion:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            if any(
-                instance.instance_id == placement.instance_id
-                for instance in self._environment_instances(version_id)
-            ):
-                raise InvalidEnvironmentState(
-                    f"{placement.instance_id} already exists in this version"
-                )
-            source = self._resolve_environment_source(placement)
-            instance = validate_environment_instance(
-                EnvironmentInstance(
-                    instance_id=placement.instance_id,
-                    source=source,
-                    region_id=placement.region_id,
-                    transform=placement.transform,
-                    origin=placement.origin,
-                ),
-                region_ids=self._source_region_ids(row["source_snapshot_id"]),
-            )
+            instance = self._validated_environment_placement(row, placement)
             edit_id = uuid.uuid4()
             self._insert_environment(version_id, instance, (edit_id, edit_id))
             self._append_edit(
@@ -326,6 +309,24 @@ class WorldObjectRepository:
             )
             self._final_environment_authorization(instance)
         return self.version(version_id)
+
+    def validate_environment_placement(
+        self,
+        version_id: uuid.UUID,
+        placement: EnvironmentPlacement,
+        *,
+        base_state_sha256: str,
+    ) -> EnvironmentInstance:
+        """Validate exactly what add would validate, without taking a lock or writing.
+
+        Apply repeats this validation under its write transaction and final authorization lock.
+        This read-only pass exists so a proposal that could not currently be applied is never shown
+        as valid. It is safe for the executor connection: every operation below is a SELECT or a
+        content-addressed store read.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._validated_environment_placement(row, placement)
 
     def move_environment(
         self,
@@ -703,6 +704,10 @@ class WorldObjectRepository:
         """Lock, re-read, and refuse a stale or invalidated base. Every mutation starts here."""
         self._lock_workspace()
         row = self._version_row(version_id, for_update=True)
+        self._require_edit_base(row, base_state_sha256)
+        return row
+
+    def _require_edit_base(self, row: Mapping[str, Any], base_state_sha256: str) -> None:
         if self._source_invalidated(row["source_snapshot_id"]):
             raise InvalidatedSourceVersion(
                 "a committed deletion invalidated this version's source snapshot"
@@ -711,7 +716,27 @@ class WorldObjectRepository:
             raise StaleObjectBase(
                 "this version moved since the base was read; read it again and re-issue the edit"
             )
-        return row
+
+    def _validated_environment_placement(
+        self, row: Mapping[str, Any], placement: EnvironmentPlacement
+    ) -> EnvironmentInstance:
+        version_id = row["version_id"]
+        if any(
+            instance.instance_id == placement.instance_id
+            for instance in self._environment_instances(version_id)
+        ):
+            raise InvalidEnvironmentState(f"{placement.instance_id} already exists in this version")
+        source = self._resolve_environment_source(placement)
+        return validate_environment_instance(
+            EnvironmentInstance(
+                instance_id=placement.instance_id,
+                source=source,
+                region_id=placement.region_id,
+                transform=placement.transform,
+                origin=placement.origin,
+            ),
+            region_ids=self._source_region_ids(row["source_snapshot_id"]),
+        )
 
     def _append_edit(
         self,
@@ -1142,9 +1167,7 @@ class WorldObjectRepository:
                 return obj
         raise UnknownWorldResource("no such authored object")
 
-    def _require_environment(
-        self, version_id: uuid.UUID, instance_id: str
-    ) -> EnvironmentInstance:
+    def _require_environment(self, version_id: uuid.UUID, instance_id: str) -> EnvironmentInstance:
         for instance in self._environment_instances(version_id):
             if instance.instance_id == instance_id:
                 return instance
@@ -1217,9 +1240,7 @@ class WorldObjectRepository:
             raise EnvironmentCompositionDenied(
                 "compose is not permitted for the source and render asset"
             )
-        self._require_environment_bytes(
-            row["source_sha256"], row["render_sha256"], None
-        )
+        self._require_environment_bytes(row["source_sha256"], row["render_sha256"], None)
 
         bounds = row["geographic_bounds"]
         publication = None
@@ -1371,9 +1392,7 @@ class WorldObjectRepository:
                 or payload.get("geographic_frame") != publication["geographic_frame"]
                 or payload.get("geographic_bounds") != publication["geographic_bounds"]
             ):
-                raise IntegrityError(
-                    "the pinned environment feature index binding is malformed"
-                )
+                raise IntegrityError("the pinned environment feature index binding is malformed")
             features = payload["features"]
         except BlobNotFoundError as exc:
             raise UnavailableAsset("the pinned environment index bytes are unavailable") from exc

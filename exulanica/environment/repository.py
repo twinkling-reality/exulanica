@@ -88,6 +88,7 @@ class AuthorizedEnvironmentBytes:
 class EnvironmentFeatureCatalog:
     publication_id: uuid.UUID
     admission_id: uuid.UUID
+    provider_key: str
     place_id: uuid.UUID
     index_asset_id: uuid.UUID
     render_asset_id: uuid.UUID
@@ -101,6 +102,7 @@ class EnvironmentFeatureCatalog:
         return {
             "publication_id": str(self.publication_id),
             "admission_id": str(self.admission_id),
+            "provider_key": self.provider_key,
             "place_id": str(self.place_id),
             "index_asset_id": str(self.index_asset_id),
             "render_asset_id": str(self.render_asset_id),
@@ -461,6 +463,7 @@ class EnvironmentRepository:
         return EnvironmentFeatureCatalog(
             publication_id=row["publication_id"],
             admission_id=admission_id,
+            provider_key=row["provider_key"],
             place_id=row["place_id"],
             index_asset_id=row["index_asset_id"],
             render_asset_id=row["render_asset_id"],
@@ -615,7 +618,8 @@ class EnvironmentRepository:
         )
         return self.connection.execute(
             """
-            select p.publication_id,p.admission_id,s.place_id,p.index_asset_id,p.render_asset_id,
+            select p.publication_id,p.admission_id,s.provider_key,s.place_id,
+                   p.index_asset_id,p.render_asset_id,
                    p.source_sha256,p.source_receipt_sha256,p.index_sha256,
                    p.index_receipt_sha256,p.render_sha256,p.render_receipt_sha256,
                    p.receipt_record as publication_receipt,
