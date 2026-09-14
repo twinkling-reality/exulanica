@@ -58,7 +58,7 @@ def test_every_seeded_predicate_has_a_recorded_decision():
     missing = sorted(set(seeded) - set(registered))
     assert not missing, (
         f"{missing} are seeded into `predicate` and no decision is recorded for them.\n"
-        "Add a VocabularyDecision to orimera/epistemics/vocabulary.py. The question it asks is: "
+        "Add a VocabularyDecision to exulanica/epistemics/vocabulary.py. The question it asks is: "
         "is this predicate's object the name a PERSON is called by? If it is, writes_a_name must "
         "be true and allows_kind must be {user} alone, and the database will refuse anything "
         "else. If it is not, say in `object_is` what the object is instead."

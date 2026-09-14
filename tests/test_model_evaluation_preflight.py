@@ -148,7 +148,7 @@ def _request(root: Path, *, all_tasks: bool = False) -> dict[str, object]:
                 "entrypoint_revision": {"kind": "git_commit", "value": "d" * 40},
             },
         },
-        "output": {"root": ".orimera/model-evaluation-results"},
+        "output": {"root": ".exulanica/model-evaluation-results"},
     }
 
 

@@ -951,7 +951,7 @@ COMPOSER_PRIMARY, COMPOSER_FALLBACK = _reasoning_cheap()
 def test_the_composer_asks_the_nvidia_reasoning_core(answered):
     """The NVIDIA core has to be in a product path, and this is the path it belongs in.
 
-    Measured before this test existed: **nothing in `orimera/` called a reasoning role at all.**
+    Measured before this test existed: **nothing in `exulanica/` called a reasoning role at all.**
     Every structured call in the package asked for `structured_extraction`, so the live system
     was Qwen and MiniMax end to end and Nemotron was exercised only by `scripts/verify_platform.py`.
 
