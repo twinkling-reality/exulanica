@@ -26,6 +26,10 @@ class UnknownSociety(SocietyError):
     pass
 
 
+class UnavailableSocietyInput(SocietyError):
+    pass
+
+
 class StaleSocietyState(SocietyError):
     pass
 
@@ -122,6 +126,8 @@ def advance_society(
     state: dict[str, Any], seed: str
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
     """Advance one simulated minute without wall time, randomness, or model calls."""
+    if state.get("profile") != SOCIETY_ENGINE_VERSION:
+        raise ValueError("unsupported legacy society profile")
     tick = int(state["tick"]) + 1
     minute = tick % 1440
     society_id = uuid.UUID(str(state["society_id"]))
