@@ -376,9 +376,7 @@ def advance_social_society(
         ]
     people_by_id = {person["id"]: person for person in state["inhabitants"]}
     current_targets = {
-        target["target_id"]: target
-        for target in latest["targets"]
-        if target["enabled"] is True
+        target["target_id"]: target for target in latest["targets"] if target["enabled"] is True
     }
     for subject, policy in (external_goal_policy or {}).items():
         if subject not in people_by_id or set(policy) != {

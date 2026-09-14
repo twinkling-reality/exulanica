@@ -218,10 +218,14 @@ def test_queued_input_change_consumes_request_as_stale_and_replays(action_world)
         world["version"].version_id, uuid.UUID(envelope["request"]["request_id"])
     )
     assert consumed["consumption"] == {"tick": 1, "disposition": "stale"}
-    event = world["connection"].execute(
-        "select document from world_society_event where workspace_id=%s and society_id=%s "
-        "and event_kind='user_action_requested'",
-        (world["workspace"], advanced["society_id"]),
-    ).fetchone()["document"]
+    event = (
+        world["connection"]
+        .execute(
+            "select document from world_society_event where workspace_id=%s and society_id=%s "
+            "and event_kind='user_action_requested'",
+            (world["workspace"], advanced["society_id"]),
+        )
+        .fetchone()["document"]
+    )
     assert event["disposition"] == "stale" and event["reason"] == "action_context_changed"
     assert society_repository(world).replay(world["version"].version_id)["replay_verified"]
