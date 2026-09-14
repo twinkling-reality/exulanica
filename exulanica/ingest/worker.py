@@ -3,9 +3,9 @@
 **It does not import the API and it must not start.** ``exulanica.ingest`` sits under
 ``exulanica.api`` in the layers contract, so a worker reaching for
 ``exulanica.api.authorisation`` to find out which workspaces exist inverts the layering, and
-``uv run lint-imports`` says so. It takes the workspaces as a value instead. The application
-knows them because they came from its token directory, and passing them down is one argument
-rather than a dependency.
+``uv run lint-imports`` says so. It takes configured workspaces plus an optional discovery
+callback instead. The API owns that callback and can query its dedicated account role; this
+lower layer receives UUID values and still knows nothing about accounts or credentials.
 
 **What runs here and what does not.** The vision stage is a model call and belongs nowhere near
 a request thread. The intake stage is a hash, an EXIF read, an orientation transform and a few
@@ -45,7 +45,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -225,7 +225,7 @@ class _LeaseKeeper:
 
 
 class DerivativeWorker:
-    """Drains the derivative queue for a fixed set of workspaces."""
+    """Drains derivative queues for explicit and freshly discovered workspace UUIDs."""
 
     def __init__(
         self,
@@ -233,6 +233,7 @@ class DerivativeWorker:
         store: ContentAddressedStore,
         workspaces: frozenset[uuid.UUID],
         *,
+        workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
         vision: VisionModel | None = None,
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
@@ -259,7 +260,10 @@ class DerivativeWorker:
         """
         self._database = database
         self._store = store
-        self._workspaces = workspaces
+        self._configured_workspaces = frozenset(workspaces)
+        self._workspace_source = workspace_source
+        self._workspace_lock = threading.Lock()
+        self._current_workspaces = self._configured_workspaces
         self._embedding_pass = embedding_pass
         self._vision = vision
         self._depth = depth
@@ -281,6 +285,20 @@ class DerivativeWorker:
         self._failed_passes = 0
 
     # -- driving it ---------------------------------------------------------------------
+
+    def _workspace_snapshot(self) -> frozenset[uuid.UUID]:
+        """Take one fail-closed authority snapshot for a pass, never a retained account cache."""
+        discovered = () if self._workspace_source is None else self._workspace_source()
+        resolved = self._configured_workspaces | frozenset(discovered)
+        if any(type(workspace) is not uuid.UUID for workspace in resolved):
+            raise TypeError("worker workspace discovery must return UUIDs")
+        with self._workspace_lock:
+            self._current_workspaces = resolved
+        return resolved
+
+    def _last_workspace_snapshot(self) -> frozenset[uuid.UUID]:
+        with self._workspace_lock:
+            return self._current_workspaces
 
     def drain(self) -> list[JobOutcome]:
         """Claim and run every job that is queued right now, then return.
@@ -306,19 +324,23 @@ class DerivativeWorker:
         statement of it.
         """
         outcomes: list[JobOutcome] = []
-        for workspace_id in sorted(self._workspaces):
-            # ONE connection per workspace per drain, not one per job. Postgres forks a backend
-            # per connection, and this loop runs every couple of seconds against every workspace
-            # for the life of the process, alongside a connection per request and one held for
-            # up to thirty minutes by every open formation stream.
-            with self._database.session(workspace_id) as connection:
-                repository = IngestRepository(connection, workspace_id)
-                while not self._stop.is_set():
+        claimed_any = True
+        while claimed_any and not self._stop.is_set():
+            claimed_any = False
+            # One claim per workspace per round. This bounds a dynamic authority snapshot by
+            # current job completion and prevents a continuously busy workspace from postponing
+            # discovery/revocation or every other workspace indefinitely.
+            for workspace_id in sorted(self._workspace_snapshot()):
+                if self._stop.is_set():
+                    break
+                with self._database.session(workspace_id) as connection:
+                    repository = IngestRepository(connection, workspace_id)
                     outcome = self._claim_one(connection, repository)
                     if outcome is None:
-                        break
-                    outcomes.append(outcome)
-                outcomes.extend(self._abandon_stranded(connection, repository))
+                        outcomes.extend(self._abandon_stranded(connection, repository))
+                    else:
+                        claimed_any = True
+                        outcomes.append(outcome)
         return outcomes
 
     def drain_observed(self) -> list[JobOutcome]:
@@ -401,8 +423,24 @@ class DerivativeWorker:
                 self._record_worker_lifecycle("worker_stopped")
 
     def _record_worker_lifecycle(self, event_type: str) -> None:
-        """Persist lifecycle per workspace; leave a failed write visible on the worker itself."""
-        for workspace_id in sorted(self._workspaces):
+        """Persist lifecycle without making shutdown wait on a fresh account lookup.
+
+        Startup resolves current authority. Shutdown writes only to the host-configured scope:
+        the stop event is already set and must neither be delayed by a new account connection nor
+        treat a cached, possibly revoked membership as authority. Dynamic workspaces therefore do
+        not receive a best-effort stop event; their durable job/lease state remains authoritative.
+        """
+        try:
+            workspaces = (
+                self._workspace_snapshot()
+                if event_type == "worker_started"
+                else self._configured_workspaces
+            )
+        except Exception as exc:
+            self._last_error = f"{type(exc).__name__}: {exc}"
+            self._failed_passes += 1
+            return
+        for workspace_id in sorted(workspaces):
             try:
                 with self._database.session(workspace_id) as connection:
                     derivative_queue.record_worker_event(
@@ -445,8 +483,8 @@ class DerivativeWorker:
 
     @property
     def workspace_count(self) -> int:
-        """Number of explicitly authorised workspace queues this process can drain."""
-        return len(self._workspaces)
+        """Number of workspace queues in the last successful authority snapshot."""
+        return len(self._last_workspace_snapshot())
 
     # -- one job ------------------------------------------------------------------------
 
