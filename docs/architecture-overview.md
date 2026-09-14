@@ -17,6 +17,60 @@ is epistemically typed and addressable; task representations are derived artifac
 with declared preserved properties and permitted uses. The current implementation
 is not yet a learned general predictive world model.
 
+**Architecture selection, 2026-09-13:** prioritize measured task quality, correctness,
+efficiency and maintainability, with NVIDIA, Nebius and open-source infrastructure as
+preferred paths. Retain the modular monolith, PostgreSQL consistency domain, asynchronous
+workers and replaceable model/rendering boundaries until evidence justifies a change.
+Personal evidence, authored changes and simulated events retain separate provenance and
+authority. Model proposals must pass domain validation before changing durable state;
+society replay consumes recorded accepted decisions rather than repeating inference.
+Expensive derived assets are retained and versioned independently of their renderer.
+See [model and service selection](model-and-service-selection.md#0-current-stack-and-selection-decision)
+for the implemented baseline and candidate comparisons.
+
+**Storage correction, 2026-09-13:** the running service uses a local content-addressed
+file store and PostgreSQL. Authenticated point-map, splat and authored-asset routes exist;
+this does not establish deployed object storage or production streaming. The Nebius
+deployment topology below remains a proposal. Personal world assets require authorized
+access; its anonymous-read bucket proposal does not apply to personal data. Public
+showcase assets require an explicit publication boundary. Reopening a world should reuse
+retained assets, while network transfer and rendering remain separate runtime costs.
+
+**Account and living-world correction, 2026-09-14:** optional Google OIDC now resolves
+application-owned users, actors and one current owned workspace before ordinary workspace
+authorization. Account tables are isolated behind a dedicated non-owner database role; browser
+cookies are revocable and cookie-authenticated writes require an in-memory CSRF token and exact
+origin. This is an implemented protocol and persistence boundary, not evidence of a configured
+Google deployment or completed account-deletion lifecycle. Account-owned workspace discovery can
+feed derivative workers and, under a separate explicit host opt-in, the society playback worker.
+The host must still provide the reviewed district/runtime binding.
+
+The society path now has three separate authorities. Deterministic v2/v3 stepping owns canonical
+state and events. Persisted playback controls schedule that same step under bounded leases.
+Typed user action requests can constrain one inhabitant's next goal to a current canonical target;
+they carry no browser coordinates, do not advance time when recorded and are consumed with an exact
+transition/event binding. Optional model decisions remain separately requested proposals. Replay
+uses the stored accepted inputs, action requests and model-decision receipts and never repeats
+inference. None of these foundations establishes open-ended agent behavior, natural conversation
+or production background progression.
+
+Reviewed reusable GLB imports retain exact asset, licence and provenance receipts before a catalog
+row can be published. That admission validates container dependencies and bytes, not animation or
+visual quality. Scene extraction is likewise a bounded preparer: it selects source-addressed points
+from an existing authorized object segment and emits a private nonmetric candidate, never an
+admitted asset. Scene-run preflight inspects current rights, exact source/split/pose/tool bindings,
+validated checkpoints and caller-supplied resource allowances without queueing work or authorizing
+allocation. Both recheck current source authority and leave publication, execution and visual
+acceptance as separate gates.
+
+The browser now has native rigged-character and representation-inspection foundations. Native
+characters preserve stable player/synthetic subject bindings, validate pinned assets and clips, and
+derive gait from resolved motion while retaining explicit fallback/withdrawal behavior. The generic
+representation lens operates only over declared compatible renderer draws and labels generated
+mesh samples as presentation. Authenticated version-scoped appearance history exists separately
+from the session-only development studio. These contracts do not establish source-person likeness,
+production character registration or accepted movement and rendering quality.
+
 - Status: mixed, labelled per claim. See `README.md` for the status convention.
 - Date: 2026-08-27
 - Source: promoted from the reconciled research report, Part D, with the disagreements in Part C
@@ -43,7 +97,7 @@ Two project decisions are inputs to this document rather than conclusions of it:
 take minutes.** Rejected alternative: a service-per-capability decomposition. Rejected because the
 whole system is one tenant's data with one consistency domain (section 3), and every service boundary
 crossed by a delete would become a second deletion path that can be left half done. The nine-week
-window and the single-operator team make network boundaries a cost with no compensating benefit.
+delivery scope makes network boundaries an operational cost without a demonstrated benefit.
 
 The split that does exist is between work that must answer inside a request and work that must not.
 Reconstruction, perception and batch ingest are minutes-to-hours, retryable, and idempotent. They run
@@ -127,12 +181,11 @@ across the project. Rejected because keeping the origin on Nebius keeps the plat
 literally true, and $2 to $10 is not worth qualifying it for. A Cloudflare edge cache in front of the
 Nebius origin is compatible with this and is recommended for users outside Europe.
 
-### 2.1 Where PostgreSQL runs: a preserved disagreement
+### 2.1 PostgreSQL deployment tradeoffs
 
-**The research streams disagreed and the disagreement is real.** One stream recommended running
-PostgreSQL as a container co-located with the API on a Nebius Serverless AI endpoint, which scores
-marginally better on platform alignment. That recommendation puts the database on the least reliable
-component in the stack.
+Running PostgreSQL alongside the API on a Nebius Serverless AI endpoint is an alternative
+to a persistent Compute VM. The selection depends on storage persistence and recovery
+guarantees for the database.
 
 The facts on both sides:
 
@@ -484,12 +537,9 @@ feature, and worse than anything the feature is worth.
 
 ### 7.1 The obligation
 
-**DECISION: the deployment is designed to run unattended for roughly 46 days**, from the last commit
-before a release to the next point at which an operator is scheduled to touch it. That horizon is a
-planning choice rather than an observed fact, and it is stated as one: this is a single-operator
-project, and 46 days is the longest gap between hands-on attention the schedule realistically
-produces. Rejected alternative: designing for steady-state operations with somebody on call, which
-would justify a much cheaper recovery story and is not the situation this deployment is in.
+**DECISION: the deployment targets an unattended operating window of roughly 46 days.**
+This is a resilience requirement, not a measured availability result. Recovery and alerting
+must support the declared window without depending on continuous manual supervision.
 
 The consequence is that the person clicking the URL is a user who will leave rather than an operator
 who will file a bug, and a dead URL is not a degraded experience. It is the whole product, because
@@ -541,7 +591,7 @@ canary endpoint, running from now to the end of the window.
 
 ### 7.3 Two cost traps
 
-Named because they are the two realistic ways this project's spend goes from small to embarrassing.
+Idle GPU allocation and continuously provisioned endpoints can dominate infrastructure costs.
 Expected total infrastructure cost is roughly **$275 to $600 across 3.7 months**, dominated by hosting
 uptime rather than by AI inference.
 

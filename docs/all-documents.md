@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules, which is what keeps it 
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**79 documents** in the public catalog.
+**80 documents** in the public catalog.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-51 documents.
+52 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -21,6 +21,7 @@ How the system works now. Edited as the system changes.
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
+- [character-representation-contract](character-representation-contract.md) : Updated 2026-09-14. Status: FOUNDATION IMPLEMENTED; PRODUCTION CONFIGURATION, VISUAL/MOVEMENT
 - [companion-question](companion-question.md) : built, covered by tests, and measured with real models on three passes. Section 6
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
@@ -37,15 +38,15 @@ How the system works now. Edited as the system changes.
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
-- [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-12; model upgrades require task-specific evidence
+- [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-14; model upgrades require task-specific evidence
 - [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
-- [physical-streaming-runtime](physical-streaming-runtime.md) : RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate
+- [physical-streaming-runtime](physical-streaming-runtime.md) : Status, corrected 2026-09-13: RENDERER CONTRACT IMPLEMENTED; production streaming and
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
-- [product-direction](product-direction.md) : Updated 2026-09-12. This roadmap defines delivery milestones and their acceptance criteria
+- [product-direction](product-direction.md) : Updated 2026-09-14. This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
@@ -57,7 +58,7 @@ How the system works now. Edited as the system changes.
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
-- [synthetic-society-contract](synthetic-society-contract.md) : IMPLEMENTED BOUNDED SIMULATION; NOT A LEARNED SOCIETY MODEL
+- [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
 - [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
