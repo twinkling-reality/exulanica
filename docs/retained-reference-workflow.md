@@ -187,8 +187,9 @@ daemon, so the worker itself must run on that host, not through a remote Docker 
    installs the NVIDIA container toolkit if the runtime is missing, unpacks the official Node
    tarball for the locked compressor, and starts a local registry on `127.0.0.1:5000` so every
    image receives a real immutable manifest digest without an external account.
-2. Ship the committed tree: `git archive HEAD | ssh <host> 'mkdir -p ~/orimera && tar -x -C ~/orimera'`,
-   then on the host `npm ci --prefix deploy/gsplat/compressor` with `~/node/bin` on the PATH.
+2. Ship the committed tree: `git archive HEAD | ssh <host> 'mkdir -p ~/exulanica && tar -x -C ~/exulanica'`.
+   Existing GPU hosts that still unpack into `~/orimera` keep that layout until they are rebuilt.
+   Then on the host `npm ci --prefix deploy/gsplat/compressor` with `~/node/bin` on the PATH.
 3. Build and push both images at that revision. The worker image is the root `Dockerfile`; the
    trainer image is `deploy/gsplat/Dockerfile` with `CUDA_BASE` set to the digest-pinned reference
    `docker inspect --format '{{index .RepoDigests 0}}'` reports for the pulled PyTorch base. Push

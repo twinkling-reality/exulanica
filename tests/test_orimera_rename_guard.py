@@ -31,8 +31,7 @@ ALLOWED_PATHS: dict[str, str] = {
         "orimera-person-consent worktree layout"
     ),
     "deploy/gsplat/run-scene-worker.sh": (
-        "default REPO_DIR remains ~/orimera until the GitHub repository and "
-        "existing GPU host layouts are renamed"
+        "REPO_DIR prefers ~/exulanica and falls back to ~/orimera on existing GPU hosts"
     ),
     "docs/adr/0011-exulanica-namespace.md": (
         "accepted rename decision, evidence table, and identifier matrix"
@@ -54,13 +53,14 @@ ALLOWED_PATHS: dict[str, str] = {
         "ORIMERA_ and orimera.api.app"
     ),
     "docs/retained-reference-workflow.md": (
-        "documents the existing remote checkout path ~/orimera used by GPU hosts"
+        "documents ~/exulanica as the new host checkout and ~/orimera as the existing layout"
     ),
     "docs/world-memory-package.md": (
         "records that the pre-release orimera-wmp-1.0 profile was withdrawn"
     ),
     "exulanica/env.py": (
-        "states that withdrawn Orimera names are not read and .orimera is not used"
+        "states that withdrawn Orimera names are not read, the store ignores "
+        ".orimera, and operator briefs fall back to .orimera/briefs"
     ),
     "exulanica/orchestration/judge_seed.py": (
         "explains why consent_record filters on tenant_id rather than the "
