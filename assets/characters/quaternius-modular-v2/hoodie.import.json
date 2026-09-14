@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.reviewed-asset-import/v1",
+  "asset_key": "quaternius.modular.hoodie.v2",
+  "title": "Quaternius hoodie, complete geometry v2",
+  "summary": "Corrected CC0 skinned artist character with complete mirrored body and original locomotion, reach and wave.",
+  "content_sha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
+  "byte_size": 1088004,
+  "licence_id": "CC0-1.0",
+  "licence_sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+  "source_url": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+  "source_revision": "sha256:25252b3fb5d48b59f2b2dafeb0fd61af0c3ea652254b39cec02fc752be0123f4",
+  "producer": "quaternius-modular-prepare/2"
+}

@@ -1,0 +1,22 @@
+{
+  "mpfbRepository": "https://github.com/makehumancommunity/mpfb2",
+  "mpfbCommit": "437dd513888a92399d1d3200d2e80859fae55abc",
+  "license": "CC0-1.0",
+  "systemAssetsUrl": "https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+  "animationSource": "../quaternius-modular-v2/hoodie.glb",
+  "systemAssetsSha256": "b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+  "mpfbTreeSha256": "62e597aafa0d054420c95c6904e4085dfa90dfbf1acbdb6b25d5478820f4b311",
+  "systemAssetsTreeSha256": "3c6e50155e268e294d01164729ac9aac8e9fc7abd0dac9f626952783ead98544",
+  "animationSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
+  "blenderBinarySha256": "3d297c91a96ef848bdb987da48cad2b4591ffa51f4f3591b231ce075b1c8af48",
+  "blenderVersion": "Blender 4.5.9 LTS",
+  "blenderBuildHash": "8bf95cbd38d1",
+  "blenderPlatform": "Darwin arm64",
+  "licenseReceipts": {
+    "mpfbAssets": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+    "mpfbCode": "26c03bc049c15fc5b9e52d791a06f1a6bc32f89edc8f8c701ab0aadf66e85b82",
+    "distributedAssets": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+    "animationAssets": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+    "animationImport": "bfb5afb304ac06c7ce70dc35a10700cabdf7da96984d6e05a381b562e3e9692d"
+  }
+}

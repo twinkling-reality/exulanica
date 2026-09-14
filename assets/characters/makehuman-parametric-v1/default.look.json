@@ -1,0 +1,185 @@
+{
+  "lookId": "editable-human",
+  "label": "Editable human",
+  "creator": "MakeHuman Community \u00b7 Quaternius motion",
+  "license": "CC0",
+  "file": "human-default.glb",
+  "descriptor": {
+    "asset": {
+      "assetKey": "preview-human-70b9ab2dc0c830a855489ee56fc5b7690f8886c1d6da064acac16a9bb45de980",
+      "mediaType": "model/gltf-binary",
+      "contentSha256": "8eb8c98fa5c516197f1a9a36d76e87145975c28a061d2a9c0762a94e10604051",
+      "byteSize": 2502012
+    },
+    "rigId": "makehuman-mixamo-unity/v1",
+    "joints": [
+      "mixamorig:Root",
+      "mixamorig:Hips",
+      "mixamorig:Spine",
+      "mixamorig:Spine1",
+      "mixamorig:LeftBreast",
+      "mixamorig:RightBreast",
+      "mixamorig:Spine2",
+      "mixamorig:LeftShoulder",
+      "mixamorig:LeftArm",
+      "mixamorig:LeftForeArm",
+      "mixamorig:LeftHand",
+      "mixamorig:LeftHandIndex1",
+      "mixamorig:LeftHandIndex2",
+      "mixamorig:LeftHandIndex3",
+      "mixamorig:LeftHandMiddle1",
+      "mixamorig:LeftHandMiddle2",
+      "mixamorig:LeftHandMiddle3",
+      "mixamorig:LeftHandPinky1",
+      "mixamorig:LeftHandPinky2",
+      "mixamorig:LeftHandPinky3",
+      "mixamorig:LeftHandRing1",
+      "mixamorig:LeftHandRing2",
+      "mixamorig:LeftHandRing3",
+      "mixamorig:LeftHandThumb1",
+      "mixamorig:LeftHandThumb2",
+      "mixamorig:LeftHandThumb3",
+      "mixamorig:RightShoulder",
+      "mixamorig:RightArm",
+      "mixamorig:RightForeArm",
+      "mixamorig:RightHand",
+      "mixamorig:RightHandIndex1",
+      "mixamorig:RightHandIndex2",
+      "mixamorig:RightHandIndex3",
+      "mixamorig:RightHandMiddle1",
+      "mixamorig:RightHandMiddle2",
+      "mixamorig:RightHandMiddle3",
+      "mixamorig:RightHandPinky1",
+      "mixamorig:RightHandPinky2",
+      "mixamorig:RightHandPinky3",
+      "mixamorig:RightHandRing1",
+      "mixamorig:RightHandRing2",
+      "mixamorig:RightHandRing3",
+      "mixamorig:RightHandThumb1",
+      "mixamorig:RightHandThumb2",
+      "mixamorig:RightHandThumb3",
+      "mixamorig:Neck",
+      "mixamorig:Head",
+      "mixamorig:Jaw",
+      "mixamorig:LeftEye",
+      "mixamorig:RightEye",
+      "mixamorig:LeftOrbicularisTop",
+      "mixamorig:RightOrbicularisTop",
+      "mixamorig:LeftOrbicularisBottom",
+      "mixamorig:RightOrbicularisBottom",
+      "mixamorig:LeftUpLeg",
+      "mixamorig:LeftButtock",
+      "mixamorig:LeftLeg",
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:RightUpLeg",
+      "mixamorig:RightButtock",
+      "mixamorig:RightLeg",
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase"
+    ],
+    "unitScale": 1.130365344189426,
+    "standingHeight": 1.548172021546634,
+    "groundOffset": -0.010411890223622322,
+    "forwardYawDegrees": 0,
+    "clips": {
+      "idle": {
+        "name": "HumanIdle",
+        "metresPerSecond": 0.0
+      },
+      "walk": {
+        "name": "HumanWalk",
+        "metresPerSecond": 1.1813438482092107
+      },
+      "run": {
+        "name": "HumanRun",
+        "metresPerSecond": 2.686737647605433
+      }
+    },
+    "rootMotion": {
+      "mode": "in-place"
+    },
+    "materialSlots": {
+      "Skin": {
+        "materials": [
+          "Skin"
+        ]
+      },
+      "Clothing": {
+        "materials": [
+          "Clothing"
+        ]
+      },
+      "Body.eyebrow003": {
+        "materials": [
+          "Body.eyebrow003"
+        ]
+      },
+      "Body.eyelashes01": {
+        "materials": [
+          "Body.eyelashes01"
+        ]
+      },
+      "Body.low-poly": {
+        "materials": [
+          "Body.low-poly"
+        ]
+      },
+      "Hair": {
+        "materials": [
+          "Hair"
+        ]
+      }
+    },
+    "morphParameters": {},
+    "variantSlots": {}
+  },
+  "defaultColors": {
+    "Skin": "#9a756f",
+    "Hair": "#393444",
+    "Clothing": "#718294"
+  },
+  "recipe": {
+    "heightCm": 175,
+    "weight": 0.5,
+    "muscle": 0.5,
+    "gender": 0.5,
+    "shoulders": 0,
+    "hips": 0,
+    "arms": 0,
+    "legs": 0,
+    "head": 0,
+    "nose": 0,
+    "noseDepth": 0,
+    "hair": "short01",
+    "outfit": "male_casualsuit01"
+  },
+  "familyId": "makehuman-parametric/v1",
+  "generated": false,
+  "preparationReceipt": {
+    "inputs": {
+      "mpfbTreeSha256": "62e597aafa0d054420c95c6904e4085dfa90dfbf1acbdb6b25d5478820f4b311",
+      "systemAssetsTreeSha256": "3c6e50155e268e294d01164729ac9aac8e9fc7abd0dac9f626952783ead98544",
+      "animationSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
+      "blenderBinarySha256": "3d297c91a96ef848bdb987da48cad2b4591ffa51f4f3591b231ce075b1c8af48",
+      "licenseReceipts": {
+        "mpfbAssets": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+        "mpfbCode": "26c03bc049c15fc5b9e52d791a06f1a6bc32f89edc8f8c701ab0aadf66e85b82",
+        "distributedAssets": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+        "animationAssets": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+        "animationImport": "bfb5afb304ac06c7ce70dc35a10700cabdf7da96984d6e05a381b562e3e9692d"
+      },
+      "mpfbCommit": "437dd513888a92399d1d3200d2e80859fae55abc",
+      "blenderVersion": "Blender 4.5.9 LTS",
+      "blenderBuildHash": "8bf95cbd38d1",
+      "systemAssetsArchiveSha256": "b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107"
+    },
+    "family": "236a429e1e85f878ab3ccc05e7c04109a3760380ad080d2b8d81515fcd7448aa",
+    "sourceLock": "6c45536333d05de7299e66edca675c4895241e97dac2e31a4f4e0dcd567f41ab",
+    "scripts": {
+      "inputs.py": "04cc3f59f0fdb14f24dc39a97ff9ed81c3ab588859cd422d01d8d529771b6b13",
+      "blender_build.py": "093a509f754b33d8f4fc94f902caa807de04eef19ce34f6076cc9028646de182",
+      "preview_server.py": "55f4f4dde22b7d080ed1bf32ea8e6bcb4d21ba86611652865ff9bd1fdc312355"
+    }
+  }
+}

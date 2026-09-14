@@ -1,0 +1,16 @@
+{
+  "retrieved_on": "2026-09-13",
+  "pages": [
+    {
+      "source_id": "men",
+      "file": "men-source-page.html.txt",
+      "sha256": "6650b8049ec4bb5c107affe09ccb9dacf88951ea0838d89d0174e0f300d515f8"
+    },
+    {
+      "source_id": "women",
+      "file": "women-source-page.html.txt",
+      "sha256": "d2cc6dcdd11e2152ffe958cefb2ca19737ab58307601e05d53186a4a0d6d22b4"
+    }
+  ],
+  "note": "Both official creator pages state CC0. The upstream Women folder License.txt repeats the Males title; its exact bytes are preserved, and the Women-specific creator page provides the pack-specific licence declaration."
+}

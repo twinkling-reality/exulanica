@@ -1,0 +1,202 @@
+{
+  "familyId": "makehuman-parametric/v1",
+  "label": "Editable human",
+  "controls": [
+    {
+      "key": "heightCm",
+      "label": "Height",
+      "group": "Body",
+      "min": 145,
+      "max": 205,
+      "default": 175,
+      "step": 1,
+      "unit": "cm"
+    },
+    {
+      "key": "weight",
+      "label": "Body fullness",
+      "group": "Body",
+      "min": 0.15,
+      "max": 0.85,
+      "default": 0.5,
+      "step": 0.05,
+      "macro": "weight"
+    },
+    {
+      "key": "muscle",
+      "label": "Muscle definition",
+      "group": "Body",
+      "min": 0.15,
+      "max": 0.85,
+      "default": 0.5,
+      "step": 0.05,
+      "macro": "muscle"
+    },
+    {
+      "key": "gender",
+      "label": "Body shape",
+      "group": "Body",
+      "min": 0,
+      "max": 1,
+      "default": 0.5,
+      "step": 0.05,
+      "macro": "gender",
+      "lowLabel": "Feminine",
+      "highLabel": "Masculine"
+    },
+    {
+      "key": "shoulders",
+      "label": "Shoulder width",
+      "group": "Proportions",
+      "min": -0.5,
+      "max": 0.5,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "torso/measure-shoulder-dist"
+      ]
+    },
+    {
+      "key": "hips",
+      "label": "Hip width",
+      "group": "Proportions",
+      "min": -0.5,
+      "max": 0.5,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "hip/hip-scale-horiz"
+      ]
+    },
+    {
+      "key": "arms",
+      "label": "Arm length",
+      "group": "Proportions",
+      "min": -0.3,
+      "max": 0.3,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "arms/l-upperarm-scale-vert",
+        "arms/l-lowerarm-scale-vert",
+        "arms/r-upperarm-scale-vert",
+        "arms/r-lowerarm-scale-vert"
+      ]
+    },
+    {
+      "key": "legs",
+      "label": "Leg length",
+      "group": "Proportions",
+      "min": -0.3,
+      "max": 0.3,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "legs/l-upperleg-scale-vert",
+        "legs/l-lowerleg-scale-vert",
+        "legs/r-upperleg-scale-vert",
+        "legs/r-lowerleg-scale-vert"
+      ]
+    },
+    {
+      "key": "head",
+      "label": "Head width",
+      "group": "Face",
+      "min": -0.4,
+      "max": 0.4,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "head/head-scale-horiz"
+      ]
+    },
+    {
+      "key": "nose",
+      "label": "Nose width",
+      "group": "Face",
+      "min": -0.5,
+      "max": 0.5,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "nose/nose-scale-horiz"
+      ]
+    },
+    {
+      "key": "noseDepth",
+      "label": "Nose depth",
+      "group": "Face",
+      "min": -0.5,
+      "max": 0.5,
+      "default": 0,
+      "step": 0.05,
+      "targets": [
+        "nose/nose-scale-depth"
+      ]
+    }
+  ],
+  "choices": [
+    {
+      "key": "hair",
+      "label": "Hair",
+      "default": "short01",
+      "options": [
+        {
+          "value": "none",
+          "label": "No hair"
+        },
+        {
+          "value": "short01",
+          "label": "Short"
+        },
+        {
+          "value": "bob01",
+          "label": "Bob"
+        },
+        {
+          "value": "afro01",
+          "label": "Afro"
+        }
+      ]
+    },
+    {
+      "key": "outfit",
+      "label": "Clothing",
+      "default": "male_casualsuit01",
+      "options": [
+        {
+          "value": "none",
+          "label": "Sculpture"
+        },
+        {
+          "value": "male_casualsuit01",
+          "label": "Shirt and trousers"
+        },
+        {
+          "value": "female_sportsuit01",
+          "label": "Athletic"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "label": "Female",
+      "recipe": {
+        "gender": 0
+      }
+    },
+    {
+      "label": "Male",
+      "recipe": {
+        "gender": 1
+      }
+    },
+    {
+      "label": "Androgynous",
+      "recipe": {
+        "gender": 0.5
+      }
+    }
+  ]
+}
