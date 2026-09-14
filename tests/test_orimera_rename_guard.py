@@ -83,6 +83,9 @@ ALLOWED_PATHS: dict[str, str] = {
     "tests/test_frontier_preflight.py": (
         "rejects the historical postgresql://localhost:5433/orimera URL"
     ),
+    "tests/test_living_world_preview.py": (
+        "verifies the documented legacy .orimera/briefs fallback for existing operator state"
+    ),
     "tests/test_models_client.py": (
         "uses ORIMERA as an arbitrary model-output token, not a product identifier"
     ),
