@@ -300,6 +300,10 @@ class DerivativeWorker:
         with self._workspace_lock:
             return self._current_workspaces
 
+    def refresh_workspaces(self) -> frozenset[uuid.UUID]:
+        """Refresh scope explicitly for startup validation and operator reporting."""
+        return self._workspace_snapshot()
+
     def drain(self) -> list[JobOutcome]:
         """Claim and run every job that is queued right now, then return.
 

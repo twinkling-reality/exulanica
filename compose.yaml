@@ -37,6 +37,7 @@ services:
       EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_APP_ROLE_PASSWORD: ${EXULANICA_APP_ROLE_PASSWORD:?set EXULANICA_APP_ROLE_PASSWORD; the runtime must not use the owner}
       EXULANICA_EXECUTOR_ROLE_PASSWORD: ${EXULANICA_EXECUTOR_ROLE_PASSWORD:?set EXULANICA_EXECUTOR_ROLE_PASSWORD; the executor has its own read-only role}
+      EXULANICA_ACCOUNT_ROLE_PASSWORD: ${EXULANICA_ACCOUNT_ROLE_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,6 +52,14 @@ services:
       # No default. `load_token_directory` raises when it is unset, and an API that started with
       # an empty token directory would accept nobody while looking healthy.
       EXULANICA_API_TOKENS: ${EXULANICA_API_TOKENS:?set EXULANICA_API_TOKENS; there is no default}
+      EXULANICA_GOOGLE_CLIENT_ID: ${EXULANICA_GOOGLE_CLIENT_ID:-}
+      EXULANICA_GOOGLE_CLIENT_SECRET: ${EXULANICA_GOOGLE_CLIENT_SECRET:-}
+      EXULANICA_GOOGLE_CALLBACK_URI: ${EXULANICA_GOOGLE_CALLBACK_URI:-}
+      EXULANICA_GOOGLE_RETURN_URIS: ${EXULANICA_GOOGLE_RETURN_URIS:-}
+      EXULANICA_ACCOUNT_BROWSER_ORIGINS: ${EXULANICA_ACCOUNT_BROWSER_ORIGINS:-}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      # Account-wide playback is a separate opt-in from configuring browser accounts.
+      EXULANICA_SOCIETY_CONTROL_WORKER: ${EXULANICA_SOCIETY_CONTROL_WORKER:-off}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       # Production delivery belongs to the separate worker service below. The in-process worker
       # remains available for a one-process development run, but this composition does not use it.
@@ -78,7 +87,10 @@ services:
       retries: 3
     environment:
       EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
-      EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:?set EXULANICA_WORKSPACE_IDS to the comma-separated workspaces this worker may drain}
+      # Static compatibility scope may be empty when the verified account-role source is set.
+      # The command refuses startup when both sources are absent.
+      EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       EXULANICA_DEPTH_MODEL: moge
       EXULANICA_DEPTH_MODEL_ID: ${EXULANICA_DEPTH_MODEL_ID:-Ruicheng/moge-2-vitl}

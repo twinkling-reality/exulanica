@@ -108,6 +108,8 @@ def readyz(request: Request, response: Response) -> dict[str, Any]:
     checks["object_store"] = _store_check(services)
     checks["model_manifest"] = _manifest_check()
     checks["derivative_worker"] = _worker_check(request, services)
+    checks["accounts"] = _account_check(services)
+    checks["society_playback"] = _society_check(request, services)
 
     ready = all(check["ok"] for check in checks.values())
     if not ready:
@@ -117,6 +119,39 @@ def readyz(request: Request, response: Response) -> dict[str, Any]:
         "checks": checks,
         "warnings": list(services.warnings),
         "configuration": describe_configuration(),
+    }
+
+
+def _account_check(services: Services) -> dict[str, Any]:
+    if services.accounts is None:
+        return {"ok": True, "configured": False}
+    try:
+        with services.accounts.repository() as repository:
+            repository.connection.execute(
+                "select session_sha256 from account_browser_session limit 0"
+            )
+    except Exception:
+        return {"ok": False, "configured": True, "detail": "Account persistence is unavailable"}
+    return {
+        "ok": True,
+        "configured": True,
+        "proves": "the account store is reachable; live Google sign-in is not probed",
+    }
+
+
+def _society_check(request: Request, services: Services) -> dict[str, Any]:
+    if not services.society_control_enabled:
+        return {"ok": True, "configured": False, "running": False}
+    thread = getattr(request.app.state, "society_control_thread", None)
+    worker = getattr(request.app.state, "society_control_worker", None)
+    running = thread is not None and thread.is_alive()
+    health = getattr(worker, "health", {"failed_rounds": 0, "last_round_failed": False})
+    return {
+        "ok": running and not health["last_round_failed"],
+        "configured": True,
+        "running": running,
+        **health,
+        "proves": "worker liveness and last round status; no promised simulation delivery rate",
     }
 
 

@@ -22,8 +22,8 @@ def test_derivative_snapshots_union_static_scope_and_drop_removed_dynamic_scope(
         workspace_source=lambda: next(snapshots),
     )
 
-    assert worker._workspace_snapshot() == frozenset({configured, first})
-    assert worker._workspace_snapshot() == frozenset({configured, second})
+    assert worker.refresh_workspaces() == frozenset({configured, first})
+    assert worker.refresh_workspaces() == frozenset({configured, second})
     assert worker.workspace_count == 2
 
 
@@ -32,7 +32,7 @@ def test_derivative_discovery_rejects_non_uuid_authority():
         None, None, frozenset(), workspace_source=lambda: ("not-a-workspace",)
     )
     with pytest.raises(TypeError, match="must return UUIDs"):
-        worker._workspace_snapshot()
+        worker.refresh_workspaces()
     assert worker.workspace_count == 0
 
 
@@ -116,7 +116,7 @@ def test_shutdown_lifecycle_uses_only_static_host_scope(monkeypatch):
         frozenset({configured}),
         workspace_source=lambda: frozenset({discovered}),
     )
-    worker._workspace_snapshot()
+    worker.refresh_workspaces()
 
     worker._record_worker_lifecycle("worker_stopped")
 
