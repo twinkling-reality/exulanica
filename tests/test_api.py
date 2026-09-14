@@ -119,6 +119,22 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
             "intent": {"kind": "go_to", "target_id": "fixture:target"},
         }
     },
+    ("GET", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {},
+    ("PUT", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {
+        "json": {}
+    },
+    (
+        "POST",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
+    ): {"json": {}},
+    (
+        "GET",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
+    ): {},
+    (
+        "GET",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
+    ): {},
     ("GET", "/world/versions/{version_id}/society/replay"): {},
     ("POST", "/world/versions/{version_id}/society"): {"json": {}},
     ("POST", "/world/versions/{version_id}/society/steps"): {"json": {}},
@@ -401,6 +417,7 @@ class Deployment:
             .replace("{resource_id}", str(uuid.uuid4()))
             .replace("{version_id}", str(uuid.uuid4()))
             .replace("{request_id}", str(uuid.uuid4()))
+            .replace("{subject_kind}", "avatar")
             .replace("{subject_id}", str(uuid.uuid4()))
         )
 

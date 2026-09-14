@@ -25,7 +25,7 @@
  * running it.
  */
 
-import type { AtlasScene, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
+import type { AtlasScene, DistrictInterpretation, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
 import type {
   PresentationTheme,
   WorldArtProfile,
@@ -74,6 +74,7 @@ export async function mountAtlas(
     readonly ownedDistrict?: {
       readonly document: OwnedDistrict;
       readonly residentBytes: number;
+      readonly interpretation?: DistrictInterpretation;
     };
   },
   beforeStart?: (binding: AtlasBinding) => void,

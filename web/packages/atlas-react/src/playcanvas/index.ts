@@ -180,6 +180,18 @@ export type {
   OwnedSocietyState,
 } from './owned-district-runtime.js';
 export { OwnedDistrictRuntime } from './owned-district-runtime.js';
+export type {
+  RepresentationDraw,
+  RepresentationEntryReport,
+  RepresentationPointAllocation,
+  RepresentationReport,
+} from './representation-runtime.js';
+export { RepresentationRuntime } from './representation-runtime.js';
+export { CharacterPreview } from './character-preview.js';
+export { FirstPersonGesture, type FirstPersonGestureDescriptor } from './first-person-gesture.js';
+export type { NativeCharacterDescriptor, NativeCharacterAppearance } from './native-character.js';
+export type { CharacterByteLoader } from './native-character-pool.js';
+export type { NativeCharacterRuntime } from './native-character-runtime.js';
 
 export type {
   AssetAvailability,

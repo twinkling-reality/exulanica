@@ -48,6 +48,7 @@ from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.routes import (
     accounts,
+    character_appearance,
     companion,
     environment_sources,
     evidence,
@@ -215,6 +216,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(society_actions.router)
     app.include_router(society_control.router)
     app.include_router(society_district.router)
+    app.include_router(character_appearance.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)
     app.include_router(identity.router)

@@ -557,6 +557,8 @@ interface Resident {
 export class SceneObjectRuntime {
   readonly #app: pc.AppBase;
   readonly #roots: ReadonlyMap<IslandId, pc.Entity>;
+  readonly #regionOverrides = new Map<IslandId, pc.Entity>();
+  #frameRevision = 0;
   readonly #resident = new Map<string, Resident>();
   #destroyed = false;
 
@@ -571,6 +573,19 @@ export class SceneObjectRuntime {
 
   has(objectId: string): boolean {
     return this.#resident.has(objectId);
+  }
+
+  /** A verified authored district frame applies only to objects, never source geometry. */
+  setRegionOverride(islandId: IslandId, root: pc.Entity | null): void {
+    if (this.#destroyed) return;
+    if (!this.#roots.has(islandId)) throw new TypeError('Unknown authored region');
+    if ((this.#regionOverrides.get(islandId) ?? null) === root) return;
+    this.#frameRevision += 1;
+    for (const resident of [...this.#resident.values()]) {
+      if (resident.object.islandId === islandId) this.remove(resident.object.objectId);
+    }
+    if (root === null) this.#regionOverrides.delete(islandId);
+    else this.#regionOverrides.set(islandId, root);
   }
 
   motionStateOf(objectId: string): string | null {
@@ -589,7 +604,8 @@ export class SceneObjectRuntime {
    */
   async place(object: PlacedAuthoredObject, bytes: ArrayBuffer): Promise<ObjectPlacementOutcome> {
     if (this.#destroyed) throw new Error('the authored object runtime is destroyed');
-    const root = this.#roots.get(object.islandId);
+    const root = this.#regionOverrides.get(object.islandId) ?? this.#roots.get(object.islandId);
+    const frameRevision = this.#frameRevision;
     if (root === undefined) {
       throw new TypeError('That region is not drawn in this world, so nothing can be placed in it');
     }
@@ -619,6 +635,9 @@ export class SceneObjectRuntime {
     const asset = await createObjectContainerAsset(this.#app, object.asset.assetKey, bytes);
     let entity: pc.Entity | undefined;
     try {
+      if (this.#destroyed || frameRevision !== this.#frameRevision) {
+        throw new Error('The authored region changed while its asset was loading');
+      }
       const resource = asset.resource as pc.ContainerResource;
       entity = resource.instantiateRenderEntity({});
       if (entity === null || entity === undefined) {
@@ -720,13 +739,17 @@ export class SceneObjectRuntime {
    */
   setResidency(allocated: ReadonlyMap<IslandId, string>, map: boolean): void {
     for (const resident of this.#resident.values()) {
-      resident.entity.enabled = !map && (allocated.get(resident.object.islandId) ?? 'stub') !== 'stub';
+      const districtRoot = this.#regionOverrides.get(resident.object.islandId);
+      resident.entity.enabled = !map && (districtRoot !== undefined
+        ? districtRoot.enabled : (allocated.get(resident.object.islandId) ?? 'stub') !== 'stub');
     }
   }
 
   destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    this.#frameRevision += 1;
+    this.#regionOverrides.clear();
     for (const resident of this.#resident.values()) this.#dispose(resident);
     this.#resident.clear();
   }

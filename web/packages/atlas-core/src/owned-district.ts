@@ -36,11 +36,20 @@ export interface OwnedDistrict {
   readonly materials: readonly OwnedDistrictMaterial[];
   readonly buildings: readonly OwnedDistrictBuilding[];
   readonly sidewalks: readonly OwnedDistrictSidewalk[];
+  readonly frame?: {
+    readonly name: string;
+    readonly origin_crs84_e7: readonly [number, number];
+    readonly axis_order: readonly ['east', 'south'];
+    readonly horizontal_unit: 'centimetre';
+    readonly coordinate_scale: 100;
+    readonly altitude_reference: 'authored-flat-ground';
+  };
   readonly source_records: readonly {
     readonly dataset_id: string;
     readonly provider_revision: string;
     readonly sha256: string;
     readonly attribution: string;
+    readonly source_url?: string;
     readonly operation_rights: Readonly<Record<string, boolean>>;
   }[];
 }
@@ -70,10 +79,36 @@ export function parseOwnedDistrict(value: unknown): OwnedDistrict {
       typeof source.provider_revision !== 'string' ||
       !/^[0-9a-f]{64}$/.test(source.sha256) ||
       typeof source.attribution !== 'string' ||
-      source.operation_rights.display !== true ||
-      source.operation_rights.persist !== true ||
-      source.operation_rights.modify !== true
+      source.operation_rights?.display !== true ||
+      source.operation_rights?.persist !== true ||
+      source.operation_rights?.modify !== true
     ) throw new Error('Owned district source record is not admitted for this runtime');
+  }
+  if (district.bounds_cm[0] >= district.bounds_cm[2] || district.bounds_cm[1] >= district.bounds_cm[3]) throw new Error('Invalid district bounds');
+  if (district.frame !== undefined && (
+    district.frame === null || !isIntegerTuple(district.frame.origin_crs84_e7, 2) ||
+    JSON.stringify(district.frame.axis_order) !== '["east","south"]' ||
+    district.frame.horizontal_unit !== 'centimetre' || district.frame.coordinate_scale !== 100 ||
+    district.frame.altitude_reference !== 'authored-flat-ground'
+  )) throw new Error('Invalid district frame');
+  const ids = new Set<string>();
+  for (const feature of [...district.buildings, ...district.sidewalks]) {
+    if (!feature || typeof feature.id !== 'string' || ids.has(feature.id) ||
+        !isIntegerTuple(feature.bbox_cm, 4) || !Array.isArray(feature.polygons) || !feature.polygons.length) throw new Error('Invalid district feature');
+    ids.add(feature.id);
+    const points: number[][] = [];
+    for (const polygon of feature.polygons) {
+      if (!Array.isArray(polygon) || !polygon.length) throw new Error('Invalid district polygon');
+      for (const ring of polygon) {
+        if (!Array.isArray(ring) || ring.length < 4 || JSON.stringify(ring[0]) !== JSON.stringify(ring[ring.length - 1])) throw new Error('Invalid district ring');
+        for (const point of ring) {
+          if (!isIntegerTuple(point, 2) || point.some(v => Math.abs(v) > 100_000_000)) throw new Error('Invalid district coordinate');
+          points.push([...point]);
+        }
+      }
+    }
+    const box = [Math.min(...points.map(p => p[0]!)), Math.min(...points.map(p => p[1]!)), Math.max(...points.map(p => p[0]!)), Math.max(...points.map(p => p[1]!))];
+    if (JSON.stringify(box) !== JSON.stringify(feature.bbox_cm)) throw new Error('Invalid district bounding box');
   }
   for (const building of district.buildings) {
     if (

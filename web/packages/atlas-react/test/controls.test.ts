@@ -141,3 +141,33 @@ describe('first-person keyboard ownership', () => {
     controls.destroy();
   });
 });
+
+describe('player keyboard fallback and camera switch', () => {
+  it('moves at pedestrian speed without pointer lock and stops while typing', () => {
+    document.body.replaceChildren();
+    Object.defineProperty(document, 'pointerLockElement', {configurable:true,value:null});
+    const canvas=document.createElement('canvas'), input=document.createElement('input'); document.body.append(canvas,input);
+    const controls=new FirstPersonControls(canvas,{x:0,y:1.62,z:0,yaw:0,pitch:0},{sensitivity:.0022,moveSpeed:1.65,sprintMultiplier:2.7,accelTime:.16,eyeHeight:1.62});
+    canvas.focus(); canvas.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW',bubbles:true}));
+    for(let i=0;i<60;i++) controls.update(1/60);
+    expect(-controls.state.z).toBeGreaterThan(1.3); expect(-controls.state.z).toBeLessThan(1.65);
+    input.focus(); const stopped=controls.state.z;
+    input.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW',bubbles:true})); controls.update(1/60);
+    expect(controls.state.z).toBe(stopped);
+    const toggle=vi.fn(); controls.onCameraToggle=toggle;
+    input.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyC',bubbles:true})); expect(toggle).not.toHaveBeenCalled();
+    canvas.focus(); canvas.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyC',bubbles:true})); expect(toggle).toHaveBeenCalledOnce();
+    controls.destroy();
+  });
+});
+
+
+describe('explicit movement assistance',()=>{
+ it('uses ordinary movement and stops when typing or the window loses focus',()=>{
+  const canvas=document.createElement('canvas'),input=document.createElement('input');document.body.append(canvas,input);
+  const controls=new FirstPersonControls(canvas,{x:0,y:1.62,z:0,yaw:0,pitch:0});
+  controls.setWalkAssist('walk');for(let i=0;i<60;i++)controls.update(1/60);expect(controls.state.z).toBeLessThan(-1);
+  input.focus();for(let i=0;i<120;i++)controls.update(1/60);const stopped=controls.state.z;controls.update(1/60);expect(Math.abs(controls.state.z-stopped)).toBeLessThan(.00001);
+  controls.setWalkAssist('run');window.dispatchEvent(new Event('blur'));controls.update(1/60);expect(controls.state.z).toBeCloseTo(stopped,4);controls.destroy();
+ });
+});

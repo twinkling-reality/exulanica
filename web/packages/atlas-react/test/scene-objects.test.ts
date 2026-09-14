@@ -605,6 +605,23 @@ describe('the runtime places, moves and animates what a surface already committe
     expect(drawn.enabled).toBe(false);
   });
 
+  it('uses a separate authorized district root and clears its objects when withdrawn', async () => {
+    const { runtime, drawn, root } = harness();
+    const district = fakeEntity();
+    runtime.setRegionOverride(ISLAND, district as unknown as pc.Entity);
+    await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    expect(district.addChild).toHaveBeenCalledWith(drawn);
+    expect(root.addChild).not.toHaveBeenCalled();
+    runtime.setResidency(new Map([[ISLAND, 'stub']]), false);
+    expect(drawn.enabled).toBe(true);
+    runtime.setResidency(new Map([[ISLAND, 'full']]), true);
+    expect(drawn.enabled).toBe(false);
+    runtime.setRegionOverride(ISLAND, null);
+    expect(runtime.objectIds).toEqual([]);
+    expect(drawn.destroy).toHaveBeenCalled();
+    runtime.destroy();
+  });
+
   it('unloads the asset and destroys the entity on remove and on teardown', async () => {
     const { runtime, drawn, assets } = harness();
     await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));

@@ -197,6 +197,25 @@ export type {
   OwnedDistrictSidewalk,
 } from './owned-district.js';
 export { ownedDistrictNavigation, parseOwnedDistrict } from './owned-district.js';
+export type {
+  PointBasis,
+  RepresentationAvailability,
+  RepresentationBounds,
+  RepresentationIntent,
+  RepresentationOrigin,
+  RepresentationResolution,
+  RepresentationSubject,
+} from './representation.js';
+export {
+  DEFAULT_REPRESENTATION_INTENT,
+  artifactByteWindow,
+  districtRepresentationSubjects,
+  representationBinaryVisualization,
+  representationIntent,
+  representationSampleIndices,
+  resolveRepresentation,
+  validateRepresentationSubject,
+} from './representation.js';
 export {
   DEFAULT_CAMERA_RADIUS_AU,
   DEFAULT_EYE_HEIGHT_AU,
@@ -488,3 +507,40 @@ export {
   motionTransform,
   travelFraction,
 } from './behaviour/bounded-motion.js';
+
+export type { DistrictPoint } from './district-geometry.js';
+export { districtSegmentSupported } from './district-geometry.js';
+export type {
+  DistrictRecipe, DistrictSubject, DistrictFrame, DistrictNavigation, DistrictInterpretation,
+} from './district-interpretation.js';
+export {
+  districtCanonicalJson, parseDistrictInterpretation,
+  districtInterpretationAvailability, districtShortestRoute,
+} from './district-interpretation.js';
+
+// Shared character representation; subject identity and appearance remain separate.
+export {
+  CHARACTER_PROFILE,
+  ABSTRACT_CHARACTER_RIG,
+  DEFAULT_CHARACTER_BODY,
+  DEFAULT_CHARACTER_APPEARANCE,
+  parseCharacterRepresentation,
+  characterSubjectKey,
+  validateCharacterReplacement,
+  resolveCharacterRepresentation,
+} from './character.js';
+export type {
+  CharacterSubject,
+  CharacterOrigin,
+  CharacterMotion,
+  CharacterSourceRef,
+  CharacterBodyTrait,
+  CharacterTraitProvenance,
+  CharacterBody,
+  AbstractCharacterAppearance,
+  CharacterAppearance,
+  CharacterRepresentation,
+  CharacterSourceAvailability,
+  CharacterResolutionContext,
+  ResolvedCharacterRepresentation,
+} from './character.js';

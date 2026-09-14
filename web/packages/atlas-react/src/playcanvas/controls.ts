@@ -87,6 +87,10 @@ export class FirstPersonControls {
   onInteract: (() => void) | null = null;
   /** Summon or dismiss Companion. Bound to X and right click. */
   onSummon: (() => void) | null = null;
+  private walkAssist:'off'|'walk'|'run'='off';
+  setWalkAssist(mode:'off'|'walk'|'run'):void {this.walkAssist=mode;}
+
+  onCameraToggle: (() => void) | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -98,6 +102,9 @@ export class FirstPersonControls {
     this.config = config;
     this.navigationWorld = navigationWorld;
     this.state = { ...start };
+    const previousTabIndex = canvas.getAttribute('tabindex');
+    canvas.tabIndex = 0;
+    this.disposers.push(() => { if (previousTabIndex === null) canvas.removeAttribute('tabindex'); else canvas.setAttribute('tabindex', previousTabIndex); });
 
     const on = <K extends keyof DocumentEventMap>(
       target: Document | HTMLElement | Window,
@@ -132,7 +139,9 @@ export class FirstPersonControls {
       if (!this.locked) {
         if (!this.enabled || this.conversationActive) return;
         // A real user gesture, which is the only thing that may request the lock.
-        void this.canvas.requestPointerLock();
+        this.canvas.focus();
+        // Some embedded browsers refuse pointer lock. Focused keyboard navigation still works.
+        void this.canvas.requestPointerLock()?.catch(() => undefined);
         return;
       }
       // A left click belongs exclusively to entering/maintaining camera look. Treating the same
@@ -144,17 +153,20 @@ export class FirstPersonControls {
     on(window, 'keydown', (e: KeyboardEvent) => {
       // While this renderer may own movement, Escape belongs to the browser's unlock gesture.
       // Converse-mode UI can handle it only after pointer lock has already been released.
-      if (e.code === 'Escape') return;
+      if (e.code === 'Escape') {this.walkAssist='off';return;}
       const target = e.target;
       if (
         target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select') !== null)
+        (target.isContentEditable || target.closest('input, textarea, select, button, summary') !== null)
       ) {
         return;
       }
       if (!this.enabled) return;
+      if (e.code === 'KeyC' && !e.repeat) { e.preventDefault(); this.onCameraToggle?.(); return; }
+      if(['KeyW','KeyA','KeyS','KeyD'].includes(e.code))this.walkAssist='off';
       this.keys.add(e.code);
-      if (this.locked && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter')) {
+      if (document.activeElement === this.canvas && (e.code.startsWith('Arrow') || ['KeyW','KeyA','KeyS','KeyD'].includes(e.code))) e.preventDefault();
+      if ((this.locked || document.activeElement === this.canvas) && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter')) {
         e.preventDefault();
         this.onInteract?.();
       }
@@ -163,8 +175,13 @@ export class FirstPersonControls {
         this.onSummon?.();
       }
     });
+    on(document, 'focusin', (event: FocusEvent) => {
+      if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable]'))this.walkAssist='off';
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, summary, [contenteditable]')) { this.keys.clear(); this.vx = 0; this.vz = 0; }
+    });
     on(window, 'keyup', (e: KeyboardEvent) => this.keys.delete(e.code));
     on(window, 'blur', () => {
+      this.walkAssist='off';
       this.keys.clear();
       this.vx = 0;
       this.vz = 0;
@@ -197,6 +214,7 @@ export class FirstPersonControls {
 
   /** Map is a camera presentation, so ground movement pauses without changing input mode. */
   setEnabled(enabled: boolean): void {
+    if(!enabled)this.walkAssist='off';
     this.enabled = enabled;
     if (!enabled) {
       this.keys.clear();
@@ -223,22 +241,29 @@ export class FirstPersonControls {
 
   /** Advance by `dt` seconds. Ordinary converse pauses; an active answer overlay opts into WASD. */
   update(dt: number): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !Number.isFinite(dt) || dt <= 0) return;
+    dt = Math.min(dt, .05);
     let ix = 0;
     let iz = 0;
-    if (this.locked || this.conversationActive) {
+    if (this.locked || this.conversationActive || document.activeElement === this.canvas) {
+      const turn = 1.35 * dt;
+      if (this.keys.has('ArrowLeft')) this.state.yaw += turn;
+      if (this.keys.has('ArrowRight')) this.state.yaw -= turn;
+      if (this.keys.has('ArrowUp')) this.state.pitch = Math.min(PITCH_LIMIT, this.state.pitch + turn);
+      if (this.keys.has('ArrowDown')) this.state.pitch = Math.max(-PITCH_LIMIT, this.state.pitch - turn);
       if (this.keys.has('KeyW')) iz += 1;
       if (this.keys.has('KeyS')) iz -= 1;
       if (this.keys.has('KeyA')) ix -= 1;
       if (this.keys.has('KeyD')) ix += 1;
     }
+    if(this.walkAssist!=='off')iz=1;
     const len = Math.hypot(ix, iz);
     if (len > 0) {
       ix /= len;
       iz /= len;
     }
 
-    const sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    const sprint = this.walkAssist==='run' || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
     const speed = this.config.moveSpeed * (sprint ? this.config.sprintMultiplier : 1);
 
     // Critically damped ramp. An instant velocity step reads as a teleport and is a comfort cost.
