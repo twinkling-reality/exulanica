@@ -960,7 +960,7 @@ has happened at least once with a stopwatch running.
 | D-11 | Whether a preview grade service survives the window at all | The canary endpoint's outage log |
 | D-14 | Nothing limits in-flight requests, so a single process can demand more backends than the cluster has slots. Section 5.4.3 measured 48 concurrent streams holding 48 backends against a 40-thread pool and 97 usable slots | Setting `uvicorn --limit-concurrency`, which is the only lever that counts requests where they are actually held. Not set today, and not urgent at one person watching one upload |
 | D-15 | Section 5.4.2's container-restart consequence is arithmetic over a measured latency and the Dockerfile. No container was built or run to observe it | Running the image, saturating it, and watching whether Docker restarts it |
-| D-16 | ~~The runtime connects as the database owner, bypassing row-level security~~ **CLOSED 2026-08-31.** The owner credential is confined to migrations; API and derivative-worker composition URLs name `orimera_app`, and both processes refuse unsafe roles at startup | PostgreSQL role tests plus deployment text contract |
+| D-16 | ~~The runtime connects as the database owner, bypassing row-level security~~ **CLOSED 2026-08-31.** The owner credential is confined to migrations; API and derivative-worker composition URLs name `exulanica_app`, and both processes refuse unsafe roles at startup | PostgreSQL role tests plus deployment text contract |
 
 ---
 

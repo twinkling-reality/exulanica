@@ -93,8 +93,8 @@ Documents are filed by how they change over time.
 
 **Where a new document goes**, first yes wins:
 
-1. Dispatch brief, handoff, procurement, or personal-run note? `.orimera/briefs/`,
-   not this git tree.
+1. Dispatch brief, handoff, procurement, or personal-run note? Private gitignored
+   operator notes, not this git tree.
 2. Machine-readable evidence with a digest? A script may write `evaluation/` on
    disk. Do not hand-edit a record. Do not `git add` a new campaign unless it
    belongs on the public catalog.

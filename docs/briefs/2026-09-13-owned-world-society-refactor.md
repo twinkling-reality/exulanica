@@ -5,11 +5,11 @@ Date: 2026-09-13
 
 ## Decision
 
-Orimera will not use Google Maps, Apple Maps, or any other visualization-only
+Exulanica will not use Google Maps, Apple Maps, or any other visualization-only
 service as the corpus for walking, collision, extraction, modification, model
 processing, training, persistence, or export.
 
-The product target is an Orimera-owned runtime representation generated from
+The product target is an Exulanica-owned runtime representation generated from
 open or expressly licensed geographic sources whose exact permitted operations
 have been verified before ingestion. The first complete slice must let a person:
 
@@ -69,7 +69,7 @@ point cloud:
 | Terrain, roads, sidewalks | Tiled solid meshes | Continuous collision and navigation |
 | Buildings | Procedural or licensed meshes with PBR materials | Editability, instancing, LOD, and interiors |
 | Distant city | Simplified massing, impostors, and shared materials | City-scale coverage |
-| Memories | Point clouds or Gaussian splats where source rights allow | Preserve Orimera's memory language |
+| Memories | Point clouds or Gaussian splats where source rights allow | Preserve Exulanica's memory language |
 | Fantasy additions | Original meshes, particles, vegetation, light, and behaviors | Clearly authored transformation |
 | Society | Structured agents with bounded visible avatars | Persistent simulation independent of rendering |
 
@@ -440,7 +440,7 @@ At completion, report:
 ## Copy-ready prompt for a new chat
 
 ```text
-Continue Orimera from the current clean main containing
+Continue Exulanica from the current clean main containing
 docs/briefs/2026-09-13-owned-world-society-refactor.md. Read that brief,
 docs/product-direction.md, docs/world-composition-contract.md, and the current
 source-admission, world-object, Selection, Companion, PlayCanvas, and simulation
@@ -448,7 +448,7 @@ implementations before planning.
 
 Use a team of agents. Do not guess. Verify source licenses and implementation
 claims from primary sources and actual code. The corrected goal is an
-Orimera-owned, editable, walkable real-place representation and bounded
+Exulanica-owned, editable, walkable real-place representation and bounded
 artificial society generated only from open or expressly licensed inputs.
 Google and Apple content are not editable corpora and may not supply collision,
 selection identity, extraction, derivatives, model input, persistence, training,
