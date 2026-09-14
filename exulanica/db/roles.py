@@ -39,9 +39,11 @@ from typing import Final
 import psycopg
 from psycopg import sql
 
+from exulanica.db.account_roles import ACCOUNT_TABLES, revoke_account_access
 from exulanica.errors import ExulanicaError
 
 __all__ = [
+    "ACCOUNT_ONLY_TABLES",
     "EXECUTOR_ROLE",
     "PURGE_CROSS_WORKSPACE_TABLES",
     "PURGE_ROLE",
@@ -87,6 +89,35 @@ READ_ONLY_TABLES: Final = (
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
 #: predicate row even though it cannot update one.
 _ADMIN_ONLY_SEQUENCES: Final = ("predicate_predicate_id_seq",)
+
+# Account lookup precedes workspace selection and belongs to its dedicated role.
+ACCOUNT_ONLY_TABLES: Final = ACCOUNT_TABLES
+
+
+def _grant_caption_purge_checks(
+    connection: psycopg.Connection, schema: sql.Identifier, role: sql.Identifier
+) -> None:
+    """Retain existing cleanup capabilities after removing their PUBLIC grants."""
+    for name, arguments in (
+        ("caption_vector_purge_is_authorized", "uuid,uuid,uuid"),
+        ("caption_vector_purge_is_complete", "uuid,uuid"),
+    ):
+        present = connection.execute(
+            "select to_regprocedure(format('%%I.%%I(%%s)',current_schema(),%s::text,%s::text)) "
+            "as function_ref",
+            (name, arguments),
+        ).fetchone()
+        if present is None:
+            continue
+        function_ref = present["function_ref"] if isinstance(present, dict) else present[0]
+        if function_ref is None:
+            continue
+        connection.execute(
+            sql.SQL("grant execute on function {}.{}({}) to {}").format(
+                schema, sql.Identifier(name), sql.SQL(arguments), role
+            )
+        )
+
 
 #: What the purger may read, and it reads it across every workspace. Identifiers, content
 #: hashes and deletion markers: enough to answer "does anything still hold these bytes" and
@@ -258,6 +289,8 @@ def provision_runtime_role(
         connection.execute(
             sql.SQL("grant {} on all tables in schema {} to {}").format(writes, schema, role_name)
         )
+        revoke_account_access(connection, role=role)
+        _grant_caption_purge_checks(connection, schema, role_name)
         if not read_only:
             connection.execute(
                 sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
@@ -334,9 +367,7 @@ def provision_purge_role(
 
     with connection.transaction():
         connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
-        exists = connection.execute(
-            "select 1 from pg_roles where rolname = %s", (role,)
-        ).fetchone()
+        exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
         if exists is None:
             connection.execute(sql.SQL("create role {} login nobypassrls").format(role_name))
         else:
@@ -356,6 +387,7 @@ def provision_purge_role(
                 )
             )
         connection.execute(sql.SQL("grant select, delete on embedding to {}").format(role_name))
+        _grant_caption_purge_checks(connection, schema, role_name)
         for table, columns in _PURGE_WRITES.items():
             connection.execute(
                 sql.SQL("grant update ({}) on {} to {}").format(
@@ -398,6 +430,7 @@ def provision_purge_role(
                     role_name,
                 )
             )
+
 
 def grant_workspace_partition(connection: psycopg.Connection, partition: str) -> None:
     """Give both runtime roles access to one per-workspace partition, if they exist.

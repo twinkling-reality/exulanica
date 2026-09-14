@@ -33,9 +33,13 @@ license = { file = "LICENSE" }
 #               package verifier uses the reviewed RFC 8032 primitive rather than carrying a
 #               handwritten elliptic-curve implementation in the data portability boundary.
 dependencies = [
+  # Google OIDC protocol and JOSE verification, with injectable HTTP for signed-provider tests.
+  "authlib==1.8.0",
   "cryptography>=43",
   "fastapi>=0.115",
   "httpx>=0.27",
+  "httpx2==2.12.0",
+  "joserfc==1.7.5",
   "jsonschema>=4.23",
   "pillow>=12.3.0",
   "pi-heif==1.4.0",  # decode-only HEIF wheel; bundled LGPL libraries in license matrix

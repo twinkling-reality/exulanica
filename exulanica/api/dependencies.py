@@ -44,32 +44,30 @@ def get_services(request: Request) -> Services:
 def current_session(
     request: Request, authorization: Annotated[str | None, Header()] = None
 ) -> Session:
-    """Resolve the bearer token to a session, or refuse.
+    """Resolve an explicit bearer header or a current browser account membership.
 
-    The scheme is checked before the token is looked up, so a caller sending a cookie or a basic
-    credential gets the same refusal as a caller sending nothing, rather than having their value
-    compared against the configured secrets.
+    An explicit header always wins, including malformed or expired credentials. A failed bearer
+    request cannot acquire different authority by falling back to a browser cookie.
     """
+    services = get_services(request)
+    if authorization is None and services.accounts is not None:
+        return services.accounts.authenticate_request(request)
     scheme, _, presented = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not presented:
         raise TokenNotAccepted("expected an Authorization header of the form 'Bearer <token>'")
-    return get_services(request).tokens.session_for(presented.strip())
+    return services.tokens.session_for(presented.strip())
 
 
 CurrentSession = Annotated[Session, Depends(current_session)]
 
 
-def scoped_connection(
-    request: Request, session: CurrentSession
-) -> Iterator[psycopg.Connection]:
+def scoped_connection(request: Request, session: CurrentSession) -> Iterator[psycopg.Connection]:
     """A connection bound to the caller's workspace, for the duration of one request."""
     with get_services(request).database.session(session.workspace_id) as connection:
         yield connection
 
 
-def readonly_connection(
-    request: Request, session: CurrentSession
-) -> Iterator[psycopg.Connection]:
+def readonly_connection(request: Request, session: CurrentSession) -> Iterator[psycopg.Connection]:
     """The same, as the role that holds SELECT and nothing else, when one is configured."""
     services = get_services(request)
     with services.readonly_database.session(session.workspace_id) as connection:
