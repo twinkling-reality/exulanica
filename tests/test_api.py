@@ -653,7 +653,7 @@ def test_the_readiness_database_check_claims_only_what_a_fresh_connect_proves(de
 
     ``/readyz`` served "the database is reachable and the connection pool is not full" to an
     operator over HTTP, and the docstring above it said the same. There is no connection pool:
-    ``orimera/db/session.py`` calls ``psycopg.connect`` per session and ``psycopg_pool`` is in
+    ``exulanica/db/session.py`` calls ``psycopg.connect`` per session and ``psycopg_pool`` is in
     neither ``pyproject.toml`` nor ``uv.lock``. An operator reading that acted on a check of
     something that does not exist, and missed the thing it does check, which is that the server
     had a free connection SLOT. Slots are what this deployment can run out of: one API process
@@ -666,7 +666,7 @@ def test_the_readiness_database_check_claims_only_what_a_fresh_connect_proves(de
     """
     assert importlib.util.find_spec("psycopg_pool") is None, (
         "psycopg_pool is installed. /readyz reports a free connection slot because every "
-        "connection is opened fresh; revisit that sentence, orimera/db/session.py and "
+        "connection is opened fresh; revisit that sentence, exulanica/db/session.py and "
         "docs/deployment.md section 5.4 before relaxing this"
     )
     proves = deployment.client.get("/readyz").json()["checks"]["database"]["proves"]

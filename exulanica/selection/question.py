@@ -13,7 +13,7 @@ Four rules this module exists to hold, none of which is enforced by asking the m
 
 *   **The Companion has no privileged path.** It emits a
     :class:`~exulanica.selection.plan.SelectionPlan` and hands it to the same
-    :func:`~orimera.selection.validation.validate` the World Index uses. There is no query it
+    :func:`~exulanica.selection.validation.validate` the World Index uses. There is no query it
     can express that the interface cannot, and :func:`propose_plan` returns the plan rather than
     applying it, because ADR-0005 requires that a conversational Selection is "shown to the user
     before it is applied".
