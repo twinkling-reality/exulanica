@@ -121,7 +121,7 @@ def _write(out: Path, seed: int, frames_per_trip: int, stream: Any) -> int:
         "frames_per_trip": frames_per_trip,
         "subjects": SUBJECTS,
         # The one entry in this document that is a guess rather than a fact the generator
-        # produced. See SUBJECT_LABELS in orimera/corpus/world.py for what that means and for
+        # produced. See SUBJECT_LABELS in exulanica/corpus/world.py for what that means and for
         # why an unresolvable mapping blocks M6 rather than scoring it zero.
         "subject_labels": {key: list(labels) for key, labels in SUBJECT_LABELS.items()},
         "places": {key: place.label for key, place in PLACES.items()},

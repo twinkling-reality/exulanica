@@ -25,7 +25,7 @@ def lock_stored_object(scope: WorkspaceScope, blob_id: BlobId) -> None:
     purger taking it, a purger and an ingest can interleave so that the ingest commits a live
     capture for bytes the purger is in the middle of removing, and under content addressing that
     ingest writes nothing to the store because the object was already there. Measured; migration
-    0015's sibling comment in ``orimera/ingest/stages/intake.py`` has the observed sequence.
+    0015's sibling comment in ``exulanica/ingest/stages/intake.py`` has the observed sequence.
 
     Named for what it locks rather than for who else takes it. The SQL function is called
     ``purge_lock_object`` because the purger is where it was first needed; renaming a shipped

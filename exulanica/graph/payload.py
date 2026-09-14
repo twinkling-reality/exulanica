@@ -115,7 +115,7 @@ class ProposalRow(BaseModel):
 class SceneGroupRow(BaseModel):
     """One run of captures close in time, and close in space when they carry a position.
 
-    A PROPOSAL about arrangement, not a place and not an entity. ``orimera/ingest/scenes.py``
+    A PROPOSAL about arrangement, not a place and not an entity. ``exulanica/ingest/scenes.py``
     is explicit that a scene-local grouping is not a persistent entity, and nothing here promotes
     it to one: the group has no name, and the place proposal that may be attached to it is a
     separate artifact that requires user confirmation.

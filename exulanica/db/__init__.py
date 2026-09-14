@@ -1,6 +1,6 @@
 """The one data layer. PostgreSQL 18 with pgvector, and nothing beside it.
 
-There used to be two: the spine in ``orimera/migrations/0001_spine.sql`` and a portable SQLite
+There used to be two: the spine in ``exulanica/migrations/0001_spine.sql`` and a portable SQLite
 mirror that the ingest path actually wrote. The mirror existed because no PostgreSQL with
 pgvector was available when ingestion was written, and it was a fork waiting to happen: the
 epistemic guards that carry the product's central promise exist only in PostgreSQL, and a

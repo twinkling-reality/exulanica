@@ -160,7 +160,7 @@ def _database_check(services: Services) -> dict[str, Any]:
 
     The noun matters here more than it usually would, because this sentence leaves the process:
     it is served to an operator over HTTP and a human acts on it. **There is no connection pool
-    in this application.** ``orimera/db/session.py`` opens a fresh ``psycopg.connect`` per
+    in this application.** ``exulanica/db/session.py`` opens a fresh ``psycopg.connect`` per
     session and ``psycopg_pool`` appears in neither ``pyproject.toml`` nor ``uv.lock``, so a
     check that reported "the pool is not full" was reporting on a component that does not exist.
 

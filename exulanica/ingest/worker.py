@@ -140,7 +140,7 @@ class JobOutcome:
     #: the counts above describe captures this worker computed that another worker may compute
     #: again.
     lease_lost: bool = False
-    #: This job was ended by :func:`~orimera.ingest.derivative_queue.abandon` rather than run: it
+    #: This job was ended by :func:`~exulanica.ingest.derivative_queue.abandon` rather than run: it
     #: had used every claim it is allowed. A third fact again, and the one that says a batch was
     #: closed by a worker that never processed a single one of its captures.
     abandoned: bool = False
@@ -319,7 +319,7 @@ class DerivativeWorker:
 
         **The abandon pass runs when there is nothing left to claim**, which is where it belongs
         rather than being convenient: a job that has used every claim is invisible to
-        :func:`~orimera.ingest.derivative_queue.claim` for ever and holds
+        :func:`~exulanica.ingest.derivative_queue.claim` for ever and holds
         ``job_one_live_job_per_batch`` against its batch while it sits there, so nothing else can
         ever be queued for that batch and the client watching it never gets a terminal event.
         What this does NOT cover is an instance running no worker at all, which

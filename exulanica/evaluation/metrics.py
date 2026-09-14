@@ -193,7 +193,7 @@ METRICS: Final[tuple[Component, ...]] = (
         blocked_on="nothing in this harness deletes anything, and this number needs a sweep that "
         "ingests its own content, tombstones it, drains the queue and then looks for the bytes. "
         "The product side is built: migration 0013 gave `purge_job` a reader, "
-        "`orimera/deletion/worker.py` is the worker and tests/test_purge.py holds it. What is "
+        "`exulanica/deletion/worker.py` is the worker and tests/test_purge.py holds it. What is "
         "missing is a harness that writes, and this one issues no INSERT and no DELETE of its own",
     ),
     Component(

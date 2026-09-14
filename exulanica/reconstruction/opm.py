@@ -107,7 +107,7 @@ class OpmSection:
 #:
 #: ``tags`` replaces OPM/1's ``segment`` and is the only structural change (ADR-0010 D3). Two
 #: uint16 channels: channel 0 is the segment id, unchanged in meaning and bounded by
-#: :data:`~orimera.reconstruction.pointmap.MAX_SEGMENT_ID`, and channel 1 is a flags word. Four
+#: :data:`~exulanica.reconstruction.pointmap.MAX_SEGMENT_ID`, and channel 1 is a flags word. Four
 #: bytes rather than two because WebGPU rejects a vertex stream whose element size is not a
 #: multiple of four, outright and silently in a release build, so the binding was already
 #: widening the channel with a per-point CPU pass over every point in the corpus. The container

@@ -1,7 +1,7 @@
 """The entity half of the snapshot: who is in the library and what is claimed about them.
 
 Split out of the route because eight SQL statements and a ``distinct on`` whose ordering is
-load bearing is not what ``orimera/api/__init__.py`` means by "routes validate and delegate;
+load bearing is not what ``exulanica/api/__init__.py`` means by "routes validate and delegate;
 nothing here decides anything", and because a read model that only has tests through HTTP has no
 tests of its own.
 """

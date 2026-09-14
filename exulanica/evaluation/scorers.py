@@ -283,7 +283,7 @@ def score_capture_time_windows(
         )
         # `may_include_proposals` is False because this plan does not ask for proposals and a
         # session that could not grant them proves it did not lean on them. The actor is required
-        # by `Session` and is read by nothing on this path: `orimera.selection` never touches it,
+        # by `Session` and is read by nothing on this path: `exulanica.selection` never touches it,
         # and this harness performs no write for it to be the author of.
         validated = validate(
             connection,

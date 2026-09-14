@@ -146,7 +146,7 @@ class TruncatedResponseError(ModelError):
     a result that happens to parse is a plausible fact with a piece missing. And a body that
     opens a reasoning block and never closes it was cut mid-thought while the endpoint reported
     an ordinary stop: ``finish_reason`` cannot see that one, and
-    ``orimera.models.reasoning.SplitContent.complete`` is what does.
+    ``exulanica.models.reasoning.SplitContent.complete`` is what does.
     """
 
 

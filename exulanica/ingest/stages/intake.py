@@ -54,7 +54,7 @@ def run(
             # THE SAME LOCK THE PURGER TAKES, and taking it here is the whole of what makes it
             # a lock rather than a formality.
             #
-            # `orimera/deletion/worker.py` holds `purge_lock_object(<content hash>)` across
+            # `exulanica/deletion/worker.py` holds `purge_lock_object(<content hash>)` across
             # asking whether the bytes may go and destroying them. That serialises purger
             # against purger. It does NOT serialise a purger against an ingest, and measured
             # without this line: workspace A's purger asks the question, workspace B commits a
