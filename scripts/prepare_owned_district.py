@@ -22,7 +22,33 @@ def main() -> int:
     parser.add_argument("--sidewalk-file", type=Path)
     parser.add_argument("--building-revision")
     parser.add_argument("--sidewalk-revision")
+    parser.add_argument(
+        "--interpretation-from",
+        type=Path,
+        help="Compile only the optional interpretation from exact retained v1 bytes",
+    )
     args = parser.parse_args()
+    if args.interpretation_from:
+        if any(
+            (args.building_file, args.sidewalk_file, args.building_revision, args.sidewalk_revision)
+        ):
+            parser.error("--interpretation-from cannot be combined with source layer options")
+        from exulanica.environment.district_interpretation import (
+            compile_interpretation,
+            validate_interpretation,
+        )
+
+        base_bytes = args.interpretation_from.read_bytes()
+        result = compile_interpretation(base_bytes)
+        document = validate_interpretation(result, base_bytes)
+        args.destination.mkdir(parents=True, exist_ok=True)
+        output = args.destination / "district-interpretation.json"
+        if output.resolve() == args.interpretation_from.resolve():
+            parser.error("interpretation output must not overwrite its source")
+        output.write_bytes(result)
+        print(f"interpretation={document.document_sha256}")
+        print(f"navigation_nodes={len(document.navigation.nodes)}")
+        return 0
 
     supplied = args.building_file is not None or args.sidewalk_file is not None
     if supplied and not all(
