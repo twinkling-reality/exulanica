@@ -47,6 +47,7 @@ from exulanica.selection.validation import Session
 SESSION_COOKIE = "__Host-exulanica-session"
 LOGIN_COOKIE = "__Host-exulanica-login"
 DISCOVERY_URI = "https://accounts.google.com/.well-known/openid-configuration"
+_DATABASE_TIMEOUT_SECONDS = 5
 
 
 def origin(url: str) -> str:
@@ -265,9 +266,16 @@ class AccountRuntime:
         # Distinct dedicated auth connection, never a fake pre-auth workspace or app connection.
         try:
             with psycopg.connect(
-                self.database_url, autocommit=True, row_factory=dict_row
+                self.database_url,
+                autocommit=True,
+                row_factory=dict_row,
+                connect_timeout=_DATABASE_TIMEOUT_SECONDS,
             ) as connection:
                 connection.execute("set time zone 'UTC'")
+                connection.execute(
+                    "select set_config('statement_timeout', %s, false)",
+                    (f"{_DATABASE_TIMEOUT_SECONDS}s",),
+                )
                 yield AccountRepository(connection)
         except psycopg.Error as exc:
             raise AccountUnavailable("account persistence is unavailable") from exc

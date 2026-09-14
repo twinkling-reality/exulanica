@@ -9,6 +9,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from exulanica.api import account_runtime
 from exulanica.api.account_repository import AccountRepository
 from exulanica.api.app import _lifespan
 from exulanica.api.authorisation import TokenDirectory, TokenNotAccepted
@@ -89,6 +90,36 @@ def test_account_workspace_query_matches_current_membership_and_revocation_autho
     assert "m.membership_role='owner'" in connection.statement
     assert "m.user_id=w.owner_user_id" in connection.statement
     assert "account_browser_session" not in connection.statement
+
+
+def test_account_repository_connections_bound_connect_and_statement_time(monkeypatch):
+    calls = []
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def execute(self, statement, parameters=None):
+            calls.append((statement, parameters))
+
+    def connect(url, **kwargs):
+        calls.append((url, kwargs))
+        return Connection()
+
+    monkeypatch.setattr(account_runtime.psycopg, "connect", connect)
+    runtime = SimpleNamespace(database_url="account-secret-url")
+    with account_runtime.AccountRuntime.repository(runtime) as repository:
+        assert isinstance(repository, AccountRepository)
+
+    assert calls[0][0] == "account-secret-url"
+    assert calls[0][1]["connect_timeout"] == 5
+    assert calls[-1] == (
+        "select set_config('statement_timeout', %s, false)",
+        ("5s",),
+    )
 
 
 def test_worker_discovery_is_role_separated_and_society_requires_explicit_opt_in(
