@@ -23,6 +23,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, ScopedConnection
 from exulanica.errors import PrivacyAdmissionError
+from exulanica.identity.subjects import UnknownSubject
 from exulanica.ingest.person_review import (
     create_subject,
     record_consent,
@@ -203,40 +204,55 @@ def add_consent(
     session: CurrentSession,
 ) -> dict[str, Any]:
     """Record one consent transition, as the account holder and never as the subject."""
-    try:
-        if body.request_id is not None:
-            return personal_request(
-                connection,
-                workspace=session.workspace_id,
-                actor=session.actor,
-                request_id=body.request_id,
-                operation=f"consent:{subject_id}",
-                body=body.model_dump(mode="json", exclude={"request_id"}),
-                captures=lambda: subject_captures(connection, session.workspace_id, subject_id),
-                subjects=[subject_id],
-                run=lambda: add_consent(
-                    subject_id, body.model_copy(update={"request_id": None}), connection, session
-                ),
-            )
-        with connection.transaction():
-            consent_id = record_consent(
-                IngestRepository(connection, session.workspace_id),
-                subject_id=subject_id,
-                actor=session.actor,
-                consent_scope=body.consent_scope,
-                decision=body.decision,
-                region_key=bytes.fromhex(body.region_key) if body.region_key else None,
-                valid_until=body.valid_until,
-                effective_at=dt.datetime.now(dt.UTC),
-            )
-    except PrivacyAdmissionError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {
-        "consent_id": str(consent_id),
-        "subject_id": str(subject_id),
-        # Echoed so a caller cannot believe it recorded the subject's own decision.
-        "actor_role": "owner",
-    }
+    with connection.transaction():
+        # Match consent/request lock order, then keep this scoped subject present until insert.
+        connection.execute("select privacy_currency_lock(%s)", (session.workspace_id,))
+        if (
+            connection.execute(
+                "select 1 from person_subject where workspace_id=%s and subject_id=%s "
+                "for key share",
+                (session.workspace_id, subject_id),
+            ).fetchone()
+            is None
+        ):
+            raise UnknownSubject("no such person subject")
+        try:
+            if body.request_id is not None:
+                return personal_request(
+                    connection,
+                    workspace=session.workspace_id,
+                    actor=session.actor,
+                    request_id=body.request_id,
+                    operation=f"consent:{subject_id}",
+                    body=body.model_dump(mode="json", exclude={"request_id"}),
+                    captures=lambda: subject_captures(connection, session.workspace_id, subject_id),
+                    subjects=[subject_id],
+                    run=lambda: add_consent(
+                        subject_id,
+                        body.model_copy(update={"request_id": None}),
+                        connection,
+                        session,
+                    ),
+                )
+            with connection.transaction():
+                consent_id = record_consent(
+                    IngestRepository(connection, session.workspace_id),
+                    subject_id=subject_id,
+                    actor=session.actor,
+                    consent_scope=body.consent_scope,
+                    decision=body.decision,
+                    region_key=bytes.fromhex(body.region_key) if body.region_key else None,
+                    valid_until=body.valid_until,
+                    effective_at=dt.datetime.now(dt.UTC),
+                )
+        except PrivacyAdmissionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {
+            "consent_id": str(consent_id),
+            "subject_id": str(subject_id),
+            # Echoed so a caller cannot believe it recorded the subject's own decision.
+            "actor_role": "owner",
+        }
 
 
 class SubjectRegion(BaseModel):

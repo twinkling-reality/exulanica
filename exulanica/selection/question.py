@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import Any, Final
@@ -251,16 +251,23 @@ class ModelCall:
             requested_model=call.model_id,
             # ChatResult fills an absent echo with the requested model for compatibility.
             # Measurement must read the wire, otherwise a missing observation looks verified.
-            served_model=(call.raw.get("model") if isinstance(call.raw.get("model"), str)
-                          and call.raw.get("model") else None),
+            served_model=(
+                call.raw.get("model")
+                if isinstance(call.raw.get("model"), str) and call.raw.get("model")
+                else None
+            ),
             used_fallback=call.used_fallback,
             attempts=call.attempts,
             latency_ms=round(call.usage.latency_s * 1000),
             prompt_tokens=_reported(usage, "prompt_tokens"),
             completion_tokens=_reported(usage, "completion_tokens"),
             reasoning_tokens=_reported(details, "reasoning_tokens"),
-            usd=(str(call.usage.usd) if _reported(usage, "prompt_tokens") is not None
-                 and _reported(usage, "completion_tokens") is not None else None),
+            usd=(
+                str(call.usage.usd)
+                if _reported(usage, "prompt_tokens") is not None
+                and _reported(usage, "completion_tokens") is not None
+                else None
+            ),
         )
 
 
@@ -346,13 +353,20 @@ class CallLog:
         EmbeddingResult exposes the selected model and usage but no served-model echo or
         HTTP attempt count. Those remain null; elapsed time is measured around the call.
         """
-        self._calls.append(ModelCall(
-            role=str(Role.EMBEDDING), requested_model=result.model_id,
-            served_model=None, used_fallback=result.usage.used_fallback, attempts=None,
-            latency_ms=latency_ms, prompt_tokens=result.usage.prompt_tokens,
-            completion_tokens=result.usage.completion_tokens, reasoning_tokens=None,
-            usd=str(result.usage.usd),
-        ))
+        self._calls.append(
+            ModelCall(
+                role=str(Role.EMBEDDING),
+                requested_model=result.model_id,
+                served_model=None,
+                used_fallback=result.usage.used_fallback,
+                attempts=None,
+                latency_ms=latency_ms,
+                prompt_tokens=result.usage.prompt_tokens,
+                completion_tokens=result.usage.completion_tokens,
+                reasoning_tokens=None,
+                usd=str(result.usage.usd),
+            )
+        )
 
     @property
     def calls(self) -> tuple[ModelCall, ...]:
@@ -609,8 +623,7 @@ def propose_plan(
         {
             "role": "user",
             "content": (
-                f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\n"
-                f"Question: {question}"
+                f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\nQuestion: {question}"
             ),
         },
     ]
@@ -733,6 +746,7 @@ def answer_question(
     plan: SelectionPlan | None = None,
     now: dt.datetime | None = None,
     store: ContentAddressedStore | None = None,
+    society_authorizer: Callable[[dict[str, Any]], None] | None = None,
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
 
@@ -790,7 +804,13 @@ def answer_question(
         # An unavailable vector role leaves lexical retrieval usable.
         with suppress(ModelError):
             query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)
-    result = execute(connection, validated, query_embedding=query_vector, store=store)
+    result = execute(
+        connection,
+        validated,
+        query_embedding=query_vector,
+        store=store,
+        society_authorizer=society_authorizer,
+    )
     if plan.intent is Intent.CONTENT:
         if result.is_empty:
             return AnsweredQuestion(
@@ -837,10 +857,16 @@ def answer_question(
     # loading so a withdrawal, deletion or changed count during that wait cannot support the
     # final answer. Reuse the query vector; this check makes no further model call.
     try:
-        current_result = execute(connection, validate(connection, plan, session),
-                                 query_embedding=query_vector, store=store)
-        current_packet = build_packet(connection, current_result,
-                                      workspace_id=session.workspace_id, now=now)
+        current_result = execute(
+            connection,
+            validate(connection, plan, session),
+            query_embedding=query_vector,
+            store=store,
+            society_authorizer=society_authorizer,
+        )
+        current_packet = build_packet(
+            connection, current_result, workspace_id=session.workspace_id, now=now
+        )
         unchanged = current_result == result and _same_evidence(packet, current_packet)
     except SelectionRejected as rejected:
         if rejected.code is not RejectionCode.UNKNOWN_REFERENCE:
@@ -848,13 +874,21 @@ def answer_question(
         unchanged = False
     if not unchanged:
         return AnsweredQuestion(
-            answer=Answer(clauses=[AnswerClause(
-                text="The evidence changed while I was answering. Please ask again so I can "
-                     "use the current evidence.",
-                type=ClauseType.META,
-            )]),
-            plan=plan, abstention=Abstention.AMBIGUOUS,
-            rejections=(*rejections, "evidence_changed_during_composition"), calls=log.calls,
+            answer=Answer(
+                clauses=[
+                    AnswerClause(
+                        text=(
+                            "The evidence changed while I was answering. Please ask again so I "
+                            "can use the current evidence."
+                        ),
+                        type=ClauseType.META,
+                    )
+                ]
+            ),
+            plan=plan,
+            abstention=Abstention.AMBIGUOUS,
+            rejections=(*rejections, "evidence_changed_during_composition"),
+            calls=log.calls,
         )
     return AnsweredQuestion(
         answer=answer,
