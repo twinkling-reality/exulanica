@@ -61,6 +61,7 @@ from exulanica.api.routes import (
     scene_segments,
     selection,
     society,
+    society_actions,
     world,
     world_read,
     world_write,
@@ -181,6 +182,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(scene_segments.router)
     app.include_router(selection.router)
     app.include_router(society.router)
+    app.include_router(society_actions.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)
     app.include_router(identity.router)
