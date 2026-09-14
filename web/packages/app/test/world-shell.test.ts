@@ -45,6 +45,15 @@ describe('the Atlas shell', () => {
     ).toEqual(initialWorldShell());
   });
 
+  it('returns from Character to the exact prior library selection', () => {
+    const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
+    const detail = updateWorldShell(index, { type: 'show-detail', id: 'person-1' });
+    const character = updateWorldShell(detail, { type: 'toggle-character' });
+    expect(character.primary).toBe('character');
+    expect(character.detailId).toBeNull();
+    expect(updateWorldShell(character, { type: 'toggle-character' })).toEqual(detail);
+  });
+
   it('has an unconditional complete-Index recovery transition for renderer loss', () => {
     const map = updateWorldShell(initialWorldShell(), { type: 'toggle-map' });
     // Recovery is unconditional, so it clears the return stack rather than leaving somewhere to
@@ -68,6 +77,7 @@ describe('shell command ownership', () => {
     ['KeyI', 'i', 'toggle-index'],
     ['KeyM', 'm', 'toggle-map'],
     ['KeyO', 'o', 'toggle-options'],
+    ['KeyK', 'k', 'toggle-character'],
     ['Slash', '?', 'toggle-controls'],
     ['Backspace', 'Backspace', 'selection-back'],
   ])('maps %s to its one shell command', (code, key, command) => {

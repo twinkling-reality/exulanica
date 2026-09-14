@@ -7,7 +7,7 @@
  * same pixels.
  */
 
-export type PrimarySurface = 'world' | 'index' | 'options' | 'controls';
+export type PrimarySurface = 'world' | 'index' | 'options' | 'controls' | 'character';
 export type CameraPresentation = 'ground' | 'map';
 
 export interface WorldSurfaceContext {
@@ -23,6 +23,7 @@ export interface WorldShellState extends WorldSurfaceContext {
 }
 
 export type WorldShellEvent =
+  | { readonly type: 'toggle-character' }
   | { readonly type: 'toggle-index' }
   | { readonly type: 'toggle-map' }
   | { readonly type: 'toggle-options' }
@@ -33,6 +34,7 @@ export type WorldShellEvent =
   | { readonly type: 'close-detail' };
 
 export type WorldCommand =
+  | 'toggle-character'
   | 'toggle-index'
   | 'toggle-map'
   | 'toggle-options'
@@ -61,6 +63,10 @@ export function updateWorldShell(
   event: WorldShellEvent,
 ): WorldShellState {
   switch (event.type) {
+    case 'toggle-character':
+      return state.primary === 'character'
+        ? restoreSurface(state)
+        : openTemporarySurface(state, { primary: 'character', camera: 'ground', detailId: null });
     case 'toggle-index':
       return state.primary === 'index'
         ? restoreSurface(state)
@@ -126,6 +132,8 @@ function restoreSurface(state: WorldShellState): WorldShellState {
 export function commandForKeystroke(stroke: CommandKeystroke): WorldCommand | null {
   if (stroke.modified || stroke.typing) return null;
   switch (stroke.code) {
+    case 'KeyK':
+      return 'toggle-character';
     case 'KeyI':
       return 'toggle-index';
     case 'KeyM':

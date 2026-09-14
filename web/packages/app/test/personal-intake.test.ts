@@ -212,3 +212,23 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     mounted.dispose();
   });
 });
+
+
+it('keeps preview intake read-only and closes its reading workflow with Escape', async () => {
+  const fetch = vi.fn();
+  const mounted = mountPersonalIntake({ preview: true,
+    credentials: { baseUrl: 'https://fixture.test', token: 'fixture-token', fetch },
+    session: createPersonalIntakeSession(), snapshot: adaptSnapshot({ state_version: 1, entities: [], occurrences: [], proposals: [], scene_groups: [], reconstruction_scenes: [], never_same: [], deleted_entity_ids: [] }),
+    media: undefined, reloadSnapshot: vi.fn(), refreshWorld: vi.fn(),
+  });
+  document.body.replaceChildren(mounted.root);
+  mounted.root.open = true;
+  await mounted.begin();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(mounted.root.querySelector('fieldset')?.disabled).toBe(true);
+  expect(mounted.root.textContent).toContain('require an authenticated workspace');
+  mounted.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  expect(mounted.root.open).toBe(false);
+  expect(document.activeElement).toBe(mounted.root.querySelector('summary'));
+  mounted.dispose();
+});

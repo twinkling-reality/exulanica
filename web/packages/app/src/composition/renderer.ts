@@ -80,13 +80,19 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   const activeTheme = themeForPreferences(state.preferences, env.systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
+  let lastMemoryVisible: boolean | undefined;
   const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
     text: 'Opening the Atlas and decoding its available reconstruction…' });
   env.shell.append(rendererLoading);
   env.shell.setAttribute('aria-busy', 'true');
   try {
-    const district = await ownedDistrict();
+    const district = await ownedDistrict({ preview: env.preview });
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
+      const memoryVisible = state.atlas?.binding.memoryLayerVisible;
+      if (memoryVisible !== undefined && memoryVisible !== lastMemoryVisible) {
+        lastMemoryVisible = memoryVisible;
+        deps.status.refreshStatus();
+      }
       if (state.atlas?.binding.ownedDistrict !== null) {
         env.canvas.dataset.ownedFrameMs = (report.dt * 1000).toFixed(2);
       }

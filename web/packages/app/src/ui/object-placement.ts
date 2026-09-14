@@ -282,11 +282,16 @@ export function buildObjectPlacement(
   reflectValues();
   reflectMotion();
 
+  let restoreFocus: HTMLElement | null = null;
   return {
     root,
 
     setVisible(visible) {
+      if (visible === !root.hidden) return;
+      if (visible) restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       root.hidden = !visible;
+      if (visible) close.focus({ preventScroll: true });
+      else if (restoreFocus?.isConnected && restoreFocus.getClientRects().length) restoreFocus.focus({ preventScroll: true });
     },
 
     visible() {

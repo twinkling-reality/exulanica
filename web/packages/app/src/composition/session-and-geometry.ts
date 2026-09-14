@@ -46,6 +46,7 @@ import type { ReconstructionRungDisclosure } from '../ui/status.js';
 import { WorldStyleClient } from '../world-style-api.js';
 import { describeWorldStyleFailure, preferencesForWorldVersion } from './appearance.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
+import type { Credentials } from '../config.js';
 
 /**
  * Open the session and everything it authorizes, up to but not including a mount.
@@ -58,6 +59,7 @@ export async function openAppSession(
   env: AppEnvironment,
   state: SessionState,
   token: string,
+  csrfToken?: string,
 ): Promise<void> {
   if (env.preview) {
     state.previewSourceMedia = (await import('../dev/preview-media.js')).PREVIEW_SOURCE_MEDIA;
@@ -65,7 +67,7 @@ export async function openAppSession(
   }
   state.credentials = env.preview
     ? previewCredentials(window.location.origin)
-    : credentials(token);
+    : credentials(token, csrfToken);
   const opened = await openSession(state.credentials);
   state.session = opened.session;
   state.snapshot = opened.initial;
@@ -147,7 +149,7 @@ export async function openAppSession(
 export async function mountSessionGeometry(deps: {
   readonly env: AppEnvironment;
   readonly state: SessionState;
-  readonly credentials: { baseUrl: string; token: string };
+  readonly credentials: Credentials;
   readonly snapshot: GraphSnapshot;
 }): Promise<{ dispose: () => void }> {
   const { env, state } = deps;

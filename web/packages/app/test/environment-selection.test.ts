@@ -6,6 +6,7 @@ import { mountEnvironmentSelection } from '../src/composition/environment-select
 import type { EnvironmentCatalog } from '../src/environment-selection-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
+import type { SocietyPlaybackControl } from '../src/society-control-api.js';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -222,7 +223,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     controls.onInteract?.();
     const buttons = [...mounted.root.querySelectorAll('button')];
     const button = (label: string) => buttons.find((held) => held.textContent === label)!;
-    const role = mounted.root.querySelector('select')!;
+    const role = mounted.root.querySelector<HTMLSelectElement>('select[aria-label="Authored role"]')!;
     role.value = 'personal';
     role.dispatchEvent(new Event('change'));
 
@@ -238,7 +239,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
     expect(apply).not.toHaveBeenCalled();
     expect(mounted.root.textContent).toContain('Proposal discarded. Nothing changed.');
 
-    const input = mounted.root.querySelector('input')!;
+    const input = mounted.root.querySelector<HTMLInputElement>('input[aria-label="Environment edit request"]')!;
     input.value = 'place this building';
     input.dispatchEvent(new Event('input'));
     button('Preview request').click();
@@ -324,10 +325,10 @@ describe('mounted NYC semantic selection lifecycle', () => {
     const button = (label: string) => buttons.find((held) => held.textContent === label)!;
     expect(button('Preview undo latest edit').disabled).toBe(false);
     button('Preview undo latest edit').click();
-    expect(mounted.root.textContent).toContain('Proposed operation: undo_latest_version_edit');
+    expect(mounted.root.textContent).toContain('This does not erase simulation history.');
 
     button('Bring into my world').click();
-    const role = mounted.root.querySelector('select')!;
+    const role = mounted.root.querySelector<HTMLSelectElement>('select[aria-label="Authored role"]')!;
     role.value = 'personal';
     role.dispatchEvent(new Event('change'));
     expect(button('Apply').disabled).toBe(true);
@@ -402,8 +403,8 @@ describe('mounted NYC semantic selection lifecycle', () => {
     await mounted.begin();
     const buttons = [...mounted.root.querySelectorAll('button')];
     const button = (label: string) => buttons.find((held) => held.textContent === label)!;
-    const input = mounted.root.querySelector('input')!;
-    const role = mounted.root.querySelector('select')!;
+    const input = mounted.root.querySelector<HTMLInputElement>('input[aria-label="Environment edit request"]')!;
+    const role = mounted.root.querySelector<HTMLSelectElement>('select[aria-label="Authored role"]')!;
     const submit = (text: string) => {
       input.value = text;
       input.dispatchEvent(new Event('input'));
@@ -451,5 +452,130 @@ describe('mounted NYC semantic selection lifecycle', () => {
     requests[5]!.resolve(proposalFor(secondFeature.id, 'personal', 'disposed-model') as never);
     await Promise.resolve();
     expect(previewText.textContent).not.toContain('disposed-model');
+  });
+});
+
+import { ApiError } from '@exulanica/graph-client';
+import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
+function liveSnapshot(tick = 0): SocietySnapshot {
+  return parseSociety({ society_id:'society', version_id:'version',branch_id:'version',place_id:'place',population_size:100,current_tick:tick,
+    state_sha256:String(tick + 1).repeat(64),input_seq:1,input_sha256:'b'.repeat(64),
+    state:{profile:'exulanica-society/v2',society_id:'society',branch_id:'version',tick,input_seq:1,input_sha256:'b'.repeat(64),
+      inhabitants:Array.from({length:100},(_,i)=>({id:`person-${i}`,synthetic:true,display_name:`Person ${i}`,role:'steward',position_mm:[i,0],motion_path_mm:[[i,0]],goal:null,route:null,
+        action:{kind:'idle',status:'active',target_id:null,remaining_ticks:0,reason:'awaiting_goal'},
+        explanation:{summary:tick?'The target was removed.':'Awaiting a goal.',event_ids:tick?['event','outside-window']:[]}}))}});
+}
+function liveMount(preview = false) {
+  const canvas = document.createElement('canvas');
+  const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
+  const district = {district:{name:'Test district',sidewalks:[]},setAuthoredInstances:vi.fn(),setSociety:vi.fn(()=>24),clearSociety:vi.fn(),
+    visibleInhabitantIds:['person-0'],drawnInhabitantCount:1,pickInhabitant:()=> 'person-0',revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>['person-0']};
+  const binding = {controls,ownedDistrict:district,camera:{forward:{x:0,y:0,z:1}},invalidate:vi.fn(),setDistrictObjectFrame:vi.fn()};
+  const client = {connect:vi.fn(async()=>liveSnapshot()),read:vi.fn(async()=>liveSnapshot(1)),advance:vi.fn(async(_snapshot:SocietySnapshot)=>liveSnapshot(1)),events:vi.fn(async()=>[
+    {event_id:'event',subject_id:'person-0',tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}])};
+  let playback: SocietyPlaybackControl = {
+    societyId:'society',versionId:'version',persisted:true,revision:0,mode:'paused',speed:1,
+    tickIntervalMs:1000,currentTick:0,stateSha256:'1'.repeat(64),nextDueAt:null,reason:null,
+    playEligible:true,playIneligibleReason:null,
+  };
+  const societyControlClient = {
+    read:vi.fn(async()=>playback),
+    configure:vi.fn(async(_control:SocietyPlaybackControl,mode:'paused'|'playing',speed:1|2|4)=>{
+      playback={...playback,revision:playback.revision+1,mode,speed,tickIntervalMs:1000/speed};return playback;
+    }),
+    step:vi.fn(async(_control:SocietyPlaybackControl,snapshot:SocietySnapshot)=>{
+      const society=await client.advance(snapshot);
+      playback={...playback,revision:playback.revision+1,currentTick:society.currentTick,stateSha256:society.stateSha256};
+      return {control:playback,society};
+    }),
+  };
+  const districtClient = {read:vi.fn(async()=>({placement:{versionId:'version',regionId:'registered-region',translationMm:[0,0,0],boundsMm:[0,0,100000,100000]},baseArtifactSha256:'b'.repeat(64),interpretationArtifactSha256:'c'.repeat(64)}))};
+  const onDistrictPlacementChange=vi.fn();
+  const environment = {catalog:vi.fn(async()=>catalog),apply:vi.fn(async()=>({kind:'recorded',version:{...version,editSeq:1}}))};
+  const mount = mountEnvironmentSelection({env:{canvas,preview} as AppEnvironment,state:{atlas:{binding}} as unknown as SessionState,
+    scene:{islands:[{islandId:'region'}]} as unknown as AtlasScene,credentials:{baseUrl:'https://api.test',token:'test'},showStatus:vi.fn(),admissionId:'admission',
+    environmentClient:environment as never,worldClient:{connect:vi.fn(async()=>({assets:[],version:{...version,edits:[{kind:'add_object',editId:'prior',undoneEditId:null}]}}))} as never,societyClient:client as never,societyControlClient:societyControlClient as never,societyDistrictClient:districtClient as never,onDistrictPlacementChange,
+    createOverlay:()=>({pick:()=>null,destroy:vi.fn()})});
+  const button = (label:string)=>[...mount.root.querySelectorAll('button')].find(b=>b.textContent===label)!;
+  return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,binding,onDistrictPlacementChange};
+}
+
+describe('persisted living world controls',()=>{
+  it('renders canonical population with the cap and advances only on explicit user action',async()=>{
+    const {mount,client,district,button,canvas}=liveMount();await mount.begin();
+    expect(client.advance).not.toHaveBeenCalled();expect(district.setSociety).toHaveBeenCalledTimes(1);
+    expect(district.setSociety).toHaveBeenCalledWith(liveSnapshot().state,24,[0,0]);
+    expect(button('Advance one minute').disabled).toBe(false);button('Advance one minute').click();
+    await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBe('1'));
+    expect(client.advance).toHaveBeenCalledTimes(1);expect(district.setSociety).toHaveBeenCalledTimes(2);
+    mount.dispose();
+  });
+  it('inspects actual persisted event documents and discloses missing references',async()=>{
+    const {mount,button,controls}=liveMount();await mount.begin();button('Advance one minute').click();
+    await vi.waitFor(()=>expect(mount.root.textContent).toContain('Persisted tick 1'));
+    controls.onInteract?.();
+    expect(mount.root.textContent).toContain('Recorded target removal.');
+    expect(mount.root.textContent).toContain('Referenced events unavailable in the latest event window: outside-window');
+    mount.dispose();
+  });
+  it('refreshes only the exact version after an authored object change, without advancing',async()=>{
+    const {mount,client}=liveMount();await mount.begin();await mount.afterAuthoredEdit('other');expect(client.read).not.toHaveBeenCalled();
+    await mount.afterAuthoredEdit('version');expect(client.read).toHaveBeenCalledTimes(1);expect(client.advance).not.toHaveBeenCalled();
+    expect(mount.root.textContent).toContain('Restoring an object retains earlier simulation events');mount.dispose();
+  });
+  it('refreshes society after an internally confirmed authored restore',async()=>{
+    const {mount,client,button,environment}=liveMount();await mount.begin();
+    button('Preview undo latest edit').click();button('Apply').click();
+    await vi.waitFor(()=>expect(client.read).toHaveBeenCalledTimes(1));
+    expect(environment.apply).toHaveBeenCalledWith(expect.objectContaining({operation:'undo_latest_version_edit'}));
+    expect(client.advance).not.toHaveBeenCalled();mount.dispose();
+  });
+  it('clears residents and selected details after permission loss without fabricating a tick',async()=>{
+    const {mount,client,button,district,controls,canvas}=liveMount();await mount.begin();controls.onInteract?.();
+    client.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
+    button('Refresh persisted society').click();await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBeUndefined());
+    expect(district.clearSociety).toHaveBeenCalled();expect(button('Advance one minute').disabled).toBe(true);
+    expect(mount.root.querySelector<HTMLElement>('.living-world-inspector')!.hidden).toBe(true);
+    mount.dispose();
+  });
+  it('keeps preview isolated even if an authored version happens to be available',async()=>{
+    const {mount,client,button}=liveMount(true);await mount.begin();
+    expect(client.connect).not.toHaveBeenCalled();expect(button('Advance one minute').closest('details')?.hidden).toBe(true);
+    await mount.afterAuthoredEdit('version');expect(client.read).not.toHaveBeenCalled();mount.dispose();
+  });
+  it('never installs residents from a response received after mount disposal',async()=>{
+    const {mount,client,district}=liveMount();const held=deferred<SocietySnapshot>();client.connect.mockReturnValueOnce(held.promise);
+    const beginning=mount.begin();await vi.waitFor(()=>expect(client.connect).toHaveBeenCalled());mount.dispose();held.resolve(liveSnapshot());await beginning;
+    expect(district.setSociety).not.toHaveBeenCalled();expect(client.events).not.toHaveBeenCalled();
+  });
+});
+
+describe('authorized district placement lifecycle',()=>{
+  it('installs only the explicit registered frame and clears it on disposal',async()=>{
+    const {mount,binding,onDistrictPlacementChange}=liveMount();await mount.begin();
+    expect(mount.districtPlacement()?.regionId).toBe('registered-region');
+    expect(binding.setDistrictObjectFrame).toHaveBeenCalledWith({regionId:'registered-region',translationMm:[0,0,0]});
+    expect(onDistrictPlacementChange).toHaveBeenCalledTimes(1);
+    mount.dispose();expect(mount.districtPlacement()).toBeNull();expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
+  });
+  it('revalidates before advancing and refuses edits/progression with unavailable frame dependencies',async()=>{
+    const {mount,districtClient,binding,button,client,canvas}=liveMount();await mount.begin();
+    districtClient.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
+    button('Advance one minute').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+    expect(client.advance).not.toHaveBeenCalled();expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
+    expect(canvas.dataset.societyTick).toBeUndefined();expect(button('Advance one minute').disabled).toBe(true);
+    mount.dispose();
+  });
+  it('can reauthorize frame and state after a prior society authorization failure',async()=>{
+    const {mount,client,button}=liveMount();await mount.begin();client.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
+    button('Refresh persisted society').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+    button('Refresh persisted society').click();await vi.waitFor(()=>expect(button('Advance one minute').disabled).toBe(false));
+    expect(mount.districtPlacement()?.regionId).toBe('registered-region');mount.dispose();
+  });
+  it('ignores a district binding response after disposal',async()=>{
+    const {mount,districtClient,binding}=liveMount();const held=deferred<Awaited<ReturnType<typeof districtClient.read>>>();districtClient.read.mockReturnValueOnce(held.promise);
+    const begin=mount.begin();await vi.waitFor(()=>expect(districtClient.read).toHaveBeenCalled());mount.dispose();
+    held.resolve({placement:{versionId:'version',regionId:'other',translationMm:[0,0,0],boundsMm:[0,0,100,100]},baseArtifactSha256:'b'.repeat(64),interpretationArtifactSha256:'c'.repeat(64)});
+    await begin;expect(mount.districtPlacement()).toBeNull();expect(binding.setDistrictObjectFrame).not.toHaveBeenCalled();
   });
 });

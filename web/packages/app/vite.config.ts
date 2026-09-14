@@ -221,6 +221,7 @@ export default defineConfig({
   plugins: [previewApi],
   server: {
     proxy: {
+      '/__character': { target: process.env['EXULANICA_CHARACTER_BUILDER_URL'] ?? 'http://127.0.0.1:5196', rewrite: path => path.replace(/^\/__character/, '') },
       '/api': {
         target: process.env['EXULANICA_API_URL'] ?? 'http://127.0.0.1:8000',
         changeOrigin: true,

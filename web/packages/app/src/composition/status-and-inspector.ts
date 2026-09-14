@@ -526,14 +526,14 @@ export function mountStatusAndInspector(
     // `applyProofLens` and nothing else: no scene is rebuilt and this panel is not re-rendered,
     // which is what makes "toggling the lens changes no scene, no rung and no receipt" checkable
     // rather than merely asserted.
-    proofLens: {
+    ...((state.atlas?.binding.memoryLayerVisible ?? true) ? { proofLens: {
       enabled: state.proofLensEnabled,
       theme: themeForPreferences(state.preferences, env.systemAppearance.matches),
-      onToggle: (enabled) => {
+      onToggle: (enabled: boolean) => {
         state.proofLensEnabled = enabled;
         applyProofLens();
       },
-    },
+    } } : {}),
     ...(sourcePresentation() === 'inspection' ? {
       reconstructionFocus: {
         collections: current.islands.map((island) => {

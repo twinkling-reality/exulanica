@@ -241,6 +241,11 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
         deps.handleAtlasCommand('index');
         return;
       }
+      if (command === 'toggle-character') {
+        event.preventDefault();
+        deps.handleAtlasCommand('character');
+        return;
+      }
       if (command === 'toggle-map') {
         event.preventDefault();
         // Tap or hold is decided on the way back up, so the key does nothing yet.

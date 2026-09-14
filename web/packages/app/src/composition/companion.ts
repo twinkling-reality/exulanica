@@ -34,6 +34,7 @@ import type { SessionState } from './session-state.js';
 
 export interface CompanionDependencies {
   readonly state: SessionState;
+  readonly onOpen?: () => void;
   /** The turn engine, which outlives a mount and is told about the new graph rather than rebuilt. */
   readonly engine: CompanionSession;
   readonly evidence: EvidenceCache;
@@ -334,6 +335,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
      * Not awaited, for the same reason. The person has their answer; storing it is this session's
      * problem and not theirs to wait on.
      */
+    onDismiss: () => dismiss(),
     onAnswerShown: (answer) => {
       const remember = deps.rememberAnswer;
       if (remember === undefined) return;
@@ -357,6 +359,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
 
   /** Open the fixed visual-novel composition over the current memory backdrop. */
   function summon(): void {
+    deps.onOpen?.();
     // Pointer Lock freezes clientX/clientY by specification. The SVG Companion follows the free
     // page pointer, so summoning releases the real browser lock instead of fabricating a cursor.
     if (document.pointerLockElement !== null) document.exitPointerLock();

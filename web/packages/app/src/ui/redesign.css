@@ -1,0 +1,192 @@
+/* Application surfaces stay legible independently of physical world materials. */
+@keyframes world-tool-arrive { from { opacity: .4; translate: 0 7px; } to { opacity: 1; translate: 0 0; } }
+#shell {
+  --ui-font-display: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  --ui-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui-font-utility: var(--ui-font-body); --companion-utility-font: var(--ui-font-body);
+  --ink: #272c38; --ink-soft: #515a6b; --ink-faint: #606878;
+  --accent: #655283; --focus: #655283; --edge: #cdd0da;
+  --surface: #ecebf2; --raised: #fff; --atlas-plane: #f7f7faf5;
+  --material-instrument: #f7faff; --material-system: #f7faff; --material-archive: #f7faff;
+  --radius-panel: 4px; --radius-control: 3px;
+  --app-shadow: 0 8px 32px #24203312;
+  font-family: var(--ui-font-body);
+}
+#shell :is(button, input, select, textarea) { font-family: var(--ui-font-body); }
+#shell :is(button, summary, input, select, textarea):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+#shell button { cursor: pointer; }
+#shell button:disabled { cursor: not-allowed; }
+#shell .world-workspace { position: static; width: auto; max-height: none; overflow: visible; padding: 0; border: 0; background: transparent; backdrop-filter: none; color: var(--ink); font-size: 14px; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
+.world-heading { position: fixed; top: 24px; left: 28px; z-index: 5; padding: 16px 20px; width: 280px; box-sizing: border-box; background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+.world-brand { display: block; font: 600 12px/1.4 var(--ui-font-body); color: var(--accent); letter-spacing: .05em; margin-bottom: 6px; }
+#shell .world-heading h2 { margin: 0 0 5px; font: 600 24px/1.15 var(--ui-font-display); letter-spacing: -.04em; }
+.world-source-label { display: block; font-size: 11px; color: var(--ink-soft); }
+#shell .world-heading .living-world-fixture { font: 500 10px/1.5 var(--ui-font-body); color: var(--ink-soft); margin: 9px 0 0; border-top: 1px solid var(--edge); padding-top: 8px; }
+.world-local-nav { position: fixed; top: 187px; left: 28px; display: flex; gap: 6px; z-index: 6; }
+#shell .world-workspace button { min-height: 38px; padding: 9px 13px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; font-size: 13px; font-weight: 500; }
+#shell .world-workspace button:hover { background: var(--surface); border-color: var(--accent); }
+#shell .world-workspace button[aria-expanded='true'] { color: var(--raised); background: var(--accent); border-color: var(--accent); }
+#shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
+.world-panel { position: fixed; right: 28px; top: 100px; bottom: 114px; z-index: 12; width: 340px; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+#shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+#shell .world-panel-heading h2 { margin: 0; font: 600 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
+#shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
+#shell .world-panel p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; }
+#shell .world-panel :is(select, input[type='text']) { width: 100%; box-sizing: border-box; min-height: 42px; border: 1px solid var(--edge); border-radius: 4px; padding: 10px; color: var(--ink); background: var(--raised); font-size: 13px; }
+#shell .world-panel summary { padding: 8px 0; font-size: 13px; line-height: 1.5; }
+#shell .world-panel details { margin-top: 18px; padding-top: 10px; }
+#shell .world-help { margin-top: 20px; color: var(--ink-soft); }
+#shell .living-world-inspector h3 { font: 600 26px/1.2 var(--ui-font-display); margin: 4px 0 14px; letter-spacing: -.03em; }
+#shell .living-world-inspector .living-world-activity { padding: 14px; background: var(--surface); border-radius: 4px; color: var(--ink); }
+#shell .living-world-inspector dd { font-size: 12px; }
+.world-viewbar { position: fixed; left: 28px; bottom: 28px; display: flex; gap: 5px; padding: 6px; z-index: 6; border-radius: 4px; background: var(--atlas-plane); box-shadow: var(--app-shadow); }
+#shell .world-viewbar button { background: transparent; border-color: transparent; }
+#shell .atlas-commands { top: 24px; right: 28px; gap: 4px; padding: 6px; border-radius: 4px; background: var(--atlas-plane); box-shadow: var(--app-shadow); }
+#shell .atlas-commands button { width: auto; height: 42px; padding: 0 13px; display: flex; align-items: center; gap: 7px; border: 0; border-radius: 4px; color: var(--ink-soft); background: transparent; box-shadow: none; }
+#shell .atlas-command-label { font-size: 13px; font-weight: 550; }
+#shell .atlas-command-icon { width: 18px; height: 18px; }
+#shell .atlas-commands button[aria-current] { background: var(--surface); color: var(--accent); }
+#shell .atlas-commands button:hover { background: var(--surface); }
+#shell .atlas-command-tooltip { display: none; }
+#shell:not([data-primary='world']) .world-workspace { visibility: hidden; }
+#shell .world-source-details { position: fixed; bottom: 8px; right: 28px; z-index: 8; max-width: 390px; color: var(--ink-soft); font-size: 11px; }
+#shell .world-source-details > summary { padding: 7px 12px; background: var(--atlas-plane); border-radius: 4px; cursor: pointer; }
+#shell .world-source-details[open] { bottom: 24px; background: var(--atlas-plane); border-radius: 4px; padding: 12px; box-shadow: var(--app-shadow); max-height: 55vh; overflow: auto; }
+#shell .world-source-details .status { position: static; display: block; width: auto; max-width: none; padding: 10px; color: var(--ink); background: transparent; }
+#shell .world-source-details .status details { margin: 12px 0; }
+#shell .held-plate, #shell .atlas-instrument, #shell .settings-view { background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+#shell[data-primary='index'] .index-workspace { top: 100px; bottom: 70px; left: 28px; right: 28px; width: auto; max-width: none; height: auto; max-height: none; transform: none; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+#shell .index-workspace .index-head { padding: 24px 28px 14px; }
+#shell .index-head h1 { font: 600 30px/1.2 var(--ui-font-display); letter-spacing: -.035em; }
+#shell .index-workspace .index-facets { display: flex; grid-column: 1 / -1; grid-row: 2; gap: 20px; padding: 0 28px 16px; align-items: start; overflow: visible; }
+#shell .index-workspace .index-search-wrap { display: block; width: min(440px, 65%); }
+#shell .index-workspace .rail-search { display: block; height: 42px; border: 1px solid var(--edge); border-radius: 4px; background: var(--raised); padding: 0 14px; font-size: 14px; }
+#shell .index-workspace .index-filters { display: block; position: relative; }
+#shell .index-filter-body { position: absolute; z-index: 20; top: 44px; right: 0; min-width: 270px; max-height: 45vh; overflow: auto; padding: 16px; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+#shell .index-workspace .index-results { grid-row: 3; padding-inline: 28px; }
+#shell .index-workspace .index-plan { grid-row: 3; }
+#shell .rail-list .index-row { min-height: 62px; border-radius: 4px; }
+#shell .index-workspace .index-foot { grid-row: 4; }
+#shell .index-workspace .personal-intake { position: static; grid-column: 1 / -1; grid-row: 5; width: auto; max-width: none; max-height: 40vh; margin: 0 28px 16px; padding: 12px 16px; overflow: auto; border: 1px solid var(--edge); border-radius: 4px; background: var(--surface); }
+#shell .personal-intake summary { color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; }
+#shell .personal-intake fieldset { border: 0; padding: 18px 0; }
+#shell .personal-intake label { margin-block: 14px; font-size: 13px; }
+#shell .personal-intake input:not([type='checkbox']), #shell .personal-intake select { padding: 10px; border: 1px solid var(--edge); background: var(--raised); border-radius: 4px; margin-top: 6px; }
+#shell .personal-intake button { margin: 8px 8px 8px 0; padding: 10px 14px; border-radius: 4px; }
+#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay { top: 100px; bottom: 48px; max-height: calc(100dvh - 148px); }
+#shell .settings-page-head h2 { font-weight: 600; font-size: 28px; }
+#shell .setting-row { padding: 16px; border-radius: 4px; }
+#shell .setting-row select { border-radius: 4px; min-height: 42px; background: var(--raised); }
+#shell .map-caption { top: 240px; left: 28px; width: 280px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); }
+#shell .gate { background: var(--atlas-plane); border-radius: 4px; padding: 36px; color: var(--ink); }
+:root[data-contrast='high'] #shell { --ink: #071728; --ink-soft: #203449; --ink-faint: #34495d; --edge: #647a90; }
+@media (max-width: 1100px) and (min-width: 960px) { #shell .atlas-commands button { padding: 0 9px; } #shell .atlas-command-icon { display: none; } .world-heading { width: 250px; } }
+@media (max-width: 959px) { #shell .viewport-boundary { color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; } }
+@media (prefers-reduced-motion: reduce) { #shell *, #shell *::before, #shell *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+#shell .world-panel { bottom: auto; max-height: calc(100dvh - 214px); min-height: 200px; }
+#shell .world-heading h2 { overflow-wrap: anywhere; }
+#shell .world-heading { max-height: 162px; overflow: auto; }
+#shell[data-primary='index'] .index-workspace.rail {
+  inset: 100px 28px 70px; margin-inline: auto; width: auto; height: auto;
+  max-width: 1300px; transform: none; translate: none;
+}
+#shell[data-primary='index'] .index-workspace.rail[data-detail-open='true'] { right: 436px; }
+#shell[data-primary='index'] > .detail {
+  inset: 100px 28px 70px auto; width: 380px; height: auto; max-height: none;
+  transform: none; translate: none; border: 1px solid var(--edge); border-radius: 4px;
+  background: var(--atlas-plane); padding: 24px; box-shadow: var(--app-shadow);
+}
+#shell[data-primary='index'] .companion-encounter { visibility: hidden; }
+#shell .index-workspace .index-plan { grid-column: 2; padding: 0 24px; }
+#shell .index-workspace .index-foot { grid-column: 1 / -1; }
+#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay {
+  inset: 100px 28px 70px; width: auto; max-width: 1120px; height: auto; max-height: none;
+  margin-inline: auto; transform: none; translate: none;
+}
+#shell .settings-category { border-radius: 4px; }
+#shell .settings-view button, #shell .atlas-instrument button { border-radius: 4px; }
+/* One conversational reading order, preserving the original turn and evidence controls. */
+#shell .companion-encounter[data-state='open'] {
+  position: fixed; inset: 100px 28px auto auto; width: 390px; max-height: calc(100dvh - 200px);
+  display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding: 22px;
+  box-sizing: border-box; transform: none; translate: none; pointer-events: auto; z-index: 35;
+  background: var(--atlas-plane); color: var(--ink); border: 1px solid var(--edge);
+  border-radius: 4px; box-shadow: var(--app-shadow);
+  --companion-text: var(--ink); --companion-ink: var(--ink);
+}
+#shell .companion-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; font: 600 22px/1.2 var(--ui-font-display); }
+#shell .companion-toolbar button { color: var(--ink); background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; padding: 9px 13px; font-size: 13px; }
+#shell .companion-encounter[data-state='open'] :is(.companion-speech, .companion-choice-rail) {
+  position: static; inset: auto; width: 100%; max-width: none; min-width: 0; height: auto;
+  max-height: none; margin: 0; padding: 0; transform: none; translate: none;
+  background: transparent; color: var(--ink); border: 0; box-shadow: none; backdrop-filter: none;
+}
+#shell .companion-encounter[data-state='open'] :is(.companion-speaker, .companion-utterance, .companion-refusal-detail, .companion-provenance, .companion-question-echo) {
+  background: transparent; color: var(--ink); text-shadow: none; padding: 0; border: 0; box-shadow: none; font-family: var(--ui-font-body);
+}
+#shell .companion-encounter[data-state='open'] .companion-speaker { font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+#shell .companion-encounter[data-state='open'] .companion-utterance { font-size: 16px; line-height: 1.6; margin: 8px 0; }
+#shell .companion-encounter[data-state='open'] .companion-provenance { font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+#shell .companion-encounter[data-state='open'] .companion-choice { color: var(--ink); background: var(--surface); border: 1px solid var(--edge); border-radius: 4px; min-height: 42px; margin: 0 0 7px; padding: 10px 12px; font-size: 13px; }
+#shell .companion-encounter[data-state='open'] .choice-key { color: var(--ink-soft); border-color: var(--edge); }
+#shell .companion-encounter[data-state='open'] .companion-escapes { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--edge); }
+#shell .companion-encounter[data-state='open'] .companion-composer { color: var(--ink); background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; }
+#shell .companion-composer :is(input, textarea) { color: var(--ink); background: var(--raised); font-size: 14px; }
+#shell .index-workspace:has(.personal-intake[open]) .index-results,
+#shell .index-workspace:has(.personal-intake[open]) .index-plan,
+#shell .index-workspace:has(.personal-intake[open]) .index-facets,
+#shell .index-workspace:has(.personal-intake[open]) .index-foot { display: none; }
+#shell .index-workspace:has(.personal-intake[open]) { grid-template-rows: auto minmax(0, 1fr); }
+#shell .index-workspace .personal-intake[open] { grid-row: 2 / -1; max-height: none; padding: 20px; }
+#shell .personal-intake > summary { padding: 4px 0; }
+#shell .personal-intake > [role='status']:not(:empty) { padding: 14px; margin: 16px 0; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; line-height: 1.6; font-size: 14px; }
+#shell .personal-intake .intake-step { margin-bottom: 12px; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; }
+#shell .personal-intake .intake-step > summary { padding: 16px; font-size: 15px; color: var(--ink); }
+#shell .intake-step-content { max-width: 880px; padding: 0 20px 20px; font-size: 14px; line-height: 1.6; }
+#shell .intake-step-content > h2 { font: 600 22px/1.2 var(--ui-font-display); }
+#shell .intake-step-content :is(input, select) { box-sizing: border-box; max-width: 100%; min-height: 40px; }
+#shell .intake-step-content input[type='checkbox'] { min-height: 0; }
+#shell .intake-step-content button { min-height: 42px; white-space: normal; }
+#shell > .reconstruction-inspector, #shell .object-placement {
+  position: fixed; inset: 100px 28px auto auto; width: min(440px, calc(100vw - 56px));
+  max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box;
+  padding: 24px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge);
+  border-radius: 4px; box-shadow: var(--app-shadow); transform: none; z-index: 40;
+}
+#shell :is(.reconstruction-inspector, .object-placement, .detail) :is(button, select) { color: var(--ink); background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; min-height: 38px; padding: 9px 12px; font-size: 13px; }
+#shell :is(.reconstruction-inspector, .object-placement, .detail) :is(h1, h2) { font-family: var(--ui-font-display); font-size: 24px; font-weight: 600; letter-spacing: -.03em; }
+#shell :is(.reconstruction-inspector, .object-placement, .detail) p { font-size: 13px; line-height: 1.6; }
+#shell .object-placement-form { gap: 16px; padding-block: 18px; }
+#shell .confirm { position: fixed; inset: 100px 28px auto auto; width: min(480px, calc(100vw - 56px)); max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box; transform: none; translate: none; padding: 26px; z-index: 90; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); color: var(--ink); box-shadow: var(--app-shadow); }
+#shell .confirm h2 { font: 600 26px/1.2 var(--ui-font-display); }
+#shell .confirm p { font-size: 14px; line-height: 1.6; }
+#shell .confirm button { padding: 11px 18px; min-height: 42px; border-radius: 4px; }
+#shell .world-place { position: fixed; top: 24px; left: 28px; width: 280px; z-index: 6; display: grid; gap: 8px; }
+#shell .world-place .world-heading { position: relative; inset: auto; width: 100%; max-height: none; overflow: visible; }
+#shell .world-place .world-local-nav { position: relative; inset: auto; }
+#shell .companion-encounter[data-state='open'] .companion-speaker { position: static; display: block; opacity: 1; transform: none; width: auto; height: auto; clip-path: none; overflow: visible; }
+#shell .companion-encounter[data-state='open'] .command-action-key { color: var(--ink-soft); border-color: var(--edge); background: var(--raised); opacity: 1; }
+#shell .intake-step-content fieldset:disabled { opacity: .7; }
+#shell .detail :is(.history, .band-row, .citations) { overflow-wrap: anywhere; }
+#shell .reconstruction-inspector-header { display: flex; align-items: start; gap: 16px; justify-content: space-between; }
+#shell .reconstruction-inspector-header h2 { margin-top: 0; }
+#shell .reconstruction-inspector nav { display: flex; gap: 8px; margin-block: 12px; }
+#shell[data-world-state='empty'] > .personal-intake { position: fixed; inset: 180px 28px 28px; width: auto; max-height: none; max-width: 1000px; margin-inline: auto; transform: none; }
+#shell .detail .detail-section > h2 { font-size: 15px; text-transform: none; letter-spacing: 0; margin-top: 24px; }
+#shell .intake-original { display: grid; gap: 6px; border-bottom: 1px solid var(--edge); padding: 12px 0; }
+#shell .intake-original label { margin: 0; }
+#shell .intake-original details { font-size: 12px; color: var(--ink-soft); }
+#shell .intake-original details > summary { font-size: 12px; padding: 4px 0; }
+@media (min-width: 960px) and (max-width: 1250px) {
+  #shell .index-workspace[data-detail-open='true'] { grid-template-columns: minmax(0, 1fr); }
+  #shell .index-workspace[data-detail-open='true'] .index-plan { display: none; }
+  #shell .index-workspace[data-detail-open='true'] .index-keys { display: none; }
+  #shell .index-workspace[data-detail-open='true'] .index-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 20px; }
+  #shell .index-workspace[data-detail-open='true'] .provenance-legend { flex: 1 1 180px; }
+}
+
+#shell .world-panel:not([hidden]), #shell .companion-encounter[data-state='open'] {
+  animation: world-tool-arrive .18s ease-out;
+  backdrop-filter: blur(14px);
+}
+:root[data-transparency='reduced'] #shell :is(.world-panel, .companion-encounter) { backdrop-filter: none; }

@@ -47,6 +47,7 @@ import {
   BOUNDED_PATH_VERSION,
   DISPLAY_EYE_HEIGHT,
   identityDisplayFrame,
+  atlasVec3,
   type AtlasScene,
   type Island,
   type IslandId,
@@ -87,21 +88,34 @@ import {
   type ReviewedAsset,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
+import type { Credentials } from '../config.js';
 
 /** How far one arrow key moves an object, in millimetres. A quarter of a step. */
 const NUDGE_STEP_MM = 250;
 /** How far one bracket key turns it, in radians. */
 const TURN_STEP = Math.PI / 12;
 
+export interface DistrictObjectPlacement {
+  readonly versionId: string;
+  readonly regionId: string;
+  readonly translationMm: readonly [number, number, number];
+  readonly boundsMm: readonly [number, number, number, number];
+}
+
 export interface ObjectsDependencies {
   readonly env: AppEnvironment;
   readonly state: SessionState;
-  readonly credentials: { readonly baseUrl: string; readonly token: string };
+  readonly credentials: Credentials;
   /** The scene this mount is drawn from, for the regions an object may stand in. */
   readonly scene: AtlasScene;
   readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
   /** True while the world itself is the primary surface, so the key does not fight a dialog. */
   readonly isWorldPrimary: () => boolean;
+  readonly onOpen?: () => void;
+  /** Refresh dependent views after an accepted write; it cannot undo that write. */
+  readonly onAuthoredEdit?: (versionId: string) => Promise<void>;
+  /** Current, byte-verified authored district binding. Never a reconstructed memory frame. */
+  readonly districtPlacement?: () => DistrictObjectPlacement | null;
   /** The write path's confirmation panel, hidden before this surface shows its own. */
   readonly hideWritePathConfirm: () => void;
   /** Injectable for tests. Production builds the real authority client. */
@@ -114,6 +128,7 @@ export interface MountedObjects {
   readonly panel: ObjectPlacementPanel;
   readonly confirm: ConfirmPanel;
   toggle(): void;
+  close(): void;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
   begin(): Promise<void>;
   dispose(): void;
@@ -129,6 +144,7 @@ interface Pending {
 export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   const { env, state } = deps;
   const listeners = new AbortController();
+  let disposed = false;
   const definition = BEHAVIOUR_REGISTRY.resolve(BOUNDED_PATH_KEY, BOUNDED_PATH_VERSION);
 
   const client = deps.client ?? (env.preview ? null : new WorldObjectsClient(deps.credentials));
@@ -185,12 +201,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     // The browser owns traversal mode. Let its pointerlockchange event update the shell before
     // the visitor clicks the object controls; displaying a panel alone leaves the mouse locked.
     if (visible && document.pointerLockElement != null) document.exitPointerLock();
+    if (visible) deps.onOpen?.();
     panel.setVisible(visible);
   }
 
   // -- reading -----------------------------------------------------------------------------------
 
   async function begin(versionId?: string): Promise<void> {
+    if (disposed) return;
     if (client === null) {
       assets = PREVIEW_ASSETS;
       version = PREVIEW_VERSION;
@@ -203,6 +221,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     try {
       const connected = await client.connect(versionId);
+      if (disposed) return;
       assets = connected.assets;
       version = connected.version;
       refresh();
@@ -225,7 +244,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /** Every object the authority holds, verified and drawn. A failure is per object, not per world. */
   async function drawEvery(): Promise<void> {
     const runtime = state.atlas?.binding.objects;
-    if (runtime === undefined || version === null) return;
+    if (disposed || runtime === undefined || version === null) return;
     for (const record of visibleObjects()) {
       const failure = await draw(record);
       if (failure !== null) {
@@ -239,7 +258,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /** Load one object's verified bytes and place it. Returns the reason it could not be drawn. */
   async function draw(record: AuthoredObject): Promise<string | null> {
     const runtime = state.atlas?.binding.objects;
-    if (runtime === undefined) return 'The world is not drawn yet.';
+    if (disposed || runtime === undefined) return 'The world is not drawn yet.';
     // The contract embeds the whole registry row on the object, so availability is already here.
     if (record.asset.availability !== 'available' && !env.preview) {
       return `The reviewed bytes for “${record.asset.title}” are not in storage `
@@ -247,8 +266,12 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     }
     const island = regionOf(record.regionId);
     if (island === null) return 'That object names a region this world does not draw.';
+    const frameKey = JSON.stringify(currentDistrict());
     try {
       const bytes = await loadBytes(record.asset, island.islandId);
+      if (listeners.signal.aborted || frameKey !== JSON.stringify(currentDistrict()) || regionOf(record.regionId) === null) {
+        return "The object’s display frame is no longer available.";
+      }
       const placed: PlacedAuthoredObject = {
         objectId: record.objectId,
         islandId: island.islandId,
@@ -322,9 +345,15 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * placement succeeded, which is the worst of the available outcomes.
    */
   function placementRegion(): { readonly island: Island; readonly sceneId: string } | null {
+    const district = currentDistrict();
+    const visitor = state.atlas?.binding.playerPose();
+    if (district !== null && visitor !== undefined && districtContains(district, visitor.position.x * MM_PER_METRE, visitor.position.z * MM_PER_METRE)) {
+      const island = regionOf(district.regionId);
+      if (island !== null) return { island, sceneId: 'authored-district' };
+    }
     const drawn = drawnRegions();
     if (drawn.length === 0) return null;
-    const pose = state.atlas?.binding.cameraPose();
+    const pose = state.atlas?.binding.playerPose();
     if (pose === undefined) return drawn[0]!;
     let best: { readonly island: Island; readonly sceneId: string } | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
@@ -356,7 +385,28 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function regionOf(regionId: string): Island | null {
-    return deps.scene.islands.find((island) => String(island.islandId) === regionId) ?? null;
+    const island = deps.scene.islands.find((item) => String(item.islandId) === regionId);
+    if (island === undefined) return null;
+    const district = currentDistrict();
+    if (district?.regionId === regionId) {
+      const [x, y, z] = district.translationMm;
+      return { ...island, placement: { position: atlasVec3(x / MM_PER_METRE, y / MM_PER_METRE, z / MM_PER_METRE), yaw: 0, scale: 1 } };
+    }
+    // A live district without its authorized binding cannot fall back to an arbitrary memory root.
+    if (deps.districtPlacement !== undefined && !env.preview && !drawnRegions().some(item => String(item.island.islandId) === regionId)) return null;
+    return island;
+  }
+
+  function currentDistrict(): DistrictObjectPlacement | null {
+    const district = deps.districtPlacement?.() ?? null;
+    return district !== null && district.versionId === version?.versionId && !version.sourceInvalidated
+      && deps.scene.islands.some(island => String(island.islandId) === district.regionId)
+      ? district : null;
+  }
+
+  function districtContains(district: DistrictObjectPlacement, xMm: number, zMm: number): boolean {
+    const [west, north, east, south] = district.boundsMm;
+    return xMm >= west && xMm <= east && zMm >= north && zMm <= south;
   }
 
   /**
@@ -390,6 +440,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     sceneId: string,
     pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number } },
   ): number {
+    if (sceneId === 'authored-district') return -(currentDistrict()?.translationMm[1] ?? 0);
     if (groundIsMeasured(sceneId)) return 0;
     return regionPointFromAtlas(
       island.placement,
@@ -407,9 +458,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   function placementPose(island: Island, sceneId: string): RegionPose | null {
     const binding = state.atlas?.binding;
     if (binding === undefined) return null;
-    const pose = binding.cameraPose();
+    const pose = binding.playerPose();
     const ground = groundMmIn(island, sceneId, pose);
-    const index = binding.engageFocusedAnchor();
+    const index = sceneId === 'authored-district' ? null : binding.engageFocusedAnchor();
     if (index !== null) {
       const at = index * 3;
       const positions = binding.table.atlasPositions;
@@ -478,7 +529,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (region === null) {
       panel.report(
         drawnRegions().length === 0
-          ? 'No region in this world draws a reconstruction, so there is no ground to stand an '
+          ? 'No authorized district or reconstructed ground is available to stand an '
             + 'object on.'
           : 'You are not standing in a region with reconstructed ground. Walk into one, then '
             + 'place the object there.',
@@ -491,6 +542,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       panel.report('The world is still forming. Try again in a moment.', 'failure');
       return;
     }
+    const districtAtPlacement = region.sceneId === 'authored-district' ? currentDistrict() : null;
+    if (districtAtPlacement !== null && !districtContains(districtAtPlacement,
+      pose.xMm + districtAtPlacement.translationMm[0], pose.zMm + districtAtPlacement.translationMm[2])) {
+      panel.report('That spot is outside the district. Face toward its ground and try again.', 'failure');
+      return;
+    }
+    const districtKey = JSON.stringify(districtAtPlacement);
     const role: ObjectRole = OBJECT_ROLES.includes(draft.role as ObjectRole)
       ? (draft.role as ObjectRole)
       : 'fictional';
@@ -514,7 +572,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       kind: 'place',
       describe:
         `Add “${asset.title}” to ${regionLabel(region.island.islandId)}, `
-        + (groundIsMeasured(region.sceneId)
+        + (districtAtPlacement !== null
+          ? 'standing on this district’s authored ground'
+          : groundIsMeasured(region.sceneId)
           ? 'standing on the ground its cameras recovered'
           : 'standing at your feet, because this region has no recovered cameras to place a '
             + 'ground from')
@@ -530,6 +590,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
             failure === null ? 'settled' : 'failure',
           );
           return;
+        }
+        if (districtAtPlacement !== null && JSON.stringify(currentDistrict()) !== districtKey) {
+          throw new Error('The district binding changed. Choose the placement again.');
         }
         const result = await client.place(version, {
           objectId,
@@ -668,6 +731,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     result: { readonly kind: 'recorded' | 'stale'; readonly version?: AlternateVersion; readonly current?: AlternateVersion },
     said: string,
   ): Promise<void> {
+    if (disposed) return;
     const next = result.kind === 'stale' ? result.current : result.version;
     if (next !== undefined) version = next;
     await redrawAll();
@@ -680,6 +744,13 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       return;
     }
     panel.report(said, 'settled');
+    if (next !== undefined && deps.onAuthoredEdit) {
+      try {
+        await deps.onAuthoredEdit(next.versionId);
+      } catch {
+        deps.showTravelStatus('Your change was saved. Society updates are temporarily unavailable.', 'failure');
+      }
+    }
   }
 
   async function redrawAll(): Promise<void> {
@@ -889,6 +960,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))) {
       return;
     }
+    if (event.code === 'Escape' && document.pointerLockElement == null && panel.visible() && confirm.root.hidden) {
+      event.preventDefault();
+      setPanelVisible(false);
+      return;
+    }
     if (event.code === 'KeyP') {
       event.preventDefault();
       setPanelVisible(!panel.visible());
@@ -920,11 +996,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   return {
     panel,
     confirm,
+    close() { setPanelVisible(false); },
     toggle() {
       setPanelVisible(!panel.visible());
     },
     begin,
     dispose() {
+      if (disposed) return;
+      disposed = true;
       listeners.abort();
       pending = null;
     },

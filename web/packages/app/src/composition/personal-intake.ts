@@ -27,6 +27,7 @@ export function createPersonalIntakeSession(): PersonalIntakeSession {
 }
 export function mountPersonalIntake(deps: {
   credentials: TransportOptions;
+  preview?: boolean;
   session: PersonalIntakeSession;
   snapshot: GraphSnapshot;
   media: SourceMediaCatalog | undefined;
@@ -65,7 +66,7 @@ export function mountPersonalIntake(deps: {
     catch { say('Browser recovery storage is unavailable. Keep this page open for exact admission retry.'); }
   }
   function reflect(): void {
-    ui.controls.disabled = busy;
+    ui.controls.disabled = busy || deps.preview === true;
     ui.retry.hidden = journal.pending === null;
 
     ui.upload.disabled = ui.detect.disabled = ui.complete.disabled = journal.pending !== null;
@@ -83,8 +84,11 @@ export function mountPersonalIntake(deps: {
           : journal.memberIds.filter(id => id !== source.capture_id);
         ui.attestation.checked = false; persist(); reflect();
       };
-      return el('p', {}, [el('label', {}, [checkbox,
-        ` Original ${index + 1}: ${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}`])]);
+      return el('div', { class: 'intake-original' }, [
+        el('label', {}, [checkbox, ` Original ${index + 1} · ${(source.bytes / 1_000_000).toFixed(2)} MB`]),
+        el('details', {}, [el('summary', { text: 'File identity' }),
+          el('p', { text: `${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}` })]),
+      ]);
     }));
     replace(ui.receipts, receiptHistory.flatMap(result => [el('p', { text: `Saved admission ${result.batch_id}` }),
       ...result.receipts.map(receipt => el('p', {
@@ -92,7 +96,7 @@ export function mountPersonalIntake(deps: {
     }))]));
   }
   async function act(run: () => Promise<void>): Promise<void> {
-    if (busy || disposed) return;
+    if (busy || disposed || deps.preview === true) return;
     busy = true; reflect();
     try { await run(); }
     catch (error) { say(error instanceof Error ? error.message : 'The request did not complete.'); }
@@ -324,6 +328,10 @@ export function mountPersonalIntake(deps: {
   }); };
   ui.refreshWorld.onclick = () => { void act(deps.refreshWorld); };
   async function begin(): Promise<void> {
+    if (deps.preview) {
+      say('Photo upload and human review require an authenticated workspace. This preview shows the workflow; its controls do not upload or save.');
+      return;
+    }
     await act(async () => {
       // A hash scopes recovery to this API/session without retaining the bearer token.
       storageKey = `personal-intake:v1:${await sha256(new TextEncoder().encode(`${deps.credentials.baseUrl}\n${deps.credentials.token}`).buffer)}`;

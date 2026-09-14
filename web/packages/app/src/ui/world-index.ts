@@ -190,7 +190,7 @@ export function buildWorldIndex(
 
   root.append(
     el('header', { class: 'index-head' }, [
-      el('h1', { id: titleId, text: 'Index' }),
+      el('h1', { id: titleId, text: 'Your library' }),
       el('div', { class: 'index-head-state' }, [resultSummary, counter]),
     ]),
     el('aside', { class: 'index-facets', 'aria-label': 'Index filters' }, [

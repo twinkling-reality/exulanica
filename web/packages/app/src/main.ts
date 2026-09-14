@@ -39,8 +39,11 @@ import './unified-interface.css';
 import './ui/object-placement.css';
 import './ui/environment-selection.css';
 import './ui/scene-segments.css';
+import './ui/redesign.css';
+import './ui/character-studio.css';
 
 import { ApiError } from '@exulanica/graph-client';
+import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
 import { FACET_KEYS, encodeFacets, type IndexFacets } from '@exulanica/world-index';
 import {
@@ -71,6 +74,7 @@ import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountPersonalIntake } from './composition/personal-intake.js';
+import { mountCharacter } from './composition/character.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
@@ -97,7 +101,14 @@ const segmentSession = createSegmentSession();
 const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewArtProfile } = env;
 
 window.addEventListener('pagehide', () => {
+  state.disposeCharacter?.();
+  state.disposeObjects?.();
   state.disposeEnvironmentSelection?.();
+  state.personalIntake.dispose?.();
+  disposeCompanionStage(state);
+  disposeFormationWatch(state);
+  disposeMountListeners(state);
+  disposeRenderer(state);
   state.disposeEnvironmentSelection = null;
   state.sourceMediaSession?.dispose();
 }, { once: true });
@@ -125,23 +136,34 @@ async function boot(): Promise<void> {
     return;
   }
   const token = developmentToken();
-  if (token === null) {
-    askForToken();
+  if (token !== null) {
+    await start(token);
     return;
   }
-  await start(token);
+  let account: BrowserAccountState;
+  try {
+    account = await readBrowserAccount();
+  } catch {
+    account = { kind: 'unavailable' };
+  }
+  if (account.kind === 'authenticated') {
+    await start('', account.session.csrfToken);
+    return;
+  }
+  askForAccess(account.kind);
 }
 
 /**
- * The credential prompt.
- *
- * There is no account system to sign in to. `exulanica/api/authorisation.py` says so plainly, and
- * this asks for the bearer token the operator configured rather than inventing a registration
- * flow a config module has no business deciding. Nothing is stored: the value goes to the
- * transport and is not written to storage, a cookie or the URL.
+ * Account login is the normal entry. The folded bearer path remains for local operators and
+ * retains its previous no-storage behavior.
  */
-function askForToken(): void {
+function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
   const form = el('form', { class: 'gate credential-gate' });
+  const google = el('button', {
+    type: 'button', class: 'account-sign-in', text: 'Continue with Google',
+    disabled: accountState === 'unavailable',
+  });
+  google.addEventListener('click', () => window.location.assign('/api/auth/google/start'));
   const input = el('input', {
     type: 'password',
     autocomplete: 'off',
@@ -160,13 +182,21 @@ function askForToken(): void {
     submit.disabled = input.value.trim().length === 0;
   });
 
+  const operator = el('details', { class: 'credential-operator' }, [
+    el('summary', { text: 'Developer access' }),
+    el('div', { class: 'credential-controls' }, [
+      el('div', { class: 'credential-entry' }, [input]), submit,
+    ]),
+  ]);
+
   form.append(
     el('p', { class: 'gate-wordmark', text: 'Exulanica' }),
+    el('p', { class: 'gate-note', text: accountState === 'unavailable'
+      ? 'Account sign-in is not configured on this host.'
+      : 'Enter your personal world.' }),
     el('div', { class: 'credential-action' }, [
-      el('div', { class: 'credential-controls' }, [
-        el('div', { class: 'credential-entry' }, [input]),
-        submit,
-      ]),
+      google,
+      operator,
       failure,
     ]),
   );
@@ -186,14 +216,18 @@ function askForToken(): void {
     });
   });
   replace(shell, [form]);
-  input.focus();
+  if (accountState === 'unavailable') operator.open = true;
 }
 
-async function start(token: string): Promise<void> {
-  await openAppSession(env, state, token);
+async function start(token: string, csrfToken?: string): Promise<void> {
+  await openAppSession(env, state, token, csrfToken);
   await mount();
 }
 async function mount(): Promise<void> {
+  state.disposeCharacter?.();
+  state.disposeCharacter = null;
+  state.disposeObjects?.();
+  state.disposeObjects = null;
   const current = state.snapshot;
   const currentSession = state.session;
   const currentEvidence = state.evidence;
@@ -224,6 +258,7 @@ async function mount(): Promise<void> {
   currentCompanion.observeSnapshot(current);
 
   const intake = mountPersonalIntake({
+    preview,
     credentials: currentCredentials, session: state.personalIntake, snapshot: current,
     media: state.previewSourceMedia,
     reloadSnapshot: () => currentSession.snapshot(),
@@ -337,6 +372,7 @@ async function mount(): Promise<void> {
   let writePath: MountedWritePath;
   const companion = mountCompanion({
     state,
+    onOpen: () => { environmentSelection.closePanels(); objects.close(); character.reach(); },
     engine: currentCompanion,
     evidence: currentEvidence,
     ask: (question) => companionAsk.ask(question, companionCityContext),
@@ -350,7 +386,7 @@ async function mount(): Promise<void> {
     reflectShell: () => reflectShell(),
     onAnswered: finishFirstUse,
     isSystemSurfaceOpen: () =>
-      shellState.primary === 'options' || shellState.primary === 'controls',
+      shellState.primary === 'options' || shellState.primary === 'controls' || shellState.primary === 'character',
   });
 
   if (memoryLoadFailure !== null) {
@@ -379,8 +415,12 @@ async function mount(): Promise<void> {
     scene: built.scene,
     showTravelStatus: (message, kind) => showTravelStatus(message, kind),
     isWorldPrimary: () => shellState.primary === 'world',
+    onAuthoredEdit: (versionId) => environmentSelection.afterAuthoredEdit(versionId),
+    districtPlacement: () => environmentSelection.districtPlacement(),
+    onOpen: () => { companion.dismiss(); environmentSelection.closePanels(); character.reach(); },
     hideWritePathConfirm: () => writePath.confirm.hide(),
   });
+  state.disposeObjects = () => objects.dispose();
   const environmentSelection = mountEnvironmentSelection({
     env,
     state,
@@ -389,6 +429,11 @@ async function mount(): Promise<void> {
     showStatus: (message, kind) => showTravelStatus(message, kind),
     ...(env.preview ? { admissionId: PREVIEW_NYC_OPEN_DATA_ADMISSION_ID } : {}),
     onSelect: (context) => { companionCityContext = context; },
+    onPanelOpen: () => { companion.dismiss(); objects.close(); character.reach(); },
+    onObjects: () => objects.toggle(),
+    onDistrictPlacementChange: () => {
+      if (environmentSelection.districtPlacement() !== null) void objects.begin();
+    },
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 
@@ -522,13 +567,23 @@ async function mount(): Promise<void> {
   const formation = mountFormation({ state, credentials: currentCredentials });
   const chrome = buildWorldChrome(shell);
   const handleAtlasCommand = (command: AtlasCommand): void => {
+    environmentSelection.closePanels();
+    objects.close();
+    if (command === 'companion') {
+      dispatchShell({ type: 'show-world' });
+      companion.toggle();
+      return;
+    }
     if (companion.panel.state() === 'open') companion.dismiss();
     if (command === 'index') dispatchShell({ type: 'toggle-index' });
+    else if (command === 'character') dispatchShell({ type: 'toggle-character' });
     else if (command === 'map') dispatchShell({ type: 'toggle-map' });
     else if (command === 'options') dispatchShell({ type: 'toggle-options' });
     else dispatchShell({ type: 'toggle-controls' });
   };
   const commandBar = buildAtlasCommands(handleAtlasCommand);
+  const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
+  state.disposeCharacter = () => character.dispose();
   const mapPeek = new MapPeek({
     isMapActive: () => shellState.camera === 'map',
     enterMap: () => dispatchShell({ type: 'toggle-map' }),
@@ -585,6 +640,13 @@ async function mount(): Promise<void> {
     showWorld: () => dispatchShell({ type: 'show-world' }),
     showTravelStatus,
   });
+  worldIndex.root.append(intake.root);
+  intake.root.addEventListener('toggle', () => {
+    if (intake.root.open && shellState.detailId !== null) dispatchShell({ type: 'close-detail' });
+  });
+  const sourceDetails = el('details', { class: 'world-source-details' }, [
+    el('summary', { text: 'Source availability' }), status.statusElement,
+  ]);
   replace(shell, [
     stage,
     chrome.reticle,
@@ -602,16 +664,19 @@ async function mount(): Promise<void> {
     minimap.root,
     appearance.options.root,
     appearance.settings.root,
+    character.root,
+    character.gestureRoot,
     viewportBoundary,
     status.inspectorRoot,
-    status.statusElement,
+    sourceDetails,
     segments.root,
-    intake.root,
   ]);
   void intake.begin();
 
   reflectShell = (): void => {
     if (shellState.primary !== 'world') {
+      environmentSelection.closePanels();
+      objects.close();
       state.atlas?.binding.endSceneInspection();
       status.hideInspector();
     }
@@ -622,7 +687,7 @@ async function mount(): Promise<void> {
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
     appearance.options.setVisible(shellState.primary === 'options');
     appearance.settings.setVisible(shellState.primary === 'controls');
-    const systemSurfaceOpen = shellState.primary === 'options' || shellState.primary === 'controls';
+    const systemSurfaceOpen = shellState.primary === 'options' || shellState.primary === 'controls' || shellState.primary === 'character';
     const modalBackground = [
       stage,
       worldIndex.root,
@@ -638,6 +703,7 @@ async function mount(): Promise<void> {
     if (!systemSurfaceOpen) for (const surface of modalBackground) surface.inert = false;
     appearance.options.setVisible(shellState.primary === 'options');
     appearance.settings.setVisible(shellState.primary === 'controls');
+    character.setVisible(shellState.primary === 'character');
     if (systemSurfaceOpen) for (const surface of modalBackground) surface.inert = true;
     commandBar.reflect(shellState.primary, shellState.camera);
     mapCaption.hidden = shellState.camera !== 'map';
@@ -659,7 +725,7 @@ async function mount(): Promise<void> {
      * Summon keeps its own guard below, so a system surface still cannot call the Companion out
      * from behind itself.
      */
-    state.atlas?.binding.setControlsEnabled(shellState.camera === 'ground');
+    state.atlas?.binding.setControlsEnabled(shellState.camera === 'ground' && shellState.primary !== 'character');
     // Every surface here takes the cursor. None of them should take your feet with it.
     state.atlas?.binding.setFreeCursorActive(
       companion.panel.state() === 'open' || shellState.primary !== 'world',
@@ -692,6 +758,7 @@ async function mount(): Promise<void> {
   });
   const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null ||
     renderer.atlas.binding.googleTiles !== null;
+  void character.attach(renderer.atlas.binding);
   if (geographicDistrict) {
     segments.root.hidden = true;
     segments.root.style.display = 'none';
@@ -744,7 +811,3 @@ function syncIndexRoute(facets: IndexFacets): void {
   for (const [key, value] of encoded) url.searchParams.set(key, value);
   window.history.replaceState(window.history.state, '', url);
 }
-
-
-
-

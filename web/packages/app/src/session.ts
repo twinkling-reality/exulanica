@@ -30,6 +30,7 @@ import { CompanionSession } from '@exulanica/companion-runtime';
 export interface SessionOptions {
   readonly baseUrl: string;
   readonly token: string;
+  readonly csrfToken?: string;
 }
 
 /**

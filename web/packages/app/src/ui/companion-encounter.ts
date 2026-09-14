@@ -18,6 +18,7 @@ export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
+  readonly onDismiss?: () => void;
   /**
    * An answer has been taken by this surface. Fired once per arriving answer, AFTER it is drawn.
    *
@@ -113,6 +114,11 @@ export function buildCompanionEncounter(
    * Companion is for. Customize is already one of the four Atlas commands and is reachable from
    * the encounter like everywhere else.
    */
+  const dismissButton = el('button', { type: 'button', class: 'companion-dismiss', 'aria-label': 'Close Companion', text: 'Close' });
+  dismissButton.addEventListener('click', () => options.onDismiss?.());
+  dismissButton.hidden = options.onDismiss === undefined;
+  const toolbar = el('header', { class: 'companion-toolbar' }, [el('span', { text: 'Companion' }), dismissButton]);
+  let restoreFocus: HTMLElement | null = null;
   const speech = buildCompanionSpeech({ speakerName });
   const choices = buildCompanionChoiceRail(handlers);
   let state: PanelState = 'enter';
@@ -182,20 +188,20 @@ export function buildCompanionEncounter(
     mode = 'turn';
     speech.render(turn);
     choices.render(turn);
-    replace(root, [speech.root, choices.root]);
+    replace(root, [toolbar, speech.root, choices.root]);
   }
 
   function renderAnswer(shown: CompanionAnswer): void {
     mode = 'answer';
     speech.renderAnswer(shown);
     choices.renderAnswer(shown, backToQuestion);
-    replace(root, [speech.root, choices.root]);
+    replace(root, [toolbar, speech.root, choices.root]);
   }
 
   function renderAsking(question: string): void {
     mode = 'asking';
     speech.renderAsking(question);
-    replace(root, [speech.root]);
+    replace(root, [toolbar, speech.root]);
   }
 
   function renderFailure(failure: AskUnavailable): void {
@@ -204,7 +210,7 @@ export function buildCompanionEncounter(
     // The rail comes back with the turn's own choices, so a question that failed leaves the
     // person exactly where they were rather than in a dead end.
     if (lastTurn !== null) choices.render(lastTurn);
-    replace(root, lastTurn === null ? [speech.root] : [speech.root, choices.root]);
+    replace(root, lastTurn === null ? [toolbar, speech.root] : [toolbar, speech.root, choices.root]);
   }
 
   /**
@@ -268,9 +274,15 @@ export function buildCompanionEncounter(
       root.dataset['placementBasis'] = placement.basis;
     },
     setState(next) {
+      const wasOpen = state === 'open';
+      if (next === 'open' && !wasOpen) restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       state = next;
       root.dataset['state'] = next;
       reflect();
+      if (next === 'open' && !wasOpen && !dismissButton.hidden) queueMicrotask(() => {
+        if (state === 'open' && dismissButton.isConnected && (document.activeElement === restoreFocus || document.activeElement === document.body)) dismissButton.focus({ preventScroll: true });
+      });
+      if (next !== 'open' && wasOpen && restoreFocus?.isConnected) restoreFocus.focus({ preventScroll: true });
     },
     render(turn) {
       lastTurn = turn;

@@ -18,29 +18,107 @@ const record = (value: unknown): Readonly<Record<string, unknown>> => {
   return value as Readonly<Record<string, unknown>>;
 };
 
+const textValue = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+const integer = (value: unknown, minimum = 0): value is number => Number.isSafeInteger(value) && (value as number) >= minimum;
+const digest = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+const point = (value: unknown): value is readonly [number, number] => Array.isArray(value) && value.length === 2 && value.every(Number.isSafeInteger);
+
 export function parseSociety(value: unknown): SocietySnapshot {
   const row = record(value);
   const state = record(row['state']);
   const inhabitants = state['inhabitants'];
-  if (
-    typeof row['society_id'] !== 'string' ||
-    typeof row['version_id'] !== 'string' ||
-    typeof row['place_id'] !== 'string' ||
-    !Number.isSafeInteger(row['population_size']) ||
-    !Number.isSafeInteger(row['current_tick']) ||
-    typeof row['state_sha256'] !== 'string' ||
-    !Array.isArray(inhabitants) ||
-    inhabitants.length < 100
-  ) throw new Error('Invalid society response');
+  const v2 = state['profile'] === 'exulanica-society/v2';
+  if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
+      !integer(row['population_size'], 100) || row['population_size'] > 512 ||
+      !integer(row['current_tick']) || state['tick'] !== row['current_tick'] ||
+      !digest(row['state_sha256']) || !Array.isArray(inhabitants) || inhabitants.length !== row['population_size'] ||
+      (state['profile'] !== undefined && state['profile'] !== 'exulanica-society/v1' && !v2)) throw new Error('Invalid society response');
+  const ids = new Set<string>();
+  for (const value of inhabitants) {
+    const inhabitant = record(value);
+    if (!textValue(inhabitant['id']) || ids.has(inhabitant['id']) || inhabitant['synthetic'] !== true ||
+        !point(inhabitant['position_mm'])) throw new Error('Invalid society inhabitant');
+    ids.add(inhabitant['id']);
+    if (!v2) continue;
+    const action = record(inhabitant['action']), explanation = record(inhabitant['explanation']);
+    const path = inhabitant['motion_path_mm'];
+    if (!textValue(inhabitant['display_name']) || !textValue(inhabitant['role']) ||
+        !['idle', 'move', 'visit', 'rest'].includes(String(action['kind'])) ||
+        !['active', 'completed', 'blocked'].includes(String(action['status'])) ||
+        !(action['target_id'] === null || textValue(action['target_id'])) ||
+        !integer(action['remaining_ticks']) || !textValue(action['reason']) ||
+        !textValue(explanation['summary']) || !Array.isArray(explanation['event_ids']) ||
+        !explanation['event_ids'].every(textValue) || !Array.isArray(path) || path.length < 1 ||
+        !path.every(point)) throw new Error('Invalid society action or explanation');
+    const end = path[path.length - 1] as readonly number[];
+    if (end[0] !== inhabitant['position_mm'][0] || end[1] !== inhabitant['position_mm'][1]) throw new Error('Invalid society motion endpoint');
+    if (inhabitant['goal'] !== null) {
+      const goal = record(inhabitant['goal']);
+      if (!['visit', 'rest'].includes(String(goal['kind'])) || !textValue(goal['target_id']) || !textValue(goal['reason'])) throw new Error('Invalid society goal');
+    }
+    if (inhabitant['route'] !== null) {
+      const route = record(inhabitant['route']);
+      if (!Array.isArray(route['node_ids']) || !route['node_ids'].every(textValue) ||
+          !integer(route['edge_index']) || !integer(route['edge_progress_mm']) ||
+          !textValue(route['destination_node_id']) || !digest(route['input_sha256'])) throw new Error('Invalid society route');
+    }
+  }
+  if (v2 && (state['society_id'] !== row['society_id'] || state['branch_id'] !== row['version_id'] ||
+      row['branch_id'] !== state['branch_id'] || !integer(state['input_seq'], 1) ||
+      row['input_seq'] !== state['input_seq'] || !digest(state['input_sha256']) ||
+      row['input_sha256'] !== state['input_sha256'])) throw new Error('Invalid society branch or input');
   return Object.freeze({
-    societyId: row['society_id'],
-    versionId: row['version_id'],
-    placeId: row['place_id'],
-    populationSize: row['population_size'] as number,
-    currentTick: row['current_tick'] as number,
-    stateSha256: row['state_sha256'],
+    societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
+    populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
     state: state as unknown as OwnedSocietyState,
   });
+}
+
+export type SocietyProfile = 'exulanica-society/v1' | 'exulanica-society/v2';
+
+/** Authorized persisted events. The endpoint returns only its latest bounded window. */
+export interface SocietyEvent {
+  readonly event_id: string;
+  readonly subject_id: string;
+  readonly tick: number;
+  readonly event_kind: string;
+  readonly document_sha256: string;
+  readonly document: Readonly<Record<string, unknown>> & {
+    readonly synthetic: true;
+    readonly summary: string;
+  };
+}
+
+export function parseSocietyEvents(value: unknown, snapshot: SocietySnapshot): readonly SocietyEvent[] {
+  const rows = record(value)['events'];
+  if (!Array.isArray(rows) || rows.length > 256) throw new Error('Invalid society events');
+  const ids = new Set<string>();
+  const subjects = new Set(snapshot.state.inhabitants.map(person => person.id));
+  const events = rows.map(raw => {
+    const row = record(raw), doc = record(row['document']);
+    if (!textValue(row['event_id']) || ids.has(row['event_id']) ||
+        !textValue(row['subject_id']) || !subjects.has(row['subject_id']) ||
+        !integer(row['tick']) || !textValue(row['event_kind']) ||
+        !digest(row['document_sha256']) || doc['synthetic'] !== true || !textValue(doc['summary'])) {
+      throw new Error('Invalid society event');
+    }
+    ids.add(row['event_id']);
+    if (snapshot.state.profile === 'exulanica-society/v2' &&
+        (doc['profile'] !== 'exulanica-society/v2' || doc['branch_id'] !== snapshot.versionId ||
+         doc['subject_id'] !== row['subject_id'] || doc['tick'] !== row['tick'] ||
+         !integer(doc['order']) || !integer(doc['input_seq'], 1) || !digest(doc['input_sha256']) ||
+         !textValue(doc['reason']) || !textValue(doc['outcome']))) throw new Error('Invalid society event binding');
+    return row as unknown as SocietyEvent;
+  });
+  // Another browser can advance between GET snapshot and GET events. Do not attach future
+  // reasons to the held state, nor claim this bounded endpoint is the complete history.
+  return Object.freeze(events.filter(event => event.tick <= snapshot.currentTick));
+}
+
+function boundSnapshot(value: unknown, versionId: string): SocietySnapshot {
+  const snapshot = parseSociety(value);
+  if (snapshot.versionId !== versionId) throw new Error('Society response belongs to another branch');
+  return snapshot;
 }
 
 export class SocietyClient {
@@ -54,18 +132,33 @@ export class SocietyClient {
     versionId: string,
     placeId: string,
     regionId: string,
+    profile: SocietyProfile = 'exulanica-society/v2',
   ): Promise<SocietySnapshot> {
     const path = `/world/versions/${encodeURIComponent(versionId)}/society`;
     try {
-      return parseSociety(await this.transport.getJson<unknown>(path));
+      return await this.read(versionId);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
-      return parseSociety(await this.transport.postJson<unknown>(path, {
+      return boundSnapshot(await this.transport.postJson<unknown>(path, {
         place_id: placeId,
         region_id: regionId,
         seed: '7a'.repeat(32),
-      }));
+        profile,
+      }), versionId);
     }
+  }
+
+  read(versionId: string): Promise<SocietySnapshot> {
+    return this.transport.getJson<unknown>(
+      `/world/versions/${encodeURIComponent(versionId)}/society`,
+    ).then(value => boundSnapshot(value, versionId));
+  }
+
+  events(snapshot: SocietySnapshot): Promise<readonly SocietyEvent[]> {
+    return this.transport.getJson<unknown>(
+      `/world/versions/${encodeURIComponent(snapshot.versionId)}/society/events`,
+      { limit: '256' },
+    ).then(value => parseSocietyEvents(value, snapshot));
   }
 
   advance(snapshot: SocietySnapshot): Promise<SocietySnapshot> {
@@ -75,6 +168,6 @@ export class SocietyClient {
         base_tick: snapshot.currentTick,
         base_state_sha256: snapshot.stateSha256,
       },
-    ).then(parseSociety);
+    ).then(value => boundSnapshot(value, snapshot.versionId));
   }
 }

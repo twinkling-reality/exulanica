@@ -293,6 +293,32 @@ body {
   margin: 0;
 }
 
+.account-sign-in {
+  min-width: min(21rem, 72vw);
+  padding: 0.78rem 1.4rem;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 22%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--ui-light-ink);
+  color: var(--ui-light-canvas);
+}
+
+.account-sign-in:disabled {
+  opacity: 0.38;
+}
+
+.credential-operator {
+  color: var(--ui-light-ink-faint);
+  font-size: 0.82rem;
+}
+
+.credential-operator > summary {
+  cursor: pointer;
+}
+
+.credential-operator > .credential-controls {
+  margin-top: 0.75rem;
+}
+
 .gate-note {
   margin: 0;
   width: min(25rem, 100%);

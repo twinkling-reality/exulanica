@@ -19,6 +19,7 @@
 
 import type { BandRow, ConfirmationSummary } from '@exulanica/companion-runtime';
 import { el, replace } from './dom.js';
+import { createModalFocus } from './modal-focus.js';
 
 export interface ConfirmHandlers {
   onConfirm(proposalId: string): void;
@@ -40,16 +41,24 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
   const root = el('aside', {
     class: 'confirm',
     role: 'dialog',
+    tabindex: '-1',
     'aria-labelledby': 'confirm-title',
     hidden: '',
   });
 
+  const focus = createModalFocus(root, root);
+  root.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopImmediatePropagation();
+      root.querySelector<HTMLButtonElement>('.confirm-actions .ghost')?.click();
+    }
+  });
   const reveal = (): void => {
-    root.hidden = false;
+    focus.setVisible(true);
     handlers.onVisibilityChange?.(true);
   };
   const conceal = (): void => {
-    root.hidden = true;
+    focus.setVisible(false);
     replace(root, []);
     handlers.onVisibilityChange?.(false);
   };
