@@ -15,7 +15,7 @@ from exulanica.world.society_actions import (
     validate_action_request,
 )
 from exulanica.world.society_planner import initial_purposeful_society
-from exulanica.world.society_social import initial_social_society
+from exulanica.world.society_social import advance_social_society, initial_social_society
 
 from society_fixtures import SEED, SOCIETY, VERSION, edited, seal, society_input
 
@@ -73,6 +73,43 @@ def test_directed_v2_advance_uses_the_reviewed_graph_and_replays_exactly():
     assert events[-1].document["disposition"] == "applied"
     assert (advanced, events, dispositions) == (replayed, replay_events, replay_dispositions)
     assert state == original
+
+
+def test_v3_external_policy_uses_the_normal_planner_without_weakening_preconditions():
+    document = society_input()
+    state = initial_social_society(SOCIETY, SEED, document)
+    action = request(state, document)
+    policies, _dispositions = action_goal_policies(state, document, [action])
+    advanced, _events, _processed = advance_social_society(
+        state, SEED, [document], external_goal_policy=policies
+    )
+    person = advanced["inhabitants"][0]
+    assert person["goal"]["target_id"] == "authored:bench:rest"
+    disconnected = deepcopy(document)
+    disconnected["navigation"]["edges"] = []
+    seal(disconnected)
+    stale = deepcopy(state)
+    stale.update(
+        input_seq=disconnected["input_seq"],
+        input_sha256=disconnected["document_sha256"],
+    )
+    unreachable, _events, _processed = advance_social_society(
+        stale, SEED, [disconnected], external_goal_policy=policies
+    )
+    unreachable_person = unreachable["inhabitants"][0]
+    assert (unreachable_person["goal"] or {}).get("target_id") != "authored:bench:rest"
+    with pytest.raises(ValueError, match="select one enabled current target"):
+        advance_social_society(
+            stale,
+            SEED,
+            [disconnected],
+            external_goal_policy={
+                person["id"]: {
+                    "allowed_target_ids": ["invented"],
+                    "preferred_target_id": "invented",
+                }
+            },
+        )
 
 
 def test_action_request_rejects_coordinates_prose_and_unreviewed_affordances():

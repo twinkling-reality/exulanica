@@ -249,7 +249,7 @@ def action_goal_policies(
     )
     policies: dict[str, dict[str, Any]] = {}
     dispositions = []
-    for request in sorted(requests, key=lambda value: value["request_id"]):
+    for request in requests:
         validate_action_request(request)
         _require(request["branch_id"] == state["branch_id"], "action request branch mismatch")
         disposition, reason = _request_reason(state, document, request)
@@ -285,7 +285,7 @@ def append_action_events(
     people = _people(next_state)
     result = list(events)
     previous_digest = society_state_sha256(previous_state)
-    for request in sorted(requests, key=lambda value: value["request_id"]):
+    for request in requests:
         disposition = by_request[request["request_id"]]
         person = people[request["subject_id"]]
         order = len(result)
