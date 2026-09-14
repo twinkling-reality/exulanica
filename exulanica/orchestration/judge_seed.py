@@ -137,6 +137,15 @@ GLOBAL_TABLES: Final[Mapping[str, str]] = {
 #: is not complete, so an archive carrying a sealed row from the machine it was exported on would
 #: produce a judge stack that starts, passes its health check, and refuses every request.
 INSTANCE_TABLES: Final[Mapping[str, str]] = {
+    # Account identity, login and browser-session state belong to the deployment's authentication
+    # boundary. A workspace seed must not carry credentials, identities or account relationships,
+    # even for rows that also name the exported workspace.
+    "account_browser_session": "per-deployment browser authentication state",
+    "account_identity": "per-deployment external identity binding",
+    "account_login_attempt": "per-deployment OIDC login state",
+    "account_membership": "per-deployment account authorization relationship",
+    "account_user": "per-deployment account identity",
+    "account_workspace": "per-deployment account-owned workspace registry",
     # Cross-workspace match calibration, keyed on `predicate_id` and accumulated by whichever
     # deployment ran the matcher. Carrying one deployment's empirical bins into another would be
     # importing a confidence curve measured on a corpus the destination does not hold.
@@ -144,6 +153,7 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "restore_control": "per-deployment deletion checkpoint state, not workspace content",
     "restore_replay_receipt": "per-deployment deletion checkpoint state, not workspace content",
     "schema_migrations": "the destination records what it applied, not what the source did",
+    "world_reviewed_asset_import": "host-admin reviewed import provenance, not workspace content",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact
