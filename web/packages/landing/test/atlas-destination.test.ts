@@ -8,7 +8,6 @@ describe('the canonical Atlas handoff', () => {
   it('uses an absolute deployment destination exactly', () => {
     const destination = resolveAtlasDestination({
       configured: 'https://atlas.exulanica.example/session',
-      development: false,
       landingHref,
     });
     expect(destination?.href).toBe('https://atlas.exulanica.example/session');
@@ -17,24 +16,25 @@ describe('the canonical Atlas handoff', () => {
   it('supports a same-origin deployment path', () => {
     const destination = resolveAtlasDestination({
       configured: '/atlas',
-      development: false,
       landingHref,
     });
     expect(destination?.href).toBe('https://exulanica.example/atlas');
   });
 
-  it('uses the documented app preview during local development', () => {
-    const destination = resolveAtlasDestination({
-      configured: undefined,
-      development: true,
-      landingHref: 'http://127.0.0.1:5174/',
-    });
-    expect(destination?.href).toBe('http://127.0.0.1:5173/?preview=1');
+  /*
+   * There was a development default pointing at `127.0.0.1:5173`. It put an Enter Exulanica
+   * station on the title screen of every local checkout whether or not anything served that port,
+   * which is the one thing this module exists to avoid. Local work asks for the handoff by name.
+   */
+  it('invents no destination in development either', () => {
+    expect(
+      resolveAtlasDestination({ configured: undefined, landingHref: 'http://127.0.0.1:5174/' }),
+    ).toBeNull();
   });
 
   it('does not invent a production destination', () => {
     expect(
-      resolveAtlasDestination({ configured: undefined, development: false, landingHref }),
+      resolveAtlasDestination({ configured: undefined, landingHref }),
     ).toBeNull();
   });
 
@@ -42,7 +42,6 @@ describe('the canonical Atlas handoff', () => {
     expect(
       resolveAtlasDestination({
         configured: 'javascript:alert(1)',
-        development: false,
         landingHref,
       }),
     ).toBeNull();
