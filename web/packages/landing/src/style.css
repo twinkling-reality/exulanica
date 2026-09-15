@@ -449,8 +449,16 @@ body {
   --companion-gaze-scale: 1.2;
 }
 
+/*
+ * The wake is off.
+ *
+ * It is a blurred ellipse wider than the Companion, tinted by the station, meant to read as light
+ * the character is standing in. At this size it reads as a grey smudge behind the head instead,
+ * and the first question it drew was "what is that shadow". The machinery stays because the
+ * travel keyframes move it with the marker; restoring it is this one value.
+ */
 .companion-menu-marker[data-state='attending'] {
-  --companion-wake-opacity: 0.2;
+  --companion-wake-opacity: 0;
 }
 
 .companion-menu-marker[data-state='attending'] .companion-menu-wake {
@@ -574,10 +582,9 @@ body {
 
 .companion-menu-marker[data-body='circle'] .companion-menu-body[data-body='circle'],
 .companion-menu-marker[data-body='arch'] .companion-menu-body[data-body='arch'],
-.companion-menu-marker[data-body='droplet'] .companion-menu-body[data-body='droplet'],
 .companion-menu-marker[data-body='squircle'] .companion-menu-body[data-body='squircle'],
 .companion-menu-marker[data-body='cloud'] .companion-menu-body[data-body='cloud'],
-.companion-menu-marker[data-body='capsule'] .companion-menu-body[data-body='capsule'] {
+.companion-menu-marker[data-body='pebble'] .companion-menu-body[data-body='pebble'] {
   visibility: visible;
 }
 

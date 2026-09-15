@@ -21,16 +21,21 @@ import { createCompanionMenuMarker, MENU_FACE } from './companion-menu-marker.js
  * This was a face per station until the faces turned out to be the wrong channel: at this size
  * the relaxed and pleased poses read as squinting rather than as character. Shape carries it
  * instead, the eyes stay open and identical everywhere, and each station keeps its own colour.
- * Meanings are as close to literal as the contract's shapes allow: a doorway at the way in, a
- * drop waiting to fall at the waitlist, a circle for return.
+ * Meanings are as close to literal as the contract's shapes allow: a doorway at the way in and a
+ * circle for return. All of them come from one family of silhouettes, so the marker changes shape
+ * between stations without changing what it is.
  */
 const STATION_BODY: Readonly<Record<string, CompanionBodyVariant>> = Object.freeze({
   'path-home': 'circle',
+  /*
+   * Enter and the waitlist share the arch because they share the slot and the job: they are the
+   * way in, and only ever one of them exists. A doorway is the honest shape for both.
+   */
   'path-enter': 'arch',
-  'path-waitlist': 'droplet',
+  'path-waitlist': 'arch',
   'path-purpose': 'squircle',
   'path-capabilities': 'cloud',
-  'path-resources': 'capsule',
+  'path-resources': 'pebble',
 });
 
 /**

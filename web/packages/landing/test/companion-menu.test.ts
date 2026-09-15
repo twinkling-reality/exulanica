@@ -104,7 +104,13 @@ describe('the Companion in the title menu', () => {
       expect(face.dataset['face']).toBe(MENU_FACE);
     }
     expect(worn.size).toBe(STATIONS.length);
-    expect(new Set(worn.values()).size).toBe(STATIONS.length);
+    /*
+     * One shape is shared on purpose. Enter Exulanica and the waitlist occupy the same slot and
+     * do the same job, only one of them is ever built, and a doorway is the honest shape for
+     * both. Every other station is distinct.
+     */
+    expect(worn.get('path-enter')).toBe(worn.get('path-waitlist'));
+    expect(new Set(worn.values()).size).toBe(STATIONS.length - 1);
     for (const body of worn.values()) expect(MENU_BODIES).toContain(body);
   });
 

@@ -30,17 +30,20 @@ export const MENU_FACES: readonly CompanionFaceVariant[] = Object.freeze([MENU_F
  * The silhouettes a station can be marked with.
  *
  * Every body variant in the contract shares the same 240 by 240 viewBox, so all of them can be
- * drawn once and revealed one at a time, exactly as the eye poses already are. These six are the
- * ones that stay distinguishable at the size this actually renders; `pebble`, `bead` and
- * `lozenge` are real variants but read as the circle at a third of a rem.
+ * drawn once and revealed one at a time, exactly as the eye poses already are.
+ *
+ * These five are the ones that belong to each other. They fill the frame, carry the eyes at the
+ * same place, and have the same visual weight. The four left out do not: `capsule` and `bead` are
+ * narrow ovals that read as a thinner, lighter character beside the rest, `lozenge` is a diamond,
+ * and `droplet` has a point that reads as a tear rather than a head. Variety is the goal, but a
+ * marker that changes species between stations is not variety.
  */
 export const MENU_BODIES: readonly CompanionBodyVariant[] = Object.freeze([
   'circle',
   'arch',
-  'droplet',
   'squircle',
   'cloud',
-  'capsule',
+  'pebble',
 ]);
 
 function svgElement<K extends keyof SVGElementTagNameMap>(
