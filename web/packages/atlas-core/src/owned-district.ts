@@ -1,5 +1,5 @@
 import { atlasVec3 } from './coords.js';
-import type { NavigationWorld, PolygonObstacle } from './navigation.js';
+import type { NavigationRegion, NavigationWorld, PolygonObstacle } from './navigation.js';
 
 export interface OwnedDistrictBuilding {
   readonly id: string;
@@ -124,7 +124,27 @@ export function parseOwnedDistrict(value: unknown): OwnedDistrict {
   return Object.freeze(district as OwnedDistrict);
 }
 
-export function ownedDistrictNavigation(district: OwnedDistrict): NavigationWorld {
+/**
+ * Build the district's walkable world, including the memories that stand on its ground.
+ *
+ * The regions argument is the whole reason travel works here. Without it this returned
+ * `regions: []`, and because `resolveDirectNavigation` looks the target up in that array before it
+ * does anything else, every "Travel to <region>" button in the Map resolved to
+ * `outside-resident-field` and reported "No safe arrival point is available in that region." The
+ * machinery was complete, wired to three call sites and tested; one empty array made the archival
+ * landscape unreachable by anything except walking, and walking is 200-plus metres through 400
+ * solid footprints at 1.65 m/s.
+ *
+ * A region is declared only when the district has ground under its centre. That is the honest
+ * line: this district is a bounded rectangle of admitted geography, and a memory whose placement
+ * falls outside it genuinely has nowhere here to stand. Declaring it anyway would trade one wrong
+ * answer for another, since `safePoseAround` would then fail on a null surface sample and report
+ * `no-safe-surface` about a region that is not missing a surface but is somewhere else entirely.
+ */
+export function ownedDistrictNavigation(
+  district: OwnedDistrict,
+  regions: readonly NavigationRegion[] = [],
+): NavigationWorld {
   const [west, north, east, south] = district.bounds_cm.map((value) => value / 100) as [
     number, number, number, number,
   ];
@@ -150,7 +170,9 @@ export function ownedDistrictNavigation(district: OwnedDistrict): NavigationWorl
     maximumSlopeDegrees: 12,
     maximumStepHeight: 0.18,
     surfaceSampleSpacing: 0.25,
-    regions: Object.freeze([]),
+    regions: Object.freeze(regions.filter((region) =>
+      region.centre.x >= west && region.centre.x <= east &&
+      region.centre.z >= north && region.centre.z <= south)),
     obstacles: Object.freeze([]),
     polygonObstacles: Object.freeze(polygonObstacles),
     traces: Object.freeze([]),

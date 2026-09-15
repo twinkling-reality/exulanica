@@ -234,9 +234,11 @@ export {
   enterAtlasMap,
   exitAtlasMap,
   flatNavigationSurface,
+  isNavigationGroundPathContinuous,
   isNavigationLineVisible,
   isNavigationPathClear,
   isNavigationPositionClear,
+  navigationRegionForIsland,
   resolveGroundMovement,
   sourceFirstCardLocalPosition,
 } from './navigation.js';

@@ -78,7 +78,15 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
   mounted.binding.onMapTarget = (islandId) => {
     const resolution = mounted.binding.navigateToIsland(islandId, deps.travelUsesReducedMotion());
     if (!resolution.ok) {
-      deps.showTravelStatus('No safe arrival point is available in that region.', 'failure');
+      // One sentence per reason. This said "No safe arrival point is available in that region" for
+      // all four, including the region that has no ground here at all, which told someone to look
+      // for a way in that does not exist.
+      deps.showTravelStatus({
+        'unknown-target': 'That region is not in this Atlas.',
+        'outside-resident-field': 'That region sits outside this place. There is no ground under it to stand on.',
+        'no-safe-surface': 'There is no ground to stand on near that region.',
+        occluded: 'That region is here, but it is built over. Nowhere nearby is open to stand.',
+      }[resolution.reason], 'failure');
       return;
     }
     deps.dispatchShell({ type: 'show-world' });

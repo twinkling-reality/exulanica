@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
+  atlasLandscapeHeight,
   DEFAULT_WORLD_MODULES,
   DEFAULT_WORLD_RECIPES,
   WORLD_DECLARABLE_FORM_KINDS,
@@ -137,5 +138,51 @@ describe('the catalog and the renderer agree on what a world can be built from',
     for (const key of ['landmark.orientation-register', 'growth.open-register']) {
       expect(DEFAULT_WORLD_MODULES.get(key).form).toBeNull();
     }
+  });
+});
+
+/*
+ * Where a memory stands when the ground under it is not the ground it was authored for.
+ *
+ * `atInstance` added `atlasLandscapeHeight` to every module unconditionally. That is right when the
+ * Atlas landscape is the surface you are standing on, and wrong over an owned district, which draws
+ * its own flat street at y = 0 and does not draw the Atlas landscape at all. The height of an
+ * invisible surface is not a small error: on the Flatiron district every region sampled between
+ * -0.74 and -1.39 metres, so a 3.4 metre landmark arrived with a third of itself inside the road.
+ */
+describe('composed world grounding', () => {
+  const at: readonly [number, number, number] = [-12, 0, -4];
+
+  function landmarkBaseY(groundHeight?: (x: number, z: number) => number): number {
+    const topology = composeAtlasWorld(scene([region('r1', 0, at)]));
+    const { device } = stage();
+    const world = groundHeight === undefined
+      ? createComposedWorld(device, topology, ORIGIN_LANDSCAPE)
+      : createComposedWorld(device, topology, ORIGIN_LANDSCAPE, undefined, groundHeight);
+    const target = topology.instances.find((value) => value.role === 'landmark')!;
+    return world.entity.findByName(target.instanceId)!.getPosition().y;
+  }
+
+  it('stands on the authored Atlas landscape by default', () => {
+    const target = composeAtlasWorld(scene([region('r1', 0, at)]))
+      .instances.find((value) => value.role === 'landmark')!;
+    expect(landmarkBaseY()).toBeCloseTo(
+      target.transform.position.y
+        + atlasLandscapeHeight(target.transform.position.x, target.transform.position.z),
+      5,
+    );
+  });
+
+  it('stands on the caller\'s ground when the caller owns it', () => {
+    // The district's own street. Not "close to zero": a flat surface means exactly its own height.
+    expect(landmarkBaseY(() => 0)).toBe(0);
+    // And the two differ by exactly the landscape this district does not draw, which is the whole
+    // displacement the fix removes. Asserted against the function rather than a chosen tolerance,
+    // so it stays true if the fixture moves.
+    const target = composeAtlasWorld(scene([region('r1', 0, at)]))
+      .instances.find((value) => value.role === 'landmark')!;
+    const buried = atlasLandscapeHeight(target.transform.position.x, target.transform.position.z);
+    expect(buried).not.toBe(0);
+    expect(landmarkBaseY() - landmarkBaseY(() => 0)).toBeCloseTo(buried, 5);
   });
 });

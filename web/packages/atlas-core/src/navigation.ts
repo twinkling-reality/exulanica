@@ -91,6 +91,26 @@ export interface NavigationRegion {
   readonly movement: MovementModel;
 }
 
+/**
+ * One island's navigable region, from the island alone.
+ *
+ * Shared rather than duplicated. A region is what travel resolves against, what spatial phase is
+ * classified by, and what the approach ring is measured from, so two worlds that describe the same
+ * island differently would disagree about where a memory is. The owned district builds its regions
+ * from this for exactly that reason: its ground and its blockers are its own, its memories are not.
+ */
+export function navigationRegionForIsland(island: Island): NavigationRegion {
+  const footprintRadius = Math.max(2.5, island.footprintRadiusLocal * island.placement.scale);
+  return Object.freeze({
+    islandId: island.islandId,
+    centre: island.placement.position,
+    footprintRadius,
+    dissolveStartRadius: footprintRadius * 0.8,
+    approachRadius: footprintRadius + REGION_APPROACH_AU,
+    movement: rungProperties(island.rung).movement,
+  });
+}
+
 export interface SemanticTrace {
   readonly from: IslandId;
   readonly to: IslandId;
@@ -162,16 +182,10 @@ export function buildNavigationWorld(
   let contentRadius = 18;
   for (let index = 0; index < scene.islands.length; index += 1) {
     const island = scene.islands[index]!;
-    const radius = Math.max(2.5, island.footprintRadiusLocal * island.placement.scale);
-    const movement = rungProperties(island.rung).movement;
-    regions.push(Object.freeze({
-      islandId: island.islandId,
-      centre: island.placement.position,
-      footprintRadius: radius,
-      dissolveStartRadius: radius * 0.8,
-      approachRadius: radius + REGION_APPROACH_AU,
-      movement,
-    }));
+    const region = navigationRegionForIsland(island);
+    const radius = region.footprintRadius;
+    const movement = region.movement;
+    regions.push(region);
     contentRadius = Math.max(contentRadius, groundDistance(centre, island.placement.position) + radius);
 
     // The present no-geometry slice has one honest archive body per source-first region. It is a
@@ -534,14 +548,30 @@ function surfacePathFailure(
   return null;
 }
 
+/**
+ * Whether the ground itself runs all the way, ignoring anything standing on it.
+ *
+ * The weaker half of the path gate, and the half that is about the world rather than about
+ * walking. A hole, a cliff, or an edge of the admitted field means there is nowhere to be along
+ * the way, and that is true however you cross it. A building means only that you cannot walk
+ * through it.
+ */
+export function isNavigationGroundPathContinuous(
+  world: NavigationWorld,
+  from: AtlasVec3,
+  to: AtlasVec3,
+): boolean {
+  return groundDistance(to, world.centre) <= world.fieldRadius
+    && surfacePathFailure(world, from, to) === null;
+}
+
 /** Full grounded path gate used by both locomotion and direct travel. */
 export function isNavigationPathClear(
   world: NavigationWorld,
   from: AtlasVec3,
   to: AtlasVec3,
 ): boolean {
-  if (groundDistance(to, world.centre) > world.fieldRadius) return false;
-  if (surfacePathFailure(world, from, to) !== null) return false;
+  if (!isNavigationGroundPathContinuous(world, from, to)) return false;
   if (collideAndSlide(from, to, world.obstacles, world.cameraRadius).collided) return false;
   return !collidePolygonsAndSlide(
     from,

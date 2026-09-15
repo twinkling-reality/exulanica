@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   atlasVec3,
+  navigationRegionForIsland,
   ownedDistrictNavigation,
   parseOwnedDistrict,
   resolveGroundMovement,
 } from '../src/index.js';
+import { island } from './fixture.js';
 
 const fixture = {
   profile: 'exulanica.owned-district/v1',
@@ -53,6 +55,26 @@ describe('owned district contract', () => {
     });
     expect(edge.recovered).toBe(true);
     expect(edge.recoveryReason).toBe('no-surface');
+  });
+
+  /*
+   * The district used to hand back `regions: []`, and because `resolveDirectNavigation` looks its
+   * target up in that array first, every region in an owned district answered
+   * `outside-resident-field`. Nothing about the memories had changed; they were simply not
+   * declared, so travel to any of them was refused.
+   */
+  it('declares the memories standing on its ground and omits the ones beyond it', () => {
+    const district = parseOwnedDistrict(fixture);
+    const inside = island({ key: 'inside', createdAt: 1, anchors: [], position: [4, 0, -3] });
+    const beyond = island({ key: 'beyond', createdAt: 2, anchors: [], position: [40, 0, 0] });
+    const world = ownedDistrictNavigation(
+      district,
+      [inside, beyond].map(navigationRegionForIsland),
+    );
+    expect(world.regions.map((region) => region.islandId)).toEqual([inside.islandId]);
+    // Not a radius test. The surface is the district rectangle, so the question a declared region
+    // has to answer is whether this district has ground under it, not how far out it sits.
+    expect(world.surface.sample(beyond.placement.position.x, beyond.placement.position.z)).toBeNull();
   });
 
   it('rejects an unadmitted source before rendering', () => {

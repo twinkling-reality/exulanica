@@ -53,6 +53,7 @@ import {
   buildAnchorTable,
   buildNeighborhoodIndex,
   buildNavigationWorld,
+  navigationRegionForIsland,
   ownedDistrictNavigation,
   classifySpatialPhase,
   enterAtlasMap,
@@ -548,6 +549,8 @@ export class AtlasBinding {
   onNavigationArrive: ((target: DirectNavigationTarget) => void) | null = null;
   onMapTarget: ((islandId: IslandId) => void) | null = null;
   onInspectionChange: ((view: SceneInspectionView | null) => void) | null = null;
+  /** Fires whenever the memory layer is switched, including when travel switches it on. */
+  onMemoryLayerChange: ((visible: boolean) => void) | null = null;
   onRepresentationChange: ((report: RepresentationReport) => void) | null = null;
 
   private publishRepresentation(): RepresentationReport {
@@ -788,7 +791,13 @@ export class AtlasBinding {
     app.root.addChild(renderRoot);
     const navigationWorld = options.ownedDistrict === undefined
       ? buildNavigationWorld(options.scene, atlasLandscapeSurface())
-      : ownedDistrictNavigation(options.ownedDistrict.document);
+      // The district owns the ground and the blockers; the scene owns where the memories are. Both
+      // are already drawn in the same coordinate space, so withholding the regions from the
+      // navigation world did not keep them apart, it only made them unreachable.
+      : ownedDistrictNavigation(
+        options.ownedDistrict.document,
+        options.scene.islands.map(navigationRegionForIsland),
+      );
     const ownedDistrict = options.ownedDistrict === undefined
       ? null
       : new OwnedDistrictRuntime(
@@ -887,6 +896,10 @@ export class AtlasBinding {
       topology,
       initialArtProfile,
       theme,
+      // Stand the memories on whichever ground is actually under them. A district draws its own
+      // flat street and hides the Atlas landscape, so the landscape's height here is the offset of
+      // an invisible surface and buries every landmark by about a metre.
+      options.ownedDistrict === undefined ? atlasLandscapeHeight : () => 0,
     );
     // What the Map looks down on. Built from the same anchors the ground view already draws, so
     // it cannot drift from what the world actually holds, and enabled only at the Map vantage.
@@ -1319,10 +1332,14 @@ export class AtlasBinding {
   }
 
   setMemoryLayerVisible(visible: boolean): void {
+    const changed = this.renderRoot.enabled !== visible;
     this.renderRoot.enabled = visible;
     if (!visible) { this.focusState = INITIAL_FOCUS_STATE; this.centred = null; }
     this.publishRepresentation();
     this.invalidate();
+    // The control that owns this switch read the binding once, when it was built. Anything that
+    // changed the layer afterwards left a checkbox saying the opposite of what the world showed.
+    if (changed) this.onMemoryLayerChange?.(visible);
   }
 
   get memoryLayerVisible(): boolean {
@@ -1779,6 +1796,11 @@ export class AtlasBinding {
     );
     if (!resolution.ok) return resolution;
     this.endSceneInspection();
+    // Travelling to a memory is a request to see it. Over an owned district the memory layer starts
+    // off, so without this the whole journey ends standing in the street facing geometry that is
+    // switched off, which reads as travel being broken rather than as a layer being hidden.
+    // `setMemoryLayerVisible` announces the change so the control that owns the switch follows it.
+    if (!this.memoryLayerVisible) this.setMemoryLayerVisible(true);
     if (this.mapState !== null) this.setMapMode(false);
     const planned = planDirectNavigationTransition(resolution, state, reducedMotion);
     if (target.kind === 'island') {

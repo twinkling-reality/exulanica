@@ -288,11 +288,15 @@ export function mountEnvironmentSelection(
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
   street.addEventListener('click', () => deps.state.atlas?.binding.setCityView('street'));
   const memoryCheckbox = memoryLayer.querySelector('input') as HTMLInputElement;
-  memoryCheckbox.addEventListener('change', () => {
-    deps.state.atlas?.binding.setMemoryLayerVisible(memoryCheckbox.checked);
-    source.textContent = memoryCheckbox.checked
+  const reflectMemoryLayer = (visible: boolean): void => {
+    memoryCheckbox.checked = visible;
+    source.textContent = visible
       ? 'City and memory layers are intentionally composed. Purple memory forms are not city semantics.'
       : 'Official BUILDING footprints. Memory and fantasy layers are separate from the geographic view.';
+  };
+  memoryCheckbox.addEventListener('change', () => {
+    deps.state.atlas?.binding.setMemoryLayerVisible(memoryCheckbox.checked);
+    reflectMemoryLayer(memoryCheckbox.checked);
   });
 
   function inspectSubject(subject: DistrictSubject): void {
@@ -834,7 +838,10 @@ export function mountEnvironmentSelection(
         ?? (atlas.ownedDistrict != null
           ? { pick: () => null, destroy: () => undefined }
           : new NYCSemanticOverlay(atlas.device, atlas.environmentRoot, features));
-      memoryCheckbox.checked = atlas.memoryLayerVisible;
+      reflectMemoryLayer(atlas.memoryLayerVisible);
+      // Travel to a region switches the layer on by itself, so the control has to follow the world
+      // rather than only lead it.
+      atlas.onMemoryLayerChange = reflectMemoryLayer;
       const interpretation = atlas.ownedDistrict?.interpretation;
       if (interpretation) {
         const destinations = el('details', {}, [el('summary', { text: 'Places inhabitants can use' })]);
