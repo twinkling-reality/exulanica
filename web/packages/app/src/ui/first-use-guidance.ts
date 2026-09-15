@@ -1,4 +1,4 @@
-export const FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v1';
+export const FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v2';
 
 export type FirstUsePhase = 'arrival' | 'traversal' | 'companion' | 'complete';
 export type FirstUseMode = 'traverse' | 'converse';
@@ -44,6 +44,7 @@ function readPhase(storage: FirstUseStorage): FirstUsePhase {
  */
 export function createFirstUseGuidance(storage: FirstUseStorage): FirstUseGuidance {
   let phase = readPhase(storage);
+  let showingArrival = true;
 
   const setPhase = (next: FirstUsePhase): boolean => {
     if (phase === next) return false;
@@ -59,35 +60,50 @@ export function createFirstUseGuidance(storage: FirstUseStorage): FirstUseGuidan
   return {
     phase: () => phase,
     prompt(mode) {
-      if (phase === 'complete') return null;
-      if (phase === 'companion') {
+      if (showingArrival && mode === 'converse') {
         return Object.freeze({
-          statement: 'Press',
-          actions: Object.freeze([{ key: 'X', label: 'to call Unnamed Companion' }]),
-          compact: true,
-        });
-      }
-      if (mode === 'converse') {
-        return Object.freeze({
-          statement: 'Atlas arranges your memories as a world.',
+          statement: 'Welcome to Exulanica',
           actions: Object.freeze([{ label: 'Click to enter' }]),
         });
       }
+      if (phase === 'complete') return null;
+      if (phase === 'companion') {
+        return Object.freeze({
+          statement: 'Welcome to Exulanica',
+          actions: Object.freeze([
+            { key: 'X', label: 'Call your Unnamed Companion' },
+            { key: 'Esc', label: 'Dismiss' },
+          ]),
+        });
+      }
+      if (mode === 'converse') return null;
+      if (phase === 'traversal') {
+        return Object.freeze({
+          statement: 'Welcome to Exulanica',
+          actions: Object.freeze([
+            { key: 'W A S D', label: 'Move' },
+            { key: 'X', label: 'Call your Unnamed Companion' },
+            { key: 'Esc', label: 'Dismiss' },
+          ]),
+        });
+      }
       return Object.freeze({
-        statement: 'Move through this memory.',
+        statement: 'Welcome to Exulanica',
         actions: Object.freeze([
-          { key: 'W A S D', label: 'Move' },
-          { key: 'X', label: 'Companion' },
+          { key: 'X', label: 'Call your Unnamed Companion' },
+          { key: 'Esc', label: 'Dismiss' },
         ]),
       });
     },
     observeMode(mode) {
+      if (mode === 'traverse') showingArrival = false;
       return mode === 'traverse' && phase === 'arrival' ? setPhase('traversal') : false;
     },
     observeMovement() {
       return phase === 'arrival' || phase === 'traversal' ? setPhase('companion') : false;
     },
     complete() {
+      showingArrival = false;
       return setPhase('complete');
     },
   };

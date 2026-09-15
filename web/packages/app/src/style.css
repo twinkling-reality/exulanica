@@ -287,6 +287,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  width: 100%;
 }
 
 .credential-action > .gate-failure {
@@ -294,29 +295,77 @@ body {
 }
 
 .account-sign-in {
-  min-width: min(21rem, 72vw);
-  padding: 0.78rem 1.4rem;
-  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 22%, transparent);
+  --credential-control-height: 2.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(26.3rem, 82vw);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-light-canvas);
+  font: inherit;
+}
+
+.account-sign-in-label {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-width: 0;
+  height: var(--credential-control-height);
+  padding: 0 1.4rem;
+  box-sizing: border-box;
   border-radius: var(--radius-pill);
   background: var(--ui-light-ink);
+}
+
+.account-sign-in-arrow {
+  display: grid;
+  flex: 0 0 var(--credential-control-height);
+  width: var(--credential-control-height);
+  height: var(--credential-control-height);
+  place-items: center;
+  box-sizing: border-box;
   color: var(--ui-light-canvas);
+  background: var(--ui-light-ink);
+  border-radius: 50%;
+  font-size: 1rem;
+  transition: transform var(--motion-standard) var(--motion-easing);
+}
+
+.account-sign-in:not(:disabled):hover .account-sign-in-arrow {
+  transform: scale(1.06);
 }
 
 .account-sign-in:disabled {
   opacity: 0.38;
+  cursor: default;
 }
 
 .credential-operator {
+  width: min(26.3rem, 82vw);
   color: var(--ui-light-ink-faint);
   font-size: 0.82rem;
 }
 
-.credential-operator > summary {
-  cursor: pointer;
+.credential-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0.15rem 0 0.9rem;
+  color: var(--ui-light-ink-faint);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.credential-operator > .credential-controls {
-  margin-top: 0.75rem;
+.credential-divider::before,
+.credential-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, var(--ui-light-ink-faint) 24%, transparent);
 }
 
 .gate-note {
@@ -336,9 +385,11 @@ body {
 }
 
 .credential-entry {
-  width: min(21rem, 54vw);
+  width: auto;
+  flex: 1;
   height: var(--credential-control-height);
   padding: 0 1rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -488,6 +539,11 @@ body {
   }
 
   .credential-controls {
+    width: min(22rem, calc(100vw - 3rem));
+  }
+
+  .credential-operator,
+  .account-sign-in {
     width: min(22rem, calc(100vw - 3rem));
   }
 

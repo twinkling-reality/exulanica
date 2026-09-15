@@ -81,7 +81,7 @@
     "unitScale": 1.130365344189426,
     "standingHeight": 1.548172021546634,
     "groundOffset": -0.010411890223622322,
-    "forwardYawDegrees": 0,
+    "forwardYawDegrees": 180,
     "clips": {
       "idle": {
         "name": "HumanIdle",

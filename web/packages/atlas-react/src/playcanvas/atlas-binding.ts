@@ -1332,7 +1332,7 @@ export class AtlasBinding {
       this.ownedDistrict === null
         ? cityCameraState(view)
         : view === 'overview'
-          ? { x: -45, y: 150, z: 300, yaw: -0.15, pitch: -0.46 }
+          ? ownedDistrictOverviewCameraState(this.ownedDistrict.district)
           : ownedDistrictCameraState(this.navigationWorld, this.ownedDistrict.district),
     );
     this.invalidate();
@@ -2354,6 +2354,33 @@ export function cityCameraState(view: 'overview' | 'street'): CameraState {
   return view === 'street'
     ? { x: -25, y: 60, z: -280, yaw: Math.PI, pitch: -0.35 }
     : { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
+}
+
+/** Frame the actual admitted district rather than assuming its local origin is Manhattan. */
+export function ownedDistrictOverviewCameraState(district: OwnedDistrict): CameraState {
+  if (district.buildings.length === 0) {
+    return { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
+  }
+  const west = Math.min(...district.buildings.map((building) => building.bbox_cm[0] / 100));
+  const north = Math.min(...district.buildings.map((building) => building.bbox_cm[1] / 100));
+  const east = Math.max(...district.buildings.map((building) => building.bbox_cm[2] / 100));
+  const south = Math.max(...district.buildings.map((building) => building.bbox_cm[3] / 100));
+  const tallest = Math.max(...district.buildings.map((building) => building.height_cm / 100));
+  const targetX = (west + east) / 2;
+  const targetZ = (north + south) / 2;
+  const span = Math.max(80, east - west, south - north);
+  const horizontal = span * 0.9;
+  const x = targetX + horizontal * 0.28;
+  const y = Math.max(65, tallest * 1.18, span * 0.52);
+  const z = targetZ + horizontal;
+  const targetY = Math.min(24, tallest * 0.28);
+  const dx = targetX - x;
+  const dz = targetZ - z;
+  return {
+    x, y, z,
+    yaw: Math.atan2(-dx, -dz),
+    pitch: Math.atan2(targetY - y, Math.hypot(dx, dz)),
+  };
 }
 
 /** Deterministic clear spawn on visible owned support, never an invisible safety floor. */

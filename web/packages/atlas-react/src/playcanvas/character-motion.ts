@@ -58,8 +58,11 @@ export class CharacterMotion {
         delta = Math.atan2(
           Math.sin(target - this.facing),
           Math.cos(target - this.facing),
-        );
-      this.facing += delta * Math.min(1, dt * 12);
+        ),
+        // A chase camera can turn much faster than a body. Keep a short ease instead of snapping,
+        // but converge quickly enough that forward travel never reads as running backward.
+        turnBlend = 1 - Math.exp(-dt / 0.045);
+      this.facing += delta * turnBlend;
     }
     this.amount += (Math.min(1, speed / 0.9) - this.amount) * blend;
     this.run +=

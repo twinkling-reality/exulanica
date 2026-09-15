@@ -189,9 +189,20 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
        * we neither see nor want it, which is the rule the renderer controls are built around.
        * Released, it has no browser job left, and the key everyone already tries for "out of
        * this" becomes the way out. One press, one level: the exchange, then the entry, then the
-       * plate. Backspace keeps its meaning for people who learned it, but nobody guesses it.
+       * plate. It never opens a surface: H owns the World hub, so dismiss/back and open cannot
+       * both happen on one keypress.
        */
       if (event.code === 'Escape' && document.pointerLockElement === null) {
+        if (
+          deps.shellState().primary === 'world' &&
+          companion.panel.state() !== 'open' &&
+          deps.firstUse.prompt('converse') !== null
+        ) {
+          event.preventDefault();
+          deps.firstUse.complete();
+          deps.reflectFirstUse();
+          return;
+        }
         // Search is the innermost thing open, so it is the first thing Escape takes back.
         if (deps.shellState().primary === 'index' && deps.worldIndex.closeSearch()) {
           event.preventDefault();
@@ -207,11 +218,15 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
           deps.dispatchShell({ type: 'close-detail' });
           return;
         }
-        if (deps.shellState().primary !== 'world') {
+        if (
+          deps.shellState().primary !== 'world' ||
+          deps.shellState().camera === 'map'
+        ) {
           event.preventDefault();
-          deps.dispatchShell({ type: 'show-world' });
+          deps.dispatchShell({ type: 'step-back' });
           return;
         }
+        return;
       }
       const command = commandForKeystroke({
         code: event.code,
@@ -219,6 +234,12 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
         modified: event.altKey || event.ctrlKey || event.metaKey,
         typing,
       });
+      if (command === 'toggle-menu') {
+        event.preventDefault();
+        if (companion.panel.state() === 'open') companion.dismiss();
+        deps.dispatchShell({ type: 'toggle-menu' });
+        return;
+      }
       if (
         !typing && companion.panel.state() === 'open' &&
         !event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyE'

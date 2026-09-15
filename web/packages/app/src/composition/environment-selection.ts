@@ -109,6 +109,8 @@ export interface MountedEnvironmentSelection {
   begin(): Promise<void>;
   dispose(): void;
   closePanels(): void;
+  openPanel(name: 'nearby' | 'authoring' | 'details'): void;
+  setWelcomeVisible(visible: boolean): void;
   afterAuthoredEdit(versionId: string): Promise<void>;
   districtPlacement(): SocietyDistrictPlacement | null;
 }
@@ -193,9 +195,9 @@ export function mountEnvironmentSelection(
     hidden: true,
   }, [apply, discard]);
   const editDetails = el('details', {}, [el('summary', { text: 'Authored changes' }), language, controls, previewText, previewControls]);
-  const fixture = el('p', { class: 'living-world-fixture', text: 'Preview fixture · read-only · no saved simulation history', hidden: !deps.env.preview });
+  const fixture = el('p', { class: 'living-world-fixture', text: 'Preview', hidden: !deps.env.preview });
   const workspace = buildWorldWorkspace({
-    root, title, fixture, source, selected, reason,
+    root, preview: deps.env.preview, title, fixture, source, selected, reason,
     onOpen: () => deps.onPanelOpen?.(),
     inspector: inspector.root, inhabitants: inhabitantsList,
     camera: [overview, street, cameraToggle],
@@ -914,7 +916,7 @@ export function mountEnvironmentSelection(
               const changes: Record<string,string> = {add_fixture_rest_pad:'Recorded fixture addition',disable_fixture_rest_pad:'Recorded fixture affordance disabled',restore_fixture_rest_pad:'Recorded fixture affordance restored; earlier events retained'};
               replayStatus.textContent = `Recorded tick ${society.currentTick}. ${frame.change ? changes[frame.change] ?? frame.change : 'Engine-produced simulation state.'} `
                 + (frame.authored_objects.length ? 'Authored fixture object recorded; its asset rendering is unavailable in this view.' : '');
-              fixture.textContent = 'Preview recording · no persistence or model evidence';
+              fixture.textContent = 'Recorded preview';
               reason.textContent = `${society.populationSize} simulated inhabitants · ${visible} nearby. Coincident positions show one selectable person. Playback: one simulated minute per 2 seconds.`;
               next.disabled = frameIndex === parsed.frames.length - 1;
               reflectNearby();
@@ -971,6 +973,8 @@ export function mountEnvironmentSelection(
       return beginPromise;
     },
     closePanels: () => workspace.close(false),
+    openPanel: (name) => workspace.openPanel(name),
+    setWelcomeVisible: (visible) => workspace.setWelcomeVisible(visible),
     afterAuthoredEdit,
     districtPlacement: () => districtView?.placement ?? null,
     dispose: () => {

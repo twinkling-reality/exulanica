@@ -36,4 +36,18 @@ describe('world workspace interaction ownership', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
     expect(root.querySelector<HTMLElement>('#world-panel-inspection')!.hidden).toBe(false);
   });
+
+  it('starts the place banner only after the welcome is addressed', () => {
+    const { root, view } = mount();
+    const arrival = root.querySelector<HTMLElement>('.world-arrival')!;
+    view.setPlace('Flatiron and Madison Square');
+    expect(arrival.hasAttribute('data-shown')).toBe(false);
+
+    view.setWelcomeVisible(false);
+    expect(arrival.hasAttribute('data-shown')).toBe(true);
+    expect(arrival.textContent).toContain('Flatiron and Madison Square');
+
+    view.setWelcomeVisible(true);
+    expect(arrival.hasAttribute('data-shown')).toBe(false);
+  });
 });

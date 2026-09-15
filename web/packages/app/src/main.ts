@@ -32,16 +32,6 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
-import '@exulanica/presentation/tokens.css';
-import './style.css';
-import './appearance.css';
-import './unified-interface.css';
-import './ui/object-placement.css';
-import './ui/environment-selection.css';
-import './ui/scene-segments.css';
-import './ui/redesign.css';
-import './ui/character-studio.css';
-
 import { ApiError } from '@exulanica/graph-client';
 import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
@@ -52,8 +42,9 @@ import {
   PREVIEW_NYC_OPEN_DATA_ADMISSION_ID,
 } from './config.js';
 import { buildScene } from './scene.js';
-import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
+import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
+import { buildWorldMenu } from './ui/world-menu.js';
 import {
   CompanionAskClient,
   CompanionProposalClient,
@@ -160,9 +151,12 @@ async function boot(): Promise<void> {
 function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
   const form = el('form', { class: 'gate credential-gate' });
   const google = el('button', {
-    type: 'button', class: 'account-sign-in', text: 'Continue with Google',
+    type: 'button', class: 'account-sign-in',
     disabled: accountState === 'unavailable',
-  });
+  }, [
+    el('span', { class: 'account-sign-in-label', text: 'Continue with Google' }),
+    el('span', { class: 'account-sign-in-arrow', 'aria-hidden': 'true', text: '→' }),
+  ]);
   google.addEventListener('click', () => window.location.assign('/api/auth/google/start'));
   const input = el('input', {
     type: 'password',
@@ -182,8 +176,10 @@ function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
     submit.disabled = input.value.trim().length === 0;
   });
 
-  const operator = el('details', { class: 'credential-operator' }, [
-    el('summary', { text: 'Developer access' }),
+  const operator = el('div', { class: 'credential-operator' }, [
+    el('div', { class: 'credential-divider', role: 'separator' }, [
+      el('span', { text: 'or, for developers' }),
+    ]),
     el('div', { class: 'credential-controls' }, [
       el('div', { class: 'credential-entry' }, [input]), submit,
     ]),
@@ -191,9 +187,9 @@ function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
 
   form.append(
     el('p', { class: 'gate-wordmark', text: 'Exulanica' }),
-    el('p', { class: 'gate-note', text: accountState === 'unavailable'
-      ? 'Account sign-in is not configured on this host.'
-      : 'Enter your personal world.' }),
+    ...(accountState === 'unavailable'
+      ? []
+      : [el('p', { class: 'gate-note', text: 'Enter your personal world.' })]),
     el('div', { class: 'credential-action' }, [
       google,
       operator,
@@ -216,7 +212,6 @@ function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
     });
   });
   replace(shell, [form]);
-  if (accountState === 'unavailable') operator.open = true;
 }
 
 async function start(token: string, csrfToken?: string): Promise<void> {
@@ -386,7 +381,8 @@ async function mount(): Promise<void> {
     reflectShell: () => reflectShell(),
     onAnswered: finishFirstUse,
     isSystemSurfaceOpen: () =>
-      shellState.primary === 'options' || shellState.primary === 'controls' || shellState.primary === 'character',
+      shellState.primary === 'menu' || shellState.primary === 'options' ||
+      shellState.primary === 'controls' || shellState.primary === 'character',
   });
 
   if (memoryLoadFailure !== null) {
@@ -581,7 +577,15 @@ async function mount(): Promise<void> {
     else if (command === 'options') dispatchShell({ type: 'toggle-options' });
     else dispatchShell({ type: 'toggle-controls' });
   };
-  const commandBar = buildAtlasCommands(handleAtlasCommand);
+  const worldMenu = buildWorldMenu({
+    preview,
+    onResume: () => dispatchShell({ type: 'toggle-menu' }),
+    onWorld: () => {
+      dispatchShell({ type: 'toggle-menu' });
+      environmentSelection.openPanel('details');
+    },
+    onCommand: handleAtlasCommand,
+  });
   const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
   state.disposeCharacter = () => character.dispose();
   const mapPeek = new MapPeek({
@@ -593,8 +597,13 @@ async function mount(): Promise<void> {
     cancel: (handle) => window.clearTimeout(handle),
   });
   reflectFirstUse = (): void => {
-    companion.panel.setFirstUsePrompt(firstUse.prompt(inputMode));
+    const prompt = firstUse.prompt(inputMode);
+    companion.panel.setFirstUsePrompt(prompt);
     shell.dataset['firstUse'] = firstUse.phase();
+    const welcomeVisible =
+      inputMode === 'converse' && prompt?.statement === 'Welcome to Exulanica';
+    shell.toggleAttribute('data-welcome', welcomeVisible);
+    environmentSelection.setWelcomeVisible(welcomeVisible);
   };
   reflectFirstUse();
   const mapReturn = el('button', { type: 'button', text: 'Return  M' });
@@ -644,9 +653,6 @@ async function mount(): Promise<void> {
   intake.root.addEventListener('toggle', () => {
     if (intake.root.open && shellState.detailId !== null) dispatchShell({ type: 'close-detail' });
   });
-  const sourceDetails = el('details', { class: 'world-source-details' }, [
-    el('summary', { text: 'Source availability' }), status.statusElement,
-  ]);
   replace(shell, [
     stage,
     chrome.reticle,
@@ -658,7 +664,7 @@ async function mount(): Promise<void> {
     objects.panel.root,
     objects.confirm.root,
     environmentSelection.root,
-    commandBar.root,
+    worldMenu.root,
     mapCaption,
     travelStatus,
     minimap.root,
@@ -668,7 +674,6 @@ async function mount(): Promise<void> {
     character.gestureRoot,
     viewportBoundary,
     status.inspectorRoot,
-    sourceDetails,
     segments.root,
   ]);
   void intake.begin();
@@ -687,7 +692,9 @@ async function mount(): Promise<void> {
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
     appearance.options.setVisible(shellState.primary === 'options');
     appearance.settings.setVisible(shellState.primary === 'controls');
-    const systemSurfaceOpen = shellState.primary === 'options' || shellState.primary === 'controls' || shellState.primary === 'character';
+    worldMenu.setVisible(shellState.primary === 'menu');
+    const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'options' ||
+      shellState.primary === 'controls' || shellState.primary === 'character';
     const modalBackground = [
       stage,
       worldIndex.root,
@@ -705,7 +712,6 @@ async function mount(): Promise<void> {
     appearance.settings.setVisible(shellState.primary === 'controls');
     character.setVisible(shellState.primary === 'character');
     if (systemSurfaceOpen) for (const surface of modalBackground) surface.inert = true;
-    commandBar.reflect(shellState.primary, shellState.camera);
     mapCaption.hidden = shellState.camera !== 'map';
     // Only while traversing the ground: the Map is already the whole answer, and a plate has the
     // world behind it rather than under it.
@@ -725,7 +731,10 @@ async function mount(): Promise<void> {
      * Summon keeps its own guard below, so a system surface still cannot call the Companion out
      * from behind itself.
      */
-    state.atlas?.binding.setControlsEnabled(shellState.camera === 'ground' && shellState.primary !== 'character');
+    state.atlas?.binding.setControlsEnabled(
+      shellState.camera === 'ground' &&
+      !['menu', 'controls', 'character'].includes(shellState.primary),
+    );
     // Every surface here takes the cursor. None of them should take your feet with it.
     state.atlas?.binding.setFreeCursorActive(
       companion.panel.state() === 'open' || shellState.primary !== 'world',

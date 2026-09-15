@@ -7,7 +7,7 @@
  * same pixels.
  */
 
-export type PrimarySurface = 'world' | 'index' | 'options' | 'controls' | 'character';
+export type PrimarySurface = 'world' | 'menu' | 'index' | 'options' | 'controls' | 'character';
 export type CameraPresentation = 'ground' | 'map';
 
 export interface WorldSurfaceContext {
@@ -23,6 +23,7 @@ export interface WorldShellState extends WorldSurfaceContext {
 }
 
 export type WorldShellEvent =
+  | { readonly type: 'toggle-menu' }
   | { readonly type: 'toggle-character' }
   | { readonly type: 'toggle-index' }
   | { readonly type: 'toggle-map' }
@@ -31,9 +32,11 @@ export type WorldShellEvent =
   | { readonly type: 'show-index' }
   | { readonly type: 'show-world' }
   | { readonly type: 'show-detail'; readonly id: string }
-  | { readonly type: 'close-detail' };
+  | { readonly type: 'close-detail' }
+  | { readonly type: 'step-back' };
 
 export type WorldCommand =
+  | 'toggle-menu'
   | 'toggle-character'
   | 'toggle-index'
   | 'toggle-map'
@@ -63,6 +66,10 @@ export function updateWorldShell(
   event: WorldShellEvent,
 ): WorldShellState {
   switch (event.type) {
+    case 'toggle-menu':
+      return state.primary === 'menu'
+        ? restoreSurface(state)
+        : openTemporarySurface(state, { primary: 'menu', camera: 'ground', detailId: null });
     case 'toggle-character':
       return state.primary === 'character'
         ? restoreSurface(state)
@@ -96,6 +103,8 @@ export function updateWorldShell(
         : state;
     case 'close-detail':
       return state.detailId === null ? state : Object.freeze({ ...state, detailId: null });
+    case 'step-back':
+      return restoreSurface(state);
   }
 }
 
@@ -132,6 +141,8 @@ function restoreSurface(state: WorldShellState): WorldShellState {
 export function commandForKeystroke(stroke: CommandKeystroke): WorldCommand | null {
   if (stroke.modified || stroke.typing) return null;
   switch (stroke.code) {
+    case 'KeyH':
+      return 'toggle-menu';
     case 'KeyK':
       return 'toggle-character';
     case 'KeyI':

@@ -6,6 +6,15 @@ import {
 } from '../src/world-shell.js';
 
 describe('the Atlas shell', () => {
+  it('opens one World menu and returns from its destinations through the same hub', () => {
+    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
+    expect(menu).toMatchObject({ primary: 'menu', camera: 'ground' });
+    const settings = updateWorldShell(menu, { type: 'toggle-controls' });
+    expect(settings.primary).toBe('controls');
+    expect(updateWorldShell(settings, { type: 'step-back' })).toEqual(menu);
+    expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
+  });
+
   it('allows one primary surface and clears Index detail when switching', () => {
     const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
     const detail = updateWorldShell(index, { type: 'show-detail', id: 'entity-1' });
@@ -74,6 +83,7 @@ describe('shell command ownership', () => {
   });
 
   it.each([
+    ['KeyH', 'h', 'toggle-menu'],
     ['KeyI', 'i', 'toggle-index'],
     ['KeyM', 'm', 'toggle-map'],
     ['KeyO', 'o', 'toggle-options'],

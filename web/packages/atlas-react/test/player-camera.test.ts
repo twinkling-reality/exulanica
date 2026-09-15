@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { ownedDistrictOverviewCameraState } from '../src/playcanvas/atlas-binding.js';
 import { playerCameraPosition } from '../src/playcanvas/player-camera.js';
 import type { OwnedDistrict } from '@exulanica/atlas-core';
 const player = {x:0,y:1.62,z:0,yaw:0,pitch:0};
 describe('player camera presentation', () => {
+  it('frames an owned district from its actual translated bounds', () => {
+    const district = {
+      buildings: [
+        { bbox_cm: [10000, 20000, 20000, 30000], height_cm: 4000 },
+        { bbox_cm: [30000, 40000, 50000, 60000], height_cm: 8000 },
+      ],
+    } as unknown as OwnedDistrict;
+    const overview = ownedDistrictOverviewCameraState(district);
+    expect(overview.x).toBeGreaterThan(250);
+    expect(overview.z).toBeGreaterThan(600);
+    expect(overview.y).toBeGreaterThan(90);
+    expect(overview.pitch).toBeLessThan(0);
+  });
+
   it('switches without mutating player pose', () => {
     const snapshot = {...player};
     expect(playerCameraPosition(player,'first-person')).toEqual([0,1.62,0]);

@@ -1,3 +1,13 @@
+import '@exulanica/presentation/tokens.css';
+import './style.css';
+import './appearance.css';
+import './unified-interface.css';
+import './ui/object-placement.css';
+import './ui/environment-selection.css';
+import './ui/scene-segments.css';
+import './ui/redesign.css';
+import './ui/character-studio.css';
+
 /** Keep module/import failures visible even when the main application's dependencies cannot run. */
 const shell = document.getElementById('shell');
 if (shell !== null) {

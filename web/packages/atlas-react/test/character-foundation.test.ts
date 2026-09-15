@@ -11,6 +11,19 @@ import {
 } from '../src/playcanvas/player-rig.js';
 
 describe('continuous shared character foundation', () => {
+  it('quickly turns toward camera-relative forward travel', () => {
+    const motion = new CharacterMotion();
+    motion.update({ x: 0, z: 0, yaw: 0, dx: 0, dz: 0, dt: 1 / 60, reduced: false });
+    let pose = motion.update({
+      x: -1 / 60, z: 0, yaw: Math.PI / 2, dx: -1 / 60, dz: 0, dt: 1 / 60, reduced: false,
+    });
+    for (let frame = 1; frame < 12; frame++) {
+      pose = motion.update({
+        x: -(frame + 1) / 60, z: 0, yaw: Math.PI / 2, dx: -1 / 60, dz: 0, dt: 1 / 60, reduced: false,
+      });
+    }
+    expect(Math.abs(pose.facing - Math.PI / 2)).toBeLessThan(0.03);
+  });
   it('produces a single closed connected skin with finite normals at both detail levels', () => {
     for (const detail of [0.018, 0.035]) {
       const sculpt = buildPlayerSculpt(detail),

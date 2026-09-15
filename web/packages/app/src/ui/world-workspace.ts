@@ -4,6 +4,7 @@ import { el } from './dom.js';
 export function buildWorldWorkspace(parts: {
   root: HTMLElement;
   onOpen?: () => void;
+  preview?: boolean;
   title: HTMLElement;
   fixture: HTMLElement;
   source: HTMLElement;
@@ -19,12 +20,15 @@ export function buildWorldWorkspace(parts: {
   root.classList.add('world-workspace');
   root.setAttribute('aria-label', 'World exploration');
   parts.title.textContent = 'Your world';
-  const availability = el('span', { class: 'world-source-label', role: 'status', text: 'Loading world details…' });
+  const availability = el('span', { class: 'world-source-label', role: 'status', text: 'Loading…' });
   const nearbyState = el('p', { class: 'world-help', role: 'status', text: 'Loading nearby people…' });
   const heading = el('header', { class: 'world-heading' }, [
-    el('span', { class: 'world-brand', text: 'Exulanica' }), parts.title,
-    el('span', { class: 'world-source-label', text: 'NYC source forms · provisional surfaces' }),
-    parts.fixture, availability,
+    el('div', { class: 'world-heading-meta' }, [
+      el('span', { class: 'world-brand', text: 'Exulanica' }),
+      parts.fixture,
+      availability,
+    ]),
+    parts.title,
   ]);
   const panels = new Map<string, HTMLElement>();
   const buttons = new Map<string, HTMLButtonElement>();
@@ -57,25 +61,47 @@ export function buildWorldWorkspace(parts: {
     panels.set(name, panel);
     return panel;
   };
-  const nearby = addPanel('nearby', 'Nearby', [
-    el('p', { text: 'Meet the fictional people and explore the places around you.' }),
+  const nearby = addPanel('nearby', 'People nearby', [
     parts.inhabitants, nearbyState,
-    el('p', { class: 'world-help', text: 'You can also aim at a person or object and press E to inspect it.' }),
+    el('p', { class: 'world-help', text: 'Aim at a person or object and press E to inspect it.' }),
   ]);
-  const details = addPanel('details', 'World details', [parts.source, parts.reason, ...parts.tools]);
-  const authoring = addPanel('authoring', 'Create in this world', [
+  const previewNotice = el('p', {
+    class: 'world-preview-notice',
+    text: 'Development preview. Synthetic and recorded content is not saved and does not establish model or deployment evidence.',
+    hidden: !parts.preview,
+  });
+  const details = addPanel('details', 'About this place', [
+    previewNotice,
+    parts.source,
+    parts.reason,
+    el('div', { class: 'world-panel-camera', 'aria-label': 'World camera controls' }, [...parts.camera]),
+    ...parts.tools,
+  ]);
+  const authoring = addPanel('authoring', 'Create', [
     el('p', { text: 'Select a source building with E, then preview an edit before applying it.' }), parts.authoring,
   ]);
   const inspection = addPanel('inspection', 'Selected in the world', [parts.selected, parts.inspector]);
   const nav = el('nav', { class: 'world-local-nav', 'aria-label': 'Explore this place' });
-  for (const [name, label] of [['nearby', 'Nearby'], ['authoring', 'Create'], ['details', 'World details']] as const) {
+  for (const [name, label] of [['nearby', 'Nearby'], ['authoring', 'Create'], ['details', 'About']] as const) {
     const button = el('button', { type: 'button', text: label, 'aria-expanded': 'false', 'aria-controls': `world-panel-${name}` });
     button.addEventListener('click', () => active === name ? close() : open(name));
     buttons.set(name, button);
     nav.append(button);
   }
-  const view = el('nav', { class: 'world-viewbar', 'aria-label': 'World camera' }, [...parts.camera]);
-  root.append(el('div', { class: 'world-place' }, [heading, nav]), nearby, details, authoring, inspection, view);
+  const arrival = el('div', {
+    class: 'world-arrival',
+    role: 'status',
+    'aria-live': 'polite',
+  }, [heading]);
+  let welcomeVisible = true;
+  let placeReady = false;
+  const showArrival = () => {
+    if (welcomeVisible || !placeReady) return;
+    arrival.removeAttribute('data-shown');
+    void arrival.offsetWidth;
+    arrival.setAttribute('data-shown', '');
+  };
+  root.append(arrival, nav, nearby, details, authoring, inspection);
   const listeners = new AbortController();
   window.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || document.pointerLockElement != null || active === null) return;
@@ -88,9 +114,19 @@ export function buildWorldWorkspace(parts: {
   }, { signal: listeners.signal });
   return {
     nearby, details, authoring,
-    setPlace(name: string) { parts.title.textContent = name; },
+    setPlace(name: string) {
+      parts.title.textContent = name;
+      placeReady = true;
+      showArrival();
+    },
+    setWelcomeVisible(visible: boolean) {
+      if (welcomeVisible === visible) return;
+      welcomeVisible = visible;
+      if (visible) arrival.removeAttribute('data-shown');
+      else showArrival();
+    },
     setAvailability(ready: boolean) {
-      availability.textContent = ready ? '' : 'World details unavailable. Open World details for the reason.';
+      availability.textContent = ready ? '' : 'Data unavailable';
       availability.hidden = ready;
       if (!ready) nearbyState.textContent = 'Nearby people are unavailable in this view.';
     },
@@ -98,6 +134,7 @@ export function buildWorldWorkspace(parts: {
       nearbyState.hidden = count > 0;
       nearbyState.textContent = 'No people are in the nearby display. Move through the world to explore.';
     },
+    openPanel(name: 'nearby' | 'authoring' | 'details') { open(name); },
     inspect() { if (active !== 'inspection') open('inspection'); },
     close,
     dispose() { listeners.abort(); },

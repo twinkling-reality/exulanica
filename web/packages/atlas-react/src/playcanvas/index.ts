@@ -172,6 +172,7 @@ export {
   AtlasBinding,
   mapCameraState,
   ownedDistrictCameraState,
+  ownedDistrictOverviewCameraState,
   sourceFirstArrivalPose,
 } from './atlas-binding.js';
 export type {

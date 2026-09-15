@@ -41,7 +41,7 @@ def prepare() -> None:
             "rigId": asset["rig_profile"],
             "joints": [joint["name"] for joint in asset["audit"]["joints"]],
             "unitScale": asset["frame"]["unit_scale"],
-            "forwardYawDegrees": 0,
+            "forwardYawDegrees": 180,
             "groundOffset": asset["frame"]["idle_floor_offset_metres"],
             "standingHeight": asset["frame"]["height_metres"],
             "clips": {

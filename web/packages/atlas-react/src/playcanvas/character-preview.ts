@@ -102,7 +102,9 @@ export class CharacterPreview {
     } catch (error) { lease.release(); throw error; }
     this.actor?.destroy();
     this.actor = actor;
-    actor.update({ position: [0, 0, 0], yaw: this.yaw, deltaSeconds: 0, discontinuity: true }, this.visible);
+    // World characters face local -Z. Turn the inspection stage back toward its +Z camera so
+    // the catalog's world-facing correction does not make the studio open on the character's back.
+    actor.update({ position: [0, 0, 0], yaw: this.yaw + Math.PI, deltaSeconds: 0, discontinuity: true }, this.visible);
     this.frame();
     this.setMotion(this.motion);
   }
@@ -112,7 +114,7 @@ export class CharacterPreview {
   }
   rotate(radians: number): void {
     this.yaw = radians;
-    this.actor?.root.setLocalEulerAngles(0, radians * 180 / Math.PI, 0);
+    this.actor?.root.setLocalEulerAngles(0, radians * 180 / Math.PI + 180, 0);
     this.app.renderNextFrame = true;
   }
   setZoom(value: number): void { this.zoom = Math.max(.8, Math.min(1.7, value)); this.frame(); }

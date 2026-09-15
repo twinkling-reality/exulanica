@@ -323,6 +323,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     },
     },
     {
+    presence: stage.root,
     /*
      * The write-back, and the ordering is the point rather than a detail.
      *

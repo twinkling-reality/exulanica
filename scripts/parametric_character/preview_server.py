@@ -157,7 +157,7 @@ class Builder:
                 unitScale=metadata["scale"],
                 standingHeight=metadata["height"],
                 groundOffset=metadata["floor"],
-                forwardYawDegrees=0,
+                forwardYawDegrees=180,
                 clips={
                     g: dict(
                         name="Human" + g.title(),

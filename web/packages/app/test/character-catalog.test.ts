@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { CharacterSubject } from '@exulanica/atlas-core';
 import { previewInhabitantSelection, type CharacterLook } from '../src/character-catalog.js';
 
@@ -30,5 +31,13 @@ describe('fictional catalog defaults', () => {
     expect(previewInhabitantSelection(catalog, { kind: 'player', playerId: 'viewer' })).toBeNull();
     expect(previewInhabitantSelection(catalog, { kind: 'scene-person' } as CharacterSubject)).toBeNull();
     expect(previewInhabitantSelection([], subject('person'))).toBeNull();
+  });
+  it('faces imported preview characters along the world forward axis', () => {
+    const looks = JSON.parse(readFileSync(
+      new URL('../public/fixtures/characters/catalog.json', import.meta.url),
+      'utf8',
+    )) as CharacterLook[];
+    expect(looks.length).toBeGreaterThan(0);
+    for (const look of looks) expect(look.descriptor.forwardYawDegrees).toBe(180);
   });
 });
