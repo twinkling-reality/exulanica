@@ -94,7 +94,6 @@ export interface CompanionEncounter {
   openEvidence(): boolean;
   setPlacement(placement: CompanionPlacement): void;
   placement(): CompanionPlacement | null;
-  hide(): void;
 }
 
 export function buildCompanionEncounter(
@@ -395,9 +394,6 @@ export function buildCompanionEncounter(
       return state === 'open' && (mode === 'turn' || mode === 'answer')
         ? choices.openEvidence()
         : false;
-    },
-    hide() {
-      root.setAttribute('hidden', '');
     },
   };
 }

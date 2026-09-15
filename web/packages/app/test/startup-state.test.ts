@@ -37,4 +37,31 @@ describe('visible Atlas startup states', () => {
     expect(loading.matches(selector)).toBe(false);
     expect(failure.matches(selector)).toBe(false);
   });
+
+  it('keeps only the light loading surface visible while world chrome boots', () => {
+    const css = readFileSync(`${process.cwd()}/packages/app/src/style.css`, 'utf8');
+    const bootstrap = readFileSync(`${process.cwd()}/packages/app/src/bootstrap.ts`, 'utf8');
+    expect(css).toContain(
+      '#shell[data-booting] > :not(.gate):not(.startup-thinking)',
+    );
+    expect(css).toContain('#shell[data-booting] > .startup-thinking');
+    expect(bootstrap).toContain("mark.className = 'startup-mark'");
+    expect(bootstrap).not.toContain("from './ui/startup-state");
+
+    const shell = document.createElement('div');
+    shell.id = 'shell';
+    shell.dataset['booting'] = '';
+    const loading = buildStartupState();
+    const menu = document.createElement('section');
+    menu.className = 'world-menu';
+    const companion = document.createElement('section');
+    companion.className = 'companion-encounter';
+    shell.append(menu, companion, loading);
+
+    const hiddenSelector =
+      '#shell[data-booting] > :not(.gate):not(.startup-thinking)';
+    expect(menu.matches(hiddenSelector)).toBe(true);
+    expect(companion.matches(hiddenSelector)).toBe(true);
+    expect(loading.matches(hiddenSelector)).toBe(false);
+  });
 });

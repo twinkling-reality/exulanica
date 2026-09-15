@@ -7,14 +7,34 @@ import './ui/environment-selection.css';
 import './ui/scene-segments.css';
 import './ui/redesign.css';
 import './ui/character-studio.css';
+import './ui/companion-layout.css';
+
+window.addEventListener('beforeunload', () => {
+  document.documentElement.setAttribute('data-reloading', '');
+});
+window.addEventListener('pageshow', () => {
+  document.documentElement.removeAttribute('data-reloading');
+});
 
 /** Keep module/import failures visible even when the main application's dependencies cannot run. */
 const shell = document.getElementById('shell');
 if (shell !== null) {
-  const loading = document.createElement('p');
-  loading.className = 'gate';
+  const loading = document.createElement('section');
+  loading.className = 'startup-thinking';
   loading.setAttribute('role', 'status');
-  loading.textContent = 'Opening Atlas…';
+  const mark = document.createElement('span');
+  mark.className = 'startup-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  const copy = document.createElement('div');
+  copy.className = 'startup-thinking-copy';
+  const label = document.createElement('p');
+  label.className = 'startup-thinking-label';
+  label.textContent = 'Opening Atlas';
+  const detail = document.createElement('p');
+  detail.className = 'startup-thinking-detail';
+  detail.textContent = 'Loading your world and its verified reconstructions…';
+  copy.append(label, detail);
+  loading.append(mark, copy);
   shell.replaceChildren(loading);
 }
 

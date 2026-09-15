@@ -85,8 +85,8 @@ export interface CompanionDependencies {
    * cannot propose" and "this sentence was a question" the same observation.
    */
   readonly proposeAppearance?: (utterance: string) => Promise<CompanionProposal>;
-  /** The element the presence draws into. Created by the root, because the world shows through it. */
-  readonly stageParent: HTMLElement;
+  /** Retained for harness compatibility; the presence now docks directly into the encounter. */
+  readonly stageParent?: HTMLElement;
   /**
    * The confirmation surface, read late.
    *
@@ -163,7 +163,9 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     deps.engine.adoptPersistedMemory(persisted, Date.now());
   }
 
-  const stage = buildCompanionStage({ parent: deps.stageParent });
+  // Built detached and inserted once by the encounter toolbar. Appending it to the world stage
+  // first caused a visible fixed-to-docked layout pass during startup.
+  const stage = buildCompanionStage();
   const appearance = (): ReturnType<typeof companionAppearanceConfiguration> =>
     companionAppearanceConfiguration({
       body: state.preferences.companionBody,
@@ -283,10 +285,14 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
 
   stopPreviousOutcomes = stopOutcomes;
 
-  const controller = createCompanionController({
+  let controller: CompanionController;
+  controller = createCompanionController({
     companion: deps.engine,
     askQuestion: (question) => askOrPropose(question),
-    onWorking: (working) => stage.setState(working ? 'working' : 'attending'),
+    onWorking: (working) => {
+      if (working) stage.setState('working');
+      else reflectTurnState(controller.current());
+    },
     onAwaitingConfirmation: (proposalId, summary, utterance) => {
       // A staged proposal is still unconfirmed. It may not borrow the settled presentation.
       stage.setState('uncertain');
@@ -358,7 +364,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   });
   controller.attach(panel);
 
-  /** Open the fixed visual-novel composition over the current memory backdrop. */
+  /** Open the docked Companion instrument over the current world. */
   function summon(): void {
     deps.onOpen?.();
     // Pointer Lock freezes clientX/clientY by specification. The SVG Companion follows the free

@@ -117,11 +117,12 @@ applyDocumentWorldStyle(previewArtProfile ?? worldArtProfile(
 void boot().catch((error: unknown) => {
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'error');
+  shell.removeAttribute('aria-busy');
   replace(shell, [buildStartupState(error)]);
 });
 
 async function boot(): Promise<void> {
-  replace(shell, [buildStartupState()]);
+  if (shell.querySelector('.startup-thinking') === null) replace(shell, [buildStartupState()]);
   if (preview) {
     await start('');
     return;
@@ -219,6 +220,12 @@ async function start(token: string, csrfToken?: string): Promise<void> {
   await mount();
 }
 async function mount(): Promise<void> {
+  shell.setAttribute('data-booting', '');
+  shell.setAttribute('aria-busy', 'true');
+  const retainedLoading = shell.querySelector<HTMLElement>('.startup-thinking') ?? buildStartupState();
+  replace(shell, [retainedLoading]);
+  disposeMountListeners(state);
+  state.atlas?.binding.setControlsEnabled(false);
   state.disposeCharacter?.();
   state.disposeCharacter = null;
   state.disposeObjects?.();
@@ -272,6 +279,8 @@ async function mount(): Promise<void> {
     replace(shell, [emptyWorld, intake.root]);
     intake.root.open = true;
     void intake.begin();
+    shell.removeAttribute('aria-busy');
+    shell.removeAttribute('data-booting');
     return;
   }
   canvas.hidden = false;
@@ -376,7 +385,6 @@ async function mount(): Promise<void> {
     rememberAnswer: async (answer) => {
       await companionMemory.rememberAnswer(answerToRemember(answer));
     },
-    stageParent: stage,
     confirm: () => writePath.confirm,
     reflectShell: () => reflectShell(),
     onAnswered: finishFirstUse,
@@ -675,6 +683,7 @@ async function mount(): Promise<void> {
     viewportBoundary,
     status.inspectorRoot,
     segments.root,
+    retainedLoading,
   ]);
   void intake.begin();
 
@@ -721,21 +730,14 @@ async function mount(): Promise<void> {
       shellState.camera !== 'ground';
     detail.root.hidden = shellState.primary !== 'index' || shellState.detailId === null;
     state.atlas?.binding.setMapMode(shellState.camera === 'map');
-    /*
-     * A plate stands in front of the world; it does not replace it. Movement therefore tracks the
-     * CAMERA MODE and nothing else: Map and direct travel own the camera, so they stop you, but
-     * opening a panel never does. Disabling controls for the system surfaces parked you in place
-     * the moment you opened Customize, which is the one surface where walking around while you
-     * change the world's appearance is the entire point.
-     *
-     * Summon keeps its own guard below, so a system surface still cannot call the Companion out
-     * from behind itself.
-     */
+    // Keyboard ownership is exclusive: a visible surface and locomotion never consume the same
+    // key state. Appearance changes remain live, but walking resumes only after returning to the
+    // ready world.
     state.atlas?.binding.setControlsEnabled(
       shellState.camera === 'ground' &&
-      !['menu', 'controls', 'character'].includes(shellState.primary),
+      shellState.primary === 'world' &&
+      companion.panel.state() !== 'open',
     );
-    // Every surface here takes the cursor. None of them should take your feet with it.
     state.atlas?.binding.setFreeCursorActive(
       companion.panel.state() === 'open' || shellState.primary !== 'world',
     );
@@ -811,6 +813,10 @@ async function mount(): Promise<void> {
   void objects.begin();
   if (!geographicDistrict) void segments.begin();
 
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  retainedLoading.remove();
+  shell.removeAttribute('aria-busy');
+  shell.removeAttribute('data-booting');
 }
 
 function syncIndexRoute(facets: IndexFacets): void {

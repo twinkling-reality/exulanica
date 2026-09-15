@@ -81,6 +81,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
   let lastMemoryVisible: boolean | undefined;
+  let resolveFirstFrame: (() => void) | null = null;
+  const firstFrame = new Promise<void>((resolve) => { resolveFirstFrame = resolve; });
   const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
     text: 'Opening the Atlas and decoding its available reconstruction…' });
   env.shell.append(rendererLoading);
@@ -88,6 +90,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   try {
     const district = await ownedDistrict({ preview: env.preview });
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
+      resolveFirstFrame?.();
+      resolveFirstFrame = null;
       const memoryVisible = state.atlas?.binding.memoryLayerVisible;
       if (memoryVisible !== undefined && memoryVisible !== lastMemoryVisible) {
         lastMemoryVisible = memoryVisible;
@@ -179,6 +183,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   deps.status.applyProofLens();
   env.canvas.dataset.companionRenderer = 'svg';
   deps.reflectShell();
+  await firstFrame;
 
   return {
     atlas,
