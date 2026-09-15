@@ -14,6 +14,8 @@ function fixture(reduced = false, withLandscape = false) {
     title: document.createElement('section'),
     purpose: document.createElement('section'),
     capabilities: document.createElement('section'),
+    research: document.createElement('section'),
+    waitlist: document.createElement('section'),
   };
   const landscape = document.createElement('div');
   const wordmark = document.createElement('h1');
@@ -102,11 +104,29 @@ describe('landing surface transitions', () => {
       expect(camera.target.y).toBeLessThan(wordmark.top);
       expect(camera.y).toBeGreaterThan(0);
       expect(Math.sign(camera.x)).toBe(destination === 'purpose' ? -1 : 1);
+      expect(camera.scale).toBe(2.5);
     }
   });
 
+  it('sends research into the wordmark centre instead of along the horizon', () => {
+    const pane = { left: 0, top: 0, width: 1200, height: 800 };
+    const wordmark = { left: 240, top: 300, width: 720, height: 110 };
+    const viewport = { width: 1200, height: 800 };
+    const purpose = titleCamera('purpose', wordmark, pane, viewport);
+    const capabilities = titleCamera('capabilities', wordmark, pane, viewport);
+    const research = titleCamera('research', wordmark, pane, viewport);
+    expect(research.scale).toBeGreaterThan(purpose.scale);
+    expect(research.target.x).toBeCloseTo(wordmark.left + wordmark.width / 2);
+    expect(research.target.y).toBe(purpose.target.y);
+    expect(research.x).toBeCloseTo(0);
+    expect(600 + research.scale * (research.target.x - 600) + research.x).toBeCloseTo(600);
+    expect(400 + research.scale * (research.target.y - 400) + research.y).toBeCloseTo(400);
+    expect(research.transform).not.toBe(purpose.transform);
+    expect(research.transform).not.toBe(capabilities.transform);
+  });
+
   it('returns through the same destination-specific camera position', async () => {
-    for (const destination of ['purpose', 'capabilities'] as const) {
+    for (const destination of ['purpose', 'capabilities', 'research'] as const) {
       const { pending, transition } = fixture();
       transition.show('title');
       transition.show(destination);

@@ -1,5 +1,5 @@
 /**
- * Exulanica's signed-out title, Purpose, and Capabilities surfaces.
+ * Exulanica's signed-out title, Purpose, Capabilities, Research, and Waitlist surfaces.
  *
  * The Atlas itself has one composition root in `@exulanica/app`. The landing page does not build a
  * second Atlas, second Companion, or scripted formation journey. Entering follows the configured
@@ -10,10 +10,13 @@ import '@exulanica/presentation/tokens.css';
 import './style.css';
 
 import { atlasDestinationFromEnvironment } from './atlas-destination.js';
+import { waitlistDestinationFromEnvironment } from './waitlist-destination.js';
 import { readEnv, watchReducedMotion } from './env.js';
 import { buildChrome, type Surface } from './ui/chrome.js';
 import { buildCapabilities } from './ui/capabilities.js';
 import { buildPurpose } from './ui/purpose.js';
+import { buildResearch } from './ui/research.js';
+import { buildWaitlist } from './ui/waitlist.js';
 import { buildTitle } from './ui/title.js';
 import { createSurfaceTransition } from './ui/surface-transition.js';
 import { boundaryReason, buildViewportBoundary, readViewport } from './ui/viewport-boundary.js';
@@ -26,11 +29,17 @@ const destination = atlasDestinationFromEnvironment(window.location.href);
 const title = buildTitle();
 const purpose = buildPurpose();
 const capabilities = buildCapabilities();
+const research = buildResearch();
+const waitlist = buildWaitlist({
+  endpoint: waitlistDestinationFromEnvironment(window.location.href),
+});
 const chrome = buildChrome({
   atlasHref: destination?.href ?? null,
   onHome: () => go('title'),
   onPurpose: () => go('purpose'),
   onCapabilities: () => go('capabilities'),
+  onResearch: () => go('research'),
+  onWaitlist: () => go('waitlist'),
 });
 
 // Keep the same decorative world mounted while the text planes travel through it.
@@ -40,14 +49,22 @@ landscape.setAttribute('aria-hidden', 'true');
 const artwork = title.querySelector('.title-artwork');
 if (artwork) landscape.append(artwork);
 // Decoration has no focus stops; the title still precedes navigation.
-overlay.append(landscape, title, chrome.root, purpose, capabilities);
+overlay.append(landscape, title, chrome.root, purpose, capabilities, research, waitlist);
 
-const PANES: Readonly<Record<Surface, HTMLElement>> = { title, purpose, capabilities };
+const PANES: Readonly<Record<Surface, HTMLElement>> = {
+  title,
+  purpose,
+  capabilities,
+  research,
+  waitlist,
+};
 const transition = createSurfaceTransition(PANES, () => env.reducedMotion, landscape);
 let surface: Surface = 'title';
 const surfaceFromHash = (): Surface => {
   if (window.location.hash === '#purpose') return 'purpose';
   if (window.location.hash === '#capabilities') return 'capabilities';
+  if (window.location.hash === '#research') return 'research';
+  if (window.location.hash === '#waitlist') return 'waitlist';
   return 'title';
 };
 go(surfaceFromHash());

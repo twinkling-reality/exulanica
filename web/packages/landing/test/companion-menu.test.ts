@@ -12,14 +12,29 @@ import { createCompanionMenuMarker, MENU_FACES } from '../src/ui/companion-menu-
 const THEME = readFileSync('packages/landing/src/themes.css', 'utf8');
 const PAGE = readFileSync('packages/landing/src/style.css', 'utf8');
 
-const STATIONS = ['path-home', 'path-enter', 'path-purpose', 'path-capabilities', 'path-resources'];
+const STATIONS = [
+  'path-home',
+  'path-enter',
+  'path-waitlist',
+  'path-purpose',
+  'path-capabilities',
+  'path-resources',
+];
 
-function chrome() {
+/*
+ * Enter Exulanica and the waitlist are mutually exclusive, so no single build holds all six
+ * stations. Anything asserting a property of every station has to walk both builds.
+ */
+const BUILDS = ['https://atlas.example/session', null] as const;
+
+function chrome(atlasHref: string | null = BUILDS[0]) {
   const built = buildChrome({
-    atlasHref: 'https://atlas.example/session',
+    atlasHref,
     onHome: vi.fn(),
     onPurpose: vi.fn(),
     onCapabilities: vi.fn(),
+    onResearch: vi.fn(),
+    onWaitlist: vi.fn(),
   });
   document.body.append(built.root);
   return built;
@@ -60,19 +75,21 @@ describe('the Companion in the title menu', () => {
   });
 
   it('wears a different face at every station', () => {
-    const built = chrome();
-    built.setSurface('title');
-    const marker = built.root.querySelector<SVGSVGElement>('.companion-menu-marker')!;
-
     const worn = new Map<string, string | undefined>();
-    for (const id of ['path-enter', 'path-purpose', 'path-capabilities', 'path-resources']) {
-      built.root.querySelector(`#${id}`)?.dispatchEvent(new PointerEvent('pointerenter'));
-      worn.set(id, marker.dataset['face']);
+    for (const atlasHref of BUILDS) {
+      const each = chrome(atlasHref);
+      each.setSurface('title');
+      const face = each.root.querySelector<SVGSVGElement>('.companion-menu-marker')!;
+      for (const id of STATIONS) {
+        const node = each.root.querySelector(`#${id}`);
+        if (node === null) continue;
+        node.dispatchEvent(new PointerEvent('pointerenter'));
+        worn.set(id, face.dataset['face']);
+      }
+      each.setSurface('purpose');
+      each.root.querySelector('#path-home')?.dispatchEvent(new PointerEvent('pointerenter'));
+      worn.set('path-home', face.dataset['face']);
     }
-    built.setSurface('purpose');
-    built.root.querySelector('#path-home')?.dispatchEvent(new PointerEvent('pointerenter'));
-    worn.set('path-home', marker.dataset['face']);
-
     expect(worn.size).toBe(STATIONS.length);
     expect(new Set(worn.values()).size).toBe(STATIONS.length);
     for (const face of worn.values()) expect(MENU_FACES).toContain(face);
@@ -126,13 +143,17 @@ describe('the Companion in the title menu', () => {
       expect(held.getAttribute('fill')).toMatch(/^var\(--companion-eye, #[0-9a-f]{6}\)$/);
     }
 
-    const built = chrome();
-    built.setSurface('title');
-    const live = built.root.querySelector<SVGSVGElement>('.companion-menu-marker')!;
     const inks = new Set<string>();
-    for (const id of STATIONS.slice(1)) {
-      built.root.querySelector(`#${id}`)?.dispatchEvent(new PointerEvent('pointerenter'));
-      inks.add(live.style.getPropertyValue('--companion-body'));
+    for (const atlasHref of BUILDS) {
+      const each = chrome(atlasHref);
+      each.setSurface('title');
+      const live = each.root.querySelector<SVGSVGElement>('.companion-menu-marker')!;
+      for (const id of STATIONS.slice(1)) {
+        const node = each.root.querySelector(`#${id}`);
+        if (node === null) continue;
+        node.dispatchEvent(new PointerEvent('pointerenter'));
+        inks.add(live.style.getPropertyValue('--companion-body'));
+      }
     }
     expect(inks.size).toBe(STATIONS.length - 1);
     for (const ink of inks) expect(ink).toMatch(/^#[0-9a-f]{6}$/);

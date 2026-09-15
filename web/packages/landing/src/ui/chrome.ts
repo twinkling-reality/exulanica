@@ -2,7 +2,7 @@
  * One signed-out navigation set shared by every landing surface.
  *
  * Resources remains one Companion station. Its ordinary links live in a secondary disclosure, so
- * documentation and source code do not become extra primary destinations.
+ * documentation, research, and source code do not become extra primary destinations.
  */
 
 import {
@@ -18,17 +18,19 @@ import { createCompanionMenuMarker } from './companion-menu-marker.js';
 /**
  * What the Companion is doing with its eyes at each station.
  *
- * The menu is five entries a visitor sweeps in a second, and a character that wears one face at
+ * The menu is six entries a visitor sweeps in a second, and a character that wears one face at
  * all of them is furniture. These are the appearance contract's own variants, assigned to say
  * something true about each destination rather than to be different for its own sake: alert at
- * the way in, curious at the question, pleased at what the product does, and relaxed at the
- * utility drawer, which is the one entry that is not about the product.
+ * the way in, wide at the invitation to be told when there is something to try, curious at the
+ * question, pleased at what the product does, and relaxed at the utility drawer, which is the
+ * one entry that is not about the product.
  */
 const STATION_FACE: Readonly<Record<string, CompanionFaceVariant>> = Object.freeze({
   'path-home': 'neutral',
   'path-enter': 'attentive',
   'path-purpose': 'curious',
   'path-capabilities': 'happy',
+  'path-waitlist': 'wide',
   'path-resources': 'sleepy',
 });
 
@@ -47,6 +49,7 @@ export const STATION_COLOR: Readonly<Record<string, CompanionColorVariant>> = Ob
   'path-purpose': 'periwinkle',
   'path-capabilities': 'orange',
   'path-resources': 'rose',
+  'path-waitlist': 'iris',
 });
 
 /** The contract owns the colours; this only picks which one a station asks for. */
@@ -64,12 +67,14 @@ export const REPOSITORY_URL = 'https://github.com/twinkling-reality/exulanica';
 export const DOCS_URL = `${REPOSITORY_URL}/tree/main/docs`;
 
 /** Where the visitor is. Informational surfaces retain a direct return to the title. */
-export type Surface = 'title' | 'purpose' | 'capabilities';
+export type Surface = 'title' | 'purpose' | 'capabilities' | 'research' | 'waitlist';
 
 export interface ChromeActions {
   onHome(): void;
   onPurpose(): void;
   onCapabilities(): void;
+  onResearch(): void;
+  onWaitlist(): void;
 }
 
 export interface ChromeOptions extends ChromeActions {
@@ -122,6 +127,16 @@ export function buildChrome(options: ChromeOptions): Chrome {
     options.onCapabilities,
     '#capabilities',
   );
+  /*
+   * One way in, and it is whichever one is true. Never both.
+   *
+   * With a world to enter the column leads with Enter Exulanica. Without one it leads with the
+   * waitlist, and the Enter station is not rendered at all. Showing the pair together offers a
+   * visitor two ways in when only one of them exists, and showing Enter greyed out with a caption
+   * saying the world is not connected is the same false promise with a footnote. Only the station
+   * that can be acted on is built.
+   */
+  const connected = options.atlasHref !== null;
   const atlas = destination(
     'Enter Exulanica',
     'path-enter',
@@ -129,19 +144,15 @@ export function buildChrome(options: ChromeOptions): Chrome {
     options.atlasHref ?? undefined,
     true,
   );
-  const atlasStatus = el('p', {
-    class: 'entry-status',
-    id: 'atlas-status',
-    role: 'status',
-    text: 'The world is not connected in this build.',
-  });
-  if (options.atlasHref === null) {
-    const disabledAtlas = atlas as HTMLButtonElement;
-    disabledAtlas.disabled = true;
-    disabledAtlas.setAttribute('aria-describedby', atlasStatus.id);
-  } else {
-    atlasStatus.hidden = true;
-  }
+  const waitlist = destination(
+    'Join the waitlist',
+    'path-waitlist',
+    options.onWaitlist,
+    '#waitlist',
+    !connected,
+  );
+  /** Whichever station leads the column. The marker rests here, and it is never a dead control. */
+  const wayIn = connected ? atlas : waitlist;
 
   const resources = destination('Resources', 'path-resources', () => {});
   resources.setAttribute('aria-expanded', 'false');
@@ -155,8 +166,9 @@ export function buildChrome(options: ChromeOptions): Chrome {
   resourceLinks.hidden = true;
   const resourceBack = destination('Back', 'resource-back', () => {});
   const documentation = destination('Documentation', 'resource-docs', () => {}, DOCS_URL);
+  const research = destination('Research', 'path-research', options.onResearch, '#research');
   const github = destination('GitHub', 'resource-github', () => {}, REPOSITORY_URL);
-  resourceLinks.append(resourceBack, documentation, github);
+  resourceLinks.append(resourceBack, documentation, research, github);
 
   /*
    * The order attention travels down the column, used to stagger an entry's arrival.
@@ -168,34 +180,27 @@ export function buildChrome(options: ChromeOptions): Chrome {
   for (const [node, order] of [
     [home, 0],
     [atlas, 0],
-    [purpose, 1],
-    [capabilities, 2],
-    [resources, 3],
+    [waitlist, 0],
+    [purpose, 2],
+    [capabilities, 3],
+    [resources, 4],
     [resourceBack, 0],
     [documentation, 1],
-    [github, 2],
+    [research, 2],
+    [github, 3],
   ] as const) {
     node.style.setProperty('--enter-index', String(order));
   }
 
   const left = el('div', { class: 'destinations' });
   const marker = createCompanionMenuMarker();
-  left.append(
-    marker,
-    home,
-    atlas,
-    atlasStatus,
-    purpose,
-    capabilities,
-    resourceLinks,
-    resources,
-  );
+  left.append(marker, home, wayIn, purpose, capabilities, resourceLinks, resources);
 
-  const targets = [home, atlas, purpose, capabilities, resources];
+  const targets = [home, wayIn, purpose, capabilities, resources];
   let currentSurface: Surface = 'title';
   let hovered: HTMLElement | null = null;
   let focused: HTMLElement | null = null;
-  let previousTarget = atlas;
+  let previousTarget = wayIn;
   let occupied: HTMLElement | null = null;
   let motionPhase = false;
   let outsideListener: ((event: PointerEvent) => void) | null = null;
@@ -204,7 +209,10 @@ export function buildChrome(options: ChromeOptions): Chrome {
   const defaultTarget = (): HTMLElement => {
     if (currentSurface === 'purpose') return purpose;
     if (currentSurface === 'capabilities') return capabilities;
-    return atlas;
+    if (currentSurface === 'research') return resources;
+    // A connected build has no waitlist station, so the surface rests the Companion on Return.
+    if (currentSurface === 'waitlist') return connected ? home : waitlist;
+    return wayIn;
   };
 
   const placeMarker = (): void => {
@@ -252,9 +260,9 @@ export function buildChrome(options: ChromeOptions): Chrome {
   const applyPrimaryVisibility = (): void => {
     const resourcesOpen = !resourceLinks.hidden;
     home.hidden = resourcesOpen || currentSurface === 'title';
+    // Enter belongs to the title; the waitlist stays reachable from the reading surfaces too.
     atlas.hidden = resourcesOpen || currentSurface !== 'title';
-    atlasStatus.hidden =
-      resourcesOpen || currentSurface !== 'title' || options.atlasHref !== null;
+    waitlist.hidden = resourcesOpen;
     purpose.hidden = resourcesOpen;
     capabilities.hidden = resourcesOpen;
   };
@@ -340,6 +348,8 @@ export function buildChrome(options: ChromeOptions): Chrome {
       for (const [node, owns] of [
         [purpose, surface === 'purpose'],
         [capabilities, surface === 'capabilities'],
+        [research, surface === 'research'],
+        [waitlist, surface === 'waitlist'],
       ] as const) {
         if (owns) node.setAttribute('aria-current', 'page');
         else node.removeAttribute('aria-current');

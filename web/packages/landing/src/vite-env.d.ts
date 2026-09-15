@@ -8,6 +8,7 @@ declare module '*.css';
 interface ImportMetaEnv {
   readonly DEV: boolean;
   readonly VITE_ATLAS_URL?: string;
+  readonly VITE_WAITLIST_URL?: string;
 }
 
 interface ImportMeta {

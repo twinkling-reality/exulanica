@@ -29,11 +29,15 @@ describe('the Exulanica title screen', () => {
     const onHome = vi.fn();
     const onPurpose = vi.fn();
     const onCapabilities = vi.fn();
+    const onResearch = vi.fn();
+    const onWaitlist = vi.fn();
     const chrome = buildChrome({
       atlasHref: 'https://atlas.example/session',
       onHome,
       onPurpose,
       onCapabilities,
+      onResearch,
+      onWaitlist,
     });
     document.body.append(chrome.root);
 
@@ -101,6 +105,10 @@ describe('the Exulanica title screen', () => {
     expect(purpose?.hasAttribute('aria-current')).toBe(false);
     expect(capabilities?.getAttribute('aria-current')).toBe('page');
     expect(marker?.dataset['target']).toBe('path-capabilities');
+
+    chrome.setSurface('research');
+    expect(chrome.root.querySelector('#path-research')?.getAttribute('aria-current')).toBe('page');
+    expect(marker?.dataset['target']).toBe('path-resources');
   });
 
   it('opens Resources as one keyboard-operable station and restores focus on Escape', () => {
@@ -109,6 +117,8 @@ describe('the Exulanica title screen', () => {
       onHome: vi.fn(),
       onPurpose: vi.fn(),
       onCapabilities: vi.fn(),
+      onResearch: vi.fn(),
+      onWaitlist: vi.fn(),
     });
     document.body.append(chrome.root);
     chrome.setSurface('title');
@@ -117,6 +127,7 @@ describe('the Exulanica title screen', () => {
     const disclosure = chrome.root.querySelector<HTMLElement>('#resource-links');
     const back = chrome.root.querySelector<HTMLButtonElement>('#resource-back');
     const docs = chrome.root.querySelector<HTMLAnchorElement>('#resource-docs');
+    const research = chrome.root.querySelector<HTMLAnchorElement>('#path-research');
     const github = chrome.root.querySelector<HTMLAnchorElement>('#resource-github');
     const purpose = chrome.root.querySelector<HTMLAnchorElement>('#path-purpose');
     const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
@@ -130,6 +141,8 @@ describe('the Exulanica title screen', () => {
     expect(disclosure?.hidden).toBe(false);
     expect(back?.tagName).toBe('BUTTON');
     expect(docs?.tagName).toBe('A');
+    expect(research?.tagName).toBe('A');
+    expect(research?.getAttribute('href')).toBe('#research');
     expect(github?.tagName).toBe('A');
     expect(purpose?.hidden).toBe(true);
     expect(
@@ -137,7 +150,7 @@ describe('the Exulanica title screen', () => {
         disclosure?.querySelectorAll<HTMLElement>('.destination') ?? [],
         (node) => node.textContent?.trim(),
       ),
-    ).toEqual(['Back', 'Documentation', 'GitHub']);
+    ).toEqual(['Back', 'Documentation', 'Research', 'GitHub']);
 
     docs?.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: resources }));
     purpose?.dispatchEvent(new PointerEvent('pointerenter'));
@@ -157,6 +170,8 @@ describe('the Exulanica title screen', () => {
       onHome: vi.fn(),
       onPurpose: vi.fn(),
       onCapabilities: vi.fn(),
+      onResearch: vi.fn(),
+      onWaitlist: vi.fn(),
     });
     document.body.append(chrome.root);
     chrome.setSurface('title');
@@ -182,22 +197,57 @@ describe('the Exulanica title screen', () => {
     expect(boundary.root.querySelector('.boundary-eyebrow')?.textContent).toBe('Exulanica');
   });
 
-  it('keeps the entry station when the world destination is disconnected', () => {
+  /*
+   * The disconnected build used to lead with a greyed Enter Exulanica and a line saying the world
+   * was not connected. An unusable control is not made honest by a caption under it, so the
+   * station is absent instead and the waitlist leads. Nothing in the column is ever dead.
+   */
+  it('offers the waitlist instead of a dead entry when no world is connected', () => {
     const chrome = buildChrome({
       atlasHref: null,
       onHome: vi.fn(),
       onPurpose: vi.fn(),
       onCapabilities: vi.fn(),
+      onResearch: vi.fn(),
+      onWaitlist: vi.fn(),
     });
     const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
 
     chrome.setSurface('title');
-    const atlas = chrome.root.querySelector<HTMLButtonElement>('#path-enter');
-    expect(atlas?.tagName).toBe('BUTTON');
-    expect(atlas?.textContent).toContain('Enter Exulanica');
-    expect(atlas?.disabled).toBe(true);
-    expect(atlas?.getAttribute('aria-describedby')).toBe('atlas-status');
-    expect(chrome.root.querySelector('[role="status"]')?.textContent).toContain('not connected');
-    expect(marker?.dataset['target']).toBe('path-enter');
+    expect(chrome.root.querySelector('#path-enter')).toBeNull();
+    expect(chrome.root.querySelector('[role="status"]')).toBeNull();
+
+    const waitlist = chrome.root.querySelector<HTMLAnchorElement>('#path-waitlist');
+    expect(waitlist?.tagName).toBe('A');
+    expect(waitlist?.getAttribute('href')).toBe('#waitlist');
+    expect(waitlist?.classList.contains('destination-primary')).toBe(true);
+    expect(waitlist?.hidden).toBe(false);
+    expect(marker?.dataset['target']).toBe('path-waitlist');
+
+    expect(
+      Array.from(
+        chrome.root.querySelectorAll<HTMLElement>('.destinations > .destination'),
+        (node) => (node.hidden ? null : node.textContent?.trim()),
+      ).filter(Boolean),
+    ).toEqual(['Join the waitlist', 'Purpose', 'Capabilities', 'Resources']);
+  });
+
+  it('leads with Enter Exulanica and builds no waitlist station when a world is connected', () => {
+    const chrome = buildChrome({
+      atlasHref: 'https://atlas.example/session',
+      onHome: vi.fn(),
+      onPurpose: vi.fn(),
+      onCapabilities: vi.fn(),
+      onResearch: vi.fn(),
+      onWaitlist: vi.fn(),
+    });
+    chrome.setSurface('title');
+    const atlas = chrome.root.querySelector<HTMLAnchorElement>('#path-enter');
+    expect(atlas?.classList.contains('destination-primary')).toBe(true);
+    // Two ways in, when only one of them exists, is the thing this replaced.
+    expect(chrome.root.querySelector('#path-waitlist')).toBeNull();
+    expect(
+      chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker')?.dataset['target'],
+    ).toBe('path-enter');
   });
 });

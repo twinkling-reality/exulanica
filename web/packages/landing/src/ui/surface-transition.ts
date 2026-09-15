@@ -5,6 +5,21 @@ const REST = 'translate3d(0, 0, 0) scale(1)';
 type InformationSurface = Exclude<Surface, 'title'>;
 type Rectangle = Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
 
+/**
+ * Where above the wordmark each surface sits, and how far in the camera pushes to get there.
+ *
+ * `along` is a fraction of the wordmark's width, so the reading pages take its two ends and the
+ * two later surfaces take its centre at different depths. A table rather than a chain of
+ * conditionals because four destinations was the point where the chain stopped being readable;
+ * the three original values are unchanged.
+ */
+const CAMERA: Readonly<Record<InformationSurface, { along: number; scale: number }>> = Object.freeze({
+  purpose: { along: 0.82, scale: 2.5 },
+  capabilities: { along: 0.18, scale: 2.5 },
+  research: { along: 0.5, scale: 3.4 },
+  waitlist: { along: 0.5, scale: 2.0 },
+});
+
 /** Place a point above the selected end of the wordmark at the viewport centre. */
 export function titleCamera(
   destination: InformationSurface,
@@ -12,9 +27,9 @@ export function titleCamera(
   pane: Rectangle,
   viewport: { width: number; height: number },
 ): { transform: string; x: number; y: number; scale: number; target: { x: number; y: number } } {
-  const scale = 2.5;
+  const { along, scale } = CAMERA[destination];
   const target = {
-    x: wordmark.left + wordmark.width * (destination === 'purpose' ? 0.82 : 0.18),
+    x: wordmark.left + wordmark.width * along,
     y: wordmark.top - wordmark.height * 0.65,
   };
   const origin = { x: pane.left + pane.width / 2, y: pane.top + pane.height / 2 };
@@ -23,8 +38,27 @@ export function titleCamera(
   return { transform: `translate3d(${x}px, ${y}px, 0) scale(${scale})`, x, y, scale, target };
 }
 
-const informationDistance = (destination: InformationSurface): string =>
-  `translate3d(${destination === 'purpose' ? 6 : -6}vw, -3vh, 0) scale(0.97)`;
+const informationDistance = (destination: InformationSurface): string => {
+  if (destination === 'research') return 'translate3d(0, 3vh, 0) scale(0.92)';
+  // The waitlist rises to meet the visitor rather than receding, which is the opposite of
+  // Research below it. Both sit on the wordmark's centre, so they need different approaches.
+  if (destination === 'waitlist') return 'translate3d(0, -4vh, 0) scale(0.96)';
+  return `translate3d(${destination === 'purpose' ? 6 : -6}vw, -3vh, 0) scale(0.97)`;
+};
+
+const readingHandoff = (next: InformationSurface): { outgoingEnd: string; incomingFrom: string } => {
+  if (next === 'research') {
+    return {
+      outgoingEnd: 'translate3d(0, 0, 0) scale(1.05)',
+      incomingFrom: 'translate3d(0, 0, 0) scale(0.94)',
+    };
+  }
+  const lateral = next === 'capabilities' ? -3 : 3;
+  return {
+    outgoingEnd: `translate3d(${-lateral}vw, 0, 0) scale(1)`,
+    incomingFrom: `translate3d(${lateral}vw, 0, 0) scale(1)`,
+  };
+};
 
 /** Move through the title plane while leaving the shared navigation outside the camera. */
 export function createSurfaceTransition(
@@ -138,11 +172,11 @@ export function createSurfaceTransition(
         fill: 'both',
       };
       const information = destination as InformationSurface;
-      const lateral = next === 'capabilities' ? -3 : 3;
+      const handoff = readingHandoff(next === 'title' ? information : next as InformationSurface);
       const outgoingEnd = toInformation ? camera : toTitle
-        ? informationDistance(information) : `translate3d(${-lateral}vw, 0, 0) scale(1)`;
+        ? informationDistance(information) : handoff.outgoingEnd;
       const incomingFrom = toInformation ? informationDistance(information) : toTitle
-        ? landscapeStart ?? camera : `translate3d(${lateral}vw, 0, 0) scale(1)`;
+        ? landscapeStart ?? camera : handoff.incomingFrom;
       const outFrames: Keyframe[] = reduced
         ? [{ opacity: outgoingStart?.opacity ?? 1 }, { opacity: 0 }]
         : [

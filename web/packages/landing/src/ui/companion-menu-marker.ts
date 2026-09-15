@@ -24,6 +24,7 @@ export const MENU_FACES: readonly CompanionFaceVariant[] = Object.freeze([
   'curious',
   'happy',
   'sleepy',
+  'wide',
 ]);
 
 function svgElement<K extends keyof SVGElementTagNameMap>(

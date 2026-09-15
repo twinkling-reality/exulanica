@@ -141,6 +141,7 @@ body {
 #path-enter { --station-accent: var(--landing-station-enter); }
 #path-purpose { --station-accent: var(--landing-station-purpose); }
 #path-capabilities { --station-accent: var(--landing-station-capabilities); }
+#path-waitlist { --station-accent: var(--landing-station-waitlist); }
 #path-resources,
 .resource-disclosure { --station-accent: var(--landing-station-resources); }
 
@@ -179,7 +180,7 @@ body {
 /*
  * Tracking opens under attention.
  *
- * A menu of five uppercase words at 0.76rem has almost no room to move without becoming
+ * A menu of six uppercase words at 0.76rem has almost no room to move without becoming
  * decoration. Letter-spacing is the one property that reads at that size from across a desk, and
  * because each item is a full-width block in a fixed-width column, opening it moves nothing else
  * on the page. A disabled entry is excluded: it must not answer a pointer it cannot serve.
@@ -317,6 +318,12 @@ body {
   --companion-tilt: 5deg;
   --companion-gaze-x: 12px;
   --companion-gaze-y: 1px;
+}
+.companion-menu-marker[data-target='path-waitlist'] {
+  --station-accent: var(--landing-station-waitlist);
+  --companion-tilt: -5deg;
+  --companion-gaze-x: 10px;
+  --companion-gaze-y: -1px;
 }
 .companion-menu-marker[data-target='path-resources'] {
   --station-accent: var(--landing-station-resources);
@@ -536,7 +543,8 @@ body {
 .companion-menu-marker[data-face='attentive'] .companion-menu-face[data-face='attentive'],
 .companion-menu-marker[data-face='curious'] .companion-menu-face[data-face='curious'],
 .companion-menu-marker[data-face='happy'] .companion-menu-face[data-face='happy'],
-.companion-menu-marker[data-face='sleepy'] .companion-menu-face[data-face='sleepy'] {
+.companion-menu-marker[data-face='sleepy'] .companion-menu-face[data-face='sleepy'],
+.companion-menu-marker[data-face='wide'] .companion-menu-face[data-face='wide'] {
   visibility: visible;
 }
 
@@ -660,7 +668,12 @@ body {
   opacity: 1;
   transition: opacity 520ms ease;
 }
-:root:is([data-surface='purpose'], [data-surface='capabilities']) .landing-landscape {
+:root:is(
+    [data-surface='purpose'],
+    [data-surface='capabilities'],
+    [data-surface='research'],
+    [data-surface='waitlist']
+  ) .landing-landscape {
   opacity: 0.38;
 }
 /* The page places the artwork; the component owns geometry, material, and motion. */
@@ -793,17 +806,6 @@ body {
   animation: rise 900ms cubic-bezier(0.22, 1, 0.36, 1) 860ms forwards;
 }
 
-.entry-status {
-  margin: 0;
-  max-width: 16rem;
-  padding: 0.54rem 0;
-  font-size: 0.76rem;
-  font-weight: 300;
-  line-height: 1.5;
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
-}
-
 /* ---------------------------------------------------------------- boundary */
 
 /*
@@ -905,6 +907,164 @@ body {
   letter-spacing: -0.018em;
   color: var(--ink);
   text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------- waitlist */
+
+/*
+ * A form, set like the application's access gate rather than like a reading page.
+ *
+ * Purpose, Capabilities, and Research use a 43rem measure at 1.35rem and up, because they are
+ * read. This is used: a modest title, one small line, a pill holding the field, and a circular
+ * arrow beside it. Borrowing the reading scale made a two line question look like an essay.
+ *
+ * The proportions below are the gate's own, reproduced rather than imported since the two live in
+ * different packages: a 2.65rem control height, a 0.65rem gap, and the field on a 5 percent ink
+ * wash instead of a border. The palettes agree by value, so this matches rather than approximates.
+ */
+.waitlist-gate {
+  width: min(30rem, 82vw);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/*
+ * One line, and it is the whole surface.
+ *
+ * There was a 1.4rem semibold heading with a 0.82rem note under it, which is a title and a
+ * subtitle for a question that fits in a sentence, and the title repeated the menu entry that
+ * opened it. Ink rather than faint, because this line is the content and not a caption on it.
+ */
+.waitlist-line {
+  margin: 0 0 0.3rem;
+  font-family: var(--font);
+  font-size: clamp(1.05rem, 1.3vw, 1.25rem);
+  font-weight: 300;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.waitlist-form {
+  --waitlist-control-height: 2.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin: 0;
+}
+
+.waitlist-entry {
+  flex: 1;
+  min-width: 0;
+  height: var(--waitlist-control-height);
+  padding: 0 1rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--ink) 5%, var(--ground));
+  border-radius: 999px;
+  transition:
+    background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.waitlist-entry:focus-within {
+  background: color-mix(in srgb, var(--ink) 7%, var(--ground));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 24%, transparent);
+}
+
+.waitlist-field {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 300;
+  color: var(--ink);
+}
+
+.waitlist-field:focus-visible {
+  outline: none;
+}
+
+.waitlist-field::placeholder {
+  color: color-mix(in srgb, var(--ink-faint) 76%, transparent);
+}
+
+/*
+ * The arrow. It is a circle rather than a labelled slab because the pill beside it already says
+ * what is being submitted, and a full-width button under a single field reads as a second
+ * decision. Its accessible name is on the button; the glyph is decoration.
+ */
+.waitlist-submit {
+  appearance: none;
+  width: var(--waitlist-control-height);
+  height: var(--waitlist-control-height);
+  flex: 0 0 var(--waitlist-control-height);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ink-faint) 34%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  transition:
+    background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.waitlist-submit:not(:disabled) {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--ground);
+  cursor: pointer;
+}
+
+.waitlist-submit:not(:disabled):hover,
+.waitlist-submit:not(:disabled):focus-visible {
+  background: color-mix(in srgb, var(--ink) 86%, var(--landing-station-waitlist));
+  border-color: color-mix(in srgb, var(--ink) 86%, var(--landing-station-waitlist));
+}
+
+.waitlist-entry:has(.waitlist-field:disabled) {
+  background: color-mix(in srgb, var(--ink) 3%, var(--ground));
+}
+
+.waitlist-field:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/*
+ * The status line is always in the document, so a screen reader's live region exists before there
+ * is anything to say. An empty one must not reserve a gap the sighted reader sees as a mistake.
+ */
+.waitlist-status {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  text-wrap: pretty;
+}
+
+.waitlist-status:empty {
+  display: none;
+}
+
+.waitlist-status-done {
+  color: var(--ink-soft);
 }
 
 /* ------------------------------------------------------------------ focus */

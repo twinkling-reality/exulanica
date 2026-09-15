@@ -1,8 +1,11 @@
 # @exulanica/landing
 
-The public Exulanica title, Purpose, and Capabilities surfaces. This package is deliberately not
-an Atlas shell. It contains no application state, Companion runtime, formation replay, graph
-client, or renderer.
+The public Exulanica title, Purpose, Capabilities, Research, and Waitlist surfaces. This package
+is deliberately not an Atlas shell. It contains no application state, Companion runtime, formation
+replay, graph client, or renderer.
+
+The waitlist is the only thing on the page that makes a network request, and only on submit. Every
+other surface is static.
 
 ```bash
 pnpm --dir web landing
@@ -20,10 +23,12 @@ VITE_ATLAS_URL=https://atlas.example.com pnpm --dir web landing:build
 ```
 
 `VITE_ATLAS_URL` may also be a same-origin path such as `/atlas`. A production build without this
-value says that the world is not connected instead of guessing a domain or exposing a dead control.
+value does not guess a domain and does not show the station at all: the waitlist leads the column
+instead. See **One way in** below.
 
-During local development the default is `http://127.0.0.1:5173/?preview=1`, the documented Vite
-preview for the canonical app. Override it whenever the app is running elsewhere:
+There is no development default. An earlier build defaulted to `http://127.0.0.1:5173/?preview=1`,
+which put an Enter Exulanica station on every local title screen whether or not anything served
+that port, and led nowhere when nothing did. Ask for the handoff by name instead:
 
 ```bash
 VITE_ATLAS_URL='http://127.0.0.1:5175/?preview=1' pnpm --dir web landing
@@ -31,6 +36,35 @@ VITE_ATLAS_URL='http://127.0.0.1:5175/?preview=1' pnpm --dir web landing
 
 The preview query is only honored by the app's Vite development server. A production app build
 does not accept it.
+
+## Waitlist endpoint
+
+The page holds no list. A deployment supplies the endpoint, exactly as it supplies the Atlas
+destination:
+
+```bash
+VITE_WAITLIST_URL=https://forms.example/f/abc pnpm --dir web landing:build
+```
+
+The submitted body is `email=<address>`, sent as `application/x-www-form-urlencoded`, which is what
+a hosted form endpoint accepts by default and which the fetch specification counts as a simple
+request, so no CORS preflight is issued. A provider wanting JSON needs `encode` in
+`src/ui/waitlist.ts` changed and nothing else. The endpoint must answer with a 2xx status and an
+`Access-Control-Allow-Origin` header that admits the deployed site, or the surface reports that the
+address did not send and hands the field back with the address still in it.
+
+**A build without `VITE_WAITLIST_URL` shows the line and a shut field, and says nothing about
+why.** It does not explain that the waitlist is unconnected: that is a fact about the build, not
+about the visitor, and reading an apology for it is worse than reading nothing. The cost of that
+choice is that a forgotten variable is silent, so check the surface once after deploying.
+
+Two rules differ from the Atlas handoff on purpose. There is no development default, because an
+Atlas default points a visitor at their own machine while a waitlist default would post somebody's
+address to whatever happened to be listening. And the endpoint must be `https`, since the request
+carries an email address; development may use `http` on a loopback host so the form can be
+exercised against a local stub. A build without a valid endpoint keeps the station and the surface,
+disables the field, and says the waitlist is not connected. It does not present a control that
+silently drops an address.
 
 ## Boundaries
 
@@ -57,20 +91,39 @@ navigation, the geometric Companion, evidence, Map, and Index inside the canonic
   a shorter lateral movement.
   Direct links open immediately, reduced motion uses an opacity fade, and interrupted transitions
   settle on the latest destination.
-- **Resources** is one Companion station that discloses ordinary Documentation and GitHub links.
+- **Research** states the project's position as recorded refusals and recorded measurements rather
+  than as ambition: generated geometry refused from the reconstruction ladder, a scene admitted at
+  the rung its evidence supports, and one measurement where views agreed with each other while
+  sitting well away from the truth. It names an open question rather than resolving it. Reached
+  from Resources, so it is not a fourth primary destination.
+- **Waitlist** is the one surface that asks the visitor for something. It uses the reading measure
+  and a single field, and reports its own connection state rather than presenting a dead control.
+- **Resources** is one Companion station that discloses ordinary Documentation, Research, and
+  GitHub links.
 - **Viewport boundary** states the product's current desktop input requirement rather than showing
   a fake small-screen product.
 
-All three surfaces share the same lower-left Companion navigation. The disclosure opens only by
+All surfaces share the same lower-left Companion navigation. The disclosure opens only by
 activating its native button and contextually replaces the destinations above Resources with Back,
 Documentation, and GitHub. It closes on Back, Escape, or an outside pointer press, restores button
 focus after Back or Escape, and keeps the Companion at Resources while focus is inside. The
 signed-out surfaces also share a neutral light canvas, visible keyboard focus, and reduced-motion
 rules. The landing palette is scoped locally so Atlas world profiles remain independent.
 
-Purpose, Capabilities, and Return are native hash links, so direct URLs and browser history retain
-their ordinary meaning. A build without `VITE_ATLAS_URL` keeps a disabled Enter Exulanica station
-and explains that the destination is not connected; it does not invent a deployment URL.
+Purpose, Capabilities, Research, Waitlist, and Return are native hash links, so direct URLs and
+browser history retain their ordinary meaning.
+
+### One way in
+
+The column leads with exactly one way in, and never both. With `VITE_ATLAS_URL` set, Enter
+Exulanica leads and no waitlist station is built. Without it, the waitlist leads and no Enter
+station is built. Two ways in when only one of them exists is the thing this replaced.
+
+An earlier build kept Enter Exulanica in place, greyed out, with a line underneath saying the world
+was not connected. The sentence was true, but it was attached to the most prominent promise on the
+page, and a visitor can act on it in neither version. Offering the thing they can act on is the
+honest form of the same fact. Nothing in the column is ever a dead control, so `.entry-status` and
+the disabled-entry branch are both gone.
 
 Capabilities describes the intended product experience in present tense, without a development-status
 footer. Reconstruction remains conditional on the source images. Current implementation evidence
