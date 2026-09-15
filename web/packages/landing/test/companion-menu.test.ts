@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildChrome, STATION_COLOR } from '../src/ui/chrome.js';
-import { createCompanionMenuMarker, MENU_FACES } from '../src/ui/companion-menu-marker.js';
+import { createCompanionMenuMarker, MENU_BODIES, MENU_FACE, MENU_FACES } from '../src/ui/companion-menu-marker.js';
 
 // Workspace-root relative, the way viewport-boundary.test.ts reads the stylesheet: this suite
 // runs under happy-dom, where `import.meta.url` is not a file URL.
@@ -56,11 +56,17 @@ describe('the Companion in the title menu', () => {
     }
 
     /*
-     * One body, one eye colour, at every station. companion-appearance.ts records that a
-     * saturated Companion reads as a sticker on the field and that its colour is a preference a
-     * person sets, so the menu may vary what it is doing and never what it is.
+     * Every silhouette is held at once and one is revealed, the same way the eye poses are.
+     * companion-appearance.ts records that a saturated Companion reads as a sticker on the field
+     * and that its colour is a preference a person sets, so the eye ink stays single.
      */
-    expect(marker.querySelectorAll('.companion-menu-body')).toHaveLength(1);
+    expect(
+      Array.from(marker.querySelectorAll<SVGPathElement>('.companion-menu-body'),
+        (b) => b.dataset['body']),
+    ).toEqual([...MENU_BODIES]);
+    // Each silhouette is real geometry, so revealing one is a real change of shape.
+    expect(new Set(Array.from(marker.querySelectorAll('.companion-menu-body'),
+      (b) => b.getAttribute('d'))).size).toBe(MENU_BODIES.length);
     const inks = new Set(
       Array.from(marker.querySelectorAll('.companion-menu-eye'), (eye) => eye.getAttribute('fill')),
     );
@@ -72,10 +78,15 @@ describe('the Companion in the title menu', () => {
       (eye) => `${eye.getAttribute('y')}/${eye.getAttribute('height')}/${eye.getAttribute('transform')}`,
     );
     expect(new Set(poses).size).toBe(MENU_FACES.length);
-    expect(marker.dataset['face']).toBe('neutral');
+    expect(marker.dataset['face']).toBe(MENU_FACE);
   });
 
-  it('wears a different face at every station', () => {
+  /*
+   * Shape carries the variety now, not the eyes. The faces were one per station until it turned
+   * out that at this size the relaxed poses read as squinting, so every station wears the same
+   * open face and its own silhouette.
+   */
+  it('wears one open face and a different silhouette at every station', () => {
     const worn = new Map<string, string | undefined>();
     for (const atlasHref of BUILDS) {
       const each = chrome(atlasHref);
@@ -85,15 +96,16 @@ describe('the Companion in the title menu', () => {
         const node = each.root.querySelector(`#${id}`);
         if (node === null) continue;
         node.dispatchEvent(new PointerEvent('pointerenter'));
-        worn.set(id, face.dataset['face']);
+        worn.set(id, face.dataset['body']);
       }
       each.setSurface('purpose');
       each.root.querySelector('#path-home')?.dispatchEvent(new PointerEvent('pointerenter'));
-      worn.set('path-home', face.dataset['face']);
+      worn.set('path-home', face.dataset['body']);
+      expect(face.dataset['face']).toBe(MENU_FACE);
     }
     expect(worn.size).toBe(STATIONS.length);
     expect(new Set(worn.values()).size).toBe(STATIONS.length);
-    for (const face of worn.values()) expect(MENU_FACES).toContain(face);
+    for (const body of worn.values()) expect(MENU_BODIES).toContain(body);
   });
 
   it('blinks on arrival so a pose never changes in the open', () => {

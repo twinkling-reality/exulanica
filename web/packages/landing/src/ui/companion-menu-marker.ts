@@ -4,6 +4,7 @@ import {
   companionAppearanceConfiguration,
   companionAvatarBlueprint,
   DEFAULT_COMPANION,
+  type CompanionBodyVariant,
   type CompanionEyeShape,
   type CompanionFaceVariant,
 } from '@exulanica/presentation';
@@ -11,20 +12,35 @@ import {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
- * The expressions this menu can wear.
+ * One face, worn everywhere.
  *
- * They are the appearance contract's own face variants, not new art. The Companion is one
- * character with one silhouette and one colour, so what distinguishes one station from another is
- * what it is doing with its eyes, which is exactly what `motionProfile: 'gaze-and-blink'` in
- * companion-appearance.ts says this thing expresses itself with.
+ * This used to carry five expressions, one per station, on the argument that a character wearing
+ * the same face at all of them is furniture. At the size this renders, the argument does not
+ * survive contact: `sleepy` is a nine pixel slit and `happy` is twelve, so the two stations that
+ * were meant to look relaxed and pleased just looked squinting, or broken. Eyes are the wrong
+ * channel for this. Shape is the right one, and there are nine of those, so the variety moved to
+ * MENU_BODIES and the eyes stay open and identical at every station.
+ *
+ * `wide` is 30 by 30 and unrotated, the only round pose in the contract's set.
  */
-export const MENU_FACES: readonly CompanionFaceVariant[] = Object.freeze([
-  'neutral',
-  'attentive',
-  'curious',
-  'happy',
-  'sleepy',
-  'wide',
+export const MENU_FACE: CompanionFaceVariant = 'wide';
+export const MENU_FACES: readonly CompanionFaceVariant[] = Object.freeze([MENU_FACE]);
+
+/**
+ * The silhouettes a station can be marked with.
+ *
+ * Every body variant in the contract shares the same 240 by 240 viewBox, so all of them can be
+ * drawn once and revealed one at a time, exactly as the eye poses already are. These six are the
+ * ones that stay distinguishable at the size this actually renders; `pebble`, `bead` and
+ * `lozenge` are real variants but read as the circle at a third of a rem.
+ */
+export const MENU_BODIES: readonly CompanionBodyVariant[] = Object.freeze([
+  'circle',
+  'arch',
+  'droplet',
+  'squircle',
+  'cloud',
+  'capsule',
 ]);
 
 function svgElement<K extends keyof SVGElementTagNameMap>(
@@ -131,14 +147,24 @@ export function createCompanionMenuMarker(): SVGSVGElement {
   const orb = svgElement('g', { class: 'companion-menu-orb' });
   const gaze = svgElement('g', { class: 'companion-menu-gaze' });
   gaze.append(eyelid('left', appearance.eyeColor), eyelid('right', appearance.eyeColor));
-  orb.append(
-    svgElement('path', {
-      class: 'companion-menu-body',
-      d: blueprint.bodyPath,
-      fill: `var(--companion-body, ${appearance.bodyColor})`,
-    }),
-    gaze,
-  );
+  for (const body of MENU_BODIES) {
+    const shape = companionAvatarBlueprint(
+      companionAppearanceConfiguration({
+        body,
+        color: DEFAULT_COMPANION.colorVariant,
+        face: MENU_FACE,
+      }),
+    ).bodyPath;
+    orb.append(
+      svgElement('path', {
+        class: 'companion-menu-body',
+        'data-body': body,
+        d: shape,
+        fill: `var(--companion-body, ${appearance.bodyColor})`,
+      }),
+    );
+  }
+  orb.append(gaze);
   /*
    * The wake and the orb share one carrier so the whole character breathes together.
    *
@@ -160,6 +186,7 @@ export function createCompanionMenuMarker(): SVGSVGElement {
   life.append(wake, pose);
   root.append(definitions, life);
   root.dataset['state'] = 'resting';
-  root.dataset['face'] = 'neutral';
+  root.dataset['face'] = MENU_FACE;
+  root.dataset['body'] = MENU_BODIES[0];
   return root;
 }

@@ -8,30 +8,29 @@
 import {
   companionAppearanceConfiguration,
   DEFAULT_COMPANION,
+  type CompanionBodyVariant,
   type CompanionColorVariant,
-  type CompanionFaceVariant,
 } from '@exulanica/presentation';
 
 import { el } from './dom.js';
-import { createCompanionMenuMarker } from './companion-menu-marker.js';
+import { createCompanionMenuMarker, MENU_FACE } from './companion-menu-marker.js';
 
 /**
- * What the Companion is doing with its eyes at each station.
+ * The silhouette the Companion wears at each station.
  *
- * The menu is six entries a visitor sweeps in a second, and a character that wears one face at
- * all of them is furniture. These are the appearance contract's own variants, assigned to say
- * something true about each destination rather than to be different for its own sake: alert at
- * the way in, wide at the invitation to be told when there is something to try, curious at the
- * question, pleased at what the product does, and relaxed at the utility drawer, which is the
- * one entry that is not about the product.
+ * This was a face per station until the faces turned out to be the wrong channel: at this size
+ * the relaxed and pleased poses read as squinting rather than as character. Shape carries it
+ * instead, the eyes stay open and identical everywhere, and each station keeps its own colour.
+ * Meanings are as close to literal as the contract's shapes allow: a doorway at the way in, a
+ * drop waiting to fall at the waitlist, a circle for return.
  */
-const STATION_FACE: Readonly<Record<string, CompanionFaceVariant>> = Object.freeze({
-  'path-home': 'neutral',
-  'path-enter': 'attentive',
-  'path-purpose': 'curious',
-  'path-capabilities': 'happy',
-  'path-waitlist': 'wide',
-  'path-resources': 'sleepy',
+const STATION_BODY: Readonly<Record<string, CompanionBodyVariant>> = Object.freeze({
+  'path-home': 'circle',
+  'path-enter': 'arch',
+  'path-waitlist': 'droplet',
+  'path-purpose': 'squircle',
+  'path-capabilities': 'cloud',
+  'path-resources': 'capsule',
 });
 
 /**
@@ -57,7 +56,7 @@ const stationInk = (station: string): { body: string; eye: string } => {
   const configuration = companionAppearanceConfiguration({
     body: DEFAULT_COMPANION.bodyVariant,
     color: STATION_COLOR[station] ?? DEFAULT_COMPANION.colorVariant,
-    face: DEFAULT_COMPANION.faceVariant,
+    face: MENU_FACE,
   });
   return { body: configuration.bodyColor, eye: configuration.eyeColor };
 };
@@ -252,7 +251,8 @@ export function buildChrome(options: ChromeOptions): Chrome {
     const target = focused ?? hovered ?? defaultTarget();
     marker.dataset['state'] = focused !== null || hovered !== null ? 'attending' : 'resting';
     marker.dataset['target'] = target.id;
-    marker.dataset['face'] = STATION_FACE[target.id] ?? 'neutral';
+    marker.dataset['body'] = STATION_BODY[target.id] ?? 'circle';
+    marker.dataset['face'] = MENU_FACE;
     const ink = stationInk(target.id);
     marker.style.setProperty('--companion-body', ink.body);
     marker.style.setProperty('--companion-eye', ink.eye);

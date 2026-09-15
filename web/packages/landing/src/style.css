@@ -558,12 +558,26 @@ body {
   transition: visibility 0s 120ms;
 }
 
-.companion-menu-marker[data-face='neutral'] .companion-menu-face[data-face='neutral'],
-.companion-menu-marker[data-face='attentive'] .companion-menu-face[data-face='attentive'],
-.companion-menu-marker[data-face='curious'] .companion-menu-face[data-face='curious'],
-.companion-menu-marker[data-face='happy'] .companion-menu-face[data-face='happy'],
-.companion-menu-marker[data-face='sleepy'] .companion-menu-face[data-face='sleepy'],
 .companion-menu-marker[data-face='wide'] .companion-menu-face[data-face='wide'] {
+  visibility: visible;
+}
+
+/*
+ * One silhouette at a time. Every body shares the 240 viewBox, so they stack exactly and the
+ * station chooses which is drawn. Hidden rather than removed for the same reason the eye poses
+ * are: swapping a path's `d` cannot transition, and a rewrite racing a pointer sweeping the
+ * column is how you get the wrong shape.
+ */
+.companion-menu-body {
+  visibility: hidden;
+}
+
+.companion-menu-marker[data-body='circle'] .companion-menu-body[data-body='circle'],
+.companion-menu-marker[data-body='arch'] .companion-menu-body[data-body='arch'],
+.companion-menu-marker[data-body='droplet'] .companion-menu-body[data-body='droplet'],
+.companion-menu-marker[data-body='squircle'] .companion-menu-body[data-body='squircle'],
+.companion-menu-marker[data-body='cloud'] .companion-menu-body[data-body='cloud'],
+.companion-menu-marker[data-body='capsule'] .companion-menu-body[data-body='capsule'] {
   visibility: visible;
 }
 
