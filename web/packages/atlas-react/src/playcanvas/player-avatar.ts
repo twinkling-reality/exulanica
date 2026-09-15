@@ -29,6 +29,7 @@ export class PlayerAvatar {
   private readonly mesh: pc.Mesh;
   private readonly material = new pc.StandardMaterial();
   private wasVisible = false;
+  private lastFacing = 0;
   private readonly contactMesh: pc.Mesh;
   private readonly grain: pc.Texture;
   private readonly contactMaterial = new pc.StandardMaterial();
@@ -165,6 +166,18 @@ export class PlayerAvatar {
       0,
     );
   }
+  /**
+   * Facing in radians, as the motion solver resolved it.
+   *
+   * Read this instead of the entity's Euler angles. `getLocalEulerAngles()` decomposes the
+   * rotation quaternion, and for any |yaw| over 90 degrees it returns the equivalent
+   * (180, 180 - yaw, 180) triple, so its `y` stops being the yaw and a character heading away
+   * from -Z is drawn mirrored, up to a full reversal at 180 degrees.
+   */
+  get facing(): number {
+    return this.lastFacing;
+  }
+
   update(
     player: CameraState,
     dx: number,
@@ -172,6 +185,8 @@ export class PlayerAvatar {
     dt: number,
     visible: boolean,
     reduced: boolean,
+    groundY = player.y - (this.body.heightMm / 1000) * 0.89,
+    headingYaw: number | null = null,
   ): void {
     visible = visible && this.representation.availability !== 'hidden';
     this.root.enabled = visible;
@@ -186,11 +201,13 @@ export class PlayerAvatar {
       yaw: player.yaw,
       dx,
       dz,
+      headingYaw,
       dt,
       reduced,
     });
     // Native replacements still use this stable root and facing, without uploading hidden fallback vertices.
-    this.root.setLocalPosition(player.x, player.y - (this.body.heightMm / 1000) * .89, player.z);
+    this.lastFacing = pose.facing;
+    this.root.setLocalPosition(player.x, groundY, player.z);
     this.root.setLocalEulerAngles(0, (pose.facing * 180) / Math.PI, 0);
     if (this.root.render?.enabled === false) { this.wasVisible = true; return; }
     deformPlayer(
@@ -231,7 +248,7 @@ export class PlayerAvatar {
     this.contactMesh.update(pc.PRIMITIVE_TRIANGLES);
     this.root.setLocalPosition(
       player.x,
-      player.y - (this.body.heightMm / 1000) * 0.89,
+      groundY,
       player.z,
     );
     this.root.setLocalEulerAngles(0, (pose.facing * 180) / Math.PI, 0);

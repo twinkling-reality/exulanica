@@ -48,6 +48,37 @@ const population = (tick: number): OwnedSocietyState => ({
   })),
 });
 describe('owned runtime population representation', () => {
+  /*
+   * A walker heading straight down +Z settles at a facing of pi, the worst case for a transform
+   * readback: PlayCanvas decomposes that rotation as (180, 0, 180), so the frame used to carry
+   * yaw 0 and the character was drawn walking backwards.
+   */
+  it('hands the native frame the facing the solver resolved, not a transform readback', () => {
+    const { runtime, app } = setup();
+    const at = (z: number): OwnedSocietyState => ({
+      profile: 'exulanica-society/v2',
+      society_id: 'society',
+      branch_id: 'branch',
+      tick: z,
+      inhabitants: [{
+        id: 'walker',
+        synthetic: true,
+        position_mm: [0, z * 1000],
+        motion_path_mm: [[0, (z - 1) * 1000], [0, z * 1000]],
+      }],
+    } as unknown as OwnedSocietyState);
+    runtime.setSociety(at(0));
+    for (let step = 1; step <= 10; step += 1) {
+      runtime.setSociety(at(step));
+      runtime.tickSociety(Number.MAX_SAFE_INTEGER);
+    }
+    const [frame] = runtime.nativeCharacterFrames(1 / 60, false);
+    expect(frame?.position).toEqual([0, 0, 10]);
+    expect(Math.abs(frame!.yaw)).toBeGreaterThan(Math.PI - 0.05);
+    runtime.destroy();
+    app.destroy();
+  });
+
   it('clears unavailable residents and cannot repopulate from retained state', () => {
     const { runtime, app } = setup();
     runtime.setSociety(population(0), 24, [0, 0]);

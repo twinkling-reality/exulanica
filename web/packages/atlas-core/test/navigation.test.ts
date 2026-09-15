@@ -103,6 +103,61 @@ describe('the grounded memory field', () => {
     expect(result.position.x).toBeLessThanOrEqual(-1 - DEFAULT_CAMERA_RADIUS_AU + 0.01);
   });
 
+  it('preserves the unblocked component of diagonal movement along a building', () => {
+    const base = buildNavigationWorld(scene([baseIsland()]));
+    const world = {
+      ...base,
+      obstacles: [],
+      polygonObstacles: [{
+        id: 'building',
+        rings: [[
+          atlasVec3(-1, 0, -3),
+          atlasVec3(1, 0, -3),
+          atlasVec3(1, 0, 3),
+          atlasVec3(-1, 0, 3),
+          atlasVec3(-1, 0, -3),
+        ]],
+      }],
+    };
+    const result = resolveGroundMovement(world, {
+      current: atlasVec3(-3, world.eyeHeight, -2),
+      desired: atlasVec3(0, world.eyeHeight, 2),
+      lastSafe: atlasVec3(-3, world.eyeHeight, -2),
+    });
+    expect(result.collided).toBe(true);
+    expect(result.position.x).toBeLessThanOrEqual(-1 - DEFAULT_CAMERA_RADIUS_AU + 0.01);
+    expect(result.position.z).toBeGreaterThan(0.5);
+  });
+
+  it('stops at a polygon corner without reversing either movement axis', () => {
+    const base = buildNavigationWorld(scene([baseIsland()]));
+    const world = {
+      ...base,
+      obstacles: [],
+      polygonObstacles: [{
+        id: 'corner',
+        rings: [[
+          atlasVec3(0, 0, 0),
+          atlasVec3(4, 0, 0),
+          atlasVec3(4, 0, 4),
+          atlasVec3(0, 0, 4),
+          atlasVec3(0, 0, 0),
+        ]],
+      }],
+    };
+    const current = atlasVec3(-2, world.eyeHeight, -2);
+    const result = resolveGroundMovement(world, {
+      current,
+      desired: atlasVec3(2, world.eyeHeight, 2),
+      lastSafe: current,
+    });
+    expect(result.collided).toBe(true);
+    expect(result.position.x).toBeGreaterThanOrEqual(current.x);
+    expect(result.position.z).toBeGreaterThanOrEqual(current.z);
+    expect(Math.hypot(result.position.x, result.position.z))
+      .toBeGreaterThanOrEqual(DEFAULT_CAMERA_RADIUS_AU - 0.01);
+  });
+
   it('uses the source-first blocker for focus visibility as well as locomotion', () => {
     const original = baseIsland();
     const world = buildNavigationWorld(scene([makeIsland({ ...original, rung: 4 })]));

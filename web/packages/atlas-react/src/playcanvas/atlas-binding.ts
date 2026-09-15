@@ -88,7 +88,7 @@ import {
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
 import { PlayerAvatar } from './player-avatar.js';
-import { playerCameraPosition, type PlayerCameraMode } from './player-camera.js';
+import { FollowCamera, playerCameraAimHeight, type PlayerCameraMode } from './player-camera.js';
 import {
   DAWN_THEME,
   DEFAULT_WORLD_ART_PROFILE,
@@ -352,6 +352,15 @@ export interface AtlasBindingOptions {
   readonly sourceMedia?: SourceMediaCatalog;
   /** Keep original photographs in the authorized inspector instead of placing optical sheets in the world. */
   readonly sourcePresentation?: 'world' | 'inspection';
+  /**
+   * Which arrangement of the composed world to build.
+   *
+   * The catalog offers substitutable modules per recipe slot; the seed decides which one each
+   * element gets, stably per element, so the same seed always rebuilds the same world and a
+   * different one rebuilds a different world from the same memories. Omitted means the composer's
+   * own default, which is what a world with no persisted arrangement should keep getting.
+   */
+  readonly worldSeed?: string;
   readonly deviceTypes?: readonly string[];
   readonly blend?: boolean;
   readonly sizeGain?: number;
@@ -662,6 +671,19 @@ export class AtlasBinding {
   }
   private playerCameraMode: PlayerCameraMode = 'first-person';
   private playerCameraDistance=3.8;
+  private readonly followCamera=new FollowCamera();
+
+  /**
+   * Third person shows the player unless the boom has been driven into them.
+   *
+   * A facade behind the player shortens the boom past the body, and drawing the avatar then fills
+   * the screen with the inside of its own head. Reads last frame's boom length, because the camera
+   * is solved after the characters are posed.
+   */
+  private get playerDrawn():boolean{
+    return this.playerCameraMode==='third-person'&&this.inspection===null
+      &&!this.followCamera.occludesPlayer();
+  }
   private nearbySignature='';
   private lastPlayerPosition: readonly [number, number] | null = null;
   private lastRenderMs = -1;
@@ -858,6 +880,7 @@ export class AtlasBinding {
     renderRoot.addChild(sourceFirst.entity);
     const topology = composeAtlasWorld(options.scene, {
       availableReconstruction,
+      ...(options.worldSeed === undefined ? {} : { seed: options.worldSeed }),
     });
     const composedWorld = createComposedWorld(
       device,
@@ -979,11 +1002,14 @@ export class AtlasBinding {
         ? cityCameraState('overview')
         : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
 
+    // The Google-tiles entry is an aerial overview, not a stance. Everything else starts on foot.
+    const aerialStart = options.ownedDistrict === undefined && cityActive;
     const controls = new FirstPersonControls(
       options.canvas,
       start,
       cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
       navigationWorld,
+      { groundStart: !aerialStart },
     );
     controls.onCameraToggle = () => { binding.setCameraMode(binding.cameraMode === 'first-person' ? 'third-person' : 'first-person'); };
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
@@ -1304,13 +1330,14 @@ export class AtlasBinding {
   }
 
   setWalkAssist(mode:'off'|'walk'|'run'):void {this.controls.setWalkAssist(mode);this.invalidate();}
-  setCameraFraming(distance:number):void {this.playerCameraDistance=Math.max(.65,Math.min(6,distance));this.invalidate();}
+  setCameraFraming(distance:number):void {this.playerCameraDistance=Math.max(.65,Math.min(6,distance));this.followCamera.reset();this.invalidate();}
   turnCamera(radians:number):void {if(!Number.isFinite(radians))return;this.controls.state.yaw+=radians;this.invalidate();}
   get cameraMode(): PlayerCameraMode { return this.playerCameraMode; }
 
   setCameraMode(mode: PlayerCameraMode): void {
     if (this.ownedDistrict === null) return;
     this.playerCameraMode = mode;
+    this.followCamera.reset();
     this.playerAvatar ??= new PlayerAvatar(this.device, this.environmentRoot);
     const canvas = this.app.graphicsDevice.canvas;
     if (canvas instanceof HTMLCanvasElement) { canvas.dataset.cameraMode = mode; canvas.dispatchEvent(new Event('camera-mode-change')); }
@@ -1980,8 +2007,8 @@ export class AtlasBinding {
     if(this.playerAvatar){
       const avatar=this.playerAvatar,s=this.controls.state;
       frames.push({subject:avatar.representation.subject,parent:this.environmentRoot,fallback:avatar.root,
-        visible:this.playerCameraMode==='third-person'&&this.inspection===null&&avatar.representation.availability!=='hidden',
-        position:[s.x,s.y-avatar.body.heightMm/1000*.89,s.z],yaw:avatar.root.getLocalEulerAngles().y*Math.PI/180,
+        visible:this.playerDrawn&&avatar.representation.availability!=='hidden',
+        position:[s.x,s.y-this.navigationWorld.eyeHeight,s.z],yaw:avatar.facing,
         deltaSeconds:dt,reducedMotion:this.reducedMotion,discontinuity:this.nativePlayerDiscontinuity||navigating});
     }
     this.nativeCharacters.syncFrames(frames);this.nativePlayerDiscontinuity=false;
@@ -2023,11 +2050,21 @@ export class AtlasBinding {
     const s = this.controls.state;
     const previous = this.lastPlayerPosition ?? [s.x, s.z];
     this.playerAvatar?.update(s, s.x - previous[0]!, s.z - previous[1]!, dt,
-      this.playerCameraMode === 'third-person' && this.inspection === null, this.reducedMotion);
+      this.playerDrawn, this.reducedMotion,
+      s.y - this.navigationWorld.eyeHeight, this.controls.movementHeading);
     this.lastPlayerPosition = [s.x, s.z];
     this.syncNativeCharacterFrames(dt,navigating);
+    // Look at the body that is actually drawn, not at a fixed offset from the eye line.
+    const groundY = s.y - this.navigationWorld.eyeHeight;
+    const standingHeight = (this.playerAvatar?.body.heightMm ?? 1820) / 1000;
     const cameraPosition = this.inspection === null
-      ? playerCameraPosition(s, this.playerCameraMode, this.ownedDistrict?.district,this.playerCameraDistance)
+      ? this.followCamera.solve(s, this.playerCameraMode, {
+        ...(this.ownedDistrict?.district === undefined ? {} : { district: this.ownedDistrict.district }),
+        requestedDistance: this.playerCameraDistance,
+        aimHeight: playerCameraAimHeight(groundY, standingHeight, this.playerCameraDistance),
+        dt,
+        reducedMotion: this.reducedMotion,
+      })
       : [s.x, s.y, s.z];
     this.pose.position.set(
       cameraPosition[0]! - this.renderOriginState.origin.x,

@@ -826,7 +826,7 @@ export class OwnedDistrictRuntime {
         ? candidatePath : [to];
       const from = path[0]!;
       this.societyPositions.set(inhabitant.id, from);
-      character.update({x:from[0],y:character.body.heightMm/1000*.89,z:from[1],yaw:0,pitch:0},0,0,1/60,true,true);
+      character.update({x:from[0],y:character.body.heightMm/1000*.89,z:from[1],yaw:0,pitch:0},0,0,1/60,true,true,0);
       return { id: inhabitant.id, role, ordinal, from, to, path };
     });
     this.societyAnimation = animated.some(person=>person.path.length>1) ? {
@@ -845,7 +845,7 @@ export class OwnedDistrictRuntime {
     if (animation === null) {
       if(nowMs<this.settleSocietyUntilMs){
         const dt=Math.max(.001,Math.min(.05,(nowMs-this.lastSocietyFrameMs)/1000));this.lastSocietyFrameMs=nowMs;
-        for(const [id,character] of this.societyCharacters){const p=this.societyPositions.get(id)!;character.update({x:p[0],y:character.body.heightMm/1000*.89,z:p[1],yaw:0,pitch:0},0,0,dt,true,false);}
+        for(const [id,character] of this.societyCharacters){const p=this.societyPositions.get(id)!;character.update({x:p[0],y:character.body.heightMm/1000*.89,z:p[1],yaw:0,pitch:0},0,0,dt,true,false,0);}
         this.applyCoincidentVisibility();
       }else this.settleSocietyUntilMs=0;
       return;
@@ -859,7 +859,7 @@ export class OwnedDistrictRuntime {
       const previous=this.societyPositions.get(inhabitant.id)??position;
       this.societyPositions.set(inhabitant.id, position);
       const character=this.societyCharacters.get(inhabitant.id);
-      character?.update({x:position[0],y:character.body.heightMm/1000*.89,z:position[1],yaw:0,pitch:0},position[0]-previous[0],position[1]-previous[1],dt,true,nowMs===Number.MAX_SAFE_INTEGER);
+      character?.update({x:position[0],y:character.body.heightMm/1000*.89,z:position[1],yaw:0,pitch:0},position[0]-previous[0],position[1]-previous[1],dt,true,nowMs===Number.MAX_SAFE_INTEGER,0);
     }
     this.applyCoincidentVisibility();
     if (linear >= 1) {this.societyAnimation = null;this.settleSocietyUntilMs=nowMs===Number.MAX_SAFE_INTEGER?0:nowMs+600;}
@@ -924,7 +924,7 @@ export class OwnedDistrictRuntime {
     const discontinuity=this.nativeSocietyDiscontinuity;this.nativeSocietyDiscontinuity=false;
     return [...this.societyCharacters.values()].map(character=>{
       const p=character.root.getLocalPosition();
-      return {subject:character.representation.subject,parent:this.societyRoot,fallback:character.root,visible:character.root.enabled,position:[p.x,p.y,p.z],yaw:character.root.getLocalEulerAngles().y*Math.PI/180,deltaSeconds,reducedMotion,discontinuity};
+      return {subject:character.representation.subject,parent:this.societyRoot,fallback:character.root,visible:character.root.enabled,position:[p.x,p.y,p.z],yaw:character.facing,deltaSeconds,reducedMotion,discontinuity};
     });
   }
 

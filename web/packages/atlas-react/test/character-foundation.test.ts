@@ -24,6 +24,46 @@ describe('continuous shared character foundation', () => {
     }
     expect(Math.abs(pose.facing - Math.PI / 2)).toBeLessThan(0.03);
   });
+
+  it('faces live camera-relative intent while integrated velocity catches up', () => {
+    const motion = new CharacterMotion();
+    let pose = motion.update({
+      x: 0, z: 0, yaw: 0, dx: 0, dz: 0, dt: 1 / 60, reduced: false,
+    });
+    for (let frame = 1; frame <= 30; frame++) {
+      const yaw = frame * 0.02;
+      // Realized velocity still points mostly down the previous street heading.
+      pose = motion.update({
+        x: 0,
+        z: -frame / 60,
+        yaw,
+        dx: 0,
+        dz: -1 / 60,
+        headingYaw: yaw,
+        dt: 1 / 60,
+        reduced: false,
+      });
+    }
+    const delta = Math.atan2(Math.sin(pose.facing - 0.6), Math.cos(pose.facing - 0.6));
+    expect(Math.abs(delta)).toBeLessThan(0.06);
+  });
+
+  it('turns toward backward intent instead of displaying a forward-running body', () => {
+    const motion = new CharacterMotion();
+    motion.update({ x: 0, z: 0, yaw: 0, dx: 0, dz: 0, dt: 1 / 60, reduced: false });
+    let pose = motion.update({
+      x: 0, z: -0.02, yaw: 0, dx: 0, dz: -0.02,
+      headingYaw: Math.PI, dt: 1 / 60, reduced: false,
+    });
+    for (let frame = 0; frame < 15; frame++) {
+      pose = motion.update({
+        x: 0, z: -0.02, yaw: 0, dx: 0, dz: 0,
+        headingYaw: Math.PI, dt: 1 / 60, reduced: false,
+      });
+    }
+    expect(Math.abs(Math.abs(pose.facing) - Math.PI)).toBeLessThan(0.03);
+  });
+
   it('produces a single closed connected skin with finite normals at both detail levels', () => {
     for (const detail of [0.018, 0.035]) {
       const sculpt = buildPlayerSculpt(detail),

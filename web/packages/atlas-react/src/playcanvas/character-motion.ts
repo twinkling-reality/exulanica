@@ -18,6 +18,8 @@ export interface CharacterPoseInput {
   readonly yaw: number;
   readonly dx: number;
   readonly dz: number;
+  /** Camera-relative keyboard heading; actual displacement remains the fallback after release. */
+  readonly headingYaw?: number | null;
   readonly dt: number;
   readonly reduced: boolean;
 }
@@ -53,8 +55,8 @@ export class CharacterMotion {
       blend = 1 - Math.exp(-dt / 0.16);
     this.time += dt;
     this.facing ??= input.yaw;
-    if (distance > 0.0001) {
-      const target = Math.atan2(-input.dx, -input.dz),
+    if ((input.headingYaw !== null && input.headingYaw !== undefined) || distance > 0.0001) {
+      const target = input.headingYaw ?? Math.atan2(-input.dx, -input.dz),
         delta = Math.atan2(
           Math.sin(target - this.facing),
           Math.cos(target - this.facing),
