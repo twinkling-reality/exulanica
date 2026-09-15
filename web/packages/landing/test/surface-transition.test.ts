@@ -16,6 +16,7 @@ function fixture(reduced = false, withLandscape = false) {
     capabilities: document.createElement('section'),
     research: document.createElement('section'),
     waitlist: document.createElement('section'),
+    developers: document.createElement('section'),
   };
   const landscape = document.createElement('div');
   const wordmark = document.createElement('h1');

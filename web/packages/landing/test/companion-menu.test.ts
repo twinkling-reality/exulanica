@@ -35,6 +35,7 @@ function chrome(atlasHref: string | null = BUILDS[0]) {
     onCapabilities: vi.fn(),
     onResearch: vi.fn(),
     onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
   });
   document.body.append(built.root);
   return built;

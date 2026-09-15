@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildChrome } from '../src/ui/chrome.js';
+import { buildChrome, STATION_COLOR } from '../src/ui/chrome.js';
 import { buildTitle } from '../src/ui/title.js';
 import { buildViewportBoundary } from '../src/ui/viewport-boundary.js';
 
@@ -31,6 +31,7 @@ describe('the Exulanica title screen', () => {
     const onCapabilities = vi.fn();
     const onResearch = vi.fn();
     const onWaitlist = vi.fn();
+    const onDevelopers = vi.fn();
     const chrome = buildChrome({
       atlasHref: 'https://atlas.example/session',
       onHome,
@@ -38,6 +39,7 @@ describe('the Exulanica title screen', () => {
       onCapabilities,
       onResearch,
       onWaitlist,
+      onDevelopers,
     });
     document.body.append(chrome.root);
 
@@ -119,6 +121,7 @@ describe('the Exulanica title screen', () => {
       onCapabilities: vi.fn(),
       onResearch: vi.fn(),
       onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
     });
     document.body.append(chrome.root);
     chrome.setSurface('title');
@@ -150,7 +153,7 @@ describe('the Exulanica title screen', () => {
         disclosure?.querySelectorAll<HTMLElement>('.destination') ?? [],
         (node) => node.textContent?.trim(),
       ),
-    ).toEqual(['Back', 'Documentation', 'Research', 'GitHub']);
+    ).toEqual(['Back', 'Documentation', 'Research', 'Developers', 'GitHub']);
 
     docs?.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: resources }));
     purpose?.dispatchEvent(new PointerEvent('pointerenter'));
@@ -172,6 +175,7 @@ describe('the Exulanica title screen', () => {
       onCapabilities: vi.fn(),
       onResearch: vi.fn(),
       onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
     });
     document.body.append(chrome.root);
     chrome.setSurface('title');
@@ -192,6 +196,38 @@ describe('the Exulanica title screen', () => {
     expect(resources?.getAttribute('aria-expanded')).toBe('false');
   });
 
+  /*
+   * The one dead control on the page, kept on purpose.
+   *
+   * Everything else is live or absent, and the disabled Enter Exulanica station was removed for
+   * exactly the reason this one exists. It is scaffolding: the route and the slot are in place
+   * before the writing is. If this test fails because somebody enabled the entry, check that the
+   * Developers page actually has copy first, then delete this test with the disabled line.
+   */
+  it('keeps Developers scaffolded and visibly unavailable', () => {
+    const chrome = buildChrome({
+      atlasHref: 'https://atlas.example/session',
+      onHome: vi.fn(),
+      onPurpose: vi.fn(),
+      onCapabilities: vi.fn(),
+      onResearch: vi.fn(),
+      onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
+    });
+    document.body.append(chrome.root);
+    chrome.setSurface('title');
+
+    const developers = chrome.root.querySelector<HTMLButtonElement>('#path-developers');
+    expect(developers?.tagName).toBe('BUTTON');
+    expect(developers?.disabled).toBe(true);
+    // The label is the whole accessible name; the reason is a separate description.
+    expect(developers?.textContent?.trim()).toBe('Developers');
+    expect(developers?.getAttribute('aria-describedby')).toBe('developers-pending');
+    expect(chrome.root.querySelector('#developers-pending')?.textContent).toBe('Not written yet');
+    // It is a station without a Companion colour or face, because nothing can stand on it.
+    expect(STATION_COLOR['path-developers']).toBeUndefined();
+  });
+
   it('uses the public product name in the desktop boundary', () => {
     const boundary = buildViewportBoundary();
     expect(boundary.root.querySelector('.boundary-eyebrow')?.textContent).toBe('Exulanica');
@@ -210,6 +246,7 @@ describe('the Exulanica title screen', () => {
       onCapabilities: vi.fn(),
       onResearch: vi.fn(),
       onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
     });
     const marker = chrome.root.querySelector<SVGSVGElement>('.companion-menu-marker');
 
@@ -240,6 +277,7 @@ describe('the Exulanica title screen', () => {
       onCapabilities: vi.fn(),
       onResearch: vi.fn(),
       onWaitlist: vi.fn(),
+      onDevelopers: vi.fn(),
     });
     chrome.setSurface('title');
     const atlas = chrome.root.querySelector<HTMLAnchorElement>('#path-enter');

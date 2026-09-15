@@ -67,7 +67,13 @@ export const REPOSITORY_URL = 'https://github.com/twinkling-reality/exulanica';
 export const DOCS_URL = `${REPOSITORY_URL}/tree/main/docs`;
 
 /** Where the visitor is. Informational surfaces retain a direct return to the title. */
-export type Surface = 'title' | 'purpose' | 'capabilities' | 'research' | 'waitlist';
+export type Surface =
+  | 'title'
+  | 'purpose'
+  | 'capabilities'
+  | 'research'
+  | 'waitlist'
+  | 'developers';
 
 export interface ChromeActions {
   onHome(): void;
@@ -75,6 +81,7 @@ export interface ChromeActions {
   onCapabilities(): void;
   onResearch(): void;
   onWaitlist(): void;
+  onDevelopers(): void;
 }
 
 export interface ChromeOptions extends ChromeActions {
@@ -167,8 +174,31 @@ export function buildChrome(options: ChromeOptions): Chrome {
   const resourceBack = destination('Back', 'resource-back', () => {});
   const documentation = destination('Documentation', 'resource-docs', () => {}, DOCS_URL);
   const research = destination('Research', 'path-research', options.onResearch, '#research');
+  /*
+   * Scaffolded, and the one deliberate dead control on this page.
+   *
+   * Everything else in this column is either live or absent, and the disabled Enter Exulanica
+   * station was deleted for exactly the reason this entry reintroduces: a greyed word is a
+   * promise a visitor cannot act on. This one is kept on the operator's instruction so the route
+   * and its slot exist before the writing does. Give the page copy and delete the two lines
+   * below, and it becomes an ordinary destination.
+   */
+  const developers = destination('Developers', 'path-developers', options.onDevelopers);
+  (developers as HTMLButtonElement).disabled = true;
+  developers.setAttribute('aria-describedby', 'developers-pending');
+  /*
+   * The reason sits beside the control, not inside it. Nested, it joined the button's accessible
+   * name, so the entry announced itself as "Developers Not written yet" and the rendered text of
+   * the disclosure stopped matching its labels.
+   */
+  const developersPending = el('span', {
+    class: 'sr-only',
+    id: 'developers-pending',
+    text: 'Not written yet',
+  });
+
   const github = destination('GitHub', 'resource-github', () => {}, REPOSITORY_URL);
-  resourceLinks.append(resourceBack, documentation, research, github);
+  resourceLinks.append(resourceBack, documentation, research, developers, developersPending, github);
 
   /*
    * The order attention travels down the column, used to stagger an entry's arrival.
@@ -187,7 +217,8 @@ export function buildChrome(options: ChromeOptions): Chrome {
     [resourceBack, 0],
     [documentation, 1],
     [research, 2],
-    [github, 3],
+    [developers, 3],
+    [github, 4],
   ] as const) {
     node.style.setProperty('--enter-index', String(order));
   }
@@ -212,6 +243,8 @@ export function buildChrome(options: ChromeOptions): Chrome {
     if (currentSurface === 'research') return resources;
     // A connected build has no waitlist station, so the surface rests the Companion on Return.
     if (currentSurface === 'waitlist') return connected ? home : waitlist;
+    // Developers has no station the Companion can stand on while it is disabled.
+    if (currentSurface === 'developers') return resources;
     return wayIn;
   };
 
@@ -350,6 +383,7 @@ export function buildChrome(options: ChromeOptions): Chrome {
         [capabilities, surface === 'capabilities'],
         [research, surface === 'research'],
         [waitlist, surface === 'waitlist'],
+        [developers, surface === 'developers'],
       ] as const) {
         if (owns) node.setAttribute('aria-current', 'page');
         else node.removeAttribute('aria-current');

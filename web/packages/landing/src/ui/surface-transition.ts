@@ -18,6 +18,7 @@ const CAMERA: Readonly<Record<InformationSurface, { along: number; scale: number
   capabilities: { along: 0.18, scale: 2.5 },
   research: { along: 0.5, scale: 3.4 },
   waitlist: { along: 0.5, scale: 2.0 },
+  developers: { along: 0.5, scale: 2.8 },
 });
 
 /** Place a point above the selected end of the wordmark at the viewport centre. */
@@ -43,6 +44,7 @@ const informationDistance = (destination: InformationSurface): string => {
   // The waitlist rises to meet the visitor rather than receding, which is the opposite of
   // Research below it. Both sit on the wordmark's centre, so they need different approaches.
   if (destination === 'waitlist') return 'translate3d(0, -4vh, 0) scale(0.96)';
+  if (destination === 'developers') return 'translate3d(0, 2vh, 0) scale(0.95)';
   return `translate3d(${destination === 'purpose' ? 6 : -6}vw, -3vh, 0) scale(0.97)`;
 };
 

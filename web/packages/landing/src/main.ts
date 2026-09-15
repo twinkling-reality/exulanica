@@ -1,5 +1,5 @@
 /**
- * Exulanica's signed-out title, Purpose, Capabilities, Research, and Waitlist surfaces.
+ * Exulanica's signed-out title, Purpose, Capabilities, Research, Waitlist, and Developers surfaces.
  *
  * The Atlas itself has one composition root in `@exulanica/app`. The landing page does not build a
  * second Atlas, second Companion, or scripted formation journey. Entering follows the configured
@@ -17,6 +17,7 @@ import { buildCapabilities } from './ui/capabilities.js';
 import { buildPurpose } from './ui/purpose.js';
 import { buildResearch } from './ui/research.js';
 import { buildWaitlist } from './ui/waitlist.js';
+import { buildDevelopers } from './ui/developers.js';
 import { buildTitle } from './ui/title.js';
 import { createSurfaceTransition } from './ui/surface-transition.js';
 import { boundaryReason, buildViewportBoundary, readViewport } from './ui/viewport-boundary.js';
@@ -30,6 +31,7 @@ const title = buildTitle();
 const purpose = buildPurpose();
 const capabilities = buildCapabilities();
 const research = buildResearch();
+const developers = buildDevelopers();
 const waitlist = buildWaitlist({
   endpoint: waitlistDestinationFromEnvironment(window.location.href),
 });
@@ -40,6 +42,7 @@ const chrome = buildChrome({
   onCapabilities: () => go('capabilities'),
   onResearch: () => go('research'),
   onWaitlist: () => go('waitlist'),
+  onDevelopers: () => go('developers'),
 });
 
 // Keep the same decorative world mounted while the text planes travel through it.
@@ -49,7 +52,7 @@ landscape.setAttribute('aria-hidden', 'true');
 const artwork = title.querySelector('.title-artwork');
 if (artwork) landscape.append(artwork);
 // Decoration has no focus stops; the title still precedes navigation.
-overlay.append(landscape, title, chrome.root, purpose, capabilities, research, waitlist);
+overlay.append(landscape, title, chrome.root, purpose, capabilities, research, waitlist, developers);
 
 const PANES: Readonly<Record<Surface, HTMLElement>> = {
   title,
@@ -57,6 +60,7 @@ const PANES: Readonly<Record<Surface, HTMLElement>> = {
   capabilities,
   research,
   waitlist,
+  developers,
 };
 const transition = createSurfaceTransition(PANES, () => env.reducedMotion, landscape);
 let surface: Surface = 'title';
@@ -65,6 +69,7 @@ const surfaceFromHash = (): Surface => {
   if (window.location.hash === '#capabilities') return 'capabilities';
   if (window.location.hash === '#research') return 'research';
   if (window.location.hash === '#waitlist') return 'waitlist';
+  if (window.location.hash === '#developers') return 'developers';
   return 'title';
 };
 go(surfaceFromHash());
