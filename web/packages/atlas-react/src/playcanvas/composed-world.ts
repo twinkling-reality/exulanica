@@ -1,5 +1,10 @@
 import * as pc from 'playcanvas';
-import { atlasLandscapeHeight, type WorldModuleInstance, type WorldTopologySnapshot } from '@exulanica/atlas-core';
+import {
+  atlasLandscapeHeight,
+  type WorldModuleFormKind,
+  type WorldModuleInstance,
+  type WorldTopologySnapshot,
+} from '@exulanica/atlas-core';
 import {
   DAWN_THEME,
   ORIGIN_LANDSCAPE,
@@ -10,6 +15,23 @@ import {
   type WorldArtProfile,
   type WorldArtProfileId,
 } from '@exulanica/presentation';
+
+/**
+ * The forms this renderer draws.
+ *
+ * A hand-written list is a claim, not a check: the first version of this set named all six
+ * registered forms, two of which nothing drew, and the test that compared it against the catalog
+ * passed because both lists were wrong the same way. `world-module-form.test.ts` now builds each
+ * of these and looks for geometry, so this set is verified rather than believed.
+ */
+export const RENDERED_WORLD_MODULE_FORMS: ReadonlySet<WorldModuleFormKind> = Object.freeze(
+  new Set<WorldModuleFormKind>([
+    'aero-beacon',
+    'survey-strata',
+    'living-buds',
+    'survey-stakes',
+  ]),
+) as ReadonlySet<WorldModuleFormKind>;
 
 export interface ComposedWorld {
   readonly entity: pc.Entity;
@@ -472,20 +494,31 @@ export function createComposedWorld(
       // addAeroBeacon unreachable. The authored `geometry.landmark` form is the selector.
       if (instance.role === 'landmark') {
         const group = atInstance(root, instance);
-        if (profile.geometry.landmark === 'aero-beacon') {
+        // The module's own declaration wins; a module that declares nothing still follows the style.
+        if ((instance.form?.kind ?? profile.geometry.landmark) === 'aero-beacon') {
           addAeroBeacon(group, profile, meshes, silhouette, brass, glass);
         } else {
           addSurveyLandmark(group, profile, meshes, stone, shadow, brass);
         }
       }
 
-      if (instance.role === 'expansion-point' && profile.profileId === SURVEY_RELIEF.profileId) {
+      /*
+       * Every region carries a required growth register, so gating it on one profile ID left the
+       * origin world quietly drawing nothing for a module its own catalog says is there. That is
+       * the same mistake the orientation register above already had corrected: the selector is the
+       * declared form, not which style happens to be active.
+       */
+      if (instance.role === 'expansion-point') {
         const group = atInstance(root, instance);
-        const count = profile.geometry.expansion === 'living-buds' ? 7 : 5;
+        const expansion = instance.form?.kind ?? profile.geometry.expansion;
+        const declared = instance.form?.parameters['count'];
+        const count = declared === undefined
+          ? (expansion === 'living-buds' ? 7 : 5)
+          : Math.max(1, Math.min(12, Math.round(declared)));
         for (let index = 0; index < count; index += 1) {
           const angle = 0.35 + index * 1.08;
           const distance = 0.28 + index * 0.13;
-          if (profile.geometry.expansion === 'living-buds') {
+          if (expansion === 'living-buds') {
             const bud = new pc.Entity(`living-bud:${index}`);
             group.addChild(bud);
             const x = Math.cos(angle) * distance;

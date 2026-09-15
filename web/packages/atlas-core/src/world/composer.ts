@@ -73,6 +73,8 @@ export interface WorldModuleInstance {
   readonly instanceId: string;
   readonly moduleKey: string;
   readonly moduleVersion: number;
+  /** What the recipe slot declares, before the seed chose among that module's variants. */
+  readonly slotModuleKey: string;
   /** The recipe request is retained when honesty or compatibility selected a fallback. */
   readonly requestedModuleKey: string;
   readonly role: WorldModuleRole;
@@ -84,6 +86,13 @@ export interface WorldModuleInstance {
   readonly collision: ModuleCollisionContract;
   readonly navigation: ModuleNavigationContract;
   readonly evidence: ModuleEvidenceRequirement;
+  /**
+   * The module's declared form, or null when the world style still chooses it.
+   *
+   * Not part of the topology digest: the module key and version that carry it already are, so the
+   * digest pins the form without restating it.
+   */
+  readonly form: WorldModuleDefinition['form'];
   readonly accessibility: WorldModuleDefinition['accessibility'];
   readonly streamingKey: string;
   readonly path: WorldPathGeometry | null;
@@ -231,6 +240,7 @@ interface InstantiateContext {
   readonly reconstructionAvailable: boolean;
   readonly modules: WorldModuleRegistry;
   readonly path: WorldPathGeometry | null;
+  readonly seed: string;
 }
 
 function instantiateRecipe(
@@ -240,14 +250,14 @@ function instantiateRecipe(
   const diagnostics: WorldTopologyDiagnostic[] = [];
   const bySlot = new Map<string, WorldModuleInstance>();
   for (const slot of context.recipe.slots) {
+    const instanceId = stableInstanceId(context.owner, context.recipe.key, slot.key);
     const resolved = resolveModule(
       context.modules,
-      slot.moduleKey,
+      selectVariant(context.modules, slot.moduleKey, context.seed, instanceId),
       context.rung,
       context.reconstructionAvailable,
     );
     const module = resolved.definition;
-    const instanceId = stableInstanceId(context.owner, context.recipe.key, slot.key);
     let transform = context.root;
     let attachment: WorldModuleAttachment | null = null;
     if (slot.attachTo !== null) {
@@ -276,6 +286,7 @@ function instantiateRecipe(
       instanceId,
       moduleKey: module.key,
       moduleVersion: module.version,
+      slotModuleKey: slot.moduleKey,
       requestedModuleKey: resolved.requestedKey,
       role: module.role,
       recipeKey: context.recipe.key,
@@ -286,6 +297,7 @@ function instantiateRecipe(
       collision: module.collision,
       navigation: module.navigation,
       evidence: module.evidence,
+      form: module.form,
       accessibility: module.accessibility,
       streamingKey: `world-asset:${encode(module.key)}@${module.version}`,
       path: context.path,
@@ -415,13 +427,37 @@ function canonicalTopology(
 }
 
 /** Small deterministic content hash for fixture identity; persistence adapters may additionally use SHA-256. */
-function fnv1a64(value: string): string {
+function fnv1a64Bits(value: string): bigint {
   let hash = 0xcbf29ce484222325n;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= BigInt(value.charCodeAt(index));
     hash = BigInt.asUintN(64, hash * 0x100000001b3n);
   }
-  return hash.toString(16).padStart(16, '0');
+  return hash;
+}
+
+function fnv1a64(value: string): string {
+  return fnv1a64Bits(value).toString(16).padStart(16, '0');
+}
+
+/**
+ * Which module fills this slot, for this seed.
+ *
+ * Hashed from the seed and the instance's own stable identity rather than drawn from a running
+ * generator, so the choice for one region does not depend on how many regions were composed
+ * before it. Adding a memory to a world therefore rearranges nothing that already existed, which
+ * is the same anti-disorientation promise the view manifest makes.
+ */
+function selectVariant(
+  modules: WorldModuleRegistry,
+  canonicalKey: string,
+  seed: string,
+  instanceId: string,
+): string {
+  const pool = modules.variantsOf(canonicalKey);
+  if (pool.length === 1) return canonicalKey;
+  const index = Number(fnv1a64Bits(`${seed}\u0000${instanceId}`) % BigInt(pool.length));
+  return pool[index]!.key;
 }
 
 export function topologyReachability(snapshot: Pick<WorldTopologySnapshot, 'navigation'>): ReadonlySet<string> {
@@ -554,6 +590,7 @@ export function composeAtlasWorld(
     reconstructionAvailable: false,
     modules,
     path: null,
+    seed,
   });
   instances.push(...worldAssembly.instances);
 
@@ -575,6 +612,7 @@ export function composeAtlasWorld(
       reconstructionAvailable: options.availableReconstruction?.has(island.islandId) ?? false,
       modules,
       path: null,
+      seed,
     });
     instances.push(...assembly.instances);
     diagnostics.push(...assembly.diagnostics);
@@ -595,6 +633,7 @@ export function composeAtlasWorld(
         end: trace.end,
         strength: trace.strength,
       }),
+      seed,
     });
     instances.push(...assembly.instances);
   }

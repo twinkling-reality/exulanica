@@ -37,6 +37,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: false, labelKey: null, colorIsSoleCarrier: false },
     evidence: 'none',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: ['material-family', 'atmosphere'],
   },
   {
@@ -74,6 +76,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: false, labelKey: null, colorIsSoleCarrier: false },
     evidence: 'none',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: ['material-family', 'regional-accent', 'detail-density'],
   },
   {
@@ -89,6 +93,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: true, labelKey: 'world.source-evidence', colorIsSoleCarrier: false },
     evidence: 'source-evidence',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -109,6 +115,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: true, labelKey: 'world.reconstruction-volume', colorIsSoleCarrier: false },
     evidence: 'reconstruction-asset',
     fallbackKey: 'region.source-register',
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -129,6 +137,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: true, labelKey: 'world.reconstruction-corridor', colorIsSoleCarrier: false },
     evidence: 'reconstruction-asset',
     fallbackKey: 'region.source-register',
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -149,6 +159,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: true, labelKey: 'world.photographic-panels', colorIsSoleCarrier: false },
     evidence: 'reconstruction-asset',
     fallbackKey: 'region.source-register',
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -164,6 +176,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: true, labelKey: 'world.evidence-cards', colorIsSoleCarrier: false },
     evidence: 'source-evidence',
     fallbackKey: 'region.source-register',
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -179,6 +193,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: false, labelKey: null, colorIsSoleCarrier: false },
     evidence: 'none',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -194,6 +210,8 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: false, labelKey: 'world.expansion-point', colorIsSoleCarrier: false },
     evidence: 'none',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: COMMON_CUSTOMIZATION,
   },
   {
@@ -209,11 +227,146 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
     accessibility: { interactive: false, labelKey: 'world.confirmed-relationship', colorIsSoleCarrier: false },
     evidence: 'none',
     fallbackKey: null,
+    variantOf: null,
+    form: null,
     customization: ['material-family', 'regional-accent', 'detail-density'],
+  },
+  /*
+   * Footprint arrangements.
+   *
+   * A region's foundation decides where its orientation register stands and where its growth
+   * register sits, so substituting the footprint rearranges the region without inventing geometry
+   * or touching the renderer, which places both from the socket it is given. These carry the same
+   * role, evidence requirement, rungs and socket contract as `region.soft-footprint`; the registry
+   * refuses them otherwise. Adding a fourth arrangement is this edit and nothing else.
+   */
+  {
+    key: 'region.terraced-footprint',
+    version: 1,
+    role: 'region-foundation',
+    allowedRungs: 'any',
+    bounds: { radius: 1, height: 0.1 },
+    sockets: [
+      {
+        key: 'content',
+        local: localVec3(0, 0, 0),
+        yaw: 0,
+        accepts: ['evidence-assembly', 'reconstruction-assembly'],
+        clearanceRadius: 0.12,
+      },
+      {
+        key: 'landmark',
+        local: localVec3(0.48, 0, 0.46),
+        yaw: 0.62,
+        accepts: ['landmark'],
+        clearanceRadius: 0.1,
+      },
+      {
+        key: 'growth',
+        local: localVec3(-0.44, 0, -0.5),
+        yaw: -0.58,
+        accepts: ['expansion-point'],
+        clearanceRadius: 0.08,
+      },
+    ],
+    collision: NO_COLLISION,
+    navigation: DECORATIVE_NAVIGATION,
+    lod: { stub: 'region-sigil', proxy: 'region-haze', coarse: 'region-terraced', full: 'region-terraced' },
+    accessibility: { interactive: false, labelKey: null, colorIsSoleCarrier: false },
+    evidence: 'none',
+    fallbackKey: 'region.soft-footprint',
+    variantOf: 'region.soft-footprint',
+    form: null,
+    customization: ['material-family', 'regional-accent', 'detail-density'],
+  },
+  {
+    key: 'region.sheltered-footprint',
+    version: 1,
+    role: 'region-foundation',
+    allowedRungs: 'any',
+    bounds: { radius: 1, height: 0.1 },
+    sockets: [
+      {
+        key: 'content',
+        local: localVec3(0, 0, 0),
+        yaw: 0,
+        accepts: ['evidence-assembly', 'reconstruction-assembly'],
+        clearanceRadius: 0.12,
+      },
+      {
+        key: 'landmark',
+        local: localVec3(-0.06, 0, -0.62),
+        yaw: 2.9,
+        accepts: ['landmark'],
+        clearanceRadius: 0.1,
+      },
+      {
+        key: 'growth',
+        local: localVec3(0.62, 0, 0.18),
+        yaw: 1.28,
+        accepts: ['expansion-point'],
+        clearanceRadius: 0.08,
+      },
+    ],
+    collision: NO_COLLISION,
+    navigation: DECORATIVE_NAVIGATION,
+    lod: { stub: 'region-sigil', proxy: 'region-haze', coarse: 'region-sheltered', full: 'region-sheltered' },
+    accessibility: { interactive: false, labelKey: null, colorIsSoleCarrier: false },
+    evidence: 'none',
+    fallbackKey: 'region.soft-footprint',
+    variantOf: 'region.soft-footprint',
+    form: null,
+    customization: ['material-family', 'regional-accent', 'detail-density'],
+  },
+  /*
+   * Arrangements that carry their own form.
+   *
+   * These declare what they are built as instead of inheriting the active world style's single
+   * choice for every module of the role at once, which is what made every region's orientation
+   * register identical. The style still owns material, colour and proportion; the module owns
+   * what it is. Their canonical counterparts keep `form: null`, so a world style that switches
+   * form still switches theirs and nothing already recorded changes shape.
+   */
+  {
+    key: 'landmark.survey-register',
+    version: 1,
+    role: 'landmark',
+    allowedRungs: 'any',
+    bounds: { radius: 0.2, height: 2.4 },
+    sockets: [],
+    collision: NO_COLLISION,
+    navigation: DECORATIVE_NAVIGATION,
+    lod: { stub: 'landmark-dot', proxy: 'landmark-mark', coarse: 'landmark-strata', full: 'landmark-strata' },
+    accessibility: { interactive: false, labelKey: 'world.orientation-register', colorIsSoleCarrier: false },
+    evidence: 'none',
+    fallbackKey: 'landmark.orientation-register',
+    variantOf: 'landmark.orientation-register',
+    form: { kind: 'survey-strata', parameters: {} },
+    customization: COMMON_CUSTOMIZATION,
+  },
+  {
+    key: 'growth.survey-register',
+    version: 1,
+    role: 'expansion-point',
+    allowedRungs: 'any',
+    bounds: { radius: 0.2, height: 0.5 },
+    sockets: [],
+    collision: NO_COLLISION,
+    navigation: DECORATIVE_NAVIGATION,
+    lod: { stub: 'growth-dot', proxy: 'growth-mark', coarse: 'growth-stakes', full: 'growth-stakes' },
+    accessibility: { interactive: false, labelKey: 'world.expansion-point', colorIsSoleCarrier: false },
+    evidence: 'none',
+    fallbackKey: 'growth.open-register',
+    variantOf: 'growth.open-register',
+    form: { kind: 'survey-stakes', parameters: { count: 6 } },
+    customization: COMMON_CUSTOMIZATION,
   },
 ]);
 
-export const DEFAULT_WORLD_MODULE_CATALOG_VERSION = 1;
+// 3: adds arrangements that declare their own form rather than inheriting the world style's.
+// 2: adds substitutable region footprint arrangements. Composition for an existing world only
+// changes where its seed now selects one, which is why this version travels in every snapshot.
+export const DEFAULT_WORLD_MODULE_CATALOG_VERSION = 3;
 export const DEFAULT_WORLD_MODULES = new WorldModuleRegistry(
   DEFAULT_WORLD_MODULE_CATALOG_VERSION,
   moduleDefinitions,

@@ -368,6 +368,23 @@ export type {
   WorldModuleRole,
 } from './world/module-registry.js';
 export { WorldModuleRegistry } from './world/module-registry.js';
+export type {
+  WorldEvidenceFormKind,
+  WorldExpansionFormKind,
+  WorldLandmarkFormKind,
+  WorldModuleForm,
+  WorldModuleFormKind,
+} from './world/module-form.js';
+export {
+  WORLD_DECLARABLE_FORM_KINDS,
+  WORLD_EVIDENCE_FORM_KINDS,
+  WORLD_EXPANSION_FORM_KINDS,
+  WORLD_FORM_KINDS_BY_ROLE,
+  WORLD_LANDMARK_FORM_KINDS,
+  WORLD_MODULE_FORM_KINDS,
+  WORLD_UNRENDERED_FORM_KINDS,
+  moduleFormFailure,
+} from './world/module-form.js';
 
 export type {
   WorldRecipeAttachment,

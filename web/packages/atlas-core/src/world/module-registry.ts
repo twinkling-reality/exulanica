@@ -1,20 +1,14 @@
 import type { LocalVec3 } from '../coords.js';
 import type { ReconstructionRung } from '../rung.js';
+import { moduleFormFailure, type WorldModuleForm } from './module-form.js';
+import type { WorldModuleRole } from './module-role.js';
+
+export type { WorldModuleRole } from './module-role.js';
 
 /**
  * A module is a passive, inspectable building block. Intelligence belongs in the composer that
  * sees the whole world, not in hundreds of autonomous objects making local decisions.
  */
-export type WorldModuleRole =
-  | 'navigation-field'
-  | 'region-foundation'
-  | 'relationship-path'
-  | 'landmark'
-  | 'evidence-assembly'
-  | 'reconstruction-assembly'
-  | 'expansion-point'
-  | 'atmosphere-anchor';
-
 export type WorldCustomizationAxis =
   | 'geometry-variant'
   | 'material-family'
@@ -91,6 +85,25 @@ export interface WorldModuleDefinition {
   readonly evidence: ModuleEvidenceRequirement;
   /** Safe semantic fallback, used when a renderer asset or old catalog entry is unavailable. */
   readonly fallbackKey: string | null;
+  /**
+   * The canonical module this one may stand in for, or null if it is itself canonical.
+   *
+   * A recipe names one canonical module per slot. The composer fills that slot from the canonical
+   * and everything declaring itself a variant of it, so widening a world is a catalog edit rather
+   * than a composer edit: nothing has to learn that a new module exists. A variant must be
+   * substitutable, which the registry enforces rather than documents (same role, evidence
+   * requirement and permitted rungs, and at least the canonical's sockets), so a recipe written
+   * against the canonical cannot be broken by a variant it has never heard of.
+   */
+  readonly variantOf: string | null;
+  /**
+   * What this module is built as, or null to let the world style decide.
+   *
+   * Declaring a form is how a catalog entry carries its own visual meaning instead of leaving it
+   * in a renderer branch. Null keeps the historical behaviour, where the active world style picks
+   * one form for every module of a role at once.
+   */
+  readonly form: WorldModuleForm | null;
   readonly customization: readonly WorldCustomizationAxis[];
 }
 
@@ -152,6 +165,43 @@ function assertDefinition(definition: WorldModuleDefinition): void {
   for (const value of Object.values(definition.lod)) {
     if (value.length === 0) throw new TypeError(`module LOD variants must be named: ${definition.key}`);
   }
+  const formFailure = moduleFormFailure(definition.role, definition.form);
+  if (formFailure !== null) throw new TypeError(`module ${definition.key}: ${formFailure}`);
+  if (definition.variantOf !== null) {
+    assertKey(definition.variantOf, `variant target on ${definition.key}`);
+    if (definition.variantOf === definition.key) {
+      throw new TypeError(`module ${definition.key} cannot be a variant of itself`);
+    }
+  }
+}
+
+/** Why `candidate` may not stand in for `canonical`, or null when it may. */
+function substitutionFailure(
+  canonical: WorldModuleDefinition,
+  candidate: WorldModuleDefinition,
+): string | null {
+  if (candidate.role !== canonical.role) return `role ${candidate.role} does not match ${canonical.role}`;
+  if (candidate.evidence !== canonical.evidence) {
+    return `evidence requirement ${candidate.evidence} does not match ${canonical.evidence}`;
+  }
+  const rungs = (value: WorldModuleDefinition): string =>
+    value.allowedRungs === 'any' ? 'any' : [...value.allowedRungs].sort().join(',');
+  if (rungs(candidate) !== rungs(canonical)) {
+    return `permitted rungs ${rungs(candidate)} do not match ${rungs(canonical)}`;
+  }
+  if (
+    candidate.navigation.surface !== canonical.navigation.surface ||
+    candidate.navigation.requiredDestination !== canonical.navigation.requiredDestination
+  ) {
+    return 'navigation contract does not match';
+  }
+  for (const socket of canonical.sockets) {
+    const replacement = candidate.sockets.find((value) => value.key === socket.key);
+    if (replacement === undefined) return `socket ${socket.key} is missing`;
+    const missing = socket.accepts.filter((role) => !replacement.accepts.includes(role));
+    if (missing.length > 0) return `socket ${socket.key} stops accepting ${missing.join(', ')}`;
+  }
+  return null;
 }
 
 /** Immutable versioned catalog with attachment and fallback validation. */
@@ -159,6 +209,7 @@ export class WorldModuleRegistry {
   readonly version: number;
   readonly definitions: readonly WorldModuleDefinition[];
   readonly #byKey: ReadonlyMap<string, WorldModuleDefinition>;
+  readonly #pools: ReadonlyMap<string, readonly WorldModuleDefinition[]>;
 
   constructor(version: number, definitions: readonly WorldModuleDefinition[]) {
     if (!Number.isSafeInteger(version) || version < 1) {
@@ -180,6 +231,10 @@ export class WorldModuleRegistry {
         lod: Object.freeze({ ...source.lod }),
         accessibility: Object.freeze({ ...source.accessibility }),
         customization: Object.freeze([...source.customization]),
+        form: source.form === null ? null : Object.freeze({
+          ...source.form,
+          parameters: Object.freeze({ ...source.form.parameters }),
+        }),
         allowedRungs:
           source.allowedRungs === 'any'
             ? 'any'
@@ -206,10 +261,60 @@ export class WorldModuleRegistry {
         cursor = byKey.get(cursor)!.fallbackKey;
       }
     }
+    /*
+     * Variants stay one level deep on purpose. A chain would make the substitutable set of a slot
+     * depend on traversal order, which is exactly the kind of thing that is fine until a catalog
+     * grows and then is impossible to reason about.
+     */
+    const pools = new Map<string, WorldModuleDefinition[]>();
+    for (const definition of byKey.values()) pools.set(definition.key, [definition]);
+    for (const definition of byKey.values()) {
+      if (definition.variantOf === null) continue;
+      const canonical = byKey.get(definition.variantOf);
+      if (canonical === undefined) {
+        throw new TypeError(`module ${definition.key} varies unknown module ${definition.variantOf}`);
+      }
+      if (canonical.variantOf !== null) {
+        throw new TypeError(
+          `module ${definition.key} varies ${canonical.key}, which is itself a variant`,
+        );
+      }
+      const failure = substitutionFailure(canonical, definition);
+      if (failure !== null) {
+        throw new TypeError(
+          `module ${definition.key} cannot stand in for ${canonical.key}: ${failure}`,
+        );
+      }
+      pools.get(canonical.key)!.push(definition);
+      pools.delete(definition.key);
+    }
     this.version = version;
     this.definitions = Object.freeze([...byKey.values()]);
     this.#byKey = byKey;
+    // Canonical first, then variants by key, so a pool's order never depends on catalog order.
+    this.#pools = new Map(
+      [...pools].map(([key, pool]) => [
+        key,
+        Object.freeze([
+          pool[0]!,
+          ...pool.slice(1).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
+        ]),
+      ]),
+    );
     Object.freeze(this);
+  }
+
+  /**
+   * Every module that may fill a slot naming `key`, canonical first.
+   *
+   * A key that is itself a variant has no pool of its own: it is reachable only through the
+   * canonical it stands in for, so a recipe cannot name a variant directly and quietly narrow
+   * the world back down to one shape.
+   */
+  variantsOf(key: string): readonly WorldModuleDefinition[] {
+    const pool = this.#pools.get(key);
+    if (pool === undefined) return Object.freeze([this.get(key)]);
+    return pool;
   }
 
   get(key: string): WorldModuleDefinition {
