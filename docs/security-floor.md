@@ -20,7 +20,10 @@ permission.
 ## 1. Route permissions
 
 **What it enforces.** CLOSED. Every mounted route requires a declared set of permissions, or is
-declared public with the reason it needs no credential. A request whose token does not hold every
+declared public with the reason it needs no credential, or is declared part of the sign-in surface
+(`/auth/google/start`, `/auth/google/callback`, `/auth/session`, `/auth/logout`), which needs no
+prior credential because it is where a browser credential is issued, reported and ended, and which
+checks its own login cookie, provider state, origin and CSRF token. A request whose token does not hold every
 required permission is refused before the route runs, before path, query and body validation, and
 before a database connection is opened for the route.
 
@@ -39,6 +42,25 @@ before a database connection is opened for the route.
   application passes.
 - Enforced by `tests/test_route_permissions.py`, which sweeps every route from the router with a
   real request and reads the status.
+
+**Who holds what.** DECISION. A bearer token holds exactly the permissions its grant names. A
+browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.write`,
+`consent.read`, `consent.write`, `deletion.write`, `intake.write`, `library.read`,
+`library.write`, `model.invoke`, `operations.read`, `operations.write`, `world.read` and
+`world.write`, which is every permission except `tiles.materialise`. That grant is keyed on the
+membership role, not assumed: a browser session exists only for an account membership, migration
+0058 allows one role, `owner`, and `AccountRepository.session` requires it.
+`tests/test_route_permissions.py` reads 0058's check and fails when a second role appears, until
+that role is given a grant of its own. `tiles.materialise` is withheld until the first tile route is
+declared and granted deliberately. An explicit Authorization header never falls back to the
+cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
+which has no source to inherit from.
+
+**Routes that reach a model** require `model.invoke` beside their read or write permission:
+`/selection/plan`, `/selection/ask`, `/selection/appearance`, `/selection/environment` and
+`POST /world/versions/{version_id}/society/decisions`, which reaches the society decision provider
+through `request_decision` without the endpoint naming a model client. The test that finds them
+reads each endpoint's source for all three markers.
 
 **The status a refusal carries.** DECISION. On a route addressed by an id (a `{parameter}` in its
 path), a missing permission answers `404 unknown_reference` with one fixed detail, identical for a
@@ -111,7 +133,7 @@ ceiling, and raising one is deliberate.
 
 ## 3. Egress allowlist
 
-**What it enforces.** CLOSED. The model transport reaches only declared origins. Each origin is a
+**What it enforces.** CLOSED. The model transport and Google sign-in reach only declared origins. Each origin is a
 scheme, a lowercase DNS host name and a port. Matching is exact: a subdomain, a different port, a
 userinfo prefix, a trailing-dot host, an IP literal in any spelling a resolver accepts, a
 backslash, whitespace or a non-ASCII character is refused. Plain `http` is accepted only for
@@ -129,6 +151,20 @@ never retried and never failed over, and the API answers it with `502 egress_ref
   variables are ignored by the client it builds.
 - Enforced at startup in `exulanica/models/client.py`: `ModelClient` refuses to construct when the
   manifest's `base_url` is not declared.
+- Enforced for Google sign-in in `exulanica/api/account_runtime.py`. When sign-in is configured,
+  `load_account_runtime` stops startup unless the list includes `https://accounts.google.com`
+  (discovery), `https://oauth2.googleapis.com` (token) and `https://www.googleapis.com` (JWKS),
+  alongside whatever else it declares. The provider is handed only those three, through the same
+  mounted check (`allowlisted_transport`, which serves `httpx2` as well as `httpx`), so sign-in
+  cannot reach the model endpoint and the model client cannot be pointed at Google by accident. A
+  provider with no allowlist and no test transport refuses at its first network call. A refusal is
+  logged with the origin it refused, and sign-in fails closed as `503 account_unavailable`.
+- Operational consequence, OPEN by nature: if Google moves its token endpoint or JWKS to another
+  host, sign-in fails closed before any request to the new host, because
+  `GoogleOIDCProvider.metadata` compares the discovery document with its pinned URLs. The fix is
+  to update those pinned URLs and add the new origin to `EXULANICA_EGRESS_ALLOWLIST`; the
+  allowlist entry alone is not enough. [deployment.md](deployment.md) says the same for an
+  operator.
 - Enforced by `tests/test_egress_allowlist.py`, which proves an unlisted host is refused with no
   socket opened, and proves the socket patch is live by letting a listed host reach it.
 
@@ -138,10 +174,15 @@ fails when the list below changes.
 
 This is a development and deployment safety rail, described as one, and it is not a substitute for
 the network's own limit. **A process-level allowlist is not a network-level one.** The sentence in
-the threat model that egress "is allowlisted" is true of the model transport and of nothing else:
+the threat model that egress "is allowlisted" is true of the model transport and Google sign-in and
+of nothing else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.
+- The test that keeps this list true matches `urlopen`, `httpx` and `httpx2` clients,
+  `OAuth2Client`, `requests`, `aiohttp`, `urllib3` and `socket.create_connection`. It first
+  matched `httpx` alone and missed the sign-in path, which used `httpx2`; a client library outside
+  that pattern would be missed the same way.
 - Any code that builds its own HTTP client or socket does not pass through it.
 - It checks the host name, not the address the name resolves to. A declared host whose DNS answer
   changes is reached wherever the answer points.
