@@ -232,9 +232,12 @@ def load_catalog(path: Path, schema: CatalogSchema) -> Catalog:
     document = read_json(path)
     if not isinstance(document, dict) or set(document) != _ENVELOPE_KEYS:
         raise CatalogError(f"{path.name}: the envelope is exactly {sorted(_ENVELOPE_KEYS)}")
-    if document["schema_version"] != 1:
+    if type(document["schema_version"]) is not int or document["schema_version"] != 1:
         raise CatalogError(f"{path.name}: schema_version is 1")
-    if (document["catalog_id"], document["catalog_version"]) != (stem, version):
+    if type(document["catalog_version"]) is not int or (
+        document["catalog_id"],
+        document["catalog_version"],
+    ) != (stem, version):
         raise CatalogError(
             f"{path.name} declares {document['catalog_id']!r} "
             f"v{document['catalog_version']!r}, which is not its file name"

@@ -334,6 +334,8 @@ def test_a_repeated_entry_key_is_rejected(tmp_path):
         ' "catalog_version": 1, "entries": []}',
         '{"schema_version": 1.0, "catalog_id": "typology", "catalog_version": 1, "entries": []}',
         '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1, "entries": NaN}',
+        '{"schema_version": true, "catalog_id": "typology", "catalog_version": 1, "entries": []}',
+        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": true, "entries": []}',
         '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1, "entries": {}}',
         "[]",
         "not json",

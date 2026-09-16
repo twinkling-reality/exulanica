@@ -269,7 +269,7 @@ class Grammar:
             raise InvalidRecordError(
                 f"{path.name}: unknown keys {sorted(unknown)}, missing keys {sorted(missing)}"
             )
-        if document["schema_version"] != 1:
+        if type(document["schema_version"]) is not int or document["schema_version"] != 1:
             raise InvalidRecordError(f"{path.name}: schema_version is 1")
         key = GrammarKey(document["grammar_id"], document["grammar_version"])
         if (key.grammar_id, key.grammar_version) != (stem, version):

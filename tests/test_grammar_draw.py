@@ -24,6 +24,7 @@ import ast
 import copy
 import dataclasses
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -42,6 +43,7 @@ from exulanica.grammar import (
 )
 from exulanica.grammar.draw import DomainCursor, _number, draw_integer
 from exulanica.grammar.errors import (
+    CatalogError,
     InvalidDomainError,
     InvalidParameterError,
     InvalidRecordError,
@@ -770,3 +772,62 @@ def test_a_parameter_the_schema_does_not_admit_is_refused(tmp_path, bindings):
         generate(
             _cascade_grammar(tmp_path), seed=SEED, subject_identity=IDENTITY, bindings=bindings
         )
+
+
+_MISSING = object()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"grammar_id": "other"},
+        {"grammar_version": 2},
+        {"grammar_version": True},
+        {"schema_version": True},
+        {"schema_version": 2},
+        {"extra": 1},
+        {"parameters": _MISSING},
+        {"subject_kind": "Box"},
+        {"admissible_uses": ["walkable"]},
+        {"admissible_uses": ["render_batch", "render_batch"]},
+        {"cascade_levels": []},
+        {"cascade_levels": ["draw"]},
+        {"cascade_levels": ["item", "item"]},
+        {"parameters": [{"name": "x_mm", "kind": "integer", "maximum": -1, "when_unset": "draw"}]},
+        {"parameters": [{"name": "x_mm", "kind": "integer", "when_unset": "default"}]},
+        {"parameters": [{"name": "x_mm", "kind": "integer", "when_unset": "draw", "default": 0}]},
+        {"parameters": [{"name": "finish", "kind": "choice", "options": [], "when_unset": "draw"}]},
+        {
+            "parameters": [{"name": "x_mm", "kind": "integer", "maximum": 1, "when_unset": "draw"}]
+            * 2
+        },
+    ],
+)
+def test_a_grammar_descriptor_outside_its_shape_is_refused(tmp_path, change):
+    """Including any attempt to give a parameter a default value: there is no such thing."""
+    source = _PACKAGE / "grammars" / "box.v1.json"
+    document = json.loads(source.read_text(encoding="utf-8"))
+    for key, value in change.items():
+        if value is _MISSING:
+            del document[key]
+        else:
+            document[key] = value
+    path = tmp_path / "box.v1.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    box = builtin_registry().get("box", 1)
+    with pytest.raises((InvalidRecordError, InvalidParameterError)):
+        Grammar.from_descriptor(path, box.stages)
+
+
+def test_a_grammar_descriptor_must_be_named_for_its_id_and_version(tmp_path):
+    box = builtin_registry().get("box", 1)
+    source = (_PACKAGE / "grammars" / "box.v1.json").read_text(encoding="utf-8")
+    Grammar.from_descriptor(_write_text(tmp_path / "box.v1.json", source), box.stages)
+    for name in ("box.json", "box.v2.json", "crate.v1.json", "Box.v1.json"):
+        with pytest.raises((InvalidRecordError, CatalogError)):
+            Grammar.from_descriptor(_write_text(tmp_path / name, source), box.stages)
+
+
+def _write_text(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="utf-8")
+    return path

@@ -227,7 +227,9 @@ def test_the_grammar_package_imports_nothing_it_may_not():
                 modules.extend(alias.name for alias in node.names)
             for module in modules:
                 if module.split(".")[0] == "exulanica":
-                    assert module.startswith(allowed), f"{path.name} imports {module}"
+                    assert any(
+                        module == name or module.startswith(f"{name}.") for name in allowed
+                    ), f"{path.name} imports {module}"
 
 
 # ---------------------------------------------------------------------------------------------
