@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules, which is what keeps it 
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**81 documents** in the public catalog.
+**82 documents** in the public catalog.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-53 documents.
+54 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
