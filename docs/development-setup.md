@@ -15,10 +15,13 @@ measurement dates below are historical, not a fresh execution report.
 ### Backend
 
 ```bash
-uv sync                      # creates .venv against the pinned 3.11
+uv sync --extra reconstruction --extra segmentation --extra pose --extra server
 cp .env.example .env         # then fill in the two keys below
-uv run pytest
+uv run pytest                # database tests skip; see below for the full suite
 ```
+
+The full suite is run with all four extras. Without `reconstruction` (numpy) and `pose`
+(pycolmap), some tests fail rather than skip.
 
 `.env` is gitignored and must never be committed. Two variables:
 
@@ -49,58 +52,165 @@ uv run scripts/verify_platform.py      # the runtime verification harness, needs
 
 ### The tests that need a database
 
-**PostgreSQL is the only data layer.** 849 of the 1902 backend tests need a real server, and they
-are the executable proof of everything the database carries: that a model cannot write a name into
-canonical state, that one workspace cannot read another's rows, that a tombstoned address refuses
-the write, and that the whole ingest path works. A default run prints a reminder naming the files
-it skipped rather than reporting green in silence.
+**PostgreSQL is the only data layer.** 1965 of the 4608 backend tests carry the `postgres` marker
+(collected 2026-09-16 at 51a09db), and they are the executable proof of everything the database
+carries: that a model cannot write a name into canonical state, that one workspace cannot read
+another's rows, that a tombstoned address refuses the write, and that the whole ingest path works. A
+default run prints a reminder naming the files it skipped rather than reporting green in silence.
 
 The target is PostgreSQL 18 with pgvector, and nothing is substituted for it. On macOS:
 
 ```bash
 brew install postgresql@18 pgvector
-brew services start postgresql@18
-createdb -p 5433 exulanica_spine_test
-EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest
 ```
 
-Port 5433 is this project's local example. Use your server's actual port in both `createdb`
-and the connection URL; starting PostgreSQL does not automatically select 5433.
+#### The full suite: a private server per worker
 
-Four things to know about that harness:
+This is how a full run is done. Each pytest-xdist worker initialises its own PostgreSQL 18 server
+in the system temporary directory, on a free loopback port, runs its share of the tests against it
+and deletes it when it finishes. No test database needs to exist first, and nothing is shared with
+another worktree's run. The reference URL below still needs the shared server on 5433 to be
+running, because `test_frontier_dry_run.py` reads the reference copy there.
+
+```bash
+EXULANICA_TEST_POSTGRES=private \
+EXULANICA_REFERENCE_DATABASE_URL=postgresql://localhost:5433/exulanica_inspect_test \
+EXULANICA_REQUIRE_POSTGRES=1 \
+uv run pytest -n 6
+```
+
+Do not set `EXULANICA_TEST_DATABASE_URL` as well; the suite refuses the combination, and it refuses
+`-n` with a single shared database. `EXULANICA_TEST_POSTGRES=private` without `-n` runs serially
+on one private server. The servers come from `scripts/test_postgres.py`, which finds the
+PostgreSQL 18 binaries through `EXULANICA_POSTGRES_BIN`, then the Homebrew and Debian locations,
+then `PATH`, and refuses an older server. Each worker stops its server before it reports itself
+finished, and a watcher stops it if the worker dies instead. `uv run python
+scripts/test_postgres.py sweep` removes anything left by a machine crash.
+
+Why a server each, rather than a schema or a database each. Both were measured on 2026-09-16:
+
+- **A schema is not enough.** Migration 0041's asset-read barrier is
+  `pg_advisory_xact_lock(119622341)`, and advisory locks belong to the whole database. With the
+  barrier held in one throwaway schema, a guarded insert in another schema of the same database
+  failed at once with "asset delivery in progress; retry mutation".
+- **A database is not enough either.** The same insert in a second database succeeded, but
+  `provision_runtime_role` from two databases of one server failed 40 times in 80 with "tuple
+  concurrently updated". Roles belong to the whole server, and the lock that function takes
+  belongs to one database.
+- **A server shares its checkpoints.** A `DROP DATABASE` on the shared server waited more than six
+  minutes on `CheckpointDone` while other worktrees ran their suites.
+
+A private server costs about a second to create and start. It uses the shared server's locale
+(`en_US.UTF-8`), connection limit and buffer size. It turns off `fsync` and `full_page_writes`,
+which protect against a machine crash and are pointless for a cluster that is deleted on exit.
+The bootstrap role is the operating-system user, a superuser, exactly as on a Homebrew server.
+The four runtime roles (`exulanica_app`, `exulanica_ro`, `exulanica_purge`, `exulanica_accounts`)
+are created with no privileges before any migration runs, as on a provisioned server, because
+migrations 0017, 0021, 0023, 0042 and 0065 grant only to runtime roles that already exist. Without
+them, a test that reads those grants passed or skipped depending on what an earlier test on the
+same server had done. The tests grant the privileges they need and connect as those roles.
+
+MEASURED 2026-09-16 at 7683a87 on an Apple M3 Pro (6 performance and 6 efficiency cores, 18 GB),
+with other worktrees asked to stay idle; load average is given at the start and end of each run.
+Every parallel run below failed and skipped exactly the same tests as the serial run, compared
+test by test across all 4608:
+
+| Run | Wall time | Load average |
+| --- | --- | --- |
+| Serial, one database on the shared 5433 server | 1074 s | 9.2 to 4.4 |
+| `-n 6`, private servers | 301 s | 7.0 to 9.3 |
+| Two worktrees at once, `-n 6` each | 674 s and 666 s | 9.3 to 6.5 |
+
+Earlier the same day, on a busier machine, `-n 4`, `-n 8` and `-n 12` took 407, 468 and 310 to
+333 seconds. At comparable load `-n 12` was no faster than `-n 6`, and it takes every core from
+the other worktrees, so six workers, one per performance core, is the setting to use. Two
+worktrees at once each take a little over twice as long as one alone, which is still well under
+the time of running them one after the other.
+
+#### Expected failures
+
+With `EXULANICA_REFERENCE_DATABASE_URL` set as above, exactly three tests fail on any database
+except the retained `exulanica_spine_test`, and they fail by design:
+
+- `test_frontier_preflight.py::test_preflight_checks_real_schema_without_ingesting_or_creating_outputs`
+  and `test_frontier_demonstration.py::test_frontier_demonstration_names_the_capture_only_and_source_first_fallbacks`
+  run the frontier preflight, and `exulanica/orchestration/preflight.py` accepts only the
+  reference database on port 5433.
+- `test_screening_currency.py::test_shared_stale_screening_end_to_end` builds its scratch URL from
+  `EXULANICA_TEST_DATABASE_URL` and then fails at `tests/test_screening_currency.py:211`, where
+  `inspect_database` refuses it with "Use the permitted local reference copy on port 5433 for
+  writes." (`exulanica/db/reference_target.py`).
+
+With `EXULANICA_REFERENCE_DATABASE_URL` unset, eight fail: those three, both tests in
+`test_frontier_dry_run.py`, and the three `PGHOSTADDR`, `PGSERVICE` and `PGSERVICEFILE` cases of
+`test_frontier_preflight.py::test_libpq_environment_cannot_redirect_the_permitted_database`. The
+five extra refuse with "Set EXULANICA_REFERENCE_DATABASE_URL=postgresql://localhost:5433/exulanica_inspect_test
+before a writable rehearsal." A parallel run fails the same tests as a serial run, test by test,
+in both configurations.
+
+`EXULANICA_REFERENCE_DATABASE_URL` is the one setting that still reaches the shared server:
+`test_frontier_dry_run.py` creates and drops its own schema in `exulanica_inspect_test`. It never
+touches `exulanica_spine_test`, and it provisions no roles there.
+
+#### A serial run on a named database
+
+The earlier form still works, one process against a database you created:
+
+```bash
+brew services start postgresql@18
+createdb -p 5433 exulanica_<name>_test
+EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_<name>_test uv run pytest
+```
+
+On the shared development server this is the form that collides with other worktrees: two runs
+provisioning runtime roles at the same moment fail each other's fixtures, and a run on the same
+database fails artifact mutations with "asset delivery in progress". Give each run a fresh
+database name rather than dropping and recreating one under load. Port 5433 is this project's
+local example; use your server's actual port in both `createdb` and the URL.
+
+Things to know about the harness, whichever form is used:
 
 - **The database name must contain "test".** It refuses to touch anything else. All work happens
   inside throwaway schemas that are dropped afterwards, because each migration carries its own
-  `commit;` and cannot be undone by a rollback. Extension setup and some role provisioning are
-  database-wide or cluster-wide, so use a dedicated development server and coordinate test runs.
-- **A brand-new database needs only `createdb`, and two tests need the documented name.** The
-  harness creates `vector`, `pgcrypto`, `pg_trgm` and `btree_gist` in `public` on first use, and
-  every test that needs a runtime role provisions it, so the role in the URL must be allowed to
-  create extensions and roles; the superuser a Homebrew install gives you is. MEASURED 2026-09-11
-  against `exulanica_fresh_test`, created with `createdb` minutes before: 2643 passed, 3 skipped,
-  3 failed. Two of those failures are a deliberate prerequisite, not a defect: `test_frontier_preflight.py::test_preflight_checks_real_schema_without_ingesting_or_creating_outputs`
-  and `test_frontier_demonstration.py::test_frontier_demonstration_names_the_capture_only_and_source_first_fallbacks`
-  run the frontier preflight, and `exulanica/orchestration/preflight.py` refuses every database
-  except `postgresql://localhost:5433/exulanica_spine_test`, so they pass only there. The third,
-  `test_screening_currency.py::test_shared_stale_screening_end_to_end`, spells that URL out
-  instead of reading `EXULANICA_TEST_DATABASE_URL`, so on any other database its search path
-  names a schema that is not there and falls through to `exulanica_spine_test`'s `public`. That
-  is a defect in the test. Two read-only fixtures had the same one, 43 failures on a fresh
-  database, until they were given `scratch_role_database` in `tests/conftest.py`; build any new
-  scratch connection from the configured URL the same way.
+  `commit;` and cannot be undone by a rollback.
+- **A brand-new database needs no preparation.** The harness creates `vector`, `pgcrypto`,
+  `pg_trgm` and `btree_gist` in `public` on first use, and every test that needs a runtime role
+  provisions it, so the role in the URL must be allowed to create extensions and roles; the
+  superuser a Homebrew install gives you is. Build any new scratch connection from
+  `EXULANICA_TEST_DATABASE_URL`, as `scratch_role_database` in `tests/conftest.py` does, never from
+  a spelled-out URL.
 - **A server that cannot run the schema is a loud failure, not a silent substitution.** An earlier
   version of the harness swapped `gen_random_uuid()` for `uuidv7()` and `bytea` for
   `halfvec(4096)` so the suite could run on PostgreSQL 14. Everything passed and the vector path
   had never executed once, which hid a test that wrote raw bytes into a vector column.
-- Set `EXULANICA_REQUIRE_POSTGRES=1` to turn the skip into a failure, which is how continuous
-  integration should run it. A historical concurrency measurement follows; it does not establish
-  that every current role-provisioning test can safely run concurrently. Serialize full database
-  campaigns on the shared development machine. MEASURED
-  2026-09-07 on the merged tree: two concurrent full runs each produced a failure set byte
-  identical to the serial baseline, and three concurrent runs of `tests/test_ingest_cli.py`, the
-  file a 2026-09-05 note blamed for six failures under concurrency, all passed. That note does not
-  reproduce. Isolation is by throwaway schema (`exulanica_test_<12 hex>`), not by database, so the
-  test schemas and `public` share one database and only the schema name separates them.
+- **`EXULANICA_REQUIRE_POSTGRES=1` turns the skip into a failure**, which is how continuous
+  integration runs it. With `EXULANICA_TEST_POSTGRES=private`, a server that cannot be started
+  stops the run before collection whether or not it is set.
+- **Keep pytest's own configuration as it is.** `addopts` already carries `-q`; a second `-q`
+  hides the pass and fail counts. Nothing configures `filterwarnings`, and `-p no:warnings` makes
+  a Pillow decompression-bomb test fail, so do not pass it.
+- **A test that loads torch runs in a child process.** pycolmap and torch each ship an OpenMP
+  runtime, and a process that has run COLMAP aborts with exit 134 and no summary when torch
+  initialises. `_isolated_torch` in `tests/test_gsplat_runner.py`, `tests/test_scene_run_preflight.py`
+  and `tests/test_segmentation_stage.py` runs each such test in its own interpreter. Parallel
+  workers do not remove the need: one worker can run both kinds of test.
+
+#### A server for the API
+
+`scripts/test_postgres.py` also keeps one persistent server per worktree for running the API
+against a database of its own:
+
+```bash
+uv run python scripts/test_postgres.py serve    # start, migrate, provision roles, print URLs
+uv run python scripts/test_postgres.py status
+uv run python scripts/test_postgres.py stop
+```
+
+`serve` creates the database `exulanica` with the four extensions, runs `exulanica-db` as the
+bootstrap owner, confirms that `exulanica_app` is not an owner, a superuser or BYPASSRLS, and prints
+`EXULANICA_DATABASE_URL`, `EXULANICA_READONLY_DATABASE_URL` and `EXULANICA_PURGE_DATABASE_URL` for
+the runtime roles. The application never connects as the superuser; the owner URL it prints is for
+migrations and provisioning, and the API refuses to start on it.
 
 ### Running the API
 
