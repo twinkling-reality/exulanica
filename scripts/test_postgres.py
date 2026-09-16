@@ -269,6 +269,7 @@ def start_test_server(label: str) -> tuple[Server, str]:
         server.initialise()
         server.start()
         _watch_owner(server, os.getpid())
+        create_runtime_roles(server)
         url = server.create_database(f"exulanica_{label}_test")
     except BaseException:
         remove_test_server(server)
@@ -295,6 +296,40 @@ def _watch_owner(server: Server, owner: int) -> None:
         start_new_session=True,
         check=True,
     )
+
+
+def create_runtime_roles(server: Server) -> None:
+    """Create the four runtime roles, holding no privileges, before any migration runs.
+
+    Migrations 0017, 0021, 0023, 0042 and 0065 grant to a runtime role only if it already exists,
+    so on a server without them a test's result depended on whether an earlier test on the same
+    server had created one. Measured 2026-09-16: ``test_texture_set_migration.py::
+    test_the_runtime_roles_read_the_catalog_and_cannot_write_it[exulanica_ro]`` passed serially on
+    5433, where the roles exist, and skipped on a fresh worker server. A provisioned server has
+    them, and so does 5433. The attributes are the ones ``provision_runtime_role``,
+    ``provision_purge_role`` and ``provision_account_role`` create; the privileges are still
+    granted only by migrations and by the tests that provision.
+    """
+    import psycopg
+    from psycopg import sql
+
+    from exulanica.db.account_roles import ACCOUNT_ROLE
+    from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
+
+    statements = [
+        (role, "create role {} login nobypassrls")
+        for role in (RUNTIME_ROLE, EXECUTOR_ROLE, PURGE_ROLE)
+    ]
+    statements.append(
+        (
+            ACCOUNT_ROLE,
+            "create role {} login noinherit nosuperuser nocreatedb nocreaterole "
+            "noreplication nobypassrls",
+        )
+    )
+    with psycopg.connect(server.url("postgres"), autocommit=True) as connection:
+        for role, statement in statements:
+            connection.execute(sql.SQL(statement).format(sql.Identifier(role)))
 
 
 def remove_test_server(server: Server) -> None:
