@@ -126,6 +126,7 @@ GLOBAL_TABLES: Final[Mapping[str, str]] = {
     "world_style_capability_registry": "migration-provided style capability vocabulary",
     "world_style_module_capability": "migration-provided style capability vocabulary",
     "world_style_module_registry": "migration-provided style capability vocabulary",
+    "world_texture_set": "migration-provided reviewed texture set pins",
 }
 
 #: Tables that belong to a deployment rather than to a workspace, and must not cross.

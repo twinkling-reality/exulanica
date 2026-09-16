@@ -32,7 +32,18 @@ from pg_harness import migrated_schema, open_scratch_connection
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = migration_directory() / "0065_texture_set_digests.sql"
 MANIFEST = ROOT / "assets" / "textures" / "manifest.json"
-RUNTIME_ROLES = ("exulanica_app", "exulanica_ro", "orimera_app", "orimera_ro")
+
+
+def _runtime_roles(path: Path) -> tuple[str, ...]:
+    """The roles a migration's read-only block loops over, read from the SQL itself."""
+    block = re.search(r"foreach r in array array\[([^\]]+)\] loop", path.read_text())
+    assert block is not None, f"{path.name} has no runtime-role grant loop"
+    return tuple(re.findall(r"'([a-z_]+)'", block.group(1)))
+
+
+#: The same four roles 0042 makes its catalogs read-only for, compared with 0042 below rather than
+#: written out here: two of them carry the pre-ADR-0011 name, which only historical SQL may spell.
+RUNTIME_ROLES = _runtime_roles(MIGRATION)
 TABLE = "world_texture_set"
 
 
@@ -52,6 +63,13 @@ def test_0065_is_the_one_texture_migration_and_is_shaped_like_its_neighbours():
     assert statements[0] == "begin;"
     assert statements[1] == "select pg_advisory_xact_lock(119622309);"
     assert statements[-1] == "commit;"
+
+
+def test_the_catalog_is_read_only_for_exactly_the_roles_0042_names():
+    reviewed = migration_directory() / "0042_authored_world_objects.sql"
+    assert _runtime_roles(reviewed) == RUNTIME_ROLES
+    assert len(RUNTIME_ROLES) == 4
+    assert {"exulanica_app", "exulanica_ro"} <= set(RUNTIME_ROLES)
 
 
 def test_the_catalog_is_not_a_workspace_table():
