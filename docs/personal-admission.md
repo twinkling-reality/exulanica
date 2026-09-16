@@ -83,23 +83,35 @@ derivative worker binds any person detector that reads pixels to the same check,
 person-region stage asks for no receipt of its own; the recorded-observation detector and the
 test doubles that discard the image are not bound.
 
-**Not covered here, and why.**
+**Not covered yet.**
 
-- The person-region stage itself does not call the check; only the worker binds its detector. A
-  pipeline built directly with a pixel-reading detector is not gated.
-- Scene pose runs COLMAP, classic feature matching with no learned weights, under the scene
-  privacy admission. Gaussian-splat training runs a learned perceptual metric (LPIPS) inside its
-  container on whichever host runs the scene worker. Neither asks for a model right yet.
+- There is no HTTP route to withdraw a right. `withdraw_model_right` is the only withdrawal.
+- The person-region stage does not call the check itself; only the derivative worker binds a
+  pixel-reading detector. A pipeline built directly with such a detector is not gated.
+- The manifest states no depth role, so depth cannot be granted by role name through the batch
+  path; a depth right names its checkpoint through `grant_model_right`.
+- Scene pose (COLMAP, classic feature matching with no learned weights) runs under the scene
+  privacy admission only. Gaussian-splat training runs a learned perceptual metric (LPIPS) in its
+  container on whichever host runs the scene worker, and asks for no model right. Until both
+  require a right naming the model and the host, neither is to be run over personal captures, on a
+  GPU or on a remote machine.
 - Place alignment's joint reconstruction stages original photographs for pose under a deletion
   check only. No API or worker path calls it; a verification script and tests do.
 - The caption embedding pass sends text derived from a photograph's observation, not its pixels,
-  to the hosted embedding model.
-- Benchmark captures keep their recorded license as their model permission.
+  to the hosted embedding model with no screening and no right. Whether that text needs a right is
+  an open decision.
+- Benchmark captures keep their recorded license as their model permission; no per-model right
+  applies to them.
 - The observation half of the final check restates `privacy_screening_allows_observation`, whose
-  detection-only branch does not consult withdrawn people or tombstoned entities, so the check does
-  not narrow what a detection receipt already permits.
+  detection-only branch does not consult withdrawn people or tombstoned entities, so an unmasked
+  rendition can reach a detector under a detection receipt and a right.
 - Rights are append-only against every row-level write, but the table owner can still `TRUNCATE`
   the table, as for the other receipt tables; the runtime role holds no such privilege.
+- Scripts that run MoGe or pycolmap over a folder of files
+  (`scripts/reconstruction_moge_scale_vs_colmap.py`, `scripts/reconstruction_pycolmap_run.py`,
+  `scripts/measure_extraction_memory.py`) read files rather than the store and check nothing.
+- The frontier demonstration and its preflight check screening receipts but not rights; a personal
+  capture without a right is reported with vision unavailable rather than refused up front.
 
 **Existing data.** Captures screened before migration 0073 have no right, and the migration writes
 none. Their receipts keep their meaning, but no model receives their bytes until the account
