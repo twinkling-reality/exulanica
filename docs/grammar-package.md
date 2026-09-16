@@ -9,9 +9,10 @@ and declared semantics) and the grammars that implement it. The city is the firs
 grammar. A second grammar, `box`, ships beside it to prove that the contract carries something
 that is not architecture with no change to the contract.
 
-This phase is structural. The package produces **no geometry and no vertices**. Every city stage
-has a versioned record shape and a validator, and none has a generator: a city generated today is
-a receipt and ten emissions that each say `not_implemented` and why.
+This phase is structural. The package produces **no mesh and no vertices**; the only generated
+values are the box grammar's three integer extents. Every city stage has a versioned record shape
+and a validator, and none has a generator: a city generated today is a receipt and ten emissions
+that each say `not_implemented` and why.
 
 ## 1. Where it sits, and why below `evidence`
 
