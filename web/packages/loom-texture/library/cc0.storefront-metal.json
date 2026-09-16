@@ -1,0 +1,49 @@
+{
+  "set_id": "cc0.storefront-metal",
+  "version": 1,
+  "title": "Storefront metal",
+  "summary": "Brushed clear-anodised aluminium with the brushing along u and light smudging.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.metal",
+      "version": 1
+    },
+    "seed": 2026091605,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 1000
+    },
+    "parameters": {
+      "finish": "clear anodised",
+      "metal_colour": [228, 230, 232],
+      "brush_cells_along": 4,
+      "brush_cells_across": 400,
+      "hair_cells_along": 16,
+      "hair_cells_across": 512,
+      "surface_height_mm_1024ths": 512,
+      "brush_relief_mm_1024ths": 40,
+      "hair_relief_mm_1024ths": 20,
+      "waviness_mm_1024ths": 120,
+      "tone_spread_q16": 900,
+      "brush_spread_q16": 1300,
+      "hair_spread_q16": 700,
+      "roughness_permille": 320,
+      "brush_roughness_spread_q16": 4000,
+      "hair_roughness_spread_q16": 1800,
+      "smudge_threshold_q16": 47500,
+      "smudge_darkening_percent": 3,
+      "smudge_roughness_q16": 3300,
+      "smudge_metalness_permille": 950,
+      "height_range_mm": 1,
+      "occlusion_radius_mm": 3,
+      "occlusion_depth_mm": 1,
+      "occlusion_strength_permille": 150
+    }
+  }
+}

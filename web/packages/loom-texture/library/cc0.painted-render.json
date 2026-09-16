@@ -1,0 +1,47 @@
+{
+  "set_id": "cc0.painted-render",
+  "version": 1,
+  "title": "Painted render",
+  "summary": "Warm off-white paint over a dashed render finish, flaking on a few raised dashes.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.render",
+      "version": 1
+    },
+    "seed": 2026091603,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 2000,
+      "v": 2000
+    },
+    "parameters": {
+      "paint_colour": [210, 198, 172],
+      "render_colour": [156, 152, 144],
+      "grime_colour": [120, 112, 98],
+      "dash_cells_per_tile": 300,
+      "relief_cells_per_tile": 40,
+      "base_height_mm_1024ths": 1536,
+      "relief_amplitude_mm_1024ths": 760,
+      "dash_height_max_mm_1024ths": 1180,
+      "sand_grain_mm_1024ths": 90,
+      "hue_spread_q16": 1300,
+      "sand_spread_q16": 900,
+      "crown_brighten_percent": 3,
+      "flaking_threshold_q16": 56000,
+      "flaking_strength_percent": 80,
+      "dirt_percent": 9,
+      "paint_roughness_permille": 720,
+      "worn_roughness_permille": 900,
+      "dirt_roughness_percent": 6,
+      "height_range_mm": 4,
+      "occlusion_radius_mm": 6,
+      "occlusion_depth_mm": 1,
+      "occlusion_strength_permille": 300
+    }
+  }
+}

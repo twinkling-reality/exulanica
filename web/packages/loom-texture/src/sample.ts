@@ -26,8 +26,11 @@ export function newSample(): Sample {
   return { height: 0, red: 0, green: 0, blue: 0, roughness: 0, metalness: 0, occlusion: ONE };
 }
 
-/** A recipe: fill `out` for the tile position (x, y), in micro-units, unwrapped. */
-export type Recipe = (x: number, y: number, out: Sample) => void;
+/**
+ * A pattern: fill `out` for the tile position (x, y), in micro-units, unwrapped. A maker builds one
+ * from a recipe; the pattern is the code, the recipe is the data.
+ */
+export type Pattern = (x: number, y: number, out: Sample) => void;
 
 /** Height in whole millimetres as a Q16 fraction of the stated range. */
 export function heightOf(millimetres: number, rangeMm: number): number {

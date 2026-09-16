@@ -1,18 +1,34 @@
-import { createHash } from 'node:crypto';
 import { canonicalBytes } from './canonical-json.js';
-import { CATALOG } from './catalog.js';
+import { LIBRARY, definitionOf } from './catalog.js';
 import { MAP_LAYOUT, encodeContainer } from './container.js';
 import type { TextureSetDefinition } from './definition.js';
+import { sha256Hex } from './digest.js';
+import { type LibrarySet, SET_ID_PATTERN, VERSIONED_OR_DIGESTED } from './library.js';
 import { LICENCE_ID, licenceBytes } from './licence.js';
+import { MAKERS } from './makers/index.js';
 import { bakeMaps } from './maps.js';
+import {
+  CATALOG_FILE,
+  ObjectStore,
+  OBJECT_DIRECTORY,
+  OBJECT_EXTENSION,
+  bakeReceipt,
+  catalogDocument,
+  libraryEntryObject,
+} from './objects.js';
+
+export { sha256Hex } from './digest.js';
+export { SET_ID_PATTERN } from './library.js';
 
 /**
- * Bake the catalog into the files `assets/textures/` holds, as bytes, without touching a disk.
+ * Bake the library into the files `assets/textures/` holds, as bytes, without touching a disk.
  *
  * The directory is content-addressed: each set is `blobs/<sha256>.ltex`, the licence text is
- * `blobs/<sha256>.txt`, and `manifest.json` is the single index both
- * `exulanica/world/texture_assets.py` and the grammar's catalog loader read. Its shape was fixed
- * with the grammar lane before either side was written:
+ * `blobs/<sha256>.txt`, every maker manifest, recipe, library entry and bake receipt is
+ * `objects/<sha256>.json` (see `objects.ts`), and two indexes sit at the top. `catalog.json`
+ * accounts for every set with a receipt. `manifest.json` is the index both
+ * `exulanica/world/texture_assets.py` and the grammar's catalog loader read, and its shape was
+ * fixed with the grammar lane before either side was written:
  *
  *   {"profile": "exulanica.texture-manifest/v1", "sets": [entry, ...]}
  *
@@ -42,8 +58,6 @@ export const ATTRIBUTES_TEXT = [
 export const BLOB_DIRECTORY = 'blobs';
 export const SET_EXTENSION = '.ltex';
 export const LICENCE_EXTENSION = '.txt';
-/** Identical to `asset_key` in migration 0042, and to `set_id` in migration 0065. */
-export const SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
 
 export interface ManifestEntry {
   readonly set_id: string;
@@ -69,16 +83,24 @@ export interface PublishedSet {
   readonly path: string;
 }
 
-export interface Publication {
-  readonly sets: readonly PublishedSet[];
-  readonly licence: { readonly bytes: Uint8Array; readonly sha256: string; readonly path: string };
-  readonly manifest: Uint8Array;
-  /** Every file the output directory holds, by path relative to it. */
-  readonly files: ReadonlyMap<string, Uint8Array>;
+/** A published library set, and the digests of the objects that account for it. */
+export interface PublishedLibrarySet extends PublishedSet {
+  readonly source: LibrarySet;
+  readonly makerSha256: string;
+  readonly recipeSha256: string;
+  readonly entrySha256: string;
+  readonly receiptSha256: string;
 }
 
-export function sha256Hex(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
+export interface Publication {
+  readonly sets: readonly PublishedLibrarySet[];
+  readonly licence: { readonly bytes: Uint8Array; readonly sha256: string; readonly path: string };
+  readonly manifest: Uint8Array;
+  readonly catalog: Uint8Array;
+  /** Every object, by digest. */
+  readonly objects: ReadonlyMap<string, Uint8Array>;
+  /** Every file the output directory holds, by path relative to it. */
+  readonly files: ReadonlyMap<string, Uint8Array>;
 }
 
 const positive = (value: number): boolean => Number.isSafeInteger(value) && value > 0;
@@ -86,7 +108,9 @@ const positive = (value: number): boolean => Number.isSafeInteger(value) && valu
 function checkDefinition(def: TextureSetDefinition): void {
   const problems: string[] = [];
   if (!SET_ID_PATTERN.test(def.setId)) problems.push('set id does not match ^[a-z][a-z0-9.-]*$');
-  if (/v\d|[0-9a-f]{16}/.test(def.setId)) problems.push('a set id never carries a version or digest');
+  if (VERSIONED_OR_DIGESTED.test(def.setId)) {
+    problems.push('a set id never carries a version or digest');
+  }
   if (!positive(def.version)) problems.push('version is a positive integer');
   if (!Number.isSafeInteger(def.seed) || def.seed < 0 || def.seed > 0xffffffff) {
     problems.push('seed is an unsigned 32-bit integer');
@@ -148,21 +172,77 @@ export function publishSet(def: TextureSetDefinition, licenceSha256: string): Pu
   };
 }
 
-export function publish(catalog: readonly TextureSetDefinition[] = CATALOG): Publication {
+export const objectPath = (digest: string): string =>
+  `${OBJECT_DIRECTORY}/${digest}${OBJECT_EXTENSION}`;
+
+export function publish(library: readonly LibrarySet[] = LIBRARY): Publication {
   const licence = licenceBytes();
   const licenceSha256 = sha256Hex(licence);
-  const sets = catalog.map((def) => publishSet(def, licenceSha256));
+  const store = new ObjectStore();
+  const makers = MAKERS.map((maker) => ({
+    maker,
+    row: {
+      maker_id: maker.manifest.maker_id,
+      version: maker.manifest.version,
+      object_sha256: store.put(maker.manifest),
+    },
+  }));
+  const sets = library.map((source): PublishedLibrarySet => {
+    const published = publishSet(definitionOf(source), licenceSha256);
+    const maker = makers.find((candidate) => candidate.maker === source.maker);
+    if (maker === undefined) {
+      throw new Error(`${source.entry.set_id} names a maker this package does not publish`);
+    }
+    const recipeSha256 = store.put(source.entry.recipe);
+    const entrySha256 = store.put(libraryEntryObject(source.entry, recipeSha256));
+    const receiptSha256 = store.put(
+      bakeReceipt({
+        makerSha256: maker.row.object_sha256,
+        entrySha256,
+        recipeSha256,
+        licenceSha256,
+        contentSha256: published.entry.content_sha256,
+        byteSize: published.entry.byte_size,
+      }),
+    );
+    return {
+      ...published,
+      source,
+      makerSha256: maker.row.object_sha256,
+      recipeSha256,
+      entrySha256,
+      receiptSha256,
+    };
+  });
   const manifest = manifestBytes(sets.map((set) => set.entry));
+  const catalog = canonicalBytes(
+    catalogDocument(
+      sha256Hex(manifest),
+      makers.map(({ row }) => row),
+      sets.map((set) => ({
+        set_id: set.entry.set_id,
+        version: set.entry.version,
+        content_sha256: set.entry.content_sha256,
+        receipt_sha256: set.receiptSha256,
+      })),
+    ),
+  );
+  const objects = store.entries();
   const licencePath = `${BLOB_DIRECTORY}/${licenceSha256}${LICENCE_EXTENSION}`;
+  // Content first and indexes last, in the order the CLI writes them.
   const files = new Map<string, Uint8Array>();
   files.set(ATTRIBUTES_FILE, new TextEncoder().encode(ATTRIBUTES_TEXT));
   files.set(licencePath, licence);
   for (const set of sets) files.set(set.path, set.container);
+  for (const [digest, bytes] of objects) files.set(objectPath(digest), bytes);
   files.set(MANIFEST_FILE, manifest);
+  files.set(CATALOG_FILE, catalog);
   return {
     sets,
     licence: { bytes: licence, sha256: licenceSha256, path: licencePath },
     manifest,
+    catalog,
+    objects,
     files,
   };
 }

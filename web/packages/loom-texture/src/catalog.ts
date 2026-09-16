@@ -1,28 +1,36 @@
+import { cavityOf, heightRangeOf } from './controls.js';
 import type { TextureSetDefinition } from './definition.js';
-import { ashlar } from './surfaces/ashlar.js';
-import { asphalt } from './surfaces/asphalt.js';
-import { brick } from './surfaces/brick.js';
-import { concrete } from './surfaces/concrete.js';
-import { kerb } from './surfaces/kerb.js';
-import { metal } from './surfaces/metal.js';
-import { paving } from './surfaces/paving.js';
-import { render } from './surfaces/render.js';
+import { type LibrarySet, readLibrary } from './library.js';
 
 /**
- * Every published set: its seed and its version, stated here and nowhere else.
+ * The published sets, as the bake reads them.
  *
- * A version is a bake input. Any change that alters a set's bytes (a recipe, a palette, the
- * container, the generator itself) must bump that set's version, because the pin a migration
- * holds is (set id, version) -> digest and a pinned pair never names new bytes. A new version
- * also needs a new migration row; `tests/test_texture_set_migration.py` fails until both agree.
+ * `LIBRARY` is every entry in `library/`, checked against its maker. `CATALOG` is the same sets as
+ * bake definitions: everything the container header states comes from the entry, the recipe or
+ * the maker's manifest, and the per-texel pattern comes from the maker applied to the recipe.
+ * Nothing about a set is stated in code any more; a set is its library file.
  */
-export const CATALOG: readonly TextureSetDefinition[] = Object.freeze([
-  brick(2026091601, 1),
-  ashlar(2026091602, 1),
-  render(2026091603, 1),
-  concrete(2026091604, 1),
-  metal(2026091605, 1),
-  asphalt(2026091606, 1),
-  paving(2026091607, 1),
-  kerb(2026091608, 1),
-]);
+export function definitionOf({ entry, maker }: LibrarySet): TextureSetDefinition {
+  const { recipe } = entry;
+  return {
+    setId: entry.set_id,
+    version: entry.version,
+    seed: recipe.seed,
+    family: maker.manifest.family,
+    title: entry.title,
+    summary: entry.summary,
+    width: recipe.resolution.width,
+    height: recipe.resolution.height,
+    extentU: recipe.extent_mm.u,
+    extentV: recipe.extent_mm.v,
+    surface: maker.manifest.surface,
+    heightRangeMm: heightRangeOf(recipe),
+    cavity: cavityOf(recipe),
+    parameters: maker.stated(recipe),
+    pattern: () => maker.pattern(recipe),
+  };
+}
+
+export const LIBRARY: readonly LibrarySet[] = readLibrary();
+
+export const CATALOG: readonly TextureSetDefinition[] = Object.freeze(LIBRARY.map(definitionOf));

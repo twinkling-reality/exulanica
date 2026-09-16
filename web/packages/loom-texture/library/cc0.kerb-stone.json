@@ -1,0 +1,65 @@
+{
+  "set_id": "cc0.kerb-stone",
+  "version": 1,
+  "title": "Kerb stone",
+  "summary": "Flame-textured grey granite kerb units, 900 mm long with 6 mm joints.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.kerb",
+      "version": 1
+    },
+    "seed": 2026091608,
+    "resolution": {
+      "width": 1024,
+      "height": 256
+    },
+    "extent_mm": {
+      "u": 1800,
+      "v": 450
+    },
+    "parameters": {
+      "unit_module_mm": 900,
+      "head_joint_mm": 6,
+      "units_per_tile": 2,
+      "tile_proportion": 4,
+      "feldspar_colour": [194, 188, 182],
+      "feldspar_percent": 50,
+      "feldspar_roughness_permille": 740,
+      "quartz_colour": [166, 168, 172],
+      "quartz_percent": 22,
+      "quartz_roughness_permille": 620,
+      "biotite_colour": [48, 48, 52],
+      "biotite_percent": 14,
+      "biotite_roughness_permille": 460,
+      "plagioclase_colour": [214, 210, 204],
+      "plagioclase_roughness_permille": 760,
+      "joint_colour": [78, 76, 72],
+      "grime_colour": [96, 92, 86],
+      "face_height_mm_1024ths": 4608,
+      "joint_height_mm_1024ths": 1024,
+      "arris_mm": 4,
+      "crystal_cells_across": 150,
+      "grain_cells_across": 300,
+      "joint_grit_cells_across": 200,
+      "grime_cells_across": 2,
+      "crystal_lift_mm_1024ths": 500,
+      "crystal_boundary_mm_1024ths": 350,
+      "grain_relief_mm_1024ths": 200,
+      "unit_tilt_mm_1024ths": 500,
+      "joint_grain_mm_1024ths": 250,
+      "crystal_brightness_spread_q16": 3000,
+      "unit_brightness_spread_q16": 2000,
+      "boundary_darkening_percent": 12,
+      "stone_roughness_spread_q16": 2600,
+      "joint_grit_spread_q16": 5000,
+      "joint_roughness_permille": 950,
+      "grime_percent": 22,
+      "height_range_mm": 6,
+      "occlusion_radius_mm": 4,
+      "occlusion_depth_mm": 2,
+      "occlusion_strength_permille": 450
+    }
+  }
+}

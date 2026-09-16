@@ -1,0 +1,67 @@
+{
+  "set_id": "cc0.brick-running-bond",
+  "version": 1,
+  "title": "Brick, running bond",
+  "summary": "Red to brown fired clay brick in running bond, 215 x 65 mm faces with 10 mm recessed joints.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.brick",
+      "version": 1
+    },
+    "seed": 2026091601,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 1800,
+      "v": 1800
+    },
+    "parameters": {
+      "bond": "running",
+      "unit_length_mm": 215,
+      "unit_height_mm": 65,
+      "head_joint_mm": 10,
+      "bed_joint_mm": 10,
+      "units_per_course": 8,
+      "courses": 24,
+      "palette": [
+        [146, 66, 48],
+        [132, 60, 46],
+        [158, 76, 56],
+        [120, 56, 44],
+        [170, 92, 68],
+        [104, 50, 42],
+        [150, 82, 64]
+      ],
+      "mortar_colour": [184, 176, 162],
+      "burnt_colour": [72, 42, 36],
+      "fresh_clay_colour": [188, 112, 86],
+      "face_height_mm": 10,
+      "joint_recess_mm": 5,
+      "arris_mm": 3,
+      "chip_depth_max_mm": 4,
+      "mortar_grain_mm_1024ths": 180,
+      "unit_tilt_u_mm_1024ths": 600,
+      "unit_tilt_v_mm_1024ths": 300,
+      "face_grain_mm_1024ths": 350,
+      "pit_percent": 22,
+      "pit_depth_mm_1024ths": 600,
+      "unit_brightness_spread_q16": 7200,
+      "flash_percent": 30,
+      "flash_darkening_percent": 18,
+      "clay_grain_spread_q16": 4600,
+      "mortar_grain_spread_q16": 4000,
+      "brick_roughness_permille": 840,
+      "mortar_roughness_permille": 930,
+      "soot_percent": 9,
+      "streak_percent": 7,
+      "height_range_mm": 12,
+      "occlusion_radius_mm": 8,
+      "occlusion_depth_mm": 4,
+      "occlusion_strength_permille": 550
+    }
+  }
+}

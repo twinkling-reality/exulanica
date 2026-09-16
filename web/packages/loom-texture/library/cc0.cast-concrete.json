@@ -1,0 +1,64 @@
+{
+  "set_id": "cc0.cast-concrete",
+  "version": 1,
+  "title": "Cast concrete",
+  "summary": "Plywood-formed concrete on 1200 x 600 mm panels, with form-tie holes and bug holes.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.concrete",
+      "version": 1
+    },
+    "seed": 2026091604,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 2400,
+      "v": 2400
+    },
+    "parameters": {
+      "panel_length_mm": 1200,
+      "panel_height_mm": 600,
+      "panel_seam_mm": 2,
+      "panels_per_row": 2,
+      "rows": 4,
+      "tie_u_mm": [299, 899],
+      "tie_v_mm": [149, 449],
+      "concrete_colour": [160, 158, 152],
+      "hole_colour": [96, 94, 90],
+      "stain_colour": [122, 120, 116],
+      "seam_colour": [124, 122, 118],
+      "laitance_colour": [182, 180, 174],
+      "surface_height_mm": 10,
+      "seam_fin_height_mm_1024ths": 600,
+      "tie_hole_radius_mm": 14,
+      "tie_hole_depth_mm": 8,
+      "tie_stain_length_mm": 260,
+      "waviness_mm_1024ths": 600,
+      "ply_grain_mm_1024ths": 180,
+      "fine_grain_mm_1024ths": 70,
+      "bug_hole_percent": 16,
+      "bug_hole_depth_mm_1024ths": 1500,
+      "void_percent": 5,
+      "void_depth_mm_1024ths": 3000,
+      "panel_brightness_spread_q16": 2600,
+      "mottle_spread_q16": 9000,
+      "laitance_percent": 18,
+      "fine_spread_q16": 2300,
+      "ply_spread_q16": 900,
+      "seam_percent": 45,
+      "stain_percent": 45,
+      "hole_percent": 85,
+      "concrete_roughness_permille": 880,
+      "hole_roughness_permille": 950,
+      "laitance_smoothing_percent": 4,
+      "height_range_mm": 12,
+      "occlusion_radius_mm": 12,
+      "occlusion_depth_mm": 3,
+      "occlusion_strength_permille": 500
+    }
+  }
+}

@@ -10,6 +10,13 @@ source. What this module adds is the backend's half: every digest the manifest n
 from the bytes on disk before a single set is handed out, and every container header must say what
 the manifest says about it.
 
+**Every set is accounted for.** Beside the manifest, ``catalog.json`` names a bake receipt for each
+set, and the receipt names the maker manifest, library entry and recipe the bytes were baked from,
+all content-addressed under ``objects/``. :mod:`exulanica.materials` verifies that graph, and the
+loader then holds each container header to its recipe: seed, resolution, extent, height range,
+occlusion, family, surface, title and summary. A set whose provenance does not check out is not
+loaded, so a pinned set always comes with the recipe a person or the Companion can vary.
+
 **A material resolves to a pinned set or it does not resolve.** :func:`resolve_texture_set` has
 exactly two failure modes: a material record with no texture set id raises
 :class:`MissingTextureSet`, and a material record naming an id that is not pinned raises
@@ -31,7 +38,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -39,6 +46,12 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError, IntegrityError
+from exulanica.materials import (
+    LibraryRecord,
+    MaterialCatalog,
+    MaterialObjectError,
+    verify_material_catalog,
+)
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
@@ -78,7 +91,9 @@ _HEX64: Final = re.compile(r"^[0-9a-f]{64}$")
 _MAGIC: Final = b"LTX1"
 _ALIGNMENT: Final = 16
 _MANIFEST: Final = "manifest.json"
+_CATALOG: Final = "catalog.json"
 _BLOBS: Final = "blobs"
+_OBJECTS: Final = "objects"
 _ENTRY_KEYS: Final = frozenset(
     {
         "set_id",
@@ -161,6 +176,11 @@ class PinnedTextureSet:
     seed: int
     height_range_mm: int
     path: Path
+    #: The maker and recipe the bytes were baked from, and the receipt that says so.
+    maker_id: str
+    maker_version: int
+    recipe_sha256: str
+    receipt_sha256: str
 
     def pin(self) -> Mapping[str, int | str]:
         """What a resolved reference records: the stable id, its version and its content digest."""
@@ -197,6 +217,8 @@ class TextureCatalog:
     sets: Mapping[str, PinnedTextureSet]
     licence_bytes: bytes
     licence_sha256: str
+    #: Every maker, recipe, entry and receipt behind the sets, verified.
+    materials: MaterialCatalog
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,12 +380,53 @@ def _check_header(header: Mapping[str, Any], entry: Mapping[str, Any], where: st
             raise TextureCatalogError(f"{where}: header {key} is non-empty text")
 
 
+def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: str) -> None:
+    """The header says what the entry, the recipe and the maker say, field for field."""
+    recipe = record.recipe
+    parameters = recipe["parameters"]
+    manifest = record.maker.manifest
+    expected = {
+        "title": record.title,
+        "summary": record.summary,
+        "seed": recipe["seed"],
+        "resolution": dict(recipe["resolution"]),
+        "extent_mm": dict(recipe["extent_mm"]),
+        "family": manifest["family"],
+        "height_range_mm": parameters["height_range_mm"],
+        "cavity": {
+            "radius_mm": parameters["occlusion_radius_mm"],
+            "depth_mm": parameters["occlusion_depth_mm"],
+            "strength_permille": parameters["occlusion_strength_permille"],
+        },
+    }
+    for key, value in expected.items():
+        if header.get(key) != value:
+            raise TextureCatalogError(
+                f"{where}: header {key} is {header.get(key)!r}, but its recipe says {value!r}"
+            )
+    placement = header.get("placement")
+    if not isinstance(placement, Mapping) or placement.get("surface") != manifest["surface"]:
+        raise TextureCatalogError(f"{where}: header placement is not its maker's surface")
+
+
+def _object_reader(directory: Path) -> Callable[[str], bytes]:
+    def read(digest: str) -> bytes:
+        path = directory / _OBJECTS / f"{digest}.json"
+        if not path.is_file():
+            raise MaterialObjectError(f"object {digest} is not in {directory}")
+        return path.read_bytes()
+
+    return read
+
+
 def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
     """Every published set, each verified against its pin and its own header, or a refusal.
 
     Refuses a manifest that is not canonical, holds a float, repeats or misorders a set, or names
     a blob that is absent, has the wrong length, hashes to anything but its pin, or carries a
-    header that disagrees with the manifest. The licence text every set names is verified too.
+    header that disagrees with the manifest. The licence text every set names is verified too,
+    and so is ``catalog.json``: every set's receipt, entry, recipe and maker, and the header
+    against the recipe.
     """
     raw = (directory / _MANIFEST).read_bytes()
     document = _canonical_document(raw, _MANIFEST)
@@ -375,14 +438,14 @@ def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
     if not isinstance(entries, list) or not entries:
         raise TextureCatalogError(f"{_MANIFEST}: sets is a non-empty list")
 
-    sets: dict[str, PinnedTextureSet] = {}
+    checked: dict[str, tuple[Mapping[str, Any], Mapping[str, Any], Path]] = {}
     licence_digests: set[str] = set()
     for index, entry in enumerate(entries):
         problem = _entry_problems(entry, index)
         if problem is not None:
             raise TextureCatalogError(problem)
         set_id = entry["set_id"]
-        if set_id in sets or (sets and set_id < next(reversed(sets))):
+        if set_id in checked or (checked and set_id < next(reversed(checked))):
             raise TextureCatalogError(f"{_MANIFEST}: sets are sorted by set_id, each id once")
         path = directory / _BLOBS / f"{entry['content_sha256']}.ltex"
         if not path.is_file():
@@ -398,6 +461,36 @@ def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
             )
         header = _decode(payload, set_id).header
         _check_header(header, entry, set_id)
+        checked[set_id] = (entry, header, path)
+        licence_digests.add(entry["licence_sha256"])
+
+    if len(licence_digests) != 1:
+        raise TextureCatalogError(
+            f"the sets name {len(licence_digests)} licence texts; they share one"
+        )
+    (licence_sha256,) = licence_digests
+    licence_path = directory / _BLOBS / f"{licence_sha256}.txt"
+    if not licence_path.is_file():
+        raise TextureCatalogError(f"the licence text {licence_path.name} is not in {directory}")
+    licence_bytes = licence_path.read_bytes()
+    if hashlib.sha256(licence_bytes).hexdigest() != licence_sha256:
+        raise TextureCatalogError("the licence text does not hash to the digest the sets name")
+
+    catalog_path = directory / _CATALOG
+    if not catalog_path.is_file():
+        raise TextureCatalogError(
+            f"{_CATALOG} is not in {directory}; every published set is accounted for by a receipt"
+        )
+    try:
+        materials = verify_material_catalog(
+            catalog_path.read_bytes(), raw, _object_reader(directory)
+        )
+    except MaterialObjectError as error:
+        raise TextureCatalogError(f"{_CATALOG}: {error}") from error
+    sets: dict[str, PinnedTextureSet] = {}
+    for set_id, (entry, header, path) in checked.items():
+        record = materials.sets[set_id]
+        _check_provenance(header, record, set_id)
         sets[set_id] = PinnedTextureSet(
             set_id=set_id,
             version=entry["version"],
@@ -415,24 +508,16 @@ def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
             seed=header["seed"],
             height_range_mm=header["height_range_mm"],
             path=path,
+            maker_id=record.maker.maker_id,
+            maker_version=record.maker.version,
+            recipe_sha256=record.recipe_sha256,
+            receipt_sha256=record.receipt_sha256,
         )
-        licence_digests.add(entry["licence_sha256"])
-
-    if len(licence_digests) != 1:
-        raise TextureCatalogError(
-            f"the sets name {len(licence_digests)} licence texts; they share one"
-        )
-    (licence_sha256,) = licence_digests
-    licence_path = directory / _BLOBS / f"{licence_sha256}.txt"
-    if not licence_path.is_file():
-        raise TextureCatalogError(f"the licence text {licence_path.name} is not in {directory}")
-    licence_bytes = licence_path.read_bytes()
-    if hashlib.sha256(licence_bytes).hexdigest() != licence_sha256:
-        raise TextureCatalogError("the licence text does not hash to the digest the sets name")
     return TextureCatalog(
         sets=MappingProxyType(sets),
         licence_bytes=licence_bytes,
         licence_sha256=licence_sha256,
+        materials=materials,
     )
 
 

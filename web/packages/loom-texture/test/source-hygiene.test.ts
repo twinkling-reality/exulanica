@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * The bake's determinism, checked where it is written rather than where it is reviewed.
  *
- * Every byte this package writes is a function of each set's seed, id, resolution and version.
+ * Every byte this package writes is a function of the library files and the source, nothing else.
  * A clock, an ambient random source or an environment read anywhere in `src/` would make that a
  * claim instead of a property, so this reads the source files itself, the way the backend's
  * model-manifest test keeps model identifiers out of Python source.
@@ -76,23 +76,28 @@ describe('the bake has no source of nondeterminism', () => {
   it('walks every module, including the nested ones', () => {
     const walked = new Set(files.map(label));
     for (const required of [
+      'catalog.ts',
       'cli.ts',
       'container.ts',
       'integer.ts',
+      'library.ts',
       'maps.ts',
       'noise.ts',
+      'objects.ts',
       'publish.ts',
+      'recipe.ts',
       'srgb.ts',
       'inspect/png.ts',
       'inspect/contact-sheet.ts',
-      'surfaces/ashlar.ts',
-      'surfaces/asphalt.ts',
-      'surfaces/brick.ts',
-      'surfaces/concrete.ts',
-      'surfaces/kerb.ts',
-      'surfaces/metal.ts',
-      'surfaces/paving.ts',
-      'surfaces/render.ts',
+      'makers/index.ts',
+      'makers/ashlar.ts',
+      'makers/asphalt.ts',
+      'makers/brick.ts',
+      'makers/concrete.ts',
+      'makers/kerb.ts',
+      'makers/metal.ts',
+      'makers/paving.ts',
+      'makers/render.ts',
     ]) {
       expect(walked, `the sweep does not read ${required}`).toContain(required);
     }

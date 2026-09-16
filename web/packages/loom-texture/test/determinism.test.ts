@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CATALOG } from '../src/catalog.js';
+import { CATALOG, LIBRARY, definitionOf } from '../src/catalog.js';
 import { encodeContainer } from '../src/container.js';
 import type { TextureSetDefinition } from '../src/definition.js';
 import { bakeMaps, sampleFields } from '../src/maps.js';
@@ -61,18 +61,15 @@ describe('a bake is a function of its stated inputs', () => {
 });
 
 describe('a different seed is a different surface', () => {
-  it('holds for every set', async () => {
-    const { brick } = await import('../src/surfaces/brick.js');
-    const { ashlar } = await import('../src/surfaces/ashlar.js');
-    const { render } = await import('../src/surfaces/render.js');
-    const { concrete } = await import('../src/surfaces/concrete.js');
-    const { metal } = await import('../src/surfaces/metal.js');
-    const { asphalt } = await import('../src/surfaces/asphalt.js');
-    const { paving } = await import('../src/surfaces/paving.js');
-    const { kerb } = await import('../src/surfaces/kerb.js');
-    for (const make of [brick, ashlar, render, concrete, metal, asphalt, paving, kerb]) {
-      const a = make(1, 1);
-      const b = make(2, 1);
+  it('holds for every set', () => {
+    for (const source of LIBRARY) {
+      const reseeded = (seed: number): TextureSetDefinition =>
+        definitionOf({
+          ...source,
+          entry: { ...source.entry, recipe: { ...source.entry.recipe, seed } },
+        });
+      const a = reseeded(1);
+      const b = reseeded(2);
       const size = { width: 64, height: a.height / 16 };
       expect(
         Buffer.from(bakeMaps(a, size).baseColor).equals(Buffer.from(bakeMaps(b, size).baseColor)),

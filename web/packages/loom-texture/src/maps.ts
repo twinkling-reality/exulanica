@@ -52,14 +52,14 @@ export function sampleFields(def: TextureSetDefinition, options: SampleOptions =
     metalness: new Uint16Array(count),
     occlusion: new Uint16Array(count),
   };
-  const recipe = def.recipe();
+  const pattern = def.pattern();
   const sample = newSample();
   const columns = new Float64Array(width);
   for (let i = 0; i < width; i += 1) columns[i] = texelToTile(i + offsetU, width);
   for (let j = 0; j < height; j += 1) {
     const y = texelToTile(j + offsetV, height);
     for (let i = 0; i < width; i += 1) {
-      recipe(columns[i]!, y, sample);
+      pattern(columns[i]!, y, sample);
       const index = j * width + i;
       // Typed arrays wrap out-of-range values modulo 2^16, so every write is clamped first.
       fields.relief[index] = channel(sample.height);

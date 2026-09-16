@@ -86,7 +86,7 @@ describe('every set tiles by construction', () => {
     const broken: TextureSetDefinition = {
       ...CATALOG[0]!,
       setId: 'test.broken',
-      recipe: () => (x, y, out) => {
+      pattern: () => (x, y, out) => {
         out.height = floorMod(x + y, 300007) >> 4;
         out.red = 0;
         out.green = 0;

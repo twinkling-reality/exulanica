@@ -1,4 +1,4 @@
-import type { Recipe } from './sample.js';
+import type { Pattern } from './sample.js';
 
 /**
  * One texture set, as the catalog states it before anything is baked.
@@ -41,8 +41,8 @@ export interface TextureSetDefinition {
   readonly cavity: CavitySpec;
   /** What the recipe reads, stated in the header so a reader can see the module it was built on. */
   readonly parameters: Readonly<Record<string, number | string>>;
-  /** Build the recipe. Called once per bake, so a recipe may hold scratch state. */
-  readonly recipe: () => Recipe;
+  /** Build the pattern. Called once per bake, so a pattern may hold scratch state. */
+  readonly pattern: () => Pattern;
 }
 
 export interface CavitySpec {

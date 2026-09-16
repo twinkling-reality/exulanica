@@ -1,0 +1,66 @@
+{
+  "set_id": "cc0.carriageway-asphalt",
+  "version": 1,
+  "title": "Carriageway asphalt",
+  "summary": "Worn asphalt with exposed coarse aggregate, oil staining and sparse cracking.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.asphalt",
+      "version": 1
+    },
+    "seed": 2026091606,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 2000,
+      "v": 2000
+    },
+    "parameters": {
+      "binder_colour": [58, 58, 60],
+      "worn_binder_colour": [72, 72, 73],
+      "oil_colour": [36, 36, 39],
+      "crack_colour": [30, 30, 32],
+      "sand_light_colour": [132, 130, 126],
+      "sand_dark_colour": [74, 73, 72],
+      "aggregate_palette": [
+        [128, 126, 122],
+        [112, 112, 114],
+        [148, 142, 134],
+        [96, 94, 92],
+        [138, 136, 138],
+        [120, 114, 106]
+      ],
+      "coarse_cells_per_tile": 180,
+      "fine_cells_per_tile": 520,
+      "crack_cells_per_tile": 6,
+      "binder_height_mm_1024ths": 1536,
+      "binder_waviness_mm_1024ths": 420,
+      "coarse_stone_height_mm_1024ths": 2000,
+      "wear_stone_lift_mm_1024ths": 400,
+      "fine_stone_height_mm_1024ths": 700,
+      "crack_depth_mm": 2,
+      "crack_width_q16": 900,
+      "crack_threshold_q16": 40000,
+      "coarse_present_percent": 86,
+      "fine_mix_percent": 60,
+      "aggregate_brightness_spread_q16": 6500,
+      "exposure_base_permille": 560,
+      "exposure_wear_percent": 34,
+      "grain_spread_q16": 3000,
+      "oil_threshold_q16": 43500,
+      "oil_percent": 45,
+      "binder_roughness_permille": 920,
+      "stone_roughness_permille": 780,
+      "oil_roughness_permille": 640,
+      "crack_roughness_percent": 3,
+      "height_range_mm": 6,
+      "occlusion_radius_mm": 5,
+      "occlusion_depth_mm": 2,
+      "occlusion_strength_permille": 500
+    }
+  }
+}

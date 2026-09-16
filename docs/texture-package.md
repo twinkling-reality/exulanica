@@ -1,7 +1,7 @@
 # Texture package
 
-Status: IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065 and
-the backend resolver. The appearance of these sets in the rendered product is UNVERIFIED: no
+Status: IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
+backend resolver, and the recipes, makers and object store the sets are baked from. The appearance of these sets in the rendered product is UNVERIFIED: no
 renderer draws them yet, and that check belongs to the corridor lane, against the gate lane's
 Flatiron baseline.
 
@@ -14,8 +14,10 @@ verbatim:
 > content-addressed, digest-pinned by a migration exactly as `assets.py` pins GLB bytes, and baked
 > in milestone 1."
 
-The implementation is `web/packages/loom-texture` (the offline bake), `assets/textures/` (the
-published sets), `exulanica/world/texture_assets.py` (the backend reader and resolver) and
+The implementation is `web/packages/loom-texture` (the makers and the offline bake), its `library/`
+(one recipe file per published set), `assets/textures/` (the published sets, objects and indexes),
+`exulanica/materials/` (the backend's checks on recipes, manifests and the catalog),
+`exulanica/world/texture_assets.py` (the backend reader and resolver) and
 `exulanica/migrations/0065_texture_set_digests.sql` (the pins).
 
 ## 1. The sets
@@ -40,8 +42,9 @@ Every set is CC0-1.0. The dedication is its own blob, referenced by digest
 hashed integers by source in this repository, with no photograph, scan, sample library or model
 output anywhere near the bake, which is what makes CC0 a claim this project can make.
 
-The module each set is built on is stated in its header under `parameters`, in whole millimetres
-(or 1/1024 mm where a half-module offset is not a whole millimetre):
+Each set's full recipe is `web/packages/loom-texture/library/<set_id>.json` (section 2). The module
+each set is built on is also stated in its header under `parameters`, in whole millimetres (or 1/1024
+mm where a half-module offset is not a whole millimetre):
 
 - **Brick, running bond.** 215 x 65 mm faces with 10 mm head and bed joints make a 225 x 75 mm
   module. Alternate courses are offset by half a module (112.5 mm). The 1800 mm tile holds exactly
@@ -68,7 +71,75 @@ The module each set is built on is stated in its header under `parameters`, in w
 The corridor needs six. Which six is the grammar's decision, so everything below that depends on
 the choice charges the six most expensive sets, which bounds any six the grammar picks.
 
-## 2. The container, and why PNG is not digested
+## 2. Recipes, makers and the object store
+
+A set is a MAKER applied to a RECIPE, and everything but the maker's code is a data object.
+
+- **A maker** is versioned code in `web/packages/loom-texture/src/makers/` (`loom.brick`,
+  `loom.ashlar`, `loom.render`, `loom.concrete`, `loom.metal`, `loom.asphalt`, `loom.paving`,
+  `loom.kerb`, all version 1) with a **manifest** (`exulanica.texture-maker/v1`): every control's
+  key, kind (`integer`, `integer_list`, `choice`, `srgb`, `srgb_list`), unit, range, group, label and
+  explanation, and the rules across controls a recipe must satisfy (`equal`, `less`,
+  `less_or_equal`, `even`, each optionally applying only when a choice has a given value, over sums
+  and products of controls, extents and constants). Every manifest declares the four controls the
+  bake reads itself: `height_range_mm` and the three occlusion controls. What a maker leaves fixed
+  (its noise scales and thresholds) is fixed by its version; what a person would name (a module, a
+  joint, a colour, how much wear) is a control.
+- **A recipe** (`exulanica.texture-recipe/v1`) names a maker and version and states every control,
+  the seed, the resolution (a power of two from 16 to 1024 on each axis) and the extent. Nothing is
+  left to a default, so a recipe means the same thing even if a maker's default changes. A recipe
+  is refused if a control is missing, undeclared, of the wrong kind or out of range, if a rule
+  fails, if a rule's arithmetic leaves the range doubles hold exactly, or if its height range times
+  its texels on an axis exceeds 32 times that axis in millimetres, past which the normal derivation
+  would stop being exact.
+- **A library entry** (`exulanica.texture-library-entry/v1`) publishes a recipe as a named,
+  versioned set with a title, a summary and a licence. The source of each is one file in
+  `web/packages/loom-texture/library/`, the recipe written out in full and kept in one layout that
+  `test/published.test.ts` enforces.
+- **A bake receipt** (`exulanica.texture-bake-receipt/v1`) records one bake: the maker manifest,
+  entry, recipe and licence digests that went in, the bake pipeline (`exulanica.texture-bake/v1`),
+  and the container digest and length that came out.
+
+Every one of these is canonical JSON under `assets/textures/objects/<sha256>.json`, named by the
+digest of its bytes, and they refer to each other only by digest, so any of them can be copied into
+another content-addressed store and still resolve. `assets/textures/catalog.json`
+(`exulanica.texture-catalog/v1`) indexes them: the digest of the manifest it accounts for, every
+maker, and one row per set naming its receipt. `manifest.json` is unchanged, byte for byte, and
+still the contract with the grammar lane (section 8).
+
+The eight published recipes are each maker's defaults on the frame the set was first baked on, and
+rebaking them reproduced every one of the eleven files published before recipes existed, byte for
+byte: no set's version changed.
+
+**Two languages, one check.** `web/packages/loom-texture/src/recipe.ts` and
+`exulanica/materials/recipes.py` both run every case in
+`web/packages/loom-texture/test/recipe-cases.json` (50 recipe cases and 39 manifest cases, each
+starting from a published object and listing the exact problems expected, in order), so the baker
+and the backend refuse the same objects with the same explanation. A person's variant, a recipe the
+Companion proposes, and a recipe a model fits later are all this kind of object, and all of them
+pass this check before anything stores or bakes them. `MaterialCatalog.recipe_problems` in
+`exulanica/materials/catalog.py` is that check against whichever published maker a recipe names.
+
+**Whatever a maker accepts, it can bake.** `test/makers.test.ts` pushes every control of every
+maker to each end of its range, and every choice to each option, one at a time on a small frame,
+repairing an extent a module rule pins. Every variant the check accepts must bake without
+throwing, encode a canonical header and tile exactly. When this was written that was 507 of the 543
+variants tried; each of the other 36 is refused by a rule, and the test lists them when it fails.
+
+**What `exulanica.materials` may not do.** It sits below the evidence spine in the layers contract,
+and a forbidden contract in `pyproject.toml` keeps it from importing the evidence address, the
+store, the database, the ingest pipeline, identity, selection, reconstruction, psycopg, torch,
+numpy, cv2 or pycolmap. A recipe is invented even when it is fitted to a photograph, and a module
+that cannot name an evidence address cannot make one pass for an observation.
+
+**What comes next, not built here.** Workspace-scoped recipes and bakes (a person's variants) get
+their own migration with forced row-level security and tombstone invalidation. A recipe derived
+from a photograph is an inert object that records the consent it depends on and is invalidated
+when its source is tombstoned; no model infers a recipe from a personal photograph. Any learned
+model that proposes recipes runs behind a process boundary, as the reconstruction container does,
+and every proposal passes the check above.
+
+## 3. The container, and why PNG is not digested
 
 `.ltex` is the shape `web/packages/scene-synth/src/format/opm.ts` proved out: four magic bytes
 (`LTX1`), a little-endian uint32 header length, the header as canonical JSON, space padding to a
@@ -92,7 +163,7 @@ Texels are interleaved within a map, rows top to bottom, and row 0, column 0 is 
 uv (0, 0). Every row is 3072 or 1024 bytes, both multiples of 4, so a map is a `subarray` a
 renderer can hand to `texImage2D` under the default unpack alignment. The header also carries the
 set id, version, seed, title, summary, the licence id and digest, the resolution, the extent, the
-placement (section 5), the height range, the cavity-occlusion parameters, the recipe's stated
+placement (section 6), the height range, the cavity-occlusion parameters, the recipe's stated
 module, and `"truth": "invented"`. Every number in it is an integer.
 
 **Why PNG is not digested.** A PNG's bytes are whatever its deflate implementation emitted, so a
@@ -101,12 +172,13 @@ different zlib build would hash differently, and the migration naming those byte
 stop being reproducible from source. The container stores texels raw, so its bytes are a function
 of the texels and the header alone. PNG is still written, by `loom-texture/src/inspect/`, as a
 picture for people; the CLI refuses to write it inside the output directory, and nothing pins or
-digests it. Transport compression (section 6) is the server's business and does not touch a
+digests it. Transport compression (section 7) is the server's business and does not touch a
 digest.
 
-## 3. Determinism
+## 4. Determinism
 
-Every file the bake writes is a function of each set's seed, id, resolution and version.
+Every file the bake writes is a function of the library files and the source: each set's recipe,
+id and version, and the makers' code.
 
 - **Hashes, not a stateful generator.** Every stochastic decision is a hash of integer lattice
   coordinates and a seed, for the reason `scene-synth/src/rng.ts` gives: output is identical across
@@ -136,7 +208,7 @@ run and against the committed `assets/textures/`: 0 differ. The package's
 `test/published.test.ts` rebakes the whole catalog on every test run and compares each committed
 file byte for byte.
 
-## 4. Tiling
+## 5. Tiling
 
 **By construction.** A recipe receives the unwrapped position of each texel, in micro-units where
 one tile is 2^20 along each axis. Every lattice is reduced modulo an integer number of cells per
@@ -163,7 +235,7 @@ the exact guarantee is the construction test above.
 show every set as a 2 x 2 tiling and at full scale around the corner where four tiles meet. They
 were inspected during the bake. They are inspection pictures lit by a fixed light, not the product.
 
-## 5. Physical extent and UV scale
+## 6. Physical extent and UV scale
 
 `extent_mm` is the physical size one tile covers, and it is the direct answer to "no UV channel, no
 texture field in the schema": a surface can carry a UV scale derived from a real dimension instead
@@ -177,7 +249,7 @@ of a number somebody picked. A wall `w` mm wide and `h` mm tall repeats a vertic
   This is also the direction the brick and ashlar courses and the concrete tie stains assume.
 - `horizontal`: u runs along the carriageway, footway or kerb, and v across it.
 
-## 6. Budgets
+## 7. Budgets
 
 **Decoded texture, the envelope this package must fit.** Melbourne was rejected on looks while
 passing every mechanical budget, with 168 MB of decoded texture for 127 m of one street. Read as
@@ -211,7 +283,7 @@ encoder whose version becomes a digest input, the same problem as zlib, and is n
 compressed object store, against a pack of about 89 MiB before this package. Every rebake of a set
 adds its bytes to history for good.
 
-## 7. The manifest, the contract with the grammar lane
+## 8. The manifest, the contract with the grammar lane
 
 `assets/textures/manifest.json` is the single index both `exulanica/world/texture_assets.py` and
 the grammar's catalog loader read. It is canonical JSON with no trailing newline, an object
@@ -237,11 +309,11 @@ set's bytes must bump its version, and the pins in migration 0065 are what catch
 The grammar lane's reader, `exulanica.grammar.textures.read_texture_manifest`, was run from its
 worktree against this manifest and accepted all eight sets.
 
-## 8. The backend reader and resolver
+## 9. The backend reader and resolver
 
 `exulanica/world/texture_assets.py` sits in the `world` layer and imports only
-`exulanica.canonical`, `exulanica.errors` and `exulanica.store`, which the layers contract already
-permits.
+`exulanica.canonical`, `exulanica.errors`, `exulanica.materials` and `exulanica.store`, which the
+layers contract permits.
 
 - `load_texture_catalog(directory=TEXTURE_DIRECTORY) -> TextureCatalog` reads the manifest, refuses
   it unless it is canonical, integer-only, sorted and in the agreed shape, recomputes every blob's
@@ -257,9 +329,19 @@ permits.
   `tests/test_texture_sets.py` checks all of this, including by reading the function's syntax tree.
 - A set id is a string matching `^[a-z][a-z0-9.-]*$`, exactly `asset_key` in migration 0042, by
   convention `<licence>.<surface>`, for example `cc0.brick-running-bond`.
+- `load_texture_catalog` also requires `catalog.json` and verifies it through
+  `exulanica.materials`: every object hashes to its name and is canonical; the catalog describes
+  exactly this manifest; every maker manifest is well formed and every recipe valid for its maker;
+  every receipt agrees with the manifest about the bytes and the licence and with its entry about
+  the recipe. Each container header must then agree with its recipe and maker: title, summary,
+  seed, resolution, extent, family, surface, height range and occlusion. What the backend cannot
+  check is that the maker, run on the recipe, produces these bytes, because the maker is
+  TypeScript; `test/published.test.ts` rebakes every set and compares byte for byte, which is what
+  catches a recipe edited in a way no header shows, such as a colour.
 - `PinnedTextureSet` carries the manifest fields, `extent_u_mm` and `extent_v_mm`, the header's
-  title, summary, seed and height range, and `pin()`, which returns the three replay fields.
-  `read_bytes()` re-verifies the digest on every read.
+  title, summary, seed and height range, the maker id and version, the recipe and receipt digests,
+  and `pin()`, which returns the three replay fields. `read_bytes()` re-verifies the digest on every
+  read. `TextureCatalog.materials` is the verified material catalog.
 - `seed_texture_sets(store, catalog=None)` writes every pinned set and the dedication into the
   content-addressed store and checks the store's digest against each pin. It is idempotent.
 
@@ -271,7 +353,7 @@ The grammar lane's layering puts `exulanica.grammar` below `world`, so its mater
 import this module; it reads the same manifest through its own reader and refuses an unpublished id
 with its own schema error. This resolver is for the layers above `world`.
 
-## 9. Migration 0065
+## 10. Migration 0065
 
 `0065_texture_set_digests.sql` creates `world_texture_set`, keyed by `(set_id, version)`, with
 `content_sha256` unique, the check constraints 0042 uses (the id pattern, 64 lowercase hex
@@ -293,9 +375,11 @@ The registry row is the reviewed decision; the bytes live in the content-address
 reports a texture unavailable when the row is here and the bytes are not, and never substitutes a
 default map or a flat colour.
 
-## 10. Rebaking a set
+## 11. Rebaking a set
 
-1. Change the recipe, and bump that set's version in `web/packages/loom-texture/src/catalog.ts`.
+1. Change the set's recipe in `web/packages/loom-texture/library/<set_id>.json` and bump its
+   `version` in the same file. A change to a maker's code that alters any texel for an existing
+   recipe is a new maker version, and a new version of every set that uses it.
 2. From `web/`, run `pnpm texture --out ../assets/textures` (or
    `npx tsx packages/loom-texture/src/cli.ts --out ../assets/textures` until the script is
    registered). The directory is rewritten and superseded blobs are removed; they stay in history.
@@ -304,11 +388,11 @@ default map or a flat colour.
 4. Update the table in section 1, run both suites, and bake twice into scratch directories and
    compare them with `cmp` before trusting the digest.
 
-`web/packages/loom-texture/test/published.test.ts` fails if the committed files are not what the
-source bakes, and `tests/test_texture_set_migration.py` fails if the manifest and the pinned rows
-disagree.
+`web/packages/loom-texture/test/published.test.ts` fails if the committed files, objects and indexes
+included, are not what the source bakes, and `tests/test_texture_set_migration.py` fails if the
+manifest and the pinned rows disagree.
 
-## 11. Follow-ups
+## 12. Follow-ups
 
 - **`world_texture_set` in `READ_ONLY_TABLES` (deferred, blocked on `exulanica/db/roles.py`).**
   That file was closed to every lane when 0065 was written. `provision_runtime_role` grants insert
@@ -317,24 +401,24 @@ disagree.
   INSERT and UPDATE on the catalog. The migration's trigger refuses both in the meantime, and
   `tests/test_texture_set_migration.py` measures the grant and the refusal and asserts the table is
   still absent from the list, so that test fails, and should be updated, on the day it is added.
-- **`world_texture_set` in `GLOBAL_TABLES` in `exulanica/orchestration/judge_seed.py`.**
-  `classify_tables` refuses any table with no `workspace_id` that no bucket names, so every
-  judge-seed export refuses on a schema with 0065 until the table is classified as
-  migration-provided reviewed texture sets.
-- **`world_texture_set` in `_PRESERVED_TABLES` in `tests/conftest.py`.** The per-test truncation
-  empties every other table, so any test on the session spine schema that reads the catalog after
-  another test has truncated it would find it empty.
-- **`docs/all-documents.md`** is generated and must be regenerated for this document.
+- **Done in this lane:** `world_texture_set` is classified in `GLOBAL_TABLES` in
+  `exulanica/orchestration/judge_seed.py` as migration-provided reviewed texture set pins, so a
+  judge-seed export no longer refuses a schema with 0065; it is in `_PRESERVED_TABLES` in
+  `tests/conftest.py`, so the per-test truncation leaves the catalog alone; and
+  `docs/all-documents.md` is regenerated with this document.
 - **Registration in `web/`.** The `web/tsconfig.json` reference and the `web/pnpm-lock.yaml`
   importer for this package are on the fabrication-delete lane's branch; the `texture` script in
   `web/package.json` and the two dependency-cruiser rules (nothing that ships to a browser imports
   loom-texture; loom-texture reaches no workspace package but `atlas-core`) are requested from it.
 
-## 12. What is not verified
+## 13. What is not verified
 
 - **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.
   The contact sheet was inspected, and it shows the stored maps under a fixed light, which is
   evidence about the bytes and not about the product. The corridor lane verifies appearance against
   the gate lane's Flatiron baseline.
-- The transfer figure in section 6 is gzip over the files, not a measured browser load.
-- The UV derivation in section 5 is arithmetic on stated extents; no surface consumes it yet.
+- The transfer figure in section 7 is gzip over the files, not a measured browser load.
+- That a recipe, run through its maker, produces a set's bytes is checked by the package's suite,
+  which runs the TypeScript maker. The backend verifies every binding it can see without the maker,
+  and no more.
+- The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it yet.

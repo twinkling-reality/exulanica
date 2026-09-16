@@ -386,11 +386,17 @@ layers = [
   "reconstruction | capture",
   "evidence | migrations",
   # The generator system sits BELOW the evidence spine, one notch stricter than reconstruction:
-  # it may import only what is under it, which is canonical JSON, the error types and the
-  # environment reader. A generated world is a pure function of a seed, a set of grammar
+  # it may import only what is under it, which is material objects, canonical JSON, the error
+  # types and the environment reader. A generated world is a pure function of a seed, a set of grammar
   # versions and a catalog, and none of those needs to know what a photograph is. Placing it
   # here is what makes the forbidden contract below a rule rather than a habit.
   "grammar",
+  # Materials as data: maker manifests, recipes, library entries, bake receipts, and the checks
+  # that decide whether a recipe means something a maker can bake. It sits BELOW the evidence
+  # spine, for the reason the forbidden contract on it gives: a recipe is invented, including one
+  # a person or a model derives from a photograph, and a module that cannot import an evidence
+  # address cannot make a recipe pass for an observation. Everything above may read it.
+  "materials",
   "canonical",
   # The corpus generator sits at the bottom and depends on nothing in this package at all: it
   # draws pictures with Pillow and knows nothing about evidence, storage or the database. Listed
@@ -499,6 +505,43 @@ forbidden_modules = [
   "exulanica.ingest",
   "exulanica.migrations",
   "exulanica.grammar",
+  "torch",
+  "numpy",
+  "cv2",
+  "pycolmap",
+]
+
+[[tool.importlinter.contracts]]
+# Material objects are data, checked anywhere, before anything expensive happens to them.
+#
+# A recipe, a maker manifest and a bake receipt are invented content, even when a recipe is later
+# fitted to a photograph, so `exulanica.materials` cannot import the module that defines an
+# evidence address, cannot write a blob a span could point at, cannot open the database, cannot
+# reach the pipeline that admits a photograph or the verdict on one, and cannot name a person. It also cannot import
+# the numeric or learning stack: a learned recipe model runs behind its own process boundary, and
+# the checks its proposals pass must stay importable in a process that has none of it.
+#
+# Note what is deliberately NOT claimed here. Every internal module named below already sits
+# above `materials` in the layer list, so the layers contract alone refuses those imports today;
+# this contract is the one that still holds if the layer moves, and it says why. The external
+# names are only checkable while something in this package graph imports them; if the last
+# importer of one goes, this contract errors on a missing module and the name should be removed
+# here rather than the check weakened. And `exulanica.canonical` stays importable, because a
+# digest is not a citation.
+name = "Material objects cannot name a citation, open a database, or load a model"
+type = "forbidden"
+source_modules = ["exulanica.materials"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+  "exulanica.reconstruction",
+  "exulanica.capture",
   "torch",
   "numpy",
   "cv2",

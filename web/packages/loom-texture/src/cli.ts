@@ -7,8 +7,10 @@ import {
   decodedBytes,
 } from './budget.js';
 import { CATALOG } from './catalog.js';
+import { sha256Hex } from './digest.js';
 import { contactSheet, litPreview } from './inspect/contact-sheet.js';
 import { encodePng } from './inspect/png.js';
+import { CATALOG_FILE, OBJECT_DIRECTORY } from './objects.js';
 import { ATTRIBUTES_FILE, BLOB_DIRECTORY, MANIFEST_FILE, publish } from './publish.js';
 
 /**
@@ -17,15 +19,17 @@ import { ATTRIBUTES_FILE, BLOB_DIRECTORY, MANIFEST_FILE, publish } from './publi
  *   pnpm texture --out ../assets/textures
  *   pnpm texture --out /tmp/bake-a --inspect /tmp/look
  *
- * `--out` receives the content-addressed sets, the licence blob, `manifest.json` and a
- * `.gitattributes` that keeps checkouts from converting any of them, and nothing else. Every byte
- * written there is a function of each set's seed, id, resolution and version. `--inspect`
- * receives PNG pictures for people; it must lie outside `--out`, because a PNG's bytes depend on
- * the zlib build and nothing in the output directory may.
+ * `--out` receives the content-addressed sets and licence blob, the content-addressed objects
+ * (maker manifests, recipes, library entries, bake receipts), `manifest.json`, `catalog.json`, and
+ * a `.gitattributes` that keeps checkouts from converting any of them, and nothing else. Every byte
+ * written there is a function of `library/` and the source. `--inspect` receives PNG pictures for
+ * people; it must lie outside `--out`, because a PNG's bytes depend on the zlib build and nothing
+ * in the output directory may.
  *
- * The output directory must be empty or hold only a previous bake. Blobs the new manifest no
- * longer names are removed, so the directory always holds exactly the published sets. A
- * superseded version stays retrievable from history and from any store it was seeded into.
+ * The output directory must be empty or hold only a previous bake. Blobs and objects the new
+ * publication no longer names are removed, so the directory always holds exactly what is
+ * published. A superseded version stays retrievable from history and from any store it was
+ * seeded into.
  */
 
 interface Args {
@@ -34,7 +38,12 @@ interface Args {
 }
 
 const USAGE = 'usage: texture --out DIR [--inspect DIR]\n';
-const BLOB_NAME = /^[0-9a-f]{64}\.(ltex|txt)$/;
+/** The directories a bake writes, and the only names each may hold. */
+const CONTENT: ReadonlyMap<string, RegExp> = new Map([
+  [BLOB_DIRECTORY, /^[0-9a-f]{64}\.(ltex|txt)$/],
+  [OBJECT_DIRECTORY, /^[0-9a-f]{64}\.json$/],
+]);
+const INDEXES = new Set([MANIFEST_FILE, CATALOG_FILE, ATTRIBUTES_FILE]);
 
 function parseArgs(argv: readonly string[]): Args {
   let out: string | undefined;
@@ -61,18 +70,18 @@ const within = (parent: string, child: string): boolean => {
 function checkOutput(out: string): void {
   if (!existsSync(out)) return;
   for (const name of readdirSync(out)) {
-    if ((name === MANIFEST_FILE || name === ATTRIBUTES_FILE) && statSync(join(out, name)).isFile()) {
-      continue;
-    }
-    if (name === BLOB_DIRECTORY && statSync(join(out, name)).isDirectory()) {
-      for (const blob of readdirSync(join(out, name))) {
-        if (!BLOB_NAME.test(blob) || !statSync(join(out, name, blob)).isFile()) {
-          throw new Error(`${join(out, name, blob)} is not something a bake writes; refusing`);
+    const path = join(out, name);
+    if (INDEXES.has(name) && statSync(path).isFile()) continue;
+    const pattern = CONTENT.get(name);
+    if (pattern !== undefined && statSync(path).isDirectory()) {
+      for (const file of readdirSync(path)) {
+        if (!pattern.test(file) || !statSync(join(path, file)).isFile()) {
+          throw new Error(`${join(path, file)} is not something a bake writes; refusing`);
         }
       }
       continue;
     }
-    throw new Error(`${join(out, name)} is not something a bake writes; refusing`);
+    throw new Error(`${path} is not something a bake writes; refusing`);
   }
 }
 
@@ -84,17 +93,20 @@ function main(): void {
     throw new Error('--inspect must lie outside --out: pictures are never part of a bake');
   }
   checkOutput(args.out);
-  const publication = publish(CATALOG);
+  const publication = publish();
 
-  mkdirSync(join(args.out, BLOB_DIRECTORY), { recursive: true });
-  // Blobs first and the manifest last, so an interrupted bake never names bytes it did not write.
+  for (const directory of CONTENT.keys()) mkdirSync(join(args.out, directory), { recursive: true });
+  // Content first, then the manifest, and the catalog that names the manifest last, so an
+  // interrupted bake never leaves an index naming bytes it did not write.
   for (const [path, bytes] of publication.files) {
-    if (path !== MANIFEST_FILE) writeFileSync(join(args.out, path), bytes);
+    if (path !== MANIFEST_FILE && path !== CATALOG_FILE) writeFileSync(join(args.out, path), bytes);
   }
   writeFileSync(join(args.out, MANIFEST_FILE), publication.manifest);
-  const kept = new Set([...publication.files.keys()].map((path) => path.split('/').pop()));
-  for (const blob of readdirSync(join(args.out, BLOB_DIRECTORY))) {
-    if (!kept.has(blob)) rmSync(join(args.out, BLOB_DIRECTORY, blob));
+  writeFileSync(join(args.out, CATALOG_FILE), publication.catalog);
+  for (const directory of CONTENT.keys()) {
+    for (const file of readdirSync(join(args.out, directory))) {
+      if (!publication.files.has(`${directory}/${file}`)) rmSync(join(args.out, directory, file));
+    }
   }
 
   process.stdout.write('set id                      v  texels     extent mm    bytes     sha256\n');
@@ -111,6 +123,7 @@ function main(): void {
   const mipped = corridorDecodedBytes(CATALOG, true);
   process.stdout.write(
     `\nlicence ${publication.licence.sha256}\n`
+      + `catalog ${sha256Hex(publication.catalog)}, ${publication.objects.size} objects\n`
       + `decoded, the ${CORRIDOR_SET_COUNT} costliest sets as RGBA8: ${plain} bytes (${mib(plain)}), `
       + `${mipped} bytes with mips (${mib(mipped)}); envelope ${ACCEPTED_DECODED_ENVELOPE_BYTES} bytes\n`
       + `decoded, all ${CATALOG.length} sets with mips: `

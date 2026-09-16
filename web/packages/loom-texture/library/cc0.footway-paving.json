@@ -1,0 +1,68 @@
+{
+  "set_id": "cc0.footway-paving",
+  "version": 1,
+  "title": "Footway paving",
+  "summary": "Precast concrete flags, 600 x 600 mm, stack bond, 6 mm grit joints, gum spotted.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.paving",
+      "version": 1
+    },
+    "seed": 2026091607,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 1800,
+      "v": 1800
+    },
+    "parameters": {
+      "bond": "stack",
+      "flag_module_mm": 600,
+      "joint_mm": 6,
+      "flags_per_row": 3,
+      "rows": 3,
+      "flag_palette": [
+        [172, 168, 160],
+        [164, 162, 158],
+        [180, 176, 166],
+        [158, 154, 148]
+      ],
+      "joint_grit_colour": [84, 80, 74],
+      "aggregate_dark_colour": [132, 128, 122],
+      "aggregate_light_colour": [198, 194, 186],
+      "gum_colour": [92, 90, 88],
+      "stain_colour": [118, 112, 104],
+      "face_height_mm": 6,
+      "joint_fill_height_mm_1024ths": 2560,
+      "chamfer_mm": 3,
+      "chip_depth_max_mm": 2,
+      "lippage_max_mm_1024ths": 800,
+      "face_texture_mm_1024ths": 150,
+      "aggregate_relief_mm_1024ths": 200,
+      "gum_relief_mm_1024ths": 180,
+      "joint_grain_mm_1024ths": 300,
+      "aggregate_percent": 55,
+      "aggregate_mix_percent": 60,
+      "gum_permille": 16,
+      "gum_shade_percent": 55,
+      "gum_shade_spread_percent": 35,
+      "flag_brightness_spread_q16": 3300,
+      "face_texture_spread_q16": 1800,
+      "joint_grit_spread_q16": 5000,
+      "flag_roughness_permille": 900,
+      "gum_roughness_permille": 560,
+      "face_roughness_spread_q16": 2000,
+      "joint_roughness_permille": 960,
+      "stain_percent": 20,
+      "chamfer_darkening_percent": 6,
+      "height_range_mm": 8,
+      "occlusion_radius_mm": 8,
+      "occlusion_depth_mm": 3,
+      "occlusion_strength_permille": 500
+    }
+  }
+}

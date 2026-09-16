@@ -62,7 +62,7 @@ How the system works now. Edited as the system changes.
 - [security-floor](security-floor.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
-- [texture-package](texture-package.md) : IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065 and
+- [texture-package](texture-package.md) : IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
 - [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0

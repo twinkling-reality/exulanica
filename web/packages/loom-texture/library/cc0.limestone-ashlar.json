@@ -1,0 +1,70 @@
+{
+  "set_id": "cc0.limestone-ashlar",
+  "version": 1,
+  "title": "Limestone ashlar",
+  "summary": "Buff limestone blocks on a 600 x 300 mm module, half bond, with 5 mm lime joints.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.ashlar",
+      "version": 1
+    },
+    "seed": 2026091602,
+    "resolution": {
+      "width": 1024,
+      "height": 1024
+    },
+    "extent_mm": {
+      "u": 2400,
+      "v": 2400
+    },
+    "parameters": {
+      "bond": "half",
+      "module_length_mm": 600,
+      "course_height_mm": 300,
+      "head_joint_mm": 5,
+      "bed_joint_mm": 5,
+      "units_per_course": 4,
+      "courses": 8,
+      "palette": [
+        [198, 188, 166],
+        [192, 183, 163],
+        [203, 194, 172],
+        [189, 182, 165],
+        [196, 185, 161]
+      ],
+      "mortar_colour": [204, 198, 184],
+      "shell_light_colour": [224, 216, 198],
+      "shell_dark_colour": [150, 142, 128],
+      "speck_light_colour": [214, 206, 188],
+      "speck_dark_colour": [168, 160, 144],
+      "face_height_mm": 6,
+      "joint_recess_mm": 3,
+      "arris_mm": 2,
+      "chip_depth_max_mm": 3,
+      "tooling_mm_1024ths": 150,
+      "face_grain_mm_1024ths": 100,
+      "face_waviness_mm_1024ths": 300,
+      "joint_grain_mm_1024ths": 120,
+      "block_brightness_spread_q16": 1900,
+      "bedding_spread_q16": 1700,
+      "cloud_spread_q16": 3000,
+      "grain_spread_q16": 1600,
+      "speck_light_percent": 17,
+      "speck_dark_percent": 17,
+      "speck_strength_percent": 55,
+      "shell_light_percent": 9,
+      "shell_dark_percent": 7,
+      "mortar_grain_spread_q16": 3000,
+      "stone_roughness_permille": 800,
+      "mortar_roughness_permille": 920,
+      "dirt_percent": 8,
+      "low_dirt_percent": 5,
+      "height_range_mm": 8,
+      "occlusion_radius_mm": 10,
+      "occlusion_depth_mm": 3,
+      "occlusion_strength_permille": 450
+    }
+  }
+}

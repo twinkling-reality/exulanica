@@ -1,0 +1,620 @@
+{
+  "about": "Cases both validators run: test/recipe.test.ts here and tests/test_material_objects.py in the backend. Each case starts from a published object, applies its changes in order, and must produce exactly the listed problems in the listed order. A recipe case starts from the recipe a published set was baked from and is checked against that set's maker, after any manifest_changes; a manifest case starts from a published maker manifest. A change sets the value at a path, where an index equal to a list's length appends, or removes the key at a path; an empty path replaces the whole object. No number here is written with a fractional part of zero, because JavaScript reads 1.0 as an integer and Python does not.",
+  "recipes": [
+    {
+      "name": "a published recipe is valid",
+      "set": "cc0.brick-running-bond",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "every published recipe is valid: kerb",
+      "set": "cc0.kerb-stone",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "a recipe is an object",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": [], "value": [1, 2, 3]}],
+      "problems": ["a recipe has exactly profile, maker, seed, resolution, extent_mm, parameters"]
+    },
+    {
+      "name": "a recipe has no other top-level key",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["note"], "value": "hand made"}],
+      "problems": ["a recipe has exactly profile, maker, seed, resolution, extent_mm, parameters"]
+    },
+    {
+      "name": "a recipe states its profile",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["profile"], "value": "exulanica.texture-recipe/v2"}],
+      "problems": ["profile is exulanica.texture-recipe/v1"]
+    },
+    {
+      "name": "a recipe names its maker's exact version",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["maker", "version"], "value": 2}],
+      "problems": ["maker is loom.brick version 1"]
+    },
+    {
+      "name": "true is not version 1",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["maker", "version"], "value": true}],
+      "problems": ["maker is loom.brick version 1"]
+    },
+    {
+      "name": "a recipe for another maker is not a brick recipe",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["maker", "id"], "value": "loom.ashlar"}],
+      "problems": ["maker is loom.brick version 1"]
+    },
+    {
+      "name": "the maker reference has exactly id and version",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["maker", "digest"], "value": "0"}],
+      "problems": ["maker is loom.brick version 1"]
+    },
+    {
+      "name": "a seed is not negative",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["seed"], "value": -1}],
+      "problems": ["seed is an unsigned 32-bit integer"]
+    },
+    {
+      "name": "a seed fits in 32 bits",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["seed"], "value": 4294967296}],
+      "problems": ["seed is an unsigned 32-bit integer"]
+    },
+    {
+      "name": "the largest seed is allowed",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["seed"], "value": 4294967295}],
+      "problems": []
+    },
+    {
+      "name": "a seed is not a fraction",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["seed"], "value": 1.5}],
+      "problems": ["seed is an unsigned 32-bit integer"]
+    },
+    {
+      "name": "a resolution is a power of two",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["resolution", "width"], "value": 1000}],
+      "problems": ["resolution is a power of two from 16 to 1024 on each axis"]
+    },
+    {
+      "name": "a resolution stays inside the decoded budget",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["resolution", "height"], "value": 2048}],
+      "problems": ["resolution is a power of two from 16 to 1024 on each axis"]
+    },
+    {
+      "name": "a resolution is at least 16",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["resolution", "height"], "value": 8}],
+      "problems": ["resolution is a power of two from 16 to 1024 on each axis"]
+    },
+    {
+      "name": "a smaller power of two is a valid resolution",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["resolution", "width"], "value": 64}, {"path": ["resolution", "height"], "value": 16}],
+      "problems": []
+    },
+    {
+      "name": "an extent is a positive length",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["extent_mm", "u"], "value": 0}],
+      "problems": ["extent_mm is a whole-millimetre u and v from 1 to 100000"]
+    },
+    {
+      "name": "an extent has only u and v",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["extent_mm", "w"], "value": 5}],
+      "problems": ["extent_mm is a whole-millimetre u and v from 1 to 100000"]
+    },
+    {
+      "name": "parameters is an object",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters"], "value": []}],
+      "problems": ["parameters is an object"]
+    },
+    {
+      "name": "a recipe states every control",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "courses"], "remove": true}],
+      "problems": ["parameters: courses is missing; a recipe states every control"]
+    },
+    {
+      "name": "a recipe states nothing its maker does not declare, sorted",
+      "set": "cc0.brick-running-bond",
+      "changes": [
+        {"path": ["parameters", "zeta"], "value": 1},
+        {"path": ["parameters", "alpha"], "value": 1},
+        {"path": ["parameters", "caf\u00e9"], "value": 1}
+      ],
+      "problems": [
+        "parameters: a key that is not printable ASCII is not a control of loom.brick",
+        "parameters: alpha is not a control of loom.brick",
+        "parameters: zeta is not a control of loom.brick"
+      ]
+    },
+    {
+      "name": "an integer control stays in its range",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "pit_percent"], "value": 101}],
+      "problems": ["parameters: pit_percent is between 0 and 100"]
+    },
+    {
+      "name": "an integer control is not text",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "pit_percent"], "value": "22"}],
+      "problems": ["parameters: pit_percent is an integer"]
+    },
+    {
+      "name": "an integer control is not a boolean",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "pit_percent"], "value": true}],
+      "problems": ["parameters: pit_percent is an integer"]
+    },
+    {
+      "name": "an integer control is a safe integer",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "pit_percent"], "value": 1152921504606846976}],
+      "problems": ["parameters: pit_percent is an integer"]
+    },
+    {
+      "name": "a choice is one of its options",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "bond"], "value": "flemish"}],
+      "problems": ["parameters: bond is one of running, stack"]
+    },
+    {
+      "name": "a colour is three bytes",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "mortar_colour"], "value": [184, 176, 256]}],
+      "problems": ["parameters: mortar_colour is three bytes of sRGB"]
+    },
+    {
+      "name": "a colour has three channels",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "mortar_colour"], "value": [184, 176]}],
+      "problems": ["parameters: mortar_colour is three bytes of sRGB"]
+    },
+    {
+      "name": "a palette holds at least one colour",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "palette"], "value": []}],
+      "problems": ["parameters: palette holds 1 to 16 colours"]
+    },
+    {
+      "name": "a palette holds only colours",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "palette", 7], "value": [1, 2, -3]}],
+      "problems": ["parameters: palette holds only three-byte sRGB colours"]
+    },
+    {
+      "name": "a palette of one colour is valid",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "palette"], "value": [[150, 80, 60]]}],
+      "problems": []
+    },
+    {
+      "name": "an integer list holds its allowed count",
+      "set": "cc0.cast-concrete",
+      "changes": [{"path": ["parameters", "tie_u_mm"], "value": []}],
+      "problems": ["parameters: tie_u_mm holds 1 to 8 integers"]
+    },
+    {
+      "name": "an integer list holds integers in range",
+      "set": "cc0.cast-concrete",
+      "changes": [{"path": ["parameters", "tie_v_mm", 1], "value": 4001}],
+      "problems": ["parameters: tie_v_mm holds integers between 0 and 4000"]
+    },
+    {
+      "name": "an integer list is a list",
+      "set": "cc0.cast-concrete",
+      "changes": [{"path": ["parameters", "tie_v_mm"], "value": 149}],
+      "problems": ["parameters: tie_v_mm is a list of integers"]
+    },
+    {
+      "name": "shape problems are reported together, and before any constraint",
+      "set": "cc0.brick-running-bond",
+      "changes": [
+        {"path": ["profile"], "value": "texture"},
+        {"path": ["seed"], "value": "2026091601"},
+        {"path": ["parameters", "courses"], "value": 23},
+        {"path": ["parameters", "arris_mm"], "remove": true}
+      ],
+      "problems": [
+        "profile is exulanica.texture-recipe/v1",
+        "seed is an unsigned 32-bit integer",
+        "parameters: arris_mm is missing; a recipe states every control"
+      ]
+    },
+    {
+      "name": "the module must span the tile",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "unit_length_mm"], "value": 210}],
+      "problems": ["bricks per course times the brick-and-joint module must equal the tile width"]
+    },
+    {
+      "name": "a longer tile makes the same change valid",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "unit_length_mm"], "value": 210}, {"path": ["extent_mm", "u"], "value": 1760}],
+      "problems": []
+    },
+    {
+      "name": "running bond needs an even number of courses",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "courses"], "value": 25}, {"path": ["extent_mm", "v"], "value": 1875}],
+      "problems": ["running bond repeats every two courses, so the tile holds an even number"]
+    },
+    {
+      "name": "stack bond does not",
+      "set": "cc0.brick-running-bond",
+      "changes": [
+        {"path": ["parameters", "bond"], "value": "stack"},
+        {"path": ["parameters", "courses"], "value": 25},
+        {"path": ["extent_mm", "v"], "value": 1875}
+      ],
+      "problems": []
+    },
+    {
+      "name": "constraints are reported in manifest order",
+      "set": "cc0.brick-running-bond",
+      "changes": [
+        {"path": ["parameters", "courses"], "value": 23},
+        {"path": ["parameters", "joint_recess_mm"], "value": 11}
+      ],
+      "problems": [
+        "courses times the course-and-joint module must equal the tile height",
+        "running bond repeats every two courses, so the tile holds an even number",
+        "the mortar cannot sit below the bottom of the height range"
+      ]
+    },
+    {
+      "name": "the bake must be able to derive normals exactly",
+      "set": "cc0.brick-running-bond",
+      "changes": [{"path": ["parameters", "height_range_mm"], "value": 57}],
+      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, or the bake cannot derive normals exactly"]
+    },
+    {
+      "name": "the same height range is fine at a lower resolution",
+      "set": "cc0.brick-running-bond",
+      "changes": [
+        {"path": ["parameters", "height_range_mm"], "value": 57},
+        {"path": ["resolution", "width"], "value": 512},
+        {"path": ["resolution", "height"], "value": 512}
+      ],
+      "problems": []
+    },
+    {
+      "name": "the height rule is checked on the short axis too",
+      "set": "cc0.kerb-stone",
+      "changes": [{"path": ["resolution", "width"], "value": 512}, {"path": ["parameters", "height_range_mm"], "value": 57}],
+      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, or the bake cannot derive normals exactly"]
+    },
+    {
+      "name": "mineral shares cannot exceed every crystal",
+      "set": "cc0.kerb-stone",
+      "changes": [{"path": ["parameters", "quartz_percent"], "value": 40}],
+      "problems": ["the mineral shares cannot add up to more than every crystal"]
+    },
+    {
+      "name": "a kerb tile keeps its stated proportion",
+      "set": "cc0.kerb-stone",
+      "changes": [{"path": ["extent_mm", "v"], "value": 400}],
+      "problems": ["the tile is the stated number of times longer than it is wide"]
+    },
+    {
+      "name": "a stone cannot show through more than fully",
+      "set": "cc0.carriageway-asphalt",
+      "changes": [{"path": ["parameters", "exposure_wear_percent"], "value": 45}],
+      "problems": ["a stone cannot show through more than fully, even where the binder is most worn"]
+    },
+    {
+      "name": "running bond paving needs an even number of rows",
+      "set": "cc0.footway-paving",
+      "changes": [{"path": ["parameters", "bond"], "value": "running"}],
+      "problems": ["running bond repeats every two rows, so the tile holds an even number"]
+    },
+    {
+      "name": "constraint arithmetic outside the safe integer range is refused, not rounded",
+      "set": "cc0.storefront-metal",
+      "manifest_changes": [
+        {
+          "path": ["constraints", 0],
+          "value": {
+            "kind": "less",
+            "left": {"product": [{"constant": 4503599627370495}, {"param": "roughness_permille"}]},
+            "right": {"constant": 0},
+            "explanation": "an overflowing rule"
+          }
+        }
+      ],
+      "changes": [],
+      "problems": ["an overflowing rule (its arithmetic leaves the safe integer range)"]
+    },
+    {
+      "name": "constraint arithmetic just inside the safe integer range is exact",
+      "set": "cc0.storefront-metal",
+      "manifest_changes": [
+        {
+          "path": ["constraints", 0],
+          "value": {
+            "kind": "equal",
+            "left": {"sum": [{"constant": 9007199254740990}, {"constant": 1}]},
+            "right": {"constant": 9007199254740991},
+            "explanation": "an exact rule"
+          }
+        }
+      ],
+      "changes": [],
+      "problems": []
+    }
+  ],
+  "manifests": [
+    {
+      "name": "a published manifest is well formed",
+      "maker": "loom.brick",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "a manifest is an object with exactly its fields",
+      "maker": "loom.brick",
+      "changes": [{"path": ["description"], "value": "brick"}],
+      "problems": ["a maker manifest has exactly profile, maker_id, version, kind, family, surface, truth, controls, constraints"]
+    },
+    {
+      "name": "every header field is checked, in order",
+      "maker": "loom.brick",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v0"},
+        {"path": ["maker_id"], "value": "Loom.Brick"},
+        {"path": ["version"], "value": 0},
+        {"path": ["kind"], "value": "learned"},
+        {"path": ["family"], "value": "brick.clay"},
+        {"path": ["surface"], "value": "diagonal"},
+        {"path": ["truth"], "value": "observed"}
+      ],
+      "problems": [
+        "profile is exulanica.texture-maker/v1",
+        "maker_id is lowercase letters, digits, dots and hyphens, starting with a letter",
+        "version is a positive integer",
+        "kind is procedural",
+        "family is lowercase letters, digits and hyphens, starting with a letter",
+        "surface is one of vertical, horizontal",
+        "truth is invented"
+      ]
+    },
+    {
+      "name": "controls is a list",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls"], "value": {}}],
+      "problems": ["controls is a list"]
+    },
+    {
+      "name": "a control key is declared once",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 34], "value": {"key": "courses", "kind": "integer", "group": "module", "label": "Courses", "explanation": "Again.", "unit": "count", "minimum": 1, "maximum": 2, "default": 2}}],
+      "problems": ["controls[34]: courses is declared twice"]
+    },
+    {
+      "name": "a control is an object",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 2], "value": "unit_height_mm"}],
+      "problems": [
+        "controls[2]: a control is an object",
+        "constraints[1]: left: unit_height_mm is not an integer control of this maker"
+      ]
+    },
+    {
+      "name": "a control kind is one of five",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 0, "kind"], "value": "constructor"}],
+      "problems": [
+        "controls[0]: kind is one of integer, integer_list, choice, srgb, srgb_list",
+        "constraints[2]: when names a choice control of this maker"
+      ]
+    },
+    {
+      "name": "a control has exactly its kind's fields",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 8, "unit"], "value": "mm"}],
+      "problems": ["controls[8]: a control of kind srgb has exactly key, kind, group, label, explanation, default"]
+    },
+    {
+      "name": "a control key is lowercase",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "key"], "value": "PitPercent"}],
+      "problems": ["controls[19]: key is lowercase letters, digits and underscores, starting with a letter"]
+    },
+    {
+      "name": "a control group is one of seven",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "group"], "value": "misc"}],
+      "problems": ["controls[19]: group is one of colour, module, relief, wear, detail, finish, lighting"]
+    },
+    {
+      "name": "a control label is not blank",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "label"], "value": "   "}],
+      "problems": ["controls[19]: label and explanation are non-empty printable ASCII"]
+    },
+    {
+      "name": "a control explanation is printable ASCII",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "explanation"], "value": "It\u2019s how often a pit appears."}],
+      "problems": ["controls[19]: label and explanation are non-empty printable ASCII"]
+    },
+    {
+      "name": "a unit is one of seven",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "unit"], "value": "fraction"}],
+      "problems": ["controls[19]: unit is one of mm, mm_1024ths, q16, percent, permille, count, cells_per_tile"]
+    },
+    {
+      "name": "a range is minimum first",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 19, "minimum"], "value": 101}],
+      "problems": ["controls[19]: minimum and maximum are integers, minimum first"]
+    },
+    {
+      "name": "a default lies in its range",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 1, "default"], "value": 601}],
+      "problems": ["controls[1]: default is between 50 and 600"]
+    },
+    {
+      "name": "a choice default is one of its options",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 0, "default"], "value": "flemish"}],
+      "problems": ["controls[0]: default is one of running, stack"]
+    },
+    {
+      "name": "choice options are distinct",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 0, "options"], "value": ["running", "running"]}],
+      "problems": [
+        "controls[0]: options are distinct non-empty printable ASCII, at least one",
+        "constraints[2]: when names a choice control of this maker"
+      ]
+    },
+    {
+      "name": "a palette allows at least one colour",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 7, "minimum_items"], "value": 0}],
+      "problems": ["controls[7]: minimum_items and maximum_items are integers, at least 1, minimum first"]
+    },
+    {
+      "name": "a palette default holds its allowed count",
+      "maker": "loom.brick",
+      "changes": [{"path": ["controls", 7, "maximum_items"], "value": 6}],
+      "problems": ["controls[7]: default holds 1 to 6 colours"]
+    },
+    {
+      "name": "every manifest declares the controls the bake reads",
+      "maker": "loom.metal",
+      "changes": [{"path": ["controls", 20], "remove": true}],
+      "problems": ["height_range_mm is an integer control in mm within 1 to 64, because the bake reads it"]
+    },
+    {
+      "name": "a common control keeps inside its bounds",
+      "maker": "loom.metal",
+      "changes": [{"path": ["controls", 22, "minimum"], "value": 0}],
+      "problems": ["occlusion_depth_mm is an integer control in mm within 1 to 64, because the bake reads it"]
+    },
+    {
+      "name": "constraints is a list",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints"], "value": null}],
+      "problems": ["constraints is a list"]
+    },
+    {
+      "name": "a constraint kind is one of four",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "kind"], "value": "greater"}],
+      "problems": ["constraints[3]: kind is one of equal, less, less_or_equal, even"]
+    },
+    {
+      "name": "a constraint has exactly its kind's fields",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "value"], "value": {"constant": 1}}],
+      "problems": ["constraints[3]: a constraint of kind less_or_equal has exactly kind, left, right, explanation, and may have when"]
+    },
+    {
+      "name": "a constraint explains itself",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "explanation"], "value": ""}],
+      "problems": ["constraints[3]: explanation is non-empty printable ASCII"]
+    },
+    {
+      "name": "an expression has one form",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "left"], "value": {"param": "joint_recess_mm", "constant": 1}}],
+      "problems": ["constraints[3]: left: an expression has exactly one of param, extent, constant, sum, product"]
+    },
+    {
+      "name": "an expression form is one of five",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "left"], "value": {"difference": []}}],
+      "problems": ["constraints[3]: left: an expression has exactly one of param, extent, constant, sum, product"]
+    },
+    {
+      "name": "a param names an integer control",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "left"], "value": {"param": "bond"}}],
+      "problems": ["constraints[3]: left: bond is not an integer control of this maker"]
+    },
+    {
+      "name": "a param is a key",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "right"], "value": {"param": 11}}],
+      "problems": ["constraints[3]: right: param names a control by its key"]
+    },
+    {
+      "name": "an extent is u or v",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 0, "right"], "value": {"extent": "w"}}],
+      "problems": ["constraints[0]: right: extent is u or v"]
+    },
+    {
+      "name": "a constant is an integer",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "right"], "value": {"constant": 0.5}}],
+      "problems": ["constraints[3]: right: a constant is an integer"]
+    },
+    {
+      "name": "a sum has a term",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "right"], "value": {"sum": []}}],
+      "problems": ["constraints[3]: right: a sum or product has at least one term"]
+    },
+    {
+      "name": "a term problem is found inside a product",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 0, "left", "product", 1, "sum", 0], "value": {"param": "palette"}}],
+      "problems": ["constraints[0]: left: palette is not an integer control of this maker"]
+    },
+    {
+      "name": "an expression nests at most eight deep",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "right"], "value": {"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"constant": 1}]}]}]}]}]}]}]}]}}],
+      "problems": ["constraints[3]: right: an expression nests at most 8 deep"]
+    },
+    {
+      "name": "eight deep is allowed",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "right"], "value": {"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"sum": [{"param": "face_height_mm"}]}]}]}]}]}]}]}}],
+      "problems": []
+    },
+    {
+      "name": "a condition names a choice control",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 2, "when", "param"], "value": "courses"}],
+      "problems": ["constraints[2]: when names a choice control of this maker"]
+    },
+    {
+      "name": "a condition names one of that choice's options",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 2, "when", "equals"], "value": "english"}],
+      "problems": ["constraints[2]: when equals one of that choice's options"]
+    },
+    {
+      "name": "a condition has exactly param and equals",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 2, "when", "not"], "value": true}],
+      "problems": ["constraints[2]: when has exactly param and equals"]
+    },
+    {
+      "name": "any constraint may carry a condition",
+      "maker": "loom.brick",
+      "changes": [{"path": ["constraints", 3, "when"], "value": {"param": "bond", "equals": "stack"}}],
+      "problems": []
+    }
+  ]
+}

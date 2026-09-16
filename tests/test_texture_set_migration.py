@@ -93,8 +93,8 @@ def test_the_set_id_rule_is_the_asset_key_rule_character_for_character():
     )
     assert asset_key is not None and set_id is not None
     assert asset_key.group(1) == set_id.group(1) == TEXTURE_SET_ID_PATTERN
-    publish = (ROOT / "web/packages/loom-texture/src/publish.ts").read_text()
-    assert f"export const SET_ID_PATTERN = /{TEXTURE_SET_ID_PATTERN}/;" in publish
+    library = (ROOT / "web/packages/loom-texture/src/library.ts").read_text()
+    assert f"export const SET_ID_PATTERN = /{TEXTURE_SET_ID_PATTERN}/;" in library
 
 
 def test_the_read_only_list_does_not_name_the_catalog_yet():
