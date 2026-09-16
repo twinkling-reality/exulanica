@@ -139,12 +139,13 @@ create trigger tg_world_texture_set_is_migration_data
 -- --------------------------------------------------------------------------------------------
 
 -- Reviewed catalogs are migration data.  The runtime reads them and cannot write them, the same
--- rule 0042 applies to world_reviewed_asset.
+-- rule 0042 applies to world_reviewed_asset, for the two runtime roles exulanica.db.roles
+-- provisions.  A role this cluster does not have is skipped rather than failing the migration.
 do $$
 declare
   r text;
 begin
-  foreach r in array array['exulanica_app','exulanica_ro','orimera_app','orimera_ro'] loop
+  foreach r in array array['exulanica_app','exulanica_ro'] loop
     if exists (select 1 from pg_roles where rolname = r) then
       execute format('revoke insert,update,delete on %I from %I', 'world_texture_set', r);
       execute format('grant select on %I to %I', 'world_texture_set', r);

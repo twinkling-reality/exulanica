@@ -20,7 +20,12 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from exulanica.db.roles import READ_ONLY_TABLES, provision_runtime_role
+from exulanica.db.roles import (
+    EXECUTOR_ROLE,
+    READ_ONLY_TABLES,
+    RUNTIME_ROLE,
+    provision_runtime_role,
+)
 from exulanica.migrations import migration_directory, migrations
 from exulanica.world.texture_assets import TEXTURE_SET_ID_PATTERN, load_texture_catalog
 from psycopg import sql
@@ -41,8 +46,8 @@ def _runtime_roles(path: Path) -> tuple[str, ...]:
     return tuple(re.findall(r"'([a-z_]+)'", block.group(1)))
 
 
-#: The same four roles 0042 makes its catalogs read-only for, compared with 0042 below rather than
-#: written out here: two of them carry the pre-ADR-0011 name, which only historical SQL may spell.
+#: The roles 0065 makes the catalog read-only for, read from the migration and compared below with
+#: the roles `exulanica.db.roles` provisions.
 RUNTIME_ROLES = _runtime_roles(MIGRATION)
 TABLE = "world_texture_set"
 
@@ -65,11 +70,11 @@ def test_0065_is_the_one_texture_migration_and_is_shaped_like_its_neighbours():
     assert statements[-1] == "commit;"
 
 
-def test_the_catalog_is_read_only_for_exactly_the_roles_0042_names():
-    reviewed = migration_directory() / "0042_authored_world_objects.sql"
-    assert _runtime_roles(reviewed) == RUNTIME_ROLES
-    assert len(RUNTIME_ROLES) == 4
-    assert {"exulanica_app", "exulanica_ro"} <= set(RUNTIME_ROLES)
+def test_the_catalog_is_read_only_for_exactly_the_provisioned_runtime_roles():
+    """The writer and the Selection executor, and no withdrawn pre-ADR-0011 name."""
+    assert (RUNTIME_ROLE, EXECUTOR_ROLE) == RUNTIME_ROLES
+    code = _code(MIGRATION.read_text())
+    assert "if exists (select 1 from pg_roles where rolname = r)" in code
 
 
 def test_the_catalog_is_not_a_workspace_table():

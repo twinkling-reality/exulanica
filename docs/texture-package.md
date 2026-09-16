@@ -278,8 +278,9 @@ with its own schema error. This resolver is for the layers above `world`.
 characters, a positive byte size, `licence_id = 'CC0-1.0'`), the resolution and extent as positive
 integers, the packing as a JSON array, the title and summary from each header, the media type, and
 `truth = 'invented'`. It inserts the eight pins above as literals and makes the table read-only
-for the same four runtime roles, with the same inline block 0042 uses: `exulanica_app`,
-`exulanica_ro`, and the two roles 0042 still names from before the ADR-0011 rename. A trigger refuses every UPDATE and DELETE, even by the owner, and every INSERT by a role that
+for `exulanica_app` and `exulanica_ro`, the two runtime roles `exulanica/db/roles.py`
+provisions, with the same inline block 0042 uses, skipping a role the cluster does not have.
+Unlike 0042 it names no role from before the ADR-0011 rename. A trigger refuses every UPDATE and DELETE, even by the owner, and every INSERT by a role that
 is not a member of the owner, so a pinned version never names other bytes and a new version
 arrives only in a new migration.
 
