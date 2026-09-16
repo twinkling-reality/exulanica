@@ -49,7 +49,6 @@ from typing import Any, Final
 
 from exulanica.errors import ExulanicaError, IntegrityError
 from exulanica.materials import (
-    LibraryRecord,
     MaterialCatalog,
     MaterialObjectError,
     read_document,
@@ -88,9 +87,11 @@ __all__ = [
     "TextureSetUnresolved",
     "UnpinnedTextureSet",
     "decode_texture_set",
+    "load_material_catalog",
     "load_texture_catalog",
     "resolve_texture_set",
     "seed_texture_sets",
+    "verify_container",
 ]
 
 TEXTURE_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "textures"
@@ -327,14 +328,20 @@ def _check_header(header: Mapping[str, Any], entry: ManifestEntry, where: str) -
             raise TextureCatalogError(f"{where}: header {key} is non-empty text")
 
 
-def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: str) -> None:
-    """The header says what the entry, the recipe and the maker say, field for field."""
-    recipe = record.recipe
+def _check_provenance(
+    header: Mapping[str, Any],
+    *,
+    title: str,
+    summary: str,
+    recipe: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    where: str,
+) -> None:
+    """The header says what the identity, the recipe and the maker say, field for field."""
     parameters = recipe["parameters"]
-    manifest = record.maker.manifest
     expected = {
-        "title": record.title,
-        "summary": record.summary,
+        "title": title,
+        "summary": summary,
         "seed": recipe["seed"],
         "resolution": thaw(recipe["resolution"]),
         "extent_mm": thaw(recipe["extent_mm"]),
@@ -369,6 +376,37 @@ def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: s
             )
 
 
+def verify_container(
+    payload: bytes,
+    *,
+    expected: ManifestEntry,
+    title: str,
+    summary: str,
+    recipe: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+) -> DecodedTextureSet:
+    """One container, held to everything a published set is held to, or a refusal.
+
+    The bytes must hash to ``expected.content_sha256`` and have its length, decode strictly, and
+    carry a header that says what ``expected`` says (set id, version, resolution, extent, licence)
+    and what the recipe and maker say (title, summary, seed, family, surface, height range,
+    occlusion, stated integer controls). The published loader asks exactly this of each set; the
+    workspace bake worker asks it of every container the baker hands back, and stores nothing that
+    fails it.
+    """
+    where = expected.set_id
+    if len(payload) != expected.byte_size:
+        raise TextureCatalogError(f"{where}: {len(payload)} bytes, {expected.byte_size} expected")
+    if hashlib.sha256(payload).hexdigest() != expected.content_sha256:
+        raise TextureCatalogError(f"{where}: the bytes do not hash to the expected digest")
+    decoded = _decode(payload, where)
+    _check_header(decoded.header, expected, where)
+    _check_provenance(
+        decoded.header, title=title, summary=summary, recipe=recipe, manifest=manifest, where=where
+    )
+    return decoded
+
+
 def _object_reader(directory: Path) -> Callable[[str], bytes]:
     def read(digest: str) -> bytes:
         path = directory / _OBJECTS / f"{digest}.json"
@@ -377,6 +415,63 @@ def _object_reader(directory: Path) -> Callable[[str], bytes]:
         return path.read_bytes()
 
     return read
+
+
+def _verified_materials(
+    directory: Path,
+    manifest_raw: bytes,
+    *,
+    catalog_sha256: str,
+    makers: Mapping[tuple[str, int], str],
+) -> MaterialCatalog:
+    catalog_path = directory / _CATALOG
+    if not catalog_path.is_file():
+        raise TextureCatalogError(
+            f"{_CATALOG} is not in {directory}; every published set is accounted for by a receipt"
+        )
+    catalog_raw = catalog_path.read_bytes()
+    catalog_digest = hashlib.sha256(catalog_raw).hexdigest()
+    if catalog_digest != catalog_sha256:
+        raise TextureCatalogError(
+            f"{_CATALOG} hashes to {catalog_digest}, not the reviewed pin {catalog_sha256}; a "
+            "rebake that changes any object updates TEXTURE_CATALOG_SHA256 in the same commit"
+        )
+    try:
+        materials = verify_material_catalog(catalog_raw, manifest_raw, _object_reader(directory))
+    except MaterialObjectError as error:
+        raise TextureCatalogError(f"{_CATALOG}: {error}") from error
+    published = {key: record.sha256 for key, record in materials.makers.items()}
+    if published != dict(makers):
+        changed = sorted(
+            f"{maker_id} version {version}"
+            for maker_id, version in set(published) | set(makers)
+            if published.get((maker_id, version)) != makers.get((maker_id, version))
+        )
+        raise TextureCatalogError(
+            f"{_CATALOG}: {', '.join(changed)} is not the published maker manifest; a published "
+            "maker version names one manifest forever, and a changed maker is a new version"
+        )
+    return materials
+
+
+def load_material_catalog(
+    directory: Path = TEXTURE_DIRECTORY,
+    *,
+    catalog_sha256: str = TEXTURE_CATALOG_SHA256,
+    makers: Mapping[tuple[str, int], str] = PUBLISHED_MAKER_MANIFESTS,
+) -> MaterialCatalog:
+    """The published makers and recipes, verified against both pins, without reading a blob.
+
+    Everything :func:`load_texture_catalog` checks about the object graph, and nothing about the
+    containers: what a process needs to judge a person's recipe, or to hold a bake to its maker,
+    when it has ``manifest.json``, ``catalog.json`` and ``objects/`` but not the sets themselves.
+    """
+    raw = (directory / _MANIFEST).read_bytes()
+    try:
+        read_texture_manifest(raw, _MANIFEST)
+    except MaterialObjectError as error:
+        raise TextureCatalogError(str(error)) from error
+    return _verified_materials(directory, raw, catalog_sha256=catalog_sha256, makers=makers)
 
 
 def load_texture_catalog(
@@ -433,37 +528,18 @@ def load_texture_catalog(
     if hashlib.sha256(licence_bytes).hexdigest() != licence_sha256:
         raise TextureCatalogError("the licence text does not hash to the digest the sets name")
 
-    catalog_path = directory / _CATALOG
-    if not catalog_path.is_file():
-        raise TextureCatalogError(
-            f"{_CATALOG} is not in {directory}; every published set is accounted for by a receipt"
-        )
-    catalog_raw = catalog_path.read_bytes()
-    catalog_digest = hashlib.sha256(catalog_raw).hexdigest()
-    if catalog_digest != catalog_sha256:
-        raise TextureCatalogError(
-            f"{_CATALOG} hashes to {catalog_digest}, not the reviewed pin {catalog_sha256}; a "
-            "rebake that changes any object updates TEXTURE_CATALOG_SHA256 in the same commit"
-        )
-    try:
-        materials = verify_material_catalog(catalog_raw, raw, _object_reader(directory))
-    except MaterialObjectError as error:
-        raise TextureCatalogError(f"{_CATALOG}: {error}") from error
-    published = {key: record.sha256 for key, record in materials.makers.items()}
-    if published != dict(makers):
-        changed = sorted(
-            f"{maker_id} version {version}"
-            for maker_id, version in set(published) | set(makers)
-            if published.get((maker_id, version)) != makers.get((maker_id, version))
-        )
-        raise TextureCatalogError(
-            f"{_CATALOG}: {', '.join(changed)} is not the published maker manifest; a published "
-            "maker version names one manifest forever, and a changed maker is a new version"
-        )
+    materials = _verified_materials(directory, raw, catalog_sha256=catalog_sha256, makers=makers)
     sets: dict[str, PinnedTextureSet] = {}
     for set_id, (entry, header, path) in checked.items():
         record = materials.sets[set_id]
-        _check_provenance(header, record, set_id)
+        _check_provenance(
+            header,
+            title=record.title,
+            summary=record.summary,
+            recipe=record.recipe,
+            manifest=record.maker.manifest,
+            where=set_id,
+        )
         sets[set_id] = PinnedTextureSet(
             set_id=set_id,
             version=entry.version,

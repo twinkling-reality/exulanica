@@ -14,12 +14,16 @@ from exulanica.store.base import (
     privileged_purger,
 )
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import LocalWorkspaceStores, WorkspaceStores, material_stores
 
 __all__ = [
     "ContentAddressedStore",
     "LocalContentAddressedStore",
+    "LocalWorkspaceStores",
     "PrivilegedPurger",
     "PurgeAuthorization",
     "PutResult",
+    "WorkspaceStores",
+    "material_stores",
     "privileged_purger",
 ]

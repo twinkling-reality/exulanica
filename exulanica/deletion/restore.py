@@ -31,6 +31,7 @@ from exulanica.env import env_get, resolve_data_dir
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import BLOB_NAMESPACE, WorkspaceStores, material_stores
 
 __all__ = ["RestoreRefused", "checkpoint", "prepare_restore", "replay", "verify_restore"]
 
@@ -211,6 +212,8 @@ def replay(
     store: ContentAddressedStore,
     checkpoint_path: Path,
     marker_path: Path,
+    *,
+    materials: WorkspaceStores | None = None,
 ) -> uuid.UUID:
     """Reapply authoritative deletions, purge, verify, then issue an idempotent receipt.
 
@@ -219,8 +222,18 @@ def replay(
     object-store backup. Archived targets retain objects whose row was already marked purged.
     Stub rows and evidence addresses remain for audit; serving paths refuse their tombstones.
     Every aggregate in affected workspaces is invalidated because its prior closure is untrusted.
+
+    ``materials`` holds each workspace's material bakes (migration 0066). A checkpoint that names
+    a bake is refused without it, before anything is replayed, because the purge could not reach
+    those bytes and the receipt would then be withheld only after the replay had begun.
     """
     record, digest = _checkpoint(checkpoint_path)
+    if materials is None and any(
+        target["target_kind"] == "material_bake"
+        for item in record["tombstones"]
+        for target in item["targets"]
+    ):
+        raise RestoreRefused("the checkpoint names material bakes and no material store was given")
     marker = _marker(marker_path)
     if (
         marker.get("checkpoint_id") != record["checkpoint_id"]
@@ -301,7 +314,7 @@ def replay(
                 "update derived_artifact set stale=true where workspace_id=%s", (workspace_id,)
             )
             applied.append((workspace_id, tombstone_id))
-    worker = PurgeWorker(purge_database, store, workspaces)
+    worker = PurgeWorker(purge_database, store, workspaces, material_stores=materials)
     while True:
         outcome = worker.drain()
         if outcome.blocked or outcome.failed or outcome.skipped or outcome.exhausted:
@@ -318,12 +331,19 @@ def replay(
             if not complete or not complete["complete"]:
                 raise RestoreRefused("a replayed tombstone is not completely purged")
             targets = connection.execute(
-                "select target_ref from purge_job where tombstone_id=%s "
-                "and target_kind in ('blob','artifact')",
+                "select target_kind, target_ref from purge_job where tombstone_id=%s "
+                "and target_kind in ('blob','artifact','material_bake')",
                 (tombstone_id,),
             ).fetchall()
-            if any(store.exists(BlobId.from_hex(row["target_ref"])) for row in targets):
-                raise RestoreRefused("replayed object-store bytes still exist")
+            for row in targets:
+                blob_id = BlobId.from_hex(row["target_ref"])
+                if row["target_kind"] == "material_bake":
+                    assert materials is not None  # refused above when a bake was named
+                    present = materials.for_workspace(workspace_id).exists(blob_id)
+                else:
+                    present = store.exists(blob_id)
+                if present:
+                    raise RestoreRefused("replayed object-store bytes still exist")
         connection.execute(
             "insert into restore_replay_receipt "
             "(restore_id,checkpoint_id,checkpoint_sha256,tombstone_count) values (%s,%s,%s,%s) "
@@ -355,12 +375,14 @@ def main(argv: list[str] | None = None) -> int:
         purge_url = env_get("PURGE_DATABASE_URL")
         if not purge_url:
             parser.error("PURGE_DATABASE_URL must name the separately provisioned purge role")
+        data_dir = resolve_data_dir()
         replay(
             Database.from_env(),
             Database(purge_url),
-            LocalContentAddressedStore(resolve_data_dir() / "blobs"),
+            LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
             args.checkpoint,
             args.marker,
+            materials=material_stores(data_dir),
         )
     return 0
 

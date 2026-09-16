@@ -22,6 +22,12 @@ Per job, and none of these may be reordered:
 correction 3. It is not a failure: another live capture, in this workspace or another, is using
 those exact bytes, and the right thing is to ask again later.
 
+**A workspace's material bakes are destroyed here too**, and nowhere else. Their bytes live in a
+namespace of that workspace's own (``exulanica.store.namespaces``), so the question is not whether
+another workspace holds them but whether the tombstone reaches the bake, which
+``material_bake_purge_is_authorized`` answers. A worker built without ``material_stores`` claims no
+bake job, and the tombstone it belongs to stays incomplete.
+
 **What this can delete from the database.** The purge role has DELETE on ``embedding`` only.
 Person withdrawal must remove the vector itself, and a soft marker would retain the sensitive
 derivative. Stored objects still use the content-addressed purge path and keep their stub rows.
@@ -57,6 +63,7 @@ from exulanica.db.session import Database
 from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, privileged_purger
+from exulanica.store.namespaces import WorkspaceStores
 
 __all__ = ["PurgeOutcome", "PurgeWorker"]
 
@@ -106,9 +113,16 @@ class PurgeWorker:
         poll_seconds: float = _POLL_SECONDS,
         limit_per_pass: int = 500,
         require_cross_workspace_view: bool = True,
+        material_stores: WorkspaceStores | None = None,
     ) -> None:
         self._database = database
         self._store = store
+        self._material_stores = material_stores
+        self._kinds = tuple(
+            kind
+            for kind in queue.DESTROYABLE_KINDS
+            if kind != "material_bake" or material_stores is not None
+        )
         self._workspaces = workspaces
         self._name = name
         self._poll_seconds = poll_seconds
@@ -197,7 +211,7 @@ class PurgeWorker:
         self, connection: psycopg.Connection, workspace_id: uuid.UUID, outcome: PurgeOutcome
     ) -> bool:
         """Claim, decide, destroy, confirm, record. Returns False when the queue is empty."""
-        target = queue.claim_purge(connection, workspace_id)
+        target = queue.claim_purge(connection, workspace_id, self._kinds)
         if target is None:
             return False
         try:
@@ -238,6 +252,9 @@ class PurgeWorker:
                 queue.finish_purge(
                     connection, target.workspace_id, purge_id=target.purge_id, state="done"
                 )
+            return
+        if target.target_kind == "material_bake":
+            self._destroy_bake(connection, target, outcome)
             return
         blob_id = BlobId.from_hex(target.target_ref)
         # The lock and the question share one transaction, so nothing can start holding these
@@ -286,6 +303,50 @@ class PurgeWorker:
             if self._store.exists(blob_id):
                 raise RuntimeError(
                     f"the store still holds {target.target_ref[:12]} after it was purged"
+                )
+            if destroyed:
+                outcome.destroyed += 1
+            else:
+                outcome.already_absent += 1
+            queue.mark_purged(connection, target)
+            queue.finish_purge(
+                connection, target.workspace_id, purge_id=target.purge_id, state="done"
+            )
+
+    def _destroy_bake(
+        self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
+    ) -> None:
+        """A bake's bytes, from its workspace's namespace, in the order every other object goes.
+
+        The lock is the one the bake worker holds from recording a bake until its bytes are
+        written, so a bake recorded just before its tombstone is destroyed after it is written,
+        never before.
+        """
+        stores = self._material_stores
+        if stores is None:  # claim_purge was not given the kind; a job here is a programming error
+            raise RuntimeError("a material bake job reached a worker with no material namespaces")
+        blob_id = BlobId.from_hex(target.target_ref)
+        store = stores.for_workspace(target.workspace_id)
+        with connection.transaction():
+            connection.execute("select purge_lock_object(%s)", (target.target_ref,))
+            row = connection.execute(
+                "select material_bake_purge_is_authorized(%s, %s, decode(%s, 'hex')) as allowed",
+                (target.workspace_id, target.tombstone_id, target.target_ref),
+            ).fetchone()
+            if row is None or not row["allowed"]:
+                raise ValueError("the tombstone does not authorize this bake purge")
+            purger = privileged_purger(
+                store,
+                PurgeAuthorization(
+                    tombstone_id=str(target.tombstone_id),
+                    actor=str(target.requested_by),
+                    reason=target.reason or "a tombstone asked for these bytes to be destroyed",
+                ),
+            )
+            destroyed = purger.purge(blob_id)
+            if store.exists(blob_id):
+                raise RuntimeError(
+                    f"the material namespace still holds {target.target_ref[:12]} after the purge"
                 )
             if destroyed:
                 outcome.destroyed += 1

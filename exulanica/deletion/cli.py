@@ -25,6 +25,7 @@ from exulanica.db.session import Database
 from exulanica.deletion.worker import PurgeWorker
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
 
 __all__ = ["PURGE_DATABASE_URL_ENV", "main"]
 
@@ -77,9 +78,10 @@ def main(argv: list[str] | None = None, stream: Any = None) -> int:
     data_dir = resolve_data_dir(explicit=args.data_dir)
     worker = PurgeWorker(
         Database(url=url),
-        LocalContentAddressedStore(data_dir / "blobs"),
+        LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
         workspaces,
         limit_per_pass=args.limit,
+        material_stores=material_stores(data_dir),
     )
     outcome = worker.drain()
 

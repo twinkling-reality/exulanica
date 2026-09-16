@@ -98,7 +98,6 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 #: Every entry here is temporary by construction: it is deleted by whoever lands the number.
 RESERVED_ELSEWHERE: dict[str, str] = {
     "0064": "assigned to the grammar lane's catalogs; 0065 landed above it with the texture sets",
-    "0066": "texture lane",
     "0067": "edit lane",
     "0068": "edit lane",
     "0069": "edit lane",

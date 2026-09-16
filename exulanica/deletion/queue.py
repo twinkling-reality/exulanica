@@ -87,8 +87,11 @@ RETRY_AFTER: Final = dt.timedelta(minutes=15)
 MAX_ATTEMPTS: Final = 8
 
 #: The kinds this worker knows how to destroy. Blob and artifact targets name stored object
-#: hashes. Embedding targets name a database row that only the purge role may delete.
-DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding")
+#: hashes. Embedding targets name a database row that only the purge role may delete. Material bake
+#: targets name a container's hash in the workspace's own material namespace (migration 0066), and
+#: a worker given no material namespaces leaves them queued, so their tombstone stays incomplete
+#: and says so rather than completing over bytes nobody destroyed.
+DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake")
 
 
 #: The policy `provision_purge_role` creates. Named here as well as there because this module is
@@ -171,7 +174,9 @@ class PurgeTarget:
 
 
 def claim_purge(
-    connection: psycopg.Connection, workspace_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    kinds: tuple[str, ...] = DESTROYABLE_KINDS,
 ) -> PurgeTarget | None:
     """Take the next job for this workspace, or None when there is nothing to do.
 
@@ -189,7 +194,22 @@ def claim_purge(
     is a bitmap scan on the unique constraint's index with the state test as a filter. That is a
     cost rather than a defect at this queue's size, and it is said here rather than left for
     somebody to infer from the index definition that the predicate is covered.
+
+    ``kinds`` narrows what may be claimed, and must be a subset of :data:`DESTROYABLE_KINDS`: a
+    worker that cannot reach the material namespaces does not claim a bake it could not destroy.
     """
+    if not set(kinds) <= set(DESTROYABLE_KINDS):
+        raise ValueError(f"cannot claim purge jobs of kinds {sorted(set(kinds))}")
+    # The bake arm is written only for a worker that may claim bakes. The function it calls
+    # arrives in migration 0066, and a worker with no material namespaces also runs against a
+    # schema from before it, as an upgrade does.
+    bakes = (
+        "     and (pj.target_kind <> 'material_bake' or "
+        "       material_bake_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
+        "                                         decode(pj.target_ref, 'hex'))) "
+        if "material_bake" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -199,7 +219,7 @@ def claim_purge(
         "     and pj.target_kind = any(%s) "
         "     and (pj.target_kind <> 'embedding' or "
         "       caption_vector_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
-        "                                          pj.target_ref::uuid)) "
+        "                                          pj.target_ref::uuid)) " + bakes +
         "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -207,7 +227,7 @@ def claim_purge(
         "   order by pj.attempted_at nulls first, pj.created_at "
         "   for update skip locked limit 1) "
         "returning purge_id, tombstone_id, workspace_id, target_kind, target_ref, attempts",
-        (workspace_id, list(DESTROYABLE_KINDS), MAX_ATTEMPTS, RETRY_AFTER),
+        (workspace_id, list(kinds), MAX_ATTEMPTS, RETRY_AFTER),
     ).fetchone()
     if row is None:
         return None
@@ -282,6 +302,14 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
             "update blob set purged_at = now(), storage_key = null "
             "where blob_sha256 = decode(%s, 'hex') and purged_at is null",
             (target.target_ref,),
+        )
+        return
+    if target.target_kind == "material_bake":
+        connection.execute(
+            "update material_bake set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = decode(%s, 'hex') "
+            "  and purged_at is null",
+            (target.workspace_id, target.target_ref),
         )
         return
     connection.execute(

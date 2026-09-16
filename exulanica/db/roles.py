@@ -111,10 +111,25 @@ def _grant_caption_purge_checks(
     connection: psycopg.Connection, schema: sql.Identifier, role: sql.Identifier
 ) -> None:
     """Retain existing cleanup capabilities after removing their PUBLIC grants."""
-    for name, arguments in (
-        ("caption_vector_purge_is_authorized", "uuid,uuid,uuid"),
-        ("caption_vector_purge_is_complete", "uuid,uuid"),
-    ):
+    _grant_functions(
+        connection,
+        schema,
+        role,
+        (
+            ("caption_vector_purge_is_authorized", "uuid,uuid,uuid"),
+            ("caption_vector_purge_is_complete", "uuid,uuid"),
+        ),
+    )
+
+
+def _grant_functions(
+    connection: psycopg.Connection,
+    schema: sql.Identifier,
+    role: sql.Identifier,
+    functions: tuple[tuple[str, str], ...],
+) -> None:
+    """Grant EXECUTE on each function that exists yet; a schema below its migration has none."""
+    for name, arguments in functions:
         present = connection.execute(
             "select to_regprocedure(format('%%I.%%I(%%s)',current_schema(),%s::text,%s::text)) "
             "as function_ref",
@@ -198,6 +213,21 @@ _PURGE_WRITES: Final = {
     "artifact": ("purged_at", "storage_key"),
     "blob": ("purged_at", "storage_key"),
 }
+
+#: Read and written within one workspace only, and so with no cross-workspace policy: a material
+#: bake's bytes live in that workspace's own store namespace (migration 0066), so no other
+#: workspace's rows bear on whether they may go. The columns are the ones ``mark_purged``, the
+#: bake's update guard and ``tombstone_purge_is_complete`` read, and the one the purger sets.
+#: Granted only once the table exists, because provisioning also runs on a schema migrated part
+#: of the way.
+_PURGE_WORKSPACE_READS: Final = {
+    "material_bake": ("workspace_id", "content_sha256", "purged_at"),
+}
+_PURGE_WORKSPACE_WRITES: Final = {
+    "material_bake": ("purged_at",),
+}
+#: The destroy question for a bake, which migration 0066 revokes from PUBLIC.
+_PURGE_FUNCTIONS: Final = (("material_bake_purge_is_authorized", "uuid,uuid,bytea"),)
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker
 #: sets and no others: not `effective_at`, which decides whether a tombstone blocks a derivative
@@ -314,16 +344,7 @@ def provision_runtime_role(
             # provisions before a pending migration runs, and tests provision schemas stopped
             # below one. A read-only table a later migration creates is revoked here once it
             # exists, so reprovisioning after that migration is what takes its writes back.
-            present = {
-                row["relname"] if isinstance(row, dict) else row[0]
-                for row in connection.execute(
-                    "select c.relname from pg_class c "
-                    "join pg_namespace n on n.oid = c.relnamespace "
-                    "where n.nspname = current_schema() and c.relkind in ('r', 'p') "
-                    "and c.relname = any(%s)",
-                    ([*READ_ONLY_TABLES, *INSERT_ONLY_TABLES],),
-                ).fetchall()
-            }
+            present = _present_tables(connection, (*READ_ONLY_TABLES, *INSERT_ONLY_TABLES))
             for table, revoked in (
                 *((table, sql.SQL("insert, update")) for table in READ_ONLY_TABLES),
                 *((table, sql.SQL("update")) for table in INSERT_ONLY_TABLES),
@@ -422,6 +443,23 @@ def provision_purge_role(
             )
         connection.execute(sql.SQL("grant select, delete on embedding to {}").format(role_name))
         _grant_caption_purge_checks(connection, schema, role_name)
+        _grant_functions(connection, schema, role_name, _PURGE_FUNCTIONS)
+        scoped = _present_tables(connection, (*_PURGE_WORKSPACE_READS, *_PURGE_WORKSPACE_WRITES))
+        for privilege, grants in (
+            (sql.SQL("select"), _PURGE_WORKSPACE_READS),
+            (sql.SQL("update"), _PURGE_WORKSPACE_WRITES),
+        ):
+            for table, columns in grants.items():
+                if table not in scoped:
+                    continue
+                connection.execute(
+                    sql.SQL("grant {} ({}) on {} to {}").format(
+                        privilege,
+                        sql.SQL(", ").join(sql.Identifier(c) for c in columns),
+                        sql.Identifier(table),
+                        role_name,
+                    )
+                )
         for table, columns in _PURGE_WRITES.items():
             connection.execute(
                 sql.SQL("grant update ({}) on {} to {}").format(
@@ -464,6 +502,20 @@ def provision_purge_role(
                     role_name,
                 )
             )
+
+
+def _present_tables(connection: psycopg.Connection, tables: tuple[str, ...]) -> set[str]:
+    """Which of ``tables`` exist in the current schema yet."""
+    return {
+        row["relname"] if isinstance(row, dict) else row[0]
+        for row in connection.execute(
+            "select c.relname from pg_class c "
+            "join pg_namespace n on n.oid = c.relnamespace "
+            "where n.nspname = current_schema() and c.relkind in ('r', 'p') "
+            "and c.relname = any(%s)",
+            (list(tables),),
+        ).fetchall()
+    }
 
 
 def grant_workspace_partition(connection: psycopg.Connection, partition: str) -> None:

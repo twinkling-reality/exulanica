@@ -624,6 +624,30 @@ def _referenced_keys(connection: psycopg.Connection, workspace_id: uuid.UUID) ->
     return keys
 
 
+def _refuse_private_bakes(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    """A workspace holding its own material bakes cannot be seeded.
+
+    Those bytes are under ``LicenseRef-Exulanica-Workspace-Private`` (migration 0066): they stay
+    in the workspace they were baked for, and a seed is a copy made to be handed to somebody else.
+    Their rows alone would restore as bakes whose bytes are missing, so the export refuses rather
+    than carrying half of them.
+    """
+    present = connection.execute("select to_regclass('material_bake') is not null as present")
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select count(*) as n from material_bake "
+        "where workspace_id = %s and content_sha256 is not null and purged_at is null",
+        (workspace_id,),
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['n']} material bake(s) under "
+            "LicenseRef-Exulanica-Workspace-Private, which never leave their workspace; a seed "
+            "cannot carry them"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -651,6 +675,7 @@ def export_seed(
     """
     if (destination / "manifest.json").exists():
         raise SeedRefused(f"{destination} already holds a seed archive; write to a new directory")
+    _refuse_private_bakes(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])
