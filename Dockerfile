@@ -66,11 +66,17 @@ RUN apt-get update \
  && chown exulanica:exulanica /app /var/lib/exulanica
 
 COPY --from=builder --chown=exulanica:exulanica /app/.venv /app/.venv
+# The published material catalog, read-only: the makers a person's recipe is checked against. The
+# baked texture sets themselves are not here, and the bake worker has an image of its own
+# (deploy/material-bake/Dockerfile) because it runs Node.
+COPY assets/textures/manifest.json assets/textures/catalog.json /app/assets/textures/
+COPY assets/textures/objects /app/assets/textures/objects
 
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    EXULANICA_DATA_DIR=/var/lib/exulanica
+    EXULANICA_DATA_DIR=/var/lib/exulanica \
+    EXULANICA_TEXTURE_DIRECTORY=/app/assets/textures
 
 WORKDIR /app
 USER exulanica

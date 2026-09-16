@@ -13,6 +13,11 @@
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !exulanica
+# The published material catalog, without the texture blobs: what the API needs to check a
+# person's recipe against the published makers. About 200 KiB.
+!assets/textures/manifest.json
+!assets/textures/catalog.json
+!assets/textures/objects
 # The gsplat trainer recipe under deploy/gsplat is its own build; it needs only its pinned
 # requirements from this directory.
 !deploy/gsplat/requirements.txt

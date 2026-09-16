@@ -155,6 +155,10 @@ exulanica-derivative-worker = "exulanica.ingest.worker_command:main"
 # `uv run --extra pose exulanica-scene-worker`. Kept separate from the depth worker because the
 # pycolmap and torch wheels load incompatible OpenMP runtimes on macOS.
 exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"
+# `uv run exulanica-material-bake --workspace <uuid> --once`. Bakes requested workspace material
+# recipes in a Node process of its own, under a timeout and a memory ceiling, and records each
+# bake before its bytes are written. Needs Node and the web package installed; downloads nothing.
+exulanica-material-bake = "exulanica.world.material_bake_command:main"
 # `uv run exulanica-wmp project ...` creates a signed, independently verifiable World Memory
 # Package; verify, inspect, and diff never open PostgreSQL.
 exulanica-wmp = "exulanica.world_package.cli:main"

@@ -44,7 +44,7 @@ import tempfile
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
@@ -424,10 +424,12 @@ class MaterialBakeWorker:
         max_attempts: int = 3,
         poll_seconds: float = 15.0,
         limit_per_pass: int = 16,
+        workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
     ) -> None:
         self._database = database
         self._stores = stores
         self._workspaces = workspaces
+        self._workspace_source = workspace_source
         self._runtime = runtime
         self._catalog = catalog if catalog is not None else load_material_catalog()
         self._limits = limits if limits is not None else BakeLimits()
@@ -448,9 +450,18 @@ class MaterialBakeWorker:
 
     # -- driving it ---------------------------------------------------------------------
 
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def workspaces(self) -> frozenset[uuid.UUID]:
+        """The configured workspaces and, when a source is set, the ones it names right now."""
+        discovered = () if self._workspace_source is None else self._workspace_source()
+        return self._workspaces | frozenset(discovered)
+
     def drain(self) -> BakeOutcome:
         outcome = BakeOutcome()
-        for workspace_id in sorted(self._workspaces):
+        for workspace_id in sorted(self.workspaces()):
             with self._database.session(workspace_id) as connection:
                 outcome.exhausted += self._expire_exhausted(connection, workspace_id)
                 while outcome.handled < self._limit and not self._stop.is_set():

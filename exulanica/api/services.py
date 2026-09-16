@@ -47,7 +47,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
 from exulanica.world.material_recipes import MaterialRuntime
-from exulanica.world.texture_assets import TextureCatalogError, load_material_catalog
+from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
@@ -265,7 +265,7 @@ def build_services(
         model_client=client,
         accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
-        materials=_material_runtime(data_dir),
+        materials=_material_runtime(data_dir, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
@@ -274,18 +274,19 @@ def build_services(
     )
 
 
-def _material_runtime(data_dir: Path) -> MaterialRuntime | None:
+def _material_runtime(data_dir: Path, environ: Mapping[str, str]) -> MaterialRuntime | None:
     """The published makers and each workspace's bake namespace, when the catalog is here.
 
-    The catalog is verified against its pins on the way in, so a directory that is present but
-    not the reviewed one is a startup failure rather than a quiet absence.
+    ``EXULANICA_TEXTURE_DIRECTORY`` names the catalog in an image; a checkout finds its own. The
+    catalog is verified against its pins on the way in, so a directory that is present but not
+    the reviewed one raises :class:`TextureCatalogError` and stops startup, rather than being
+    reported as absent. Only a missing catalog is an absence, and ``warnings`` says so.
     """
+    directory = env_get("TEXTURE_DIRECTORY", environ)
     try:
-        catalog = load_material_catalog()
+        catalog = load_material_catalog(Path(directory)) if directory else load_material_catalog()
     except FileNotFoundError:
         return None
-    except TextureCatalogError:
-        raise
     return MaterialRuntime(catalog=catalog, stores=material_stores(data_dir))
 
 

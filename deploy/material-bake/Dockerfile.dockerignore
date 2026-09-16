@@ -1,0 +1,18 @@
+# An allowlist, as the root context's is: the package, the baker's source and lock, and the
+# published material catalog without its blobs. Never a `.env`.
+*
+!pyproject.toml
+!uv.lock
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!exulanica
+!web/package.json
+!web/pnpm-lock.yaml
+!web/pnpm-workspace.yaml
+!web/tsconfig.base.json
+!web/packages/loom-texture
+web/packages/loom-texture/node_modules
+web/packages/loom-texture/dist
+!assets/textures/manifest.json
+!assets/textures/catalog.json
+!assets/textures/objects
