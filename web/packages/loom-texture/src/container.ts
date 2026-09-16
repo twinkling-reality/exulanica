@@ -1,6 +1,5 @@
 import { canonicalBytes, canonicalJson } from './canonical-json.js';
 import type { TextureSetDefinition } from './definition.js';
-import { LICENCE_ID } from './licence.js';
 import type { Maps } from './maps.js';
 
 /**
@@ -105,7 +104,7 @@ function headerBody(
     title: def.title,
     summary: def.summary,
     truth: TRUTH,
-    licence: { id: LICENCE_ID, sha256: licenceSha256 },
+    licence: { id: def.licenceId, sha256: licenceSha256 },
     resolution: { width: def.width, height: def.height },
     extent_mm: { u: def.extentU, v: def.extentV },
     placement: placement(def.surface),

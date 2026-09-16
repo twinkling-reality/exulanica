@@ -1,6 +1,8 @@
 import { cavityOf, heightRangeOf } from './controls.js';
 import type { TextureSetDefinition } from './definition.js';
 import { type LibrarySet, readLibrary } from './library.js';
+import type { Maker } from './maker.js';
+import type { Recipe } from './recipe.js';
 
 /**
  * The published sets, as the bake reads them.
@@ -11,14 +13,41 @@ import { type LibrarySet, readLibrary } from './library.js';
  * Nothing about a set is stated in code any more; a set is its library file.
  */
 export function definitionOf({ entry, maker }: LibrarySet): TextureSetDefinition {
-  const { recipe } = entry;
+  return recipeDefinition(
+    {
+      setId: entry.set_id,
+      version: entry.version,
+      title: entry.title,
+      summary: entry.summary,
+      licenceId: entry.licence_id,
+    },
+    entry.recipe,
+    maker,
+  );
+}
+
+/** What a container states besides the recipe: who the set is, and under which licence. */
+export interface SetIdentity {
+  readonly setId: string;
+  readonly version: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly licenceId: string;
+}
+
+/**
+ * A bake definition from an identity, a checked recipe and its maker. The one place a recipe
+ * becomes what the container header states, for a published set and a workspace's own bake alike.
+ */
+export function recipeDefinition(
+  identity: SetIdentity,
+  recipe: Recipe,
+  maker: Maker,
+): TextureSetDefinition {
   return {
-    setId: entry.set_id,
-    version: entry.version,
+    ...identity,
     seed: recipe.seed,
     family: maker.manifest.family,
-    title: entry.title,
-    summary: entry.summary,
     width: recipe.resolution.width,
     height: recipe.resolution.height,
     extentU: recipe.extent_mm.u,

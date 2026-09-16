@@ -24,6 +24,12 @@ export interface TextureSetDefinition {
   readonly family: string;
   readonly title: string;
   readonly summary: string;
+  /**
+   * The licence the bytes are under, stated in the header beside the digest of its text. A
+   * published set is `CC0-1.0`; a workspace's own bake is `LicenseRef-Exulanica-Workspace-Private`,
+   * which nothing that publishes will accept.
+   */
+  readonly licenceId: string;
   /** Texels. */
   readonly width: number;
   readonly height: number;

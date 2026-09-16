@@ -16,7 +16,7 @@ export {
   mipChainTexels,
 } from './budget.js';
 export { canonicalBytes, canonicalJson } from './canonical-json.js';
-export { CATALOG, LIBRARY, definitionOf } from './catalog.js';
+export { CATALOG, LIBRARY, type SetIdentity, definitionOf, recipeDefinition } from './catalog.js';
 export {
   CONTAINER_MAGIC,
   type DecodedContainer,
@@ -55,6 +55,7 @@ export {
   type LibraryEntry,
   type LibrarySet,
   SET_ID_PATTERN,
+  WORKSPACE_SET_ID_PREFIX,
   formatLibrarySource,
   libraryEntryProblems,
   readLibrary,
@@ -110,3 +111,27 @@ export {
   parseStrictJson,
   parseStrictJsonBytes,
 } from './strict-json.js';
+export { RequestRefused, bakeWorkspaceRequest } from './workspace/bake.js';
+export {
+  WORKSPACE_LICENCE_FILE,
+  WORKSPACE_LICENCE_ID,
+  type WorkspaceLicence,
+  workspaceLicence,
+} from './workspace/licence.js';
+export {
+  BAKE_REQUEST_PROFILE,
+  BAKE_RESULT_PROFILE,
+  type BakeRequest,
+  type BakeResult,
+  MAXIMUM_WORKSPACE_TEXELS,
+  WORKSPACE_SET_ID,
+  WORKSPACE_VERSION,
+  bakeRequestProblems,
+} from './workspace/request.js';
+export {
+  SOURCE_PROFILE,
+  SOURCE_ROOTS,
+  type SourceFile,
+  packageSourceDigest,
+  sourceFiles,
+} from './workspace/source.js';

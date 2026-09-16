@@ -30,6 +30,8 @@ export const LIBRARY_FOLDER = 'library';
 export const SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
 /** A set id names a surface. It never carries a version or a digest. */
 export const VERSIONED_OR_DIGESTED = /v\d|[0-9a-f]{16}/;
+/** Set ids a workspace's own bakes take (`workspace/request.ts`). No published set is named so. */
+export const WORKSPACE_SET_ID_PREFIX = /^ws\./;
 
 export interface LibraryEntry {
   readonly set_id: string;
@@ -84,6 +86,8 @@ export function libraryEntryProblems(candidate: unknown): string[] {
   const { set_id: setId, version, title, summary, licence_id: licenceId, recipe } = candidate;
   if (typeof setId !== 'string' || !SET_ID_PATTERN.test(setId) || VERSIONED_OR_DIGESTED.test(setId)) {
     problems.push('set_id names a surface: ^[a-z][a-z0-9.-]*$, with no version or digest in it');
+  } else if (WORKSPACE_SET_ID_PREFIX.test(setId)) {
+    problems.push('set_id does not begin ws., which names a workspace bake');
   }
   if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1) {
     problems.push('version is a positive integer');

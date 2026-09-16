@@ -3,7 +3,12 @@ import { LIBRARY, definitionOf } from './catalog.js';
 import { MAP_LAYOUT, encodeContainer } from './container.js';
 import type { TextureSetDefinition } from './definition.js';
 import { sha256Hex } from './digest.js';
-import { type LibrarySet, SET_ID_PATTERN, VERSIONED_OR_DIGESTED } from './library.js';
+import {
+  type LibrarySet,
+  SET_ID_PATTERN,
+  VERSIONED_OR_DIGESTED,
+  WORKSPACE_SET_ID_PREFIX,
+} from './library.js';
 import { LICENCE_ID, licenceBytes } from './licence.js';
 import { MAKERS } from './makers/index.js';
 import { bakeMaps } from './maps.js';
@@ -111,6 +116,12 @@ function checkDefinition(def: TextureSetDefinition): void {
   if (VERSIONED_OR_DIGESTED.test(def.setId)) {
     problems.push('a set id never carries a version or digest');
   }
+  if (WORKSPACE_SET_ID_PREFIX.test(def.setId)) {
+    problems.push('a set id beginning ws. names a workspace bake, which is never published');
+  }
+  if (def.licenceId !== LICENCE_ID) {
+    problems.push(`a published set is under ${LICENCE_ID}, not ${def.licenceId}`);
+  }
   if (!positive(def.version)) problems.push('version is a positive integer');
   if (!Number.isSafeInteger(def.seed) || def.seed < 0 || def.seed > 0xffffffff) {
     problems.push('seed is an unsigned 32-bit integer');
@@ -145,7 +156,7 @@ export function manifestEntry(
       srgb: layout.srgb,
     })),
     extent_mm: { u: def.extentU, v: def.extentV },
-    licence_id: LICENCE_ID,
+    licence_id: def.licenceId,
     licence_sha256: licenceSha256,
   };
 }
