@@ -1,9 +1,11 @@
 # Texture package
 
 Status: IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
-backend resolver, and the recipes, makers and object store the sets are baked from. The appearance of these sets in the rendered product is UNVERIFIED: no
+backend resolver, and the recipes, makers and object store the sets are baked from; and, in
+migration 0066, for a workspace's own recipes and bakes, their erasure, their routes and the bake
+worker (section 14). The appearance of these sets in the rendered product is UNVERIFIED: no
 renderer draws them yet, and that check belongs to the corridor lane, against the gate lane's
-Flatiron baseline.
+Flatiron baseline. No bake worker runs in any deployment, and no model has been trained.
 
 The plan names what shipped and what this package replaces, and both sentences are quoted
 verbatim:
@@ -466,10 +468,19 @@ manifest and the pinned rows disagree.
   `web/package.json` and two dependency-cruiser rules to `web/.dependency-cruiser.cjs`: nothing that
   ships to a browser imports loom-texture, and loom-texture reaches no workspace package but
   `atlas-core`.
-- **Tier B.** The synthetic dataset exporter is built (section 13). Not started: workspace recipes
-  and bakes in migration 0066, the Node bake worker that runs a maker server-side, an inert
-  photograph-derived recipe object with its consent dependency, and any learned recipe model behind
-  a process boundary (section 2).
+- **Tier B.** Built:
+  - the synthetic dataset exporter (section 13);
+  - workspace recipes and bakes, their erasure and routes, and the Node bake worker (section 14);
+  - the inert photograph-derived recipe object;
+  - the training code behind its own environment and container (`ml/README.md`).
+
+  Still to do, each named where it belongs:
+  - a sweep that reclaims a withdrawn recipe's bake sooner than the workspace's deletion, through
+    the one purge machinery;
+  - wiring the bake worker's image into `compose.yaml`, and building it;
+  - the migration after 0073 that replaces the two inert triggers with the personal model right's
+    check;
+  - the first training run, which waits for an operator's yes.
 
 ## 13. Synthetic dataset
 
@@ -533,7 +544,154 @@ from real photographs. The pictures are clean, flat and synthetic, and closing t
 photographs a model may lawfully learn from, which this repository does not have and this lane does
 not use.
 
-## 14. What is not verified
+## 14. A workspace's own recipes and bakes
+
+Migration 0066 is the schema and records why it has this shape. The code is:
+
+- `exulanica/world/material_recipes.py`, the repository;
+- `exulanica/world/material_bakes.py`, the worker;
+- `exulanica/world/material_bake_command.py`, the `exulanica-material-bake` command;
+- `exulanica/api/routes/materials.py`, the routes;
+- `exulanica/materials/workspace.py`, the request, receipt and licence;
+- `web/packages/loom-texture/src/workspace/`, the baker's side.
+
+**A recipe is a row, checked before it is stored.** A person varies a published set, or the
+Companion proposes a recipe from words. Each recipe row holds:
+
+- the recipe's canonical bytes, the same document as jsonb, and the digest over the bytes;
+- the maker, by id, version and manifest digest;
+- the origin: `authored`, `proposed` or `photo_derived`;
+- the published set it was varied from, if any;
+- the person's own label, which is outside every digest and never reaches a container.
+
+The repository refuses the recipe unless:
+
+- it is canonical, portable JSON;
+- it names a maker version `PUBLISHED_MAKER_MANIFESTS` pins;
+- `recipe_problems` finds nothing wrong with it against that manifest. This is the check the
+  baker makes and the published library passes.
+
+A recipe row never changes; a changed recipe is a new row.
+
+**Removing a recipe hides it and destroys nothing.** Withdrawal is an append-only row in
+`material_recipe_withdrawal`. The recipe and its bake answer 410 at once, and a bake still waiting
+is cancelled. The bytes stay: they are a cache the recipe reproduces exactly, and they are
+reclaimed when the workspace is deleted. A sweep that reclaims them sooner is a follow-up, and it
+must run through the one purge machinery. When the edit lane lands, removal becomes one of its
+operations and can be undone.
+
+**Photo-derived recipes are inert until the personal model right (0073) exists.** Two triggers
+refuse every such row, and the repository refuses first. Everything these recipes need is already
+built, and tested with those two triggers set aside:
+
+- their source photographs, one row each;
+- the people in them, recorded both when a photograph is read and when a person is confirmed later;
+- blocking;
+- erasure.
+
+`exulanica.materials.photo_derived.PhotoDerivedRecipe` is the object a model will emit. It cannot
+be built without a processing right reference, and whether that right is current is asked by the
+world service that writes the recipe, not by the object.
+
+**A bake is queued, never made in a request.**
+
+- **Request.** `POST /materials/recipes/{recipe_id}/bake` queues it. The request counts against the
+  workspace's quota: 64 a day and 8 waiting, unless a `material_bake_quota` row says otherwise.
+- **Claim.** The worker claims the bake with a lease and checks the recipe again before starting
+  anything.
+- **Bake.** The worker runs `src/workspace/cli.ts` in a new process session, with a minimal
+  environment and four limits:
+  - a V8 heap ceiling;
+  - a 60 second wall-clock timeout;
+  - a 768 MiB resident-memory ceiling. The worker measures and enforces this itself and kills
+    the whole process group, because macOS enforces no kernel memory limit on a child process;
+  - the baker's own ceiling of 1024 x 1024 texels.
+
+  Measured: a 1024 x 1024 brick bakes in 2.3 s at 119 MiB, and a 0.2 s timeout and a 64 MiB
+  ceiling each stopped a bake.
+- **Command.** The command reads a canonical request (`exulanica.texture-bake-request/v1`), writes
+  the container to a file that must not exist, and prints its digest, its length, the Node version
+  and the package source digest.
+- **Verification.** The worker believes none of that output until it has checked:
+  - the result is read strictly;
+  - the container has the stated length and hash;
+  - `verify_container` holds it to the request, the recipe and the maker, which are the published
+    loader's own checks;
+  - the package source digest matches the one the worker computes from the same files;
+  - a re-bake reproduces the digest already recorded.
+- **Record, then write.** The worker records the bake, with its receipt
+  (`exulanica.workspace-texture-bake-receipt/v1`: the request, maker, recipe, licence, bytes, Node
+  version and package source digest). Only then does it write the bytes, under a session lock
+  that the purger also takes. A crash in between leaves a row whose bytes are missing. Asking again
+  re-bakes it, and the bytes must come out the same.
+
+**A workspace bake says whose it is.**
+
+- The set id is `ws.` followed by the recipe row's 32 hex digits, and the version is always 1.
+- The title and summary are derived mechanically, for example "Workspace variant of loom.brick
+  version 1" and "Baked in one workspace from recipe" followed by its digest.
+- The licence is `LicenseRef-Exulanica-Workspace-Private`. Its text is
+  `web/packages/loom-texture/licences/workspace-private.txt`, sha256 `43420ede...` (pinned in full
+  in `exulanica/materials/workspace.py`).
+
+Every path that publishes refuses that licence, each with a test:
+
+- the published manifest reader;
+- loom-texture's publisher, library and dataset plan;
+- the World Memory Package scanner, which also refuses any `.ltex` file;
+- the judge seed;
+- grammar catalogs;
+- the checks on the two global registries.
+
+The bytes route answers `private, no-store` and names the licence in `X-Exulanica-Licence`.
+
+**Bytes live in the workspace's own namespace**, `<data dir>/materials/<workspace hex>/`. This is
+never inside the shared blob store, so the question of whether a bake may be destroyed never
+needs another workspace's rows.
+
+**Erasure runs through the one machinery.** `purge_job` has a `material_bake` target kind, and
+three kinds of tombstone reach bakes:
+
+- a workspace tombstone enqueues every bake;
+- a capture tombstone enqueues the bakes of photo-derived recipes that name the capture;
+- a person withdrawal enqueues the bakes that a recorded identity decision ties to that person.
+
+The rest of the machinery:
+
+- **The destroy question** is `material_bake_purge_is_authorized`.
+- **The purge role** holds SELECT on `workspace_id`, `content_sha256` and `purged_at` of
+  `material_bake`, UPDATE on `purged_at`, and EXECUTE on that function, and nothing else.
+  `tests/test_material_recipes.py` asserts exactly that.
+- **Completion.** `tombstone_purge_is_complete` stays false while a bake still has bytes.
+- **Restore.** `exulanica/deletion/restore.py` replays bake purges and checks the namespace. A
+  checkpoint that names bakes is refused when no namespace is given.
+- **Serialisation.** A tombstone and a bake serialise on a per-workspace lock, in the shape of
+  0044, so a tombstone either sees a finished bake or refuses it.
+
+**Routes.** `/materials/makers`, `/materials/library`, `/materials/recipes`, one recipe, its
+withdrawal, its bake request, its bake and the bake's bytes. Reads need `world.read` and writes
+need `world.write`. The answers:
+
+| Status | Meaning |
+| --- | --- |
+| 404 | the recipe never existed in this workspace |
+| 410 | the recipe was withdrawn or deleted |
+| 409 | the bake is not ready, its bytes are missing, or the recipe is photo-derived |
+| 422 | the maker refuses the recipe |
+| 429 | the bake quota is spent |
+| 503 | the instance has no material catalog |
+
+The bytes route releases the container only after the 0041 final check.
+
+**Deployment.**
+
+- **API image.** It carries `manifest.json`, `catalog.json` and `objects/` (about 200 KiB), and
+  `EXULANICA_TEXTURE_DIRECTORY` points at them.
+- **Worker image.** The bake worker runs Node, so it has an image recipe of its own,
+  `deploy/material-bake/Dockerfile`. That recipe is written, not built, and not in `compose.yaml`.
+- **Training.** The training code is in `ml/` (see `ml/README.md`).
+
+## 15. What is not verified
 
 - **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.
   The contact sheet was inspected, and it shows the stored maps under a fixed light, which is
@@ -546,3 +704,16 @@ not use.
   that is not an integer control (a bond or finish is stated as a sentence) is covered only by the
   reviewed pin and the rebake.
 - The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it yet.
+- **The workspace bake path has run only in tests.**
+  - No deployment runs the bake worker.
+  - `deploy/material-bake/Dockerfile` and `ml/container/Dockerfile` have never been built.
+  - `compose.yaml` does not name the worker.
+- **The memory ceiling is a watchdog that polls every 25 ms.** A burst between two looks can pass
+  it briefly. The kernel-side limit is the container's, when a deployment sets one.
+- **`verify_container` does not check that the texels came from the maker.** What stands for that
+  is weaker:
+  - the package source digest, matched on both sides;
+  - the determinism of a re-bake;
+  - the package suite, which proves it for the published library only.
+- **Photo-derived recipes have been exercised only in tests**, with their two inert triggers set
+  aside. No model has proposed a recipe, and no model has been trained.

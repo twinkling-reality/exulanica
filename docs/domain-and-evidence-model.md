@@ -1513,6 +1513,18 @@ the experiment plan as the test most likely to find a real bug.
 | **Entity** | entity, links, proposals, assertions, entity-level aggregates | person and occurrence embeddings, person-dependent point maps, and every artifact for every reconstruction scene containing the confirmed occurrence; the display-name cache is cleared | source captures and original photograph bytes, `identity_rejection` rows, the dependency and withdrawal receipts |
 | **Workspace** | everything | everything, including blobs | an audit stub |
 
+**ADDED 2026-09-16. A workspace's material bakes are in the same cascade** (migration 0066,
+`docs/texture-package.md` section 14):
+
+- **A workspace tombstone** purges every bake from the workspace's own store namespace.
+- **A capture tombstone** purges the bakes of photo-derived recipes that name the capture.
+- **An entity tombstone** purges the bakes that a recorded identity decision ties to the person.
+
+Each runs through `purge_job`, with the target kind `material_bake`, and none of these recipes
+can exist before the personal model right does. Withdrawing a recipe a person authored is not a
+tombstone. It hides the recipe and its bake at once, and the bytes are reclaimed with the
+workspace.
+
 **CORRECTED 2026-09-04. Entity withdrawal is now a production cascade. Interval withdrawal
 remains partial.** Migration 0030 adds `person_derivative_dependency`. A confirmed identity link
 records edges to the occurrence's point-map artifact, every reconstruction scene and job that

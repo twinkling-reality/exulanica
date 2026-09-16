@@ -7,7 +7,7 @@
 -- recipe an object with a digest. This is the personal half. A person varies a recipe (a darker
 -- mortar, a longer brick), the Companion proposes one from a description, and later a recipe may
 -- be derived from the person's own photographs. Each is a row here, and each can be baked into a
--- container that belongs to that workspace alone. `docs/texture-package.md` section 15 is the
+-- container that belongs to that workspace alone. `docs/texture-package.md` section 14 is the
 -- design; what follows records the shape.
 --
 -- THE SHAPE CHOSEN.
