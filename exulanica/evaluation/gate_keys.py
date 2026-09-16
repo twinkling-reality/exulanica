@@ -31,8 +31,12 @@ means. No measurement, threshold or mechanical decision moved.
 
 **Version 4 gave the question one meaning.** Version 3's question joined two claims, so a yes, a no
 or a short negation in the judge's own words could attach to either. Version 4 asks one thing and
-each option says what it means. :data:`VERSION_2` and :data:`VERSION_3` keep the earlier wording for
-their records.
+each option says what it means.
+
+**Version 5 changed only how a typed reply is read.** A typed reply with no pick counts as no when
+it holds the whole word "no" and not the whole word "yes", and never counts as yes, so a typed reply
+can fail the key and never pass it. Nothing the judge is shown changed. :data:`VERSION_2`,
+:data:`VERSION_3` and :data:`VERSION_4` keep the earlier wording for their records.
 
 Pure: this module imports nothing from the product, performs no I/O and holds no clock.
 """
@@ -69,8 +73,10 @@ __all__ = [
     "RUBRIC_VERSION",
     "SUPERSEDED_VERSIONS",
     "THRESHOLDS",
+    "TYPED_REPLY_RULE",
     "VERSION_2",
     "VERSION_3",
+    "VERSION_4",
     "WORDS_STORAGE",
     "GateKey",
     "RetainedRecord",
@@ -86,7 +92,7 @@ __all__ = [
 EvidenceKind = Literal["mechanical", "judged"]
 
 #: Bumped only by a new reconciliation record. The corridor is scored against this version.
-GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v4"
+GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v5"
 
 EVIDENCE_KINDS: Final[tuple[EvidenceKind, ...]] = ("mechanical", "judged")
 
@@ -95,8 +101,8 @@ CAPTURE_LABELS: Final[tuple[str, ...]] = ("start", "midpoint", "endpoint")
 
 RUBRIC_PATH: Final = "docs/visual-gate-rubric.md"
 
-#: The rubric's own version line reads ``Rubric version: 4``.
-RUBRIC_VERSION: Final = 4
+#: The rubric's own version line reads ``Rubric version: 5``.
+RUBRIC_VERSION: Final = 5
 
 #: How each capture is labelled when it is shown to the judge, alone, in route order.
 PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
@@ -159,6 +165,20 @@ WORDS_STORAGE: Final = (
 CARRIED_WORDS_NOTICE: Final = (
     "The question now has one meaning. Pick the answer you mean. The words you already wrote "
     "about this picture are kept; add more if you like."
+)
+
+
+#: How a reply the judge types instead of picking an option is read, as the records state it.
+TYPED_REPLY_RULE: Final = (
+    "A typed reply with no pick counts as no when it contains the whole word no, in any case, and "
+    "does not contain the whole word yes. A typed reply never counts as yes; a yes must be picked. "
+    "Any other typed reply is not an answer."
+)
+
+#: How versions 2 to 4 read a typed reply.
+_TYPED_REPLY_RULE_BEFORE_V5: Final = (
+    "A typed reply with no pick counts only when its first word is yes or no, and then as that "
+    "word."
 )
 
 
@@ -233,6 +253,9 @@ class SupersededVersion:
     composition: str
     #: Canonical definitions that differ from the current ones, keyed by spelling.
     definitions: Mapping[str, str]
+    #: The line shown above a question that carries earlier words, or None when there was none.
+    carried_notice: str | None = None
+    typed_reply_rule: str = _TYPED_REPLY_RULE_BEFORE_V5
 
     def prompt(self, label: str) -> str:
         """What the judge read for one capture under this version."""
@@ -240,6 +263,22 @@ class SupersededVersion:
         if self.requirement is not None:
             parts.append(self.requirement)
         return "\n\n".join(parts)
+
+    def shows_what_is_shown_now(self) -> bool:
+        """Whether the judge saw exactly what the current version shows: every line and option."""
+        return (
+            self.question,
+            self.guidance,
+            self.requirement,
+            self.options,
+            self.carried_notice,
+        ) == (
+            RUBRIC_QUESTION,
+            RUBRIC_GUIDANCE,
+            ANSWER_REQUIREMENT,
+            ANSWER_OPTIONS,
+            CARRIED_WORDS_NOTICE,
+        )
 
 
 _SHELL_DEFINITION_V2: Final = (
@@ -309,8 +348,45 @@ VERSION_3: Final = SupersededVersion(
     definitions=MappingProxyType({}),
 )
 
+#: Version 4, superseded before any answer was scored under it. Its record is retained, and the
+#: reply given under it is the first one version 5's typed-reply rule reads.
+VERSION_4: Final = SupersededVersion(
+    key_set="exulanica.visual-gate-keys/v4",
+    rubric_version=4,
+    rubric_sha256="ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b",
+    question="Is this a finished, lived-in street? Yes or no, and say why in your own words.",
+    guidance=(
+        "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not "
+        "flat colour; you could name what at least three ground-floor shops or entrances are; the "
+        "buildings form an unbroken street edge with no cut or hole; you can see things near "
+        "(about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a "
+        "plain block mock-up."
+    ),
+    requirement=(
+        "Pick Yes or No and type a few words why in the notes; the answer cannot be recorded "
+        "without them."
+    ),
+    options=("Yes, a finished, lived-in street", "No, a plain block mock-up"),
+    composition=(
+        "Each capture is shown alone, in route order, and the judge answers the one question with "
+        "the option they mean and their own words. An answer that arrives without words may be "
+        "followed once, with the picture shown alone again, by a request for the reason, and that "
+        "reply never changes the answer. A pick that the judge's own words, given right after it, "
+        "may contradict is not recorded. Words the judge wrote about a picture before its question "
+        "was reworded are carried into its next ask, under a line that says so; they are part of "
+        "the reason for a no, and a yes needs new words. The first no makes the key false and the "
+        "pictures after it are not asked. The key is true only when all three pictures got yes. "
+        "There is no score."
+    ),
+    definitions=MappingProxyType({}),
+    carried_notice=(
+        "The question now has one meaning. Pick the answer you mean. The words you already wrote "
+        "about this picture are kept; add more if you like."
+    ),
+)
+
 #: Every one-question version this one supersedes, oldest first.
-SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_3)
+SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_3, VERSION_4)
 
 #: The two conditions the product-shell key has actually been scored under. Melbourne's record
 #: set the key true while its preview API answered three 404s, so the key alone never says which.

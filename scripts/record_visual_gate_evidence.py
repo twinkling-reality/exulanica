@@ -3,13 +3,13 @@
 Two verbs, because they bind different evidence:
 
 ``reconciliation``
-    Reads the three retained rejection records and their briefs, the version 2 reconciliation
-    record, the rubric and the answers given under version 2, recomputes every digest, resolves
+    Reads the three retained rejection records and their briefs, the version 4 reconciliation
+    record, the rubric and the reply typed under version 4, recomputes every digest, resolves
     every hardPass spelling through ``exulanica.evaluation.gate_keys``, checks that no corridor and
-    no record was scored against an earlier key set, retains byte-for-byte copies of the rubric and
-    of the pictures the version 2 answers are about, writes the answers' words to the record's
-    private companion, and writes
-    ``docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json``. Any disagreement
+    no record was scored against an earlier key set, retains a byte-for-byte copy of the rubric,
+    binds the picture the reply is about as the version 3 record retained it, writes the reply's
+    words to the record's private companion, and writes
+    ``docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json``. Any disagreement
     between the files and the reconciled table stops the write and says so.
 
 ``baseline``
@@ -87,11 +87,12 @@ EARLIER_RECONCILIATIONS = (
     "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json",
     "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json",
     "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json",
+    "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json",
 )
 SUPERSEDED_RECONCILIATION = EARLIER_RECONCILIATIONS[-1]
-RECONCILIATION = ROOT / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json"
+RECONCILIATION = ROOT / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json"
 RECONCILIATION_ARTIFACTS = (
-    ROOT / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v4"
+    ROOT / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5"
 )
 RUBRIC_COPY = RECONCILIATION_ARTIFACTS / "visual-gate-rubric.md"
 BASELINE = ROOT / "docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json"
@@ -132,7 +133,9 @@ def _write(
     text = json.dumps(document, indent=2, ensure_ascii=False) + "\n"
     _refuse_forbidden(text, path.name)
     try:
-        refuse_private_words(text, private, lines=lines)
+        # JSON quotes every key and value, so the quoted-part test, which the record builder has
+        # already run on every string, would read keys such as "why" as quotations here.
+        refuse_private_words(text, private, lines=lines, quoted=False)
     except GateEvidenceError as error:
         raise SystemExit(f"refusing to write {path.name}: {error}") from error
     path.write_text(text, encoding="utf-8")
@@ -481,7 +484,7 @@ def _database_role(url: str) -> dict[str, Any]:
 
 
 def _rubric() -> tuple[bytes, str]:
-    """The rubric on disk, which must be the one the version 2 reconciliation record fixed."""
+    """The rubric on disk, which must be the one the current reconciliation record fixed."""
     rubric = (ROOT / RUBRIC_PATH).read_bytes()
     digest = hashlib.sha256(rubric).hexdigest()
     fixed = json.loads(RECONCILIATION.read_bytes())["record"]["judgedKey"]
@@ -691,6 +694,26 @@ def _reconstruction_claim(run: dict[str, Any]) -> str:
     return fetched + drawn
 
 
+def _judged_claim(detail: dict[str, Any]) -> str:
+    """How the judged key was answered and read, as the record states it."""
+    answered = detail["answeredAgainst"]["rubricVersion"]
+    if answered == RUBRIC_VERSION:
+        under = f"under rubric version {RUBRIC_VERSION}"
+    else:
+        under = (
+            f"under rubric version {answered}, and read under rubric version {RUBRIC_VERSION}, "
+            "which shows the judge the same words and changes only how a typed reply is read"
+        )
+    return (
+        f"readsAsInhabitedStreet was answered by the named judge, one picture at a time, {under}. "
+        "No model judged any picture: no model produced, suggested, pre-filled or ranked an "
+        "answer, and the key stays reserved to the named human judge. Nothing beyond the "
+        "rubric's typed-reply rule was inferred from the judge's words, which are kept exactly as "
+        "typed in this record's private companion; this record carries their SHA-256 and byte "
+        "count."
+    )
+
+
 def _because_judged(detail: dict[str, Any]) -> str:
     decisive = detail["decisiveNo"]
     if decisive is None:
@@ -699,7 +722,14 @@ def _because_judged(detail: dict[str, Any]) -> str:
     tail = ""
     if unasked:
         tail = f", so {' and '.join(unasked)} {'was' if len(unasked) == 1 else 'were'} not asked"
-    return f"the named judge answered no to {PICTURE_TITLES[decisive]} ({decisive}){tail}"
+    picture = f"{PICTURE_TITLES[decisive]} ({decisive})"
+    entry = next(entry for entry in detail["pictures"] if entry["label"] == decisive)
+    if entry["picked"] is None:
+        return (
+            f"the named judge typed a reply to {picture} in place of a pick, and the rubric's "
+            f"typed-reply rule reads it as no{tail}"
+        )
+    return f"the named judge picked no for {picture}{tail}"
 
 
 def baseline(arguments: argparse.Namespace) -> int:
@@ -1094,16 +1124,17 @@ def baseline(arguments: argparse.Namespace) -> int:
                 reconstruction_claim,
                 f"{lock_sentence} The heading was set by writing the controls' yaw once, and every "
                 "position came from the product's own movement.",
-                "readsAsInhabitedStreet was answered by the named judge, one picture at a time under "
-                f"rubric version {RUBRIC_VERSION}. No model produced, suggested, pre-filled or ranked "
-                "an answer, and nothing was inferred from the judge's words. The words are kept "
-                "exactly as typed in this record's private companion, and this record carries their "
-                "SHA-256 and byte count.",
-                "What the judge gave about these captures under rubric versions 2 and 3 is not "
-                "this record's answer. It is calibration evidence in the version 3 and version 4 "
-                "reconciliation records, and no key value here is taken from it. Where a picture's "
-                "reason includes words the judge wrote under an earlier version, the ask said they "
-                "were kept, and each is labelled with when and under which version it was given.",
+                _judged_claim(judged_detail),
+                "The typed-reply rule of rubric version 5 was adopted after the reply this record "
+                "reads was given, and that reply is the rule's first application. The judge had "
+                "declined further questions about these pictures, so none was asked again.",
+                "What the judge gave about these captures under rubric version 2, and the pick "
+                "given under version 3, are not this record's answer. They are calibration "
+                "evidence in the version 3 and version 4 reconciliation records, and no key value "
+                "here is taken from them; the version 2 reply is not re-read under version 5. "
+                "Where a picture's reason includes words the judge wrote under an earlier version, "
+                "the ask said they were kept, and each is labelled with when and under which "
+                "version it was given.",
                 "A picture listed as not asked after a decisive no was not shown to the judge for an "
                 "answer, and nothing is claimed about how it would have been answered.",
                 "The three retained rejections are not scored or re-scored here.",
@@ -1141,7 +1172,7 @@ def baseline(arguments: argparse.Namespace) -> int:
                     "scoredUnder": GATE_KEY_SET_VERSION,
                     "note": (
                         "The runs were measured by the code at this commit, whose loom-gate "
-                        "package still named key set version 2. Versions 3 and 4 moved no "
+                        "package still named key set version 2. Versions 3, 4 and 5 moved no "
                         "measurement, threshold or mechanical decision, as their reconciliation "
                         "records state, so the same numbers decide every key under the version "
                         "this record is scored under."
@@ -1241,6 +1272,7 @@ def baseline(arguments: argparse.Namespace) -> int:
                     "rubric": RUBRIC_PATH,
                     "rubricVersion": RUBRIC_VERSION,
                     "rubricCopy": _relative(RUBRIC_COPY),
+                    "answeredAgainst": judged_detail["answeredAgainst"],
                     "answeredFrom": (
                         "each capture above, shown alone at full size under its picture title and "
                         "followed by its one question, in route order, stopping at the first no"
@@ -1279,7 +1311,9 @@ def baseline(arguments: argparse.Namespace) -> int:
     except GateEvidenceError as error:
         shutil.rmtree(ARTIFACTS, ignore_errors=True)
         raise SystemExit(f"nothing is written: {error}") from error
-    companion_path, companion = judge_words_file(_relative(BASELINE), judged)
+    companion_path, companion = judge_words_file(
+        _relative(BASELINE), judged, judged_detail["answeredAgainst"]["rubricVersion"]
+    )
     if document["record"]["judgeWords"]["sha256"] != hashlib.sha256(companion).hexdigest():
         raise SystemExit("the private companion is not the one the record binds")
     _write_private(companion_path, companion, replace=arguments.replace)
@@ -1333,7 +1367,7 @@ def main(argv: list[str] | None = None) -> int:
     reconcile = verbs.add_parser("reconciliation", help="write the key reconciliation record")
     reconcile.add_argument("--date", required=True, help="ISO date the record is produced")
     reconcile.add_argument(
-        "--calibration", required=True, help="the pick and words given under rubric version 3"
+        "--calibration", required=True, help="the reply typed under rubric version 4"
     )
     reconcile.add_argument("--replace", action="store_true")
     reconcile.set_defaults(handler=reconciliation)

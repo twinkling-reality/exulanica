@@ -2,9 +2,9 @@
 
 A gate that cannot be made to fail in a test is not a gate. Every refusal below is a way a record
 could otherwise have been written with less evidence than its keys claim. The judged key follows
-rubric version 4: one question per picture, in route order, and the first no decides. The judge's
-words never enter a public record, which carries their SHA-256 and byte count; a private companion
-holds them.
+rubric version 5: one question per picture, in route order, the first no decides, and a reply typed
+in place of a pick can only ever be a no. The judge's words never enter a public record, which
+carries their SHA-256 and byte count; a private companion holds them.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.errors import CanonicalisationError
+from exulanica.evaluation import visual_gate
 from exulanica.evaluation.gate_keys import (
     ANSWER_OPTIONS,
     ANSWER_REQUIREMENT,
@@ -36,8 +37,10 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_V1,
     RUBRIC_VERSION,
     THRESHOLDS,
+    TYPED_REPLY_RULE,
     VERSION_2,
     VERSION_3,
+    VERSION_4,
     WORDS_STORAGE,
     UnknownGateKey,
     judge_prompt,
@@ -59,6 +62,7 @@ from exulanica.evaluation.visual_gate import (
     judged_answers_from_record,
     recompose_judged,
     refuse_private_words,
+    typed_reply_answer,
     visual_gate_record,
     words_fingerprint,
     words_from_companion,
@@ -452,8 +456,10 @@ def test_an_answer_without_a_reason_in_the_judges_own_words_is_refused(picked, w
         ("Yes (Recommended)", "It looks lived in.", _JUDGE, "not one of the options"),
         ("yes", "It looks lived in.", _JUDGE, "not one of the options"),
         ("Other", "It looks lived in.", _JUDGE, "not one of the options"),
-        (None, "Just coloured shapes, no shops at all.", _JUDGE, "nothing is inferred"),
+        (None, "Just coloured shapes, not one shop.", _JUDGE, "nothing is inferred"),
         (None, "Nobody could live here.", _JUDGE, "nothing is inferred"),
+        (None, "Yes, shops and a lobby I could name.", _JUDGE, "nothing is inferred"),
+        (None, "No shops, yes, but it is a street.", _JUDGE, "nothing is inferred"),
         (None, "[No preference]", _JUDGE, "skipped"),
         (None, "No preference", _JUDGE, "skipped"),
     ],
@@ -468,7 +474,43 @@ def test_an_answer_not_typed_by_the_judge_is_refused(picked, words, typed_by, ma
         _record(_evidence(readsAsInhabitedStreet=answers))
 
 
-def test_a_typed_reply_counts_only_by_the_answer_word_it_opens_with():
+#: Replies typed in place of a pick, one for each way the typed-reply rule can read a reply. They
+#: are invented for the tests; the judge's own replies stay in the private companions.
+_TYPED_NO = "Honestly this is still a bare block model, no shops or signs at all."
+_TYPED_BOTH_WORDS = "Yes the street is there, but no, nothing looks built."
+_TYPED_YES = "Yes, though the fronts are plain, the street edge holds."
+_TYPED_NEITHER = "The street shape reads, the surfaces do not."
+
+
+@pytest.mark.parametrize(
+    ("words", "answer"),
+    [
+        (_TYPED_NO, "no"),
+        # No as a determiner is still the whole word no.
+        ("There are no shops, and every front is one colour.", "no"),
+        # The rule's known cost: the whole word no inside praise reads as a no.
+        ("A lovely street, no complaints from me.", "no"),
+        ("NO", "no"),
+        ("no-one would call this finished", "no"),
+        ("Yesterday it looked no better.", "no"),
+        (_TYPED_BOTH_WORDS, None),
+        ("No, and yes, the shapes are there.", None),
+        (_TYPED_YES, None),
+        ("yes", None),
+        ("Yes, a finished, lived-in street", None),
+        (_TYPED_NEITHER, None),
+        ("Nobody lives here.", None),
+        ("nope", None),
+        ("not really", None),
+        ("[No preference]", None),
+        ("", None),
+    ],
+)
+def test_the_typed_reply_rule_reads_only_a_whole_no_without_a_whole_yes(words, answer):
+    assert typed_reply_answer(words) == answer
+
+
+def test_a_typed_reply_can_only_ever_be_a_no():
     value, detail = _decide(
         _answers(
             _asked("start", None, "NO IT IS JUST COLOURED SHAPES"),
@@ -478,18 +520,33 @@ def test_a_typed_reply_counts_only_by_the_answer_word_it_opens_with():
     )
     assert value is False
     entry = detail["pictures"][0]
-    assert (entry["picked"], entry["answer"]) == (None, "no")
-    assert entry["words_sha256"] == hashlib.sha256(b"NO IT IS JUST COLOURED SHAPES").hexdigest()
-    value, detail = _decide(
-        _answers(
-            *(
-                _asked(label, None, "yes, shops and a lobby I could name")
-                for label in CAPTURE_LABELS
-            )
-        )
+    assert (entry["picked"], entry["answer"], entry["readFrom"]) == (
+        None,
+        "no",
+        "the typed-reply rule",
     )
-    assert value is True
-    assert {entry["answer"] for entry in detail["pictures"]} == {"yes"}
+    assert entry["words_sha256"] == hashlib.sha256(b"NO IT IS JUST COLOURED SHAPES").hexdigest()
+    assert detail["typedReplyRule"] == TYPED_REPLY_RULE
+    value, detail = _decide(
+        _answers(_asked("start", None, _TYPED_NO), _unasked("midpoint"), _unasked("endpoint"))
+    )
+    assert value is False
+    assert detail["pictures"][0]["answer"] == "no"
+    assert detail["pictures"][0]["reason"] == [
+        {
+            "from": "reply",
+            "rubricVersion": RUBRIC_VERSION,
+            "givenAt": _GIVEN_AT,
+            "givenAs": "in reply to this ask",
+            **words_fingerprint(_TYPED_NO),
+        }
+    ]
+    for words in (_TYPED_YES, _TYPED_BOTH_WORDS, _TYPED_NEITHER):
+        typed = _answers(*(_asked(label, None, words) for label in CAPTURE_LABELS))
+        with pytest.raises(GateEvidenceError, match="nothing is inferred"):
+            _decide(typed)
+        with pytest.raises(GateEvidenceError, match="nothing is inferred"):
+            _record(_evidence(readsAsInhabitedStreet=typed))
 
 
 def test_the_judges_words_are_fingerprinted_exactly_as_typed_and_kept_out_of_the_record():
@@ -906,6 +963,34 @@ def test_an_unasked_picture_cannot_carry_earlier_words():
         _decide(_answers(_asked("start", _NO, "Blocks."), carrying, _unasked("endpoint")))
 
 
+def test_a_typed_no_after_carried_words_keeps_both_reasons_in_the_order_given():
+    value, detail = _decide(
+        _answers(_with_carried(None, _TYPED_NO), _unasked("midpoint"), _unasked("endpoint"))
+    )
+    assert value is False
+    entry = detail["pictures"][0]
+    assert (entry["picked"], entry["answer"]) == (None, "no")
+    assert entry["words_sha256"] == words_fingerprint(_TYPED_NO)["words_sha256"]
+    assert entry["reason"] == [
+        {
+            "from": "earlier words",
+            "rubricVersion": 3,
+            "givenAt": _EARLIER_AT,
+            "givenAs": _EARLIER_AS,
+            **words_fingerprint(_EARLIER),
+        },
+        {
+            "from": "reply",
+            "rubricVersion": RUBRIC_VERSION,
+            "givenAt": _GIVEN_AT,
+            "givenAs": "in reply to this ask",
+            **words_fingerprint(_TYPED_NO),
+        },
+    ]
+    with pytest.raises(GateEvidenceError, match="nothing is inferred"):
+        _decide(_answers(_with_carried(None, _TYPED_YES), _asked("midpoint"), _asked("endpoint")))
+
+
 def test_a_rubric_digest_mismatch_is_refused():
     with pytest.raises(GateEvidenceError, match="rubric digest mismatch"):
         _decide(_answers(), rubric_sha256=_SHA)
@@ -915,6 +1000,63 @@ def test_a_rubric_digest_mismatch_is_refused():
         _record(_evidence(), rubric_sha256="docs/visual-gate-rubric.md")
     with pytest.raises(GateEvidenceError, match="must name the rubric answered"):
         _decide(dataclasses.replace(_answers(), rubric_sha256="latest"))
+
+
+def test_only_an_answer_given_against_version_4_is_read_under_another_digest():
+    against_v4 = dataclasses.replace(
+        _answers(_asked("start", None, _TYPED_NO), _unasked("midpoint"), _unasked("endpoint")),
+        rubric_sha256=VERSION_4.rubric_sha256,
+    )
+    value, detail = _decide(against_v4)
+    assert value is False
+    assert detail["rubricSha256"] == _RUBRIC_SHA
+    assert detail["rubricVersion"] == RUBRIC_VERSION == VERSION_4.rubric_version + 1
+    answered = detail["answeredAgainst"]
+    assert (answered["rubricVersion"], answered["rubricSha256"]) == (4, VERSION_4.rubric_sha256)
+    assert "exactly what version 4 showed" in answered["acceptedBecause"]
+    assert [reason["rubricVersion"] for reason in detail["pictures"][0]["reason"]] == [4]
+    _, companion = judge_words_file(_RECORD_PATH, against_v4, 4)
+    assert json.loads(companion)["replies"][0]["rubricVersion"] == 4
+    words = words_from_companion(json.loads(companion), _RECORD_PATH)
+    assert _decide(judged_answers_from_record(detail, words)) == (False, detail)
+    record = _record(_evidence(readsAsInhabitedStreet=against_v4))["record"]
+    assert record["gate"]["keys"]["readsAsInhabitedStreet"] == detail
+    assert record["judgeWords"]["sha256"] == hashlib.sha256(companion).hexdigest()
+
+    _, current = _decide(_no_at_start())
+    assert current["answeredAgainst"] == {
+        "rubricVersion": RUBRIC_VERSION,
+        "rubricSha256": _RUBRIC_SHA,
+    }
+
+    earlier = (
+        VERSION_3.rubric_sha256,
+        VERSION_2.rubric_sha256,
+        hashlib.sha256(b"rubric version 1").hexdigest(),
+        _SHA,
+    )
+    for digest in earlier:
+        with pytest.raises(GateEvidenceError, match="rubric digest mismatch"):
+            _decide(dataclasses.replace(against_v4, rubric_sha256=digest))
+
+
+@pytest.mark.parametrize(
+    "shown",
+    [
+        {"question": "Is this a street?"},
+        {"guidance": "A yes means it looks real."},
+        {"requirement": "Pick one."},
+        {"options": ("Yes", "No")},
+        {"carried_notice": None},
+    ],
+)
+def test_version_4_answers_are_refused_once_version_4_showed_anything_else(monkeypatch, shown):
+    changed = dataclasses.replace(VERSION_4, **shown)
+    assert not changed.shows_what_is_shown_now()
+    monkeypatch.setattr(visual_gate, "SUPERSEDED_VERSIONS", (VERSION_2, VERSION_3, changed))
+    against_v4 = dataclasses.replace(_no_at_start(), rubric_sha256=VERSION_4.rubric_sha256)
+    with pytest.raises(GateEvidenceError, match="rubric digest mismatch"):
+        _decide(against_v4)
 
 
 def test_a_capture_not_bound_by_digest_or_another_capture_is_refused():
@@ -1104,6 +1246,9 @@ def test_the_rubric_names_a_judge_and_fixes_the_one_question():
         assert question not in text, "the rubric still asks a version 1 question"
     assert VERSION_2.question not in text, "the rubric still asks the version 2 question"
     assert VERSION_3.question not in text, "the rubric still asks the version 3 question"
+    assert VERSION_4.question == RUBRIC_QUESTION, "version 5 changed what the judge is asked"
+    assert TYPED_REPLY_RULE in text
+    assert "counts only when its first word" not in text
     assert CARRIED_WORDS_NOTICE in text
     assert RUBRIC_GUIDANCE.index("real materials") < RUBRIC_GUIDANCE.index("ground-floor")
     assert "No model may score `readsAsInhabitedStreet`" in text
@@ -1145,7 +1290,8 @@ def test_the_judge_reads_exactly_the_rubrics_words_for_each_picture():
 _V2_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
 _V3_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json"
 _V4_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json"
-_V4_ARTIFACTS = "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v4"
+_V5_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json"
+_V5_ARTIFACTS = "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5"
 
 
 def _writer(monkeypatch, root: Path):
@@ -1158,20 +1304,27 @@ def _writer(monkeypatch, root: Path):
     spec.loader.exec_module(module)
     root = root.resolve()
     monkeypatch.setattr(module, "ROOT", root)
-    monkeypatch.setattr(module, "RECONCILIATION", root / _V4_RECORD)
-    monkeypatch.setattr(module, "RUBRIC_COPY", root / _V4_ARTIFACTS / "visual-gate-rubric.md")
+    monkeypatch.setattr(module, "RECONCILIATION", root / _V5_RECORD)
+    monkeypatch.setattr(module, "RUBRIC_COPY", root / _V5_ARTIFACTS / "visual-gate-rubric.md")
     return module
 
 
 def _scratch_root(tmp_path: Path, rubric: bytes, v3_measurements_unchanged: bool = True) -> Path:
-    """A document root holding the rubric and stubs of the reconciliation chain, v4 at its head."""
+    """A document root holding the rubric and stubs of the reconciliation chain, v5 at its head."""
     root = tmp_path / "root"
-    (root / _V4_ARTIFACTS).mkdir(parents=True)
+    (root / _V5_ARTIFACTS).mkdir(parents=True)
     (root / "docs/visual-gate-rubric.md").write_bytes(rubric)
-    (root / _V4_ARTIFACTS / "visual-gate-rubric.md").write_bytes(rubric)
+    (root / _V5_ARTIFACTS / "visual-gate-rubric.md").write_bytes(rubric)
     chain = {
-        _V4_RECORD: {
+        _V5_RECORD: {
             "judgedKey": {"rubricSha256": hashlib.sha256(rubric).hexdigest()},
+            "supersedes": {
+                "keySet": VERSION_4.key_set,
+                "measurementsUnchanged": True,
+                "path": _V4_RECORD,
+            },
+        },
+        _V4_RECORD: {
             "supersedes": {
                 "keySet": VERSION_3.key_set,
                 "measurementsUnchanged": True,
@@ -1267,6 +1420,16 @@ def test_the_writer_refuses_a_judgement_not_asked_in_the_rubrics_words(monkeypat
     answers, _ = writer._judgement(stale, rubric)
     with pytest.raises(GateEvidenceError, match="rubric digest mismatch"):
         _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+    for digest in (VERSION_3.rubric_sha256, VERSION_2.rubric_sha256):
+        earlier = _judgement_file(tmp_path / "f.json", rubric, rubricSha256=digest)
+        answers, _ = writer._judgement(earlier, rubric)
+        with pytest.raises(GateEvidenceError, match="rubric digest mismatch"):
+            _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+    fourth = _judgement_file(tmp_path / "g.json", rubric, rubricSha256=VERSION_4.rubric_sha256)
+    answers, _ = writer._judgement(fourth, rubric)
+    value, detail = _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+    assert value is False
+    assert detail["answeredAgainst"]["rubricSha256"] == VERSION_4.rubric_sha256
 
 
 def test_the_writer_accepts_a_superseded_key_set_only_when_its_measurements_are_unchanged(
@@ -1276,11 +1439,16 @@ def test_the_writer_accepts_a_superseded_key_set_only_when_its_measurements_are_
     writer = _writer(monkeypatch, _scratch_root(tmp_path / "same", rubric))
     assert writer._key_sets_measured_alike() == {
         GATE_KEY_SET_VERSION,
+        VERSION_4.key_set,
         VERSION_3.key_set,
         VERSION_2.key_set,
     }
     writer = _writer(monkeypatch, _scratch_root(tmp_path / "moved", rubric, False))
-    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION, VERSION_3.key_set}
+    assert writer._key_sets_measured_alike() == {
+        GATE_KEY_SET_VERSION,
+        VERSION_4.key_set,
+        VERSION_3.key_set,
+    }
     run = tmp_path / "run.json"
     run.write_text(
         json.dumps({"profile": "exulanica.visual-gate-run/v1", "keySet": VERSION_2.key_set}),
@@ -1401,8 +1569,14 @@ def test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names(
     assert f"Named human judge: {judged['judge']}\n" in rubric
     rubric_sha = hashlib.sha256(_RUBRIC.read_bytes()).hexdigest()
     assert judged["rubricSha256"] == rubric_sha
-    # Version 2 composition, decided again from what the record carries and nothing else.
+    # Version 5 composition, decided again from what the record carries and nothing else.
     assert judged["rubricVersion"] == RUBRIC_VERSION
+    assert judged["typedReplyRule"] == TYPED_REPLY_RULE
+    answered = judged["answeredAgainst"]
+    assert (answered["rubricVersion"], answered["rubricSha256"]) in {
+        (RUBRIC_VERSION, rubric_sha),
+        (VERSION_4.rubric_version, VERSION_4.rubric_sha256),
+    }
     assert (judged["question"], judged["guidance"]) == (RUBRIC_QUESTION, RUBRIC_GUIDANCE)
     assert [entry["picture"] for entry in judged["pictures"]] == list(PICTURE_TITLES.values())
     value = recompose_judged(judged)
@@ -1419,6 +1593,9 @@ def test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names(
             for reason in entry["reason"]:
                 assert reason["words_private"] is True and reason["words_bytes"] > 0
                 assert reason["rubricVersion"] <= RUBRIC_VERSION
+                assert reason["givenAt"] and reason["givenAs"].strip()
+            if entry["picked"] is None:
+                assert (entry["answer"], entry["readFrom"]) == ("no", "the typed-reply rule")
             prompt = judge_prompt(entry["label"])
             notice = entry.get("noticeAboveTheQuestion")
             shown = prompt if notice is None else f"{notice}\n\n{prompt}"
@@ -1435,6 +1612,7 @@ def test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names(
         if detail["evidenceKind"] == "mechanical":
             assert decide_mechanical(spelling, detail["decidedBy"]) is record["hardPass"][spelling]
     assert record["claimsNotMade"]
+    assert any("No model judged any picture" in claim for claim in record["claimsNotMade"])
 
 
 def test_the_retained_baseline_is_decided_again_from_its_private_companion():

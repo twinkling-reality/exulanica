@@ -6,20 +6,21 @@ only possible if the gate can say FAIL. So this module decides; it does not tran
 *   **Every mechanical key is re-decided here** from the measured fields its canonical definition
     names. A caller cannot hand in ``True``; it hands in the numbers, and a number that is missing
     is a key with no evidence, which is refused rather than emitted.
-*   **The judged key is decided only from a named human's answers**, under version 4 of
+*   **The judged key is decided only from a named human's answers**, under version 5 of
     docs/visual-gate-rubric.md: one question per picture, asked in route order, and the first no
-    decides. No name, a placeholder in place of a name, a rubric other than the one the record is
-    written with, a picture other than the one bound, an answer somebody else typed, an answer with
-    no reason in the judge's own words, a follow-up nobody needed, an answer given after a decisive
-    no and a key with a picture unasked are all refused. Nothing in this module can produce
-    ``readsAsInhabitedStreet`` from a measurement, and nothing may.
+    decides. A reply typed in place of a pick can only ever be a no. No name, a placeholder in
+    place of a name, a rubric the judge was not shown, a picture other than the one bound, an
+    answer somebody else typed, an answer with no reason in the judge's own words, a follow-up
+    nobody needed, an answer given after a decisive no and a key with a picture unasked are all
+    refused. Nothing in this module can produce ``readsAsInhabitedStreet`` from a measurement, and
+    nothing may.
 *   **The judge's words stay private.** A public record carries, for each reply, the SHA-256 and
     byte count of the judge's words and binds a companion record under ``.exulanica/judge-words/``
     that holds them. The companion never enters the repository, and
     :func:`refuse_private_words` refuses a public record that would carry any of the words.
 *   **The corridor bar is every key.** A candidate passes only when all nine keys hold, the judged
-    one by three yes answers, and never against a baseline that itself holds every key, because
-    then the gate could not tell the candidate from what it replaces.
+    one by three picked yes answers, and never against a baseline that itself holds every key,
+    because then the gate could not tell the candidate from what it replaces.
 
 The record shape follows the three retained rejections, so the four can be read side by side, and
 the envelope is the repository's digest-bound profile: ``record_sha256`` is the SHA-256 of
@@ -66,7 +67,8 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_VERSION,
     SUPERSEDED_VERSIONS,
     THRESHOLDS,
-    VERSION_3,
+    TYPED_REPLY_RULE,
+    VERSION_4,
     WORDS_STORAGE,
     GateKey,
     key,
@@ -100,6 +102,7 @@ __all__ = [
     "recompose_judged",
     "reconciliation_record",
     "refuse_private_words",
+    "typed_reply_answer",
     "visual_gate_record",
     "words_fingerprint",
     "words_from_companion",
@@ -107,22 +110,24 @@ __all__ = [
 
 DIGEST_BOUND_PROFILE: Final = "exulanica.digest-bound-record/v1"
 
-#: How the judged answers compose under rubric version 4, as the records state it.
+#: How the judged answers compose under rubric version 5, as the records state it.
 COMPOSITION: Final = (
     "Each capture is shown alone, in route order, and the judge answers the one question with the "
-    "option they mean and their own words. An answer that arrives without words may be followed "
-    "once, with the picture shown alone again, by a request for the reason, and that reply never "
-    "changes the answer. A pick that the judge's own words, given right after it, may contradict "
-    "is not recorded. Words the judge wrote about a picture before its question was reworded are "
-    "carried into its next ask, under a line that says so; they are part of the reason for a no, "
-    "and a yes needs new words. The first no makes the key false and the pictures after it are "
-    "not asked. The key is true only when all three pictures got yes. There is no score."
+    "option they mean and their own words. A typed reply with no pick counts as no when it holds "
+    "the whole word no and not the whole word yes, and never counts as yes. An answer that arrives "
+    "without words may be followed once, with the picture shown alone again, by a request for the "
+    "reason, and that reply never changes the answer. A pick that the judge's own words, given "
+    "right after it, may contradict is not recorded. Words the judge wrote about a picture before "
+    "its question was reworded are carried into its next ask, under a line that says so; they are "
+    "part of the reason for a no, and a yes needs new words. The first no makes the key false and "
+    "the pictures after it are not asked. The key is true only when all three pictures got a "
+    "picked yes. There is no score."
 )
 
 #: What a corridor has to clear, as the records state it.
 CORRIDOR_BAR: Final = (
-    "all three pictures answered yes by the named judge, plus every mechanical key, against a "
-    "baseline that does not itself hold every key"
+    "all three pictures answered by picking yes, by the named judge, plus every mechanical key, "
+    "against a baseline that does not itself hold every key"
 )
 
 #: Text a record may never carry, the same three the retained-records test refuses.
@@ -174,6 +179,10 @@ _TEMPLATE_SLOT: Final = re.compile(r"^[<{\[].*[>}\]]$")
 #: The answer word a typed reply has to open with. Nothing may precede it but white space, so the
 #: bracketed marker a question tool shows for a skipped question can never read as a no.
 _OPENING_ANSWER: Final = re.compile(r"^\s*(yes|no)\b", flags=re.IGNORECASE)
+
+#: The whole words the typed-reply rule reads, in any case.
+_WHOLE_NO: Final = re.compile(r"\bno\b", flags=re.IGNORECASE)
+_WHOLE_YES: Final = re.compile(r"\byes\b", flags=re.IGNORECASE)
 
 #: A skipped question as a question tool reports it. Not an answer, whatever its first word is.
 _SKIP_MARKERS: Final = frozenset({"no preference", "[no preference]"})
@@ -422,6 +431,7 @@ def refuse_private_words(
     *,
     shown: Sequence[str] = (),
     lines: Sequence[str] = (),
+    quoted: bool = True,
     path: str = "$",
 ) -> None:
     """Refuse a public record that would carry any of the judge's words.
@@ -429,7 +439,9 @@ def refuse_private_words(
     ``private`` holds the judge's words, ``lines`` any line written for an ask that may quote
     them, and ``shown`` what the judge was shown. No string in ``value`` may contain a private
     text or line of three words or more, a run of five of the judge's words that the judge was
-    not shown, or a quoted part of the judge's words other than an answer word.
+    not shown, or, unless ``quoted`` is false, a quoted part of the judge's words other than an
+    answer word. Prose quotes to name what somebody wrote; source code quotes single common words
+    for other reasons, so a check over code turns the last test off.
     """
     texts = [_folded(text) for text in private if isinstance(text, str) and text.strip()]
     written = [_folded(line) for line in lines if isinstance(line, str) and line.strip()]
@@ -454,7 +466,7 @@ def refuse_private_words(
                 raise GateEvidenceError(
                     f"{where} carries the judge's words, which stay in the private companion"
                 )
-            for match in _QUOTED.finditer(item):
+            for match in _QUOTED.finditer(item) if quoted else ():
                 span = _folded(next(group for group in match.groups() if group is not None))
                 if len(span) < 2 or span in {"yes", "no"}:
                     continue
@@ -565,6 +577,19 @@ def _carried(where: str, picture: PictureAnswer, judge: str) -> list[dict[str, A
     return entries
 
 
+def typed_reply_answer(words: str) -> str | None:
+    """How a reply typed in place of a pick is read: ``"no"``, or None when it is not an answer.
+
+    It is no only when it holds the whole word no, in any case, and not the whole word yes. It is
+    never yes: a yes must be picked, so a typed reply can fail the key and never pass it.
+    """
+    if not isinstance(words, str) or _is_skip(words):
+        return None
+    if _WHOLE_NO.search(words) and not _WHOLE_YES.search(words):
+        return "no"
+    return None
+
+
 def _answer(
     label: str, picture: PictureAnswer, judge: str, judged_on: str, answered_version: int
 ) -> dict[str, Any]:
@@ -586,16 +611,17 @@ def _answer(
     blank = words is None or words.strip() == ""
     if not blank and _is_skip(words):
         raise GateEvidenceError(f"{where} was skipped, which is not an answer")
-    opening = None if blank else _OPENING_ANSWER.match(words)
     if picture.picked is None:
         if blank:
             raise GateEvidenceError(f"{where} was skipped, which is not an answer")
-        if opening is None:
+        typed = typed_reply_answer(words)
+        if typed is None:
             raise GateEvidenceError(
-                f"{where}: the judge picked no option and their reply does not begin with yes or "
-                "no, so there is no answer the judge gave; nothing is inferred from their words"
+                f"{where}: the judge picked no option, and a typed reply counts only as a no, "
+                "when it holds the whole word no and not the whole word yes; this one does not, "
+                "so it is not an answer and nothing is inferred from it"
             )
-        answer = opening.group(1).casefold()
+        answer = typed
     elif picture.picked in OPTION_ANSWERS:
         answer = OPTION_ANSWERS[picture.picked]
     else:
@@ -608,11 +634,7 @@ def _answer(
         "state": "answered",
         "picked": picture.picked,
         "answer": answer,
-        "readFrom": (
-            "the option picked"
-            if picture.picked is not None
-            else "the first word of the typed reply"
-        ),
+        "readFrom": ("the option picked" if picture.picked is not None else "the typed-reply rule"),
         "rubricVersion": answered_version,
         "givenAt": picture.given_at,
         **words_fingerprint(None if blank else words),
@@ -702,14 +724,41 @@ def _answer(
     return entry
 
 
+def _answered_version(answered_sha256: str, rubric_sha256: str) -> dict[str, Any]:
+    """The rubric version a judgement was given against, or a digest-mismatch refusal."""
+    if answered_sha256 == rubric_sha256:
+        return {"rubricVersion": RUBRIC_VERSION, "rubricSha256": rubric_sha256}
+    previous = SUPERSEDED_VERSIONS[-1]
+    if (
+        previous.rubric_version == RUBRIC_VERSION - 1
+        and answered_sha256 == previous.rubric_sha256
+        and previous.shows_what_is_shown_now()
+    ):
+        return {
+            "rubricVersion": previous.rubric_version,
+            "rubricSha256": previous.rubric_sha256,
+            "acceptedBecause": (
+                f"version {RUBRIC_VERSION} shows the judge exactly what version "
+                f"{previous.rubric_version} showed: the same question, guidance, requirement "
+                "line, options, carried-words line and follow-up"
+            ),
+        }
+    raise GateEvidenceError(
+        f"{JUDGED_KEY}: the judge answered against rubric {answered_sha256}, and the record is "
+        f"written with rubric {rubric_sha256}; a rubric digest mismatch is refused"
+    )
+
+
 def decide_judged(
     evidence: JudgedAnswers, *, rubric_sha256: str, captures: Mapping[str, str]
 ) -> tuple[bool, dict[str, Any]]:
-    """The judged key's value and what it was decided from, under rubric version 4.
+    """The judged key's value and what it was decided from, under rubric version 5.
 
     ``rubric_sha256`` is the digest of the rubric the record is written with, and ``captures``
     maps each route label to the SHA-256 of the capture the record binds. The judge's answers
-    must name both exactly, so a judgement cannot be carried onto another rubric or picture.
+    must name both, so a judgement cannot be carried onto another rubric or picture. The one
+    exception is a judgement given against the version this one superseded when that version
+    showed the judge exactly what this one shows; both digests are then carried.
     """
     if not isinstance(evidence, JudgedAnswers):
         raise GateEvidenceError(f"{JUDGED_KEY} needs the named judge's answers")
@@ -720,11 +769,7 @@ def decide_judged(
         raise GateEvidenceError(f"{JUDGED_KEY}: rubric_sha256 must name the rubric answered")
     if not isinstance(rubric_sha256, str) or not _SHA256.match(rubric_sha256):
         raise GateEvidenceError(f"{JUDGED_KEY}: the record names no rubric digest to check against")
-    if evidence.rubric_sha256 != rubric_sha256:
-        raise GateEvidenceError(
-            f"{JUDGED_KEY}: the judge answered against rubric {evidence.rubric_sha256}, and the "
-            f"record is written with rubric {rubric_sha256}; a rubric digest mismatch is refused"
-        )
+    answered = _answered_version(evidence.rubric_sha256, rubric_sha256)
     pictures = tuple(evidence.pictures)
     labels = [getattr(picture, "label", None) for picture in pictures]
     if labels != list(CAPTURE_LABELS) or not all(
@@ -760,7 +805,9 @@ def decide_judged(
                     f"{JUDGED_KEY}: {PICTURE_TITLES[label]} ({label}) was answered after the "
                     f"decisive no at {decisive}; the rubric does not ask it"
                 )
-            entry.update(_answer(label, picture, judge, evidence.judged_on, RUBRIC_VERSION))
+            entry.update(
+                _answer(label, picture, judge, evidence.judged_on, answered["rubricVersion"])
+            )
             if entry["answer"] == "no":
                 decisive = label
         elif picture.asked is False:
@@ -793,7 +840,8 @@ def decide_judged(
         "evidenceKind": "judged",
         "rubric": RUBRIC_PATH,
         "rubricVersion": RUBRIC_VERSION,
-        "rubricSha256": evidence.rubric_sha256,
+        "rubricSha256": rubric_sha256,
+        "answeredAgainst": answered,
         "judge": judge,
         "judgedOn": evidence.judged_on,
         "question": RUBRIC_QUESTION,
@@ -801,6 +849,7 @@ def decide_judged(
         "requirement": ANSWER_REQUIREMENT,
         "options": list(ANSWER_OPTIONS),
         "optionAnswers": dict(OPTION_ANSWERS),
+        "typedReplyRule": TYPED_REPLY_RULE,
         "composition": COMPOSITION,
         "pictures": entries,
         "decisiveNo": decisive,
@@ -947,7 +996,7 @@ def judged_answers_from_record(
         return JudgedAnswers(
             judge=detail["judge"],
             judged_on=detail["judgedOn"],
-            rubric_sha256=detail["rubricSha256"],
+            rubric_sha256=detail["answeredAgainst"]["rubricSha256"],
             pictures=tuple(pictures),
         )
     except (KeyError, TypeError) as error:
@@ -982,6 +1031,8 @@ def recompose_judged(detail: Mapping[str, Any]) -> bool:
                     raise GateEvidenceError(f"{where} was answered after the decisive no")
                 if entry["answer"] not in ("yes", "no") or entry["typedBy"] != detail["judge"]:
                     raise GateEvidenceError(f"{where} is not an answer the judge gave")
+                if entry["picked"] is None and entry["answer"] != "no":
+                    raise GateEvidenceError(f"{where} reads a typed reply as a yes")
                 reasons = list(entry["reason"])
                 if not reasons or not all(_fingerprinted(reason) for reason in reasons):
                     raise GateEvidenceError(f"{where} carries no fingerprint of the judge's words")
@@ -1147,10 +1198,11 @@ def visual_gate_record(
     """A digest-bound visual gate record in the retained rejection records' shape.
 
     ``rubric_sha256`` is the digest of the rubric the record is written with; the judge must have
-    answered against exactly that rubric. ``record_path`` is where the record is written, which
-    names its private companion; the record binds that companion and carries none of the judge's
-    words. ``baseline`` is the calibration record a candidate is read against. Without it the
-    record is itself a baseline and its verdict is decided by the nine keys alone.
+    answered against that rubric, or against the one it superseded when that showed the judge the
+    same words. ``record_path`` is where the record is written, which names its private companion;
+    the record binds that companion and carries none of the judge's words. ``baseline`` is the
+    calibration record a candidate is read against. Without it the record is itself a baseline
+    and its verdict is decided by the nine keys alone.
     """
     if not _ISO_DATE.match(date):
         raise GateEvidenceError("date must be an ISO date")
@@ -1227,7 +1279,8 @@ def visual_gate_record(
         record["baselineComparison"] = comparison
     judged = evidence[JUDGED_KEY]
     assert isinstance(judged, JudgedAnswers)  # build_gate refuses anything else
-    companion_path, companion = judge_words_file(record_path, judged)
+    answered = _answered_version(judged.rubric_sha256, rubric_sha256)
+    companion_path, companion = judge_words_file(record_path, judged, answered["rubricVersion"])
     record["judgeWords"] = _companion_binding(companion_path, companion)
     for name, value in (extra or {}).items():
         if name in record:
@@ -1371,6 +1424,7 @@ _RUBRIC_LINES: Final = (
     ANSWER_REQUIREMENT,
     CARRIED_WORDS_NOTICE,
     WORDS_STORAGE,
+    TYPED_REPLY_RULE,
     *(reason_follow_up(answer) for answer in OPTION_ANSWERS.values()),
     *(f"**{option}**" for option in ANSWER_OPTIONS),
     f"`{NOT_ASKED}`",
@@ -1378,8 +1432,32 @@ _RUBRIC_LINES: Final = (
     *(f"| `{label}` | {title} |" for label, title in PICTURE_TITLES.items()),
 )
 
-#: The two claims version 3's question joined.
-_V3_CLAIMS: Final = ("a finished, lived-in street", "not a plain block mock-up")
+#: What version 4 said a corridor has to clear, before the bar said the yes answers are picked.
+_V4_CORRIDOR_BAR: Final = (
+    "all three pictures answered yes by the named judge, plus every mechanical key, against a "
+    "baseline that does not itself hold every key"
+)
+
+#: Every refusal the record writer makes, as the records state them.
+_WRITER_REFUSES: Final = (
+    "a missing or placeholder judge",
+    "a missing reason in the judge's own words, including a follow-up that gets no words",
+    "a reply that does not say when it was given",
+    "a rubric digest mismatch, except a judgement given against the version this one superseded "
+    "when that version showed the judge exactly what this one shows",
+    "a capture not bound by digest, or an answer about another capture",
+    "a yes key with any picture unasked",
+    "an answer given after a decisive no",
+    "a typed reply that does not hold the whole word no, or that holds the whole word yes",
+    "a follow-up for an answer that already gave its reason, or one not in the rubric's words",
+    "a pick that is not one of the options",
+    "carried words without the line that says they are kept, or from a rubric version that was "
+    "never fixed",
+    "a yes whose only words are carried words, and a follow-up for a picture whose earlier words "
+    "are carried",
+    "any answer or follow-up reply not typed by the judge",
+    "a public record that would carry any of the judge's words, or a quoted part of them",
+)
 
 
 def _storage_note(version: int) -> str:
@@ -1404,16 +1482,16 @@ def _brief_quote_holds(quote: str, brief_text: str) -> bool:
 
 
 def _rubric_binding(rubric: bytes, copy_path: str) -> dict[str, Any]:
-    """The rubric the record fixes: checked for the version 4 wording, then bound by digest."""
+    """The rubric the record fixes: checked for the version 5 wording, then bound by digest."""
     text = rubric.decode("utf-8")
     for line in _RUBRIC_LINES:
         if line not in text:
             raise GateEvidenceError(f"FINDING: the rubric does not carry {line.strip()!r}")
-    earlier = (
+    earlier = {
         *(question for _, question in RUBRIC_V1.questions),
         *(version.question for version in SUPERSEDED_VERSIONS),
-    )
-    for question in earlier:
+    } - {RUBRIC_QUESTION}
+    for question in sorted(earlier):
         if question in text:
             raise GateEvidenceError(f"FINDING: the rubric still asks {question!r}")
     judges = re.findall(r"^Named human judge: (.*)$", text, flags=re.MULTILINE)
@@ -1431,7 +1509,7 @@ def _rubric_binding(rubric: bytes, copy_path: str) -> dict[str, Any]:
 
 
 def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any]:
-    """The version 3 record, checked to say what version 3 said and to differ only where it may."""
+    """The version 4 record, checked to say what version 4 said and to differ only where it may."""
     if document.get("profile") != DIGEST_BOUND_PROFILE:
         raise GateEvidenceError(f"{path} is not a digest-bound record")
     body = document["record"]
@@ -1447,36 +1525,47 @@ def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any
         judged["guidance"],
         judged["requirement"],
         judged["reasonFollowUp"],
+        judged["carriedWordsNotice"],
         judged["options"],
         judged["composition"],
+        judged["corridorBar"],
         judged["wordsStorage"],
+        judged.get("typedReplyRule"),
     )
     expected = (
-        VERSION_3.key_set,
-        VERSION_3.rubric_version,
-        VERSION_3.rubric_sha256,
-        VERSION_3.question,
-        VERSION_3.guidance,
-        VERSION_3.requirement,
+        VERSION_4.key_set,
+        VERSION_4.rubric_version,
+        VERSION_4.rubric_sha256,
+        VERSION_4.question,
+        VERSION_4.guidance,
+        VERSION_4.requirement,
         REASON_FOLLOW_UP,
-        list(VERSION_3.options),
-        VERSION_3.composition,
+        VERSION_4.carried_notice,
+        list(VERSION_4.options),
+        VERSION_4.composition,
+        _V4_CORRIDOR_BAR,
         WORDS_STORAGE,
+        None,
     )
     if stated != expected:
-        raise GateEvidenceError(f"FINDING: {path} is not the version 3 record this supersedes")
+        raise GateEvidenceError(f"FINDING: {path} is not the version 4 record this supersedes")
+    if not VERSION_4.shows_what_is_shown_now():
+        raise GateEvidenceError(
+            "FINDING: version 5 may change only how a typed reply is read, and it changes what "
+            "the judge is shown"
+        )
     changed: dict[str, dict[str, str]] = {}
     unchanged: list[str] = []
     for entry, item in zip(body["canonicalKeys"], CANONICAL_KEYS, strict=True):
         current = _canonical_entry(item)
         if entry["key"] != item.spelling:
             raise GateEvidenceError(f"FINDING: {path} orders the canonical keys differently")
-        before = VERSION_3.definitions.get(item.spelling, item.definition)
+        before = VERSION_4.definitions.get(item.spelling, item.definition)
         if entry["definition"] != before:
             raise GateEvidenceError(f"FINDING: {path} defines {item.spelling} unexpectedly")
         if {**entry, "definition": current["definition"]} != current:
             raise GateEvidenceError(
-                f"FINDING: {item.spelling} changed more than its wording since {path}; version 4 "
+                f"FINDING: {item.spelling} changed more than its wording since {path}; version 5 "
                 "moves no measurement"
             )
         if before == item.definition:
@@ -1490,63 +1579,82 @@ def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any
         ("authenticationConditions", list(AUTHENTICATION_CONDITIONS)),
     ):
         if body[name] != value:
-            raise GateEvidenceError(f"FINDING: {name} moved since {path}; version 4 moves none")
+            raise GateEvidenceError(f"FINDING: {name} moved since {path}; version 5 moves none")
     return {
         "path": path,
         "record_sha256": digest,
-        "keySet": VERSION_3.key_set,
-        "rubricVersion": VERSION_3.rubric_version,
-        "rubricSha256": VERSION_3.rubric_sha256,
+        "keySet": VERSION_4.key_set,
+        "rubricVersion": VERSION_4.rubric_version,
+        "rubricSha256": VERSION_4.rubric_sha256,
         "changes": {
-            "question": {"before": VERSION_3.question, "after": RUBRIC_QUESTION},
-            "guidance": {"before": VERSION_3.guidance, "after": RUBRIC_GUIDANCE},
-            "options": {"before": list(VERSION_3.options), "after": list(ANSWER_OPTIONS)},
-            "carriedWordsNotice": {"before": None, "after": CARRIED_WORDS_NOTICE},
-            "composition": {"before": VERSION_3.composition, "after": COMPOSITION},
+            "typedReplyRule": {"before": VERSION_4.typed_reply_rule, "after": TYPED_REPLY_RULE},
+            "composition": {"before": VERSION_4.composition, "after": COMPOSITION},
+            "corridorBar": {"before": _V4_CORRIDOR_BAR, "after": CORRIDOR_BAR},
+            "writerRefuses": {"before": judged["writerRefuses"], "after": list(_WRITER_REFUSES)},
             "definitions": changed,
         },
+        "shownUnchanged": True,
         "keysWithUnchangedDefinitions": unchanged,
         "measurementsUnchanged": True,
         "keyValuesChanged": [],
         "unchanged": [
             "every spelling, definition and resolution",
             "every measurement, threshold and mechanical decision, so no key value changes",
-            "the guidance for a yes, the line asking for words and the one follow-up",
+            "everything the judge is shown: the picture titles, the question, the guidance, the "
+            "line asking for words, the two options, the carried-words line and the one follow-up",
+            "that the answer is the option the judge picks",
             "that each picture is shown alone, the first no decides, and the key holds only for "
             "three yes answers",
-            "that there is no score, and that the corridor bar is three yes answers from the named "
-            "judge plus every mechanical key",
+            "that there is no score",
             "the named judge",
             "that no model may answer, suggest, pre-fill or break a tie",
             "that the judge's own words are kept exactly as typed in a private companion record, "
-            "never in a public one, and that an answer without a reason is not recorded",
+            "never in a public one, and are the reason; and that an answer without a reason is not "
+            "recorded",
             "that the rubric SHA-256 is bound",
             "that captures are bound by path, byte size and SHA-256",
-            "every refusal the record writer makes",
         ],
         "why": {
-            "question": (
-                "Version 3's question joined two claims, a finished, lived-in street and not a "
-                "plain block mock-up, so a yes, a no, or a short negation in the judge's own "
-                "words, could attach to either. The first answer given under it, described under "
-                "calibrationEvidence, could not be read without inferring. Version 4 asks one "
-                "thing."
+            "typedReplyRule": (
+                "Under version 4 a typed reply counted only when its first word was yes or no, so "
+                "a reply that says no without opening with it could not be read. Version 5 reads "
+                "a typed reply as no when it holds the whole word no and not the whole word yes, "
+                "and never as yes. A typed reply can therefore only fail a key, never pass one. "
+                "That is the cautious direction for a stop condition, so the rule cannot inflate "
+                "a result."
             ),
-            "options": (
-                "Each option now states its meaning, so a pick cannot be read as agreeing with "
-                "one half of a question and disagreeing with the other."
-            ),
-            "carriedWords": (
-                "Words the judge wrote about a picture before its question was reworded are kept "
-                "for its next ask, and the ask says so. A pick that such words, given right after "
-                "it, may contradict is not recorded; a no may take its reason from them; a yes "
-                "needs new words."
+            "corridorBar": (
+                "The bar stays absolute: three picked yes answers from the named judge, plus every "
+                "mechanical key. It now says picked, because a typed reply can never be a yes."
             ),
         },
+        "adoption": (
+            "This rule was adopted after the version 4 reply described under calibrationEvidence "
+            "was given, and that reply is the rule's first application. The judge had declined "
+            "further questions about these pictures, so none was asked again."
+        ),
+        "knownCost": (
+            "The whole word no inside a favourable sentence would read as a no. That can only "
+            "ever fail a key, never pass one. Every ask therefore presents the two options, so "
+            "that a reply typed in place of a pick stays rare."
+        ),
+        "notReRead": (
+            "The replies given under version 2, kept as calibration evidence by the version 3 "
+            "reconciliation record, are not re-read. They were given under version 2, which asked "
+            "a different question. One of them, typed in place of a pick, holds the whole word no "
+            "and not the whole word yes, so this rule would read it as a no; the rule is not "
+            "applied to them, and nothing is taken from them."
+        ),
+        "answersAcceptedFromVersion4": (
+            "A judgement given against version 4 is read under version 5, because version 4 "
+            "showed the judge exactly what version 5 shows. A record written from one carries "
+            "both digests and labels the judge's reasons with version 4. A judgement given "
+            "against any other version is refused."
+        ),
         "strictness": (
-            "Version 4 asks what version 3 meant to ask, with one meaning. The composition and "
-            "the corridor bar are unchanged, and a pick that may be contradicted is not recorded, "
-            "so version 4 is at least as strict as version 3."
+            "Version 4 could read a typed reply as a yes; version 5 reads one only as a no, and "
+            "the key still needs three picked yes answers, so version 5 is at least as strict as "
+            "version 4."
         ),
     }
 
@@ -1556,19 +1664,16 @@ def _calibration(
     captures: Sequence[Mapping[str, Any]],
     judge: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-    """The pick and message given under version 3, checked, with their words kept apart.
+    """The reply typed under version 4, with how versions 4 and 5 read it and its words apart.
 
-    Returns the public evidence, which carries each reply's pick, time and the SHA-256 and byte
-    count of its words, the replies the record's private companion keeps word for word, and the
-    lines shown above a question beside them, of which version 3's ask had none.
+    Returns the public evidence, which carries the reply's time, readings and the SHA-256 and
+    byte count of its words, the replies the record's private companion keeps word for word, and
+    the lines shown above a question beside them, of which version 4's ask had none of its own.
     """
     if calibration.get("judge") != judge:
         raise GateEvidenceError("FINDING: the calibration evidence is not the rubric's judge's")
-    if calibration.get("rubricSha256") != VERSION_3.rubric_sha256:
-        raise GateEvidenceError("FINDING: the calibration evidence was not given under version 3")
-    for claim in _V3_CLAIMS:
-        if claim not in VERSION_3.question:
-            raise GateEvidenceError(f"FINDING: version 3's question does not say {claim!r}")
+    if calibration.get("rubricSha256") != VERSION_4.rubric_sha256:
+        raise GateEvidenceError("FINDING: the calibration evidence was not given under version 4")
     pictures = list(calibration.get("pictures", []))
     labels = [picture.get("label") for picture in pictures]
     if labels != list(CAPTURE_LABELS[: len(labels)]) or not labels:
@@ -1583,103 +1688,142 @@ def _calibration(
     bound = {capture["label"]: capture["sha256"] for capture in captures}
     entries: list[dict[str, Any]] = []
     private_replies: list[dict[str, Any]] = []
-    picks = messages = 0
     for picture in pictures:
         label = picture["label"]
         title = PICTURE_TITLES[label]
         if picture.get("captureSha256") != bound[label]:
             raise GateEvidenceError(f"FINDING: {title} was answered about another capture")
         replies = list(picture.get("replies", []))
-        kinds = [reply.get("kind") for reply in replies]
-        if kinds != ["pick", "message"]:
-            raise GateEvidenceError(f"FINDING: {title} does not carry a pick and then a message")
-        carried = []
-        for reply in replies:
-            if reply.get("typedBy") != judge:
-                raise GateEvidenceError(f"FINDING: a reply about {title} was not the judge's")
-            given_at = _given_at(f"FINDING: a reply about {title}", reply.get("givenAt"))
-            words = _words_or_none(reply.get("words"))
-            if reply["kind"] == "pick":
-                if reply.get("shown") != VERSION_3.prompt(label):
-                    raise GateEvidenceError(f"FINDING: {title} was not asked in version 3's words")
-                if reply.get("picked") not in VERSION_3.options:
-                    raise GateEvidenceError(f"FINDING: {title}'s pick is not a version 3 option")
-                picks += 1
-                carried.append(
-                    {
-                        "kind": "pick",
-                        "shown": reply["shown"],
-                        "picked": reply["picked"],
-                        "rubricVersion": VERSION_3.rubric_version,
-                        "givenAt": given_at,
-                        **words_fingerprint(words),
-                        "typedBy": judge,
-                        "counted": False,
-                        "whyNotCounted": (
-                            "the judge's own words, sent right after the pick, may contradict "
-                            "it, and a pick they may contradict is not recorded"
-                        ),
-                    }
-                )
-            else:
-                if reply.get("shown") is not None or words is None:
-                    raise GateEvidenceError(f"FINDING: {title}'s message must be unasked words")
-                if _OPENING_ANSWER.match(words):
-                    raise GateEvidenceError(f"FINDING: {title}'s message opens with an answer")
-                messages += 1
-                carried.append(
-                    {
-                        "kind": "message",
-                        "shown": None,
-                        "rubricVersion": VERSION_3.rubric_version,
-                        "givenAt": given_at,
-                        **words_fingerprint(words),
-                        "typedBy": judge,
-                        "sentWith": reply.get("sentWith"),
-                        "counted": False,
-                        "whyNotCounted": (
-                            "not a reply to any ask; it begins with neither yes nor no, and a "
-                            "short negation in it can attach to either claim of the version 3 "
-                            "question, so nothing is inferred from it"
-                        ),
-                    }
-                )
+        if [reply.get("kind") for reply in replies] != ["typed"]:
+            raise GateEvidenceError(f"FINDING: {title} does not carry one typed reply")
+        (reply,) = replies
+        if reply.get("typedBy") != judge:
+            raise GateEvidenceError(f"FINDING: the reply about {title} was not the judge's")
+        given_at = _given_at(f"FINDING: the reply about {title}", reply.get("givenAt"))
+        shown = f"{VERSION_4.carried_notice}\n\n{VERSION_4.prompt(label)}"
+        if reply.get("shown") != shown:
+            raise GateEvidenceError(f"FINDING: {title} was not asked in version 4's words")
+        if reply.get("picked") is not None:
+            raise GateEvidenceError(f"FINDING: {title}'s reply was not typed in place of a pick")
+        words = reply.get("words")
+        if not isinstance(words, str) or not _has_reason(words):
+            raise GateEvidenceError(f"FINDING: {title}'s typed reply says nothing")
+        if _OPENING_ANSWER.match(words):
+            raise GateEvidenceError(
+                f"FINDING: version 4 could read {title}'s reply, so it calibrates nothing"
+            )
+        now = typed_reply_answer(words)
+        if now != "no":
+            raise GateEvidenceError(f"FINDING: version 5 does not read {title}'s reply as a no")
+        earlier = tuple(
+            CarriedWords(
+                words=item.get("words"),
+                typed_by=item.get("typedBy"),
+                rubric_version=item.get("rubricVersion"),
+                rubric_sha256=item.get("rubricSha256"),
+                given_at=item.get("givenAt"),
+                given_as=item.get("givenAs"),
+            )
+            for item in reply.get("carried", [])
+        )
+        carried = _carried(
+            f"calibration {title}",
+            PictureAnswer(
+                label=label,
+                capture_sha256=bound[label],
+                asked=True,
+                carried=earlier,
+                notice=VERSION_4.carried_notice,
+            ),
+            judge,
+        )
+        for item in earlier:
             private_replies.append(
                 {
                     "label": label,
                     "picture": title,
-                    "kind": reply["kind"],
-                    "rubricVersion": VERSION_3.rubric_version,
-                    "givenAt": given_at,
-                    "picked": reply.get("picked"),
-                    "words": words,
+                    "kind": "carried",
+                    "rubricVersion": item.rubric_version,
+                    "rubricSha256": item.rubric_sha256,
+                    "givenAt": item.given_at,
+                    "givenAs": item.given_as,
+                    "picked": None,
+                    "words": item.words,
                     "typedBy": judge,
                 }
             )
+        private_replies.append(
+            {
+                "label": label,
+                "picture": title,
+                "kind": "typed",
+                "rubricVersion": VERSION_4.rubric_version,
+                "givenAt": given_at,
+                "shownAbove": VERSION_4.carried_notice,
+                "picked": None,
+                "words": words,
+                "typedBy": judge,
+            }
+        )
         entries.append(
-            {"label": label, "picture": title, "captureSha256": bound[label], "replies": carried}
+            {
+                "label": label,
+                "picture": title,
+                "captureSha256": bound[label],
+                "replies": [
+                    {
+                        "kind": "typed",
+                        "shown": shown,
+                        "picked": None,
+                        "rubricVersion": VERSION_4.rubric_version,
+                        "givenAt": given_at,
+                        **words_fingerprint(words),
+                        "typedBy": judge,
+                        "carriedIntoTheAsk": carried,
+                        "readUnderVersion4": {
+                            "answer": None,
+                            "why": (
+                                "a typed reply counted only when its first word was yes or no, "
+                                "and this one begins with neither"
+                            ),
+                        },
+                        "readUnderVersion5": {
+                            "answer": now,
+                            "why": "it holds the whole word no and not the whole word yes",
+                        },
+                    }
+                ],
+            }
         )
     evidence = {
-        "underRubricVersion": VERSION_3.rubric_version,
-        "rubricSha256": VERSION_3.rubric_sha256,
-        "wordsKept": _storage_note(VERSION_3.rubric_version),
+        "underRubricVersion": VERSION_4.rubric_version,
+        "rubricSha256": VERSION_4.rubric_sha256,
+        "wordsKept": _storage_note(VERSION_4.rubric_version),
         "judge": judge,
         "askedIn": calibration.get("askedIn"),
         "pictures": entries,
         "notAsked": [PICTURE_TITLES[label] for label in not_asked],
-        "summary": {"answersScored": 0, "picksNotRecorded": picks, "messagesNotCounted": messages},
-        "claimsJoined": list(_V3_CLAIMS),
+        "summary": {
+            "answersScoredUnderVersion4": 0,
+            "typedRepliesVersion4CouldNotRead": len(entries),
+        },
+        "firstApplication": (
+            "Version 5's typed-reply rule was adopted after this reply was given. This reply is "
+            "the first the rule reads, and no other reply has been read under it."
+        ),
+        "judgeDeclinedFurtherQuestions": True,
         "finding": (
-            "Version 3's question joined two claims, "
-            f"{_V3_CLAIMS[0]!r} and {_V3_CLAIMS[1]!r}, so a yes, a no or a short negation in the "
-            "judge's words could attach to either. The judge picked Yes and then sent a message "
-            "whose words, kept in this record's private companion, hold such a negation, and the "
-            "rubric could not read the pair without inferring. Version 4 asks one thing, and each "
-            "option says what it means."
+            "Under version 4 a typed reply counted only when its first word was yes or no. The "
+            "judge typed a reply in place of a pick that begins with neither and holds the whole "
+            "word no, so version 4 could not read it and the judgement stopped unscored. Version "
+            "5 reads a typed reply as no when it holds the whole word no and not the whole word "
+            "yes, and never as yes."
         ),
         "status": (
             "Calibration evidence, not a key value. No answer was scored and no record was "
-            "written under version 3."
+            "written under version 4. A gate record may read this reply under version 5, because "
+            "version 4 showed the judge exactly what version 5 shows; this record takes no key "
+            "value from it."
         ),
     }
     return evidence, private_replies, []
@@ -1719,10 +1863,10 @@ def reconciliation_record(
     """The key reconciliation record, measured from the retained records, briefs and rubric.
 
     ``retained`` maps each retained label to its parsed document and ``briefs`` maps it to the
-    bytes of its brief. ``superseded`` is the version 3 reconciliation record this one replaces,
+    bytes of its brief. ``superseded`` is the version 4 reconciliation record this one replaces,
     ``rubric`` the bytes of the rubric it fixes, retained at ``rubric_copy_path``, and
-    ``calibration`` the pick and message given under version 3 about ``calibration_captures``,
-    whose words go only to the private companion named by ``record_path``.
+    ``calibration`` the reply typed under version 4 about ``calibration_captures``, whose
+    words go only to the private companion named by ``record_path``.
     ``scored_corridors`` are the retained records that score a corridor and
     ``scored_against_superseded`` those scored against an earlier key set; both must be empty,
     because a rubric may change only before anything is read against it. Every fact is re-derived
@@ -1878,7 +2022,7 @@ def reconciliation_record(
                 }
             )
     if mapping != superseded["record"]["mapping"]:
-        raise GateEvidenceError("FINDING: the spelling table moved, and version 4 does not move it")
+        raise GateEvidenceError("FINDING: the spelling table moved, and version 5 does not move it")
     used = set(spelling_uses)
     listed = {entry["spelling"] for entry in mapping}
     if not used <= listed:
@@ -1896,7 +2040,7 @@ def reconciliation_record(
             raise GateEvidenceError(f"{spelling} names a source or a city")
 
     record: dict[str, Any] = {
-        "profile": "exulanica.visual-gate-key-reconciliation/v4",
+        "profile": "exulanica.visual-gate-key-reconciliation/v5",
         "date": date,
         "status": "reconciled",
         "base": base,
@@ -1929,6 +2073,14 @@ def reconciliation_record(
             "optionAnswers": dict(OPTION_ANSWERS),
             "wordsStorage": WORDS_STORAGE,
             "judgeWordsDirectory": JUDGE_WORDS_DIRECTORY,
+            "typedReplyRule": TYPED_REPLY_RULE,
+            "answersAcceptedAgainst": [
+                {"rubricVersion": RUBRIC_VERSION, "rubricSha256": rubric_entry["sha256"]},
+                {
+                    "rubricVersion": VERSION_4.rubric_version,
+                    "rubricSha256": VERSION_4.rubric_sha256,
+                },
+            ],
             "notAsked": NOT_ASKED,
             "composition": COMPOSITION,
             "corridorBar": CORRIDOR_BAR,
@@ -1936,27 +2088,7 @@ def reconciliation_record(
                 "the human judge named in the rubric, never a model: no model may answer, "
                 "suggest, pre-fill or break a tie"
             ),
-            "writerRefuses": [
-                "a missing or placeholder judge",
-                "a missing reason in the judge's own words, including a follow-up that gets no "
-                "words",
-                "a reply that does not say when it was given",
-                "a rubric digest mismatch",
-                "a capture not bound by digest, or an answer about another capture",
-                "a yes key with any picture unasked",
-                "an answer given after a decisive no",
-                "a reply that begins with neither yes nor no",
-                "a follow-up for an answer that already gave its reason, or one not in the "
-                "rubric's words",
-                "a pick that is not one of the options",
-                "carried words without the line that says they are kept, or from a rubric "
-                "version that was never fixed",
-                "a yes whose only words are carried words, and a follow-up for a picture whose "
-                "earlier words are carried",
-                "any answer or follow-up reply not typed by the judge",
-                "a public record that would carry any of the judge's words, or a quoted part of "
-                "them",
-            ],
+            "writerRefuses": list(_WRITER_REFUSES),
         },
         "calibrationEvidence": evidence,
         "judgeWords": _companion_binding(companion_path, companion),
@@ -1978,7 +2110,7 @@ def reconciliation_record(
             "againstEarlierKeySets": list(scored_against_superseded),
             "measuredAs": (
                 "retained records under docs/evaluation whose file name or record profile names "
-                "a corridor, and those whose gate block names key set version 1, 2 or 3, read "
+                "a corridor, and those whose gate block names key set version 1, 2, 3 or 4, read "
                 "when this record was written"
             ),
         },
@@ -1991,16 +2123,25 @@ def reconciliation_record(
             "No generated geometry is scored here, and none existed in this repository when the "
             "rubric was revised.",
             "The canonical definitions do not make any retained rejection pass or fail anew.",
-            "The version 3 record is superseded, not edited. No corridor was scored, and no "
-            "record was written, under versions 1, 2 or 3; no answer was scored under version 3.",
-            "The version 3 pick and message are calibration evidence. No key value is taken from "
-            "them, and the pick is not an answer. The message's words are not in this record: it "
-            "carries their SHA-256 and byte count, and its private companion holds them.",
-            "Nothing here is an answer under version 4. The rubric fixes how the judge is asked; "
-            "only the named judge answers.",
+            "The version 4 record is superseded, not edited. No corridor was scored, and no "
+            "record was written, under versions 1, 2, 3 or 4, and no answer was scored under "
+            "version 4.",
+            "The version 4 reply is calibration evidence here, and this record takes no key value "
+            "from it. Its words are not in this record: it carries their SHA-256 and byte count, "
+            "and its private companion holds them.",
+            "The replies given under version 2 are not re-read under version 5, because they were "
+            "given under version 2.",
+            "The typed-reply rule is not presented as fixed before any answer: it was adopted "
+            "after the version 4 reply was given, and that reply is its first application.",
+            "Nothing here is an answer under version 5. The rubric fixes how the judge is asked "
+            "and how a typed reply is read; only the named judge answers, and no model judged any "
+            "picture.",
         ],
     }
-    shown = [*_shown_texts(), *(VERSION_3.prompt(label) for label in CAPTURE_LABELS)]
+    shown = [
+        *_shown_texts(),
+        *(f"{VERSION_4.carried_notice}\n\n{VERSION_4.prompt(label)}" for label in CAPTURE_LABELS),
+    ]
     refuse_private_words(
         record,
         [item["words"] for item in private_replies if item["words"] is not None],

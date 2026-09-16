@@ -21,7 +21,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = join(here, '..', '..', '..', '..');
 const reconciliation = JSON.parse(
-  readFileSync(join(repository, 'docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json'), 'utf8'),
+  readFileSync(join(repository, 'docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json'), 'utf8'),
 ) as {
   record: {
     keySet: string;
