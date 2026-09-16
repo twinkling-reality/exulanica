@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
 import uuid
 from contextlib import contextmanager
 from dataclasses import replace
+from functools import wraps
+from pathlib import Path
 
 import pytest
 from exulanica.evaluation.reference_inputs import envelope
@@ -22,6 +27,33 @@ from exulanica.reconstruction.splat import _canonical, _quality
 
 from test_reconstruction_splat import FakeRunner, _dataset, _pose_receipt
 from test_reconstruction_splat import _manifest as _base_manifest
+
+
+def _isolated_torch(test):
+    """Match worker isolation: Torch and native COLMAP use incompatible macOS OpenMP builds."""
+
+    @wraps(test)
+    def execute(*args, **kwargs):
+        if os.environ.get("EXULANICA_TORCH_TEST_CHILD") == test.__name__:
+            return test(*args, **kwargs)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--noconftest",
+                f"{Path(__file__).resolve()}::{test.__name__}",
+            ],
+            env={**os.environ, "EXULANICA_TORCH_TEST_CHILD": test.__name__},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    return execute
 
 
 def _manifest(**changes):
@@ -421,6 +453,7 @@ def test_unsupported_runner_revision_is_a_tool_blocker(run):
     assert inspect_local_run(**run)["blockers"][0]["stage"] == "tool"
 
 
+@_isolated_torch
 def test_actual_cpu_checkpoint_passes_existing_complete_state_validator(run):
     torch = pytest.importorskip("torch")
     pytest.importorskip("numpy")
