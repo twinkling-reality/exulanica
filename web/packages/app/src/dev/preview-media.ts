@@ -7,7 +7,7 @@ interface PreviewSource extends SourceMediaDescriptor {
 
 const COURTYARD: Omit<PreviewSource, 'evidenceRef'> = Object.freeze({
   title: 'Glasshouse courtyard',
-  capturedLabel: '12 April 2025 · 14:18',
+  capturedLabel: 'Date unresolved',
   url: '/fixtures/memory/glasshouse-courtyard.jpg',
   assetPath: 'fixtures/memory/glasshouse-courtyard.jpg',
   available: true,
@@ -17,7 +17,7 @@ const COURTYARD: Omit<PreviewSource, 'evidenceRef'> = Object.freeze({
 
 const STUDIO: Omit<PreviewSource, 'evidenceRef'> = Object.freeze({
   title: 'Spring planting day',
-  capturedLabel: '21 June 2025 · 10:06',
+  capturedLabel: 'Date unresolved',
   url: '/fixtures/memory/glasshouse-studio.jpg',
   assetPath: 'fixtures/memory/glasshouse-studio.jpg',
   available: true,
@@ -27,7 +27,7 @@ const STUDIO: Omit<PreviewSource, 'evidenceRef'> = Object.freeze({
 
 const SHORE: Omit<PreviewSource, 'evidenceRef'> = Object.freeze({
   title: 'Kite at the lakeshore',
-  capturedLabel: '2 September 2025 · 19:42',
+  capturedLabel: 'Date unresolved',
   url: '/fixtures/memory/lakeshore-kite.jpg',
   assetPath: 'fixtures/memory/lakeshore-kite.jpg',
   available: true,
