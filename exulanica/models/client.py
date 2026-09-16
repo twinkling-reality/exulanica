@@ -31,6 +31,11 @@ Everything here exists because of something that was measured, not assumed:
     object is the answer, and the call fails rather than guessing. See
     ``exulanica.models.schema.extract_json_object``.
 
+*   **The endpoint is checked against the egress allowlist when the client is built.** A
+    deployment whose ``EXULANICA_EGRESS_ALLOWLIST`` does not declare ``manifest.base_url`` fails
+    here, at startup, instead of at its first question. The transport checks every call again;
+    see :mod:`exulanica.models.egress` for what that does and does not cover.
+
 The client holds a cache, a budget guard and a ledger. All three are optional collaborators with
 inert defaults, so a caller gets no caching and generous limits unless it asks, and a test gets
 exact ones.
@@ -48,6 +53,7 @@ from exulanica.models.budget import BudgetGuard
 from exulanica.models.cache import NullResponseCache, ResponseCache, cache_key
 from exulanica.models.chain import ModelChain
 from exulanica.models.credentials import api_key_from_env
+from exulanica.models.egress import EGRESS_ALLOWLIST_ENV, EgressConfigurationError, EgressRefused
 from exulanica.models.errors import (
     GuidedJsonForbiddenError,
     MaxTokensTooLowError,
@@ -102,12 +108,27 @@ class ModelClient:
         self._manifest = manifest or load_manifest()
         self._cache: ResponseCache = cache if cache is not None else NullResponseCache()
         self._budget = budget if budget is not None else BudgetGuard()
+        network = transport if transport is not None else HttpxTransport()
+        # Checked before the credential is read, so a misconfigured deployment is told about its
+        # allowlist rather than about a key it may not need yet. A transport that carries no
+        # allowlist is a test double that reaches no network; HttpxTransport always carries one
+        # when it built its own client.
+        egress = getattr(network, "egress", None)
+        if egress is not None:
+            try:
+                egress.require(self._manifest.base_url)
+            except EgressRefused as exc:
+                raise EgressConfigurationError(
+                    f"the model endpoint {self._manifest.base_url} is not declared in "
+                    f"{EGRESS_ALLOWLIST_ENV}, so this client could never reach it. Declare it, or "
+                    "do not start a model client in this deployment."
+                ) from exc
         # The credential is read here and handed to the chain, which is the only thing that
         # needs it. It is not kept on this object: a client that does not hold a key cannot leak
         # one through a repr, a traceback or a cache entry.
         self._chain = ModelChain(
             manifest=self._manifest,
-            transport=transport if transport is not None else HttpxTransport(),
+            transport=network,
             api_key=api_key or api_key_from_env(self._manifest.api_key_env),
             budget=self._budget,
             timeout=timeout,

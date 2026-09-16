@@ -42,6 +42,7 @@ from exulanica.epistemics.caption_embeddings import embed_capture
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
+from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import Role
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
@@ -296,6 +297,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         "EXULANICA_GOOGLE_RETURN_URIS",
         "EXULANICA_ACCOUNT_BROWSER_ORIGINS",
         "EXULANICA_ACCOUNT_DATABASE_URL",
+        EGRESS_ALLOWLIST_ENV,
     )
     return {
         name: (

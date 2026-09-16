@@ -9,18 +9,39 @@ the same code that runs in production, rather than a mock of it.
 The default implementation is ``httpx``. Nothing here retries: retry policy belongs with the
 caller that knows whether the operation is idempotent, and a transport that silently retries a
 non-idempotent call is a billing surprise.
+
+**The egress allowlist bites here**, because this is the one place in the model path that reaches
+the network. :class:`HttpxTransport` will not build a network client without an
+:class:`~exulanica.models.egress.EgressAllowlist`, read from the environment when none is passed,
+and it holds every call to it twice: once against the URL before the client is asked, and once
+inside the client against the request it is about to send, which is the check a redirect hop
+passes through as well. Redirects are not followed in any case. A refusal is raised as
+:class:`~exulanica.models.egress.EgressRefused` and is never folded into ``TransportError``,
+because a ``TransportError`` is retryable by default and a refused destination must not be.
+
+An injected ``client`` is the seam tests use to avoid the network. A real ``httpx.Client``
+passed that way still needs an allowlist, and nothing in the package passes one:
+``tests/test_egress_allowlist.py`` greps for it. A test double that is not an ``httpx.Client``
+reaches no network, and this seam does not police what it does.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from exulanica.models.egress import (
+    EgressAllowlist,
+    EgressConfigurationError,
+    EgressRefused,
+    load_egress_allowlist,
+)
 from exulanica.models.errors import TransportError
 
-__all__ = ["HttpResponse", "HttpxTransport", "Transport"]
+__all__ = ["HttpResponse", "HttpxTransport", "Transport", "allowlisted_httpx_client"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +108,42 @@ class Transport(Protocol):
     ) -> HttpResponse: ...
 
 
+def allowlisted_httpx_client(
+    egress: EgressAllowlist, *, inner: Any | None = None, follow_redirects: bool = False
+) -> Any:
+    """An ``httpx.Client`` whose every outgoing request is held to ``egress`` before it connects.
+
+    The check is a transport mounted inside the client, so it sees each request after httpx has
+    parsed it and before a connection is opened, and it sees every hop of a redirect chain as its
+    own request. ``inner`` and ``follow_redirects`` exist so a test can prove that; the defaults
+    are what runs. Environment proxies are not consulted, because httpx ignores them once a
+    transport is supplied, and a proxy the environment names is a destination this list does not.
+    """
+    import httpx  # imported lazily so tests never need the dependency loaded
+
+    class _AllowlistedTransport(httpx.BaseTransport):
+        def __init__(self, wrapped: httpx.BaseTransport) -> None:
+            self._wrapped = wrapped
+
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            url = request.url
+            egress.require_parts(
+                scheme=url.scheme,
+                host=url.raw_host.decode("ascii"),
+                port=url.port,
+                userinfo=url.userinfo,
+            )
+            return self._wrapped.handle_request(request)
+
+        def close(self) -> None:
+            self._wrapped.close()
+
+    return httpx.Client(
+        transport=_AllowlistedTransport(inner if inner is not None else httpx.HTTPTransport()),
+        follow_redirects=follow_redirects,
+    )
+
+
 class HttpxTransport:
     """The real transport. One pooled client, reused across calls.
 
@@ -94,12 +151,20 @@ class HttpxTransport:
     handshake per photograph is latency paid for nothing.
     """
 
-    def __init__(self, *, client: Any | None = None) -> None:
+    def __init__(self, *, client: Any | None = None, egress: EgressAllowlist | None = None) -> None:
         if client is None:
-            import httpx  # imported lazily so tests never need the dependency loaded
-
-            client = httpx.Client(follow_redirects=False)
+            egress = egress if egress is not None else load_egress_allowlist()
+            client = allowlisted_httpx_client(egress)
+        elif egress is None:
+            httpx = sys.modules.get("httpx")
+            if httpx is not None and isinstance(client, httpx.Client):
+                raise EgressConfigurationError(
+                    "an httpx.Client reaches the network, so HttpxTransport needs an egress "
+                    "allowlist to go with it. Pass egress=, or pass no client at all."
+                )
         self._client = client
+        #: None only for an injected test double, which reaches no network.
+        self.egress = egress
 
     def close(self) -> None:
         close = getattr(self._client, "close", None)
@@ -127,10 +192,16 @@ class HttpxTransport:
         payload: Mapping[str, Any],
         timeout: float,
     ) -> HttpResponse:
+        if self.egress is not None:
+            self.egress.require(url)
         try:
             return self._wrap(
                 self._client.post(url, headers=dict(headers), json=dict(payload), timeout=timeout)
             )
+        except EgressRefused:
+            # Raised by the mounted check inside the client. Not a transport failure, and not
+            # retryable, so it must not be collapsed into the type below.
+            raise
         # Every httpx failure mode is collapsed into one type: the caller's decision is
         # the same for a timeout, a DNS failure and a reset connection.
         except Exception as exc:
@@ -139,7 +210,11 @@ class HttpxTransport:
     def get_json(
         self, url: str, *, headers: Mapping[str, str], timeout: float
     ) -> HttpResponse:
+        if self.egress is not None:
+            self.egress.require(url)
         try:
             return self._wrap(self._client.get(url, headers=dict(headers), timeout=timeout))
+        except EgressRefused:
+            raise
         except Exception as exc:
             raise TransportError(f"GET {url} failed: {exc!r}") from exc
