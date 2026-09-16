@@ -1,0 +1,138 @@
+== script
+#!/bin/zsh
+# Bake the texture catalog in five runs across three Node majors and two CPU architectures,
+# then compare every file of every run against the first run with cmp, and against the
+# committed assets/textures. Prints this script, then everything it observed.
+set -u
+WEB=/Users/glendonchin/dev/Technology/exulanica-preview-handoffs/web
+OUT=$1
+cd $WEB
+echo "== script"
+cat $0
+echo
+echo "== source"
+echo "commit $(git -C .. rev-parse HEAD)"
+echo "working tree changes under web/packages/loom-texture/src: $(git -C .. status --short -- web/packages/loom-texture/src | wc -l | tr -d ' ')"
+npx tsc --build packages/loom-texture || exit 1
+rm -rf $OUT && mkdir -p $OUT
+run() {
+  local name=$1; shift
+  echo
+  echo "== run $name"
+  echo "runtime: $("$@" -p 'process.version + " " + process.arch + " " + process.platform')"
+  "$@" ${RUNNER_ARGS[@]} --out $OUT/$name > $OUT/$name.stdout 2>&1
+  echo "exit: $?"
+  (cd $OUT/$name && find . -type f | LC_ALL=C sort | while read f; do shasum -a 256 "$f"; done)
+}
+RUNNER_ARGS=(node_modules/tsx/dist/cli.mjs packages/loom-texture/src/cli.ts)
+run node24-arm64-a /opt/homebrew/opt/node@24/bin/node
+run node24-arm64-b /opt/homebrew/opt/node@24/bin/node
+run node26-arm64 /opt/homebrew/opt/node@26/bin/node
+# esbuild ships a native binary per architecture, so the x86_64 run executes the tsc output.
+RUNNER_ARGS=(packages/loom-texture/dist/src/cli.js)
+run node20-arm64 arch -arm64 /usr/local/bin/node
+run node20-x86_64-rosetta arch -x86_64 /usr/local/bin/node
+echo
+echo "== cmp, file by file, against node24-arm64-a"
+FILES=($(cd $OUT/node24-arm64-a && find . -type f | LC_ALL=C sort))
+echo "files per run: ${#FILES[@]}"
+for other in node24-arm64-b node26-arm64 node20-arm64 node20-x86_64-rosetta; do
+  differing=0
+  for f in $FILES; do cmp -s "$OUT/node24-arm64-a/$f" "$OUT/$other/$f" || { echo "DIFFERS $other $f"; differing=$((differing+1)); }; done
+  extra=$(cd $OUT/$other && find . -type f | wc -l | tr -d ' ')
+  echo "$other: $differing of ${#FILES[@]} files differ; $extra files present"
+done
+echo
+echo "== cmp against the committed assets/textures"
+differing=0
+for f in $FILES; do cmp -s "$OUT/node24-arm64-a/$f" "../assets/textures/$f" || { echo "DIFFERS committed $f"; differing=$((differing+1)); }; done
+echo "committed: $differing of ${#FILES[@]} files differ; $(cd ../assets/textures && find . -type f | wc -l | tr -d ' ') files present"
+
+== source
+commit 15a2e3d97e1ed80b324641cdd4eda6b30e59e08a
+working tree changes under web/packages/loom-texture/src: 0
+
+== run node24-arm64-a
+runtime: v24.15.0 arm64 darwin
+exit: 0
+86e3766d147048762dd879582714d0f60392ae5abaa5597397414722b1c45f8b  ./.gitattributes
+3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef  ./blobs/3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef.ltex
+3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78  ./blobs/3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78.ltex
+495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3  ./blobs/495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3.ltex
+4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b  ./blobs/4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b.ltex
+7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a  ./blobs/7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a.ltex
+91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499  ./blobs/91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499.ltex
+986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d  ./blobs/986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d.ltex
+d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f  ./blobs/d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f.txt
+e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43  ./blobs/e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43.ltex
+7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7  ./manifest.json
+
+== run node24-arm64-b
+runtime: v24.15.0 arm64 darwin
+exit: 0
+86e3766d147048762dd879582714d0f60392ae5abaa5597397414722b1c45f8b  ./.gitattributes
+3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef  ./blobs/3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef.ltex
+3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78  ./blobs/3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78.ltex
+495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3  ./blobs/495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3.ltex
+4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b  ./blobs/4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b.ltex
+7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a  ./blobs/7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a.ltex
+91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499  ./blobs/91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499.ltex
+986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d  ./blobs/986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d.ltex
+d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f  ./blobs/d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f.txt
+e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43  ./blobs/e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43.ltex
+7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7  ./manifest.json
+
+== run node26-arm64
+runtime: v26.7.0 arm64 darwin
+exit: 0
+86e3766d147048762dd879582714d0f60392ae5abaa5597397414722b1c45f8b  ./.gitattributes
+3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef  ./blobs/3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef.ltex
+3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78  ./blobs/3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78.ltex
+495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3  ./blobs/495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3.ltex
+4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b  ./blobs/4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b.ltex
+7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a  ./blobs/7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a.ltex
+91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499  ./blobs/91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499.ltex
+986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d  ./blobs/986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d.ltex
+d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f  ./blobs/d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f.txt
+e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43  ./blobs/e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43.ltex
+7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7  ./manifest.json
+
+== run node20-arm64
+runtime: v20.10.0 arm64 darwin
+exit: 0
+86e3766d147048762dd879582714d0f60392ae5abaa5597397414722b1c45f8b  ./.gitattributes
+3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef  ./blobs/3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef.ltex
+3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78  ./blobs/3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78.ltex
+495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3  ./blobs/495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3.ltex
+4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b  ./blobs/4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b.ltex
+7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a  ./blobs/7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a.ltex
+91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499  ./blobs/91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499.ltex
+986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d  ./blobs/986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d.ltex
+d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f  ./blobs/d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f.txt
+e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43  ./blobs/e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43.ltex
+7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7  ./manifest.json
+
+== run node20-x86_64-rosetta
+runtime: v20.10.0 x64 darwin
+exit: 0
+86e3766d147048762dd879582714d0f60392ae5abaa5597397414722b1c45f8b  ./.gitattributes
+3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef  ./blobs/3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef.ltex
+3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78  ./blobs/3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78.ltex
+495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3  ./blobs/495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3.ltex
+4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b  ./blobs/4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b.ltex
+7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a  ./blobs/7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a.ltex
+91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499  ./blobs/91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499.ltex
+986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d  ./blobs/986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d.ltex
+d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f  ./blobs/d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f.txt
+e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43  ./blobs/e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43.ltex
+7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7  ./manifest.json
+
+== cmp, file by file, against node24-arm64-a
+files per run: 11
+node24-arm64-b: 0 of 11 files differ; 11 files present
+node26-arm64: 0 of 11 files differ; 11 files present
+node20-arm64: 0 of 11 files differ; 11 files present
+node20-x86_64-rosetta: 0 of 11 files differ; 11 files present
+
+== cmp against the committed assets/textures
+committed: 0 of 11 files differ; 11 files present
