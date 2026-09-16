@@ -8,8 +8,9 @@ stack: the import-linter contracts in ``pyproject.toml`` keep it that way, so th
 anywhere and a recipe can be judged before anything expensive happens to it.
 
 What is here: the strict reader and the profiles (:mod:`~exulanica.materials.objects`), the
-manifest and recipe checks the TypeScript baker shares case for case
-(:mod:`~exulanica.materials.recipes`), and verification of the published catalog
+maker manifest and recipe checks the TypeScript baker shares case for case
+(:mod:`~exulanica.materials.recipes`), the one reader of the published texture manifest
+(:mod:`~exulanica.materials.manifest`), and verification of the published catalog
 (:mod:`~exulanica.materials.catalog`). Every object here is invented, never observed, and nothing
 here can say otherwise.
 """
@@ -20,6 +21,15 @@ from exulanica.materials.catalog import (
     MaterialCatalog,
     ObjectReader,
     verify_material_catalog,
+)
+from exulanica.materials.manifest import (
+    CONTAINER_LAYOUT,
+    MANIFEST_PROFILE,
+    PUBLISHED_LICENCE_ID,
+    SET_ID_PATTERN,
+    ManifestEntry,
+    TextureMap,
+    read_texture_manifest,
 )
 from exulanica.materials.objects import (
     BAKE_PIPELINE,
@@ -32,6 +42,7 @@ from exulanica.materials.objects import (
     MaterialObjectError,
     canonical_bytes,
     freeze,
+    identical,
     parse_strict,
     read_document,
     read_object,
@@ -51,23 +62,31 @@ __all__ = [
     "BAKE_RECEIPT_PROFILE",
     "CATALOG_PROFILE",
     "COMMON_CONTROLS",
+    "CONTAINER_LAYOUT",
     "LIBRARY_ENTRY_PROFILE",
     "MAKER_PROFILE",
+    "MANIFEST_PROFILE",
+    "PUBLISHED_LICENCE_ID",
     "RECIPE_PROFILE",
+    "SET_ID_PATTERN",
     "STRICT_JSON_PROBLEMS",
     "LibraryRecord",
     "MakerRecord",
+    "ManifestEntry",
     "MaterialCatalog",
     "MaterialObjectError",
     "ObjectReader",
+    "TextureMap",
     "canonical_bytes",
     "check_recipe",
     "evaluate",
     "freeze",
+    "identical",
     "manifest_problems",
     "parse_strict",
     "read_document",
     "read_object",
+    "read_texture_manifest",
     "recipe_problems",
     "sha256_hex",
     "thaw",

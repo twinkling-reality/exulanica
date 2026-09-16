@@ -48,6 +48,7 @@ from exulanica.grammar.textures import (
     TextureSet,
     read_texture_manifest,
 )
+from exulanica.materials.manifest import CONTAINER_LAYOUT
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENT = ROOT / "docs" / "grammar-package.md"
@@ -381,18 +382,27 @@ def _manifest_entry(set_id: str, content: str = "a" * 64, version: int = 1) -> d
         "version": version,
         "content_sha256": content,
         "byte_size": 1024,
-        "resolution": 1024,
-        "channels": 4,
-        "extent_mm": 2000,
+        "resolution": {"width": 16, "height": 16},
+        "channels": [texture_map.as_channel() for texture_map in CONTAINER_LAYOUT],
+        "extent_mm": {"u": 2000, "v": 2000},
         "licence_id": "CC0-1.0",
         "licence_sha256": "b" * 64,
     }
 
 
+def _manifest_bytes(document: object) -> bytes:
+    """The manifest's canonical form, so a refusal below is for its own reason and not the form.
+
+    Sorted keys, no spaces, ASCII: what canonical JSON is for these documents, written with the
+    standard library so a document holding a float can still be written and refused on reading.
+    """
+    return json.dumps(document, sort_keys=True, separators=(",", ":")).encode("ascii")
+
+
 def _manifest(tmp_path: Path, sets: list, **override: object) -> Path:
     path = tmp_path / "manifest.json"
     document = {"profile": MANIFEST_PROFILE, "sets": sets, **override}
-    path.write_text(json.dumps(document), encoding="utf-8")
+    path.write_bytes(_manifest_bytes(document))
     return path
 
 
@@ -435,7 +445,7 @@ def test_a_well_formed_manifest_is_read_by_id(tmp_path):
 )
 def test_a_manifest_outside_its_shape_is_refused(tmp_path, document):
     path = tmp_path / "manifest.json"
-    path.write_text(json.dumps(document), encoding="utf-8")
+    path.write_bytes(_manifest_bytes(document))
     with pytest.raises(CatalogError):
         read_texture_manifest(path)
 

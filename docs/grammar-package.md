@@ -203,7 +203,9 @@ with the orchestrator on 2026-09-16, before the texture lane started:
   each id once, and each entry carrying exactly `set_id`, `version`, `content_sha256`,
   `byte_size`, `resolution`, `channels`, `extent_mm`, `licence_id` and `licence_sha256`.
   `read_texture_manifest` refuses anything else, and refuses a missing file rather than reading
-  it as empty.
+  it as empty. It reads through `exulanica.materials.manifest`, the one rule every reader of the
+  manifest shares, so the file must also be canonical JSON and each field must have the form
+  `docs/texture-package.md` section 8 gives.
 - **A resolved reference carries a pin into the digest.** A catalog file and a material record
   hold the id alone. When the loader resolves an id, it records the set's `set_id`, `version`
   and `content_sha256` beside the entry, and `catalog_digest` covers them. A rebaked set moves

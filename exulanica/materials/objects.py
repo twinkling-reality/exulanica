@@ -42,6 +42,7 @@ __all__ = [
     "MaterialObjectError",
     "canonical_bytes",
     "freeze",
+    "identical",
     "is_sha256",
     "nesting",
     "parse_strict",
@@ -88,7 +89,7 @@ def sha256_hex(raw: bytes) -> str:
 
 
 def is_sha256(value: object) -> bool:
-    return isinstance(value, str) and _HEX64.fullmatch(value) is not None
+    return type(value) is str and _HEX64.fullmatch(value) is not None
 
 
 def portable(value: object) -> bool:
@@ -203,6 +204,21 @@ def thaw(value: Any) -> Any:
     if isinstance(value, list | tuple):
         return [thaw(item) for item in value]
     return value
+
+
+def identical(left: Any, right: Any) -> bool:
+    """Whether two documents are the same JSON, frozen or not, with ``true`` never equal to ``1``.
+
+    Python's ``==`` says ``True == 1`` and ``1 == 1.0``, which two canonical documents never do:
+    their bytes differ. Every comparison between a document and what it must say uses this.
+    """
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        return left.keys() == right.keys() and all(
+            identical(item, right[key]) for key, item in left.items()
+        )
+    if isinstance(left, list | tuple) and isinstance(right, list | tuple):
+        return len(left) == len(right) and all(map(identical, left, right))
+    return type(left) is type(right) and left == right
 
 
 def canonical_bytes(document: Any) -> bytes:

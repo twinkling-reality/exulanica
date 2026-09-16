@@ -238,7 +238,13 @@ def test_the_grammar_package_never_names_a_citation_type():
 
 def test_the_grammar_package_imports_nothing_it_may_not():
     """The fast, self-explaining form of the contract, for when lint-imports is not at hand."""
-    allowed = ("exulanica.grammar", "exulanica.canonical", "exulanica.errors", "exulanica.env")
+    allowed = (
+        "exulanica.grammar",
+        "exulanica.materials",
+        "exulanica.canonical",
+        "exulanica.errors",
+        "exulanica.env",
+    )
     for path in _sources():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

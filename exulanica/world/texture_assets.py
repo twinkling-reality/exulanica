@@ -41,7 +41,6 @@ content-addressed.
 from __future__ import annotations
 
 import hashlib
-import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,8 +53,20 @@ from exulanica.materials import (
     MaterialCatalog,
     MaterialObjectError,
     read_document,
+    thaw,
     verify_material_catalog,
 )
+from exulanica.materials.manifest import (
+    CONTAINER_LAYOUT,
+    MANIFEST_NAME,
+    MANIFEST_PROFILE,
+    PUBLISHED_LICENCE_ID,
+    SET_ID_PATTERN,
+    ManifestEntry,
+    TextureMap,
+    read_texture_manifest,
+)
+from exulanica.materials.objects import identical
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
@@ -83,14 +94,14 @@ __all__ = [
 ]
 
 TEXTURE_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "textures"
-TEXTURE_MANIFEST_PROFILE: Final = "exulanica.texture-manifest/v1"
+TEXTURE_MANIFEST_PROFILE: Final = MANIFEST_PROFILE
 TEXTURE_SET_PROFILE: Final = "exulanica.texture-set/v1"
 TEXTURE_SET_MEDIA_TYPE: Final = "application/vnd.exulanica.texture-set"
 TEXTURE_TRUTH: Final = "invented"
 #: Identical to ``asset_key`` in migration 0042 and ``set_id`` in migration 0065, character for
 #: character; ``tests/test_texture_set_migration.py`` compares the three.
-TEXTURE_SET_ID_PATTERN: Final = "^[a-z][a-z0-9.-]*$"
-CC0_LICENCE_ID: Final = "CC0-1.0"
+TEXTURE_SET_ID_PATTERN: Final = SET_ID_PATTERN
+CC0_LICENCE_ID: Final = PUBLISHED_LICENCE_ID
 #: The reviewed published library: the sha256 of ``assets/textures/catalog.json``. The catalog
 #: names every maker manifest and every receipt by digest, and each receipt names its entry and
 #: recipe, so this one digest pins every object in the directory. A rebake that changes any object
@@ -113,27 +124,12 @@ PUBLISHED_MAKER_MANIFESTS: Final[Mapping[tuple[str, int], str]] = MappingProxyTy
     }
 )
 
-_SET_ID: Final = re.compile(TEXTURE_SET_ID_PATTERN)
-_HEX64: Final = re.compile(r"^[0-9a-f]{64}$")
 _MAGIC: Final = b"LTX1"
 _ALIGNMENT: Final = 16
-_MANIFEST: Final = "manifest.json"
+_MANIFEST: Final = MANIFEST_NAME
 _CATALOG: Final = "catalog.json"
 _BLOBS: Final = "blobs"
 _OBJECTS: Final = "objects"
-_ENTRY_KEYS: Final = frozenset(
-    {
-        "set_id",
-        "version",
-        "content_sha256",
-        "byte_size",
-        "resolution",
-        "channels",
-        "extent_mm",
-        "licence_id",
-        "licence_sha256",
-    }
-)
 
 
 class TextureCatalogError(ExulanicaError):
@@ -152,31 +148,8 @@ class UnpinnedTextureSet(TextureSetUnresolved):
     """The material record names a texture set id that no pinned set has."""
 
 
-@dataclass(frozen=True, slots=True)
-class TextureMap:
-    """One map in a set, and exactly how its channels are packed."""
-
-    name: str
-    components: int
-    holds: tuple[str, ...]
-    srgb: bool
-
-    def as_channel(self) -> dict[str, Any]:
-        return {
-            "map": self.name,
-            "components": self.components,
-            "holds": list(self.holds),
-            "srgb": self.srgb,
-        }
-
-
 #: The packing every container declares, in the order its maps are stored.
-_LAYOUT: Final = (
-    TextureMap("base_color", 3, ("red", "green", "blue"), True),
-    TextureMap("normal", 3, ("normal_x", "normal_y", "normal_z"), False),
-    TextureMap("orm", 3, ("occlusion", "roughness", "metalness"), False),
-    TextureMap("height", 1, ("height",), False),
-)
+_LAYOUT: Final = CONTAINER_LAYOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,17 +190,18 @@ class PinnedTextureSet:
 
     def manifest_entry(self) -> dict[str, Any]:
         """The manifest entry this set was loaded from, reconstructed field for field."""
-        return {
-            "set_id": self.set_id,
-            "version": self.version,
-            "content_sha256": self.content_sha256,
-            "byte_size": self.byte_size,
-            "resolution": {"width": self.width, "height": self.height},
-            "channels": [texture_map.as_channel() for texture_map in self.maps],
-            "extent_mm": {"u": self.extent_u_mm, "v": self.extent_v_mm},
-            "licence_id": self.licence_id,
-            "licence_sha256": self.licence_sha256,
-        }
+        return ManifestEntry(
+            set_id=self.set_id,
+            version=self.version,
+            content_sha256=self.content_sha256,
+            byte_size=self.byte_size,
+            width=self.width,
+            height=self.height,
+            extent_u_mm=self.extent_u_mm,
+            extent_v_mm=self.extent_v_mm,
+            licence_id=self.licence_id,
+            licence_sha256=self.licence_sha256,
+        ).as_entry()
 
     def read_bytes(self) -> bytes:
         """The container, re-verified: a file changed since the catalog loaded is refused."""
@@ -301,14 +275,18 @@ def _decode(payload: bytes, where: str) -> DecodedTextureSet:
     cursor = start
     for entry, layout in zip(declared, _LAYOUT, strict=True):
         length = texels * layout.components
-        if not (
-            isinstance(entry, dict)
-            and entry.get("name") == layout.name
-            and entry.get("components") == layout.components
-            and entry.get("holds") == list(layout.holds)
-            and entry.get("srgb") is layout.srgb
-            and entry.get("byte_offset") == cursor
-            and entry.get("byte_length") == length
+        packing = {
+            "name": layout.name,
+            "components": layout.components,
+            "holds": list(layout.holds),
+            "srgb": layout.srgb,
+            "byte_offset": cursor,
+            "byte_length": length,
+        }
+        # A map may also describe itself (the baker writes how to decode it); what it may not do
+        # is state its packing any other way, and `true` is not `1` here.
+        if not isinstance(entry, dict) or not all(
+            identical(entry.get(key), value) for key, value in packing.items()
         ):
             raise TextureCatalogError(f"{where}: map {layout.name} is not packed as declared")
         maps[layout.name] = view[cursor : cursor + length]
@@ -325,57 +303,22 @@ def decode_texture_set(payload: bytes) -> DecodedTextureSet:
     return _decode(payload, "texture set")
 
 
-def _entry_problems(entry: object, index: int) -> str | None:
-    where = f"{_MANIFEST} sets[{index}]"
-    if not isinstance(entry, dict) or set(entry) != _ENTRY_KEYS:
-        return f"{where} has keys other than exactly {sorted(_ENTRY_KEYS)}"
-    set_id = entry["set_id"]
-    if type(set_id) is not str or _SET_ID.fullmatch(set_id) is None:
-        return f"{where}: set_id {set_id!r} is not a texture set id"
-    if not _positive_int(entry["version"]) or not _positive_int(entry["byte_size"]):
-        return f"{where}: version and byte_size are positive integers"
-    for field in ("content_sha256", "licence_sha256"):
-        if type(entry[field]) is not str or _HEX64.fullmatch(entry[field]) is None:
-            return f"{where}: {field} is 64 lowercase hex characters"
-    if entry["licence_id"] != CC0_LICENCE_ID:
-        return f"{where}: licence_id is {CC0_LICENCE_ID}"
-    extent = entry["extent_mm"]
-    if not (
-        isinstance(extent, dict)
-        and set(extent) == {"u", "v"}
-        and _positive_int(extent["u"])
-        and _positive_int(extent["v"])
-    ):
-        return f"{where}: extent_mm is a positive whole-millimetre u and v"
-    return None
-
-
-def _check_header(header: Mapping[str, Any], entry: Mapping[str, Any], where: str) -> None:
+def _check_header(header: Mapping[str, Any], entry: ManifestEntry, where: str) -> None:
+    """The header says what the manifest entry says. Its maps were held to the layout on decode."""
     expected = {
         "media_type": TEXTURE_SET_MEDIA_TYPE,
         "truth": TEXTURE_TRUTH,
-        "set_id": entry["set_id"],
-        "version": entry["version"],
-        "resolution": entry["resolution"],
-        "extent_mm": entry["extent_mm"],
-        "licence": {"id": entry["licence_id"], "sha256": entry["licence_sha256"]},
+        "set_id": entry.set_id,
+        "version": entry.version,
+        "resolution": {"width": entry.width, "height": entry.height},
+        "extent_mm": {"u": entry.extent_u_mm, "v": entry.extent_v_mm},
+        "licence": {"id": entry.licence_id, "sha256": entry.licence_sha256},
     }
     for key, value in expected.items():
-        if header.get(key) != value:
+        if not identical(header.get(key), value):
             raise TextureCatalogError(
                 f"{where}: header {key} is {header.get(key)!r}, not {value!r}"
             )
-    channels = [
-        {
-            "map": texture_map["name"],
-            "components": texture_map["components"],
-            "holds": texture_map["holds"],
-            "srgb": texture_map["srgb"],
-        }
-        for texture_map in header["maps"]
-    ]
-    if channels != entry["channels"]:
-        raise TextureCatalogError(f"{where}: the manifest's channels are not the header's maps")
     for key in ("seed", "height_range_mm"):
         if type(header.get(key)) is not int or header[key] < 0:
             raise TextureCatalogError(f"{where}: header {key} is a non-negative integer")
@@ -393,8 +336,8 @@ def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: s
         "title": record.title,
         "summary": record.summary,
         "seed": recipe["seed"],
-        "resolution": dict(recipe["resolution"]),
-        "extent_mm": dict(recipe["extent_mm"]),
+        "resolution": thaw(recipe["resolution"]),
+        "extent_mm": thaw(recipe["extent_mm"]),
         "family": manifest["family"],
         "height_range_mm": parameters["height_range_mm"],
         "cavity": {
@@ -404,7 +347,7 @@ def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: s
         },
     }
     for key, value in expected.items():
-        if header.get(key) != value:
+        if not identical(header.get(key), value):
             raise TextureCatalogError(
                 f"{where}: header {key} is {header.get(key)!r}, but its recipe says {value!r}"
             )
@@ -453,40 +396,30 @@ def load_texture_catalog(
     that directory's own.
     """
     raw = (directory / _MANIFEST).read_bytes()
-    document = _canonical_document(raw, _MANIFEST)
-    if not isinstance(document, dict) or set(document) != {"profile", "sets"}:
-        raise TextureCatalogError(f"{_MANIFEST} is an object with exactly profile and sets")
-    if document["profile"] != TEXTURE_MANIFEST_PROFILE:
-        raise TextureCatalogError(f"{_MANIFEST}: profile is {TEXTURE_MANIFEST_PROFILE!r}")
-    entries = document["sets"]
-    if not isinstance(entries, list) or not entries:
-        raise TextureCatalogError(f"{_MANIFEST}: sets is a non-empty list")
+    try:
+        entries = read_texture_manifest(raw, _MANIFEST)
+    except MaterialObjectError as error:
+        raise TextureCatalogError(str(error)) from error
 
-    checked: dict[str, tuple[Mapping[str, Any], Mapping[str, Any], Path]] = {}
+    checked: dict[str, tuple[ManifestEntry, Mapping[str, Any], Path]] = {}
     licence_digests: set[str] = set()
-    for index, entry in enumerate(entries):
-        problem = _entry_problems(entry, index)
-        if problem is not None:
-            raise TextureCatalogError(problem)
-        set_id = entry["set_id"]
-        if set_id in checked or (checked and set_id < next(reversed(checked))):
-            raise TextureCatalogError(f"{_MANIFEST}: sets are sorted by set_id, each id once")
-        path = directory / _BLOBS / f"{entry['content_sha256']}.ltex"
+    for set_id, entry in entries.items():
+        path = directory / _BLOBS / f"{entry.content_sha256}.ltex"
         if not path.is_file():
             raise TextureCatalogError(f"{set_id}: {path.name} is not in {directory}")
         payload = path.read_bytes()
-        if len(payload) != entry["byte_size"]:
+        if len(payload) != entry.byte_size:
             raise TextureCatalogError(
-                f"{set_id}: {len(payload)} bytes on disk, {entry['byte_size']} pinned"
+                f"{set_id}: {len(payload)} bytes on disk, {entry.byte_size} pinned"
             )
-        if hashlib.sha256(payload).hexdigest() != entry["content_sha256"]:
+        if hashlib.sha256(payload).hexdigest() != entry.content_sha256:
             raise TextureCatalogError(
                 f"{set_id}: the bytes on disk do not hash to the pinned digest"
             )
         header = _decode(payload, set_id).header
         _check_header(header, entry, set_id)
         checked[set_id] = (entry, header, path)
-        licence_digests.add(entry["licence_sha256"])
+        licence_digests.add(entry.licence_sha256)
 
     if len(licence_digests) != 1:
         raise TextureCatalogError(
@@ -533,16 +466,16 @@ def load_texture_catalog(
         _check_provenance(header, record, set_id)
         sets[set_id] = PinnedTextureSet(
             set_id=set_id,
-            version=entry["version"],
-            content_sha256=entry["content_sha256"],
-            byte_size=entry["byte_size"],
-            width=entry["resolution"]["width"],
-            height=entry["resolution"]["height"],
-            extent_u_mm=entry["extent_mm"]["u"],
-            extent_v_mm=entry["extent_mm"]["v"],
+            version=entry.version,
+            content_sha256=entry.content_sha256,
+            byte_size=entry.byte_size,
+            width=entry.width,
+            height=entry.height,
+            extent_u_mm=entry.extent_u_mm,
+            extent_v_mm=entry.extent_v_mm,
             maps=_LAYOUT,
-            licence_id=entry["licence_id"],
-            licence_sha256=entry["licence_sha256"],
+            licence_id=entry.licence_id,
+            licence_sha256=entry.licence_sha256,
             title=header["title"],
             summary=header["summary"],
             seed=header["seed"],

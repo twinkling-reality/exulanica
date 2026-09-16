@@ -329,14 +329,35 @@ textual diffs and merges.
 `{set_id, version, content_sha256}` when it resolves an id, and its catalog digest covers those
 pins. A set id is a stable name and never carries a version or a digest; a rebake that changes a
 set's bytes must bump its version, and the pins in migration 0065 are what catch one that does not.
-The grammar lane's reader, `exulanica.grammar.textures.read_texture_manifest`, was run from its
-worktree against this manifest and accepted all eight sets.
+
+**One reader, one rule.** `exulanica/materials/manifest.py` is the only code that reads the
+manifest. `read_texture_manifest(raw)` reads it the way every material object is read (strict,
+canonical, printable ASCII, safe integers), then holds every entry to one rule:
+
+- the nine fields exactly;
+- a set id matching `^[a-z][a-z0-9.-]*$`;
+- a positive integer version and size;
+- lowercase sha256 digests;
+- a positive resolution and extent;
+- `channels` equal, map for map, to `CONTAINER_LAYOUT`;
+- the licence `CC0-1.0`.
+
+The manifest lists the published library and nothing else, so a set under any other licence
+cannot appear in it, and that includes a workspace's private bakes. It must list at least one set,
+sorted and each once. The resolver in section 9 and the grammar's
+`exulanica.grammar.textures.read_texture_manifest` both call it. The grammar keeps its own public
+names and its `CatalogError`, and its set id rule is the same compiled pattern.
+
+`tests/test_texture_manifest.py` breaks the manifest 27 ways and requires the same words from all
+three entry points. Every comparison between a document and what it must say is type-strict
+(`exulanica.materials.identical`): `true` is never `1`, although Python's `==` says it is. The
+container decoder and the header and provenance checks use the same comparison, and forged
+containers with `true` in place of `1` are refused.
 
 ## 9. The backend reader and resolver
 
 `exulanica/world/texture_assets.py` sits in the `world` layer and imports only
-`exulanica.canonical`, `exulanica.errors`, `exulanica.materials` and `exulanica.store`, which the
-layers contract permits.
+`exulanica.errors`, `exulanica.materials` and `exulanica.store`, which the layers contract permits.
 
 - `load_texture_catalog(directory=TEXTURE_DIRECTORY) -> TextureCatalog` reads the manifest, refuses
   it unless it is canonical, integer-only, sorted and in the agreed shape, recomputes every blob's
@@ -382,8 +403,9 @@ surface, and whatever draws it must say so rather than paint a flat colour that 
 architecture.
 
 The grammar lane's layering puts `exulanica.grammar` below `world`, so its material stage cannot
-import this module; it reads the same manifest through its own reader and refuses an unpublished id
-with its own schema error. This resolver is for the layers above `world`.
+import this module. It reads the same manifest through the same rule in `exulanica.materials`,
+which sits below it, and refuses an unpublished id with its own schema error. This resolver is for
+the layers above `world`.
 
 ## 10. Migration 0065
 
