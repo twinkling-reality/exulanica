@@ -72,6 +72,7 @@ __all__ = [
     "InvalidRecipe",
     "MaterialBusy",
     "MaterialError",
+    "MaterialReadOnly",
     "MaterialRepository",
     "MaterialRuntime",
     "MaterialWithdrawn",
@@ -127,6 +128,10 @@ class BakeQuotaExceeded(MaterialError):
 
 class MaterialBusy(MaterialError):
     """A delivery held the 0041 read lock through every retry. Asking again shortly succeeds."""
+
+
+class MaterialReadOnly(MaterialError):
+    """This deployment's database role may read material tables and not write them (the judge)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,8 +260,11 @@ def _refusals() -> Iterator[None]:
             raise MaterialWithdrawn("a deletion or a withdrawal reached this recipe") from error
         raise
     except psycopg.errors.InsufficientPrivilege as error:
-        if "personal model right" in (error.diag.message_primary or ""):
-            raise PhotoDerivedRecipeInert(error.diag.message_primary or "") from error
+        message = error.diag.message_primary or ""
+        if "personal model right" in message:
+            raise PhotoDerivedRecipeInert(message) from error
+        if message.startswith("permission denied for"):
+            raise MaterialReadOnly("this deployment keeps material recipes read-only") from error
         raise
 
 
@@ -269,9 +277,9 @@ def _retrying(operation: Callable[[], _T]) -> _T:
     for attempt in range(_ATTEMPTS):
         try:
             return operation()
-        except psycopg.errors.SerializationFailure as error:
+        except (psycopg.errors.SerializationFailure, psycopg.errors.DeadlockDetected) as error:
             if attempt == _ATTEMPTS - 1:
-                raise MaterialBusy("a delivery was in progress; ask again") from error
+                raise MaterialBusy("a delivery or a deletion was in progress; ask again") from error
             time.sleep(0.05 * (attempt + 1))
     raise AssertionError("unreachable")
 
@@ -491,10 +499,22 @@ class MaterialRepository:
         return _bake(refreshed)
 
     def _bytes_present(self, row: Mapping[str, Any]) -> bool:
+        """Whether a baked row's bytes are there, counting a write still in progress as there.
+
+        The worker records a bake and then writes its bytes, holding the object's lock across both.
+        Asked inside a transaction that already holds the workspace's lifecycle lock, so the object
+        lock is only tried, never waited for: the worker takes the object lock first and the
+        lifecycle lock second, and waiting here would be the other half of a deadlock.
+        """
         if row["content_sha256"] is None or row["purged_at"] is not None:
             return False
-        store = self.stores.for_workspace(self.workspace_id)
-        return store.exists(BlobId(bytes(row["content_sha256"])))
+        digest = bytes(row["content_sha256"])
+        if self.stores.for_workspace(self.workspace_id).exists(BlobId(digest)):
+            return True
+        free = self.connection.execute(
+            "select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) as free", (digest.hex(),)
+        ).fetchone()
+        return not (free is not None and free["free"])
 
     def read_bake(self, recipe_id: uuid.UUID) -> AuthorizedBake:
         """The container, hash-checked, released only if the bake is still current afterwards."""
@@ -505,6 +525,12 @@ class MaterialRepository:
         if row["purged_at"] is not None:
             raise MaterialWithdrawn(f"the bake of recipe {recipe_id} was erased")
         digest = bytes(row["content_sha256"])
+        # A bake is recorded before its bytes are written, under the object's lock. Waiting for
+        # that lock, holding nothing else, is what turns "missing" into "a moment later".
+        with self.connection.transaction():
+            self.connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))", (digest.hex(),)
+            )
         try:
             data = self.stores.for_workspace(self.workspace_id).get(BlobId(digest))
         except BlobNotFoundError as error:

@@ -14,8 +14,9 @@ migration 0066. What this module decides is the shape of an answer.
 *   ``GET /materials/recipes/{recipe_id}/bake/bytes`` serves the container after the 0041 final
     check, marked private and never cached, with the licence that says it stays in the workspace.
 
-A recipe that never existed here is 404; one that was withdrawn or reached by a deletion is 410.
-Nothing answers 403, so the surface is not an existence oracle.
+A recipe that never existed here is 404; one that was withdrawn or reached by a deletion is 410,
+so another workspace's recipe and an invented id answer alike. A deployment whose database role
+may not write material tables (the judge deployment) answers every write 403, whatever the id.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from exulanica.world.material_recipes import (
     InvalidRecipe,
     MaterialBusy,
     MaterialError,
+    MaterialReadOnly,
     MaterialRepository,
     MaterialRuntime,
     MaterialWithdrawn,
@@ -130,6 +132,10 @@ def _refused(error: Exception) -> JSONResponse:
         )
     if isinstance(error, BakeQuotaExceeded):
         return _problem(429, "bake_quota_exceeded", str(error))
+    if isinstance(error, MaterialReadOnly):
+        return _problem(
+            403, "materials_read_only", "this deployment keeps material recipes read-only"
+        )
     if isinstance(error, MaterialBusy):
         response = _problem(503, "retry", "a delivery was in progress; ask again")
         response.headers["Retry-After"] = "1"

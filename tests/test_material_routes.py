@@ -243,3 +243,44 @@ def test_an_instance_without_the_catalog_says_so(materials):
             headers={"Authorization": "Bearer materials-owner-token-without-catalog"},
         )
     assert (response.status_code, response.json()["code"]) == (503, "materials_unavailable")
+
+
+def test_a_read_only_deployment_answers_writes_with_a_named_403(materials):
+    from test_material_recipes import _read_only_database
+
+    judge = _read_only_database(materials)
+    token = "materials-judge-" + uuid.uuid4().hex
+    services = Services(
+        database=judge,
+        readonly_database=judge,
+        store=materials.purged.store,
+        tokens=load_token_directory(
+            {
+                "EXULANICA_API_TOKENS": json.dumps(
+                    {
+                        token: {
+                            "workspace_id": str(materials.workspace_id),
+                            "actor": str(uuid.uuid4()),
+                            "permissions": EVERY_PERMISSION,
+                        }
+                    }
+                )
+            }
+        ),
+        executor_shares_the_write_role=True,
+        model_client=None,
+        materials=MaterialRuntime(catalog=CATALOG, stores=materials.stores),
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(create_app(services, verify=False)) as client:
+        assert client.get("/materials/recipes", headers=headers).status_code == 200
+        for path, body in (
+            ("/materials/recipes", {"recipe": _small()}),
+            (f"/materials/recipes/{uuid.uuid4()}/bake", None),
+            (f"/materials/recipes/{uuid.uuid4()}/withdraw", None),
+        ):
+            response = client.post(path, headers=headers, json=body)
+            assert (response.status_code, response.json()["code"]) == (
+                403,
+                "materials_read_only",
+            ), path

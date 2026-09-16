@@ -510,6 +510,15 @@ create trigger tg_material_recipe_withdrawal_cancels
 -- 6. The bake's guard: its states, its immutable half, and who may mark it purged.
 -- --------------------------------------------------------------------------------------------
 
+-- Whether a tombstone may destroy these bytes from its workspace's namespace.
+--
+-- A workspace tombstone may destroy anything in the namespace, whether or not a row still names
+-- it: the namespace is the workspace's alone, and all of it goes. A capture or person tombstone
+-- may destroy a bake only when its scope reaches that bake's photo-derived recipe, so a forged job
+-- cannot reach an authored bake. It may also destroy bytes no bake row names at all. The one way
+-- such bytes exist is a restore: a database backed up before the bake was recorded, beside a
+-- namespace that still holds it. There, the sealed checkpoint that named the job is the authority,
+-- as it is for a blob; without this, the replay could never finish and the bytes would stay.
 create function material_bake_purge_is_authorized(
   p_workspace uuid, p_tombstone uuid, p_content bytea
 ) returns boolean
@@ -517,28 +526,39 @@ language sql volatile security definer as $fn$
   select p_workspace = current_workspace() and p_content is not null and exists (
     select 1
       from tombstone t
-      join material_bake b on b.workspace_id = t.workspace_id and b.content_sha256 = p_content
-      join material_recipe r on r.workspace_id = b.workspace_id and r.recipe_id = b.recipe_id
      where t.workspace_id = p_workspace
        and t.tombstone_id = p_tombstone
        and t.effective_at <= now()
        and (t.scope = 'workspace'
-            or (t.scope = 'capture' and r.origin = 'photo_derived' and exists (
-                  select 1 from material_recipe_source s
-                   where s.workspace_id = r.workspace_id
-                     and s.recipe_id = r.recipe_id
-                     and s.capture_id = t.capture_id))
-            or (t.scope = 'entity' and r.origin = 'photo_derived' and exists (
-                  select 1 from person_derivative_dependency d
-                   where d.workspace_id = r.workspace_id
-                     and d.entity_id = t.entity_id
-                     and d.target_kind = 'material_recipe'
-                     and d.target_id = r.recipe_id))));
+            or (t.scope in ('capture', 'entity') and (
+                  not exists (select 1 from material_bake b
+                               where b.workspace_id = p_workspace
+                                 and b.content_sha256 = p_content)
+                  or exists (
+                    select 1
+                      from material_bake b
+                      join material_recipe r on r.workspace_id = b.workspace_id
+                                            and r.recipe_id = b.recipe_id
+                     where b.workspace_id = p_workspace
+                       and b.content_sha256 = p_content
+                       and r.origin = 'photo_derived'
+                       and ((t.scope = 'capture' and exists (
+                               select 1 from material_recipe_source s
+                                where s.workspace_id = r.workspace_id
+                                  and s.recipe_id = r.recipe_id
+                                  and s.capture_id = t.capture_id))
+                            or (t.scope = 'entity' and exists (
+                               select 1 from person_derivative_dependency d
+                                where d.workspace_id = r.workspace_id
+                                  and d.entity_id = t.entity_id
+                                  and d.target_kind = 'material_recipe'
+                                  and d.target_id = r.recipe_id))))))));
 $fn$;
 
 comment on function material_bake_purge_is_authorized(uuid, uuid, bytea) is
-  'May this tombstone destroy the bake with these bytes: it is effective, in this session''s '
-  'workspace, and its scope reaches the bake''s recipe. A narrow capability for the purge role.';
+  'May this tombstone destroy these bytes from its workspace''s namespace: it is effective, in '
+  'this session''s workspace, and it is a workspace tombstone, or its scope reaches the bake''s '
+  'photo-derived recipe, or no bake row names the bytes (a restore). For the purge role.';
 
 do $$ begin
   execute format('alter function material_bake_purge_is_authorized(uuid,uuid,bytea) '

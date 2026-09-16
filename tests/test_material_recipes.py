@@ -57,6 +57,7 @@ from exulanica.world.material_recipes import (
     BakeNotReady,
     BakeQuotaExceeded,
     InvalidRecipe,
+    MaterialReadOnly,
     MaterialRepository,
     MaterialWithdrawn,
     PhotoDerivedRecipeInert,
@@ -153,15 +154,22 @@ class Materials:
         Erasure does not care what the bytes are, only that a recorded bake names them and the
         namespace holds them, so this needs no Node. The receipt is a real one for the recipe.
         """
-        record = self.repository().recipe(recipe_id)
         worker = self.worker()
         claim = worker._claim(self.connection, self.workspace_id)
         assert claim is not None and claim.recipe_id == recipe_id
         container = payload or b"synthetic container for " + recipe_id.bytes
+        assert worker._record_and_write(
+            self.connection, self.workspace_id, claim, container, self.receipt(recipe_id, container)
+        )
+        return container
+
+    def receipt(self, recipe_id: uuid.UUID, container: bytes) -> dict:
+        """A real receipt for the recipe, naming made-up container bytes."""
+        record = self.repository().recipe(recipe_id)
         request = bake_request(
             recipe_id=recipe_id, recipe=record.recipe, maker_sha256=record.maker_sha256
         )
-        receipt = bake_receipt(
+        return bake_receipt(
             request=request,
             maker_sha256=record.maker_sha256,
             recipe_sha256=record.recipe_sha256,
@@ -172,10 +180,22 @@ class Materials:
                 package_sha256="0" * 64,
             ),
         )
-        assert worker._record_and_write(
-            self.connection, self.workspace_id, claim, container, receipt
-        )
-        return container
+
+    def forget_bakes(self) -> None:
+        """Delete every bake row, as a database restored from before the bakes would lack them."""
+        with self.connection.transaction():
+            for table, trigger in (
+                ("material_bake_request", "tg_material_bake_request_append_only"),
+                ("material_bake", "tg_material_bake_no_delete"),
+            ):
+                self.connection.execute(f"alter table {table} disable trigger {trigger}")
+            self.connection.execute("delete from material_bake_request")
+            self.connection.execute("delete from material_bake")
+            for table, trigger in (
+                ("material_bake_request", "tg_material_bake_request_append_only"),
+                ("material_bake", "tg_material_bake_no_delete"),
+            ):
+                self.connection.execute(f"alter table {table} enable trigger {trigger}")
 
     def baked(self, set_id: str = BRICK, **recipe_options) -> tuple[uuid.UUID, bytes]:
         recipe = self.repository().create_recipe(_small(set_id, **recipe_options))
@@ -1082,3 +1102,194 @@ def test_a_claim_waits_for_a_deletion_before_it_locks_a_bake(materials):
     )
     assert outcome == {"value": None}, outcome
     assert materials.rows("select state from material_bake")[0]["state"] == "cancelled"
+
+
+# -- what the review of this migration found -------------------------------------------------------
+
+
+@pytest.mark.parametrize("scope", ["workspace", "capture"])
+def test_restore_finishes_when_the_restored_database_predates_the_bake(materials, tmp_path, scope):
+    """A Monday database, a Tuesday bake, a Wednesday deletion: the bytes still go."""
+    if scope == "workspace":
+        _, container = materials.baked()
+    else:
+        with materials.photo_derived_allowed():
+            recipe_id = materials.photo_derived([_capture(materials)])
+        materials.repository().request_bake(recipe_id)
+        container = materials.record_synthetic_bake(recipe_id)
+    if scope == "workspace":
+        materials.purged.repository.insert_tombstone(
+            scope="workspace", requested_by=uuid.uuid4(), reason="the person left"
+        )
+    else:
+        materials.purged.tombstone_the_capture(_capture(materials))
+    purge_database = materials.purged.database(role=_PURGE_ROLE, password=_PURGE_PASSWORD)
+    materials.purge_worker().drain()
+    assert not materials.in_namespace(container)
+    source, marker = tmp_path / "checkpoint.json", tmp_path / "restore.json"
+    checkpoint(materials.owner, source)
+    prepare_restore(source, marker)
+    materials.stores.for_workspace(materials.workspace_id).put_bytes(container)
+    materials.forget_bakes()
+    replay(
+        materials.owner,
+        purge_database,
+        materials.purged.store,
+        source,
+        marker,
+        materials=materials.stores,
+    )
+    assert not materials.in_namespace(container)
+    assert len(materials.rows("select * from restore_replay_receipt")) == 1
+
+
+def test_a_bake_being_written_is_waited_for_and_never_re_requested(materials):
+    import threading
+    import time
+
+    from exulanica.canonical import canonical_json
+
+    record = materials.repository().create_recipe(_small())
+    materials.repository().request_bake(record.recipe_id)
+    worker = materials.worker()
+    claim = worker._claim(materials.connection, materials.workspace_id)
+    container = b"bytes the worker has recorded and not yet written"
+    digest = hashlib.sha256(container).digest()
+    raw_receipt = canonical_json(materials.receipt(record.recipe_id, container))
+    outcome: dict[str, object] = {}
+    with materials.owner.session(materials.workspace_id) as writer:
+        writer.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (digest.hex(),))
+        assert worker._record(writer, materials.workspace_id, claim, digest, container, raw_receipt)
+        # Recorded and not written: asking again must not queue it, and reading must wait.
+        assert materials.repository().request_bake(record.recipe_id).state == "baked"
+        assert materials.rows("select count(*) as n from material_bake_request")[0]["n"] == 1
+
+        def read() -> None:
+            with materials.owner.session(materials.workspace_id) as reader:
+                outcome["pid"] = reader.info.backend_pid
+                try:
+                    outcome["data"] = materials.repository(reader).read_bake(record.recipe_id).data
+                except Exception as error:  # the assertion below names it
+                    outcome["error"] = error
+
+        thread = threading.Thread(target=read)
+        thread.start()
+        deadline = time.monotonic() + 30
+        waiting = 0
+        while not waiting and time.monotonic() < deadline:
+            if "pid" in outcome:
+                waiting = writer.execute(
+                    "select count(*) as n from pg_locks "
+                    "where pid = %s and locktype = 'advisory' and not granted",
+                    (outcome["pid"],),
+                ).fetchone()["n"]
+            if not waiting:
+                time.sleep(0.02)
+        assert waiting, outcome
+        materials.stores.for_workspace(materials.workspace_id).put_bytes(container)
+        writer.execute("select pg_advisory_unlock(hashtextextended(%s, 0))", (digest.hex(),))
+        thread.join(timeout=30)
+    assert outcome.get("data") == container, outcome
+
+
+def _fake_node(directory: Path, body: str) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    fake = directory / "node"
+    fake.write_text("#!/bin/sh\n" + body, encoding="ascii")
+    fake.chmod(0o755)
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("status", "failure_class", "stored"),
+    [
+        (1, "bake_failed", "the baker exited 1"),
+        (2, "invalid_recipe", "the baker refused the request: at /srv/secret"),
+    ],
+)
+def test_what_the_baker_prints_never_reaches_the_workspace_verbatim(
+    materials, tmp_path, status, failure_class, stored
+):
+    runtime = _real_runtime()
+    record = materials.repository().create_recipe(_small())
+    materials.repository().request_bake(record.recipe_id)
+    fake = _fake_node(
+        tmp_path / f"node-{status}",
+        f"printf 'at /srv/secret\\001\\303\\251\\n' >&2\nexit {status}\n",
+    )
+    lying = BakeRuntime(node=fake, loader=runtime.loader, package=runtime.package)
+    outcome = materials.worker(lying).drain()
+    assert outcome.failed == 1, outcome
+    row = materials.rows("select failure_class, failure_message from material_bake")[0]
+    assert (row["failure_class"], row["failure_message"]) == (failure_class, stored)
+    assert all(" " <= character <= "~" for character in row["failure_message"])
+
+
+def test_a_pass_serves_workspaces_in_turn_and_outlives_one_that_breaks(materials, monkeypatch):
+    other = uuid.uuid4()
+    with materials.owner.session(other) as connection:
+        foreign = MaterialRepository(
+            connection, other, uuid.uuid4(), catalog=CATALOG, stores=materials.stores
+        )
+        for seed in (1, 2):
+            foreign.request_bake(foreign.create_recipe(_small(seed=seed)).recipe_id)
+    for seed in (3, 4):
+        repository = materials.repository()
+        repository.request_bake(repository.create_recipe(_small(seed=seed)).recipe_id)
+    seen: list[uuid.UUID] = []
+    broken: set[uuid.UUID] = set()
+
+    def stub(self, connection, workspace_id, claim, outcome):
+        seen.append(workspace_id)
+        if workspace_id in broken:
+            raise RuntimeError("a bake that breaks unexpectedly")
+        self._finish_failed(connection, workspace_id, claim, _Failed("bake_failed", "stub"))
+        outcome.failed += 1
+
+    monkeypatch.setattr(MaterialBakeWorker, "_bake_one", stub)
+    both = frozenset({materials.workspace_id, other})
+    runtime = BakeRuntime(Path("/absent/node"), Path("/absent"), Path("/absent"))
+    worker = MaterialBakeWorker(
+        materials.owner,
+        materials.stores,
+        both,
+        runtime=runtime,
+        catalog=CATALOG,
+        limit_per_pass=2,
+    )
+    worker.drain()
+    assert sorted(seen) == sorted(both), "one bake from each workspace, not two from the first"
+
+    seen.clear()
+    broken.add(min(both))
+    outcome = worker.drain()
+    assert seen == [min(both), max(both)]
+    assert outcome.failed == 1 and len(outcome.errors) == 1
+    assert "a bake that breaks unexpectedly" in outcome.errors[0]
+
+
+def _read_only_database(materials):
+    import secrets
+
+    from exulanica.orchestration.judge_seed import provision_judge_role
+
+    role, password = "exulanica_judge_materials", secrets.token_urlsafe(24)
+    with materials.owner.unscoped() as admin:
+        admin.execute(f"set search_path to {materials.purged.scratch}, public")
+        provision_judge_role(admin, role=role, password=password)
+    return materials.purged.database(role=role, password=password)
+
+
+def test_a_read_only_deployment_refuses_material_writes_by_name(materials):
+    materials.repository().create_recipe(_small())
+    with _read_only_database(materials).session(materials.workspace_id) as connection:
+        repository = materials.repository(connection)
+        [existing] = repository.recipes()
+        for write in (
+            lambda: repository.create_recipe(_small(seed=11)),
+            lambda: repository.request_bake(existing.recipe_id),
+            lambda: repository.withdraw_recipe(existing.recipe_id),
+        ):
+            with pytest.raises(MaterialReadOnly):
+                write()
+    assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 1

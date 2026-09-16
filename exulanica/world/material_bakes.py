@@ -360,11 +360,15 @@ def run_baker(runtime: BakeRuntime, limits: BakeLimits, request: bytes) -> BakeR
 
 
 class _Failed(Exception):
-    """A bake that ends ``failed``, with the class the schema names."""
+    """A bake that ends ``failed``, with the class the schema names.
 
-    def __init__(self, failure_class: str, message: str) -> None:
+    ``detail`` is for the operator's log and never reaches the row a workspace can read.
+    """
+
+    def __init__(self, failure_class: str, message: str, detail: str = "") -> None:
         super().__init__(message)
         self.failure_class = failure_class
+        self.detail = detail
 
 
 @dataclass
@@ -376,6 +380,8 @@ class BakeOutcome:
     lost: int = 0
     exhausted: int = 0
     failures: list[str] = field(default_factory=list)
+    #: Workspaces a pass stopped serving because something unexpected happened, and what.
+    errors: list[str] = field(default_factory=list)
 
     @property
     def handled(self) -> int:
@@ -394,12 +400,21 @@ class _Claim:
 _SERIALIZATION_RETRIES: Final = 5
 
 
+def _printable(text: str) -> str:
+    """Only printable ASCII, lines joined, so a refusal can never carry a control byte."""
+    return " ".join(
+        "".join(character if " " <= character <= "~" else " " for character in line).strip()
+        for line in text.splitlines()
+        if line.strip()
+    )
+
+
 def _retrying(operation: Callable[[], _T]) -> _T:
     """Run a write again when a delivery held the 0041 read lock; the last failure propagates."""
     for attempt in range(_SERIALIZATION_RETRIES):
         try:
             return operation()
-        except psycopg.errors.SerializationFailure:
+        except (psycopg.errors.SerializationFailure, psycopg.errors.DeadlockDetected):
             if attempt == _SERIALIZATION_RETRIES - 1:
                 raise
             time.sleep(0.05 * (attempt + 1))
@@ -473,15 +488,35 @@ class MaterialBakeWorker:
         return self._workspaces | frozenset(discovered)
 
     def drain(self) -> BakeOutcome:
+        """Bake what is waiting, one bake per workspace in turn, up to the pass limit.
+
+        In turn, so one busy workspace cannot take every bake a pass allows; and each workspace
+        on its own, so an error in one is recorded and the others are still served.
+        """
         outcome = BakeOutcome()
-        for workspace_id in sorted(self.workspaces()):
-            with self._database.session(workspace_id) as connection:
-                outcome.exhausted += self._expire_exhausted(connection, workspace_id)
-                while outcome.handled < self._limit and not self._stop.is_set():
-                    claim = self._claim(connection, workspace_id)
-                    if claim is None:
+        with contextlib.ExitStack() as sessions:
+            active: dict[uuid.UUID, psycopg.Connection] = {}
+            for workspace_id in sorted(self.workspaces()):
+                try:
+                    connection = sessions.enter_context(self._database.session(workspace_id))
+                    outcome.exhausted += self._expire_exhausted(connection, workspace_id)
+                except Exception as error:
+                    outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
+                    continue
+                active[workspace_id] = connection
+            while active and outcome.handled < self._limit and not self._stop.is_set():
+                for workspace_id, connection in list(active.items()):
+                    if outcome.handled >= self._limit or self._stop.is_set():
                         break
-                    self._bake_one(connection, workspace_id, claim, outcome)
+                    try:
+                        claim = self._claim(connection, workspace_id)
+                        if claim is None:
+                            del active[workspace_id]
+                            continue
+                        self._bake_one(connection, workspace_id, claim, outcome)
+                    except Exception as error:
+                        outcome.errors.append(f"{workspace_id}: {type(error).__name__}: {error}")
+                        del active[workspace_id]
         return outcome
 
     def start(self) -> None:
@@ -623,7 +658,10 @@ class MaterialBakeWorker:
                 result=result,
             )
         except _Failed as failed:
-            outcome.failures.append(f"{claim.set_id}: {failed.failure_class}: {failed}")
+            outcome.failures.append(
+                f"{claim.set_id}: {failed.failure_class}: {failed}"
+                + (f" ({failed.detail})" if failed.detail else "")
+            )
             if self._finish_failed(connection, workspace_id, claim, failed):
                 outcome.failed += 1
             else:
@@ -687,11 +725,17 @@ class MaterialBakeWorker:
                 f"stopped at {run.peak_memory_bytes} bytes resident, over "
                 f"{self._limits.memory_bytes}",
             )
-        stderr = run.stderr.decode("utf-8", "replace").strip()
         if run.returncode == _REFUSED:
-            raise _Failed("invalid_recipe", f"the baker refused the request: {stderr}")
+            # The baker's refusals are its own sentences about the person's own recipe; anything
+            # else it printed is kept out of the row, which the workspace can read.
+            reasons = _printable(run.stderr.decode("utf-8", "replace"))[:500]
+            raise _Failed("invalid_recipe", f"the baker refused the request: {reasons}")
         if run.returncode != 0:
-            raise _Failed("bake_failed", f"the baker exited {run.returncode}: {stderr[-500:]}")
+            raise _Failed(
+                "bake_failed",
+                f"the baker exited {run.returncode}",
+                detail=_printable(run.stderr.decode("utf-8", "replace"))[-500:],
+            )
         try:
             if len(run.stdout) > self._limits.result_bytes:
                 raise MaterialObjectError("the result is longer than any result")
@@ -800,8 +844,9 @@ class MaterialBakeWorker:
                             (workspace_id, claim.bake_id, claim.claim_token, digest),
                         )
                 return cursor.rowcount == 1
-            except psycopg.errors.SerializationFailure:
-                # A delivery held the 0041 read lock. The write is safe to try again.
+            except (psycopg.errors.SerializationFailure, psycopg.errors.DeadlockDetected):
+                # A delivery held the 0041 read lock, or a deletion won a lock race. The write is
+                # safe to try again.
                 time.sleep(0.05 * (attempt + 1))
             except psycopg.errors.IntegrityConstraintViolation as error:
                 if (error.diag.message_primary or "").startswith("tombstoned"):
