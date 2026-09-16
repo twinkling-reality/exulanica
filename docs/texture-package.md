@@ -480,7 +480,8 @@ manifest and the pinned rows disagree.
   - wiring the bake worker's image into `compose.yaml`, and building it;
   - the migration after 0073 that replaces the two inert triggers with the personal model right's
     check;
-  - the first training run, which waits for an operator's yes.
+  - a lockfile for `ml/`, which has none yet;
+  - the first training run, which waits for an operator's yes and for that lockfile.
 
 ## 13. Synthetic dataset
 
@@ -710,6 +711,11 @@ The bytes route releases the container only after the 0041 final check.
 - **Worker image.** The bake worker runs Node, so it has an image recipe of its own,
   `deploy/material-bake/Dockerfile`. That recipe is written, not built, and not in `compose.yaml`.
 - **Training.** The training code is in `ml/` (see `ml/README.md`).
+  - **`ml/` has no lockfile yet.** `ml/pyproject.toml` names torch and numpy by range only,
+    because resolving torch is a download, and that waits for a yes.
+  - **A locked environment is required before any training run.** Nothing checks this yet. The
+    change that adds the lockfile should also make `train` refuse to start without it, and put
+    the lockfile's digest in the run's receipt.
 
 **Evidence.** `web/packages/loom-texture/evidence/2026-09-16-workspace-bake-determinism.log.txt` is
 the output of a script that makes one bake request per published set, with the set's own recipe at
