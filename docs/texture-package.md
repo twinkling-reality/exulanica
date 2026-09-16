@@ -397,6 +397,9 @@ provisions, with the same inline block 0042 uses, skipping a role the cluster do
 Unlike 0042 it names no role from before the ADR-0011 rename. `READ_ONLY_TABLES` in
 `exulanica/db/roles.py` names the table, so `provision_runtime_role`, which grants insert and
 update on every table and revokes them from that list, leaves a provisioned role with SELECT only.
+Provisioning skips a listed table a partly migrated schema does not have yet, so a role provisioned
+before 0065 is handed writes on the new table by its default privileges when 0065 runs, and the next
+provisioning takes them back; `tests/test_texture_set_migration.py` walks exactly that upgrade.
 A trigger is the second wall: it refuses every UPDATE and DELETE, even by the owner, and every
 INSERT by a role that is not a member of the owner, so a pinned version never names other bytes, a
 new version arrives only in a new migration, and a role handed a write here by mistake is still

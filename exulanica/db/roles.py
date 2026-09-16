@@ -301,7 +301,23 @@ def provision_runtime_role(
                     schema, role_name
                 )
             )
+            # Provisioning also runs on a schema migrated only part of the way: a deployment
+            # provisions before a pending migration runs, and tests provision schemas stopped
+            # below one. A read-only table a later migration creates is revoked here once it
+            # exists, so reprovisioning after that migration is what takes its writes back.
+            present = {
+                row["relname"] if isinstance(row, dict) else row[0]
+                for row in connection.execute(
+                    "select c.relname from pg_class c "
+                    "join pg_namespace n on n.oid = c.relnamespace "
+                    "where n.nspname = current_schema() and c.relkind in ('r', 'p') "
+                    "and c.relname = any(%s)",
+                    (list(READ_ONLY_TABLES),),
+                ).fetchall()
+            }
             for table in READ_ONLY_TABLES:
+                if table not in present:
+                    continue
                 connection.execute(
                     sql.SQL("revoke insert, update on {} from {}").format(
                         sql.Identifier(table), role_name

@@ -351,3 +351,45 @@ def test_the_owner_can_pin_a_new_version_as_a_later_migration_would(connection):
         ).fetchall()
         assert [row["version"] for row in versions] == [1, 99]
     assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+
+
+def test_provisioning_before_0065_leaves_the_catalog_read_only_once_it_exists(monkeypatch):
+    """Provisioning runs on schemas migrated part of the way, and must not assume a later table.
+
+    A deployment provisions its runtime role before a pending migration runs, and tests provision
+    schemas stopped below a migration, so provisioning revokes writes only on read-only tables
+    that exist. Here a role is provisioned on a schema that stops before 0065. Applying 0065 then
+    hands that role SELECT, INSERT and UPDATE on the new table through its default privileges,
+    because 0065's own grant block names only the provisioned exulanica roles, and reprovisioning
+    takes the writes back.
+    """
+    import pg_harness
+
+    below = [migration for migration in migrations() if migration.version < "0065"]
+    role = f"texture_upgrade_{uuid.uuid4().hex[:12]}"
+    with monkeypatch.context() as patch:
+        patch.setattr(pg_harness, "migrations", lambda: iter(below))
+        with pg_harness.migrated_schema() as (_, admin):
+            admin.row_factory = dict_row
+            try:
+                missing = admin.execute("select to_regclass(%s) as found", (TABLE,)).fetchone()
+                assert missing["found"] is None
+                provision_runtime_role(admin, role=role)
+                admin.commit()
+                admin.execute(MIGRATION.read_text())
+                handed = _privileges(admin, role)
+                assert handed["can_read"] and handed["can_insert"] and handed["can_update"]
+                provision_runtime_role(admin, role=role)
+                assert _privileges(admin, role) == {
+                    "can_read": True,
+                    "can_insert": False,
+                    "can_update": False,
+                    "can_delete": False,
+                }
+            finally:
+                admin.rollback()
+                present = admin.execute("select 1 from pg_roles where rolname = %s", (role,))
+                if present.fetchone() is not None:
+                    admin.execute(sql.SQL("drop owned by {}").format(sql.Identifier(role)))
+                    admin.execute(sql.SQL("drop role {}").format(sql.Identifier(role)))
+                admin.commit()
