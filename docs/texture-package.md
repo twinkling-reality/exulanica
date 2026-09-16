@@ -204,9 +204,16 @@ id and version, and the makers' code.
 the script printed at its top. It baked the catalog five times: twice on Node 24.15.0 (arm64), once
 on Node 26.7.0 (arm64), once on Node 20.10.0 (arm64) and once on Node 20.10.0 running as x86_64
 under Rosetta 2. Every one of the 11 files in every run was compared with `cmp` against the first
-run and against the committed `assets/textures/`: 0 differ. The package's
-`test/published.test.ts` rebakes the whole catalog on every test run and compares each committed
-file byte for byte.
+run and against the committed `assets/textures/`: 0 differ.
+
+`web/packages/loom-texture/evidence/2026-09-16-determinism-objects.log.txt` is the same script run
+again once the sets were baked from recipes, at the commit it names and with no uncommitted change
+under `src/`, on the same five runtimes. Every one of the 44 files it wrote (the 8 sets, the
+dedication, the 32 objects, the manifest, the catalog and `.gitattributes`) was compared the same
+way: 0 differ, the manifest and every set are the same bytes as in the first record, and the x86_64
+run, which executes the compiled output, found the library through the package root. The package's
+`test/published.test.ts` rebakes the whole library on every test run and compares each committed
+file byte for byte, and `tests/test_texture_sets.py` holds both records to the committed files.
 
 ## 5. Tiling
 

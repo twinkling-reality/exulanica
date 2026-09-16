@@ -41,8 +41,17 @@ from PIL import Image, ImageChops, ImageStat
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = TEXTURE_DIRECTORY / "manifest.json"
 DOC = ROOT / "docs" / "texture-package.md"
-EVIDENCE = (
-    ROOT / "web" / "packages" / "loom-texture" / "evidence" / "2026-09-16-determinism.log.txt"
+EVIDENCE_DIRECTORY = ROOT / "web" / "packages" / "loom-texture" / "evidence"
+#: The bake before recipes were objects: the eleven files that existed then.
+EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism.log.txt"
+#: The bake from recipes: every file the directory holds, objects and catalog included.
+OBJECT_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism-objects.log.txt"
+RUNS = (
+    "node24-arm64-a",
+    "node24-arm64-b",
+    "node26-arm64",
+    "node20-arm64",
+    "node20-x86_64-rosetta",
 )
 
 #: The Melbourne street measurement: rejected on looks, passing every mechanical budget, with
@@ -471,25 +480,53 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
         assert entry["content_sha256"] in row.group(0), entry["set_id"]
         assert re.search(rf"\|\s*{entry['version']}\s*\|", row.group(0)), entry["set_id"]
     assert EVIDENCE.relative_to(ROOT).as_posix() in text
+    assert OBJECT_EVIDENCE.relative_to(ROOT).as_posix() in text
     assert "—" not in text
+
+
+def _run(record, run):
+    section = record.split(f"== run {run}\n", 1)[1].split("\n== ", 1)[0]
+    assert "exit: 0" in section, run
+    return section
 
 
 def test_the_determinism_record_is_of_the_published_bytes(manifest):
     record = EVIDENCE.read_text(encoding="utf-8")
     digests = {entry["content_sha256"] for entry in manifest["sets"]}
-    for run in (
-        "node24-arm64-a",
-        "node24-arm64-b",
-        "node26-arm64",
-        "node20-arm64",
-        "node20-x86_64-rosetta",
-    ):
-        section = record.split(f"== run {run}\n", 1)[1].split("\n== ", 1)[0]
-        assert "exit: 0" in section, run
+    for run in RUNS:
+        section = _run(record, run)
         listed = set(re.findall(r"^([0-9a-f]{64})  \./blobs/\1\.ltex$", section, re.MULTILINE))
         assert listed == digests, run
         manifest_line = re.search(r"^([0-9a-f]{64})  \./manifest\.json$", section, re.MULTILINE)
         assert manifest_line.group(1) == hashlib.sha256(MANIFEST.read_bytes()).hexdigest(), run
-    for run in ("node24-arm64-b", "node26-arm64", "node20-arm64", "node20-x86_64-rosetta"):
+    for run in RUNS[1:]:
         assert f"{run}: 0 of 11 files differ; 11 files present" in record
     assert "committed: 0 of 11 files differ; 11 files present" in record
+
+
+def test_the_object_determinism_record_is_of_every_published_file(manifest, catalog):
+    record = OBJECT_EVIDENCE.read_text(encoding="utf-8")
+    present = sorted(
+        path.relative_to(TEXTURE_DIRECTORY).as_posix()
+        for path in TEXTURE_DIRECTORY.rglob("*")
+        if path.is_file()
+    )
+    expected = {
+        f"./{name}": hashlib.sha256((TEXTURE_DIRECTORY / name).read_bytes()).hexdigest()
+        for name in present
+    }
+    assert {
+        name[len("./objects/") : -len(".json")] for name in expected if "/objects/" in name
+    } == (catalog.materials.object_digests())
+    assert "working tree changes under web/packages/loom-texture/src: 0" in record
+    for run in RUNS:
+        section = _run(record, run)
+        listed = dict(
+            (name, digest)
+            for digest, name in re.findall(r"^([0-9a-f]{64})  (\./\S+)$", section, re.MULTILINE)
+        )
+        assert listed == expected, run
+    count = len(present)
+    for run in RUNS[1:]:
+        assert f"{run}: 0 of {count} files differ; {count} files present" in record
+    assert f"committed: 0 of {count} files differ; {count} files present" in record
