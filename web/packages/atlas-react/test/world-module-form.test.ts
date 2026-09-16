@@ -92,11 +92,48 @@ describe('a declared form has to produce something', () => {
   );
 
   it('would have caught the forms that are registered but drawn by nothing', () => {
-    expect(WORLD_UNRENDERED_FORM_KINDS).toEqual([...WORLD_EVIDENCE_FORM_KINDS]);
+    expect(WORLD_UNRENDERED_FORM_KINDS).toEqual([
+      ...WORLD_EVIDENCE_FORM_KINDS,
+      ...WORLD_LANDMARK_FORM_KINDS,
+    ]);
     for (const kind of WORLD_UNRENDERED_FORM_KINDS) {
       expect(WORLD_DECLARABLE_FORM_KINDS).not.toContain(kind);
       expect(RENDERED_WORLD_MODULE_FORMS.has(kind)).toBe(false);
     }
+  });
+});
+
+/*
+ * A located region still receives a landmark instance: the composer's location gate decides that
+ * much. What it may not receive is a body. The beacon and the survey strata were invented shapes,
+ * and this is the assertion that keeps a later change from quietly standing one there again.
+ */
+describe('a landmark has no body until a grammar record gives it one', () => {
+  it('draws nothing for a located region\'s landmark instance', () => {
+    const topology = composeAtlasWorld(scene([region('r1', 0, [-12, 0, -4])]));
+    const landmarks = topology.instances.filter((value) => value.role === 'landmark');
+    expect(landmarks.length).toBeGreaterThan(0);
+    const { device, app } = stage();
+    for (const profile of [ORIGIN_LANDSCAPE, SURVEY_RELIEF]) {
+      const world = createComposedWorld(device, topology, profile);
+      for (const landmark of landmarks) {
+        const group = world.entity.findByName(landmark.instanceId);
+        const drawn = group === null ? 0 : (group as pc.Entity).findComponents('render').length;
+        expect(drawn).toBe(0);
+      }
+      world.destroy();
+    }
+    app.destroy();
+  });
+
+  it('lets no landmark module declare a form', () => {
+    expect(WORLD_FORM_KINDS_BY_ROLE.has('landmark')).toBe(false);
+    for (const kind of WORLD_LANDMARK_FORM_KINDS) {
+      expect(WORLD_DECLARABLE_FORM_KINDS).not.toContain(kind);
+      expect(RENDERED_WORLD_MODULE_FORMS.has(kind)).toBe(false);
+    }
+    expect(DEFAULT_WORLD_MODULES.definitions.filter((value) => value.role === 'landmark')
+      .map((value) => value.form)).toEqual([null]);
   });
 });
 
@@ -116,13 +153,14 @@ describe('the catalog and the renderer agree on what a world can be built from',
    * above atlas-core and could import them instead; until it does, this is the tripwire.
    */
   it('uses the same form names the world style profiles use', () => {
+    // The profiles name only a growth form now: their landmark and evidence tokens were deleted
+    // with the renderer loops that read them.
     for (const profile of [ORIGIN_LANDSCAPE, SURVEY_RELIEF]) {
-      for (const form of [profile.geometry.landmark, profile.geometry.evidence, profile.geometry.expansion]) {
-        expect(WORLD_MODULE_FORM_KINDS).toContain(form);
-      }
+      expect(WORLD_MODULE_FORM_KINDS).toContain(profile.geometry.expansion);
+      expect(WORLD_EXPANSION_FORM_KINDS).toContain(profile.geometry.expansion);
+      expect(profile.geometry).not.toHaveProperty('landmark');
+      expect(profile.geometry).not.toHaveProperty('evidence');
     }
-    expect(WORLD_LANDMARK_FORM_KINDS).toContain(ORIGIN_LANDSCAPE.geometry.landmark);
-    expect(WORLD_EXPANSION_FORM_KINDS).toContain(ORIGIN_LANDSCAPE.geometry.expansion);
   });
 
   it('keeps every declared form legal for the role that declares it', () => {
@@ -153,20 +191,21 @@ describe('the catalog and the renderer agree on what a world can be built from',
 describe('composed world grounding', () => {
   const at: readonly [number, number, number] = [-12, 0, -4];
 
-  function landmarkBaseY(groundHeight?: (x: number, z: number) => number): number {
+  // The growth register is the module that still draws, so it is what grounding is measured on.
+  function growthBaseY(groundHeight?: (x: number, z: number) => number): number {
     const topology = composeAtlasWorld(scene([region('r1', 0, at)]));
     const { device } = stage();
     const world = groundHeight === undefined
       ? createComposedWorld(device, topology, ORIGIN_LANDSCAPE)
       : createComposedWorld(device, topology, ORIGIN_LANDSCAPE, undefined, groundHeight);
-    const target = topology.instances.find((value) => value.role === 'landmark')!;
+    const target = topology.instances.find((value) => value.role === 'expansion-point')!;
     return world.entity.findByName(target.instanceId)!.getPosition().y;
   }
 
   it('stands on the authored Atlas landscape by default', () => {
     const target = composeAtlasWorld(scene([region('r1', 0, at)]))
-      .instances.find((value) => value.role === 'landmark')!;
-    expect(landmarkBaseY()).toBeCloseTo(
+      .instances.find((value) => value.role === 'expansion-point')!;
+    expect(growthBaseY()).toBeCloseTo(
       target.transform.position.y
         + atlasLandscapeHeight(target.transform.position.x, target.transform.position.z),
       5,
@@ -175,14 +214,14 @@ describe('composed world grounding', () => {
 
   it('stands on the caller\'s ground when the caller owns it', () => {
     // The district's own street. Not "close to zero": a flat surface means exactly its own height.
-    expect(landmarkBaseY(() => 0)).toBe(0);
+    expect(growthBaseY(() => 0)).toBe(0);
     // And the two differ by exactly the landscape this district does not draw, which is the whole
     // displacement the fix removes. Asserted against the function rather than a chosen tolerance,
     // so it stays true if the fixture moves.
     const target = composeAtlasWorld(scene([region('r1', 0, at)]))
-      .instances.find((value) => value.role === 'landmark')!;
+      .instances.find((value) => value.role === 'expansion-point')!;
     const buried = atlasLandscapeHeight(target.transform.position.x, target.transform.position.z);
     expect(buried).not.toBe(0);
-    expect(landmarkBaseY() - landmarkBaseY(() => 0)).toBeCloseTo(buried, 5);
+    expect(growthBaseY() - growthBaseY(() => 0)).toBeCloseTo(buried, 5);
   });
 });

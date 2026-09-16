@@ -203,14 +203,28 @@ describe('a variant has to be substitutable, and the catalog says so', () => {
   });
 
   it('refuses a form belonging to another role', () => {
-    const landmark = {
-      ...DEFAULT_WORLD_MODULES.get('landmark.orientation-register'),
-      key: 'landmark.test-wrong',
-      variantOf: 'landmark.orientation-register',
-      form: { kind: 'living-buds', parameters: {} },
+    const growth = {
+      ...DEFAULT_WORLD_MODULES.get('growth.open-register'),
+      key: 'growth.test-wrong',
+      variantOf: 'growth.open-register',
+      form: { kind: 'aero-beacon', parameters: {} },
     };
-    expect(() => new WorldModuleRegistry(3, [...canonicalOnly, landmark as never]))
-      .toThrow(/is not one of aero-beacon, survey-strata/);
+    expect(() => new WorldModuleRegistry(3, [...canonicalOnly, growth as never]))
+      .toThrow(/is not one of living-buds, survey-stakes/);
+  });
+
+  /* No renderer draws a landmark form, so the catalog lets no landmark module declare one. */
+  it('refuses any form on a landmark', () => {
+    for (const kind of ['aero-beacon', 'survey-strata']) {
+      const landmark = {
+        ...DEFAULT_WORLD_MODULES.get('landmark.orientation-register'),
+        key: 'landmark.test-formed',
+        variantOf: 'landmark.orientation-register',
+        form: { kind, parameters: {} },
+      };
+      expect(() => new WorldModuleRegistry(3, [...canonicalOnly, landmark as never]))
+        .toThrow(/role landmark has no registered form vocabulary/);
+    }
   });
 
   it('refuses parameters that are not stable names or not real numbers', () => {

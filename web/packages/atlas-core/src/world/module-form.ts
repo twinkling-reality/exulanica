@@ -35,17 +35,22 @@ export const WORLD_EXPANSION_FORM_KINDS: readonly WorldExpansionFormKind[] =
 /**
  * Registered names that no renderer draws.
  *
- * `memory-lens` and `indexed-bays` are named by the world style profiles and implemented nowhere:
- * evidence bodies come from the source-first grove when a real photograph exists, and section 8.3
- * of the interaction model is why nothing decorative stands in when one does not. They stay
- * registered so a style naming them is still checked, and they stay out of
+ * `memory-lens` and `indexed-bays` are implemented nowhere: evidence bodies come from the
+ * source-first grove when a real photograph exists, and section 8.3 of the interaction model is
+ * why nothing decorative stands in when one does not.
+ *
+ * `aero-beacon` and `survey-strata` are drawn by nothing either. No builder draws these kinds: the
+ * renderer loops that used to stand a beacon or a set of survey ribs at a region were invented
+ * shapes and were deleted. A landmark will come from a grammar record, not from a renderer form.
+ *
+ * All four stay registered so a name can still be checked, and they stay out of
  * `WORLD_FORM_KINDS_BY_ROLE` so no module can promise a shape that will never appear.
  *
  * This list exists because the first version of this file asserted all six were drawn. The test
  * compared two hand-written lists, both wrong in the same way, and passed.
  */
 export const WORLD_UNRENDERED_FORM_KINDS: readonly WorldModuleFormKind[] =
-  Object.freeze([...WORLD_EVIDENCE_FORM_KINDS]);
+  Object.freeze([...WORLD_EVIDENCE_FORM_KINDS, ...WORLD_LANDMARK_FORM_KINDS]);
 
 /**
  * Which forms each role may declare.
@@ -59,8 +64,9 @@ export const WORLD_UNRENDERED_FORM_KINDS: readonly WorldModuleFormKind[] =
  *
  * - `navigation-field`, `region-foundation` and `relationship-path` are drawn by the continuous
  *   world field shader, which takes region bodies and confirmed traces as uniforms. A per-instance
- *   form has nothing to select there, and the style-specific relationship inlay is a second
- *   treatment of the same trace rather than an alternative to it.
+ *   form has nothing to select there.
+ * - `landmark` draws nothing. Its two registered forms were invented renderer shapes, and a
+ *   landmark will be a grammar record; until one exists a landmark module declares no form.
  * - `evidence-assembly` draws nothing decorative on purpose. Evidence bodies come from the
  *   source-first grove when a real photograph exists, and nothing stands in when one does not.
  * - `reconstruction-assembly` realizes admitted reconstruction artifacts, so its appearance is
@@ -68,7 +74,6 @@ export const WORLD_UNRENDERED_FORM_KINDS: readonly WorldModuleFormKind[] =
  */
 export const WORLD_FORM_KINDS_BY_ROLE: ReadonlyMap<WorldModuleRole, readonly WorldModuleFormKind[]> =
   new Map<WorldModuleRole, readonly WorldModuleFormKind[]>([
-    ['landmark', WORLD_LANDMARK_FORM_KINDS],
     ['expansion-point', WORLD_EXPANSION_FORM_KINDS],
   ]);
 

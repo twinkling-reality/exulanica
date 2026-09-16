@@ -16,11 +16,17 @@ import {
 import { validateWorldStyleControlManifest } from '../src/world-style-capabilities.js';
 
 describe('world art profiles', () => {
-  it('offers materially different silhouettes over one protected topology contract', () => {
-    expect(ORIGIN_LANDSCAPE.geometry.landmark).not.toBe(SURVEY_RELIEF.geometry.landmark);
-    expect(ORIGIN_LANDSCAPE.geometry.evidence).not.toBe(SURVEY_RELIEF.geometry.evidence);
-    expect(ORIGIN_LANDSCAPE.geometry.landmarkHeight)
-      .not.toBe(SURVEY_RELIEF.geometry.landmarkHeight);
+  it('offers materially different worlds over one protected topology contract', () => {
+    expect(ORIGIN_LANDSCAPE.geometry.expansion).not.toBe(SURVEY_RELIEF.geometry.expansion);
+    expect(ORIGIN_LANDSCAPE.field).not.toEqual(SURVEY_RELIEF.field);
+    // No profile authors an orientation register or evidence silhouette any more: the renderer
+    // drew invented shapes from those tokens, and a region with no recorded register shows none.
+    for (const profile of [ORIGIN_LANDSCAPE, SURVEY_RELIEF]) {
+      expect(profile.geometry).not.toHaveProperty('landmark');
+      expect(profile.geometry).not.toHaveProperty('evidence');
+      expect(profile.geometry).not.toHaveProperty('landmarkHeight');
+      expect(profile.geometry).not.toHaveProperty('landmarkWidth');
+    }
     expect(ORIGIN_LANDSCAPE.compatibilityKey).toBe(SURVEY_RELIEF.compatibilityKey);
     expect(ORIGIN_LANDSCAPE.semanticChannels).toEqual(SURVEY_RELIEF.semanticChannels);
     expect(ORIGIN_LANDSCAPE.palette.sky).not.toBe(ORIGIN_LANDSCAPE.palette.terrain);

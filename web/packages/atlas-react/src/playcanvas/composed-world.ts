@@ -10,7 +10,6 @@ import {
   ORIGIN_LANDSCAPE,
   SURVEY_RELIEF,
   unitRgb,
-  worldSilhouetteTone,
   type PresentationTheme,
   type WorldArtProfile,
   type WorldArtProfileId,
@@ -23,11 +22,12 @@ import {
  * registered forms, two of which nothing drew, and the test that compared it against the catalog
  * passed because both lists were wrong the same way. `world-module-form.test.ts` now builds each
  * of these and looks for geometry, so this set is verified rather than believed.
+ *
+ * No landmark form is here. The beacon and survey strata this file used to build were invented
+ * shapes, and a landmark will come from a grammar record rather than from a renderer form.
  */
 export const RENDERED_WORLD_MODULE_FORMS: ReadonlySet<WorldModuleFormKind> = Object.freeze(
   new Set<WorldModuleFormKind>([
-    'aero-beacon',
-    'survey-strata',
     'living-buds',
     'survey-stakes',
   ]),
@@ -53,10 +53,7 @@ interface ProfileLayer {
 interface MeshCatalog {
   readonly cube: pc.Mesh;
   readonly rock: pc.Mesh;
-  readonly ridge: pc.Mesh;
   readonly sky: pc.Mesh;
-  readonly ring: pc.Mesh;
-  readonly disc: pc.Mesh;
 }
 
 interface ShaderDesc {
@@ -314,35 +311,6 @@ function openingFrame(topology: WorldTopologySnapshot): {
   };
 }
 
-/** A quiet archive horizon: a real silhouette beyond navigation, softened by field fog. */
-function createRidgeMesh(device: pc.GraphicsDevice): pc.Mesh {
-  const xs = Array.from({ length: 33 }, (_, index) => -112 + index * 7);
-  const heights = xs.map((x) =>
-    3.1 + Math.sin(x * 0.043) * 1.5 + Math.sin(x * 0.091 + 1.3) * 0.65,
-  );
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let index = 0; index < xs.length; index += 1) {
-    const x = xs[index]!;
-    const height = heights[index]!;
-    positions.push(x, -2, -4, x, height, -4, x, -2, 4, x, height * 0.9, 4);
-  }
-  for (let index = 0; index < xs.length - 1; index += 1) {
-    const a = index * 4;
-    const b = (index + 1) * 4;
-    indices.push(
-      a, b, b + 1, a, b + 1, a + 1,
-      a + 2, a + 3, b + 3, a + 2, b + 3, b + 2,
-      a + 1, b + 1, b + 3, a + 1, b + 3, a + 3,
-    );
-  }
-  const geometry = new pc.Geometry();
-  geometry.positions = positions;
-  geometry.indices = indices;
-  geometry.normals = pc.calculateNormals(positions, indices);
-  return pc.Mesh.fromGeometry(device, geometry);
-}
-
 function addOriginEnvironment(
   root: pc.Entity,
   topology: WorldTopologySnapshot,
@@ -372,82 +340,6 @@ function addOriginEnvironment(
 }
 
 /**
- * The orientation register.
- *
- * Structure is drawn in the silhouette tone rather than in `stone`: on a near-white world a
- * paper-coloured mast is the same value as the air behind it, so the one thing in the field that
- * exists to be found from a distance was the one thing that could not be seen. `landmarkWidth` is
- * the authored token for how substantial this world's register is, and it is read here rather
- * than being replaced by a constant.
- */
-function addAeroBeacon(
-  group: pc.Entity,
-  profile: WorldArtProfile,
-  meshes: MeshCatalog,
-  silhouette: pc.StandardMaterial,
-  brass: pc.StandardMaterial,
-  glass: pc.StandardMaterial,
-): void {
-  const h = profile.geometry.landmarkHeight;
-  const w = profile.geometry.landmarkWidth;
-  const mast = 0.09 + w * 0.055;
-  const foot = 0.55 + w * 0.3;
-  addPrimitive(group, 'beacon-base', meshes.disc, silhouette, [0, 0.12, 0], [foot, 0.18, foot]);
-  addPrimitive(group, 'beacon-stem', meshes.cube, silhouette, [0, h * 0.42, 0], [mast, h * 0.78, mast]);
-  addPrimitive(group, 'beacon-lens', meshes.rock, glass, [0, h * 0.86, 0], [0.58, 0.58, 0.28]);
-  addPrimitive(group, 'beacon-ring', meshes.ring, silhouette, [0, h * 0.86, 0], [1.5, 1.5, 1.5], [90, 0, 0]);
-  addPrimitive(group, 'beacon-signal', meshes.rock, brass, [0, h * 0.86, -0.02], [0.2, 0.2, 0.12]);
-}
-
-function addSurveyLandmark(
-  group: pc.Entity,
-  profile: WorldArtProfile,
-  meshes: MeshCatalog,
-  stone: pc.StandardMaterial,
-  shadow: pc.StandardMaterial,
-  brass: pc.StandardMaterial,
-): void {
-  const h = profile.geometry.landmarkHeight;
-  for (let index = 0; index < 4; index += 1) {
-    const height = h * (0.7 - index * 0.1);
-    addPrimitive(group, `survey-rib:${index}`, meshes.cube, index % 2 === 0 ? stone : shadow,
-      [(index - 1.5) * 0.34, height / 2, 0], [0.12, height, 0.38 + index * 0.08],
-      [0, (index - 1.5) * 8, 0]);
-  }
-  addPrimitive(group, 'survey-index', meshes.cube, brass, [0, 0.08, -0.2], [1.15, 0.035, 0.08]);
-}
-
-function addRelationshipInlay(
-  root: pc.Entity,
-  instance: WorldModuleInstance,
-  mesh: pc.Mesh,
-  material: pc.StandardMaterial,
-  groundHeight: ComposedWorldGroundHeight,
-): void {
-  if (instance.path === null) return;
-  const { start, end, strength } = instance.path;
-  const dx = end.x - start.x;
-  const dz = end.z - start.z;
-  const length = Math.hypot(dx, dz);
-  if (length < 0.01) return;
-  const count = Math.max(3, Math.min(14, Math.floor(length / 3.2)));
-  const yaw = (Math.atan2(dx, dz) * 180) / Math.PI;
-  const group = new pc.Entity(instance.instanceId);
-  root.addChild(group);
-  for (let index = 1; index < count; index += 1) {
-    const t = index / count;
-    addPrimitive(group, `relationship-inlay:${index}`, mesh, material,
-      [
-        start.x + dx * t,
-        groundHeight(start.x + dx * t, start.z + dz * t) + 0.018,
-        start.z + dz * t,
-      ],
-      [0.055 + strength * 0.035, 0.018, 0.38 + strength * 0.18],
-      [0, yaw, 0]);
-  }
-}
-
-/**
  * Realize passive topology as one authored landscape. Profile layers are built once and toggled,
  * so a visual preview cannot perturb identity, placement, navigation, collision, or evidence.
  */
@@ -472,10 +364,7 @@ export function createComposedWorld(
   const meshes: MeshCatalog = {
     cube: pc.Mesh.fromGeometry(device, new pc.BoxGeometry({ halfExtents: new pc.Vec3(0.5, 0.5, 0.5) })),
     rock: pc.Mesh.fromGeometry(device, new pc.SphereGeometry({ radius: 0.5, latitudeBands: 7, longitudeBands: 8 })),
-    ridge: createRidgeMesh(device),
     sky: pc.Mesh.fromGeometry(device, new pc.SphereGeometry({ radius: 1, latitudeBands: 24, longitudeBands: 48 })),
-    ring: pc.Mesh.fromGeometry(device, new pc.TorusGeometry({ ringRadius: 0.32, tubeRadius: 0.045, segments: 28, sides: 8 })),
-    disc: pc.Mesh.fromGeometry(device, new pc.CylinderGeometry({ radius: 0.5, height: 0.5, capSegments: 32 })),
   };
   const layers = new Map<WorldArtProfileId, ProfileLayer>();
 
@@ -483,9 +372,7 @@ export function createComposedWorld(
     const root = new pc.Entity(`world-profile:${profile.profileId}`);
     const stone = createMaterial(profile.palette.stone, { gloss: 0.12 });
     const shadow = createMaterial(profile.palette.stoneShadow, { gloss: 0.08 });
-    const silhouette = createMaterial(worldSilhouetteTone(profile.palette), { gloss: 0.1 });
     const brass = createMaterial(profile.palette.brass, { metalness: 0.62, gloss: 0.36 });
-    const path = createMaterial(profile.palette.path, { metalness: 0.22, gloss: 0.22 });
     const growth = createMaterial(profile.palette.terrainLift, { gloss: 0.34 });
     const glass = createMaterial(profile.palette.paper, {
       emissive: profile.palette.paper,
@@ -495,9 +382,7 @@ export function createComposedWorld(
     });
     glass.cull = pc.CULLFACE_NONE;
     const sky = createSkyMaterial(profile);
-    const materials = Object.freeze<pc.Material[]>([
-      stone, shadow, silhouette, brass, path, growth, glass, sky,
-    ]);
+    const materials = Object.freeze<pc.Material[]>([stone, shadow, brass, growth, glass, sky]);
     entity.addChild(root);
 
     const mapHidden = profile.profileId === ORIGIN_LANDSCAPE.profileId
@@ -508,24 +393,17 @@ export function createComposedWorld(
     for (const instance of topology.instances) {
       // Foundations remain one continuous field. Evidence bodies are created by source-first-grove
       // so a missing photograph never gets replaced by decorative renderer geometry here.
-      // Every region carries a required orientation register (world/default-catalog.ts). Gating
-      // it on one profile ID left the origin world with no vertical reference at all and made
-      // addAeroBeacon unreachable. The authored `geometry.landmark` form is the selector.
-      if (instance.role === 'landmark') {
-        const group = atInstance(root, instance, groundHeight);
-        // The module's own declaration wins; a module that declares nothing still follows the style.
-        if ((instance.form?.kind ?? profile.geometry.landmark) === 'aero-beacon') {
-          addAeroBeacon(group, profile, meshes, silhouette, brass, glass);
-        } else {
-          addSurveyLandmark(group, profile, meshes, stone, shadow, brass);
-        }
-      }
+      // A `landmark` instance draws nothing. The composer already gives one only to a region whose
+      // real location is known; the beacon and survey strata this file used to stand there were
+      // invented shapes, and a landmark will come from a grammar record, not a renderer loop.
+      // `relationship-path` instances draw nothing here either: the inlay this file used to lay
+      // was a row of blocks on the straight line between two layout positions.
 
       /*
        * Every region carries a required growth register, so gating it on one profile ID left the
        * origin world quietly drawing nothing for a module its own catalog says is there. That is
-       * the same mistake the orientation register above already had corrected: the selector is the
-       * declared form, not which style happens to be active.
+       * the same mistake the orientation register once had: the selector is the declared form, not
+       * which style happens to be active.
        */
       if (instance.role === 'expansion-point') {
         const group = atInstance(root, instance, groundHeight);
@@ -554,28 +432,15 @@ export function createComposedWorld(
           }
         }
       }
-
-      if (instance.role === 'relationship-path') {
-        if (profile.profileId !== ORIGIN_LANDSCAPE.profileId) {
-          addRelationshipInlay(root, instance, meshes.cube, path, groundHeight);
-        }
-      }
     }
     const applyProfile = (next: WorldArtProfile): void => {
       updateMaterial(stone, next.palette.stone, { gloss: 0.34 });
       updateMaterial(shadow, next.palette.stoneShadow, { gloss: 0.28 });
-      updateMaterial(silhouette, worldSilhouetteTone(next.palette), { gloss: 0.1 });
       updateMaterial(brass, next.palette.brass, {
         emissive: next.palette.brass,
         emissiveIntensity: next.material.emissiveStrength * 0.34,
         metalness: 0.38,
         gloss: 0.64,
-      });
-      updateMaterial(path, next.palette.path, {
-        emissive: next.palette.path,
-        emissiveIntensity: next.material.emissiveStrength * 0.44,
-        metalness: 0.16,
-        gloss: 0.48,
       });
       updateMaterial(growth, next.palette.terrainLift, { gloss: 0.32 });
       updateMaterial(glass, next.palette.paper, {
@@ -627,10 +492,7 @@ export function createComposedWorld(
       }
       meshes.cube.destroy();
       meshes.rock.destroy();
-      meshes.ridge.destroy();
       meshes.sky.destroy();
-      meshes.ring.destroy();
-      meshes.disc.destroy();
     },
   };
 }

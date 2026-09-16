@@ -108,16 +108,7 @@ export type WorldArtAppearanceSource = Omit<WorldArtProfileSource, WorldArtProfi
 
 const AEROHEART_APPEARANCE: WorldArtAppearanceSource = {
   geometry: {
-    landmark: 'aero-beacon',
-    evidence: 'memory-lens',
     expansion: 'living-buds',
-    // The orientation register is a REGION-scale reference, not a cross-field one: the landmark
-    // socket puts it about three units from its region centre and the opening camera spawns 3.6
-    // units out, so a person always stands beside one. Taller does not read as further away, it
-    // reads as a wall: at 6.4 this spans more than the full vertical field of view from spawn.
-    // Tall enough to clear the horizon dissolve and still be found from the opening position.
-    landmarkHeight: 3.4,
-    landmarkWidth: 2.4,
     evidenceSpread: 1.7,
     detailCount: 8,
     expansionCount: 5,
@@ -216,11 +207,7 @@ const AEROHEART_APPEARANCE: WorldArtAppearanceSource = {
 
 const SURVEY_RELIEF_APPEARANCE: WorldArtAppearanceSource = {
   geometry: {
-    landmark: 'survey-strata',
-    evidence: 'indexed-bays',
     expansion: 'survey-stakes',
-    landmarkHeight: 2.1,
-    landmarkWidth: 0.9,
     evidenceSpread: 1.55,
     detailCount: 8,
     expansionCount: 5,

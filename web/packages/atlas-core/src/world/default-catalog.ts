@@ -322,28 +322,10 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
    * Arrangements that carry their own form.
    *
    * These declare what they are built as instead of inheriting the active world style's single
-   * choice for every module of the role at once, which is what made every region's orientation
-   * register identical. The style still owns material, colour and proportion; the module owns
-   * what it is. Their canonical counterparts keep `form: null`, so a world style that switches
+   * choice for every module of the role at once. The style still owns material, colour and
+   * proportion; the module owns what it is. Their canonical counterparts keep `form: null`, so a world style that switches
    * form still switches theirs and nothing already recorded changes shape.
    */
-  {
-    key: 'landmark.survey-register',
-    version: 1,
-    role: 'landmark',
-    allowedRungs: 'any',
-    bounds: { radius: 0.2, height: 2.4 },
-    sockets: [],
-    collision: NO_COLLISION,
-    navigation: DECORATIVE_NAVIGATION,
-    lod: { stub: 'landmark-dot', proxy: 'landmark-mark', coarse: 'landmark-strata', full: 'landmark-strata' },
-    accessibility: { interactive: false, labelKey: 'world.orientation-register', colorIsSoleCarrier: false },
-    evidence: 'none',
-    fallbackKey: 'landmark.orientation-register',
-    variantOf: 'landmark.orientation-register',
-    form: { kind: 'survey-strata', parameters: {} },
-    customization: COMMON_CUSTOMIZATION,
-  },
   {
     key: 'growth.survey-register',
     version: 1,
@@ -363,10 +345,12 @@ const moduleDefinitions: readonly WorldModuleDefinition[] = Object.freeze([
   },
 ]);
 
+// 4: removes the survey-strata orientation register. No renderer draws a landmark form any more,
+// so a seed that chose it now chooses the canonical register, which also draws nothing.
 // 3: adds arrangements that declare their own form rather than inheriting the world style's.
 // 2: adds substitutable region footprint arrangements. Composition for an existing world only
 // changes where its seed now selects one, which is why this version travels in every snapshot.
-export const DEFAULT_WORLD_MODULE_CATALOG_VERSION = 3;
+export const DEFAULT_WORLD_MODULE_CATALOG_VERSION = 4;
 export const DEFAULT_WORLD_MODULES = new WorldModuleRegistry(
   DEFAULT_WORLD_MODULE_CATALOG_VERSION,
   moduleDefinitions,

@@ -3,12 +3,8 @@
  * This file contains no catalog entries and no profile-specific branching.
  */
 
-export type WorldLandmarkForm = 'aero-beacon' | 'survey-strata';
-export type WorldEvidenceForm = 'memory-lens' | 'indexed-bays';
 export type WorldExpansionForm = 'living-buds' | 'survey-stakes';
 
-const WORLD_LANDMARK_FORMS = new Set<WorldLandmarkForm>(['aero-beacon', 'survey-strata']);
-const WORLD_EVIDENCE_FORMS = new Set<WorldEvidenceForm>(['memory-lens', 'indexed-bays']);
 const WORLD_EXPANSION_FORMS = new Set<WorldExpansionForm>(['living-buds', 'survey-stakes']);
 
 /**
@@ -161,11 +157,7 @@ export interface WorldArtProfileSource {
   readonly description: string;
   readonly compatibilityKey: 'atlas-topology-v1';
   readonly geometry: {
-    readonly landmark: WorldLandmarkForm;
-    readonly evidence: WorldEvidenceForm;
     readonly expansion: WorldExpansionForm;
-    readonly landmarkHeight: number;
-    readonly landmarkWidth: number;
     readonly evidenceSpread: number;
     readonly detailCount: number;
     readonly expansionCount: number;
@@ -598,11 +590,9 @@ export function validateWorldArtProfileSource(source: WorldArtProfileSource): vo
   if (source.compatibilityKey !== 'atlas-topology-v1') {
     throw new TypeError(`unsupported topology compatibility: ${source.profileId}`);
   }
-  if (
-    !WORLD_LANDMARK_FORMS.has(source.geometry.landmark) ||
-    !WORLD_EVIDENCE_FORMS.has(source.geometry.evidence) ||
-    !WORLD_EXPANSION_FORMS.has(source.geometry.expansion)
-  ) throw new TypeError(`unregistered world geometry form: ${source.profileId}`);
+  if (!WORLD_EXPANSION_FORMS.has(source.geometry.expansion)) {
+    throw new TypeError(`unregistered world geometry form: ${source.profileId}`);
+  }
   for (const [name, number] of Object.entries(source.geometry)) {
     if (typeof number === 'number' && (!Number.isFinite(number) || number < 0)) {
       throw new TypeError(`invalid ${source.profileId} geometry token ${name}`);
