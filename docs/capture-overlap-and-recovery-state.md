@@ -3,10 +3,11 @@
 Status: 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check.
 
 The place record, its five recovery states and its read seam are in place (migration 0063,
-`exulanica/graph/places.py`). The overlap verdict (policy `exulanica.capture-overlap-policy/v1`)
-reproduces the four measured capture outcomes, but only inside a narrow threshold window. It is not
-monotone in spacing at its threshold, and it **failed its held-out check**, so it may predict and
-give advice but it is **not authorised to refuse a set**.
+`exulanica/graph/places.py`). The overlap verdict (policy `exulanica.capture-overlap-policy/v1`) is
+cheap and deterministic, and it is **not reliable**. At its declared threshold it reproduces three
+of the four measured capture outcomes and refuses the set that registered 12 of 12. It is not
+monotone in spacing, and it **failed its held-out check**. It is therefore **not authorised to
+refuse a set**, and the read seam does not offer its sentences to a person.
 
 ## What a regular person gets
 
@@ -23,9 +24,10 @@ never asks for a number of photographs, because the measurement below shows that
 and count does not.
 
 The second half of the work was meant to tell the person this *before* anything is spent. That
-half exists, it is cheap, and it is honest about its limits. On the one held-out set it would have
-turned away a set that rebuilt and trained, so until a better policy passes a held-out set its
-answer is advice and nothing more.
+half exists, and it is cheap, but it is not good enough to speak to anyone. It would have turned
+away the one held-out set, which rebuilt and trained, and one of the four calibration sets, which
+rebuilt. Until a better policy passes a held-out set, its answer is recorded for evaluation and
+nobody is told it.
 
 ## What a verdict is, and what it is not
 
@@ -102,11 +104,14 @@ integers, and `measured-runs.json` carries the lists with their receipt digests.
 
 ## The descriptor
 
-`exulanica/capture/overlap.py`, standard library and Pillow only, integers from the decoded
+`exulanica/capture/overlap.py`: the standard library, Pillow, and the repository's one decoder
+(`exulanica.corpus.decode`, which brings the core HEIF decoder), with integers from the decoded
 pixels onward:
 
-1. Decode with Pillow, refuse the four mirrored EXIF orientations and any pixel format that is not
-   exact 8-bit, apply `ImageOps.exif_transpose`, and resize so the long side is 256 pixels.
+1. Decode through `exulanica.corpus.decode.open_sensor`, the repository's one decoder with its
+   shared pixel budget. Refuse the four mirrored EXIF orientations and any pixel format that is
+   not exact 8-bit, convert to luminance, resize with `BOX` so the long side is 256 pixels, and
+   apply `ImageOps.exif_transpose` to the small copy.
 2. Find corners as the minimum of four directional differences (a straight edge has no difference
    along itself), keep the 160 strongest after 5-pixel suppression, and describe each with 128
    comparisons from a fixed pattern derived from SHA-256.
@@ -119,8 +124,8 @@ pixels onward:
 A photograph that cannot be measured carries a reason (`unreadable`, `undecodable`,
 `decompression_limit`, `mirrored_orientation`, `unsupported_pixel_format`, `too_small`) and is
 not a node. It is counted in the set, as the pose gate counts every member, and credited to the
-largest group, so it can raise a ceiling and never causes a refusal. HEIF is not decoded here;
-a HEIF photograph is `undecodable` under this policy.
+largest group, so it can raise a ceiling and never causes a refusal. HEIF decodes through the
+same door, with libheif applying its own container transform.
 
 The descriptor parameters were chosen on the pairwise angle curve of frames 0 to 112, where the
 accepted receipt gives every pair's true angle. Resolutions of 192 to 512 pixels, 64 to 160
@@ -129,36 +134,49 @@ curve. That curve contains the photographs of the four rows, so **the rows are n
 the design choice**. Frames 113 to 209 are a different series and were not used to choose
 anything.
 
+**The decode path changed after the first measurement, and the result changed with it.** The
+design was chosen and first measured with Pillow's JPEG draft scaling. The full test suite then
+showed that this opened photographs outside the repository's one decoder
+(`tests/test_ingest_persistence.py::test_a_photograph_becomes_pixels_in_exactly_one_module`).
+With the draft decode, the declared rule chose 8 and all four rows were right at 7, 8 and 9. With
+the sanctioned full decode, the same rule still chooses 8, all four rows are right only at 6 and 7,
+and the set that registered 12 of 12 is refused. Every number below is from the sanctioned decode.
+A separation that flips with a decode detail is not a separation this descriptor can be trusted
+with.
+
 ## The policy and its threshold
 
 `OverlapPolicy` is recorded whole in every verdict and bound by its digest:
 
 * `edge_min_score` = **8**. The rule: maximise the true-edge rate on calibration pairs at most 21
   degrees apart (the neighbour spacing of the set that registered 12 of 12) minus the false-edge
-  rate on pairs at least 90 degrees apart. J = 9453 per ten thousand at 8, against 9395 at 7 and
-  9305 at 9, over 6328 pairs (446 near, 2894 far). On the validation series the same rule gives
-  8482 at 8, and its maximum would have been 8583 at 7.
+  rate on pairs at least 90 degrees apart. J = 9492 per ten thousand at 8, against 9392 at 7 and
+  9427 at 9, over 6328 pairs (446 near, 2894 far). On the validation series the same rule gives
+  8887 at 8, and its maximum would have been 8945 at 7. The threshold was not moved after the
+  rows were seen.
 * `registration_floor` = **4/5**, the pose gate's own `min_registered_fraction`, as an exact
   ratio.
 * `refusal_authorised` = **false**, for the held-out result below.
 
 At the threshold, pairs link at these rates by true angle (calibration series): 100% under 10
-degrees, 95% at 10 to 20, 49% at 20 to 30, 11% at 30 to 40, and 2 to 4% beyond.
+degrees, 97% at 10 to 20, 49% at 20 to 30, 13% at 30 to 40, and 1 to 4% beyond.
 
 ## The four rows, with their margins
 
-A margin here is the range of edge thresholds over which the verdict stays the same.
+The last column is where the verdict changes as the edge threshold rises from 1 to 40.
 
-| Row | Outcome from the receipt | Verdict at 8 | Holds for | Margin |
+| Row | Outcome from the receipt | Verdict at 8 | Right at 8? | Verdict by threshold |
 | --- | --- | --- | --- | --- |
-| six | `insufficient_overlap` (0 of 6) | `insufficient_overlap`, scatter; no pair scores above 4 | 5 and up | three steps below, none needed above |
-| twelve, 30 to 40 deg | `registered_partial` (7 of 12) | `registered_partial`, 2 groups, largest 4 | 7 to 25 | **one step below**: at 6 it recommends a run |
-| twelve, 20 to 30 deg | `registered_scene` (12 of 12) | `registered_scene`, one chain | 1 to 9 | **one step above**; its weakest neighbour pair scores exactly 8 |
-| 210 | `registered_scene` (210 of 210) | `registered_scene`, one chain | 1 to 15 | seven steps above |
+| six | `insufficient_overlap` (0 of 6) | `registered_partial`, one pair (frames 90 and 112, 83 deg apart, scoring 8) and four alone | yes, refused | run below 5; partial 5 to 8; insufficient from 9 |
+| twelve, 30 to 40 deg | `registered_partial` (7 of 12) | `registered_partial`, 3 groups, largest 4 | yes, refused | run below 6; partial 6 to 25 |
+| twelve, 20 to 30 deg | `registered_scene` (12 of 12) | `registered_partial`, 2 groups, largest 7 | **no, refused** | run up to 7; partial from 8 |
+| 210 | `registered_scene` (210 of 210) | `registered_scene`, one chain | yes, run | run up to 14 |
 
-All four agree with their outcomes only for thresholds 7, 8 and 9. The two twelves, which differ
-only in overlap, are separated. They are separated by one step of threshold on each side, and a
-row that passes by one step is reported as passing by one step.
+The six is refused for the right decision with a ceiling one state too high. That is allowed for a
+ceiling, which is an upper bound. The set that registered is refused outright: its two weakest
+neighbour links score 7 and 8. **All four rows are decided right only at thresholds 6 and 7.** The
+declared rule chose 8, and choosing 6 or 7 now, after seeing the rows, would be fitting the
+threshold to the rows.
 
 ## Monotonicity
 
@@ -166,26 +184,27 @@ The requirement: as spacing widens, the verdict must never turn a refusal back i
 test fixes a start and a count (6, 8, 12 or 16), widens the frame step one at a time, and counts
 the sequences in which a refusal becomes a run again:
 
-| Threshold | Calibration (452 sequences) | Validation (388 sequences) | All four rows right |
-| --- | --- | --- | --- |
-| 7 | 141 | 27 | yes |
-| **8 (policy)** | **89** | **11** | **yes** |
-| 9 | 16 | 4 | yes |
-| 10 | 0 | 2 | no: the set that registered is refused |
-| 12 | 0 | 0 | no |
+| Threshold | Calibration (452 sequences) | Validation (388 sequences) | Four rows right | Bowl right |
+| --- | --- | --- | --- | --- |
+| 6 | 285 | 110 | yes | yes |
+| 7 | 197 | 31 | yes | no |
+| **8 (policy)** | **81** | **17** | **no** | **no** |
+| 9 | 17 | 3 | no | no |
+| 10 | 2 | 1 | no | no |
+| 12 | 0 | 1 | no | no |
 
-**By the lane's own definition, the verdict at 8 is a fit.** No threshold is both monotone and
-right about the two twelves. Most of the reversals come from chance edges, pairs of coincidental
-matches that pass the 2% far-pair false-edge rate and push a set over the four-fifths floor. They
-are not mainly the turntable backdrop: of the far edges inside reversed sets, 242 join frames of
-one ring and 74 join different rings.
+**By the lane's own definition, the verdict is a fit wherever it is right.** No threshold is both
+close to monotone and right about the two twelves. The one threshold that is right on all five
+known outcomes, 6, was found only after seeing them, and it is the least monotone of all. The
+reversals come from chance edges, pairs of coincidental matches that pass the far-pair
+false-edge rate and push a set over the four-fifths floor.
 
 Run rate by each set's true spacing to link four fifths of it, at the policy threshold:
 
 | Spacing (deg) | 5-10 | 10-15 | 15-20 | 20-25 | 25-30 | 30-35 | 35-40 | 40+ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| calibration | 100% | 100% | 79% | 84% | 16% | 7% | 18% | 0 to 9% |
-| validation | 100% | 100% | 34% | 52% | 3% | 0% | 3% | 0% |
+| calibration | 100% | 100% | 91% | 91% | 20% | 9% | 14% | 0 to 10% |
+| validation | 100% | 100% | 57% | 85% | 4% | 5% | 0% | 0% |
 
 The transition sits between 20 and 30 degrees, where the measured runs put it. It is not clean,
 and in the validation series the 15 to 20 degree band runs less often than the 20 to 25 band.
@@ -197,21 +216,25 @@ the policy was fixed. Its outcome is read from the retained receipts, not assume
 `292d697b...` and `d3563ac2...` placed 51 of 51 and were accepted, and the set trained into the
 delivered scene `docs/retained-reference-workflow.md` describes.
 
-Policy v1 says `registered_partial`: 5 groups, largest 20, 5 photographs overlapping nothing, 67
+Policy v1 says `registered_partial`: 6 groups, largest 20, 3 photographs overlapping nothing, 75
 edges among 1275 pairs, refused from threshold 7 upward. **It would have turned away the one real
-set that trained.** Only 25 of the 50 consecutive handheld shots link at the threshold. Handheld
+set that trained.** Only 26 of the 50 consecutive handheld shots link at the threshold. Handheld
 photographs change scale and roll between shots, and a descriptor chosen on a fixed-camera
-turntable is invariant to neither.
+turntable is invariant to neither. (With the earlier draft decode it said the same with 5 groups
+and 67 edges.)
 
-So `refusal_authorised` is false, the schema refuses a verdict-based refusal under it, and the
-read seam shows such a verdict's instructions as `advice` and never as a record's `reason`. The
+So `refusal_authorised` is false. The schema refuses a verdict-based refusal under it, and the
+read seam returns such a verdict for evaluation and offers its sentences neither as `advice` nor
+as a record's `reason`. The
 bowl is now spent as a held-out set: any policy chosen after seeing this result needs a fresh one.
 
 ## Cost
 
-The 210-photograph verdict (210 decodes, 21,945 pair scores) took 36 to 47 seconds of wall clock
-on this machine across runs under varying load from other work, 69 to 82 MiB peak resident
-memory. The bowl took 3.2 to 3.6 seconds. Nothing else is involved: no reconstruction, no
+The 210-photograph verdict (210 decodes, 21,945 pair scores) took 41.5 and 42.1 seconds of wall
+clock in the two retained runs through the sanctioned decoder, with 138 to 143 MiB peak resident
+memory, because a full 12-megapixel frame is decoded before it is reduced. The draft-scaled
+decode had taken 36 to 47 seconds under varying load from other work. The bowl took 4.4
+seconds. Nothing else is involved: no reconstruction, no
 process, no device. `tests/test_capture_overlap.py` refuses process creation for the whole
 measurement, checks that nothing heavy was imported during it, and checks in a fresh `-I`
 process that importing the package and running a verdict loads none of torch, numpy, cv2,
@@ -226,17 +249,17 @@ The verdict record holds integers, strings, booleans and nulls, and no clock. `c
 accepts it, and a float injected anywhere is refused. The same photographs give byte-identical
 digests in one process, twice, and in two processes with `PYTHONHASHSEED` 0 and 4242. The set is
 ordered by ref, so the order photographs are given in does not matter. Not verified: identical
-bytes across platforms or Pillow builds. The JPEG draft scale and the `BOX` resize compute their
-coefficients in floating point inside Pillow, so the descriptor profile names what was measured
-and does not claim more.
+bytes across platforms or Pillow builds. The `BOX` resize computes its coefficients in floating
+point inside Pillow, so the descriptor profile names what was measured and does not claim more.
 
 ## What could not be measured: one side uncovered
 
 Whether a chain of photographs comes back round is the natural way to say "one side of the subject
 has no coverage". Two readings of it from the thresholded graph were measured against turntable
-arcs of known extent. Reading the middle layer's spread misread 7 of 23 determined arcs, and
-removing a middle photograph and checking whether the ends still connect misread 6 of 23. A
-single chance edge makes an open arc look closed. So the graph does not report closure, and the
+arcs of known extent. Reading the middle layer's spread misread 3 of 22 determined arcs, and
+removing a middle photograph and checking whether the ends still connect misread 2 of 22. With the
+earlier draft decode the same readings misread 7 and 6 of 23. A single chance edge makes an open
+arc look closed, and a reading that moves that much with a decode detail is not established. So the graph does not report closure, and the
 vocabulary entry `one_side_uncovered` exists but no current policy emits it. A pose receipt's
 cameras could measure it after a run.
 
@@ -308,12 +331,14 @@ member of which was withdrawn. The record carries:
   use. Each is `available` with a digest-bound href, or `unavailable` with a reason. All six real
   photographs in the test are served.
 * the verdict, `verified` only when its bytes reproduce its digest and parse as canonical, else
-  `invalid` with no instructions.
+  `invalid` with no instructions. Its instructions are for evaluation unless its policy is
+  authorised.
 * the reason, for `insufficient_overlap`, `registered_partial` and any withdrawal. A pose
   receipt's reason is `stated` only when its bytes are in the store and agree with the event:
   the same photographs by SHA-256, the same counts, the same acceptance. Otherwise it is
   `unavailable` or `invalid`, with no sentence.
-* `advice`: a verified verdict's instructions when the state does not rest on that verdict.
+* `advice`: a verified, authorised verdict's instructions when the state does not rest on that
+  verdict. Under policy v1 it is always empty.
 * the full state history.
 
 `place_record_ids(connection, workspace, state)` lists readable records in a state. Nothing here
