@@ -15,6 +15,12 @@ from exulanica.epistemics.source_images import decoded_receipt_for, normalized_i
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.decode import open_upright
+from exulanica.ingest.model_rights import (
+    LOCAL_PROCESS,
+    ModelHandoff,
+    ModelIdentity,
+    grant_model_right,
+)
 from exulanica.ingest.personal_admission import HUMAN_ATTESTATION
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.scene_selection import enqueue_exact_scene_reconstruction
@@ -28,11 +34,20 @@ from exulanica.reconstruction.source_lineage import (
 )
 from PIL import Image
 
+from test_intake_upload import _TOKEN
 from test_intake_upload import upload as upload
 from test_personal_admission_route import post
 from test_personal_heic import FIXTURE
 from test_scene_reconstruction_pipeline import FakeColmap, _processor
 from test_segmentation_stage import ScriptedSegmenter
+
+#: The checkpoints this file's doubles stand in for: the plane depth model and the scripted
+#: segmenter with its detector, each pinned as ``ScriptedSegmenter.identity`` pins it.
+LOCAL_DOUBLES = (
+    ModelIdentity.local("depth", "synthetic-heic-plane/v1", "7" * 40),
+    ModelIdentity.local("object_segmentation", "test/scripted-segmenter", "0" * 40),
+    ModelIdentity.local("open_vocabulary_detection", "test/scripted-detector", "0" * 40),
+)
 
 
 def rotated_heic(turns):
@@ -131,11 +146,27 @@ def admit(upload, count=1, *, mask=False):
         reviewed = post(upload, "/personal-admission", body)
         assert reviewed.status_code == 202, reviewed.text
     assert all(r["eligibility_state"] == "eligible" for r in reviewed.json()["receipts"])
+    # The local doubles below read these personal photographs, so the account holder names each
+    # one in a model right; a screening receipt alone lets no model receive the bytes.
+    actor = upload.client.app.state.services.tokens.session_for(_TOKEN).actor
+    for receipt in reviewed.json()["receipts"]:
+        for identity in LOCAL_DOUBLES:
+            grant_model_right(
+                upload.repository,
+                capture_id=uuid.UUID(receipt["capture_id"]),
+                authorization_id=uuid.UUID(receipt["authorization_id"]),
+                identity=identity,
+                destination=LOCAL_PROCESS,
+                granted_by=actor,
+                purpose="Synthetic HEIC lineage test",
+                valid_until=dt.datetime.fromisoformat(body["authority"]["valid_until"]),
+            )
     return sources, reviewed.json()["receipts"]
 
 
 class PlaneDepth:
     model_id = "synthetic-heic-plane/v1"
+    model_handoff = ModelHandoff.local(ModelIdentity.local("depth", model_id, "7" * 40))
 
     def __init__(self):
         self.images = []
