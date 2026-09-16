@@ -40,6 +40,7 @@ accepted versions would make a refusal indistinguishable from a join nobody atte
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import uuid
 from dataclasses import dataclass
@@ -47,8 +48,20 @@ from typing import Any, Final, Literal
 
 import psycopg
 
+from exulanica.canonical import canonical_json
+from exulanica.capture.instructions import INSTRUCTION_VOCABULARY, Instruction, instruction
+from exulanica.capture.recovery import (
+    RECOVERY_STATES,
+    Basis,
+    RecoveryState,
+    outcome_from_pose_receipt,
+)
+from exulanica.capture.verdict import PredictedCeiling
 from exulanica.errors import BlobNotFoundError, CanonicalisationError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.graph.asset_read_policy import evaluation_time
+from exulanica.graph.payload import SceneUnposedPhotographRow
+from exulanica.graph.reconstruction_scenes import _viewer_photograph
 from exulanica.graph.wire_numbers import decimal_string as _decimal
 from exulanica.graph.wire_numbers import decimal_strings as _decimals
 from exulanica.store.base import ContentAddressedStore
@@ -57,11 +70,18 @@ __all__ = [
     "PLACE_ALIGNMENT_RECEIPT_PROFILE",
     "PlaceHistory",
     "PlacePosition",
+    "PlaceRecord",
     "PlaceTransform",
     "PlaceVersion",
+    "RecordPhotograph",
+    "RecordReason",
+    "RecordStateChange",
+    "RecordVerdict",
     "RefusedAlignment",
     "SceneMembership",
     "place_history",
+    "place_record",
+    "place_record_ids",
     "scene_place_membership",
 ]
 
@@ -578,3 +598,361 @@ def scene_place_membership(
         undated_version_count=int(row["undated_version_count"]),
         blocked=bool(row["blocked"]),
     )
+
+
+# --------------------------------------------------------------------------------------------
+# A set of photographs that has a recovery state, and possibly no place at all.
+#
+# ``0063_place_recovery_state.sql`` is the schema. A record at ``insufficient_overlap`` is a
+# room of its own photographs with a stated reason, and this is the read that makes it one: the
+# record, its state, why it is in that state, and the member photographs through the viewer
+# route every other photograph is served through. The discipline above holds here too. A verdict
+# whose bytes do not reproduce its digest is ``invalid``, a receipt this reader cannot obtain is
+# ``unavailable``, a photograph the viewer route would not serve now is ``unavailable``, and none
+# of them is replaced by something that reads as fine.
+# --------------------------------------------------------------------------------------------
+
+_RECORD: Final = """
+select r.record_id, r.recovery_state, r.state_seq, r.member_count, r.created_at,
+       r.verdict_policy, r.verdict_canonical, r.verdict_sha256, r.verdict_refusal_authorised,
+       r.predicted_ceiling, r.verdict_worth_attempting, r.verdict_fault,
+       r.photograph_count, r.measured_count, r.edge_min_score, r.edge_count,
+       r.largest_component, r.group_count, r.isolated_count
+  from place_record r
+ where r.workspace_id = %s
+   and r.record_id = %s
+   and not tombstone_blocks_place_record(r.workspace_id, r.record_id)
+"""
+
+# The record's own predicate withdraws the whole set when any member is withdrawn. The member's
+# own predicates are asked as well, so this list never relies on a caller having asked first.
+_RECORD_MEMBERS: Final = """
+select m.capture_id, m.ordinal, c.blob_sha256
+  from place_record_member m
+  join capture c on c.workspace_id = m.workspace_id and c.capture_id = m.capture_id
+ where m.workspace_id = %s
+   and m.record_id = %s
+   and c.deleted_at is null
+   and not tombstone_blocks_capture(m.workspace_id, m.capture_id)
+   and not person_withdrawal_blocks_capture(m.workspace_id, m.capture_id)
+   and not tombstone_blocks_place_record(m.workspace_id, m.record_id)
+ order by m.ordinal
+"""
+
+_RECORD_EVENTS: Final = """
+select e.seq, e.from_state, e.to_state, e.basis, e.verdict_sha256, e.receipt_artifact_id,
+       e.registered_count, e.receipt_accepted, e.withdrawal_tombstone_id, e.recorded_at,
+       receipt.content_sha256 as receipt_sha256
+  from place_record_state_event e
+  left join artifact receipt
+    on receipt.workspace_id = e.workspace_id
+   and receipt.artifact_id = e.receipt_artifact_id
+   and receipt.purged_at is null
+   and not person_withdrawal_blocks_artifact(receipt.workspace_id, receipt.artifact_id)
+ where e.workspace_id = %s
+   and e.record_id = %s
+   and not tombstone_blocks_place_record(e.workspace_id, e.record_id)
+ order by e.seq
+"""
+
+_RECORD_IDS: Final = """
+select r.record_id
+  from place_record r
+ where r.workspace_id = %s
+   and r.recovery_state = %s
+   and not tombstone_blocks_place_record(r.workspace_id, r.record_id)
+ order by r.created_at, r.record_id
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class RecordVerdict:
+    """The overlap verdict stored with a record, re-checked before anything reads it.
+
+    ``state`` is ``verified`` when the stored bytes reproduce the stored digest and parse as the
+    canonical document they claim to be, and ``invalid`` otherwise, in which case nothing below
+    ``reason`` is trusted and ``instructions`` is empty. ``refusal_authorised`` is False for a
+    policy that has not passed a held-out set, and a caller must present such a verdict's
+    instructions as advice and never as the reason a set was refused.
+    """
+
+    state: Literal["verified", "invalid"]
+    policy: str
+    refusal_authorised: bool
+    sha256: str
+    predicted_ceiling: PredictedCeiling
+    worth_attempting: bool
+    fault: str | None
+    photograph_count: int
+    measured_count: int
+    edge_min_score: int
+    edge_count: int
+    largest_component: int
+    groups: int
+    isolated: int
+    instructions: list[Instruction]
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RecordPhotograph:
+    """One member photograph, as the viewer route would serve it now, or why it would not."""
+
+    capture_id: uuid.UUID
+    ordinal: int
+    state: Literal["available", "unavailable"]
+    photograph: SceneUnposedPhotographRow | None
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RecordStateChange:
+    """One applied state event: what moved, on what basis, and what that basis points at."""
+
+    seq: int
+    from_state: RecoveryState
+    to_state: RecoveryState
+    basis: Basis
+    verdict_sha256: str | None
+    receipt_artifact_id: uuid.UUID | None
+    receipt_sha256: str | None
+    registered_count: int | None
+    receipt_accepted: bool | None
+    withdrawal_tombstone_id: uuid.UUID | None
+    recorded_at: dt.datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RecordReason:
+    """Why a record is in a state that needs a reason, in the instruction vocabulary.
+
+    ``stated`` carries sentences built only from counts this reader re-read. ``unavailable``
+    means the evidence the state rests on could not be obtained, and ``invalid`` that it was
+    obtained and disagrees with the event naming it; neither carries a sentence, because a
+    sentence built from evidence that cannot be checked would be a reason nobody measured.
+    """
+
+    state: Literal["stated", "unavailable", "invalid"]
+    basis: Basis
+    instructions: list[Instruction]
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceRecord:
+    """A set of photographs, what became of it, why, and the photographs themselves.
+
+    ``reason`` is present for ``insufficient_overlap`` and ``registered_partial``, the two states
+    a person needs told what to do about, and for any state a withdrawal lowered. ``advice`` is a
+    verified verdict's instructions when the record's state does not rest on that verdict, and it
+    is advice: a verdict under a policy not authorised to refuse lands here and never in
+    ``reason``.
+    """
+
+    record_id: uuid.UUID
+    recovery_state: RecoveryState
+    member_count: int
+    created_at: dt.datetime
+    photographs: list[RecordPhotograph]
+    verdict: RecordVerdict | None
+    reason: RecordReason | None
+    advice: list[Instruction]
+    history: list[RecordStateChange]
+
+
+def place_record(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    record_id: uuid.UUID,
+    store: ContentAddressedStore | None,
+) -> PlaceRecord | None:
+    """Return one record as a room of its photographs, or ``None`` when it is not readable.
+
+    ``None`` covers a record that does not exist, one in another workspace and one any member of
+    which was withdrawn, so a caller cannot turn this into an existence oracle. The withdrawal is
+    decided by ``tombstone_blocks_place_record`` in the query, never by filtering here.
+    """
+    row = connection.execute(_RECORD, (workspace, record_id)).fetchone()
+    if row is None:
+        return None
+    viewed_at = evaluation_time(connection)
+    members = connection.execute(_RECORD_MEMBERS, (workspace, record_id)).fetchall()
+    photographs = [
+        _record_photograph(connection, workspace, member, viewed_at) for member in members
+    ]
+    member_bytes = sorted(bytes(member["blob_sha256"]).hex() for member in members)
+    history = [
+        RecordStateChange(
+            seq=int(event["seq"]),
+            from_state=event["from_state"],
+            to_state=event["to_state"],
+            basis=event["basis"],
+            verdict_sha256=_hex(event["verdict_sha256"]),
+            receipt_artifact_id=event["receipt_artifact_id"],
+            receipt_sha256=_hex(event["receipt_sha256"]),
+            registered_count=event["registered_count"],
+            receipt_accepted=event["receipt_accepted"],
+            withdrawal_tombstone_id=event["withdrawal_tombstone_id"],
+            recorded_at=event["recorded_at"],
+        )
+        for event in connection.execute(_RECORD_EVENTS, (workspace, record_id)).fetchall()
+    ]
+    verdict = _record_verdict(row)
+    current = history[-1] if history else None
+    if current is not None and current.seq != int(row["state_seq"]):
+        # The schema applies an event in the statement that admits it, so this is a record the
+        # reader cannot establish, and it says so rather than reading one of the two.
+        raise IntegrityError(f"place record {record_id} and its newest state event disagree")
+    reason = None
+    if current is not None and (
+        row["recovery_state"] in ("insufficient_overlap", "registered_partial")
+        or current.basis == "withdrawal"
+    ):
+        reason = _record_reason(current, verdict, member_bytes, store)
+    advice: list[Instruction] = []
+    if (
+        verdict is not None
+        and verdict.state == "verified"
+        and (reason is None or reason.basis != "verdict")
+    ):
+        advice = verdict.instructions
+    return PlaceRecord(
+        record_id=row["record_id"],
+        recovery_state=row["recovery_state"],
+        member_count=int(row["member_count"]),
+        created_at=row["created_at"],
+        photographs=photographs,
+        verdict=verdict,
+        reason=reason,
+        advice=advice,
+        history=history,
+    )
+
+
+def place_record_ids(
+    connection: psycopg.Connection, workspace: uuid.UUID, recovery_state: RecoveryState
+) -> list[uuid.UUID]:
+    """The readable records in one state, oldest first."""
+    if recovery_state not in RECOVERY_STATES:
+        raise ValueError(f"{recovery_state!r} is not a recovery state")
+    return [
+        row["record_id"]
+        for row in connection.execute(_RECORD_IDS, (workspace, recovery_state)).fetchall()
+    ]
+
+
+def _record_photograph(
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    member: dict[str, Any],
+    viewed_at: dt.datetime,
+) -> RecordPhotograph:
+    photograph = _viewer_photograph(connection, workspace, str(member["capture_id"]), viewed_at)
+    return RecordPhotograph(
+        capture_id=member["capture_id"],
+        ordinal=int(member["ordinal"]),
+        state="available" if photograph is not None else "unavailable",
+        photograph=photograph,
+        reason=None
+        if photograph is not None
+        else "the viewer route would not serve this photograph now",
+    )
+
+
+def _record_verdict(row: dict[str, Any]) -> RecordVerdict | None:
+    if row["verdict_canonical"] is None:
+        return None
+    canonical = bytes(row["verdict_canonical"])
+    digest = bytes(row["verdict_sha256"])
+    common = {
+        "policy": row["verdict_policy"],
+        "refusal_authorised": bool(row["verdict_refusal_authorised"]),
+        "sha256": digest.hex(),
+        "predicted_ceiling": row["predicted_ceiling"],
+        "worth_attempting": bool(row["verdict_worth_attempting"]),
+        "fault": row["verdict_fault"],
+        "photograph_count": int(row["photograph_count"]),
+        "measured_count": int(row["measured_count"]),
+        "edge_min_score": int(row["edge_min_score"]),
+        "edge_count": int(row["edge_count"]),
+        "largest_component": int(row["largest_component"]),
+        "groups": int(row["group_count"]),
+        "isolated": int(row["isolated_count"]),
+    }
+    try:
+        if hashlib.sha256(canonical).digest() != digest:
+            raise ValueError("the stored verdict bytes do not reproduce its digest")
+        document = json.loads(canonical)
+        if canonical_json(document) != canonical:
+            raise ValueError("the stored verdict is not in canonical form")
+        items = document["instructions"]["items"]
+        if document["instructions"]["vocabulary"] != INSTRUCTION_VOCABULARY:
+            raise ValueError("the verdict's instructions use another vocabulary")
+        instructions = [instruction(item["key"], item["counts"]) for item in items]
+    except (CanonicalisationError, KeyError, TypeError, ValueError) as error:
+        return RecordVerdict(state="invalid", instructions=[], reason=str(error), **common)
+    return RecordVerdict(state="verified", instructions=instructions, reason=None, **common)
+
+
+def _record_reason(
+    event: RecordStateChange,
+    verdict: RecordVerdict | None,
+    member_bytes: list[str],
+    store: ContentAddressedStore | None,
+) -> RecordReason:
+    member_count = len(member_bytes)
+    if event.basis == "withdrawal":
+        return RecordReason("stated", "withdrawal", [], None)
+    if event.basis == "verdict":
+        if verdict is None or verdict.state != "verified" or verdict.sha256 != event.verdict_sha256:
+            return RecordReason(
+                "invalid", "verdict", [], "the refusing verdict does not verify against its event"
+            )
+        return RecordReason("stated", "verdict", verdict.instructions, None)
+    if event.basis != "pose_receipt":
+        return RecordReason("stated", event.basis, [], None)
+    if store is None or event.receipt_sha256 is None:
+        return RecordReason(
+            "unavailable", "pose_receipt", [], "the pose receipt is not available to this reader"
+        )
+    try:
+        payload = store.get(BlobId(bytes.fromhex(event.receipt_sha256)))
+    except BlobNotFoundError:
+        return RecordReason(
+            "unavailable", "pose_receipt", [], "the pose receipt is missing from object storage"
+        )
+    except IntegrityError:
+        return RecordReason(
+            "invalid", "pose_receipt", [], "the pose receipt failed its content digest"
+        )
+    try:
+        receipt = json.loads(payload)
+        outcome = outcome_from_pose_receipt(receipt)
+        frames = sorted(frame["sha256"] for frame in receipt["manifest"]["frames"])
+    except (KeyError, TypeError, ValueError) as error:
+        return RecordReason(
+            "invalid", "pose_receipt", [], f"the pose receipt is unreadable: {error}"
+        )
+    if frames != member_bytes:
+        return RecordReason(
+            "invalid", "pose_receipt", [], "the pose receipt was made from other photographs"
+        )
+    if (
+        outcome.state != event.to_state
+        or outcome.registered_count != event.registered_count
+        or outcome.accepted != event.receipt_accepted
+        or outcome.member_count != member_count
+    ):
+        return RecordReason(
+            "invalid", "pose_receipt", [], "the pose receipt disagrees with the event naming it"
+        )
+    if outcome.state == "insufficient_overlap":
+        said = instruction("run_placed_none", {"photographs": member_count})
+    elif outcome.state == "registered_partial":
+        said = instruction(
+            "run_placed_some",
+            {"registered": outcome.registered_count, "photographs": member_count},
+        )
+    else:
+        return RecordReason("stated", "pose_receipt", [], None)
+    return RecordReason("stated", "pose_receipt", [said], None)
