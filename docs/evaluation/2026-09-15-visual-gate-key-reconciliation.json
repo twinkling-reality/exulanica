@@ -1,0 +1,647 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.visual-gate-key-reconciliation/v1",
+    "date": "2026-09-16",
+    "naming": "The file name carries 2026-09-15, the date the phase 0 plan fixed for it; date is the day the record was produced.",
+    "status": "reconciled",
+    "base": "feda24dd119a9652e7f6b7ccbcaecdceb4b1ba6b",
+    "branch": "lane/gate",
+    "keySet": "exulanica.visual-gate-keys/v1",
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "record_sha256": "caf3c54cbd14cc7be35702b4b0abb583d3db8f821628a6e6312d02b84758087a"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "record_sha256": "6cc00994c74ddf976c1bd3899dd637fdea4f4acf9e1b4e7605ea63426dd26c85"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+        "record_sha256": "97b66da014db8457b6ef60e31ffea84eb3e3c37c821b019862bf2838f7bc8206"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
+        "byte_size": 6324,
+        "sha256": "de3d017c3c9c641524318057b828367050962461cc46469b347ad8766d8901c7"
+      },
+      {
+        "path": "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
+        "byte_size": 7002,
+        "sha256": "d4a8ee7d1e41f38cea0c7a985867307006fdba41635d2e5cd38e928ec1f883f4"
+      },
+      {
+        "path": "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
+        "byte_size": 7821,
+        "sha256": "3929a90e55a95956e45e0213f2300a9c97f4043498caad96447bb0dacdecc272"
+      }
+    ],
+    "canonicalKeys": [
+      {
+        "key": "continuousTexturedStreetAndFacades",
+        "definition": "True only when at least one walking-surface or facade triangle is drawn, every drawn walking-surface and facade triangle is textured, and the drawn walking surface has no gap at any route sample.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "continuousTexturedGround",
+          "continuousTexturedStreet",
+          "continuousSourceTexturedStreetAndFacades"
+        ],
+        "measurement": "textured-surface-coverage/v1",
+        "decidedBy": [
+          "streetAndFacadeTriangles",
+          "untexturedStreetAndFacadeTriangles",
+          "routeSupportGapSamples"
+        ]
+      },
+      {
+        "key": "readsAsInhabitedStreet",
+        "definition": "True only when the human judge named in docs/visual-gate-rubric.md answers yes to all three rubric questions for each of the start, midpoint and endpoint captures, nine yes answers of nine, and never when an answer is missing or was given by a model.",
+        "evidenceKind": "judged",
+        "predecessorSpellings": [
+          "recognizableUrbanStreet",
+          "recognizableUrbanScene",
+          "recognizableMelbourneUrbanScene"
+        ],
+        "rubric": "docs/visual-gate-rubric.md"
+      },
+      {
+        "key": "noCutsOrFloatingGeometry",
+        "definition": "True only when the drawn walking surface has no gap at any route sample, every building exterior ring edge has drawn geometry within 0.05 m of its midpoint at 1 m above the support, every drawn component reaches the walking surface through a chain of contacts, and no drawn triangle lies inside a building volume.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "noFloatingOrCutGeometry",
+          "noCutOrFloatingGeometry",
+          "noLargeCutsOrFloatingGeometry"
+        ],
+        "measurement": "drawn-geometry-integrity/v1",
+        "decidedBy": [
+          "routeSupportGapSamples",
+          "ringEdgesWithoutDrawnFacade",
+          "componentsDetachedFromSupport",
+          "trianglesInsideBuildings"
+        ]
+      },
+      {
+        "key": "usefulEyeLevelMovement",
+        "definition": "True only when key events delivered to the product's own handlers, with no position written by the harness, carried the player at least 120 m along the route heading with at most 0.34 m of lateral deviation and no recovery event, and every route sample of the live per-frame trace had drawn walking surface beneath it and stood 1.62 m, within 0.05 m, above it, where the product's navigation support and the drawn support agree within 0.05 m.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "eyeLevelMovement",
+          "verifiedEyeLevelMovement"
+        ],
+        "measurement": "product-driven-route-trace/v1",
+        "decidedBy": [
+          "walkedDisplacementMm",
+          "maxLateralDeviationMm",
+          "recoveryEvents",
+          "harnessPositionWrites",
+          "traceSamples",
+          "routeSupportGapSamples",
+          "maxEyeHeightErrorMm",
+          "maxSupportResampleDeltaMm"
+        ]
+      },
+      {
+        "key": "completeCapsuleClearanceVerification",
+        "definition": "True only when, at every route sample, a vertical capsule of radius 0.34 m and total height 1.9 m standing on the drawn walking surface keeps at least 0.34 m from every drawn triangle that rises more than 0.18 m above that surface and lies outside every building exterior ring with at least 0.34 m to its nearest edge, with no sample skipped.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "capsule-clearance/v1",
+        "decidedBy": [
+          "capsuleSamples",
+          "capsuleSamplesChecked",
+          "capsuleTriangleContactSamples",
+          "capsuleRingContactSamples"
+        ]
+      },
+      {
+        "key": "practicalBrowserBudget",
+        "definition": "True only when the environment's transferred bytes, the drawn triangles, the environment's decoded texture bytes and the run's maximum per-frame draw calls are each no greater than Melbourne's envelope of 28,247,006 bytes, 227,173 triangles, 167,772,160 bytes and 87 draw calls, and the run recorded no GPU error and no uncaught page exception or unhandled rejection; frame time, low-percentile frame rate and heap are reported beside Melbourne's and do not decide the key, because they vary between runs of one build.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "browser-envelope/v1",
+        "decidedBy": [
+          "environmentTransferredBytes",
+          "drawnTriangles",
+          "environmentDecodedTextureBytes",
+          "maxDrawCalls",
+          "gpuErrors",
+          "pageErrors"
+        ]
+      },
+      {
+        "key": "companionPresent",
+        "definition": "True only when, at each of the three captures, the product's Companion presence element is connected, ready, marked shown and laid out with a nonzero box inside the viewport, and its encounter surface is connected and open.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "live-dom-companion/v1",
+        "decidedBy": [
+          "captures",
+          "capturesWithCompanionShown"
+        ]
+      },
+      {
+        "key": "reticlePresent",
+        "definition": "True only when, at each of the three captures, the product's reticle element is connected, displayed with nonzero opacity and a nonzero box, and centred on the viewport within 1 px.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "live-dom-reticle/v1",
+        "decidedBy": [
+          "captures",
+          "capturesWithReticleCentred"
+        ]
+      },
+      {
+        "key": "authenticatedShellAndAuthoredHandlersPreserved",
+        "definition": "True only when every capture was taken in the product's own shell document with a mounted world and no credential gate, empty-world or error surface, every listener on the window, the document and the world canvas comes from the product's own modules, the product's keyboard listeners carried every interaction the harness made, and no page or handler was substituted; as the retained Melbourne record used it, the key does not by itself assert a bearer credential, so every record states its authentication condition in a separate field.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "product-shell-and-listeners/v1",
+        "decidedBy": [
+          "captures",
+          "capturesInProductShell",
+          "foreignListeners",
+          "productWindowKeydownListeners",
+          "interactionsNotCarriedByProduct",
+          "substitutedPages"
+        ]
+      }
+    ],
+    "evidenceKinds": [
+      "mechanical",
+      "judged"
+    ],
+    "judgedKey": {
+      "key": "readsAsInhabitedStreet",
+      "rubric": "docs/visual-gate-rubric.md",
+      "questions": [
+        {
+          "id": "premises",
+          "text": "Can the viewer name a plausible use for at least three ground-floor premises?"
+        },
+        {
+          "id": "frontage",
+          "text": "Is the frontage continuous, with no gap that reads as a cut?"
+        },
+        {
+          "id": "depth",
+          "text": "Is there a legible depth cue at roughly 30 m, 100 m and 300 m?"
+        }
+      ],
+      "captures": [
+        "start",
+        "midpoint",
+        "endpoint"
+      ],
+      "composition": "Each of the three questions is answered yes or no for each of the three captures. The key is true only for nine yes answers of nine. The score is the number of yes answers, and a corridor fails unless its score is strictly greater than the Flatiron baseline's.",
+      "scoredBy": "the human judge named in the rubric, never a model"
+    },
+    "thresholds": {
+      "eyeHeightMm": 1620,
+      "eyeHeightToleranceMm": 50,
+      "capsuleRadiusMm": 340,
+      "capsuleHeightMm": 1900,
+      "stepHeightMm": 180,
+      "walkableSlopeDegrees": 12,
+      "supportSampleSpacingMm": 50,
+      "supportAgreementMm": 50,
+      "contactToleranceMm": 50,
+      "facadeBandMm": 250,
+      "facadeProbeHeightMm": 1000,
+      "routeLengthMm": 125000,
+      "minimumWalkedMm": 120000,
+      "maximumLateralDeviationMm": 340,
+      "frontageSearchMm": 40000
+    },
+    "melbourneEnvelope": {
+      "environmentTransferredBytes": 28247006,
+      "drawnTriangles": 227173,
+      "environmentDecodedTextureBytes": 167772160,
+      "maxDrawCalls": 87
+    },
+    "classification": {
+      "drawnGeometry": "Every triangle of every enabled, visible mesh instance the application renders in its world layer, in world coordinates, read from the live renderer.",
+      "walkingSurfaceTriangle": "A drawn triangle whose unit normal has an upward component of at least cos(12 degrees) and whose centroid lies no more than 0.18 m above the navigation support.",
+      "facadeTriangle": "A drawn triangle whose unit normal has a vertical component of at most sin(12 degrees), whose centroid lies within 0.25 m horizontally of a building exterior ring edge and between the support and that building's top.",
+      "texturedTriangle": "A drawn triangle whose mesh carries a texture coordinate channel and whose material binds at least one texture with nonzero decoded bytes.",
+      "component": "A connected set of drawn triangles, joined where vertices coincide to the millimetre.",
+      "contact": "Two components are in contact when a vertex of one lies within 0.05 m of a triangle of the other, or inside the other's closed volume, or an edge of one crosses a triangle of the other.",
+      "buildingVolume": "The prism of a building exterior ring from its support to its top, shrunk by 0.05 m on every side.",
+      "routeSample": "A point of the walked trace resampled along its length at 0.05 m spacing."
+    },
+    "authenticationConditions": [
+      "credentialed-api",
+      "vite-preview-api"
+    ],
+    "retainedRecords": [
+      {
+        "label": "helsinki-visual-feasibility",
+        "path": "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "record_sha256": "caf3c54cbd14cc7be35702b4b0abb583d3db8f821628a6e6312d02b84758087a",
+        "brief": "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 6,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousTexturedGround",
+            "retainedValue": false,
+            "briefedCriterion": "Continuous source-textured ground along the initial route."
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableUrbanStreet",
+            "retainedValue": false,
+            "briefedCriterion": "A recognizable Helsinki urban street at the pilot."
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noFloatingOrCutGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "No floating or cut geometry visible on the initial route."
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "eyeLevelMovement",
+            "retainedValue": true,
+            "briefedCriterion": "Correct eye-level first-person movement on simplified verified support."
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "practicalBrowserBudget": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Existing Companion and reticle remain present."
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Existing Companion and reticle remain present."
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block",
+            "briefedCriterion": "Existing authored-object and authentication handlers are not replaced."
+          }
+        }
+      },
+      {
+        "label": "helsinki-terminal-lod-successor",
+        "path": "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "record_sha256": "6cc00994c74ddf976c1bd3899dd637fdea4f4acf9e1b4e7605ea63426dd26c85",
+        "brief": "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 7,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousTexturedStreet",
+            "retainedValue": false,
+            "briefedCriterion": "continuous source-textured street along the initial route;"
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableUrbanScene",
+            "retainedValue": false,
+            "briefedCriterion": "a recognizable Helsinki urban scene;"
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noCutOrFloatingGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "no cut, floating or camera-occluding geometry;"
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "verifiedEyeLevelMovement",
+            "retainedValue": false,
+            "briefedCriterion": "movement only over stable terminal support with full capsule clearance;"
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block",
+            "briefedCriterion": "A vertical capsule of radius 0.34 metres and total height 1.9 metres, grounded on that support, intersects no visual triangle except the support surface."
+          },
+          "practicalBrowserBudget": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "scored",
+            "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+            "retainedValue": true,
+            "briefedCriterion": "authenticated shell and authored handlers preserved."
+          }
+        }
+      },
+      {
+        "label": "melbourne-c4-29-visual-feasibility",
+        "path": "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+        "record_sha256": "97b66da014db8457b6ef60e31ffea84eb3e3c37c821b019862bf2838f7bc8206",
+        "brief": "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 9,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousSourceTexturedStreetAndFacades",
+            "retainedValue": false,
+            "briefedCriterion": "continuous source-textured street and facades along the complete route;"
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableMelbourneUrbanScene",
+            "retainedValue": false,
+            "briefedCriterion": "a recognizable Melbourne urban scene;"
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noLargeCutsOrFloatingGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "no large cuts, floating geometry, or camera-occluding surfaces;"
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "usefulEyeLevelMovement",
+            "retainedValue": false,
+            "briefedCriterion": "useful eye-level movement over verified route support;"
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "scored",
+            "spelling": "completeCapsuleClearanceVerification",
+            "retainedValue": false,
+            "briefedCriterion": "a vertical capsule of radius 0.34 metres and total height 1.9 metres, grounded on that support, has full clearance from visual geometry except the support surface;"
+          },
+          "practicalBrowserBudget": {
+            "state": "scored",
+            "spelling": "practicalBrowserBudget",
+            "retainedValue": true,
+            "briefedCriterion": "practical measured browser transfer, decoded-memory, draw-call and frame budgets."
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "scored",
+            "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+            "retainedValue": true,
+            "briefedCriterion": "authenticated shell and authored handlers preserved;"
+          }
+        }
+      }
+    ],
+    "mapping": [
+      {
+        "spelling": "continuousTexturedStreetAndFacades",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "continuousTexturedGround",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "continuousTexturedStreet",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "continuousSourceTexturedStreetAndFacades",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "readsAsInhabitedStreet",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "recognizableUrbanStreet",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "recognizableUrbanScene",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "recognizableMelbourneUrbanScene",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noCutsOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "noFloatingOrCutGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noCutOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noLargeCutsOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "usefulEyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "eyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "verifiedEyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "completeCapsuleClearanceVerification",
+        "resolvesTo": "completeCapsuleClearanceVerification",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "practicalBrowserBudget",
+        "resolvesTo": "practicalBrowserBudget",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "companionPresent",
+        "resolvesTo": "companionPresent",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "helsinki-visual-feasibility",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "reticlePresent",
+        "resolvesTo": "reticlePresent",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "helsinki-visual-feasibility",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+        "resolvesTo": "authenticatedShellAndAuthoredHandlersPreserved",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      }
+    ],
+    "mappingChecks": {
+      "retainedSpellings": 17,
+      "retainedSpellingsResolved": 17,
+      "total": true,
+      "unambiguous": true,
+      "canonicalKeys": 9
+    },
+    "authenticatedShellUnderMelbourne": {
+      "key": "authenticatedShellAndAuthoredHandlersPreserved",
+      "retainedValue": true,
+      "authenticatedShellPresent": true,
+      "previewApi404s": [
+        {
+          "url": "http://127.0.0.1:5183/preview-api/companion/memory/recent?limit=50",
+          "status": 404
+        },
+        {
+          "url": "http://127.0.0.1:5183/preview-api/graph/sources",
+          "status": 404
+        },
+        {
+          "url": "http://127.0.0.1:5183/preview-api/personal-admission",
+          "status": 404
+        }
+      ],
+      "statement": "Melbourne set authenticatedShellAndAuthoredHandlersPreserved to true while its browser block recorded these three 404 responses from the Vite-only preview API, not from a credentialed backend. As the retained evidence used it, the key means the product shell and its authored handlers were present and were not replaced by a bespoke harness page; it does not by itself assert a real bearer token. Every canonical record therefore carries authenticationCondition: vite-preview-api is Melbourne's condition, and credentialed-api, a real token against a real API, is strictly stronger."
+    },
+    "scopeNotes": {
+      "continuousTexturedStreetAndFacades": "All three briefs required SOURCE texture, and the first two named only the ground or the street. The canonical key drops the source condition, because a generated corridor has no source texture and a key naming one could not be scored against it, and it widens the surface to street and facades. It is also mechanised: the retained values were judged from captures.",
+      "readsAsInhabitedStreet": "Renamed and redefined by the operator's binding. The retained keys asked whether a real, named city was recognisable, were scored before the rubric existed, and are not rubric scores.",
+      "noCutsOrFloatingGeometry": "The retained criteria were judged from captures, Melbourne's only for LARGE cuts, and the successor briefs also named camera-occluding surfaces, which the canonical set measures under completeCapsuleClearanceVerification. The canonical key is measured over all drawn geometry.",
+      "usefulEyeLevelMovement": "The first Helsinki brief asked for correct movement on simplified verified support, the successor folded full capsule clearance into this key, and Melbourne asked for useful movement over verified support while its recorder retained only a static camera segment. The canonical key requires a live numeric trace and keeps capsule clearance separate.",
+      "completeCapsuleClearanceVerification": "Scored as its own key only by Melbourne. The successor brief required the same capsule inside its movement criterion and its record carries no separate key for it, so it is absent there, as it is in the first Helsinki record, whose brief never named a capsule.",
+      "practicalBrowserBudget": "Melbourne's brief named frame budgets among the practical budgets. The canonical key reports frame time and heap beside Melbourne's but decides only on the values that do not vary between runs of one build.",
+      "companionPresent": "Presence of the product's Companion, now read from the live document.",
+      "reticlePresent": "Presence of the product's reticle, now read from the live document.",
+      "authenticatedShellAndAuthoredHandlersPreserved": "The first Helsinki brief required authored-object and authentication handlers to remain, and its record says handler preservation was verified structurally, but its hardPass block has no key for it, so it is absent there and no value is inferred."
+    },
+    "claimsNotMade": [
+      "No canonical value is asserted for any retained run. Retained values are quoted under the spelling each record used, and the retained records are not edited.",
+      "No key absent from a retained record is inferred true or false.",
+      "No generated geometry is scored here, and none existed in this repository when the keys were fixed.",
+      "The canonical definitions do not make any retained rejection pass or fail anew."
+    ]
+  },
+  "record_sha256": "30c3bd75047b1da83b6db6616f6deb8412ea40924e4b169bc6ff4644fc29342d"
+}
