@@ -8,13 +8,17 @@
  *
  *   1. waits for the product's own shell to mount a world, and halts on a credential gate, an
  *      empty world or an error surface rather than scoring something else;
- *   2. summons the Companion with a trusted X key, which is also the product's own way of keeping
- *      walking available while pointer lock is not held (automation never receives the lock);
- *   3. turns the player to the route heading by writing the controls' yaw, the one value mouse
+ *   2. turns the player to the route heading by writing the controls' yaw, the one value mouse
  *      look would have written, and never writes a position;
- *   4. walks the route with trusted W key events through the product's own movement, collision
- *      and support resolution, recording every frame of the live player state, and captures the
- *      shell at the start, midpoint and endpoint;
+ *   3. at the start, midpoint and endpoint, summons the Companion with a trusted X key and
+ *      captures the shell with the Companion and the reticle on screen;
+ *   4. between captures, dismisses the Companion with a trusted Escape, because the product gives
+ *      the keyboard to one owner at a time and walking is off while the Companion is open; gives
+ *      the world canvas focus with a trusted click when it does not have it, the gesture the
+ *      product's own arrival prompt asks for ("Click to enter"), because keyboard walking without
+ *      pointer lock needs that focus; and walks with trusted W key events through the product's
+ *      own movement, collision and support resolution, recording every frame of the live player
+ *      state;
  *   5. reads the drawn triangles, the listeners on the window, the document and the canvas, the
  *      product's own validation report and the network, and measures the eight mechanical keys
  *      with @exulanica/loom-gate. The judged key is left for the named human judge.
@@ -28,7 +32,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -64,12 +68,15 @@ const options = {
   out: argument('out'),
   label: argument('label', 'run'),
   port: Number(argument('cdp-port', '9351')),
-  validationSeconds: Number(argument('validation-seconds', '40')),
+  // The product caps its own measuring window at 60 seconds.
+  validationSeconds: Number(argument('validation-seconds', '60')),
 };
 const appUrl = new URL(options.app);
 const appOrigin = appUrl.origin;
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const phaseStarted = Date.now();
+const phase = (name) => process.stderr.write(`[${((Date.now() - phaseStarted) / 1000).toFixed(1)} s] ${name}\n`);
 const repoPath = (path) => (isAbsolute(path) ? path : join(ROOT, path));
 
 /** A URL as a record may carry it: repository-relative, never an absolute local path. */
@@ -125,6 +132,7 @@ class Session {
       if (message.id !== undefined) {
         const slot = this.pending.get(message.id);
         this.pending.delete(message.id);
+        if (slot === undefined) return;
         if (message.error) slot.reject(new Error(`${slot.method}: ${JSON.stringify(message.error)}`));
         else slot.resolve(message.result);
         return;
@@ -140,10 +148,19 @@ class Session {
     this.listeners.set(method, held);
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = 180_000) {
     const id = (this.nextId += 1);
     return new Promise((resolvePromise, reject) => {
-      this.pending.set(id, { resolve: resolvePromise, reject, method });
+      // A call the browser never answers is a failure with a name, not a silent wait.
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method} was not answered within ${timeoutMs} ms`));
+      }, timeoutMs);
+      const settle = (fn) => (value) => {
+        clearTimeout(timer);
+        fn(value);
+      };
+      this.pending.set(id, { resolve: settle(resolvePromise), reject: settle(reject), method });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
@@ -327,6 +344,7 @@ const CAPTURE_STATE = `function (origin, title) {
     credentialGate: document.querySelector('.credential-gate') !== null,
     emptyWorld: document.querySelector('[data-empty-world]') !== null,
     activeElement: active === null ? null : active.tagName.toLowerCase(),
+    atlasFocused: canvas !== null && active === canvas,
     typingTarget: active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ||
       active instanceof HTMLSelectElement || (active instanceof HTMLElement && active.isContentEditable),
     heapBytes: performance.memory?.usedJSHeapSize ?? null,
@@ -336,11 +354,18 @@ const CAPTURE_STATE = `function (origin, title) {
 
 const INSTALL_RECORDER = `function () {
   const binding = this;
-  const recorder = { poses: [], recording: false, failures: [], handle: null, observer: null };
+  const recorder = { poses: [], recording: false, failures: [], handle: null, frameHandle: null,
+    observer: null, maxDrawCalls: 0, renderedFrames: 0 };
   recorder.handle = binding.app.on('update', () => {
     if (!recorder.recording) return;
     const s = binding.controls.state;
     recorder.poses.push([s.x, s.y, s.z, s.yaw, s.pitch, binding.controls.movementSpeed]);
+  });
+  // The same counter the product's validation recorder reads, over the whole route rather than
+  // its capped window.
+  recorder.frameHandle = binding.app.on('frameend', () => {
+    recorder.renderedFrames += 1;
+    recorder.maxDrawCalls = Math.max(recorder.maxDrawCalls, binding.app.stats.drawCalls.total);
   });
   const status = document.querySelector('.travel-status');
   if (status !== null) {
@@ -426,8 +451,33 @@ const EXTRACT_SCENE = `async function (pcUrl) {
   }
   let environmentTextureBytes = 0;
   for (const bytes of environmentTextures.values()) environmentTextureBytes += bytes;
+  // What else the cameras' layers draw, which the triangle measurement above does not read.
+  const owned = new Set(app.root.findComponents('render').flatMap((render) => render.meshInstances));
+  const otherInstances = { triangles: 0, points: 0, lines: 0, other: 0 };
+  const counted = new Set();
+  for (const layerId of layers) {
+    const layer = app.scene.layers.getLayerById(layerId);
+    const instances = layer?.meshInstances ??
+      [...(layer?.opaqueMeshInstances ?? []), ...(layer?.transparentMeshInstances ?? [])];
+    for (const instance of instances) {
+      if (counted.has(instance) || owned.has(instance)) continue;
+      counted.add(instance);
+      if (!instance.visible || instance.node?.enabled === false) continue;
+      const type = instance.mesh?.primitive?.[0]?.type;
+      if ([pc.PRIMITIVE_TRIANGLES, pc.PRIMITIVE_TRISTRIP, pc.PRIMITIVE_TRIFAN].includes(type)) otherInstances.triangles += 1;
+      else if (type === pc.PRIMITIVE_POINTS) otherInstances.points += 1;
+      else if ([pc.PRIMITIVE_LINES, pc.PRIMITIVE_LINELOOP, pc.PRIMITIVE_LINESTRIP].includes(type)) otherInstances.lines += 1;
+      else otherInstances.other += 1;
+    }
+  }
+  const layerInventory = {
+    renderComponentInstancesRead: meshes.length,
+    otherInstances,
+    gsplatComponents: app.root.findComponents('gsplat').filter((c) => c.enabled && c.entity.enabled).length,
+  };
   return {
     meshes,
+    layerInventory,
     skipped,
     origin: { x: origin.x, y: origin.y, z: origin.z },
     environmentTextureBytes,
@@ -463,6 +513,17 @@ async function main() {
   const profile = join(out, `.chrome-profile-${options.label}`);
   rmSync(profile, { recursive: true, force: true });
 
+  // The code that measures, bound by digest so a record can show it was the committed code.
+  const measuredBy = [
+    'scripts/capture_visual_gate.mjs',
+    ...readdirSync(join(ROOT, 'web/packages/loom-gate/src'))
+      .filter((name) => name.endsWith('.ts'))
+      .sort()
+      .map((name) => `web/packages/loom-gate/src/${name}`),
+  ].map((path) => {
+    const bytes = readFileSync(join(ROOT, path));
+    return { path, byteSize: bytes.byteLength, sha256: sha256(bytes) };
+  });
   const artifactBytes = readFileSync(repoPath(options.artifact));
   const rendererBytes = readFileSync(repoPath(options.renderer));
   const artifact = JSON.parse(artifactBytes.toString('utf8'));
@@ -568,12 +629,15 @@ async function main() {
         document.querySelector('#shell .reticle') !== null &&
         document.querySelector('.reconstruction-loading') === null;
     })()`, 'the product shell to mount a world', 240_000);
+    phase('the shell mounted a world');
     // The direct-navigation transition and the first frames settle before anything is read.
     await sleep(3000);
 
-    const pcUrl = await session.evaluate(
-      `performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes('/.vite/deps/playcanvas.js')) ?? null`,
-    );
+    // Read from the protocol's own request log rather than the page's resource timing, whose
+    // default 250-entry buffer fills with development modules before the engine module loads.
+    const pcUrl = [...network.values()]
+      .map((entry) => entry.url)
+      .find((url) => new URL(url).pathname.endsWith('/.vite/deps/playcanvas.js')) ?? null;
     if (pcUrl === null) await halt('the page never loaded the rendering engine module');
 
     // The binding is reached through the engine's own update listener, read by the debugger.
@@ -598,6 +662,7 @@ async function main() {
       }
     }
     if (bindingId === null) await halt('the Atlas binding was not reachable from the engine update listener');
+    phase('the Atlas binding was reached');
     const documentId = await session.reference('document');
     const captureState = () => session.call(documentId, CAPTURE_STATE, [appOrigin, PRODUCT_TITLE]);
     const pose = () => session.call(bindingId, READ_POSE);
@@ -615,37 +680,98 @@ async function main() {
       for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
     }
     const plan = planRoute([arrival.x, arrival.z], prisms, [west, north, east, south]);
+    phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
     const interactions = [];
     const harnessWrites = [];
-    const key = async (type, code, keyName, virtual) => {
+    const key = async (type, code, keyName, virtual, autoRepeat = false) => {
       await session.send('Input.dispatchKeyEvent', {
         type, code, key: keyName, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual,
-        text: type === 'keyDown' ? keyName : undefined, autoRepeat: false,
+        text: type === 'keyDown' && keyName.length === 1 ? keyName : undefined, autoRepeat,
       });
     };
+    // A held physical key keeps sending repeated keydown events. The product relies on that: a
+    // shell refresh clears its held-key set, and the next repeat puts the key back.
+    const KEY_REPEAT = Object.freeze({ delayMs: 250, intervalMs: 33 });
     const refuseTyping = async (what) => {
       const state = await captureState();
       if (state.typingTarget) await halt(`${what}: focus is in a text field, so keys would type instead of act`);
     };
 
-    // Summon the Companion through the product's own X handler.
-    await refuseTyping('summon');
-    await key('keyDown', 'KeyX', 'x', 88);
-    await key('keyUp', 'KeyX', 'x', 88);
-    let summoned = false;
-    for (let attempt = 0; attempt < 30 && !summoned; attempt += 1) {
-      await sleep(100);
-      const state = await captureState();
-      const controls = await pose();
-      summoned = state.companion.shown && controls.conversationActive;
-    }
-    interactions.push({ kind: 'summon-companion', key: 'KeyX', carriedByProduct: summoned });
-    if (!summoned) await halt('the product did not summon the Companion on X');
+    const pointerLockSamples = [];
+    const noteLock = (at, state) => pointerLockSamples.push({ at, pointerLocked: state.pointerLocked });
+
+    // The product gives the keyboard to one owner at a time: with the Companion open, walking is
+    // off. So the Companion is summoned for each capture and dismissed before each walk, each
+    // time through the product's own key handlers.
+    const summon = async (at) => {
+      await refuseTyping('summon');
+      await key('keyDown', 'KeyX', 'x', 88);
+      await key('keyUp', 'KeyX', 'x', 88);
+      let summoned = false;
+      for (let attempt = 0; attempt < 30 && !summoned; attempt += 1) {
+        await sleep(100);
+        const state = await captureState();
+        const controls = await pose();
+        summoned = state.companion.shown && controls.conversationActive;
+      }
+      interactions.push({ kind: 'summon-companion', key: 'KeyX', at, carriedByProduct: summoned });
+      if (!summoned) await halt(`the product did not summon the Companion on X at ${at}`);
+    };
+    const dismiss = async (at) => {
+      await key('keyDown', 'Escape', 'Escape', 27);
+      await key('keyUp', 'Escape', 'Escape', 27);
+      let dismissed = false;
+      for (let attempt = 0; attempt < 30 && !dismissed; attempt += 1) {
+        await sleep(100);
+        const state = await captureState();
+        const controls = await pose();
+        dismissed = state.companion.encounter?.state !== 'open' && controls.enabled &&
+          !controls.conversationActive;
+      }
+      interactions.push({ kind: 'dismiss-companion', key: 'Escape', at, carriedByProduct: dismissed });
+      if (!dismissed) await halt(`the product did not dismiss the Companion on Escape at ${at}`);
+    };
+    // Walking without pointer lock needs the world canvas focused. A real click on the canvas is
+    // the product's own way there, and the gesture its arrival prompt asks for: its mousedown
+    // handler focuses the canvas and asks for the lock.
+    const focusWorld = async (at) => {
+      const current = await captureState();
+      if (current.atlasFocused) return;
+      const point = await session.call(documentId, `function () {
+        const canvas = document.getElementById('atlas');
+        const cx = innerWidth / 2;
+        const cy = innerHeight / 2;
+        for (let ring = 0; ring <= 12; ring += 1) {
+          for (let step = 0; step < Math.max(1, ring * 8); step += 1) {
+            const angle = (step / Math.max(1, ring * 8)) * Math.PI * 2;
+            const x = Math.round(cx + Math.cos(angle) * ring * 24);
+            const y = Math.round(cy + Math.sin(angle) * ring * 24);
+            if (document.elementFromPoint(x, y) === canvas) return { x, y };
+          }
+        }
+        return null;
+      }`);
+      if (point === null) await halt(`no point near the centre reaches the world canvas at ${at}`);
+      await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+      await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 });
+      await session.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 });
+      let focused = false;
+      let state = current;
+      for (let attempt = 0; attempt < 30 && !focused; attempt += 1) {
+        await sleep(100);
+        state = await captureState();
+        focused = state.atlasFocused;
+      }
+      noteLock(`after focus click at ${at}`, state);
+      interactions.push({ kind: 'focus-world', input: 'left click on the world canvas', at, point, carriedByProduct: focused });
+      if (!focused) await halt(`the product did not focus the world canvas on a click at ${at}`);
+    };
 
     // Face along the route. Mouse look would write this same value; nothing writes a position.
     await session.call(bindingId, `function (yaw) { this.controls.state.yaw = yaw; return true; }`, [plan.yaw]);
-    harnessWrites.push({ field: 'controls.state.yaw', valueMicroradians: Math.round(plan.yaw * 1e6), why: 'pointer lock, and so mouse look, is not granted to automation' });
+    noteLock('when the heading was written', await captureState());
+    harnessWrites.push({ field: 'controls.state.yaw', valueMicroradians: Math.round(plan.yaw * 1e6), why: 'mouse look needs pointer movement under a held lock, which the harness does not synthesize; the heading is written once and no position is written' });
 
     const recorderId = await session.call(bindingId, INSTALL_RECORDER, [], false);
     const accelTime = await session.call(bindingId, `function () { return this.controls.config.accelTime; }`);
@@ -665,6 +791,7 @@ async function main() {
     const captures = [];
     const capture = async (label) => {
       await settle();
+      await summon(label);
       await session.call(bindingId, `function () { this.invalidate(); return true; }`);
       await sleep(500);
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -678,6 +805,8 @@ async function main() {
         const bytes = Buffer.from(data, 'base64');
         const file = `${options.label}-capture-${String(captures.length + 1).padStart(2, '0')}-route-${label}.png`;
         writeFileSync(join(out, file), bytes);
+        noteLock(`${label} capture`, state);
+        phase(`the ${label} capture was taken`);
         captures.push({
           label,
           file,
@@ -712,14 +841,34 @@ async function main() {
       if (opened.exceptionDetails) await halt('the trace recorder could not be started');
       await key('keyDown', 'KeyW', 'w', 87);
       const started = Date.now();
+      let nextRepeat = started + KEY_REPEAT.delayMs;
+      let repeats = 0;
+      let releasedAt = started;
+      // A stall is a lack of progress, not a slow walk: the product walks at its own pace.
+      let best = along(start);
+      let bestAt = started;
       try {
         for (;;) {
           const p = await pose();
           if (along(p) + p.speed * accelTime >= targetAlong) break;
-          if (Date.now() - started > 30_000) await halt(`the walk stalled at ${along(p).toFixed(2)} m of ${targetAlong} m`);
+          if (along(p) > best + 0.05) {
+            best = along(p);
+            bestAt = Date.now();
+          }
+          if (Date.now() - bestAt > 5000 || Date.now() - started > 600_000) {
+            await halt(`the walk stalled at ${along(p).toFixed(2)} m of ${targetAlong} m ` +
+              `(speed ${p.speed.toFixed(3)}, enabled ${p.enabled}, conversation ${p.conversationActive}, ` +
+              `repeats ${repeats})`);
+          }
+          if (Date.now() >= nextRepeat) {
+            await key('keyDown', 'KeyW', 'w', 87, true);
+            repeats += 1;
+            nextRepeat += KEY_REPEAT.intervalMs;
+          }
           await sleep(4);
         }
       } finally {
+        releasedAt = Date.now();
         await key('keyUp', 'KeyW', 'w', 87);
       }
       const end = await settle();
@@ -727,29 +876,122 @@ async function main() {
       interactions.push({
         kind: 'walk',
         key: 'KeyW',
+        heldMs: releasedAt - started,
+        autoRepeat: { ...KEY_REPEAT, repeatedKeyDowns: repeats },
         targetAlongMm: Math.round(targetAlong * 1000),
         displacementMillimetres: Math.round(displacement * 1000),
         carriedByProduct: displacement > 1,
       });
       if (displacement <= 1) await halt('the product did not move the player on W');
+      phase(`the walk reached ${along(end).toFixed(2)} m of ${targetAlong} m`);
     };
 
     await capture(CAPTURE_LABELS[0]);
+    await dismiss(CAPTURE_LABELS[0]);
+    await focusWorld(CAPTURE_LABELS[0]);
     await walkTo(routeLength / 2);
     await capture(CAPTURE_LABELS[1]);
+    await dismiss(CAPTURE_LABELS[1]);
+    await focusWorld(CAPTURE_LABELS[1]);
     await walkTo(routeLength);
     await capture(CAPTURE_LABELS[2]);
     await session.call(recorderId, `function () { this.recording = false; return true; }`);
     const recorded = await session.call(recorderId, `function () {
-      const out = { poses: this.poses, failures: this.failures };
+      const out = { poses: this.poses, failures: this.failures, maxDrawCalls: this.maxDrawCalls,
+        renderedFrames: this.renderedFrames };
       this.handle.off();
+      this.frameHandle.off();
       this.observer?.disconnect();
       return out;
     }`);
     const poses = recorded.poses.map(([x, y, z, yaw, pitch, speed]) => ({ x, y, z, yaw, pitch, speed }));
     if (poses.length === 0) await halt('the live trace recorded no frame of the walk');
+    phase(`the trace holds ${poses.length} frames`);
+
+    const authored = await session.call(bindingId, `function () {
+      return { objectIds: [...this.objects.objectIds], district: this.ownedDistrict?.metrics ?? null };
+    }`);
+    phase('the authored objects were read');
+
+    // What was drawn, and the product's own support under it. The scene is held in the page and
+    // read in pieces: a reply of about six megabytes was never delivered by the protocol.
+    const sceneId = await session.call(bindingId, EXTRACT_SCENE, [pcUrl], false);
+    const sceneInfo = await session.call(sceneId, `function () {
+      return { ...this, meshes: this.meshes.map(({ triangles, ...rest }) => ({ ...rest, triangleChars: triangles.length })) };
+    }`);
+    const TEXT_PIECE = 1_000_000;
+    const triangleTexts = [];
+    for (const [index, mesh] of sceneInfo.meshes.entries()) {
+      const pieces = [];
+      for (let offset = 0; offset < mesh.triangleChars; offset += TEXT_PIECE) {
+        pieces.push(await session.call(sceneId, `function (index, offset, size) {
+          return this.meshes[index].triangles.slice(offset, offset + size);
+        }`, [index, offset, TEXT_PIECE]));
+      }
+      const text = pieces.join('');
+      if (text.length !== mesh.triangleChars) await halt(`mesh ${mesh.id} arrived incomplete`);
+      triangleTexts.push(text);
+    }
+    const scene = {
+      ...sceneInfo,
+      meshes: sceneInfo.meshes.map(({ triangleChars, ...mesh }, index) => ({ ...mesh, triangles: triangleTexts[index] })),
+    };
+    phase(`the drawn scene was read: ${scene.meshes.length} meshes`);
+    const meshes = scene.meshes.map((mesh) => ({
+      id: mesh.id,
+      cull: mesh.cull,
+      hasUv: mesh.hasUv,
+      decodedTextureBytes: mesh.decodedTextureBytes,
+      triangles: float64FromBase64(mesh.triangles),
+    }));
+    let supportQueries = 0;
+    const measured = await measureScene({
+      meshes,
+      prisms,
+      plan,
+      poses,
+      sampleSupport: async (points) => {
+        supportQueries += points.length / 2;
+        const heights = [];
+        // Batched, for the same reason the scene is read in pieces.
+        for (let start = 0; start < points.length; start += 100_000) {
+          const text = await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(points.subarray(start, start + 100_000))]);
+          for (const value of float64FromBase64(text)) heights.push(Number.isNaN(value) ? null : value);
+        }
+        return heights;
+      },
+    });
+
+    phase('the drawn scene was measured');
+    // The product's own validation report, emitted once its measuring window closes.
+    const report = await (async () => {
+      phase('waiting for the product validation report');
+      const deadline = navigatedAt + (options.validationSeconds + 90) * 1000;
+      for (;;) {
+        const text = await session.evaluate(`document.getElementById('exulanica-browser-validation-report')?.textContent ?? null`);
+        if (text !== null) return JSON.parse(text);
+        if (Date.now() > deadline) await halt('the product never emitted its validation report');
+        await sleep(1000);
+      }
+    })();
+
+    // The scored artifact, found on the wire by its bytes rather than by its name.
+    let environment = null;
+    for (const [requestId, entry] of network) {
+      if (!entry.finished || entry.decodedBytes !== artifactBytes.byteLength) continue;
+      const body = await session.send('Network.getResponseBody', { requestId }).catch(() => null);
+      if (body === null) continue;
+      const bytes = Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
+      if (sha256(bytes) !== sha256(artifactBytes)) continue;
+      environment = { requestPath: normalizeUrl(entry.url), transferredBytes: entry.encodedBytes, decodedBytes: bytes.byteLength, status: entry.status };
+      break;
+    }
+    if (environment === null) await halt('the page never fetched the scored artifact byte for byte');
+    phase('the scored artifact was matched on the wire');
 
     // Listeners on the window, the document and the world canvas, by the script that added them.
+    // Read last, once every measurement that needs the binding is done, so toggling the debugger
+    // domain cannot touch them.
     await session.send('Debugger.enable');
     await sleep(300);
     const scripts = new Map();
@@ -777,58 +1019,10 @@ async function main() {
       }
     }
     await session.send('Debugger.disable');
+    phase('the listeners were inventoried');
     listenerInventory.sort((a, b) =>
       `${a.target}|${a.type}|${a.source}|${a.line}`.localeCompare(`${b.target}|${b.type}|${b.source}|${b.line}`));
 
-    const authored = await session.call(bindingId, `function () {
-      return { objectIds: [...this.objects.objectIds], district: this.ownedDistrict?.metrics ?? null };
-    }`);
-
-    // What was drawn, and the product's own support under it.
-    const scene = await session.call(bindingId, EXTRACT_SCENE, [pcUrl]);
-    const meshes = scene.meshes.map((mesh) => ({
-      id: mesh.id,
-      cull: mesh.cull,
-      hasUv: mesh.hasUv,
-      decodedTextureBytes: mesh.decodedTextureBytes,
-      triangles: float64FromBase64(mesh.triangles),
-    }));
-    let supportQueries = 0;
-    const measured = await measureScene({
-      meshes,
-      prisms,
-      plan,
-      poses,
-      sampleSupport: async (points) => {
-        supportQueries += points.length / 2;
-        const text = await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(points)]);
-        return [...float64FromBase64(text)].map((value) => (Number.isNaN(value) ? null : value));
-      },
-    });
-
-    // The product's own validation report, emitted once its measuring window closes.
-    const report = await (async () => {
-      const deadline = navigatedAt + (options.validationSeconds + 90) * 1000;
-      for (;;) {
-        const text = await session.evaluate(`document.getElementById('exulanica-browser-validation-report')?.textContent ?? null`);
-        if (text !== null) return JSON.parse(text);
-        if (Date.now() > deadline) await halt('the product never emitted its validation report');
-        await sleep(1000);
-      }
-    })();
-
-    // The scored artifact, found on the wire by its bytes rather than by its name.
-    let environment = null;
-    for (const [requestId, entry] of network) {
-      if (!entry.finished || entry.decodedBytes !== artifactBytes.byteLength) continue;
-      const body = await session.send('Network.getResponseBody', { requestId }).catch(() => null);
-      if (body === null) continue;
-      const bytes = Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
-      if (sha256(bytes) !== sha256(artifactBytes)) continue;
-      environment = { requestPath: normalizeUrl(entry.url), transferredBytes: entry.encodedBytes, decodedBytes: bytes.byteLength, status: entry.status };
-      break;
-    }
-    if (environment === null) await halt('the page never fetched the scored artifact byte for byte');
 
     const requests = [...network.values()];
     const pathOf = (entry) => {
@@ -883,7 +1077,9 @@ async function main() {
       harnessPositionWrites: harnessWrites.filter((write) => /\.(x|y|z)$/.test(write.field)).length,
       environmentTransferredBytes: environment.transferredBytes,
       environmentDecodedTextureBytes: scene.environmentTextureBytes,
-      maxDrawCalls: report.renderer.max_draw_calls,
+      // The product's window closes before a walk at the product's pace ends, so the run's
+      // maximum is the larger of its window and the whole route.
+      maxDrawCalls: Math.max(report.renderer.max_draw_calls, recorded.maxDrawCalls),
       gpuErrors: gpuError === 0 ? 0 : 1,
       pageErrors: exceptions.length,
     };
@@ -898,6 +1094,7 @@ async function main() {
       scored: {
         artifact: { path: options.artifact, byteSize: artifactBytes.byteLength, sha256: sha256(artifactBytes), profile: artifact.profile, districtId: artifact.district_id },
         renderer: { path: options.renderer, byteSize: rendererBytes.byteLength, sha256: sha256(rendererBytes) },
+        measuredBy,
       },
       browser: {
         engine: `${version.Browser} over the Chrome DevTools Protocol, driven by scripts/capture_visual_gate.mjs (no Playwright)`,
@@ -928,10 +1125,22 @@ async function main() {
       },
       interactions,
       harnessWrites,
+      pointerLock: {
+        everHeld: pointerLockSamples.some((sample) => sample.pointerLocked),
+        samples: pointerLockSamples,
+      },
       harnessObservers: [
         'one engine update listener that copies the controls state each frame while the walk runs',
+        'one engine frameend listener that keeps the largest per-frame draw call count from the start capture to the endpoint capture',
         'one MutationObserver on the travel status that records failure messages while the walk runs',
       ],
+      drawCalls: {
+        productWindowMax: report.renderer.max_draw_calls,
+        productWindowSeconds: options.validationSeconds,
+        routeMax: recorded.maxDrawCalls,
+        routeRenderedFrames: recorded.renderedFrames,
+        decidingMax: Math.max(report.renderer.max_draw_calls, recorded.maxDrawCalls),
+      },
       captures,
       trace: {
         frames: poses.length,
@@ -948,6 +1157,7 @@ async function main() {
           triangles: Buffer.from(mesh.triangles, 'base64').byteLength / 72,
         })),
         skipped: scene.skipped,
+        layerInventory: scene.layerInventory,
         renderOrigin: scene.origin,
         environmentTextures: scene.environmentTextures,
         environmentTextureBytes: scene.environmentTextureBytes,
@@ -986,9 +1196,15 @@ async function main() {
     console.log(JSON.stringify({ label: options.label, keys, route: run.route.headingMillidegrees, captures: captures.map((c) => c.file) }, null, 2));
   } finally {
     session.socket.close();
+    const exited = new Promise((resolveExit) => chrome.once('exit', resolveExit));
     chrome.kill();
-    await sleep(500);
-    rmSync(profile, { recursive: true, force: true });
+    await Promise.race([exited, sleep(5000)]);
+    // Chrome can still be flushing its profile; a failed removal must never hide the run's result.
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch (error) {
+      console.error(`the scratch browser profile was not removed: ${error.message}`);
+    }
     if (process.env.VISUAL_GATE_CHROME_LOG === '1') process.stderr.write(log());
   }
 }

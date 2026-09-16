@@ -529,6 +529,39 @@ def _differences(first: Any, second: Any, path: str = "") -> list[str]:
     return [] if first == second else [path]
 
 
+def _reconstruction_claim(run: dict[str, Any]) -> str:
+    """What the page did with the workspace's retained reconstruction, from the run's own counts."""
+    reads = sum(
+        count
+        for name, count in run["authentication"]["apiResponses"].items()
+        if name.startswith("GET /api/geometry/")
+    )
+    inventory = run["scene"]["layerInventory"]
+    other = inventory["otherInstances"]
+    if reads == 0:
+        fetched = "The page fetched no retained reconstruction geometry"
+    else:
+        fetched = (
+            f"The page also fetched the credentialed workspace's retained reconstruction ({reads} "
+            "geometry reads), which weighs on the page transfer and the heap"
+        )
+    if sum(other.values()) == 0 and inventory["gsplatComponents"] == 0:
+        drawn = (
+            ". When the scene was read, the cameras' layers drew nothing but the "
+            f"{inventory['renderComponentInstancesRead']} render mesh instances the triangle "
+            "measurements read: no point instance, no line, no other mesh and no enabled splat."
+        )
+    else:
+        drawn = (
+            ". When the scene was read, the cameras' layers also drew "
+            f"{other['triangles']} triangle, {other['points']} point, {other['lines']} line and "
+            f"{other['other']} other mesh instances outside render components, and "
+            f"{inventory['gsplatComponents']} enabled splats, none of which the triangle "
+            "measurements read."
+        )
+    return fetched + drawn
+
+
 def _because_judged(detail: dict[str, Any]) -> str:
     decisive = detail["decisiveNo"]
     if decisive is None:
@@ -566,7 +599,12 @@ def baseline(arguments: argparse.Namespace) -> int:
     )
     for other in (repeat,):
         if other["scored"] != run["scored"]:
-            raise SystemExit("the two runs scored different files")
+            raise SystemExit(
+                "the two runs scored different files or were measured by different code"
+            )
+    measured_by = [
+        _unmodified(item["path"], item["sha256"]) for item in run["scored"]["measuredBy"]
+    ]
     role = _database_role(arguments.api_database_url)
     if role["superuser"] or role["bypassRls"] or role["ownsRowLevelSecurityTable"]:
         raise SystemExit(f"the API role is privileged: {role}")
@@ -754,7 +792,7 @@ def baseline(arguments: argparse.Namespace) -> int:
             "melbourne": melbourne_preprocessing["decodedAtlasBytes"],
         },
         "maxDrawCalls": {
-            "flatiron": report["renderer"]["max_draw_calls"],
+            "flatiron": run["drawCalls"]["decidingMax"],
             "melbourne": melbourne_browser["maxDrawCalls"],
         },
         "frames": {"flatiron": measurement["frames"], "melbourne": melbourne_browser["frames"]},
@@ -829,13 +867,29 @@ def baseline(arguments: argparse.Namespace) -> int:
                 _decimal(repeat_measurement["first_meaningful_render_ms"]),
             ],
             "maxDrawCalls": [
-                report["renderer"]["max_draw_calls"],
-                repeat_report["renderer"]["max_draw_calls"],
+                run["drawCalls"]["decidingMax"],
+                repeat["drawCalls"]["decidingMax"],
             ],
         },
         "judgedKey": _repeat_capture_note(run, repeat),
     }
     route = run["route"]
+    draw_calls = run["drawCalls"]
+    key_repeat = next(item for item in run["interactions"] if item["kind"] == "walk")["autoRepeat"]
+    trace_frames = json.loads(
+        (run_dir / run_path.name.replace("-run.json", "-trace.json")).read_bytes()
+    )["frames"]
+    moving = [frame for frame in trace_frames if frame[5] > 0]
+    peak_speed = max(frame[5] for frame in trace_frames)
+    pose_spacing = walk["walkedDisplacementMm"] // max(1, len(moving))
+    lock_held = [item["at"] for item in run["pointerLock"]["samples"] if item["pointerLocked"]]
+    sampled = "when the heading was written, after each focus click and at each capture"
+    lock_sentence = (
+        f"Pointer lock was not held at any sampled moment ({sampled})."
+        if not lock_held
+        else f"Pointer lock was held {', '.join(lock_held)}, of the moments sampled ({sampled})."
+    )
+    reconstruction_claim = _reconstruction_claim(run)
     try:
         document = visual_gate_record(
             profile="exulanica.visual-gate-flatiron-baseline/v1",
@@ -861,7 +915,8 @@ def baseline(arguments: argparse.Namespace) -> int:
                 "frames": measurement["frames"],
                 "frameP95Ms": _decimal(measurement["frameP95Ms"]),
                 "fpsP1Low": _decimal(measurement["fpsP1Low"]),
-                "maxDrawCalls": report["renderer"]["max_draw_calls"],
+                "maxDrawCalls": run["drawCalls"]["decidingMax"],
+                "drawCallSources": run["drawCalls"],
                 "gpuError": report["renderer"]["gpu_error"],
                 "reticlePresent": all(state["reticle"]["centred"] for state in capture_states),
                 "companionPresent": all(state["companion"]["shown"] for state in capture_states),
@@ -898,11 +953,12 @@ def baseline(arguments: argparse.Namespace) -> int:
                 "No texture is claimed. None is bound anywhere in the district, and the decoded "
                 "environment texture bytes were measured as zero.",
                 "Frame time, low-percentile frame rate, heap and first render are measurements of "
-                "this machine in this run. They are reported and do not decide any key. The page also "
-                "fetched and uploaded the credentialed workspace's retained reconstruction, which the "
-                "district view does not draw and which dominates the page transfer and the heap.",
-                "Pointer lock was never held. The heading was set by writing the controls' yaw, and "
-                "every position came from the product's own movement.",
+                "this machine in this run, over the product's own measuring window of "
+                f"{draw_calls['productWindowSeconds']} seconds. They are reported and do not decide "
+                "any key.",
+                reconstruction_claim,
+                f"{lock_sentence} The heading was set by writing the controls' yaw once, and every "
+                "position came from the product's own movement.",
                 "readsAsInhabitedStreet was answered by the named judge, one picture at a time under "
                 "rubric version 2. No model produced, suggested, pre-filled or ranked an answer, and "
                 "nothing was inferred from the judge's words. The words are kept exactly as typed in "
@@ -929,6 +985,7 @@ def baseline(arguments: argparse.Namespace) -> int:
                         "districtId": run["scored"]["artifact"]["districtId"],
                     },
                     "renderer": scored_renderer,
+                    "measuredBy": measured_by,
                     "earlierRecordOfThisArtifact": _earlier_record(scored_artifact),
                 },
                 "contentPlanes": {
@@ -1023,17 +1080,28 @@ def baseline(arguments: argparse.Namespace) -> int:
                 },
                 "observations": _observations(run),
                 "limitations": [
-                    "Pointer lock is not granted to automation, so the heading was written rather "
-                    "than looked, and the product's mouse-look path was not exercised.",
-                    "The Companion was summoned so that the product keeps walking available without "
-                    "pointer lock; its open encounter is visible in every capture.",
+                    "The heading was written once rather than looked, so the product's mouse-look "
+                    "path was not exercised. The world canvas was given focus by a real click, "
+                    "which is the product's keyboard path while pointer lock is not held.",
+                    "The product turns walking off while the Companion is open, so the Companion "
+                    "was summoned for each capture and dismissed with Escape before each walk; its "
+                    "open encounter is visible in every capture.",
                     "The credentialed workspace is the only retained workspace in the judge seed with "
-                    "a scene group, so the Atlas mounts only for it. Its reconstruction is fetched "
-                    "and uploaded but not drawn in the district view.",
+                    "a scene group, so the Atlas mounts only for it.",
                     "Contact and inside-building tests use a 0.05 m tolerance and even-odd "
                     "containment; hidden geometry counts exactly as visible geometry does.",
-                    "Walking speed is the product's 32 m/s city speed, so the live trace holds about "
-                    "one pose every 0.5 m and is resampled to 0.05 m by interpolation.",
+                    f"Walking speed is the product's own. The live trace peaks at {peak_speed} mm "
+                    f"per second and holds one pose about every {pose_spacing} mm of walking, and "
+                    "is resampled to 0.05 m by interpolation.",
+                    f"A held W key was delivered as one keydown followed by repeated keydowns after "
+                    f"{key_repeat['delayMs']} ms, every {key_repeat['intervalMs']} ms, as a held "
+                    "physical key sends them; the product clears its held keys whenever its shell "
+                    "refreshes and relies on the repeat.",
+                    "The product's validation window closes after "
+                    f"{draw_calls['productWindowSeconds']} seconds of frames, before a walk at the "
+                    "product's pace ends, so maxDrawCalls is the larger of that window's maximum "
+                    f"({draw_calls['productWindowMax']}) and a frame listener's maximum over the "
+                    f"whole route ({draw_calls['routeMax']}).",
                     "Transferred bytes for the environment include the response headers the browser "
                     "counted; the body alone is reported beside it.",
                 ],
