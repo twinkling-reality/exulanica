@@ -223,7 +223,8 @@ same published files.
 
 `web/packages/loom-texture/evidence/2026-09-16-determinism-objects.log.txt` is the same script run
 again once the sets were baked from recipes, at the commit it names and with no uncommitted change
-under `src/`, on the same five runtimes. Every one of the 44 files it wrote (the 8 sets, the
+anywhere in the package (its library included) or in `assets/textures/`, on the same five
+runtimes. Every one of the 44 files it wrote (the 8 sets, the
 dedication, the 32 objects, the manifest, the catalog and `.gitattributes`) was compared the same
 way: 0 differ, the manifest and every set are the same bytes as in the first record, and the x86_64
 run, which executes the compiled output, found the library through the package root. The package's

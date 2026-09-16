@@ -12,7 +12,7 @@ cat $0
 echo
 echo "== source"
 echo "commit $(git -C .. rev-parse HEAD)"
-echo "working tree changes under web/packages/loom-texture/src: $(git -C .. status --short -- web/packages/loom-texture/src | wc -l | tr -d ' ')"
+echo "working tree changes under web/packages/loom-texture and assets/textures: $(git -C .. status --short -- web/packages/loom-texture assets/textures | wc -l | tr -d ' ')"
 npx tsc --build packages/loom-texture || exit 1
 rm -rf $OUT && mkdir -p $OUT
 run() {
@@ -49,8 +49,8 @@ for f in $FILES; do cmp -s "$OUT/node24-arm64-a/$f" "../assets/textures/$f" || {
 echo "committed: $differing of ${#FILES[@]} files differ; $(cd ../assets/textures && find . -type f | wc -l | tr -d ' ') files present"
 
 == source
-commit 4c118819ad1538cd906e0806e8dc91f1c0b74a26
-working tree changes under web/packages/loom-texture/src: 0
+commit abdd14b527029b21290d0c4d7d7e192d53556fd8
+working tree changes under web/packages/loom-texture and assets/textures: 0
 
 == run node24-arm64-a
 runtime: v24.15.0 arm64 darwin

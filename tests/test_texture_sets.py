@@ -520,7 +520,7 @@ def test_the_object_determinism_record_is_of_every_published_file(manifest, cata
     assert {
         name[len("./objects/") : -len(".json")] for name in expected if "/objects/" in name
     } == (catalog.materials.object_digests())
-    assert "working tree changes under web/packages/loom-texture/src: 0" in record
+    assert "working tree changes under web/packages/loom-texture and assets/textures: 0" in record
     for run in RUNS:
         section = _run(record, run)
         listed = dict(
