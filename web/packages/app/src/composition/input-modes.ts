@@ -101,9 +101,13 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
    * spatial state that this world is not allowed to make. So the beacon marks, and the index
    * filtered to that one region shows what the memory actually holds.
    */
-  const openRegionMemory = (islandId: IslandId): void => {
+  const scopeRegionMemory = (islandId: IslandId): void => {
     state.indexFacets = Object.freeze({ ...ALL_FACETS, islands: Object.freeze([islandId]) });
     deps.worldIndex.render(current, state.indexFacets, state.selected);
+  };
+
+  const openRegionMemory = (islandId: IslandId): void => {
+    scopeRegionMemory(islandId);
     if (deps.shellState().primary !== 'index') deps.dispatchShell({ type: 'toggle-index' });
   };
 
@@ -112,7 +116,16 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       const index = mounted.binding.table.indexOf.get(target.anchorId);
       if (index !== undefined) mounted.binding.focusAnchor(index);
     }
-    if (target.kind === 'island') openRegionMemory(target.islandId);
+    /*
+     * Arriving SCOPES the memory; it does not open it.
+     *
+     * Opening took the world away at the end of every journey: the index is a full surface, so the
+     * last thing travelling to a place did was cover the place. Approaching still means something
+     * here, and it is the more useful half of it. The index is now already narrowed to the region
+     * underfoot, so the moment the visitor asks for it they get this memory and not the library,
+     * and until they ask they are standing in the street looking at the landmark they travelled to.
+     */
+    if (target.kind === 'island') scopeRegionMemory(target.islandId);
     deps.showTravelStatus(target.kind === 'anchor' ? 'Located the source.' : 'The memory is in focus.');
   };
 
