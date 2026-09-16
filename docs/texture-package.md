@@ -691,6 +691,19 @@ The bytes route releases the container only after the 0041 final check.
   `deploy/material-bake/Dockerfile`. That recipe is written, not built, and not in `compose.yaml`.
 - **Training.** The training code is in `ml/` (see `ml/README.md`).
 
+**Evidence.** `web/packages/loom-texture/evidence/2026-09-16-workspace-bake-determinism.log.txt` is
+the output of a script that makes one bake request per published set, with the set's own recipe at
+its own resolution. It runs the command the bake worker runs on three runtimes:
+
+- Node 24.15.0 on arm64, under tsx;
+- Node 26.7.0 on arm64, under tsx;
+- Node 20.10.0 on x86_64 under Rosetta, running the tsc output.
+
+All 24 bakes exited 0. The eight containers are byte-identical across the three runs, and so are
+the result lines once the Node version is set aside. Every run claimed the package source digest
+the backend computes from the same files. The record names the commit it ran at and a clean
+working tree. `tests/test_texture_sets.py` holds the record to all of that.
+
 ## 15. What is not verified
 
 - **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.

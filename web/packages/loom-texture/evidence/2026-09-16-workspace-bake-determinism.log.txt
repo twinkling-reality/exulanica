@@ -1,0 +1,133 @@
+== script
+#!/bin/zsh
+# Bake one workspace request per published set on three runtimes across two CPU architectures,
+# with the command the bake worker runs, and compare every container with cmp against the first
+# run, every result line apart from the Node version, and the package source digest each run
+# claimed against the one the backend computes. Prints this script, then everything it observed.
+set -u
+ROOT=/Users/glendonchin/dev/Technology/exulanica-preview-handoffs
+WEB=$ROOT/web
+HERE=${0:A:h}
+WORK=$(mktemp -d $HERE/run.XXXXXX)
+cd $WEB
+echo "== script"
+cat $0
+echo
+echo "== source"
+echo "commit $(git -C $ROOT rev-parse HEAD)"
+echo "working tree changes under web/packages/loom-texture and exulanica: $(git -C $ROOT status --short -- web/packages/loom-texture exulanica | wc -l | tr -d ' ')"
+node_modules/.bin/tsc --build packages/loom-texture || exit 1
+/opt/homebrew/opt/node@24/bin/node --import ./node_modules/tsx/dist/loader.mjs $HERE/requests.mts $WORK/requests || exit 1
+REQUESTS=($(cd $WORK/requests && ls | LC_ALL=C sort))
+echo "requests: ${#REQUESTS[@]}"
+(cd $WORK/requests && for f in $REQUESTS; do echo "$(shasum -a 256 < $f | cut -d' ' -f1)  $f"; done)
+run() {
+  local name=$1; shift
+  local out=$WORK/$name
+  mkdir -p $out
+  echo
+  echo "== run $name"
+  echo "runtime: $("$@" -p 'process.version + " " + process.arch + " " + process.platform')"
+  for f in $REQUESTS; do
+    "$@" ${RUNNER[@]} --request $WORK/requests/$f --out $out/${f%.json}.ltex > $out/${f%.json}.result 2> $out/${f%.json}.stderr
+    echo "exit $? ${f%.json} $(shasum -a 256 < $out/${f%.json}.ltex | cut -d' ' -f1) $(wc -c < $out/${f%.json}.ltex | tr -d ' ')"
+  done
+}
+RUNNER=(--import ./node_modules/tsx/dist/loader.mjs packages/loom-texture/src/workspace/cli.ts)
+run node24-arm64 /opt/homebrew/opt/node@24/bin/node
+run node26-arm64 /opt/homebrew/opt/node@26/bin/node
+# esbuild ships a native binary per architecture, so the x86_64 run executes the tsc output.
+RUNNER=(packages/loom-texture/dist/src/workspace/cli.js)
+run node20-x86_64-rosetta arch -x86_64 /usr/local/bin/node
+echo
+echo "== cmp, container by container, against node24-arm64"
+for other in node26-arm64 node20-x86_64-rosetta; do
+  differing=0
+  for f in $REQUESTS; do
+    cmp -s $WORK/node24-arm64/${f%.json}.ltex $WORK/$other/${f%.json}.ltex || { echo "DIFFERS $other $f"; differing=$((differing+1)); }
+  done
+  echo "$other: $differing of ${#REQUESTS[@]} containers differ"
+done
+echo
+echo "== result lines, with the Node version set aside"
+python3 - $WORK "${REQUESTS[@]}" <<'PY'
+import json, sys
+from pathlib import Path
+work, requests = Path(sys.argv[1]), sys.argv[2:]
+runs = ["node24-arm64", "node26-arm64", "node20-x86_64-rosetta"]
+digests = set()
+for request in requests:
+    stem = request[:-5]
+    lines = []
+    for run in runs:
+        document = json.loads((work / run / f"{stem}.result").read_bytes())
+        digests.add(document["runtime"]["package_sha256"])
+        document["runtime"] = {"package_sha256": document["runtime"]["package_sha256"]}
+        lines.append(json.dumps(document, sort_keys=True))
+    print(f"{stem}: {'identical' if len(set(lines)) == 1 else 'DIFFERENT'} across {len(runs)} runs")
+print(f"package source digests claimed: {sorted(digests)}")
+PY
+echo "package source digest the backend computes: $($ROOT/.venv/bin/python -c 'from exulanica.world.material_bakes import package_source_sha256; print(package_source_sha256())')"
+rm -rf $WORK
+
+== source
+commit 222c25b71ca5f58e933f7b7966f49ad302b07813
+working tree changes under web/packages/loom-texture and exulanica: 0
+requests: 8
+d4d0766adfed08653b73020d923f9e631a34e72d9393b161c463b4dc9277f03a  00-cc0.brick-running-bond.json
+0d0748fbdce1708651ec9a34e51aa82b4ce17b3b494d33e94510993415e28071  01-cc0.carriageway-asphalt.json
+7a5a7310be44571e4ae9bcb160ff80046584015a7337d8a13f5350b4aaccb8d4  02-cc0.cast-concrete.json
+e6cd66715241649df87e6dcaaa73bdf1833f56beeab4f6b10a271c1967c69adc  03-cc0.footway-paving.json
+4af1ebc74ca5b638225b4c89db2c01be66492f5cc00c85a4dda0b75729368586  04-cc0.kerb-stone.json
+d393f59fe5d1c969a0b1163c4741f714ac5ac4a40b6e578a8d531c57f6736ac8  05-cc0.limestone-ashlar.json
+881ba36e63f81c2d1791764fe6b722cf386d9e62f741a679c53aac10e397dc58  06-cc0.painted-render.json
+88de9d4f810d87c68b99788814d275362e0aff300f01ab9d892083e4859f76a2  07-cc0.storefront-metal.json
+
+== run node24-arm64
+runtime: v24.15.0 arm64 darwin
+exit 0 00-cc0.brick-running-bond 148ee3ba2a2c9ba9a3839171405460d5ca11d1f30c8b5264543ea77b5c48d0e1 10488112
+exit 0 01-cc0.carriageway-asphalt 8c29e877fc1a999c9a300145ccdb3b5d51e6de0944c78433d6a05945a3724806 10487984
+exit 0 02-cc0.cast-concrete 52eca15ccd7bcd744fa4d89e6e823c6cea6a224b78ca69e92478c3ac3bb19e57 10488096
+exit 0 03-cc0.footway-paving a5a1c5dc9e587fcbefae00363e06f243ea2ac356e79db05655a0034396286f7b 10488032
+exit 0 04-cc0.kerb-stone 773587b7a13de1f0dac03e30d8c9660ebcf752ca1ad028ba1cb66416fb8e4b2d 2623632
+exit 0 05-cc0.limestone-ashlar 21367a710875a0827561930c9f1cbd038c88614dc8843091705bf41ebf8b530c 10488128
+exit 0 06-cc0.painted-render 2e67b21c1fa29dab73e6f67caa35da79d35e5b7b6de19a8843ec68f16258c881 10487920
+exit 0 07-cc0.storefront-metal 5b27c6732785632984da94501130174232a721efa813880374a905020aa16060 10487872
+
+== run node26-arm64
+runtime: v26.7.0 arm64 darwin
+exit 0 00-cc0.brick-running-bond 148ee3ba2a2c9ba9a3839171405460d5ca11d1f30c8b5264543ea77b5c48d0e1 10488112
+exit 0 01-cc0.carriageway-asphalt 8c29e877fc1a999c9a300145ccdb3b5d51e6de0944c78433d6a05945a3724806 10487984
+exit 0 02-cc0.cast-concrete 52eca15ccd7bcd744fa4d89e6e823c6cea6a224b78ca69e92478c3ac3bb19e57 10488096
+exit 0 03-cc0.footway-paving a5a1c5dc9e587fcbefae00363e06f243ea2ac356e79db05655a0034396286f7b 10488032
+exit 0 04-cc0.kerb-stone 773587b7a13de1f0dac03e30d8c9660ebcf752ca1ad028ba1cb66416fb8e4b2d 2623632
+exit 0 05-cc0.limestone-ashlar 21367a710875a0827561930c9f1cbd038c88614dc8843091705bf41ebf8b530c 10488128
+exit 0 06-cc0.painted-render 2e67b21c1fa29dab73e6f67caa35da79d35e5b7b6de19a8843ec68f16258c881 10487920
+exit 0 07-cc0.storefront-metal 5b27c6732785632984da94501130174232a721efa813880374a905020aa16060 10487872
+
+== run node20-x86_64-rosetta
+runtime: v20.10.0 x64 darwin
+exit 0 00-cc0.brick-running-bond 148ee3ba2a2c9ba9a3839171405460d5ca11d1f30c8b5264543ea77b5c48d0e1 10488112
+exit 0 01-cc0.carriageway-asphalt 8c29e877fc1a999c9a300145ccdb3b5d51e6de0944c78433d6a05945a3724806 10487984
+exit 0 02-cc0.cast-concrete 52eca15ccd7bcd744fa4d89e6e823c6cea6a224b78ca69e92478c3ac3bb19e57 10488096
+exit 0 03-cc0.footway-paving a5a1c5dc9e587fcbefae00363e06f243ea2ac356e79db05655a0034396286f7b 10488032
+exit 0 04-cc0.kerb-stone 773587b7a13de1f0dac03e30d8c9660ebcf752ca1ad028ba1cb66416fb8e4b2d 2623632
+exit 0 05-cc0.limestone-ashlar 21367a710875a0827561930c9f1cbd038c88614dc8843091705bf41ebf8b530c 10488128
+exit 0 06-cc0.painted-render 2e67b21c1fa29dab73e6f67caa35da79d35e5b7b6de19a8843ec68f16258c881 10487920
+exit 0 07-cc0.storefront-metal 5b27c6732785632984da94501130174232a721efa813880374a905020aa16060 10487872
+
+== cmp, container by container, against node24-arm64
+node26-arm64: 0 of 8 containers differ
+node20-x86_64-rosetta: 0 of 8 containers differ
+
+== result lines, with the Node version set aside
+00-cc0.brick-running-bond: identical across 3 runs
+01-cc0.carriageway-asphalt: identical across 3 runs
+02-cc0.cast-concrete: identical across 3 runs
+03-cc0.footway-paving: identical across 3 runs
+04-cc0.kerb-stone: identical across 3 runs
+05-cc0.limestone-ashlar: identical across 3 runs
+06-cc0.painted-render: identical across 3 runs
+07-cc0.storefront-metal: identical across 3 runs
+package source digests claimed: ['af7bf703ffe6880d7a0492fbc5f45da5234cf1501ea486a4ae7f71ffc3dafb33']
+package source digest the backend computes: af7bf703ffe6880d7a0492fbc5f45da5234cf1501ea486a4ae7f71ffc3dafb33

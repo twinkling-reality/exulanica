@@ -46,6 +46,9 @@ EVIDENCE_DIRECTORY = ROOT / "web" / "packages" / "loom-texture" / "evidence"
 EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism.log.txt"
 #: The bake from recipes: every file the directory holds, objects and catalog included.
 OBJECT_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism-objects.log.txt"
+#: A workspace bake of every published recipe, through the command the bake worker runs.
+WORKSPACE_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-workspace-bake-determinism.log.txt"
+WORKSPACE_RUNS = ("node24-arm64", "node26-arm64", "node20-x86_64-rosetta")
 RUNS = (
     "node24-arm64-a",
     "node24-arm64-b",
@@ -483,6 +486,7 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
         assert re.search(rf"\|\s*{entry['version']}\s*\|", row.group(0)), entry["set_id"]
     assert EVIDENCE.relative_to(ROOT).as_posix() in text
     assert OBJECT_EVIDENCE.relative_to(ROOT).as_posix() in text
+    assert WORKSPACE_EVIDENCE.relative_to(ROOT).as_posix() in text
     assert "\u2014" not in text
 
 
@@ -532,3 +536,30 @@ def test_the_object_determinism_record_is_of_every_published_file(manifest, cata
     for run in RUNS[1:]:
         assert f"{run}: 0 of {count} files differ; {count} files present" in record
     assert f"committed: 0 of {count} files differ; {count} files present" in record
+
+
+def test_the_workspace_bake_record_is_every_published_recipe_baked_alike(manifest):
+    """The bake worker's command, on three runtimes and two architectures, one bake per set."""
+    record = WORKSPACE_EVIDENCE.read_text(encoding="utf-8")
+    assert re.search(r"^commit [0-9a-f]{40}$", record, re.MULTILINE)
+    assert "working tree changes under web/packages/loom-texture and exulanica: 0" in record
+    stems = [f"{index:02d}-{entry['set_id']}" for index, entry in enumerate(manifest["sets"])]
+    runs = {}
+    for run in WORKSPACE_RUNS:
+        section = record.split(f"== run {run}\n", 1)[1].split("\n== ", 1)[0]
+        runs[run] = re.findall(r"^exit 0 (\S+) ([0-9a-f]{64}) (\d+)$", section, re.MULTILINE)
+        assert [stem for stem, _, _ in runs[run]] == stems, run
+    assert runs[WORKSPACE_RUNS[1]] == runs[WORKSPACE_RUNS[0]] == runs[WORKSPACE_RUNS[2]]
+    for run in WORKSPACE_RUNS[1:]:
+        assert f"{run}: 0 of {len(stems)} containers differ" in record
+    for stem in stems:
+        assert f"{stem}: identical across 3 runs" in record
+    claimed = re.search(r"^package source digests claimed: \['([0-9a-f]{64})'\]$", record, re.M)
+    computed = re.search(
+        r"^package source digest the backend computes: ([0-9a-f]{64})$", record, re.M
+    )
+    assert claimed is not None and computed is not None
+    assert claimed.group(1) == computed.group(1)
+    # A workspace bake states its own set id and licence, so its bytes are never a published set's.
+    published = {entry["content_sha256"] for entry in manifest["sets"]}
+    assert not published & {digest for _, digest, _ in runs[WORKSPACE_RUNS[0]]}
