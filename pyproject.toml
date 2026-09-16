@@ -373,8 +373,20 @@ layers = [
   # layer of its own rather than a sibling of the three above because it must sit BELOW them
   # for the forbidden contract on it to mean anything: a module that may import evidence and
   # chooses not to is a habit, and one that may not is a rule.
-  "reconstruction",
+  #
+  # Capture is its sibling for the same reason the three workflows are siblings of each other.
+  # The capture package decides, from the photographs alone and before any GPU spend, whether a
+  # set can rebuild; reconstruction then tries. Neither may import the other, so a verdict can
+  # never quietly depend on the machinery it is predicting, and a rung can never quietly depend
+  # on the prediction. Whatever composes the two sits above both.
+  "reconstruction | capture",
   "evidence | migrations",
+  # The generator system sits BELOW the evidence spine, one notch stricter than reconstruction:
+  # it may import only what is under it, which is canonical JSON, the error types and the
+  # environment reader. A generated world is a pure function of a seed, a set of grammar
+  # versions and a catalog, and none of those needs to know what a photograph is. Placing it
+  # here is what makes the forbidden contract below a rule rather than a habit.
+  "grammar",
   "canonical",
   # The corpus generator sits at the bottom and depends on nothing in this package at all: it
   # draws pictures with Pillow and knows nothing about evidence, storage or the database. Listed
@@ -430,15 +442,49 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+# ADR-0008, as a rule the tooling keeps rather than a sentence in a document.
+#
+# A generated subject, whether a street, a tree, a chair or a person, is a pure function of a
+# seed, a grammar version and a catalog. It is never evidence and must never be able to pass for
+# it. The strongest available form of that is a generator that cannot construct a citation:
+# `exulanica.grammar` does not import the module that defines an evidence address, cannot write
+# a blob a span could point at, cannot open the database, cannot reach the pipeline that admits a
+# photograph, cannot name a person, and cannot reach the selector that binds cited content for a
+# model. No refactor inside it can produce any of those, and no reviewer has to notice.
+#
+# Note what is deliberately NOT claimed here. Every module named below already sits above
+# `grammar` in the layer list, so today the layers contract alone refuses the import; this
+# contract is the one that still holds if somebody moves the layer, and it says why. It does not
+# claim that generated content is labelled correctly once something above composes it with
+# recorded content: that is the job of the `invented` plane and its own wire key, which live
+# above this package. It does not stop the package reading its catalog files by path; a catalog
+# is authored data, not a registration, and registering a value is a database write this package
+# cannot make. And `exulanica.canonical` stays importable, because a digest is not a citation.
+name = "Generated content cannot name a citation, because it cannot name one"
+type = "forbidden"
+source_modules = ["exulanica.grammar"]
+forbidden_modules = [
+  "exulanica.evidence",
+  "exulanica.store",
+  "exulanica.db",
+  "exulanica.ingest",
+  "exulanica.identity",
+  "exulanica.selection",
+]
+
+[[tool.importlinter.contracts]]
 # The pure core is testable with no server and no credentials, and that is a property worth
 # pinning rather than rediscovering. A psycopg import here would mean an evidence address had
-# learned how it is stored.
+# learned how it is stored. The generator system is listed for the same reason: a generated
+# world is recomputable on a machine that has never seen a database, and that stays true only
+# while nothing in it can open one.
 name = "The pure core does not know a database exists"
 type = "forbidden"
 source_modules = [
   "exulanica.canonical",
   "exulanica.errors",
   "exulanica.evidence",
+  "exulanica.grammar",
   "exulanica.models",
   "exulanica.store",
 ]
