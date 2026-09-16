@@ -170,53 +170,21 @@ module.exports = {
       to: { path: String.raw`^packages/atlas-core/src/presentation-metrics\.ts$` },
     },
 
-    // ---- atlas-three: the ADR-0003 option A binding ----------------------------------------
-    {
-      name: 'atlas-three-no-react',
-      severity: 'error',
-      comment:
-        'atlas-three is the engine half of the binding and is deliberately framework-free: the ' +
-        'anchor overlay writes into pre-allocated DOM nodes inside the render loop, which is ' +
-        'exactly what a React tree must not do (interaction-model.md 3.4). React integration ' +
-        'belongs in atlas-react, on top of this.',
-      from: { path: pkg('atlas-three') },
-      to: { path: REACT },
-    },
-    {
-      name: 'atlas-three-imports-atlas-core-only',
-      severity: 'error',
-      comment:
-        'The bake-off has to be able to end by deleting a package. atlas-three may name three.js ' +
-        'and Spark and it may call atlas-core, and it may reach nothing else in the workspace.',
-      from: { path: pkg('atlas-three') },
-      to: { path: notPkgRef('atlas-three', 'atlas-core') },
-    },
+    // ---- engines stay behind the binding ---------------------------------------------------
     {
       name: 'engine-specific-code-stays-behind-the-binding',
       severity: 'error',
       comment:
-        'Only the binding layer and the two harnesses may name an engine. If ADR-0003 flips ' +
-        'to PlayCanvas, this rule is what guarantees the blast radius stays small. ' +
-        'companion-forms is on the list because the roadmap requires a world-rendered Companion ' +
-        'prototype before a depth contract can be approved, and a prototype that could not name ' +
-        'a renderer would be prototyping something else.',
+        'Only the binding layer may name an engine: atlas-react, which carries the PlayCanvas ' +
+        'binding and its harness. This rule is what keeps a renderer switch to a small blast ' +
+        'radius. companion-forms is on the list because the roadmap requires a world-rendered ' +
+        'Companion prototype before a depth contract can be approved, and a prototype that could ' +
+        'not name a renderer would be prototyping something else.',
       from: {
         path: String.raw`^packages/`,
-        pathNot: String.raw`^packages/(atlas-three|atlas-react|bakeoff|companion-forms)/`,
+        pathNot: String.raw`^packages/(atlas-react|companion-forms)/`,
       },
-      to: { path: `${RENDERER}|${pkgRef('atlas-three')}` },
-    },
-
-    // ---- bakeoff: the ADR-0003 X-R1 harness -------------------------------------------------
-    {
-      name: 'bakeoff-imports-the-binding-and-the-core-only',
-      severity: 'error',
-      comment:
-        'The harness measures the binding. It may not reach into graph-client, world-index or ' +
-        'companion-runtime, because a number that included them would not be a renderer number. ' +
-        'It also may not import scene-synth: the fixture crosses as bytes over HTTP.',
-      from: { path: pkg('bakeoff') },
-      to: { path: notPkgRef('bakeoff', 'atlas-core', 'atlas-three') },
+      to: { path: RENDERER },
     },
 
     // ---- companion-forms: the Companion depth prototypes -------------------------------------
@@ -267,11 +235,9 @@ module.exports = {
       comment:
         'The app is the composition root: it is the one place that knows a transport, a scene ' +
         'graph, a renderer binding, an index and a Companion all exist at once. It may reach ' +
-        'the six product packages and nothing else in the workspace. Not atlas-three, which is ' +
-        'the retained second renderer binding and would be a second engine in the product; not ' +
-        'bakeoff, which is a measurement harness; not scene-synth, which writes files with ' +
-        'node:fs; and not landing, which is the signed-out surface and must keep paying for no ' +
-        'renderer.',
+        'the product packages listed below and nothing else in the workspace. Not scene-synth, ' +
+        'which writes files with node:fs; not companion-forms, which is a prototype bench; and ' +
+        'not landing, which is the signed-out surface and must keep paying for no renderer.',
       from: { path: pkg('app') },
       to: {
         path: notPkgRef(

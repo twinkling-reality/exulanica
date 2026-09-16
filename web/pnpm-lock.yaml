@@ -160,6 +160,12 @@ importers:
         specifier: ^6
         version: 6.4.3(@types/node@22.20.1)(lightningcss@1.33.0)(tsx@4.23.12)
 
+  packages/loom-gate: {}
+
+  packages/loom-tess: {}
+
+  packages/loom-texture: {}
+
   packages/presentation:
     dependencies:
       '@exulanica/atlas-core':

@@ -26,10 +26,13 @@
       "path": "./packages/scene-synth"
     },
     {
-      "path": "./packages/atlas-three"
+      "path": "./packages/loom-gate"
     },
     {
-      "path": "./packages/bakeoff"
+      "path": "./packages/loom-texture"
+    },
+    {
+      "path": "./packages/loom-tess"
     },
     {
       "path": "./packages/companion-forms"
