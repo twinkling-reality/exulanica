@@ -672,8 +672,8 @@ class RecordVerdict:
     ``state`` is ``verified`` when the stored bytes reproduce the stored digest and parse as the
     canonical document they claim to be, and ``invalid`` otherwise, in which case nothing below
     ``reason`` is trusted and ``instructions`` is empty. ``refusal_authorised`` is False for a
-    policy that has not passed a held-out set, and a caller must present such a verdict's
-    instructions as advice and never as the reason a set was refused.
+    policy that has not passed a held-out set, and such a verdict's instructions are for
+    evaluation only: :class:`PlaceRecord` never offers them as advice or as a reason.
     """
 
     state: Literal["verified", "invalid"]
@@ -744,9 +744,10 @@ class PlaceRecord:
 
     ``reason`` is present for ``insufficient_overlap`` and ``registered_partial``, the two states
     a person needs told what to do about, and for any state a withdrawal lowered. ``advice`` is a
-    verified verdict's instructions when the record's state does not rest on that verdict, and it
-    is advice: a verdict under a policy not authorised to refuse lands here and never in
-    ``reason``.
+    verified verdict's instructions when the record's state does not rest on that verdict, and
+    only when the verdict's policy is authorised to refuse. A policy that has not passed a
+    held-out set does not speak to a person at all: its verdict is still returned, under
+    ``verdict``, for evaluation, and nothing in it is presented as what to do.
     """
 
     record_id: uuid.UUID
@@ -813,6 +814,7 @@ def place_record(
     if (
         verdict is not None
         and verdict.state == "verified"
+        and verdict.refusal_authorised
         and (reason is None or reason.basis != "verdict")
     ):
         advice = verdict.instructions

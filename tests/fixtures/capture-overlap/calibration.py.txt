@@ -170,7 +170,7 @@ def subset(indices):
 
 
 say("\nmonotonicity sweep: counts 6, 8, 12 and 16, every start, every step that fits")
-for threshold in (7, 8, 9, 10, 12):
+for threshold in (6, 7, 8, 9, 10, 12):
     policy = dataclasses.replace(POLICY_V1, edge_min_score=threshold)
     line = []
     for label, low, high in (("calibration 0-112", 0, 112), ("validation 113-209", 113, 209)):

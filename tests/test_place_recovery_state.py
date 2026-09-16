@@ -376,7 +376,10 @@ def test_a_verdict_under_a_policy_not_authorised_to_refuse_cannot_seal_a_set(roo
     assert read.recovery_state == "not_attempted" and read.reason is None
     assert read.verdict is not None and read.verdict.state == "verified"
     assert read.verdict.refusal_authorised is False
-    assert read.advice == read.verdict.instructions and read.advice
+    # An unvalidated policy does not speak to the person: its sentences stay in the verdict, for
+    # evaluation, and are not offered as advice.
+    assert read.verdict.instructions
+    assert read.advice == []
 
 
 def test_an_authorised_refusal_is_a_room_whose_reason_is_the_verdict(room):
@@ -403,7 +406,7 @@ def test_an_authorised_refusal_is_a_room_whose_reason_is_the_verdict(room):
     assert read is not None and read.recovery_state == "insufficient_overlap"
     assert read.reason is not None and read.reason.state == "stated"
     assert read.reason.basis == "verdict"
-    assert [item.key for item in read.reason.instructions] == ["no_overlapping_neighbours"]
+    assert [item.key for item in read.reason.instructions] == ["mostly_unconnected"]
     assert read.advice == []
     assert len(read.photographs) == 6
 

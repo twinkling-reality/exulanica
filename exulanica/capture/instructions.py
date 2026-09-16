@@ -103,9 +103,10 @@ _ENTRIES: Final[dict[InstructionKey, _Entry]] = {
         "each photograph overlaps the one before it.",
     ),
     # One side of the subject has no coverage. In the vocabulary so the shape has words, and
-    # emitted by NO current policy: overlap-policy/v1 tried to read it from the pair graph and
-    # misread 6 of 23 turntable arcs of known extent, so it does not claim it. A later policy
-    # that can measure it, from a pose receipt's cameras for instance, has the sentence ready.
+    # emitted by NO current policy: overlap-policy/v1 tried to read it from the pair graph, and
+    # its readings of turntable arcs of known extent were wrong too often and moved with the
+    # decoder, so it does not claim it. A later policy that can measure it, from a pose
+    # receipt's cameras for instance, has the sentence ready.
     "one_side_uncovered": _Entry(
         (),
         "These photographs should build into a 3D place, but not all the way round.",

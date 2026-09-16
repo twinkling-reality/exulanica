@@ -153,19 +153,19 @@ POLICY_V1: Final = OverlapPolicy(
             "the score maximising true-edge rate on pairs at most 21 degrees apart minus "
             "false-edge rate on pairs at least 90 degrees apart; 21 degrees is the neighbour "
             "spacing of the twelve-photograph set that registered twelve of twelve; measured "
-            "9453 per ten thousand at 8 over 6328 pairs (446 near, 2894 far), 9395 at 7, 9305 at 9",
+            "9492 per ten thousand at 8 over 6328 pairs (446 near, 2894 far), 9392 at 7, 9427 at 9",
         ),
         (
             "validation",
-            "sorted file names 113 to 209, 4656 pairs, not used to choose anything: 8482 at 8, "
-            "maximum 8583 at 7",
+            "sorted file names 113 to 209, 4656 pairs, not used to choose anything: 8887 at 8, "
+            "maximum 8945 at 7",
         ),
         (
             "known_weakness",
-            "not monotone in spacing at this threshold: widening the step of a fixed start and "
-            "count turns a refusal back into a run in 89 of 452 calibration sequences and 11 of "
-            "388 validation sequences; none do at 10, where the set that registered twelve of "
-            "twelve is refused",
+            "at this threshold the set that registered twelve of twelve is predicted "
+            "registered_partial, and all four measured sets are predicted correctly only at 6 "
+            "and 7; widening the step of a fixed start and count turns a refusal back into a run "
+            "in 81 of 452 calibration sequences and 17 of 388 validation sequences",
         ),
         (
             "registration_floor",
@@ -175,7 +175,7 @@ POLICY_V1: Final = OverlapPolicy(
             "held_out",
             "chili salmon bowl (Charin Rungchaowarat, CC0), all 51, first measured after this "
             "policy was fixed: pose receipts 292d697b and d3563ac2 registered 51 of 51 and the "
-            "set trained, and this policy predicted registered_partial (5 groups, largest 20), "
+            "set trained, and this policy predicted registered_partial (6 groups, largest 20), "
             "so it fails its held-out check and is not authorised to refuse; the bowl is spent "
             "as a held-out set for any policy chosen after this result",
         ),

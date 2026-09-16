@@ -14,15 +14,16 @@ Three decisions shape it.
 extras, and in-process torch after COLMAP aborts the whole test process. A verdict whose purpose
 is to be cheaper than the run it prevents must import cleanly on an instance that has none of
 them, and ``tests/test_capture_overlap.py`` checks ``sys.modules`` in a fresh process to hold
-that.
+that. Bytes become pixels only through ``exulanica.corpus.decode``, the repository's one decoder,
+which applies the shared pixel budget and brings the core HEIF decoder with it.
 
 **Integers from the decoded pixels onward.** ``exulanica.canonical`` refuses a float in a digest
-input, and the verdict is a digest input. Pillow's ``reduce``, ``BoxBlur`` with an integer radius,
-the rank filters and the channel operations all work on 8-bit integers, and the descriptor bits,
-positions and counts derived from them are Python integers. The two steps whose coefficients
-Pillow computes in floating point are the JPEG draft scale and the ``BOX`` resize; both are fixed
-by the image dimensions alone, so they are deterministic on one platform and library build. That
-they give identical bytes across platforms is not verified here and is recorded as such.
+input, and the verdict is a digest input. The luminance conversion, ``BoxBlur`` with an integer
+radius, the rank filters and the channel operations all work on 8-bit integers, and the
+descriptor bits, positions and counts derived from them are Python integers. The one step whose
+coefficients Pillow computes in floating point is the ``BOX`` resize; they are fixed by the image
+dimensions alone, so it is deterministic on one platform and library build. That it gives
+identical bytes across platforms is not verified here and is recorded as such.
 
 **A photograph that cannot be measured is named, never defaulted.** It carries a reason from a
 closed list and it is not a node of the graph. A blank descriptor would be a photograph that
@@ -39,7 +40,6 @@ calibration rock) matches in every pair and carries no parallax a reconstruction
 from __future__ import annotations
 
 import hashlib
-import io
 import re
 import struct
 from collections import Counter
@@ -48,9 +48,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal
 
-from PIL import Image, ImageChops, ImageFilter, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from exulanica.canonical import round_half_down
+from exulanica.corpus.decode import UNREADABLE, open_sensor
 
 __all__ = [
     "DESCRIPTOR_PROFILE",
@@ -231,8 +232,16 @@ def _working_size(width: int, height: int, long_side: int) -> tuple[int, int]:
 
 
 def _decode(data: bytes, parameters: DescriptorParameters) -> Image.Image | UnavailableReason:
+    """Bounded pixels through the repository's one decoder, upright, grey and 256 pixels long.
+
+    ``exulanica.corpus.decode.open_sensor`` is the only place a photograph becomes pixels, because
+    Pillow's pixel budget and its decompression-bomb promotion are interpreter-global, and a second
+    door would inherit whatever the last import set. So this never opens bytes itself. The frame
+    is reduced to luminance and to the working size in its stored grid first, and the EXIF
+    orientation is applied to the small copy, which carries the same metadata.
+    """
     try:
-        with Image.open(io.BytesIO(data)) as opened:
+        with open_sensor(data) as opened:
             orientation = opened.getexif().get(_ORIENTATION_TAG, 1)
             if orientation in _MIRRORED:
                 return "mirrored_orientation"
@@ -241,19 +250,16 @@ def _decode(data: bytes, parameters: DescriptorParameters) -> Image.Image | Unav
             if max(opened.size) < parameters.long_side:
                 return "too_small"
             stored = _working_size(*opened.size, parameters.long_side)
-            opened.draft("L", stored)
-            upright = ImageOps.exif_transpose(opened)
-    except Image.DecompressionBombError:
+            grey = opened.convert("L")
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
         return "decompression_limit"
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, EOFError, struct.error):
+    except (*UNREADABLE, SyntaxError, EOFError, struct.error):
         return "undecodable"
-    grey = upright.convert("L")
-    target = _working_size(*grey.size, parameters.long_side)
-    if min(target) < parameters.minimum_side:
+    if min(stored) < parameters.minimum_side:
         return "too_small"
-    if grey.size != target:
-        grey = grey.resize(target, Image.Resampling.BOX)
-    return grey
+    if grey.size != stored:
+        grey = grey.resize(stored, Image.Resampling.BOX)
+    return ImageOps.exif_transpose(grey)
 
 
 def extract_features(
@@ -424,9 +430,10 @@ class OverlapGraph:
     ``structure`` says whether the set is one chain, several islands or a scatter. Whether a
     chain comes back round to where it started is deliberately NOT here: two readings of that
     from the thresholded graph were measured against arcs of the calibration turntable whose
-    extent is known, and the better one misread 6 of 23. A chance edge between two far
-    photographs is enough to make an open arc look closed, and a shape this graph cannot
-    establish is not reported as one.
+    extent is known, and they misread 3 and 2 of 22 with this decoder and 7 and 6 of 23 with an
+    earlier draft-scaled decode. A chance edge between two far photographs is enough to make an
+    open arc look closed, and a shape whose reading moves that much with a decode detail is not
+    reported as established.
     """
 
     measurement: OverlapMeasurement

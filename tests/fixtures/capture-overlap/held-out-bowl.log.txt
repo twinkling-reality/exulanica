@@ -2,10 +2,10 @@ bowl photographs 51
 receipt 292d697be5d0: 51 frames, 51 are bowl photographs, outcome registered_scene, registered 51 of 51, accepted True, reasons []
 receipt d3563ac261c6: 51 frames, 51 are bowl photographs, outcome registered_scene, registered 51 of 51, accepted True, reasons []
 receipt 2976a64d54ec: 40 frames, 40 are bowl photographs, outcome registered_partial, registered 40 of 40, accepted False, reasons ['recovered camera translation is below the manifest threshold']
-verdict in 3.56 s: ceiling registered_partial, worth False, fault separate_groups, advisories []
-measured 51 of 51, edges 67 of 1275 pairs, largest 20, groups 5, isolated 5, structure islands
+verdict in 4.37 s: ceiling registered_partial, worth False, fault separate_groups, advisories []
+measured 51 of 51, edges 75 of 1275 pairs, largest 20, groups 6, isolated 3, structure islands
 unavailable []
 working sizes [(192, 256)]
-digest 69ca517b73cac26c597c5c21123555cbf17fdbbbd323b5a64637f86d094fb787
+digest 6fc0a1a923ee396ebc47841690e3630a2487a677e7e152b61b3f3f741fa92bec
 verdict by threshold: t>=1: registered_scene; t>=7: registered_partial
-says: Your photographs are kept here as they are. They won't build into a 3D place yet. These photographs fall into 5 separate groups, and nothing joins one group to the next. Go back to the gaps between the groups and take one every few steps, so each photograph overlaps the one before it.
+says: Your photographs are kept here as they are. They won't build into a 3D place yet. These photographs fall into 6 separate groups, and nothing joins one group to the next. Go back to the gaps between the groups and take one every few steps, so each photograph overlaps the one before it.

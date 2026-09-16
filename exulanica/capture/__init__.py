@@ -1,9 +1,10 @@
 """Capture: whether a set of photographs can rebuild, decided before any GPU spend.
 
-Pure: the standard library and Pillow, and within this package only :mod:`exulanica.canonical`
-and :mod:`exulanica.errors` below it. No database, no object store, no evidence address, no
-numeric stack. ``pyproject.toml`` places it beside ``exulanica.reconstruction`` in the layer
-list, so neither may import the other, and a forbidden contract keeps the rest out.
+Pure: the standard library and Pillow, and from this package only :mod:`exulanica.canonical`,
+:mod:`exulanica.errors` and the one decoder, :mod:`exulanica.corpus.decode`, all below it. No
+database, no object store, no evidence address, no numeric stack. ``pyproject.toml`` places it
+beside ``exulanica.reconstruction`` in the layer list, so neither may import the other, and a
+forbidden contract keeps the rest out.
 
 *   :mod:`exulanica.capture.overlap` measures the photographs and builds the pairwise graph.
 *   :mod:`exulanica.capture.verdict` reads a predicted ceiling off that graph under a declared

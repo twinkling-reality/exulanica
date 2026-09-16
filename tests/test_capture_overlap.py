@@ -256,7 +256,7 @@ def test_instructions_are_closed_and_carry_only_the_numbers_they_were_given():
             token for token in text.replace(",", " ").replace(".", " ").split() if token.isdigit()
         }
         assert digits <= {str(value) for value in counts.values()}, (key, text)
-        assert "—" not in text
+        assert chr(0x2014) not in text, "no em dash in anything a person reads"
         lowered = text.lower()
         assert "take " not in lowered or not any(
             lowered.split("take ", 1)[1].startswith(str(n)) for n in range(10)
@@ -395,13 +395,6 @@ def volcanic():
     return verdict, wall, cpu, newly
 
 
-def _subset_verdict(measurement: OverlapMeasurement, indices, threshold: int | None = None):
-    policy = POLICY_V1 if threshold is None else dataclasses.replace(
-        POLICY_V1, edge_min_score=threshold
-    )  # fmt: skip
-    return verdict_for_measurement(measurement.subset(NAMES[i] for i in indices), policy)
-
-
 def _outcome(run) -> str:
     if run["registered_count"] == 0:
         return "insufficient_overlap"
@@ -420,32 +413,49 @@ def test_the_210_photograph_verdict_costs_seconds_and_starts_nothing(volcanic):
 
 
 @pytest.mark.parametrize(
-    ("label", "ceiling", "fault", "window"),
+    ("label", "ceiling", "fault", "decided_right", "transitions"),
     [
-        # The verdict holds for every edge threshold in the window and for no threshold outside it,
-        # which is the margin the document reports.
-        ("six", "insufficient_overlap", "no_overlapping_neighbours", (5, None)),
-        ("twelve_wide", "registered_partial", "separate_groups", (7, 25)),
-        ("twelve_close", "registered_scene", None, (1, 9)),
-        ("all_210", "registered_scene", None, (1, 15)),
+        # ``transitions`` is the verdict as the edge threshold rises from 1 to 40, written as the
+        # thresholds where it changes: the margin the document reports, pinned exactly.
+        ("six", "registered_partial", "mostly_unconnected", True,
+         [(1, "registered_scene"), (5, "registered_partial"), (9, "insufficient_overlap")]),
+        ("twelve_wide", "registered_partial", "separate_groups", True,
+         [(1, "registered_scene"), (6, "registered_partial"), (26, "insufficient_overlap")]),
+        # THE KNOWN FAILURE. This set registered twelve of twelve, and at the policy threshold the
+        # verdict refuses it. It is right only up to 7, and the declared rule chose 8.
+        ("twelve_close", "registered_partial", "separate_groups", False,
+         [(1, "registered_scene"), (8, "registered_partial"), (29, "insufficient_overlap")]),
+        ("all_210", "registered_scene", None, True,
+         [(1, "registered_scene"), (15, "registered_partial")]),
     ],
-)
-def test_the_four_measured_rows_and_their_margins(volcanic, label, ceiling, fault, window):
+)  # fmt: skip
+def test_the_four_measured_rows_and_their_margins(
+    volcanic, label, ceiling, fault, decided_right, transitions
+):
     measurement = volcanic[0].graph.measurement
     run = RUNS[label]
-    verdict = _subset_verdict(measurement, run["indices"])
+    subset = (
+        measurement if label == "all_210" else measurement.subset(NAMES[i] for i in run["indices"])
+    )
+
+    def at(threshold=None):
+        policy = POLICY_V1
+        if threshold is not None:
+            policy = dataclasses.replace(POLICY_V1, edge_min_score=threshold)
+        return verdict_for_measurement(subset, policy)
+
+    verdict = at()
     assert verdict.predicted_ceiling == ceiling
     assert verdict.fault == fault
-    # Consistent with what the run actually did: the outcome is at or below the ceiling, and the
-    # set is recommended for a run exactly when the run registered it.
-    order = ["insufficient_overlap", "registered_partial", "registered_scene"]
-    assert order.index(_outcome(run)) <= order.index(ceiling)
-    assert verdict.worth_attempting == (_outcome(run) == "registered_scene")
-    low, high = window
+    # Right means: the set is recommended for a run exactly when the run registered it.
+    assert (verdict.worth_attempting == (_outcome(run) == "registered_scene")) is decided_right
+    seen, previous = [], None
     for threshold in range(1, 41):
-        inside = threshold >= low and (high is None or threshold <= high)
-        held = _subset_verdict(measurement, run["indices"], threshold).predicted_ceiling == ceiling
-        assert held == inside, (label, threshold)
+        current = at(threshold).predicted_ceiling
+        if current != previous:
+            seen.append((threshold, current))
+            previous = current
+    assert seen == transitions
 
 
 def test_the_measured_index_lists_come_from_the_receipts_not_from_arithmetic():
@@ -478,8 +488,8 @@ def test_the_monotonicity_sweep_matches_its_record(volcanic):
     """Widening the step of a fixed start and count should never turn a refusal into a run.
 
     At the policy threshold it does, and this pins how often, so the document cannot drift from
-    the code: 89 of 452 calibration sequences and 11 of 388 validation sequences. At 10 none of
-    the calibration sequences do, and that threshold refuses the set that registered.
+    the code: 81 of 452 calibration sequences and 17 of 388 validation sequences. At 10 only 2
+    and 1 do, and that threshold refuses the set that registered as well.
     """
     measurement = volcanic[0].graph.measurement
     cache: dict[tuple[int, ...], OverlapMeasurement] = {}
@@ -501,10 +511,10 @@ def test_the_monotonicity_sweep_matches_its_record(volcanic):
                         previous, step = run, step + 1
             counts[(threshold, label)] = (flips, sequences)
     assert counts == {
-        (8, "calibration"): (89, 452),
-        (8, "validation"): (11, 388),
-        (10, "calibration"): (0, 452),
-        (10, "validation"): (2, 388),
+        (8, "calibration"): (81, 452),
+        (8, "validation"): (17, 388),
+        (10, "calibration"): (2, 452),
+        (10, "validation"): (1, 388),
     }
 
 
@@ -614,8 +624,8 @@ def test_the_held_out_bowl_is_the_failure_the_document_reports():
         assert {frame["sha256"] for frame in receipt["manifest"]["frames"]} <= digests
     verdict = assess_capture_set([Photograph.from_path(name, BOWL / name) for name in names])
     graph = verdict.graph
-    assert (graph.measured_count, len(graph.edges)) == (51, 67)
-    assert (graph.largest_component, graph.groups, graph.isolated) == (20, 5, 5)
+    assert (graph.measured_count, len(graph.edges)) == (51, 75)
+    assert (graph.largest_component, graph.groups, graph.isolated) == (20, 6, 3)
     assert verdict.predicted_ceiling == "registered_partial"
     assert verdict.fault == "separate_groups"
     assert verdict.worth_attempting is False, "the known failure: this set registered 51 of 51"
