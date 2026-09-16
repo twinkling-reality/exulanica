@@ -1,0 +1,3 @@
+# Pinned by digest: no line-ending conversion, keyword expansion or filter, ever.
+* -text -ident -filter -working-tree-encoding
+blobs/** binary

@@ -1,0 +1,107 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CATALOG } from '../src/catalog.js';
+import { encodeContainer } from '../src/container.js';
+import type { TextureSetDefinition } from '../src/definition.js';
+import { bakeMaps, sampleFields } from '../src/maps.js';
+import { sha256Hex } from '../src/publish.js';
+import { FIELD_NAMES } from './support.js';
+
+/**
+ * Same inputs, same bytes; and nothing but the stated inputs reaches them.
+ *
+ * The two-directory `cmp` of a full bake is the operator-level proof and is recorded in
+ * docs/texture-package.md; `published.test.ts` rebakes every set and compares with the committed
+ * files. These are the fast, local forms of the same claim.
+ */
+const small = (def: TextureSetDefinition, size = 32): TextureSetDefinition => ({
+  ...def,
+  width: size,
+  height: def.height === def.width ? size : size / 4,
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('a bake is a function of its stated inputs', () => {
+  it('produces identical maps twice over, for every set', () => {
+    for (const def of CATALOG) {
+      const a = bakeMaps(def, { width: 64, height: def.height / 16 });
+      const b = bakeMaps(def, { width: 64, height: def.height / 16 });
+      expect(Buffer.from(a.baseColor).equals(Buffer.from(b.baseColor)), def.setId).toBe(true);
+      expect(Buffer.from(a.normal).equals(Buffer.from(b.normal)), def.setId).toBe(true);
+      expect(Buffer.from(a.orm).equals(Buffer.from(b.orm)), def.setId).toBe(true);
+      expect(Buffer.from(a.relief).equals(Buffer.from(b.relief)), def.setId).toBe(true);
+    }
+  });
+
+  it('never consults a clock or an ambient random source', () => {
+    const refuse = (name: string) => () => {
+      throw new Error(`the bake called ${name}`);
+    };
+    vi.spyOn(Math, 'random').mockImplementation(refuse('Math.random'));
+    vi.spyOn(Date, 'now').mockImplementation(refuse('Date.now'));
+    vi.spyOn(performance, 'now').mockImplementation(refuse('performance.now'));
+    vi.spyOn(process, 'hrtime').mockImplementation(refuse('process.hrtime') as never);
+    for (const def of CATALOG) {
+      expect(() => encodeContainer(small(def), bakeMaps(small(def)), '0'.repeat(64))).not.toThrow();
+    }
+  });
+
+  it('changes the digest, and only the header, when only the version changes', () => {
+    const def = small(CATALOG[0]!);
+    const maps = bakeMaps(def);
+    const first = encodeContainer(def, maps, 'a'.repeat(64));
+    const second = encodeContainer({ ...def, version: def.version + 1 }, maps, 'a'.repeat(64));
+    expect(sha256Hex(first)).not.toBe(sha256Hex(second));
+    // The texels are untouched: the maps are the same bytes at the end of both files.
+    const tail = maps.baseColor.length + maps.normal.length + maps.orm.length + maps.relief.length;
+    expect(Buffer.from(first.subarray(-tail)).equals(Buffer.from(second.subarray(-tail)))).toBe(true);
+  });
+});
+
+describe('a different seed is a different surface', () => {
+  it('holds for every set', async () => {
+    const { brick } = await import('../src/surfaces/brick.js');
+    const { ashlar } = await import('../src/surfaces/ashlar.js');
+    const { render } = await import('../src/surfaces/render.js');
+    const { concrete } = await import('../src/surfaces/concrete.js');
+    const { metal } = await import('../src/surfaces/metal.js');
+    const { asphalt } = await import('../src/surfaces/asphalt.js');
+    const { paving } = await import('../src/surfaces/paving.js');
+    const { kerb } = await import('../src/surfaces/kerb.js');
+    for (const make of [brick, ashlar, render, concrete, metal, asphalt, paving, kerb]) {
+      const a = make(1, 1);
+      const b = make(2, 1);
+      const size = { width: 64, height: a.height / 16 };
+      expect(
+        Buffer.from(bakeMaps(a, size).baseColor).equals(Buffer.from(bakeMaps(b, size).baseColor)),
+        a.setId,
+      ).toBe(false);
+    }
+  });
+});
+
+describe('changing the resolution does not reshuffle the surface', () => {
+  // Texel k of a 64-texel row and texel 3k + 1 of a 192-texel row sample the same point of the
+  // tile exactly (see `src/tile.ts`), so every recipe field must agree there to the last unit.
+  for (const def of CATALOG) {
+    it(`${def.setId} samples the same values at shared points`, () => {
+      const coarseWidth = def.width / 16;
+      const coarseHeight = def.height / 16;
+      const coarse = sampleFields(def, { width: coarseWidth, height: coarseHeight });
+      const fine = sampleFields(def, { width: coarseWidth * 3, height: coarseHeight * 3 });
+      const disagreements: string[] = [];
+      for (const name of FIELD_NAMES) {
+        for (let j = 0; j < coarseHeight; j += 1) {
+          for (let i = 0; i < coarseWidth; i += 1) {
+            const a = coarse[name][j * coarseWidth + i];
+            const b = fine[name][(3 * j + 1) * coarseWidth * 3 + 3 * i + 1];
+            if (a !== b) disagreements.push(`${name} at (${i}, ${j}): ${a} vs ${b}`);
+          }
+        }
+      }
+      expect(disagreements.slice(0, 5)).toEqual([]);
+    });
+  }
+});
