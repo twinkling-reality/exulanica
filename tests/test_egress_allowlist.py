@@ -437,3 +437,55 @@ def test_nothing_in_the_package_hands_the_transport_its_own_client():
         if re.search(r"HttpxTransport\(\s*client\s*=", path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+# -- the deployment sees it -----------------------------------------------------------------
+
+
+def _deployment_environ(tmp_path, **extra: str) -> dict[str, str]:
+    return {
+        "EXULANICA_DATABASE_URL": "postgresql://localhost:5433/never-connected-to",
+        "EXULANICA_DATA_DIR": str(tmp_path),
+        "EXULANICA_DERIVATIVE_WORKER": "off",
+        "EXULANICA_API_TOKENS": json.dumps(
+            {
+                "a-token-long-enough-to-be-accepted-here": {
+                    "workspace_id": "00000000-0000-0000-0000-000000000001",
+                    "actor": "00000000-0000-0000-0000-000000000002",
+                    "permissions": ["library.read"],
+                }
+            }
+        ),
+        **extra,
+    }
+
+
+def test_readiness_reports_whether_the_allowlist_is_set_and_never_its_value():
+    """Fails if the name is dropped from ``describe_configuration`` in exulanica/api/services.py,
+    which would hide the one control the threat model claimed long before it existed."""
+    from exulanica.api.services import describe_configuration
+
+    assert describe_configuration({})[EGRESS_ALLOWLIST_ENV] == "missing"
+    reported = describe_configuration({EGRESS_ALLOWLIST_ENV: json.dumps([LISTED])})
+    assert reported[EGRESS_ALLOWLIST_ENV] == "set"
+    assert LISTED not in json.dumps(reported)
+
+
+def test_a_deployment_with_a_model_key_and_no_allowlist_does_not_start(tmp_path, sockets):
+    from exulanica.api.services import build_services
+
+    environ = _deployment_environ(tmp_path, NEBIUS_API_KEY="test-key-not-real")
+    with pytest.MonkeyPatch.context() as patch:
+        for name, value in environ.items():
+            patch.setenv(name, value)
+        patch.delenv(EGRESS_ALLOWLIST_ENV, raising=False)
+        with pytest.raises(EgressConfigurationError, match="no default"):
+            build_services(environ)
+        endpoint = load_manifest().base_url.split("/", 3)
+        patch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps(["https://elsewhere.example"]))
+        with pytest.raises(EgressConfigurationError, match="not declared"):
+            build_services(environ)
+        patch.setenv(EGRESS_ALLOWLIST_ENV, json.dumps([f"{endpoint[0]}//{endpoint[2]}"]))
+        services = build_services(environ)
+    assert services.model_client is not None
+    assert sockets == []
