@@ -30,6 +30,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
+from exulanica.materials.workspace import WORKSPACE_LICENCE_ID
 from exulanica.world_package.authored import (
     EXTENSION_KEY,
     EXTENSION_NAME,
@@ -78,6 +79,7 @@ _FORBIDDEN_SUFFIXES: Final = frozenset(
         ".jpeg",
         ".jpg",
         ".js",
+        ".ltex",
         ".mov",
         ".mp3",
         ".mp4",
@@ -350,6 +352,10 @@ def scan_payload(path: str, value: Any) -> None:
             for index, child in enumerate(node):
                 walk(child, f"{pointer}/{index}")
         elif isinstance(node, str):
+            if node == WORKSPACE_LICENCE_ID:
+                raise ProhibitedContentError(
+                    f"{path}{pointer}: bytes under {WORKSPACE_LICENCE_ID} stay in their workspace"
+                )
             lowered = node.lower()
             if _PRIVATE_KEY_MARKER.lower() in lowered:
                 raise ProhibitedContentError(f"{path}{pointer}: private signing material")

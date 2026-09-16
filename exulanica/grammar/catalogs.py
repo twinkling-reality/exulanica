@@ -38,6 +38,7 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.grammar.documents import read_json, split_versioned_name
 from exulanica.grammar.errors import CatalogError, UnresolvedReferenceError
 from exulanica.grammar.records import KEY_PATTERN
+from exulanica.materials.workspace import PrivateLicenceRefused, refuse_private_licence
 
 __all__ = [
     "LICENCE_ORIGINS",
@@ -165,6 +166,10 @@ class Licence:
         )
         if _SPDX.fullmatch(licence.spdx) is None:
             raise CatalogError(f"{where}.spdx is an SPDX identifier, got {licence.spdx!r}")
+        try:
+            refuse_private_licence(licence.spdx, f"{where}.spdx")
+        except PrivateLicenceRefused as error:
+            raise CatalogError(str(error)) from error
         if licence.verdict not in LICENCE_VERDICTS:
             raise CatalogError(f"{where}.verdict {licence.verdict!r} may not ship")
         if licence.origin not in LICENCE_ORIGINS:
