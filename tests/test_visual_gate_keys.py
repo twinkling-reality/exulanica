@@ -5,9 +5,11 @@ exclude file and exist only where they were produced. Every assertion that reads
 file is present and skips, naming the file, when it is not, so a checkout without them says what
 it could not check instead of passing it silently.
 
-Two reconciliation records are retained. Version 1 fixed the keys and the first rubric; version 2
-superseded it before anything was scored, changing only the judged key. The latest is checked
-against this module, and version 1 against the wording :data:`RUBRIC_V1` keeps for it.
+Three reconciliation records are retained. Version 1 fixed the keys and the first rubric; version 2
+superseded it before anything was scored, changing only the judged key; version 3 changed the
+question and one definition's wording, and carries version 2's answers as calibration evidence.
+The latest is checked against this module, and the earlier two against the wording
+:data:`RUBRIC_V1` and :data:`VERSION_2` keep for them.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from exulanica.canonical import canonical_json
 from exulanica.evaluation import gate_keys
 from exulanica.evaluation.gate_keys import (
     ANSWER_OPTIONS,
+    ANSWER_REQUIREMENT,
     CANONICAL_KEYS,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
@@ -29,6 +32,7 @@ from exulanica.evaluation.gate_keys import (
     MELBOURNE_ENVELOPE,
     NOT_ASKED,
     PICTURE_TITLES,
+    REASON_FOLLOW_UP,
     RETAINED_RECORDS,
     RUBRIC_GUIDANCE,
     RUBRIC_PATH,
@@ -36,14 +40,19 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_V1,
     RUBRIC_VERSION,
     THRESHOLDS,
+    VERSION_2,
+    WORDS_STORAGE,
     UnknownGateKey,
     resolve,
 )
 
 _ROOT = Path(__file__).resolve().parents[1]
-_SUPERSEDED = "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json"
-_LATEST = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
-_RECONCILIATIONS = (_SUPERSEDED, _LATEST)
+_FIRST = "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json"
+_SECOND = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
+_LATEST = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json"
+_RECONCILIATIONS = (_FIRST, _SECOND, _LATEST)
+#: Each record and the reconciliation record it superseded.
+_PREVIOUS = {_SECOND: _FIRST, _LATEST: _SECOND}
 
 #: The drift the operator's plan proposed, restated here so the module is checked against it
 #: rather than against itself.
@@ -186,8 +195,8 @@ def test_each_reconciliation_record_reproduces_its_digest_and_binds_the_three_re
     assert document["record_sha256"] == hashlib.sha256(canonical_json(record)).hexdigest()
     bindings = {item["path"]: item["record_sha256"] for item in record["predecessor_records"]}
     expected = {record.path: record.record_sha256 for record in RETAINED_RECORDS}
-    if path == _LATEST:
-        expected[_SUPERSEDED] = _reconciliation(_SUPERSEDED)["record_sha256"]
+    if path in _PREVIOUS:
+        expected[_PREVIOUS[path]] = _reconciliation(_PREVIOUS[path])["record_sha256"]
     assert bindings == expected
     assert record["mappingChecks"] == {
         "retainedSpellings": 17,
@@ -219,7 +228,11 @@ def test_the_latest_reconciliation_record_states_the_module_it_was_written_from(
     assert judged["rubricVersion"] == RUBRIC_VERSION
     assert judged["question"] == RUBRIC_QUESTION
     assert judged["guidance"] == RUBRIC_GUIDANCE
+    assert judged["requirement"] == ANSWER_REQUIREMENT
+    assert judged["reasonFollowUp"] == REASON_FOLLOW_UP
     assert judged["options"] == list(ANSWER_OPTIONS)
+    assert judged["wordsStorage"] == WORDS_STORAGE
+    assert record["rubricVersion"] == RUBRIC_VERSION
     assert judged["notAsked"] == NOT_ASKED
     assert {item["label"]: item["title"] for item in judged["pictures"]} == dict(PICTURE_TITLES)
     assert "questions" not in judged
@@ -238,24 +251,96 @@ def test_the_latest_reconciliation_fixes_the_rubric_on_disk_and_retains_a_copy()
     assert f"Named human judge: {judge}\n".encode() in rubric
 
 
-def test_the_revision_came_before_anything_was_scored_and_changed_only_the_judged_key():
-    record = _reconciliation()["record"]
+def test_version_2_came_before_anything_was_scored_and_changed_only_the_judged_key():
+    record = _reconciliation(_SECOND)["record"]
     assert record["scoredBeforeRevision"]["corridors"] == []
     assert record["scoredBeforeRevision"]["againstVersion1"] == []
     supersedes = record["supersedes"]
-    assert supersedes["path"] == _SUPERSEDED
-    assert supersedes["record_sha256"] == _reconciliation(_SUPERSEDED)["record_sha256"]
+    assert supersedes["path"] == _FIRST
+    assert supersedes["record_sha256"] == _reconciliation(_FIRST)["record_sha256"]
     assert supersedes["changedKeys"] == [JUDGED_KEY]
-    assert supersedes["unchangedKeys"] == [
-        spelling for spelling in CANONICAL_SPELLINGS if spelling != JUDGED_KEY
-    ]
-    assert supersedes["keySet"] == RUBRIC_V1.key_set != GATE_KEY_SET_VERSION
-    assert record["mapping"] == _reconciliation(_SUPERSEDED)["record"]["mapping"]
+    assert supersedes["keySet"] == RUBRIC_V1.key_set
+    assert record["mapping"] == _reconciliation(_FIRST)["record"]["mapping"]
+
+
+def test_the_version_2_record_still_states_version_2():
+    """Version 2 is retained as written; version 3 changed its question and one definition."""
+    record = _reconciliation(_SECOND)["record"]
+    assert record["keySet"] == VERSION_2.key_set
+    judged = record["judgedKey"]
+    assert judged["rubricVersion"] == VERSION_2.rubric_version
+    assert judged["rubricSha256"] == VERSION_2.rubric_sha256
+    assert (judged["question"], judged["guidance"]) == (VERSION_2.question, VERSION_2.guidance)
+    assert judged["composition"] == VERSION_2.composition
+    for entry, item in zip(record["canonicalKeys"], CANONICAL_KEYS, strict=True):
+        assert entry["definition"] == VERSION_2.definitions.get(item.spelling, item.definition)
+        if item.evidence_kind == "mechanical":
+            assert entry["decidedBy"] == list(item.decided_by)
+            assert entry["measurement"] == item.measurement
+
+
+def test_version_3_came_before_anything_was_scored_and_moved_no_measurement():
+    record = _reconciliation()["record"]
+    assert record["scoredBeforeRevision"]["corridors"] == []
+    assert record["scoredBeforeRevision"]["againstEarlierKeySets"] == []
+    supersedes = record["supersedes"]
+    assert supersedes["path"] == _SECOND
+    assert supersedes["record_sha256"] == _reconciliation(_SECOND)["record_sha256"]
+    assert supersedes["keySet"] == VERSION_2.key_set != GATE_KEY_SET_VERSION
+    assert supersedes["rubricSha256"] == VERSION_2.rubric_sha256
+    assert supersedes["rubricSha256"] != record["judgedKey"]["rubricSha256"]
+    assert supersedes["measurementsUnchanged"] is True
+    assert supersedes["keyValuesChanged"] == []
+    changes = supersedes["changes"]
+    assert changes["question"] == {"before": VERSION_2.question, "after": RUBRIC_QUESTION}
+    assert changes["guidance"] == {"before": VERSION_2.guidance, "after": RUBRIC_GUIDANCE}
+    assert set(changes["definitions"]) == {"authenticatedShellAndAuthoredHandlersPreserved"}
+    assert (
+        "pointer"
+        in changes["definitions"]["authenticatedShellAndAuthoredHandlersPreserved"]["after"]
+    )
+    assert record["mapping"] == _reconciliation(_SECOND)["record"]["mapping"]
+
+
+def test_version_3_carries_the_version_2_answers_as_calibration_evidence():
+    record = _reconciliation()["record"]
+    evidence = record["calibrationEvidence"]
+    assert evidence["underRubricVersion"] == 2
+    assert evidence["rubricSha256"] == VERSION_2.rubric_sha256
+    assert evidence["judge"] == record["judgedKey"]["judge"]
+    assert [capture["label"] for capture in record["captures"]] == list(CAPTURE_LABELS)
+    bound = {capture["label"]: capture["sha256"] for capture in record["captures"]}
+    for picture in evidence["pictures"]:
+        assert picture["captureSha256"] == bound[picture["label"]]
+        replies = picture["replies"]
+        assert [reply["counted"] for reply in replies] == [False] * (len(replies) - 1) + [True]
+        assert replies[-1]["answer"] == "yes"
+        for reply in replies:
+            assert reply["prompt"] == VERSION_2.prompt(picture["label"])
+            assert reply["typedBy"] == evidence["judge"]
+            assert reply["rubricVersion"] == 2 and reply["givenAt"].startswith("2026-09-16T")
+            assert "verbatim" not in reply and "words" not in reply
+            assert reply["words_private"] is (reply["words_sha256"] is not None)
+    first, second = evidence["pictures"][0]["replies"]
+    assert first["counted"] is False and first["picked"] is None and first["words_private"]
+    assert first["addedAboveTheQuestion"] is None
+    assert second["addedAboveTheQuestion"]["words_private"] is True
+    assert evidence["summary"] == {
+        "yesAnswers": 3,
+        "noAnswers": 0,
+        "uncountedReplies": 1,
+        "answersWithoutWords": ["Picture 1 of 3", "Picture 3 of 3"],
+    }
+    assert "quotedFragments" not in evidence
+    assert "private companion" in evidence["wordsKept"]
+    assert "did not separate" in evidence["finding"]
+    assert "not a key value" in evidence["status"]
+    assert record["judgeWords"]["path"] == ".exulanica/judge-words/" + Path(_LATEST).name
 
 
 def test_the_superseded_record_still_states_version_1():
     """Version 1 is retained as written. Only the judged key's wording differs from the module."""
-    record = _reconciliation(_SUPERSEDED)["record"]
+    record = _reconciliation(_FIRST)["record"]
     assert record["keySet"] == RUBRIC_V1.key_set
     judged = record["judgedKey"]
     assert [(q["id"], q["text"]) for q in judged["questions"]] == list(RUBRIC_V1.questions)
@@ -264,6 +349,9 @@ def test_the_superseded_record_still_states_version_1():
         assert entry["key"] == item.spelling
         if item.spelling == JUDGED_KEY:
             assert entry["definition"] == RUBRIC_V1.judged_definition != item.definition
+        elif item.spelling in VERSION_2.definitions:
+            assert entry["definition"] == VERSION_2.definitions[item.spelling] != item.definition
+            assert entry["decidedBy"] == list(item.decided_by)
         else:
             assert entry["definition"] == item.definition
             assert entry["decidedBy"] == list(item.decided_by)

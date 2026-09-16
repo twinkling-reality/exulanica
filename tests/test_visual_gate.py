@@ -2,7 +2,7 @@
 
 A gate that cannot be made to fail in a test is not a gate. Every refusal below is a way a record
 could otherwise have been written with less evidence than its keys claim. The judged key follows
-rubric version 2: one question per picture, in route order, and the first no decides. The judge's
+rubric version 3: one question per picture, in route order, and the first no decides. The judge's
 words never enter a public record, which carries their SHA-256 and byte count; a private companion
 holds them.
 """
@@ -22,6 +22,7 @@ from exulanica.canonical import canonical_json
 from exulanica.errors import CanonicalisationError
 from exulanica.evaluation.gate_keys import (
     ANSWER_OPTIONS,
+    ANSWER_REQUIREMENT,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
     GATE_KEY_SET_VERSION,
@@ -33,15 +34,18 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_V1,
     RUBRIC_VERSION,
     THRESHOLDS,
+    VERSION_2,
     WORDS_STORAGE,
     UnknownGateKey,
     judge_prompt,
+    reason_follow_up,
 )
 from exulanica.evaluation.visual_gate import (
     JUDGE_WORDS_PROFILE,
     GateEvidenceError,
     JudgedAnswers,
     PictureAnswer,
+    ReasonFollowUp,
     beats_baseline,
     build_gate,
     decide_judged,
@@ -52,6 +56,7 @@ from exulanica.evaluation.visual_gate import (
     recompose_judged,
     refuse_private_words,
     visual_gate_record,
+    words_fingerprint,
     words_from_companion,
 )
 
@@ -483,6 +488,7 @@ def test_the_judges_words_are_fingerprinted_exactly_as_typed_and_kept_out_of_the
         len(data),
         True,
     )
+    assert entry["reason"] == words_fingerprint(words)
     assert (entry["typedBy"], entry["givenAt"], entry["rubricVersion"]) == (
         _JUDGE,
         _GIVEN_AT,
@@ -515,6 +521,14 @@ def test_a_reply_that_does_not_say_when_it_was_given_is_refused():
         )
         with pytest.raises(GateEvidenceError, match="given"):
             _decide(answers)
+    late = dataclasses.replace(
+        _without_words("start", "No"),
+        follow_up=ReasonFollowUp(
+            shown=reason_follow_up("No"), words="Flat blocks.", typed_by=_JUDGE, given_at=None
+        ),
+    )
+    with pytest.raises(GateEvidenceError, match="given"):
+        _decide(_answers(late, _unasked("midpoint"), _unasked("endpoint")))
     stray = dataclasses.replace(_unasked("midpoint"), given_at=_GIVEN_AT)
     with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
         _decide(_answers(_asked("start", "No", "Blocks."), stray, _unasked("endpoint")))
@@ -536,8 +550,170 @@ def test_a_public_record_never_carries_the_judges_words():
     # The question the judge was shown and the answer words are not the judge's own words.
     _record(evidence, reason=f'Asked "{RUBRIC_QUESTION}", the judge picked "No".')
     refuse_private_words(["A single run of three: coloured blocks name"], [words])
+    line = "Your reply began 'Plain'. Your own words are kept."
+    refuse_private_words(["The judge's own words are kept as typed."], [words], lines=[line])
     with pytest.raises(GateEvidenceError, match="judge's words"):
-        refuse_private_words({"key": ["a", {"deep": "blocks I cannot name"}]}, [words])
+        refuse_private_words([f"Shown: {line}"], [words], lines=[line])
+    with pytest.raises(GateEvidenceError, match="quotes the judge's words"):
+        refuse_private_words(["The reply began 'Plain'."], [words], lines=[line])
+    with pytest.raises(GateEvidenceError, match="judge's words"):
+        refuse_private_words({"key": ["a", {"deep": "coloured blocks I cannot name"}]}, [words])
+    refuse_private_words(["blocks I cannot name; only four words run on"], [words])
+    follow = _without_words("start", "No", "Every wall is one flat grey.")
+    with pytest.raises(GateEvidenceError, match="judge's words"):
+        _record(
+            {
+                **_passing_measurements(),
+                "readsAsInhabitedStreet": _answers(
+                    follow, _unasked("midpoint"), _unasked("endpoint")
+                ),
+            },
+            reason="The follow-up said every wall is one flat grey.",
+        )
+
+
+def _without_words(
+    label: str, picked: str = "Yes", reply: str | None = "Brick fronts, a bakery."
+) -> PictureAnswer:
+    """An answer picked with no words, followed once for its reason unless ``reply`` is None."""
+    follow = None
+    if reply is not None:
+        follow = ReasonFollowUp(
+            shown=reason_follow_up(picked), words=reply, typed_by=_JUDGE, given_at=_GIVEN_AT
+        )
+    return PictureAnswer(
+        label=label,
+        capture_sha256=_CAPTURES[label],
+        asked=True,
+        picked=picked,
+        words=None,
+        typed_by=_JUDGE,
+        follow_up=follow,
+        given_at=_GIVEN_AT,
+    )
+
+
+def test_an_answer_without_words_takes_its_reason_from_one_follow_up():
+    value, detail = _decide(
+        _answers(_without_words("start"), _asked("midpoint"), _asked("endpoint"))
+    )
+    assert value is True
+    entry = detail["pictures"][0]
+    assert (entry["picked"], entry["answer"], entry["words_sha256"]) == ("Yes", "yes", None)
+    assert entry["reason"] == words_fingerprint("Brick fronts, a bakery.")
+    assert entry["reasonFrom"] == "follow-up"
+    assert entry["followUp"] == {
+        "asked": "You answered Yes. In a few words, why?",
+        **words_fingerprint("Brick fronts, a bakery."),
+        "typedBy": _JUDGE,
+        "givenAt": _GIVEN_AT,
+    }
+    assert detail["pictures"][1]["reasonFrom"] == "reply"
+    assert detail["requirement"] == ANSWER_REQUIREMENT
+    answers = _answers(_without_words("start"), _asked("midpoint"), _asked("endpoint"))
+    _, companion = judge_words_file(_RECORD_PATH, answers)
+    replies = json.loads(companion)["replies"]
+    assert [(reply["kind"], reply["words"]) for reply in replies[:2]] == [
+        ("reply", None),
+        ("follow-up", "Brick fronts, a bakery."),
+    ]
+    assert replies[1]["shown"] == "You answered Yes. In a few words, why?"
+
+
+def test_a_follow_up_never_changes_the_answer():
+    value, detail = _decide(
+        _answers(
+            _without_words("start", "No", "yes the colours are fine but it is a block model"),
+            _unasked("midpoint"),
+            _unasked("endpoint"),
+        )
+    )
+    assert value is False
+    assert detail["pictures"][0]["answer"] == "no"
+    assert detail["decisiveNo"] == "start"
+
+
+def _followed(
+    picked: str | None, words: str | None, shown: str, reply: str | None, typed_by: str = _JUDGE
+) -> PictureAnswer:
+    return PictureAnswer(
+        label="start",
+        capture_sha256=_CAPTURES["start"],
+        asked=True,
+        picked=picked,
+        words=words,
+        typed_by=_JUDGE,
+        follow_up=ReasonFollowUp(shown=shown, words=reply, typed_by=typed_by, given_at=_GIVEN_AT),
+        given_at=_GIVEN_AT,
+    )
+
+
+@pytest.mark.parametrize(
+    ("picture", "match"),
+    [
+        (
+            _followed("Yes", "Real brick, a corner cafe.", reason_follow_up("Yes"), "Because."),
+            "already gave",
+        ),
+        (_followed("No", None, reason_follow_up("Yes"), "Flat blocks."), "rubric's words"),
+        (
+            _followed("Yes", None, "Why did you say yes? Was it the shops?", "Shops."),
+            "rubric's words",
+        ),
+        (
+            _followed("Yes", None, reason_follow_up("Yes"), "Shops.", typed_by="Claude"),
+            "not typed by the judge",
+        ),
+        (
+            _followed("Yes", None, reason_follow_up("Yes"), None),
+            "no reason in the judge's own words",
+        ),
+        (
+            _followed("Yes", None, reason_follow_up("Yes"), "   "),
+            "no reason in the judge's own words",
+        ),
+        (
+            _followed("Yes", None, reason_follow_up("Yes"), "[No preference]"),
+            "no reason in the judge's own words",
+        ),
+        (
+            _followed("Yes", None, reason_follow_up("Yes"), "yes"),
+            "no reason in the judge's own words",
+        ),
+        (
+            _followed("Yes", "yes", reason_follow_up("Yes"), "No."),
+            "no reason in the judge's own words",
+        ),
+    ],
+)
+def test_a_follow_up_that_is_not_allowed_or_gives_no_reason_is_refused(picture, match):
+    answers = _answers(picture, _asked("midpoint"), _asked("endpoint"))
+    with pytest.raises(GateEvidenceError, match=re.escape(match)):
+        _decide(answers)
+    with pytest.raises(GateEvidenceError, match=re.escape(match)):
+        _record(_evidence(readsAsInhabitedStreet=answers))
+
+
+def test_an_answer_with_no_words_and_no_follow_up_is_refused():
+    answers = _answers(_without_words("start", reply=None), _asked("midpoint"), _asked("endpoint"))
+    with pytest.raises(GateEvidenceError, match="no reason in the judge's own words"):
+        _decide(answers)
+
+
+def test_an_unasked_picture_cannot_carry_a_follow_up():
+    carrying = dataclasses.replace(
+        _unasked("midpoint"),
+        follow_up=ReasonFollowUp(shown=reason_follow_up("No"), words="Flat.", typed_by=_JUDGE),
+    )
+    with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
+        _decide(_answers(_asked("start", "No", "Blocks."), carrying, _unasked("endpoint")))
+
+
+def test_a_skipped_question_is_not_an_answer():
+    for words in (None, "", "  "):
+        answers = _answers(_asked("start", None, words), _unasked("midpoint"), _unasked("endpoint"))
+        with pytest.raises(GateEvidenceError, match="skipped"):
+            _decide(answers)
 
 
 def test_a_rubric_digest_mismatch_is_refused():
@@ -590,7 +766,9 @@ def test_answers_out_of_route_order_or_malformed_are_refused():
 
 
 def test_a_retained_record_is_decided_again_from_its_private_companion():
-    answers = _no_at_start()
+    answers = _answers(
+        _without_words("start", "No", "Flat blocks."), _unasked("midpoint"), _unasked("endpoint")
+    )
     record = _record({**_passing_measurements(), "readsAsInhabitedStreet": answers})
     judged = record["record"]["gate"]["keys"]["readsAsInhabitedStreet"]
     _, companion = judge_words_file(_RECORD_PATH, answers)
@@ -604,7 +782,7 @@ def test_a_retained_record_is_decided_again_from_its_private_companion():
     with pytest.raises(GateEvidenceError, match="not the private companion"):
         words_from_companion(json.loads(companion), "docs/evaluation/another-record.json")
     forged = json.loads(companion)
-    forged["replies"][0]["words"] = "Something else entirely."
+    forged["replies"][1]["words"] = "Something else entirely."
     with pytest.raises(GateEvidenceError, match="does not match its own digest"):
         words_from_companion(forged, _RECORD_PATH)
     tampered = copy.deepcopy(judged)
@@ -624,7 +802,7 @@ def test_a_retained_record_is_decided_again_from_its_private_companion():
     with pytest.raises(GateEvidenceError, match="does not follow"):
         recompose_judged(tampered)
     tampered = copy.deepcopy(judged)
-    tampered["pictures"][0]["words_private"] = False
+    tampered["pictures"][0]["reason"]["words_private"] = False
     with pytest.raises(GateEvidenceError, match="no fingerprint"):
         recompose_judged(tampered)
     del tampered["judge"]
@@ -723,9 +901,12 @@ def test_the_rubric_names_a_judge_and_fixes_the_one_question():
     assert RUBRIC_QUESTION in text
     assert RUBRIC_GUIDANCE in text
     assert WORDS_STORAGE in text
+    assert ANSWER_REQUIREMENT in text
     assert f"`{NOT_ASKED}`" in text
     for _, question in RUBRIC_V1.questions:
         assert question not in text, "the rubric still asks a version 1 question"
+    assert VERSION_2.question not in text, "the rubric still asks the version 2 question"
+    assert RUBRIC_GUIDANCE.index("real materials") < RUBRIC_GUIDANCE.index("ground-floor")
     assert "No model may score `readsAsInhabitedStreet`" in text
     for label, title in PICTURE_TITLES.items():
         assert f"| `{label}` | {title} |" in text
@@ -746,12 +927,22 @@ def test_the_judge_reads_exactly_the_rubrics_words_for_each_picture():
     text = _RUBRIC.read_text(encoding="utf-8")
     for index, label in enumerate(CAPTURE_LABELS, start=1):
         prompt = judge_prompt(label)
-        title, question, guidance = prompt.split("\n\n")
+        title, question, guidance, requirement = prompt.split("\n\n")
         assert title == f"Picture {index} of 3"
         assert (question, guidance) == (RUBRIC_QUESTION, RUBRIC_GUIDANCE)
-        assert question in text and guidance in text
+        assert requirement == ANSWER_REQUIREMENT
+        assert question in text and guidance in text and requirement in text
+    for option in ANSWER_OPTIONS:
+        assert reason_follow_up(option) == f"You answered {option}. In a few words, why?"
+        assert reason_follow_up(option) in text
+    with pytest.raises(ValueError, match="not an option"):
+        reason_follow_up("Maybe")
     with pytest.raises(ValueError, match="not a route capture"):
         judge_prompt("overview")
+
+
+_V3_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json"
+_V3_ARTIFACTS = "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v3"
 
 
 def _writer(monkeypatch, root: Path):
@@ -763,40 +954,33 @@ def _writer(monkeypatch, root: Path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     root = root.resolve()
-    reconciliation = root / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
     monkeypatch.setattr(module, "ROOT", root)
-    monkeypatch.setattr(module, "RECONCILIATION", reconciliation)
-    monkeypatch.setattr(
-        module,
-        "RUBRIC_COPY",
-        root
-        / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v2"
-        / "visual-gate-rubric.md",
-    )
+    monkeypatch.setattr(module, "RECONCILIATION", root / _V3_RECORD)
+    monkeypatch.setattr(module, "RUBRIC_COPY", root / _V3_ARTIFACTS / "visual-gate-rubric.md")
     return module
 
 
-def _scratch_root(tmp_path: Path, rubric: bytes) -> Path:
+def _scratch_root(tmp_path: Path, rubric: bytes, measurements_unchanged: bool = True) -> Path:
     root = tmp_path / "root"
-    (root / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v2").mkdir(
-        parents=True
-    )
+    (root / _V3_ARTIFACTS).mkdir(parents=True)
     (root / "docs/visual-gate-rubric.md").write_bytes(rubric)
-    (
-        root
-        / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v2"
-        / "visual-gate-rubric.md"
-    ).write_bytes(rubric)
-    fixed = {"record": {"judgedKey": {"rubricSha256": hashlib.sha256(rubric).hexdigest()}}}
-    (root / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json").write_text(
-        json.dumps(fixed), encoding="utf-8"
-    )
+    (root / _V3_ARTIFACTS / "visual-gate-rubric.md").write_bytes(rubric)
+    fixed = {
+        "record": {
+            "judgedKey": {"rubricSha256": hashlib.sha256(rubric).hexdigest()},
+            "supersedes": {
+                "keySet": VERSION_2.key_set,
+                "measurementsUnchanged": measurements_unchanged,
+            },
+        }
+    }
+    (root / _V3_RECORD).write_text(json.dumps(fixed), encoding="utf-8")
     return root
 
 
 def _judgement_file(path: Path, rubric: bytes, **changes) -> Path:
     judgement = {
-        "profile": "exulanica.visual-gate-judgement/v2",
+        "profile": "exulanica.visual-gate-judgement/v3",
         "judge": "Glendon",
         "judgedOn": "2026-09-16",
         "rubric": "docs/visual-gate-rubric.md",
@@ -871,6 +1055,54 @@ def test_the_writer_refuses_a_judgement_not_asked_in_the_rubrics_words(monkeypat
         _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
 
 
+def test_the_writer_accepts_a_superseded_key_set_only_when_its_measurements_are_unchanged(
+    monkeypatch, tmp_path
+):
+    rubric = _RUBRIC.read_bytes()
+    writer = _writer(monkeypatch, _scratch_root(tmp_path / "same", rubric))
+    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION, VERSION_2.key_set}
+    writer = _writer(monkeypatch, _scratch_root(tmp_path / "moved", rubric, False))
+    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION}
+    run = tmp_path / "run.json"
+    run.write_text(
+        json.dumps({"profile": "exulanica.visual-gate-run/v1", "keySet": VERSION_2.key_set}),
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="does not share"):
+        writer._load_run(run)
+
+
+def test_the_writer_reads_a_follow_up_exactly_as_it_was_asked(monkeypatch, tmp_path):
+    rubric = _RUBRIC.read_bytes()
+    writer = _writer(monkeypatch, _scratch_root(tmp_path, rubric))
+    pictures = json.loads(_judgement_file(tmp_path / "base.json", rubric).read_text())["pictures"]
+    pictures[0].update(
+        {
+            "picked": "No",
+            "words": None,
+            "followUp": {
+                "shown": reason_follow_up("No"),
+                "words": "Flat colour everywhere.",
+                "typedBy": "Glendon",
+                "givenAt": "2026-09-16T12:01:00Z",
+            },
+        }
+    )
+    answers, asked_as = writer._judgement(
+        _judgement_file(tmp_path / "follow.json", rubric, pictures=pictures), rubric
+    )
+    assert asked_as["followUps"] == {"start": reason_follow_up("No")}
+    value, detail = _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+    assert value is False
+    assert detail["pictures"][0]["reason"] == words_fingerprint("Flat colour everywhere.")
+    pictures[0]["followUp"]["shown"] = "You said no. Why not?"
+    answers, _ = writer._judgement(
+        _judgement_file(tmp_path / "reworded.json", rubric, pictures=pictures), rubric
+    )
+    with pytest.raises(GateEvidenceError, match="rubric's words"):
+        _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+
+
 def test_the_writer_keeps_the_judges_words_in_the_private_companion(monkeypatch, tmp_path):
     rubric = _RUBRIC.read_bytes()
     root = _scratch_root(tmp_path, rubric)
@@ -879,9 +1111,11 @@ def test_the_writer_keeps_the_judges_words_in_the_private_companion(monkeypatch,
     path, companion = judge_words_file(_RECORD_PATH, answers)
     writer._write_private(path, companion, replace=False)
     assert (root / path).read_bytes() == companion
+    assert (root / path).stat().st_mode & 0o077 == 0
     writer._write_private(path, companion, replace=False)
     with pytest.raises(SystemExit, match="other words"):
         writer._write_private(path, companion + b" ", replace=False)
+    assert writer._private_words(companion) == (["Blocks, not a street."], [])
     leak = root / "docs/evaluation/leak.json"
     with pytest.raises(SystemExit, match="judge's words"):
         writer._write(
@@ -918,10 +1152,16 @@ def test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names(
     binding = record["judgeWords"]
     assert binding["path"] == ".exulanica/judge-words/" + _BASELINE.name
     assert binding["tracked"] is False
+    assert judged["requirement"] == ANSWER_REQUIREMENT
     for entry in judged["pictures"]:
         if entry["state"] == "answered":
             assert record["judgement"]["prompts"][entry["label"]] == judge_prompt(entry["label"])
-            assert entry["words_private"] is True and entry["words_bytes"] > 0
+            assert entry["reason"] and entry["typedBy"] == judged["judge"]
+            if "followUp" in entry:
+                assert entry["words_sha256"] is None or entry["reasonFrom"] == "follow-up"
+                shown = record["judgement"]["followUps"][entry["label"]]
+                assert shown == entry["followUp"]["asked"]
+                assert shown == reason_follow_up(entry["picked"] or entry["answer"].capitalize())
     for spelling, detail in record["gate"]["keys"].items():
         if detail["evidenceKind"] == "mechanical":
             assert decide_mechanical(spelling, detail["decidedBy"]) is record["hardPass"][spelling]

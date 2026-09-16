@@ -1,22 +1,31 @@
 # Visual gate rubric: readsAsInhabitedStreet
 
-Status: version 2, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record, never an edit made after a corridor has been scored.
+Status: version 3, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record, never an edit made after a corridor has been scored.
 
-Rubric version: 2
+Rubric version: 3
 
-Version 2 was written on 2026-09-16, on branch `lane/gate` at main `63d97d2`. At that commit
+Version 3 was written on 2026-09-16, on branch `lane/gate` at main `63d97d2`. At that commit
 `exulanica.grammar` emits only the box proof's three integer extents, which are admitted to no
 projection, and every city stage (terrain, streets, parcels, massing, facade, material,
 streetlife, vitrine, premises, tile) is a record shape with a validator and no generator. No
 tessellator, no tile and no drawable generated geometry exists anywhere in the repository, and no
 corridor has been scored.
 
-Key set: `exulanica.visual-gate-keys/v2`, reconciled in
-`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json`, which supersedes
-`docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json`. Version 1 of this rubric, stated
-in that record, asked three questions of each picture, nine in all. Nine answers across three
-pictures proved too long to complete, and a gate whose judgement cannot be completed cannot run.
-Version 2 asks one question of each picture and stops at the first no.
+Key set: `exulanica.visual-gate-keys/v3`, reconciled in
+`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json`, which supersedes
+`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json` and, through it,
+`docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json`.
+
+Why the question changed. Version 1 asked three questions of each picture, nine in all, and a
+judgement that long could not be completed. Version 2 asked one question of each picture, whether
+it looked like a real street where people live, shop and work. Asked of the shipped Flatiron
+district, whose surfaces are flat colour, it got yes for all three pictures, so it did not separate
+a finished street from a block mock-up, and a corridor that is textured and uncut but still reads as
+a block-out would have cleared it. Version 3 asks that directly and lists real-looking materials
+first in its guidance. The version 2 answers are the calibration evidence for this change: the
+version 3 reconciliation record carries each pick, its reading and the SHA-256 of the judge's
+words, and its private companion keeps the words. No record was scored under version 1 or
+version 2.
 
 ## Judge
 
@@ -53,12 +62,16 @@ captures below are not shown between questions.
 
 The same question is asked of each picture, in these plain words, and is not paraphrased:
 
-> Does this look like a real street where people live, shop and work? Yes or no, and say why in your own words.
+> Does this look like a finished, lived-in street, not a plain block mock-up? Yes or no, and say why in your own words.
 
-Directly under the question the judge is shown what a yes means. It is guidance, not three more
+Directly under the question the judge is shown what a yes means. It is guidance, not four more
 questions, and nothing else is offered as explanation:
 
-> A yes means: you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m).
+> A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m).
+
+Every ask ends with this line, so that an answer arrives with its reason:
+
+> Pick Yes or No and type a few words why in the notes; the answer cannot be recorded without them.
 
 ## How it is asked
 
@@ -69,7 +82,17 @@ questions, and nothing else is offered as explanation:
 
     > The judge's own words are kept exactly as typed in a private companion record under .exulanica/judge-words/, which never enters the repository. The public record binds that companion by SHA-256 and carries, for each reply, the SHA-256 and byte count of its words in their place.
 
-*   No follow-up question is asked about what a word means. The guidance above is all the
+*   If an answer still arrives with no words, the picture is shown alone again and the judge is
+    asked once, and only once for that picture:
+
+    > You answered Yes. In a few words, why?
+
+    or, for a no:
+
+    > You answered No. In a few words, why?
+
+    That reply is the answer's reason. It never changes the answer.
+*   No other follow-up is asked, and none about what a word means. The guidance above is all the
     explanation there is.
 *   If the judge declines to answer, the judgement stops there. Nothing is recorded as an answer,
     the question is not asked again in the same session, and no record is written.
@@ -80,8 +103,9 @@ questions, and nothing else is offered as explanation:
 *   A reply the judge types in place of picking an option counts only when its first word is yes
     or no. Any other reply, and a skipped question, is not an answer. Nothing is inferred from it,
     by a model or by anyone else, and the judgement stops unscored.
-*   Every answer carries a reason in the judge's own words. Words that are only yes or no are an
-    answer without a reason, and a record is not written from them.
+*   Every answer carries a reason in the judge's own words: the words given with it, or the reply
+    to its one follow-up. Words that are only yes or no are not a reason, and a record is not
+    written from an answer without one.
 
 ## How the answers compose
 
@@ -96,7 +120,8 @@ questions, and nothing else is offered as explanation:
 
 A corridor passes only with **all three pictures answered yes by the named judge, plus every
 mechanical key**. Version 1 also required every one of its sub-answers to be yes for this key to
-hold, so the bar is at least as strict as it was.
+hold, and version 3's question asks for more than version 2's, so the bar is at least as strict as
+it has been.
 
 The Flatiron baseline is the calibration a corridor is read against. If the baseline itself ever
 held every key, the gate could not tell a corridor from the district it replaces: the rubric would
@@ -112,8 +137,9 @@ Every record that scores this key carries, and `visual_gate.py` refuses to write
 *   the SHA-256 of this rubric file as the judge answered against it, which must be the rubric
     the record is written with;
 *   for each picture in order, its label and the SHA-256 of the capture shown, and either the
-    answer with how it was given, when it was given, the SHA-256 and byte count of the judge's own
-    words and the name of the person who typed them, which must be the judge, or
+    answer with how it was given, when each reply was given, the SHA-256 and byte count of the
+    judge's own words, the follow-up when one was asked, the reason the answer is recorded with and
+    the name of the person who typed each reply, which must be the judge, or
     `not asked after a decisive no`;
 *   the path, byte size and SHA-256 of its private companion record, which holds the judge's
     words and is never committed;
@@ -122,8 +148,10 @@ Every record that scores this key carries, and `visual_gate.py` refuses to write
 The writer refuses a missing or placeholder judge, a missing reason in the judge's own words, a
 reply that does not say when it was given, a rubric digest mismatch, a capture not bound by
 digest, a picture answered about a capture other than the one bound, a yes key with any picture
-unasked, an answer given after a decisive no, any answer not typed by the judge, and a public
-record that would carry any of the judge's words or a quoted part of them.
+unasked, an answer given after a decisive no, a reply that begins with neither yes nor no, a
+follow-up for an answer that already gave its reason or one not asked in the words above, any
+answer or reply not typed by the judge, and a public record that would carry any of the judge's
+words or a quoted part of them.
 
 ## Calibration set
 

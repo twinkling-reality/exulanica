@@ -18,10 +18,17 @@ reconciliation record and no canonical value is asserted for any predecessor run
 threshold can enter a digest input as it stands. ``exulanica.canonical`` refuses floats there, and
 a record that restated a threshold as a float would not be writable at all.
 
-**Version 2 changed the judged key and nothing else.** The rubric now asks one plain question of
-each picture and stops at the first no, where version 1 asked three questions of each. The eight
-mechanical keys, the spellings and the thresholds are version 1's, and :data:`RUBRIC_V1` keeps
-version 1's wording so the retained version 1 record can still be checked against what it said.
+**Version 2 changed the judged key and nothing else.** The rubric asked one plain question of
+each picture and stopped at the first no, where version 1 asked three questions of each.
+:data:`RUBRIC_V1` keeps version 1's wording so its retained record can still be checked.
+
+**Version 3 changed the question and one definition's wording, and nothing that is measured.**
+Version 2's question was answered yes for all three pictures of a district drawn in flat colour, so
+it did not separate a finished street from a block mock-up; version 3 asks that directly and puts
+real-looking materials first in the guidance. The product-shell key named only keyboard listeners
+while the product enters its world with a click on the world canvas; version 3 names keyboard and
+pointer listeners and says what carrying a click means. No measurement, threshold or mechanical
+decision moved. :data:`VERSION_2` keeps version 2's wording for its retained record.
 
 Pure: this module imports nothing from the product, performs no I/O and holds no clock.
 """
@@ -35,6 +42,7 @@ from typing import Final, Literal
 
 __all__ = [
     "ANSWER_OPTIONS",
+    "ANSWER_REQUIREMENT",
     "AUTHENTICATION_CONDITIONS",
     "CANONICAL_KEYS",
     "CANONICAL_SPELLINGS",
@@ -46,6 +54,7 @@ __all__ = [
     "MELBOURNE_ENVELOPE",
     "NOT_ASKED",
     "PICTURE_TITLES",
+    "REASON_FOLLOW_UP",
     "RETAINED_RECORDS",
     "RUBRIC_GUIDANCE",
     "RUBRIC_PATH",
@@ -53,20 +62,23 @@ __all__ = [
     "RUBRIC_V1",
     "RUBRIC_VERSION",
     "THRESHOLDS",
+    "VERSION_2",
     "WORDS_STORAGE",
     "GateKey",
     "RetainedRecord",
     "SupersededRubric",
+    "SupersededVersion",
     "UnknownGateKey",
     "judge_prompt",
     "key",
+    "reason_follow_up",
     "resolve",
 ]
 
 EvidenceKind = Literal["mechanical", "judged"]
 
 #: Bumped only by a new reconciliation record. The corridor is scored against this version.
-GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v2"
+GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v3"
 
 EVIDENCE_KINDS: Final[tuple[EvidenceKind, ...]] = ("mechanical", "judged")
 
@@ -75,8 +87,8 @@ CAPTURE_LABELS: Final[tuple[str, ...]] = ("start", "midpoint", "endpoint")
 
 RUBRIC_PATH: Final = "docs/visual-gate-rubric.md"
 
-#: The rubric's own version line reads ``Rubric version: 2``.
-RUBRIC_VERSION: Final = 2
+#: The rubric's own version line reads ``Rubric version: 3``.
+RUBRIC_VERSION: Final = 3
 
 #: How each capture is labelled when it is shown to the judge, alone, in route order.
 PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
@@ -88,15 +100,22 @@ PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
 
 #: The one question, asked of each picture in these words and never paraphrased.
 RUBRIC_QUESTION: Final = (
-    "Does this look like a real street where people live, shop and work? "
+    "Does this look like a finished, lived-in street, not a plain block mock-up? "
     "Yes or no, and say why in your own words."
 )
 
-#: Shown directly under the question. Guidance for what a yes means, not three more questions.
+#: Shown directly under the question. Guidance for what a yes means, not four more questions.
 RUBRIC_GUIDANCE: Final = (
-    "A yes means: you could name what at least three ground-floor shops or entrances are; the "
+    "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat "
+    "colour; you could name what at least three ground-floor shops or entrances are; the "
     "buildings form an unbroken street edge with no cut or hole; you can see things near (about "
     "30 m), middle (about 100 m) and far (about 300 m)."
+)
+
+#: The last line of every ask, so that an answer arrives with its reason.
+ANSWER_REQUIREMENT: Final = (
+    "Pick Yes or No and type a few words why in the notes; the answer cannot be recorded "
+    "without them."
 )
 
 #: The only options the judge is offered, in this order, neither marked or preselected.
@@ -104,6 +123,10 @@ ANSWER_OPTIONS: Final[tuple[str, ...]] = ("Yes", "No")
 
 #: What a record says of each picture after the first no. Those pictures are never asked.
 NOT_ASKED: Final = "not asked after a decisive no"
+
+#: The one follow-up a picture may get, and only when its answer arrived with no words. Its reply
+#: is the answer's reason and never changes the answer.
+REASON_FOLLOW_UP: Final = "You answered {answer}. In a few words, why?"
 
 #: Where the judge's words are kept, as every rubric version states it. The words never enter the
 #: repository; a public record carries their SHA-256 and byte count in their place.
@@ -116,15 +139,24 @@ WORDS_STORAGE: Final = (
 
 
 def judge_prompt(label: str) -> str:
-    """Exactly what the judge reads for one capture: its label, the question and the guidance."""
+    """Exactly what the judge reads for one capture: label, question, guidance, requirement."""
     if label not in PICTURE_TITLES:
         raise ValueError(f"{label!r} is not a route capture; expected one of {CAPTURE_LABELS}")
-    return f"{PICTURE_TITLES[label]}\n\n{RUBRIC_QUESTION}\n\n{RUBRIC_GUIDANCE}"
+    return (
+        f"{PICTURE_TITLES[label]}\n\n{RUBRIC_QUESTION}\n\n{RUBRIC_GUIDANCE}\n\n{ANSWER_REQUIREMENT}"
+    )
+
+
+def reason_follow_up(answer: str) -> str:
+    """Exactly what the judge reads when an answer arrived without words."""
+    if answer not in ANSWER_OPTIONS:
+        raise ValueError(f"{answer!r} is not an option the judge is offered")
+    return REASON_FOLLOW_UP.format(answer=answer)
 
 
 @dataclass(frozen=True, slots=True)
 class SupersededRubric:
-    """A rubric version no record may be scored against any longer, as its record stated it."""
+    """Rubric version 1, which no record may be scored against, as its record stated it."""
 
     key_set: str
     questions: tuple[tuple[str, str], ...]
@@ -158,6 +190,61 @@ RUBRIC_V1: Final = SupersededRubric(
         "Each of the three questions is answered yes or no for each of the three captures. The "
         "key is true only for nine yes answers of nine. The score is the number of yes answers, "
         "and a corridor fails unless its score is strictly greater than the Flatiron baseline's."
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SupersededVersion:
+    """A one-question rubric and key set version no record may be scored against any longer."""
+
+    key_set: str
+    rubric_version: int
+    rubric_sha256: str
+    question: str
+    guidance: str
+    composition: str
+    #: Canonical definitions that differ from the current ones, keyed by spelling.
+    definitions: Mapping[str, str]
+
+    def prompt(self, label: str) -> str:
+        """What the judge read for one capture under this version."""
+        return f"{PICTURE_TITLES[label]}\n\n{self.question}\n\n{self.guidance}"
+
+
+#: Version 2, superseded before any corridor or any record was scored against it. Its record is
+#: retained, and the answers given under it are version 3's calibration evidence.
+VERSION_2: Final = SupersededVersion(
+    key_set="exulanica.visual-gate-keys/v2",
+    rubric_version=2,
+    rubric_sha256="05bd20cebcc06bbbdc143102fd21c2b979adae6ea882cdc74b06a347b938ab1d",
+    question=(
+        "Does this look like a real street where people live, shop and work? "
+        "Yes or no, and say why in your own words."
+    ),
+    guidance=(
+        "A yes means: you could name what at least three ground-floor shops or entrances are; the "
+        "buildings form an unbroken street edge with no cut or hole; you can see things near "
+        "(about 30 m), middle (about 100 m) and far (about 300 m)."
+    ),
+    composition=(
+        "Each capture is shown alone, in route order, and the judge answers the one question yes "
+        "or no with their own words. The first no makes the key false and the pictures after it "
+        "are not asked. The key is true only when all three pictures got yes. There is no score."
+    ),
+    definitions=MappingProxyType(
+        {
+            "authenticatedShellAndAuthoredHandlersPreserved": (
+                "True only when every capture was taken in the product's own shell document with "
+                "a mounted world and no credential gate, empty-world or error surface, every "
+                "listener on the window, the document and the world canvas comes from the "
+                "product's own modules, the product's keyboard listeners carried every "
+                "interaction the harness made, and no page or handler was substituted; as the "
+                "retained Melbourne record used it, the key does not by itself assert a bearer "
+                "credential, so every record states its authentication condition in a separate "
+                "field."
+            )
+        }
     ),
 )
 
@@ -420,8 +507,12 @@ CANONICAL_KEYS: Final[tuple[GateKey, ...]] = (
             "True only when every capture was taken in the product's own shell document with a "
             "mounted world and no credential gate, empty-world or error surface, every listener on "
             "the window, the document and the world canvas comes from the product's own modules, "
-            "the product's keyboard listeners carried every interaction the harness made, and no "
-            "page or handler was substituted; as the retained Melbourne record used it, the key "
+            "the product's own keyboard and pointer listeners carried every interaction the "
+            "harness made, and no page or handler was substituted. A key press counts as carried "
+            "when the state its product handler controls changes as that handler defines it: the "
+            "Companion opens, the Companion closes, or the player moves. A click counts as carried "
+            "when it lands on the world canvas, whose listeners are all the product's own, and the "
+            "canvas then holds keyboard focus. As the retained Melbourne record used it, the key "
             "does not by itself assert a bearer credential, so every record states its "
             "authentication condition in a separate field."
         ),
