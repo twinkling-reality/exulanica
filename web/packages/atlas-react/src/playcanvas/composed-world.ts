@@ -1,5 +1,10 @@
 import * as pc from 'playcanvas';
-import { atlasLandscapeHeight, type WorldModuleInstance, type WorldTopologySnapshot } from '@exulanica/atlas-core';
+import {
+  atlasLandscapeHeight,
+  type WorldModuleFormKind,
+  type WorldModuleInstance,
+  type WorldTopologySnapshot,
+} from '@exulanica/atlas-core';
 import {
   DAWN_THEME,
   ORIGIN_LANDSCAPE,
@@ -10,6 +15,23 @@ import {
   type WorldArtProfile,
   type WorldArtProfileId,
 } from '@exulanica/presentation';
+
+/**
+ * The forms this renderer draws.
+ *
+ * A hand-written list is a claim, not a check: the first version of this set named all six
+ * registered forms, two of which nothing drew, and the test that compared it against the catalog
+ * passed because both lists were wrong the same way. `world-module-form.test.ts` now builds each
+ * of these and looks for geometry, so this set is verified rather than believed.
+ */
+export const RENDERED_WORLD_MODULE_FORMS: ReadonlySet<WorldModuleFormKind> = Object.freeze(
+  new Set<WorldModuleFormKind>([
+    'aero-beacon',
+    'survey-strata',
+    'living-buds',
+    'survey-stakes',
+  ]),
+) as ReadonlySet<WorldModuleFormKind>;
 
 export interface ComposedWorld {
   readonly entity: pc.Entity;
@@ -244,11 +266,18 @@ function addPrimitive(
   return entity;
 }
 
-function atInstance(root: pc.Entity, instance: WorldModuleInstance): pc.Entity {
+/** Where the ground is under a point. Authored Atlas terrain unless a caller owns the ground. */
+export type ComposedWorldGroundHeight = (x: number, z: number) => number;
+
+function atInstance(
+  root: pc.Entity,
+  instance: WorldModuleInstance,
+  groundHeight: ComposedWorldGroundHeight,
+): pc.Entity {
   const group = new pc.Entity(instance.instanceId);
   group.setPosition(
     instance.transform.position.x,
-    instance.transform.position.y + atlasLandscapeHeight(
+    instance.transform.position.y + groundHeight(
       instance.transform.position.x,
       instance.transform.position.z,
     ),
@@ -393,6 +422,7 @@ function addRelationshipInlay(
   instance: WorldModuleInstance,
   mesh: pc.Mesh,
   material: pc.StandardMaterial,
+  groundHeight: ComposedWorldGroundHeight,
 ): void {
   if (instance.path === null) return;
   const { start, end, strength } = instance.path;
@@ -409,7 +439,7 @@ function addRelationshipInlay(
     addPrimitive(group, `relationship-inlay:${index}`, mesh, material,
       [
         start.x + dx * t,
-        atlasLandscapeHeight(start.x + dx * t, start.z + dz * t) + 0.018,
+        groundHeight(start.x + dx * t, start.z + dz * t) + 0.018,
         start.z + dz * t,
       ],
       [0.055 + strength * 0.035, 0.018, 0.38 + strength * 0.18],
@@ -426,6 +456,17 @@ export function createComposedWorld(
   topology: WorldTopologySnapshot,
   initialProfile: WorldArtProfile = ORIGIN_LANDSCAPE,
   _theme: PresentationTheme = DAWN_THEME,
+  /**
+   * Where this world's ground actually is.
+   *
+   * The default is the authored Atlas terrain, which is right when that terrain is the ground you
+   * are standing on. It is wrong over an owned district, where the visible ground is the district's
+   * own flat asphalt at y = 0 and the Atlas landscape is not drawn at all. Sinking a memory by the
+   * height of a surface nobody can see is not a subtle error: every one of the four regions on the
+   * Flatiron district sits between 0.74 and 1.39 metres below the street, so a 3.2 metre landmark
+   * arrives with a third of itself inside the road.
+   */
+  groundHeight: ComposedWorldGroundHeight = atlasLandscapeHeight,
 ): ComposedWorld {
   const entity = new pc.Entity('atlas-composed-world');
   const meshes: MeshCatalog = {
@@ -471,21 +512,32 @@ export function createComposedWorld(
       // it on one profile ID left the origin world with no vertical reference at all and made
       // addAeroBeacon unreachable. The authored `geometry.landmark` form is the selector.
       if (instance.role === 'landmark') {
-        const group = atInstance(root, instance);
-        if (profile.geometry.landmark === 'aero-beacon') {
+        const group = atInstance(root, instance, groundHeight);
+        // The module's own declaration wins; a module that declares nothing still follows the style.
+        if ((instance.form?.kind ?? profile.geometry.landmark) === 'aero-beacon') {
           addAeroBeacon(group, profile, meshes, silhouette, brass, glass);
         } else {
           addSurveyLandmark(group, profile, meshes, stone, shadow, brass);
         }
       }
 
-      if (instance.role === 'expansion-point' && profile.profileId === SURVEY_RELIEF.profileId) {
-        const group = atInstance(root, instance);
-        const count = profile.geometry.expansion === 'living-buds' ? 7 : 5;
+      /*
+       * Every region carries a required growth register, so gating it on one profile ID left the
+       * origin world quietly drawing nothing for a module its own catalog says is there. That is
+       * the same mistake the orientation register above already had corrected: the selector is the
+       * declared form, not which style happens to be active.
+       */
+      if (instance.role === 'expansion-point') {
+        const group = atInstance(root, instance, groundHeight);
+        const expansion = instance.form?.kind ?? profile.geometry.expansion;
+        const declared = instance.form?.parameters['count'];
+        const count = declared === undefined
+          ? (expansion === 'living-buds' ? 7 : 5)
+          : Math.max(1, Math.min(12, Math.round(declared)));
         for (let index = 0; index < count; index += 1) {
           const angle = 0.35 + index * 1.08;
           const distance = 0.28 + index * 0.13;
-          if (profile.geometry.expansion === 'living-buds') {
+          if (expansion === 'living-buds') {
             const bud = new pc.Entity(`living-bud:${index}`);
             group.addChild(bud);
             const x = Math.cos(angle) * distance;
@@ -505,7 +557,7 @@ export function createComposedWorld(
 
       if (instance.role === 'relationship-path') {
         if (profile.profileId !== ORIGIN_LANDSCAPE.profileId) {
-          addRelationshipInlay(root, instance, meshes.cube, path);
+          addRelationshipInlay(root, instance, meshes.cube, path, groundHeight);
         }
       }
     }

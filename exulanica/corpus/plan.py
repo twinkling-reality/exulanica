@@ -11,7 +11,7 @@ path the ingest pipeline has and that a tidy corpus would never reach.
 *   **Two visits to one place, months apart.** Scene grouping clusters on time and position, so a
     place photographed twice must produce two groups and not one. A corpus visited once cannot
     tell a working clusterer from one that returns everything.
-*   **A device that writes no UTC offset.** `orimera/ingest/exif.py` carries a 26-hour
+*   **A device that writes no UTC offset.** `exulanica/ingest/exif.py` carries a 26-hour
     uncertainty for exactly this case and it is the common one in real libraries. Half this
     corpus is shot on a device that writes `OffsetTimeOriginal` and half on one that does not.
 *   **Photographs with no GPS at all.** The indoor trip has no fix, which is what actually

@@ -84,7 +84,7 @@ DERIVATIVES: Final = "intake_derivatives"
 #: **This bound outruns the formation stream's cap, and it is not a wall-clock bound.** With the
 #: deployed lease of 720 seconds and no other work ahead of it, a job stranded on every claim
 #: reaches its terminal event after about 3 x 720 = 2160 seconds; queued work can make it later.
-#: ``orimera/api/routes/formation`` gives up at 1800. What a client sees then is what it sees for
+#: ``exulanica/api/routes/formation`` gives up at 1800. What a client sees then is what it sees for
 #: any ingest that outlives the cap: the stream ends without a terminal event, the client
 #: reconnects with its resume token, and missed events are replayed from the ledger rather than
 #: recomputed. Only the FIRST strand is guaranteed to be visible inside one stream, and a sentence

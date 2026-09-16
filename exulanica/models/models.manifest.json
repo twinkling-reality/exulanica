@@ -34,7 +34,7 @@
       "catalog_use_cases": ["text", "reasoning", "function_calling", "code", "context_and_rag", "responses_api"],
       "catalog_license": "nvidia-open-model-license",
       "region_informational": "eu-north1",
-      "note": "Same price and role as the cheap primary, quarter of the context. The vendor prefix is genuinely doubled in the callable identifier; that is not a typo here."
+      "note": "Primary for reasoning_cheap. The callable identifier includes both vendor prefixes exactly as listed. The configured context window is smaller than the Lightning fallback window."
     },
     "nvidia/nemotron-3-super-120b-a12b": {
       "input_usd_per_mtok": 0.3,
@@ -48,7 +48,7 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing"],
       "catalog_license": "nvidia-open-model-license",
       "region_informational": "us-central1",
-      "note": "The callable identifier is entirely lowercase where the display name is not. 4.64x the cheap tier per turn."
+      "note": "Configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
     },
     "nvidia/Nemotron-3-Ultra-550b-a55b": {
       "input_usd_per_mtok": 1.0,
@@ -62,7 +62,7 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing", "responses_api"],
       "catalog_license": "openmdw-1.1",
       "region_informational": "us-central1",
-      "note": "15.48x the cheap tier per turn and no measured advantage on this project's tasks. Reachable only by asking for the hard role explicitly; nothing routes here by default."
+      "note": "Configured as the reasoning_hard primary, with no production caller. Availability and task-specific quality must be evaluated before adoption; configuration alone does not establish either."
     },
     "MiniMaxAI/MiniMax-M3": {
       "input_usd_per_mtok": 0.3,
@@ -104,7 +104,7 @@
       "catalog_use_cases": ["text", "code", "function_calling", "context_and_rag", "fine_tune", "responses_api"],
       "catalog_license": "Apache 2.0 License",
       "region_informational": "eu-north1",
-      "note": "Held in reserve for the extraction role only, for the case where the reasoning core's schema conformance is measured to fail. Carries the catalog JSON mode tag, which no surviving text Nemotron does."
+      "note": "Primary for structured_extraction, used for request classification, query planning, appearance drafts and environment-operation drafts. Structured output is validated by the client and the calling feature."
     },
     "deepseek-ai/DeepSeek-V4-Flash-0731": {
       "input_usd_per_mtok": 0.14,
@@ -187,19 +187,19 @@
       "primary": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
       "fallback": "nvidia/Nemotron-3_5-Lightning",
       "required_use_cases": ["text", "reasoning"],
-      "rationale": "Every Companion turn and every cross-scene continuity decision. SWAPPED on 48 measured composer calls over the same four packets, recorded in docs/evaluation/2026-09-09-companion-memory.json. The Nano answered at a median of 3627 ms against 18617 ms, 5.1 times faster, with zero validator rejections in 24 calls against one for the Lightning, and it never exhausted its ceiling. The single runaway that made this a proposal rather than a change on the predecessor record did not reproduce in 24 attempts. Prices are identical, so the swap costs nothing and is not a saving. The mechanism is in the usage object: the Lightning spends a median 5190 reasoning tokens per answer and the Nano reports none, on answers of about 60 tokens either way. The rationale here previously read that context length was the binding constraint; a ten-item packet measured 1325 prompt tokens, so the Nano 262144 window holds roughly two thousand items and the constraint was never binding at any observed size. The Lightning remains the fallback and keeps its 1048576 window for the case where it becomes so."
+      "rationale": "Used by selection.question.compose_answer to produce cited Companion answers from validated evidence packets. The comparison in docs/evaluation/2026-09-09-companion-memory.json supports Nano latency and validator conformance on four packets; it does not establish general reasoning quality or coverage of every continuity decision. Model-unavailability errors can select Lightning. Answer validation failures receive a repair attempt and then a deterministic answer, not automatic escalation to a larger model."
     },
     "reasoning_mid": {
       "primary": "nvidia/nemotron-3-super-120b-a12b",
       "fallback": "nvidia/Nemotron-3_5-Lightning",
       "required_use_cases": ["text", "reasoning"],
-      "rationale": "Escalation, entered only where the cheap tier has been measured to fail a specific task. The fallback degrades to the cheap tier rather than failing the request."
+      "rationale": "Configured reasoning candidate with no production caller. Adoption requires task-specific quality comparisons against the current caller baseline. Its declared Lightning fallback handles model-unavailability errors; no automatic quality escalation selects this role."
     },
     "reasoning_hard": {
       "primary": "nvidia/Nemotron-3-Ultra-550b-a55b",
       "fallback": "nvidia/nemotron-3-super-120b-a12b",
       "required_use_cases": ["text", "reasoning"],
-      "rationale": "Manual ceiling. Present so an escalation exists, absent from every default route because a 15.48x price for an unmeasured advantage is a claim this project has committed not to make."
+      "rationale": "Configured reasoning candidate with no production caller. No task-specific comparison establishes an advantage for Companion answers or continuity reasoning. Promotion requires evidence of improved answer quality and task success. The declared Super fallback handles model-unavailability errors; this role is not an implemented quality escalation path."
     },
     "vision": {
       "primary": "MiniMaxAI/MiniMax-M3",
@@ -211,7 +211,7 @@
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",
       "required_use_cases": ["text"],
-      "rationale": "Not in any default route. Reserved for the case where the reasoning core's json_schema conformance is measured to be unreliable, at which point the NVIDIA core keeps the reasoning role and gives up the extraction role."
+      "rationale": "Used by classify_request, propose_plan, draft_appearance and draft_environment_operation for structured intent, query and authored-change proposals. Callers validate these outputs before execution or presentation. The declared DeepSeek fallback handles model-unavailability errors, not failed quality checks or an automatic transfer of work from the reasoning role."
     },
     "embedding": {
       "primary": "Qwen/Qwen3-Embedding-8B",

@@ -1,3 +1,5 @@
+import { NativeCharacterRuntime } from './native-character-runtime.js';
+import type { CharacterByteLoader } from './native-character-pool.js';
 import * as pc from 'playcanvas';
 import type {
   AnchorTable,
@@ -25,6 +27,9 @@ import type {
   ResidencyState,
   ResidencyView,
   RepresentationPressureState,
+  RepresentationIntent,
+  RepresentationBounds,
+  RepresentationSubject,
   RenderOriginState,
   SpatialClassification,
   TierState,
@@ -48,6 +53,7 @@ import {
   buildAnchorTable,
   buildNeighborhoodIndex,
   buildNavigationWorld,
+  navigationRegionForIsland,
   ownedDistrictNavigation,
   classifySpatialPhase,
   enterAtlasMap,
@@ -70,7 +76,6 @@ import {
   planResidency,
   residencyDemandsForView,
   sampleDirectNavigationTransition,
-  sourceFirstCardLocalPosition,
   completeResidencyRequest,
   composeAtlasWorld,
   WorldCustomizationController,
@@ -78,9 +83,12 @@ import {
   INITIAL_RENDER_ORIGIN,
   renderOriginForNeighborhood,
   frameFraction,
+  validateRepresentationSubject,
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
+import { PlayerAvatar } from './player-avatar.js';
+import { FollowCamera, playerCameraAimHeight, type PlayerCameraMode } from './player-camera.js';
 import {
   DAWN_THEME,
   DEFAULT_WORLD_ART_PROFILE,
@@ -106,11 +114,6 @@ import {
   createGoogleTilesEnvironment,
   type GoogleTilesEnvironment,
 } from './google-tiles-environment.js';
-import {
-  SOURCE_VEIL_HEIGHT,
-  createSourceFirstGrove,
-  type SourceFirstGrove,
-} from './source-first-grove.js';
 import type { SourceMediaCatalog } from './source-media.js';
 import { sourceMediaForIsland } from './source-media.js';
 import { createWorldField, type WorldField } from './world-field.js';
@@ -135,6 +138,16 @@ import {
   validateScenePointMapPlacement,
   scenePointMapViewpoint,
 } from './scene-point-maps.js';
+import {
+  RepresentationRuntime,
+  type RepresentationReport,
+} from './representation-runtime.js';
+import {
+  representationParentVisible,
+  representationWorldBounds,
+  sampledPointAllocation,
+  staticMeshRepresentation,
+} from './representation-binding.js';
 
 /**
  * The PlayCanvas binding for the Atlas.
@@ -333,7 +346,15 @@ export interface AtlasBindingOptions {
   /** Caller-authorized media presentation keyed by the scene's evidence handles. */
   readonly sourceMedia?: SourceMediaCatalog;
   /** Keep original photographs in the authorized inspector instead of placing optical sheets in the world. */
-  readonly sourcePresentation?: 'world' | 'inspection';
+  /**
+   * Which arrangement of the composed world to build.
+   *
+   * The catalog offers substitutable modules per recipe slot; the seed decides which one each
+   * element gets, stably per element, so the same seed always rebuilds the same world and a
+   * different one rebuilds a different world from the same memories. Omitted means the composer's
+   * own default, which is what a world with no persisted arrangement should keep getting.
+   */
+  readonly worldSeed?: string;
   readonly deviceTypes?: readonly string[];
   readonly blend?: boolean;
   readonly sizeGain?: number;
@@ -357,7 +378,10 @@ export interface AtlasBindingOptions {
   readonly ownedDistrict?: {
     readonly document: OwnedDistrict;
     readonly residentBytes: number;
+    readonly interpretation?: import('@exulanica/atlas-core').DistrictInterpretation;
   };
+  /** Optional current rights/record refinements for known renderer subjects. */
+  readonly representationSubjects?: readonly RepresentationSubject[];
 }
 
 export interface FrameReport {
@@ -409,7 +433,6 @@ export class AtlasBinding {
   readonly scene: AtlasScene;
   readonly navigationWorld: NavigationWorld;
   readonly field: WorldField;
-  readonly sourceFirst: SourceFirstGrove;
   readonly topology: WorldTopologySnapshot;
   readonly composedWorld: ComposedWorld;
   readonly regionMass: RegionMass;
@@ -417,6 +440,33 @@ export class AtlasBinding {
   readonly customization: WorldCustomizationController;
   /** Authored objects. Empty until a surface places one; see `scene-objects.ts`. */
   readonly objects: SceneObjectRuntime;
+  private districtObjectFrame: { readonly regionId: IslandId; readonly key: string; readonly root: pc.Entity } | null = null;
+
+  /** Install only a currently authorized region-to-district translation from the host. */
+  setDistrictObjectFrame(binding: { readonly regionId: string; readonly translationMm: readonly [number, number, number] } | null): void {
+    if (binding !== null && (this.ownedDistrict === null ||
+        !binding.translationMm.every(Number.isSafeInteger) ||
+        !this.scene.islands.some(island => String(island.islandId) === binding.regionId))) {
+      throw new TypeError('District object frame requires a known region and integer translation');
+    }
+    const key = binding === null ? null : JSON.stringify(binding);
+    if (key === (this.districtObjectFrame?.key ?? null)) return;
+    if (this.districtObjectFrame !== null) {
+      this.objects.setRegionOverride(this.districtObjectFrame.regionId, null);
+      this.districtObjectFrame.root.destroy();
+      this.districtObjectFrame = null;
+    }
+    if (binding !== null) {
+      const regionId = this.scene.islands.find(island => String(island.islandId) === binding.regionId)!.islandId;
+      const root = new pc.Entity(`district-objects:${regionId}`);
+      root.setLocalPosition(...binding.translationMm.map(value => value / 1000) as [number, number, number]);
+      this.environmentRoot.addChild(root);
+      this.objects.setRegionOverride(regionId, root);
+      this.districtObjectFrame = { regionId, key: key!, root };
+    }
+    this.applyResidencyPresentation();
+    this.invalidate();
+  }
   /** Scene segments, one region at a time. Installs nothing until a surface applies one. */
   readonly segmentOverlay: SegmentOverlayRuntime;
   readonly neighborhoodIndex: NeighborhoodIndex;
@@ -426,10 +476,18 @@ export class AtlasBinding {
   /** Null unless explicitly feature-flagged with a key by the application. */
   googleTiles: GoogleTilesEnvironment<unknown> | null = null;
   readonly ownedDistrict: OwnedDistrictRuntime | null;
+  private representationController: RepresentationRuntime | null = null;
+  get representation(): RepresentationRuntime {
+    return this.representationController ??= new RepresentationRuntime();
+  }
+  private readonly representationDefaults = new Map<string, RepresentationSubject>();
+  private readonly representationOverrides = new Map<string, RepresentationSubject>();
+  private readonly representationFrames = new Map<string, pc.GraphNode>();
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
   private centred: CentredPhotograph | null = null;
+  private occupied: IslandId | null = null;
   private readonly centredInverse = new pc.Mat4();
   private readonly centredCapture = new pc.Vec3();
   private readonly centredDirection = new pc.Vec3();
@@ -460,7 +518,6 @@ export class AtlasBinding {
   private navigationElapsedMs = 0;
   private navigationTargetIsland: IslandId | null = null;
   private readonly recoveredCameras: readonly RecoveredSceneCamera[];
-  private readonly sourcePresentation: 'world' | 'inspection';
   private inspection: {
     readonly returnPose: NavigationPose;
     readonly returnFov: number;
@@ -484,6 +541,15 @@ export class AtlasBinding {
   onNavigationArrive: ((target: DirectNavigationTarget) => void) | null = null;
   onMapTarget: ((islandId: IslandId) => void) | null = null;
   onInspectionChange: ((view: SceneInspectionView | null) => void) | null = null;
+  /** Fires whenever the memory layer is switched, including when travel switches it on. */
+  onMemoryLayerChange: ((visible: boolean) => void) | null = null;
+  onRepresentationChange: ((report: RepresentationReport) => void) | null = null;
+
+  private publishRepresentation(): RepresentationReport {
+    const report = this.representation.update();
+    this.onRepresentationChange?.(report);
+    return report;
+  }
 
   /** Called by the physical residency executor after its checked publish or terminal fallback. */
   settleResidencyRequest(requestId: string, ok: boolean): void {
@@ -495,7 +561,6 @@ export class AtlasBinding {
   }
 
   private applyResidencyPresentation(): void {
-    this.sourceFirst.setResidency(this.residencyAllocated, this.mapState !== null);
     this.objects.setResidency(this.residencyAllocated, this.mapState !== null);
     for (const visual of this.islands) {
       const inspecting = visual.island.islandId === this.inspection?.view.islandId;
@@ -509,6 +574,7 @@ export class AtlasBinding {
       visual.entity.enabled = visual.island.islandId === this.inspection?.view.islandId
         || this.residencyAllocated.get(visual.island.islandId) !== 'stub';
     }
+    this.publishRepresentation();
   }
 
   private constructor(
@@ -526,7 +592,6 @@ export class AtlasBinding {
     recoveredCameras: readonly RecoveredSceneCamera[],
     navigationWorld: NavigationWorld,
     field: WorldField,
-    sourceFirst: SourceFirstGrove,
     topology: WorldTopologySnapshot,
     composedWorld: ComposedWorld,
     regionMass: RegionMass,
@@ -538,7 +603,6 @@ export class AtlasBinding {
     initialProfile: WorldArtProfile,
     residencyCatalog: readonly ResidencyAsset[],
     residencyBudget: number,
-    sourcePresentation: 'world' | 'inspection',
     objectRoots: ReadonlyMap<IslandId, pc.Entity>,
     ownedDistrict: OwnedDistrictRuntime | null,
   ) {
@@ -558,10 +622,8 @@ export class AtlasBinding {
     this.trainedScenes = trainedScenes;
     this.trainedSceneFailures = trainedSceneFailures;
     this.recoveredCameras = recoveredCameras;
-    this.sourcePresentation = sourcePresentation;
     this.navigationWorld = navigationWorld;
     this.field = field;
-    this.sourceFirst = sourceFirst;
     this.objects = new SceneObjectRuntime(app, objectRoots);
     this.segmentOverlay = new SegmentOverlayRuntime(islands, trainedScenes, () => playcanvasSegmentEngine(app), {
       lensPrepared: (entity) => this.proofLensSplatsPrepared.has(entity),
@@ -587,6 +649,33 @@ export class AtlasBinding {
 
   private dirty = true;
   private reducedMotion = false;
+  private playerAvatar: PlayerAvatar | null = null;
+  nativeCharacters:NativeCharacterRuntime|null=null;
+  private nativePlayerDiscontinuity=true;
+  /** Loader must resolve a permitted pinned reference through the current authenticated asset path. */
+  enableNativeCharacters(loadBytes:CharacterByteLoader):NativeCharacterRuntime{
+    this.nativeCharacters??=new NativeCharacterRuntime(this.app,loadBytes);
+    if(this.ownedDistrict)this.playerAvatar??=new PlayerAvatar(this.device,this.environmentRoot);
+    this.syncNativeCharacterFrames(0,true);
+    return this.nativeCharacters;
+  }
+  private playerCameraMode: PlayerCameraMode = 'first-person';
+  private playerCameraDistance=3.8;
+  private readonly followCamera=new FollowCamera();
+
+  /**
+   * Third person shows the player unless the boom has been driven into them.
+   *
+   * A facade behind the player shortens the boom past the body, and drawing the avatar then fills
+   * the screen with the inside of its own head. Reads last frame's boom length, because the camera
+   * is solved after the characters are posed.
+   */
+  private get playerDrawn():boolean{
+    return this.playerCameraMode==='third-person'&&this.inspection===null
+      &&!this.followCamera.occludesPlayer();
+  }
+  private nearbySignature='';
+  private lastPlayerPosition: readonly [number, number] | null = null;
   private lastRenderMs = -1;
   private readonly renderedPose = { x: NaN, y: NaN, z: NaN, yaw: NaN, pitch: NaN };
 
@@ -608,6 +697,7 @@ export class AtlasBinding {
     appOptions.graphicsDevice = device;
     appOptions.componentSystems = [
       pc.RenderComponentSystem,
+      pc.AnimComponentSystem,
       pc.CameraComponentSystem,
       pc.LightComponentSystem,
       pc.GSplatComponentSystem,
@@ -636,10 +726,10 @@ export class AtlasBinding {
     const [skyR, skyG, skyB] = unitRgb(initialArtProfile.palette.sky);
     camera.addComponent('camera', {
       fov: options.fov ?? 70,
-      nearClip: cityActive ? 0.2 : 0.08,
+      nearClip: 0.08,
       farClip: cityActive ? 15_000 : 1200,
       clearColor: cityActive
-        ? new pc.Color(0.62, 0.76, 0.82, 1)
+        ? new pc.Color(0.79, 0.85, 0.88, 1)
         : new pc.Color(skyR, skyG, skyB, 1),
     });
     if (camera.camera !== undefined && camera.camera !== null) {
@@ -649,30 +739,37 @@ export class AtlasBinding {
 
     const [hazeR, hazeG, hazeB] = unitRgb(initialArtProfile.palette.haze);
     app.scene.ambientLight = cityActive
-      ? new pc.Color(0.62, 0.64, 0.64)
+      ? new pc.Color(0.64, 0.69, 0.74)
       : new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    app.scene.exposure = cityActive ? 1.32 : 1.06;
+    app.scene.exposure = cityActive ? 1.12 : 1.06;
     app.scene.fog.type = pc.FOG_LINEAR;
     app.scene.fog.color.set(
-      cityActive ? 0.68 : hazeR,
-      cityActive ? 0.75 : hazeG,
-      cityActive ? 0.78 : hazeB,
+      cityActive ? 0.83 : hazeR,
+      cityActive ? 0.86 : hazeG,
+      cityActive ? 0.89 : hazeB,
     );
-    app.scene.fog.start = cityActive ? 420 : 46;
-    app.scene.fog.end = cityActive ? 1_350 : 220;
+    app.scene.fog.start = cityActive ? 110 : 46;
+    app.scene.fog.end = cityActive ? 820 : 220;
 
     const worldLight = new pc.Entity('atlas-directional-light');
     const [lr, lg, lb] = unitRgb(initialArtProfile.palette.sun);
     worldLight.addComponent('light', {
       type: 'directional',
       color: new pc.Color(lr, lg, lb),
-      intensity: cityActive ? 1.55 : 1.65,
+      intensity: cityActive ? 1.1 : 1.65,
       castShadows: true,
-      shadowDistance: cityActive ? 650 : 72,
+      shadowDistance: cityActive ? 120 : 72,
+      normalOffsetBias: cityActive ? 0.25 : 0,
+      shadowBias: cityActive ? 0.2 : 0.05,
       shadowResolution: 2048,
     });
     worldLight.setEulerAngles(52, -38, 0);
     app.root.addChild(worldLight);
+    if(cityActive){
+      const skyFill=new pc.Entity('district-sky-fill');
+      skyFill.addComponent('light',{type:'directional',color:new pc.Color(.70,.82,1),intensity:.72,castShadows:false});
+      skyFill.setEulerAngles(28,145,0);app.root.addChild(skyFill);
+    }
 
     const table = buildAnchorTable(options.scene);
     const environmentRoot = new pc.Entity('geographic-environment');
@@ -681,7 +778,13 @@ export class AtlasBinding {
     app.root.addChild(renderRoot);
     const navigationWorld = options.ownedDistrict === undefined
       ? buildNavigationWorld(options.scene, atlasLandscapeSurface())
-      : ownedDistrictNavigation(options.ownedDistrict.document);
+      // The district owns the ground and the blockers; the scene owns where the memories are. Both
+      // are already drawn in the same coordinate space, so withholding the regions from the
+      // navigation world did not keep them apart, it only made them unreachable.
+      : ownedDistrictNavigation(
+        options.ownedDistrict.document,
+        options.scene.islands.map(navigationRegionForIsland),
+      );
     const ownedDistrict = options.ownedDistrict === undefined
       ? null
       : new OwnedDistrictRuntime(
@@ -689,6 +792,7 @@ export class AtlasBinding {
         environmentRoot,
         options.ownedDistrict.document,
         options.ownedDistrict.residentBytes,
+        options.ownedDistrict.interpretation,
       );
     const neighborhoodIndex = buildNeighborhoodIndex(options.scene);
     const explicitPointMaps = options.placedPointMaps ?? [];
@@ -761,23 +865,19 @@ export class AtlasBinding {
     );
     if (options.ownedDistrict !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);
-    const sourceFirst = createSourceFirstGrove(
-      app,
-      sourceGroveScene(options.scene, availableReconstruction, options.sourcePresentation),
-      options.sourceMedia ?? new Map(),
-      initialArtProfile,
-      theme,
-      options.reducedMotion ?? false,
-    );
-    renderRoot.addChild(sourceFirst.entity);
     const topology = composeAtlasWorld(options.scene, {
       availableReconstruction,
+      ...(options.worldSeed === undefined ? {} : { seed: options.worldSeed }),
     });
     const composedWorld = createComposedWorld(
       device,
       topology,
       initialArtProfile,
       theme,
+      // Stand the memories on whichever ground is actually under them. A district draws its own
+      // flat street and hides the Atlas landscape, so the landscape's height here is the offset of
+      // an invisible surface and buries every landmark by about a metre.
+      options.ownedDistrict === undefined ? atlasLandscapeHeight : () => 0,
     );
     // What the Map looks down on. Built from the same anchors the ground view already draws, so
     // it cannot drift from what the world actually holds, and enabled only at the Map vantage.
@@ -891,14 +991,18 @@ export class AtlasBinding {
       ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
       : cityActive
         ? cityCameraState('overview')
-        : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
+        : initialAtlasCameraState(options.scene, navigationWorld);
 
+    // The Google-tiles entry is an aerial overview, not a stance. Everything else starts on foot.
+    const aerialStart = options.ownedDistrict === undefined && cityActive;
     const controls = new FirstPersonControls(
       options.canvas,
       start,
-      cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 32, sprintMultiplier: 3.2 } : DEFAULT_CONTROLS,
+      cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
       navigationWorld,
+      { groundStart: !aerialStart },
     );
+    controls.onCameraToggle = () => { binding.setCameraMode(binding.cameraMode === 'first-person' ? 'third-person' : 'first-person'); };
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
     const overlay =
       options.overlay === false ? null : new AnchorOverlay(options.overlayParent);
@@ -941,7 +1045,6 @@ export class AtlasBinding {
       options.recoveredCameras ?? [],
       navigationWorld,
       field,
-      sourceFirst,
       topology,
       composedWorld,
       regionMass,
@@ -953,7 +1056,6 @@ export class AtlasBinding {
       initialArtProfile,
       Object.freeze(residencyCatalog),
       residencyBudget,
-      options.sourcePresentation ?? 'world',
       objectRoots,
       ownedDistrict,
     );
@@ -972,26 +1074,285 @@ export class AtlasBinding {
       ) as GoogleTilesEnvironment<unknown>;
       void binding.googleTiles.attach();
     }
+    binding.initializeRepresentation(options.representationSubjects ?? []);
     return binding;
   }
 
-  setMemoryLayerVisible(visible: boolean): void {
-    this.renderRoot.enabled = visible;
+  private representationSubject(fallback: RepresentationSubject): RepresentationSubject {
+    return this.representationOverrides.get(fallback.subjectId) ?? fallback;
+  }
+
+  private initializeRepresentation(subjects: readonly RepresentationSubject[]): void {
+    const remember = (subject: RepresentationSubject): (() => RepresentationSubject) => {
+      if (this.representationDefaults.has(subject.subjectId)) {
+        throw new TypeError(`Duplicate representation subject ${subject.subjectId}`);
+      }
+      this.representationDefaults.set(subject.subjectId, Object.freeze(subject));
+      return () => this.representationSubject(subject);
+    };
+
+    for (const visual of this.islands) {
+      const { min, max } = visual.pointMap.map.header.bounds;
+      const source = visual.pointMap.artifactId;
+      const surface = visual.cloud.surface;
+      const current = remember({
+        subjectId: source,
+        subjectKind: 'scene',
+        sceneId: visual.pointMap.sceneId,
+        frameId: `artifact:${source}:opm-local`,
+        origin: 'inferred',
+        sourceRefs: Object.freeze([source]),
+        availability: 'available',
+        rendered: surface,
+        points: 'retained-points',
+        compatibleBlend: false,
+        bounds: Object.freeze({
+          frameId: `artifact:${source}:opm-local`,
+          units: 'metres',
+          origin: 'inferred',
+          basis: 'source-bounds',
+          min: Object.freeze([...min]) as readonly [number, number, number],
+          max: Object.freeze([...max]) as readonly [number, number, number],
+        }),
+        label: null,
+        dataAvailable: visual.pointMap.captureId !== undefined,
+        unavailableReason: surface
+          ? 'Point-map surfaces support endpoint switching, not continuous blending.'
+          : null,
+      });
+      this.representationFrames.set(source, visual.entity);
+      const render = visual.entity.render;
+      if (render === undefined || render === null) continue;
+      const originallyEnabled = render.enabled;
+      if (surface) {
+        this.representation.register({
+          currentSubject: current,
+          parentVisible: () => visual.entity.parent !== null
+            && representationParentVisible(visual.entity.parent),
+          setRenderedWeight: weight => { render.enabled = originallyEnabled && weight > 0; },
+          createPoints: limit => sampledPointAllocation(
+            this.device,
+            visual.entity,
+            visual.pointMap.map.position,
+            limit,
+            new pc.Color(0.62, 0.9, 1),
+            source,
+          ),
+          restore: () => { render.enabled = originallyEnabled; },
+        });
+      } else {
+        this.representation.register({
+          currentSubject: current,
+          parentVisible: () => visual.entity.parent !== null
+            && representationParentVisible(visual.entity.parent),
+          setRenderedWeight: () => {},
+          createPoints: () => null,
+          setExistingPointWeight: weight => { render.enabled = originallyEnabled && weight > 0; },
+          restore: () => { render.enabled = originallyEnabled; },
+        });
+      }
+    }
+
+    for (const visual of this.trainedScenes) {
+      const source = visual.geometry.artifactId;
+      const centres = splatCentres(visual);
+      const current = remember({
+        subjectId: source,
+        subjectKind: 'scene',
+        sceneId: visual.geometry.sceneId,
+        frameId: `artifact:${source}:asset-local`,
+        origin: 'generated',
+        sourceRefs: Object.freeze([source]),
+        availability: 'available',
+        rendered: true,
+        points: centres === null ? null : 'gaussian-centres',
+        compatibleBlend: false,
+        bounds: Object.freeze({
+          frameId: `artifact:${source}:asset-local`,
+          units: 'scene-units',
+          origin: 'generated',
+          basis: 'source-bounds',
+          min: Object.freeze([...visual.geometry.bounds.min]) as readonly [number, number, number],
+          max: Object.freeze([...visual.geometry.bounds.max]) as readonly [number, number, number],
+        }),
+        label: null,
+        dataAvailable: false,
+        unavailableReason: centres === null
+          ? 'The engine retained no CPU Gaussian-centre buffer.'
+          : 'Gaussian-centre display supports endpoint switching, not continuous blending.',
+      });
+      this.representationFrames.set(source, visual.entity);
+      const component = visual.entity.gsplat;
+      if (component === undefined || component === null) continue;
+      const originallyEnabled = component.enabled;
+      this.representation.register({
+        currentSubject: current,
+        parentVisible: () => visual.entity.parent !== null
+          && representationParentVisible(visual.entity.parent),
+        setRenderedWeight: weight => { component.enabled = originallyEnabled && weight > 0; },
+        createPoints: limit => centres === null ? null : sampledPointAllocation(
+          this.device,
+          visual.entity,
+          centres,
+          limit,
+          new pc.Color(0.9, 0.72, 1),
+          source,
+        ),
+        restore: () => { component.enabled = originallyEnabled; },
+      });
+    }
+
+    if (this.ownedDistrict !== null) {
+      const district = this.ownedDistrict.district;
+      const sourceRefs = Object.freeze(district.source_records.map(source => source.sha256));
+      const sourceDisplayAllowed = district.source_records.length > 0
+        && district.source_records.every(source => source.operation_rights.display === true);
+      let ordinal = 0;
+      for (const render of this.ownedDistrict.root.findComponents('render') as pc.RenderComponent[]) {
+        for (const instance of render.meshInstances) {
+          const subjectId = `${district.district_id}:render-group:${render.entity.name}:${ordinal}`;
+          ordinal += 1;
+          const current = remember({
+            subjectId,
+            subjectKind: 'geometry-group',
+            sceneId: null,
+            frameId: `${district.frame?.name ?? district.district_id}:render-metres`,
+            // This is renderer tessellation derived from retained source and interpretation
+            // records. Sampling its vertices must never relabel them as observed measurements.
+            origin: 'generated',
+            sourceRefs,
+            availability: sourceDisplayAllowed ? 'available' : 'unavailable',
+            rendered: true,
+            points: 'mesh-surface-samples',
+            compatibleBlend: true,
+            bounds: null,
+            label: render.entity.name,
+            dataAvailable: sourceDisplayAllowed,
+            unavailableReason: sourceDisplayAllowed
+              ? 'Sampled points are generated aggregate mesh vertices, not measurements or per-feature segmentation.'
+              : 'A retained district source is unavailable for display.',
+          });
+          this.representationFrames.set(subjectId, instance.node);
+          const draw = staticMeshRepresentation(this.device, instance, current);
+          if (draw !== null) this.representation.register(draw);
+        }
+      }
+    }
+    this.setRepresentationSubjects(subjects);
+  }
+
+  /** Update current rights and records for known geometry without replacing world identity. */
+  setRepresentationSubjects(subjects: readonly RepresentationSubject[]): RepresentationReport {
+    const seen = new Set<string>();
+    for (const subject of subjects) {
+      validateRepresentationSubject(subject);
+      if (seen.has(subject.subjectId)) throw new TypeError('Representation subjects must be unique');
+      seen.add(subject.subjectId);
+      const fixed = this.representationDefaults.get(subject.subjectId);
+      if (fixed === undefined) throw new TypeError(`Unknown representation subject ${subject.subjectId}`);
+      for (const key of [
+        'subjectKind', 'sceneId', 'frameId', 'origin', 'rendered', 'points', 'compatibleBlend',
+      ] as const) {
+        if (subject[key] !== fixed[key]) {
+          throw new TypeError(`Representation subject ${subject.subjectId} changed ${key}`);
+        }
+      }
+    }
+    // Commit only after every record passes. Copy caller-owned arrays so later mutation cannot
+    // silently change current rights, references or display bounds.
+    for (const subject of subjects) {
+      const bounds = subject.bounds === null ? null : Object.freeze({
+        ...subject.bounds,
+        min: Object.freeze([...subject.bounds.min]) as readonly [number, number, number],
+        max: Object.freeze([...subject.bounds.max]) as readonly [number, number, number],
+      });
+      this.representationOverrides.set(subject.subjectId, Object.freeze({
+        ...subject,
+        sourceRefs: Object.freeze([...subject.sourceRefs]),
+        bounds,
+      }));
+    }
+    const report = this.publishRepresentation();
     this.invalidate();
+    return report;
+  }
+
+  /** Presentation-only. Camera, inspection, picking, clocks, collision and navigation are untouched. */
+  setRepresentationIntent(intent: RepresentationIntent): RepresentationReport {
+    const report = this.representation.setIntent(intent);
+    this.onRepresentationChange?.(report);
+    this.invalidate();
+    return report;
+  }
+
+  get representationReport(): RepresentationReport { return this.representation.report; }
+
+  /** Display-world corners for UI projection. This creates no draw or pick target. */
+  representationBounds(subject: RepresentationSubject): readonly (readonly [number, number, number])[] | null {
+    validateRepresentationSubject(subject);
+    const known = this.representationFrames.get(subject.subjectId);
+    const registered = this.representationDefaults.get(subject.subjectId);
+    if (registered !== undefined && subject.frameId !== registered.frameId) return null;
+    const effective = registered === undefined ? subject : this.representationSubject(registered);
+    if (effective.availability !== 'available') return null;
+    const districtFrame = this.ownedDistrict === null
+      ? null
+      : `${this.ownedDistrict.district.frame?.name ?? this.ownedDistrict.district.district_id}:render-metres`;
+    const frame = known ?? (effective.subjectKind === 'object' && effective.frameId === districtFrame
+      ? this.ownedDistrict!.root
+      : null);
+    if (effective.bounds === null || frame === null || effective.bounds.frameId !== effective.frameId) {
+      return null;
+    }
+    return representationWorldBounds(effective.bounds as RepresentationBounds, frame);
+  }
+
+  setMemoryLayerVisible(visible: boolean): void {
+    const changed = this.renderRoot.enabled !== visible;
+    this.renderRoot.enabled = visible;
+    if (!visible) { this.focusState = INITIAL_FOCUS_STATE; this.centred = null; }
+    this.publishRepresentation();
+    this.invalidate();
+    // The control that owns this switch read the binding once, when it was built. Anything that
+    // changed the layer afterwards left a checkbox saying the opposite of what the world showed.
+    if (changed) this.onMemoryLayerChange?.(visible);
   }
 
   get memoryLayerVisible(): boolean {
     return this.renderRoot.enabled;
   }
 
+  setWalkAssist(mode:'off'|'walk'|'run'):void {this.controls.setWalkAssist(mode);this.invalidate();}
+  setCameraFraming(distance:number):void {this.playerCameraDistance=Math.max(.65,Math.min(6,distance));this.followCamera.reset();this.invalidate();}
+  turnCamera(radians:number):void {if(!Number.isFinite(radians))return;this.controls.state.yaw+=radians;this.invalidate();}
+  get cameraMode(): PlayerCameraMode { return this.playerCameraMode; }
+
+  setCameraMode(mode: PlayerCameraMode): void {
+    if (this.ownedDistrict === null) return;
+    this.playerCameraMode = mode;
+    this.followCamera.reset();
+    this.playerAvatar ??= new PlayerAvatar(this.device, this.environmentRoot);
+    const canvas = this.app.graphicsDevice.canvas;
+    if (canvas instanceof HTMLCanvasElement) { canvas.dataset.cameraMode = mode; canvas.dispatchEvent(new Event('camera-mode-change')); }
+    this.invalidate();
+  }
+
+  /** Reticle origin is the displayed camera; reach remains a separate player-space check. */
+  interactionRay(): { origin: readonly [number, number, number]; direction: readonly [number, number, number] } {
+    const position = this.camera.getPosition();
+    const forward = this.camera.forward;
+    return { origin: [position.x + this.renderOriginState.origin.x, position.y + this.renderOriginState.origin.y, position.z + this.renderOriginState.origin.z], direction: [forward.x, forward.y, forward.z] };
+  }
+
   setCityView(view: 'overview' | 'street'): void {
+    this.nativePlayerDiscontinuity=true;
     if (this.googleTiles === null && this.ownedDistrict === null) return;
     Object.assign(
       this.controls.state,
       this.ownedDistrict === null
         ? cityCameraState(view)
         : view === 'overview'
-          ? { x: -45, y: 150, z: 300, yaw: -0.15, pitch: -0.46 }
+          ? ownedDistrictOverviewCameraState(this.ownedDistrict.district)
           : ownedDistrictCameraState(this.navigationWorld, this.ownedDistrict.district),
     );
     this.invalidate();
@@ -1001,15 +1362,15 @@ export class AtlasBinding {
     this.invalidate();
     this.motes.setTheme(theme);
     this.field.setTheme(theme);
-    this.sourceFirst.setTheme(theme);
     this.composedWorld.setTheme(theme);
     for (const visual of this.islands) visual.cloud.setTheme(theme);
+    const report = this.representation.refresh();
+    this.onRepresentationChange?.(report);
   }
 
   setReducedMotion(reduced: boolean): void {
     this.reducedMotion = reduced;
     this.field.setReducedMotion(reduced);
-    this.sourceFirst.setReducedMotion(reduced);
     this.invalidate();
   }
 
@@ -1029,7 +1390,7 @@ export class AtlasBinding {
     const s = this.controls.state;
     const r = this.renderedPose;
     return shouldDrawFrame({
-      dirty: this.dirty,
+      dirty: this.dirty || (this.ownedDistrict?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
       navigating: this.navigationTransition !== null,
       poseChanged:
         s.x !== r.x || s.y !== r.y || s.z !== r.z ||
@@ -1070,7 +1431,6 @@ export class AtlasBinding {
     this.regionMass.applyProfile(profile);
     this.regionRelief.applyProfile(profile);
     this.field.setProfile(profile);
-    this.sourceFirst.setProfile(profile);
     this.setClearColours(profile);
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
       this.camera.camera.clearColor.copy(
@@ -1371,7 +1731,6 @@ export class AtlasBinding {
       this.field.setMapGroundPose(this.mapState.ground);
       if (this.overlay !== null) this.overlay.root.hidden = true;
       this.mapOverlay?.setActive(true);
-      this.sourceFirst.setResidency(this.residencyAllocated, true);
       this.refreshPresentIslands(true);
       this.refreshControlsEnabled();
       return;
@@ -1390,7 +1749,6 @@ export class AtlasBinding {
     this.field.setMapGroundPose(null);
     if (this.overlay !== null) this.overlay.root.hidden = false;
     this.mapOverlay?.setActive(false);
-    this.sourceFirst.setResidency(this.residencyAllocated, false);
       this.refreshPresentIslands(false);
     this.refreshControlsEnabled();
   }
@@ -1409,24 +1767,17 @@ export class AtlasBinding {
     );
     if (!resolution.ok) return resolution;
     this.endSceneInspection();
+    // Travelling to a memory is a request to see it. Over an owned district the memory layer starts
+    // off, so without this the whole journey ends standing in the street facing geometry that is
+    // switched off, which reads as travel being broken rather than as a layer being hidden.
+    // `setMemoryLayerVisible` announces the change so the control that owns the switch follows it.
+    if (!this.memoryLayerVisible) this.setMemoryLayerVisible(true);
     if (this.mapState !== null) this.setMapMode(false);
     const planned = planDirectNavigationTransition(resolution, state, reducedMotion);
-    if (target.kind === 'island') {
-      const island = this.scene.islands.find((candidate) => candidate.islandId === target.islandId);
-      if (island?.rung === 4) {
-        // Keep atlas-core's validated destination POSITION exactly. Only turn the arrival camera
-        // toward the canonical source body, so Map travel cannot deposit someone facing empty
-        // layout space while the memory sits behind them.
-        this.navigationTransition = Object.freeze({
-          ...planned,
-          to: sourceFirstArrivalPose(island, planned.to, this.sourcePresentation),
-        });
-      } else {
-        this.navigationTransition = planned;
-      }
-    } else {
-      this.navigationTransition = planned;
-    }
+    // atlas-core already aims the arrival at the region itself. The previous override tilted the
+    // camera up at the source veil hanging above it; with no body in the air there is nothing to
+    // look up at, and the region's own landmark is what the arrival should face.
+    this.navigationTransition = planned;
     this.navigationElapsedMs = 0;
     this.navigationTargetIsland = resolution.islandId;
     this.refreshControlsEnabled();
@@ -1570,9 +1921,21 @@ export class AtlasBinding {
     return best;
   }
 
+  /**
+   * The region the visitor is standing inside, or null.
+   *
+   * The landmark is what marks a memory in the world now that nothing else does, and a landmark is
+   * geometry with no identity of its own: it carries no anchor, so the reticle cannot settle on it
+   * the way it settles on an occurrence. Spatial phase already knows which region holds the camera,
+   * and that is the same answer without inventing a picking surface for a beacon.
+   */
+  get occupiedRegion(): IslandId | null {
+    return this.occupied;
+  }
+
   /** Engage exactly the one settled reticle target. The application decides which panel opens. */
   engageFocusedAnchor(): number | null {
-    if (this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null) return null;
+    if (!this.memoryLayerVisible || this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null) return null;
     const index = this.focusState.focusedIndex;
     this.focusState = latchFocus(this.focusState);
     return index;
@@ -1592,9 +1955,14 @@ export class AtlasBinding {
     this.focusState = releaseFocus(this.focusState);
   }
 
-  cameraPose(): CameraPose {
+  playerPose(): CameraPose {
     const s = this.controls.state;
     return { position: atlasVec3(s.x, s.y, s.z), forward: this.controls.forward() };
+  }
+
+  cameraPose(): CameraPose {
+    const ray = this.interactionRay();
+    return { position: atlasVec3(...ray.origin), forward: atlasVec3(...ray.direction) };
   }
 
   private navigationPose(): NavigationPose {
@@ -1626,6 +1994,19 @@ export class AtlasBinding {
     this.onNavigationArrive?.(transition.target);
   }
 
+  private syncNativeCharacterFrames(dt:number,navigating=false):void{
+    if(!this.nativeCharacters)return;
+    const frames=[...(this.ownedDistrict?.nativeCharacterFrames(dt,this.reducedMotion)??[])];
+    if(this.playerAvatar){
+      const avatar=this.playerAvatar,s=this.controls.state;
+      frames.push({subject:avatar.representation.subject,parent:this.environmentRoot,fallback:avatar.root,
+        visible:this.playerDrawn&&avatar.representation.availability!=='hidden',
+        position:[s.x,s.y-this.navigationWorld.eyeHeight,s.z],yaw:avatar.facing,
+        deltaSeconds:dt,reducedMotion:this.reducedMotion,discontinuity:this.nativePlayerDiscontinuity||navigating});
+    }
+    this.nativeCharacters.syncFrames(frames);this.nativePlayerDiscontinuity=false;
+  }
+
   /**
    * One frame of Atlas logic. Called from the engine's update, before it renders.
    *
@@ -1642,13 +2023,46 @@ export class AtlasBinding {
     const navigating = this.navigationTransition !== null;
     if (navigating) this.advanceDirectNavigation(dt * 1000);
     else if (this.inspection === null) this.controls.update(dt);
-    this.ownedDistrict?.tickSociety(nowMs);
+    this.ownedDistrict?.refreshNearby([this.controls.state.x, this.controls.state.z]);
+    this.ownedDistrict?.tickSociety(this.reducedMotion ? Number.MAX_SAFE_INTEGER : nowMs);
+    if (this.ownedDistrict && Math.floor(nowMs / 1000) !== Math.floor((nowMs - dt * 1000) / 1000)) {
+      const canvas = this.device.canvas;
+      if (canvas instanceof HTMLCanvasElement) {
+        canvas.dataset.ownedGeometryBytes = String(this.ownedDistrict.geometryResidentBytes+(this.playerAvatar?.residentBytes??0));
+        canvas.dataset.characterTextureBytes=String(this.ownedDistrict.characterTextureBytes+(this.playerAvatar?.textureResidentBytes??0));
+        canvas.dataset.actualDrawCalls = String(this.app.stats.drawCalls.total);
+        canvas.dataset.playerPosition = JSON.stringify([this.controls.state.x, this.controls.state.y, this.controls.state.z]);
+        canvas.dataset.displayCameraPosition = JSON.stringify(this.camera.getPosition().toArray());
+        canvas.dataset.societyRendered = String(this.ownedDistrict.drawnInhabitantCount);
+        canvas.dataset.societyNearby=String(this.ownedDistrict.visibleInhabitantIds.length);
+        const signature=this.ownedDistrict.visibleInhabitantIds.join('|');
+        if(signature!==this.nearbySignature){this.nearbySignature=signature;canvas.dispatchEvent(new Event('society-nearby-change'));}
+      }
+    }
 
     const s = this.controls.state;
+    const previous = this.lastPlayerPosition ?? [s.x, s.z];
+    this.playerAvatar?.update(s, s.x - previous[0]!, s.z - previous[1]!, dt,
+      this.playerDrawn, this.reducedMotion,
+      s.y - this.navigationWorld.eyeHeight, this.controls.movementHeading);
+    this.lastPlayerPosition = [s.x, s.z];
+    this.syncNativeCharacterFrames(dt,navigating);
+    // Look at the body that is actually drawn, not at a fixed offset from the eye line.
+    const groundY = s.y - this.navigationWorld.eyeHeight;
+    const standingHeight = (this.playerAvatar?.body.heightMm ?? 1820) / 1000;
+    const cameraPosition = this.inspection === null
+      ? this.followCamera.solve(s, this.playerCameraMode, {
+        ...(this.ownedDistrict?.district === undefined ? {} : { district: this.ownedDistrict.district }),
+        requestedDistance: this.playerCameraDistance,
+        aimHeight: playerCameraAimHeight(groundY, standingHeight, this.playerCameraDistance),
+        dt,
+        reducedMotion: this.reducedMotion,
+      })
+      : [s.x, s.y, s.z];
     this.pose.position.set(
-      s.x - this.renderOriginState.origin.x,
-      s.y - this.renderOriginState.origin.y,
-      s.z - this.renderOriginState.origin.z,
+      cameraPosition[0]! - this.renderOriginState.origin.x,
+      cameraPosition[1]! - this.renderOriginState.origin.y,
+      cameraPosition[2]! - this.renderOriginState.origin.z,
     );
     this.camera.setPosition(this.pose.position);
     this.qYaw.setFromAxisAngle(pc.Vec3.UP, (s.yaw * 180) / Math.PI);
@@ -1675,6 +2089,14 @@ export class AtlasBinding {
         : mapTierState(this.scene);
 
     const spatial = classifySpatialPhase(this.navigationWorld, cameraAtlas);
+    /*
+     * Standing IN the memory, not merely near it.
+     *
+     * `approaching` reaches 24 metres past the footprint, which over a district is most of a city
+     * block and would hand every interact key in that radius to a memory. Inside the footprint is
+     * the honest reading of "standing at it", and it is also where the landmark is.
+     */
+    this.occupied = spatial.phase === 'inside' || spatial.phase === 'dissolve' ? spatial.islandId : null;
     this.activeNeighborhood =
       spatial.islandId === null
         ? (this.activeNeighborhood ?? this.neighborhoodIndex.neighborhoods[0]?.neighborhoodId ?? null)
@@ -1691,7 +2113,7 @@ export class AtlasBinding {
       this.renderRoot.setPosition(-origin.x, -origin.y, -origin.z);
       this.environmentRoot.setPosition(-origin.x, -origin.y, -origin.z);
       this.field.setRenderOrigin(origin.x, origin.z);
-      this.pose.position.set(s.x - origin.x, s.y - origin.y, s.z - origin.z);
+      this.pose.position.set(cameraPosition[0]! - origin.x, cameraPosition[1]! - origin.y, cameraPosition[2]! - origin.z);
       this.camera.setPosition(this.pose.position);
     }
     const { view: residencyView, signature } = residencyFrameInputs({
@@ -1800,14 +2222,10 @@ export class AtlasBinding {
       },
       this.focusState,
     );
-    this.focusState = resolution.state;
-    const focusedIslandId = this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null
-      ? null
-      : (this.table.anchors[this.focusState.focusedIndex]?.islandId ?? null);
-    this.sourceFirst.update(nowMs, cameraAtlas, focusedIslandId);
+    this.focusState = this.memoryLayerVisible ? resolution.state : INITIAL_FOCUS_STATE;
     this.field.update(nowMs);
 
-    this.centred = this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
+    this.centred = this.memoryLayerVisible && this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
     const tileForward = this.controls.forward();
     this.googleTiles?.update(
       [s.x, s.y, s.z],
@@ -1815,10 +2233,13 @@ export class AtlasBinding {
       this.camera.camera?.fov ?? 70,
       [tileForward.x, tileForward.y, tileForward.z],
     );
+    const memoryOverlayVisible = this.memoryLayerVisible || this.mapState !== null || this.inspection !== null;
+    if (this.overlay) this.overlay.root.hidden = !memoryOverlayVisible;
     const cameraComponent = this.camera.camera;
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
       this.overlay.update({
         photographPrompt: this.centred !== null,
+        memoryPrompt: this.occupied !== null,
         table: this.table,
         emphasis: this.emphasis,
         camera: cameraComponent,
@@ -1875,6 +2296,13 @@ export class AtlasBinding {
   }
 
   destroy(): void {
+    const canvas = this.device.canvas;
+    if (canvas instanceof HTMLCanvasElement) {
+      for (const key of ['cameraMode','ownedGeometryBytes','characterTextureBytes','actualDrawCalls','playerPosition','displayCameraPosition','societyRendered','societyNearby']) delete canvas.dataset[key];
+    }
+    this.representation.destroy();
+    this.nativeCharacters?.destroy();
+    this.playerAvatar?.destroy();
     this.ownedDistrict?.destroy();
     this.googleTiles?.dispose();
     this.googleTiles = null;
@@ -1883,7 +2311,6 @@ export class AtlasBinding {
     this.mapOverlay?.destroy();
     this.motes.destroy();
     this.field.destroy();
-    this.sourceFirst.destroy();
     this.composedWorld.destroy();
     this.regionMass.destroy();
     this.regionRelief.destroy();
@@ -1899,21 +2326,17 @@ export class AtlasBinding {
   }
 }
 
-/** Only this renderer input changes; the authoritative scene, source catalog, and topology stay intact. */
-export function sourceGroveScene(
-  scene: AtlasScene,
-  availableReconstruction: ReadonlySet<IslandId>,
-  sourcePresentation: 'world' | 'inspection' = 'world',
-): AtlasScene {
-  return { ...scene, islands: sourcePresentation === 'inspection' ? [] : scene.islands.map((island) =>
-    availableReconstruction.has(island.islandId) ? island : { ...island, rung: 4 as const }) };
-}
-
-/** Preserve safe startup positions; only a visible in-world source may own the upward framing. */
+/**
+ * Where a session opens.
+ *
+ * The upward framing is gone with the body it framed. This used to pitch the opening camera up at
+ * the source veil hanging 3.45 metres over the region, which is the one thing that made an opening
+ * shot point at empty air once the veil was removed. A region now opens level, looking at its own
+ * ground, where its landmark stands.
+ */
 export function initialAtlasCameraState(
   scene: AtlasScene,
   navigationWorld: NavigationWorld,
-  sourcePresentation: 'world' | 'inspection' = 'world',
 ): CameraState {
   const first = scene.islands[0];
   if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {
@@ -1938,21 +2361,7 @@ export function initialAtlasCameraState(
         const x = first.placement.position.x + Math.sin(first.placement.yaw) * distance;
         const z = first.placement.position.z + Math.cos(first.placement.yaw) * distance;
         const height = navigationWorld.surface.sample(x, z)?.height ?? 0;
-        if (sourcePresentation === 'inspection') {
-          return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
-        }
-        const sourceLocal = sourceFirstCardLocalPosition(first);
-        const source = localToAtlas(first.placement, sourceLocal);
-        const sourceHeight = atlasLandscapeHeight(source.x, source.z) +
-          SOURCE_VEIL_HEIGHT * first.placement.scale;
-        const horizontal = Math.max(1, Math.hypot(source.x - x, source.z - z));
-        return {
-          x,
-          y: height + navigationWorld.eyeHeight,
-          z,
-          yaw: first.placement.yaw,
-          pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
-        };
+        return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
       })();
 }
 
@@ -1961,6 +2370,33 @@ export function cityCameraState(view: 'overview' | 'street'): CameraState {
   return view === 'street'
     ? { x: -25, y: 60, z: -280, yaw: Math.PI, pitch: -0.35 }
     : { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
+}
+
+/** Frame the actual admitted district rather than assuming its local origin is Manhattan. */
+export function ownedDistrictOverviewCameraState(district: OwnedDistrict): CameraState {
+  if (district.buildings.length === 0) {
+    return { x: -45, y: 95, z: -380, yaw: Math.PI, pitch: -0.48 };
+  }
+  const west = Math.min(...district.buildings.map((building) => building.bbox_cm[0] / 100));
+  const north = Math.min(...district.buildings.map((building) => building.bbox_cm[1] / 100));
+  const east = Math.max(...district.buildings.map((building) => building.bbox_cm[2] / 100));
+  const south = Math.max(...district.buildings.map((building) => building.bbox_cm[3] / 100));
+  const tallest = Math.max(...district.buildings.map((building) => building.height_cm / 100));
+  const targetX = (west + east) / 2;
+  const targetZ = (north + south) / 2;
+  const span = Math.max(80, east - west, south - north);
+  const horizontal = span * 0.9;
+  const x = targetX + horizontal * 0.28;
+  const y = Math.max(65, tallest * 1.18, span * 0.52);
+  const z = targetZ + horizontal;
+  const targetY = Math.min(24, tallest * 0.28);
+  const dx = targetX - x;
+  const dz = targetZ - z;
+  return {
+    x, y, z,
+    yaw: Math.atan2(-dx, -dz),
+    pitch: Math.atan2(targetY - y, Math.hypot(dx, dz)),
+  };
 }
 
 /** Deterministic clear spawn on visible owned support, never an invisible safety floor. */
@@ -2102,29 +2538,6 @@ export function recoveredCameraState(island: Island, viewpointLocal: LocalVec3, 
   };
 }
 
-/** Preserve the validated destination position while facing a rung-4 arrival toward its source. */
-export function sourceFirstArrivalPose(
-  island: Island,
-  pose: NavigationPose,
-  sourcePresentation: 'world' | 'inspection' = 'world',
-): NavigationPose {
-  if (sourcePresentation === 'inspection' || island.rung !== 4) return pose;
-  const card = localToAtlas(island.placement, sourceFirstCardLocalPosition(island));
-  const source = atlasVec3(
-    card.x,
-    atlasLandscapeHeight(card.x, card.z) + SOURCE_VEIL_HEIGHT * island.placement.scale,
-    card.z,
-  );
-  const dx = source.x - pose.position.x;
-  const dy = source.y - pose.position.y;
-  const dz = source.z - pose.position.z;
-  const horizontal = Math.max(1e-9, Math.hypot(dx, dz));
-  return Object.freeze({
-    position: pose.position,
-    yaw: Math.atan2(-dx, -dz),
-    pitch: Math.atan2(dy, horizontal),
-  });
-}
 
 /** A deterministic overview pose derived only from persisted presentation layout. */
 export function mapCameraState(scene: AtlasScene): CameraState {

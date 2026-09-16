@@ -198,6 +198,18 @@ shader, a URL, or a selector, for the same reason a style recipe cannot.
 `world_reviewed_asset` is a global reviewed catalog, not tenant data. It is seeded by migration
 0042 and is read-only to the runtime roles by grant, like every other registry in this schema.
 
+Reviewed external CC0 assets can also be imported through the host administration command
+`scripts/import_reviewed_world_asset.py`. Its manifest pins the asset bytes, exact upstream
+license evidence, source URL/revision and producer. Validation refuses digest/size mismatches,
+external GLB dependencies and unsupported codecs. It does not certify animation quality or
+character rig compatibility. The command validates by default; publication retains the asset,
+license and canonical import receipt before committing a registry row.
+
+Migration 0054 adds append-only import receipts. Repeating an identical import is idempotent;
+an existing key or its provenance cannot be rebound. Withdrawing a registry entry preserves
+its import receipt, and the import command cannot silently republish that withdrawn key.
+These global reusable assets do not grant permission to display a source-derived person.
+
 ```text
 asset_key        stable reviewed name
 content_sha256   SHA-256 of the GLB bytes
@@ -572,3 +584,29 @@ The browser reads and draws available environment instances through the existing
 binding. Unified Selection, Companion editing, WMP projection, extraction, retained-database writes
 and real-scene visual validation are outside the implemented environment-instance scope. The
 existing reviewed CC0 asset registry and its byte semantics are unchanged.
+
+
+## Bounded scene-extraction preparation
+
+`scripts/prepare_scene_extraction.py` prepares an object-segment candidate from an available
+reconstruction and its pinned source masks. It retains source point indices, colors and provenance,
+bounds the sampled input, and rechecks source availability before completing the artifact. Its PLY
+uses the original scene units; it establishes neither metric scale nor a complete object's shape.
+Person segments are outside this preparer's scope. The output is a candidate for review, not an
+admitted render asset, collision shape or automatically placeable world object.
+
+## Authored district object coordinates
+
+`GET /world/versions/{version_id}/society/district` supplies the authorized region registration and
+exact pinned district documents. The browser verifies the bytes, source availability, version and
+frame before using the region-to-district translation. Authored objects have a separate display
+root; the registration never moves reconstructed source geometry. New placement uses the district's
+authored ground and bounds, with the existing confirmation and version compare-and-swap. Missing or
+withdrawn registration clears that display frame and prevents pending placement from using it.
+
+An authored object becomes a society target only through the reviewed composition adapter and one
+of the existing `visit` or `rest` affordances. The typed society action API can request that a
+synthetic inhabitant use the resulting canonical target, but it does not edit the object, add a
+behavior, bypass clearance or grant source rights. The request and its eventual disposition are
+simulation history; moving, removing or restoring the object remains authored-world history and
+appends the corresponding society input.

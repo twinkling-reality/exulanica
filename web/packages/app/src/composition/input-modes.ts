@@ -14,8 +14,9 @@
  * registered beside it would outlive its owner.
  */
 
+import type { IslandId } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
-import { decodeFacets } from '@exulanica/world-index';
+import { ALL_FACETS, decodeFacets } from '@exulanica/world-index';
 
 import type { MountedAtlas } from '../atlas.js';
 import type { AtlasCommand } from '../ui/atlas-commands.js';
@@ -78,17 +79,53 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
   mounted.binding.onMapTarget = (islandId) => {
     const resolution = mounted.binding.navigateToIsland(islandId, deps.travelUsesReducedMotion());
     if (!resolution.ok) {
-      deps.showTravelStatus('No safe arrival point is available in that region.', 'failure');
+      // One sentence per reason. This said "No safe arrival point is available in that region" for
+      // all four, including the region that has no ground here at all, which told someone to look
+      // for a way in that does not exist.
+      deps.showTravelStatus({
+        'unknown-target': 'That region is not in this Atlas.',
+        'outside-resident-field': 'That region sits outside this place. There is no ground under it to stand on.',
+        'no-safe-surface': 'There is no ground to stand on near that region.',
+        occluded: 'That region is here, but it is built over. Nowhere nearby is open to stand.',
+      }[resolution.reason], 'failure');
       return;
     }
     deps.dispatchShell({ type: 'show-world' });
     deps.showTravelStatus(deps.travelUsesReducedMotion() ? 'Located the region.' : 'Moving to the region…');
   };
+  /*
+   * A memory opens in the interface, never in the scene.
+   *
+   * The landmark standing on the ground says a memory is here; it is not the memory, and a
+   * photograph hung in the air to be the memory is exactly the confusion of observation with
+   * spatial state that this world is not allowed to make. So the beacon marks, and the index
+   * filtered to that one region shows what the memory actually holds.
+   */
+  const scopeRegionMemory = (islandId: IslandId): void => {
+    state.indexFacets = Object.freeze({ ...ALL_FACETS, islands: Object.freeze([islandId]) });
+    deps.worldIndex.render(current, state.indexFacets, state.selected);
+  };
+
+  const openRegionMemory = (islandId: IslandId): void => {
+    scopeRegionMemory(islandId);
+    if (deps.shellState().primary !== 'index') deps.dispatchShell({ type: 'toggle-index' });
+  };
+
   mounted.binding.onNavigationArrive = (target) => {
     if (target.kind === 'anchor') {
       const index = mounted.binding.table.indexOf.get(target.anchorId);
       if (index !== undefined) mounted.binding.focusAnchor(index);
     }
+    /*
+     * Arriving SCOPES the memory; it does not open it.
+     *
+     * Opening took the world away at the end of every journey: the index is a full surface, so the
+     * last thing travelling to a place did was cover the place. Approaching still means something
+     * here, and it is the more useful half of it. The index is now already narrowed to the region
+     * underfoot, so the moment the visitor asks for it they get this memory and not the library,
+     * and until they ask they are standing in the street looking at the landmark they travelled to.
+     */
+    if (target.kind === 'island') scopeRegionMemory(target.islandId);
     deps.showTravelStatus(target.kind === 'anchor' ? 'Located the source.' : 'The memory is in focus.');
   };
 
@@ -118,9 +155,16 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       // opens that photograph: the original, who is in it, and its evidence. The mouse is freed
       // because the inspector is read and clicked, not walked.
       const photograph = mounted.binding.centredPhotograph;
-      if (photograph === null) return;
-      if (document.pointerLockElement !== null) document.exitPointerLock();
-      status.inspectSceneSources(photograph.sceneId, photograph.captureId);
+      if (photograph !== null) {
+        if (document.pointerLockElement !== null) document.exitPointerLock();
+        status.inspectSceneSources(photograph.sceneId, photograph.captureId);
+        return;
+      }
+      // Nothing under the reticle, but standing at a memory is itself a selection of it: the
+      // landmark in front of the visitor is that memory's only mark in the world.
+      const region = mounted.binding.occupiedRegion;
+      if (region === null) return;
+      openRegionMemory(region);
       return;
     }
     const anchor = mounted.binding.table.anchors[index];
@@ -189,9 +233,20 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
        * we neither see nor want it, which is the rule the renderer controls are built around.
        * Released, it has no browser job left, and the key everyone already tries for "out of
        * this" becomes the way out. One press, one level: the exchange, then the entry, then the
-       * plate. Backspace keeps its meaning for people who learned it, but nobody guesses it.
+       * plate. It never opens a surface: H owns the World hub, so dismiss/back and open cannot
+       * both happen on one keypress.
        */
       if (event.code === 'Escape' && document.pointerLockElement === null) {
+        if (
+          deps.shellState().primary === 'world' &&
+          companion.panel.state() !== 'open' &&
+          deps.firstUse.prompt('converse') !== null
+        ) {
+          event.preventDefault();
+          deps.firstUse.complete();
+          deps.reflectFirstUse();
+          return;
+        }
         // Search is the innermost thing open, so it is the first thing Escape takes back.
         if (deps.shellState().primary === 'index' && deps.worldIndex.closeSearch()) {
           event.preventDefault();
@@ -207,11 +262,15 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
           deps.dispatchShell({ type: 'close-detail' });
           return;
         }
-        if (deps.shellState().primary !== 'world') {
+        if (
+          deps.shellState().primary !== 'world' ||
+          deps.shellState().camera === 'map'
+        ) {
           event.preventDefault();
-          deps.dispatchShell({ type: 'show-world' });
+          deps.dispatchShell({ type: 'step-back' });
           return;
         }
+        return;
       }
       const command = commandForKeystroke({
         code: event.code,
@@ -219,6 +278,12 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
         modified: event.altKey || event.ctrlKey || event.metaKey,
         typing,
       });
+      if (command === 'toggle-menu') {
+        event.preventDefault();
+        if (companion.panel.state() === 'open') companion.dismiss();
+        deps.dispatchShell({ type: 'toggle-menu' });
+        return;
+      }
       if (
         !typing && companion.panel.state() === 'open' &&
         !event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyE'
@@ -239,6 +304,11 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       if (command === 'toggle-index') {
         event.preventDefault();
         deps.handleAtlasCommand('index');
+        return;
+      }
+      if (command === 'toggle-character') {
+        event.preventDefault();
+        deps.handleAtlasCommand('character');
         return;
       }
       if (command === 'toggle-map') {

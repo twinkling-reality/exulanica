@@ -25,7 +25,7 @@
  * running it.
  */
 
-import type { AtlasScene, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
+import type { AtlasScene, DistrictInterpretation, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
 import type {
   PresentationTheme,
   WorldArtProfile,
@@ -64,7 +64,6 @@ export async function mountAtlas(
     readonly artProfile?: WorldArtProfile;
     readonly artProfileParameters?: WorldStyleParameters;
     readonly sourceMedia?: SourceMediaCatalog;
-    readonly sourcePresentation?: 'world' | 'inspection';
     readonly reducedMotion?: boolean;
     readonly pointMaps?: ReadonlyMap<IslandId, PointMap>;
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
@@ -74,6 +73,7 @@ export async function mountAtlas(
     readonly ownedDistrict?: {
       readonly document: OwnedDistrict;
       readonly residentBytes: number;
+      readonly interpretation?: DistrictInterpretation;
     };
   },
   beforeStart?: (binding: AtlasBinding) => void,
@@ -84,7 +84,6 @@ export async function mountAtlas(
     scene,
     pointMaps: presentation?.pointMaps ?? NO_POINT_MAPS,
     recoveredCameras: presentation?.recoveredCameras ?? [],
-    sourcePresentation: presentation?.sourcePresentation ?? 'world',
     ...(presentation?.trainedGeometry === undefined ? {} : { trainedGeometry: presentation.trainedGeometry }),
     ...(presentation?.placedPointMaps === undefined
       ? {}

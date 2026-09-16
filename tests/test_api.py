@@ -57,9 +57,34 @@ PUBLIC_ROUTES: dict[str, str] = {
     "/redoc": "the schema of the API, which is not data",
 }
 
+# Cookie-only endpoints have a separate disabled-provider and signed-login suite.
+ACCOUNT_ROUTES = {
+    ("GET", "/auth/google/start"),
+    ("GET", "/auth/google/callback"),
+    ("GET", "/auth/session"),
+    ("POST", "/auth/logout"),
+}
+
+
+@pytest.mark.parametrize(("method", "path"), sorted(ACCOUNT_ROUTES))
+def test_account_routes_are_unavailable_without_configured_accounts(deployment, method, path):
+    response = deployment.client.request(method, path)
+    assert response.status_code == 503
+    assert response.json()["code"] == "account_unavailable"
+    assert "no-store" in response.headers["cache-control"]
+
+
 #: A request body for every authenticated route, so the sweep can actually call it. A route
 #: missing from here and from PUBLIC_ROUTES fails `test_every_route_is_covered_by_this_file`.
 ROUTE_PROBES: dict[tuple[str, str], dict] = {
+    ("GET", "/world/versions/{version_id}/society/control"): {},
+    ("PUT", "/world/versions/{version_id}/society/control"): {
+        "json": {"base_revision": 0, "mode": "paused", "speed": 1}
+    },
+    ("POST", "/world/versions/{version_id}/society/control/steps"): {
+        "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": "0" * 64}
+    },
+    ("GET", "/world/versions/{version_id}/society/control/events"): {},
     ("GET", "/graph"): {},
     ("GET", "/graph/sources"): {},
     ("POST", "/environment-resources/sources"): {"json": {}},
@@ -83,9 +108,39 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/selection/environment"): {"json": {}},
     ("GET", "/world/versions/{version_id}/society"): {},
     ("GET", "/world/versions/{version_id}/society/events"): {},
+    ("GET", "/world/versions/{version_id}/society/actions"): {},
+    ("GET", "/world/versions/{version_id}/society/actions/{request_id}"): {},
+    ("POST", "/world/versions/{version_id}/society/actions"): {
+        "json": {
+            "idempotency_key": str(uuid.uuid4()),
+            "base_tick": 0,
+            "base_state_sha256": "0" * 64,
+            "subject_id": str(uuid.uuid4()),
+            "intent": {"kind": "go_to", "target_id": "fixture:target"},
+        }
+    },
+    ("GET", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {},
+    ("PUT", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {
+        "json": {}
+    },
+    (
+        "POST",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
+    ): {"json": {}},
+    (
+        "GET",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
+    ): {},
+    (
+        "GET",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
+    ): {},
     ("GET", "/world/versions/{version_id}/society/replay"): {},
     ("POST", "/world/versions/{version_id}/society"): {"json": {}},
     ("POST", "/world/versions/{version_id}/society/steps"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/society/decisions"): {"json": {}},
+    ("GET", "/world/versions/{version_id}/society/decisions/{request_id}"): {},
+    ("GET", "/world/versions/{version_id}/society/district"): {},
     ("POST", "/world/versions/{version_id}/environment-instances"): {"json": {}},
     ("POST", "/world/versions/{version_id}/environment-instances/undo"): {"json": {}},
     ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): {"json": {}},
@@ -360,6 +415,10 @@ class Deployment:
             .replace("{answer_id}", str(uuid.uuid4()))
             .replace("{kind}", "source")
             .replace("{resource_id}", str(uuid.uuid4()))
+            .replace("{version_id}", str(uuid.uuid4()))
+            .replace("{request_id}", str(uuid.uuid4()))
+            .replace("{subject_kind}", "avatar")
+            .replace("{subject_id}", str(uuid.uuid4()))
         )
 
 
@@ -479,7 +538,9 @@ def test_every_route_is_covered_by_this_file(deployment):
     uncovered = [
         (method, path)
         for method, path in routable_paths(deployment.client.app)
-        if path not in PUBLIC_ROUTES and (method, path) not in ROUTE_PROBES
+        if path not in PUBLIC_ROUTES
+        and (method, path) not in ROUTE_PROBES
+        and (method, path) not in ACCOUNT_ROUTES
     ]
     assert not uncovered, (
         f"these routes are neither public nor probed: {uncovered}. Add them to ROUTE_PROBES "
@@ -581,6 +642,8 @@ def test_readiness_reports_each_check_separately(deployment):
         "object_store",
         "model_manifest",
         "derivative_worker",
+        "accounts",
+        "society_playback",
     }
     # Not asked for, so not running, and READY: draining the queue in another process is a real
     # deployment. What is never ready is a worker that WAS asked for and is not there, which is
@@ -607,7 +670,7 @@ def test_the_readiness_database_check_claims_only_what_a_fresh_connect_proves(de
 
     ``/readyz`` served "the database is reachable and the connection pool is not full" to an
     operator over HTTP, and the docstring above it said the same. There is no connection pool:
-    ``orimera/db/session.py`` calls ``psycopg.connect`` per session and ``psycopg_pool`` is in
+    ``exulanica/db/session.py`` calls ``psycopg.connect`` per session and ``psycopg_pool`` is in
     neither ``pyproject.toml`` nor ``uv.lock``. An operator reading that acted on a check of
     something that does not exist, and missed the thing it does check, which is that the server
     had a free connection SLOT. Slots are what this deployment can run out of: one API process
@@ -620,7 +683,7 @@ def test_the_readiness_database_check_claims_only_what_a_fresh_connect_proves(de
     """
     assert importlib.util.find_spec("psycopg_pool") is None, (
         "psycopg_pool is installed. /readyz reports a free connection slot because every "
-        "connection is opened fresh; revisit that sentence, orimera/db/session.py and "
+        "connection is opened fresh; revisit that sentence, exulanica/db/session.py and "
         "docs/deployment.md section 5.4 before relaxing this"
     )
     proves = deployment.client.get("/readyz").json()["checks"]["database"]["proves"]

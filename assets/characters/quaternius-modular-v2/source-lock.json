@@ -1,0 +1,117 @@
+{
+  "profile": "exulanica.character-preparation/v1",
+  "producer": "quaternius-modular-prepare/2",
+  "blender_version": "4.5.9",
+  "source_license": "CC0-1.0",
+  "sources": [
+    {
+      "source_id": "men",
+      "filename": "men.blend",
+      "url": "https://drive.google.com/uc?export=download&id=1B9DlH0SacSiAlAdnk_Ra9tA0sEpkNAtT",
+      "sha256": "25252b3fb5d48b59f2b2dafeb0fd61af0c3ea652254b39cec02fc752be0123f4",
+      "byte_length": 11548924,
+      "license_file": "men-LICENSE.txt",
+      "license_sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+      "license_url": "https://drive.google.com/uc?export=download&id=1TTvylHa1CsiJuHFWWiv6PFGhLM-aAH5z",
+      "creator": "Quaternius",
+      "page_url": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "upstream_release_label": "February 2022",
+      "retrieved_on": "2026-09-13",
+      "origin_translation_z_metres": 0.004659328609704971,
+      "origin_reference_look": "hoodie"
+    },
+    {
+      "source_id": "women",
+      "filename": "women.blend",
+      "url": "https://drive.google.com/uc?export=download&id=1g_8kXWOocZRf26wxEdiV_zVcye8zDqJa",
+      "sha256": "e478c764a329f5ba8a425df865e2b9061bba42add8afe8e7324cc2cb257fc8de",
+      "byte_length": 10966012,
+      "license_file": "women-LICENSE.txt",
+      "license_sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+      "license_url": "https://drive.google.com/uc?export=download&id=1lIFL16xEpoPbr0j_HUATgmcEnAmYoIK2",
+      "creator": "Quaternius",
+      "page_url": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "upstream_release_label": "April 2022",
+      "retrieved_on": "2026-09-13",
+      "origin_translation_z_metres": 0.0064259483478963375,
+      "origin_reference_look": "casual-f"
+    }
+  ],
+  "looks": [
+    {
+      "look_id": "hoodie",
+      "source_id": "men",
+      "mesh_nodes": {
+        "upper": "Casual_Body",
+        "lower": "Casual_Legs",
+        "feet": "Casual_Feet",
+        "head_hair": "Casual_Head"
+      },
+      "actions": {
+        "idle": "Idle",
+        "walk": "Walk",
+        "run": "Run"
+      },
+      "smooth_shading": true,
+      "subdivision_levels": 1
+    },
+    {
+      "look_id": "casual",
+      "source_id": "men",
+      "mesh_nodes": {
+        "upper": "Casual2_Body",
+        "lower": "Casual2_Legs",
+        "feet": "Casual2_Feet",
+        "head_hair": "Casual2_Head"
+      },
+      "actions": {
+        "idle": "Idle",
+        "walk": "Walk",
+        "run": "Run"
+      },
+      "smooth_shading": true,
+      "subdivision_levels": 1
+    },
+    {
+      "look_id": "casual-f",
+      "source_id": "women",
+      "mesh_nodes": {
+        "upper": "Casual_Body",
+        "lower": "Casual_Legs",
+        "feet": "Casual_Feet",
+        "head_hair": "Casual_Head"
+      },
+      "actions": {
+        "idle": "Idle",
+        "walk": "Walk",
+        "run": "Run"
+      },
+      "smooth_shading": true,
+      "subdivision_levels": 1
+    },
+    {
+      "look_id": "formal-f",
+      "source_id": "women",
+      "mesh_nodes": {
+        "upper": "Formal_Body",
+        "lower": "Formal_Legs",
+        "feet": "Formal_Feet",
+        "head_hair": "Formad_Head"
+      },
+      "actions": {
+        "idle": "Idle",
+        "walk": "Walk",
+        "run": "Run"
+      },
+      "smooth_shading": true,
+      "subdivision_levels": 1
+    }
+  ],
+  "toolchain": {
+    "blender_build_hash": "8bf95cbd38d1",
+    "verified_platform": "macos-arm64",
+    "download_url": "https://download.blender.org/release/Blender4.5/blender-4.5.9-macos-arm64.dmg",
+    "download_sha256": "e3a3d7aac381fb4e4d05197f99cd8899484d7e8bc4497c134066e6733f372238",
+    "checksums_url": "https://download.blender.org/release/Blender4.5/blender-4.5.9.sha256"
+  }
+}

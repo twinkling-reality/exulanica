@@ -26,7 +26,7 @@ def routable_paths(app: object) -> list[tuple[str, str]]:
     surface it could no longer see.
 
     That is the failure this file's own docstring says it exists to prevent, and it is the
-    failure mode `.orimera/working/known-defects.md` records twice: a test that passes without
+    failure mode a private known-defects note records twice: a test that passes without
     exercising its case. It was found by adding a route and noticing the suite stayed green.
 
     So the walk is recursive over anything that carries routes, and

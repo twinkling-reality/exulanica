@@ -5,7 +5,7 @@
 """MoGe-2 metric depth as a scale source for a COLMAP sparse model.
 
 Measures whether MoGe-2's per-image metric depth can supply the metres-per-unit scale that
-orimera/reconstruction/pose.py's manifest currently requires a human to type in. For every
+exulanica/reconstruction/pose.py's manifest currently requires a human to type in. For every
 registered image of the COLMAP B8 model (known intrinsics, eight views), for every 2D
 observation with a 3D point: depth_colmap = (R x + t).z in COLMAP units and depth_moge = -z of
 the MoGe point at the same pixel (OPM frame, metres); their ratio is metres per COLMAP unit.
@@ -30,7 +30,7 @@ measurement of MoGe-2 scale accuracy on photographs.
 Inputs: the spike directory, required, holding images/, analysis.json from
 reconstruction_pycolmap_analyze.py and runs/B8/sparse/0_text from
 reconstruction_pycolmap_run.py. Needs the repository's .venv with the reconstruction extra
-(torch, moge) for orimera.reconstruction.moge, plus numpy and pillow; pycolmap is not needed,
+(torch, moge) for exulanica.reconstruction.moge, plus numpy and pillow; pycolmap is not needed,
 the model is read from its text export. Writes <spike_dir>/moge_scale_vs_colmap.json, or
 moge_scale_vs_colmap_knownfov.json with --known-fov, unless --out is given.
 

@@ -8,6 +8,7 @@ import type { CompanionPlacement } from './companion-placement.js';
 import { buildCompanionSpeech } from './companion-speech.js';
 import { el, replace } from './dom.js';
 import type { FirstUsePrompt } from './first-use-guidance.js';
+import { createModalFocus } from './modal-focus.js';
 
 export type CompanionHandlers = CompanionChoiceHandlers;
 
@@ -18,6 +19,9 @@ export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
+  /** The live presence renderer, visually docked here while retaining its own state owner. */
+  readonly presence?: HTMLElement;
+  readonly onDismiss?: () => void;
   /**
    * An answer has been taken by this surface. Fired once per arriving answer, AFTER it is drawn.
    *
@@ -90,7 +94,6 @@ export interface CompanionEncounter {
   openEvidence(): boolean;
   setPlacement(placement: CompanionPlacement): void;
   placement(): CompanionPlacement | null;
-  hide(): void;
 }
 
 export function buildCompanionEncounter(
@@ -100,6 +103,7 @@ export function buildCompanionEncounter(
   const speakerName = options.speakerName ?? 'Unnamed Companion';
   const root = el('aside', {
     class: 'companion-encounter',
+    role: 'dialog',
     'aria-label': 'Companion encounter',
     'aria-live': 'polite',
     'data-state': 'enter',
@@ -113,6 +117,24 @@ export function buildCompanionEncounter(
    * Companion is for. Customize is already one of the four Atlas commands and is reachable from
    * the encounter like everywhere else.
    */
+  const dismissButton = el('button', {
+    type: 'button',
+    class: 'companion-dismiss',
+    'aria-label': 'Close Companion',
+  }, [
+    el('kbd', { text: 'Esc' }),
+    el('span', { text: 'Close' }),
+  ]);
+  dismissButton.addEventListener('click', () => options.onDismiss?.());
+  dismissButton.hidden = options.onDismiss === undefined;
+  const toolbar = el('header', { class: 'companion-toolbar' }, [
+    ...(options.presence === undefined ? [] : [options.presence]),
+    el('span', { class: 'companion-identity' }, [
+      el('span', { class: 'companion-surface-kicker', text: 'In your world' }),
+      el('span', { class: 'companion-surface-title', text: 'Companion' }),
+    ]),
+    dismissButton,
+  ]);
   const speech = buildCompanionSpeech({ speakerName });
   const choices = buildCompanionChoiceRail(handlers);
   let state: PanelState = 'enter';
@@ -149,12 +171,23 @@ export function buildCompanionEncounter(
   let lastQuestion: string | null = null;
   let currentPlacement: CompanionPlacement | null = null;
   let firstUsePrompt: FirstUsePrompt | null = null;
+  const draw = (children: readonly Node[]): void => {
+    const focused =
+      document.activeElement instanceof HTMLElement && root.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+    replace(root, children);
+    if (focused?.isConnected && document.activeElement !== focused) {
+      focused.focus({ preventScroll: true });
+    }
+  };
 
   function renderPrompt(): void {
     root.toggleAttribute('data-first-use', firstUsePrompt !== null);
     if (firstUsePrompt !== null) {
+      root.hidden = false;
       root.toggleAttribute('data-compact-prompt', firstUsePrompt.compact === true);
-      replace(root, [
+      draw([
         el('p', { class: 'companion-prompt' }, [
           el('span', { class: 'companion-prompt-statement', text: firstUsePrompt.statement }),
           el('span', { class: 'companion-prompt-actions' }, firstUsePrompt.actions.map((action) =>
@@ -167,35 +200,32 @@ export function buildCompanionEncounter(
       return;
     }
     root.removeAttribute('data-compact-prompt');
-    replace(root, [
-      el(
-        'p',
-        { class: 'companion-prompt' },
-        state === 'enter'
-          ? ['Click to look around']
-          : ['Press ', el('b', { text: 'X' }), ` to call ${speakerName}`],
-      ),
-    ]);
+    if (state !== 'open') {
+      root.hidden = true;
+      draw([]);
+      return;
+    }
+    draw([toolbar]);
   }
 
   function renderTurn(turn: Turn): void {
     mode = 'turn';
     speech.render(turn);
     choices.render(turn);
-    replace(root, [speech.root, choices.root]);
+    draw([toolbar, speech.root, choices.root]);
   }
 
   function renderAnswer(shown: CompanionAnswer): void {
     mode = 'answer';
     speech.renderAnswer(shown);
     choices.renderAnswer(shown, backToQuestion);
-    replace(root, [speech.root, choices.root]);
+    draw([toolbar, speech.root, choices.root]);
   }
 
   function renderAsking(question: string): void {
     mode = 'asking';
     speech.renderAsking(question);
-    replace(root, [speech.root]);
+    draw([toolbar, speech.root]);
   }
 
   function renderFailure(failure: AskUnavailable): void {
@@ -204,7 +234,7 @@ export function buildCompanionEncounter(
     // The rail comes back with the turn's own choices, so a question that failed leaves the
     // person exactly where they were rather than in a dead end.
     if (lastTurn !== null) choices.render(lastTurn);
-    replace(root, lastTurn === null ? [speech.root] : [speech.root, choices.root]);
+    draw(lastTurn === null ? [toolbar, speech.root] : [toolbar, speech.root, choices.root]);
   }
 
   /**
@@ -246,6 +276,13 @@ export function buildCompanionEncounter(
   }
 
   renderPrompt();
+  const modalFocus = createModalFocus(root, dismissButton);
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || state !== 'open') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    options.onDismiss?.();
+  });
 
   return {
     root,
@@ -268,9 +305,14 @@ export function buildCompanionEncounter(
       root.dataset['placementBasis'] = placement.basis;
     },
     setState(next) {
+      const wasOpen = state === 'open';
+      if (next !== 'open' && wasOpen) modalFocus.setVisible(false);
+      if (next === 'open' && !wasOpen) root.hidden = true;
       state = next;
       root.dataset['state'] = next;
+      root.toggleAttribute('aria-modal', next === 'open');
       reflect();
+      if (next === 'open' && !wasOpen) modalFocus.setVisible(true);
     },
     render(turn) {
       lastTurn = turn;
@@ -352,9 +394,6 @@ export function buildCompanionEncounter(
       return state === 'open' && (mode === 'turn' || mode === 'answer')
         ? choices.openEvidence()
         : false;
-    },
-    hide() {
-      root.setAttribute('hidden', '');
     },
   };
 }

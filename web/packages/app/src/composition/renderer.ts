@@ -19,7 +19,6 @@ import { worldArtProfile } from '@exulanica/presentation';
 import { mountAtlas } from '../atlas.js';
 import {
   ownedDistrict,
-  sourcePresentation,
 } from '../config.js';
 import { themeForPreferences } from '../theme.js';
 import { el } from '../ui/dom.js';
@@ -80,13 +79,23 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   const activeTheme = themeForPreferences(state.preferences, env.systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
+  let lastMemoryVisible: boolean | undefined;
+  let resolveFirstFrame: (() => void) | null = null;
+  const firstFrame = new Promise<void>((resolve) => { resolveFirstFrame = resolve; });
   const rendererLoading = el('p', { class: 'reconstruction-loading', role: 'status',
     text: 'Opening the Atlas and decoding its available reconstruction…' });
   env.shell.append(rendererLoading);
   env.shell.setAttribute('aria-busy', 'true');
   try {
-    const district = await ownedDistrict();
+    const district = await ownedDistrict({ preview: env.preview });
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
+      resolveFirstFrame?.();
+      resolveFirstFrame = null;
+      const memoryVisible = state.atlas?.binding.memoryLayerVisible;
+      if (memoryVisible !== undefined && memoryVisible !== lastMemoryVisible) {
+        lastMemoryVisible = memoryVisible;
+        deps.status.refreshStatus();
+      }
       if (state.atlas?.binding.ownedDistrict !== null) {
         env.canvas.dataset.ownedFrameMs = (report.dt * 1000).toFixed(2);
       }
@@ -133,7 +142,6 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       ...(state.pointMaps === undefined ? {} : { pointMaps: state.pointMaps }),
       ...(state.placedPointMaps === undefined ? {} : { placedPointMaps: state.placedPointMaps }),
       trainedGeometry: state.trainedGeometry,
-      sourcePresentation: sourcePresentation(),
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
       ownedDistrict: district,
@@ -173,6 +181,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   deps.status.applyProofLens();
   env.canvas.dataset.companionRenderer = 'svg';
   deps.reflectShell();
+  await firstFrame;
 
   return {
     atlas,

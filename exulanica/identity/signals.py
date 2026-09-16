@@ -21,7 +21,7 @@ is recorded as a parameter rather than claimed as a signal.
 These functions read tables that ingest wrote and identity did not: ``capture``,
 ``derived_artifact``, and ``assertion`` under ``gps_position_is``. Reading a table is not
 importing a module, so the layer contract is untouched, but the string ``'scene_group'`` is
-written in ``orimera/ingest/scenes.py`` and read here, and a test pins the two together because a
+written in ``exulanica/ingest/scenes.py`` and read here, and a test pins the two together because a
 literal duplicated across a boundary nothing checks is a literal that drifts.
 """
 

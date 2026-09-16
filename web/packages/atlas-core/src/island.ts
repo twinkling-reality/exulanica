@@ -34,6 +34,21 @@ export interface Island {
   /** Where this island sits in the Atlas. Presentation only. Never an answer. */
   readonly placement: IslandPlacement;
 
+  /**
+   * Whether that placement is a REAL location, or an arrangement the layout solver invented.
+   *
+   * `IslandPlacement.position` says of itself that it "carries no real-world meaning", and for
+   * almost every region that is exactly true: the position is a phyllotaxis spiral seeded at
+   * spacing 260, relaxed toward a target separation. On the Flatiron district that packing put one
+   * memory outside the district with no ground under it, one inside a 47 metre building, and all
+   * four between 0.74 and 1.39 metres below the street. Drawing a body at such a position tells
+   * somebody their memory is THERE, which is a claim the layout never made and cannot support.
+   *
+   * Absent, this is false. A memory with no known place does not get one, and the world is emptier
+   * for it. That is the honest result: the alternative is a decorative algorithm answering "where".
+   */
+  readonly placementLocated?: boolean;
+
   /** Which rung the reconstruction actually earned. Displayed, not hidden. */
   readonly rung: ReconstructionRung;
 

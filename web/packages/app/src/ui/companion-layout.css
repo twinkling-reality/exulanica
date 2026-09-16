@@ -1,0 +1,675 @@
+/* Canonical Companion prompt, panel, presence, responsive, and motion styles. */
+
+#shell .companion-encounter[hidden] {
+  display: none !important;
+}
+
+#shell .companion-encounter[data-first-use] {
+  position: fixed;
+  top: 56%;
+  bottom: auto;
+  left: 50%;
+  width: min(470px, calc(100vw - 48px));
+  box-sizing: border-box;
+  padding: 14px 16px;
+  color: var(--ui-companion-text);
+  background: color-mix(in srgb, var(--ui-companion-surface) 64%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-text) 22%, transparent);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--ui-shadow) 18%, transparent);
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  transform: translate(-50%, -50%);
+  animation: world-tool-arrive var(--motion-standard) var(--motion-easing);
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  color: inherit;
+  font-size: 0.82rem;
+  white-space: normal;
+  text-shadow: none;
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt-statement {
+  color: inherit;
+  font: 400 15px/1.3 var(--ui-font-display);
+  letter-spacing: 0;
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt-actions {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0;
+  border: 0;
+}
+
+#shell .companion-encounter[data-compact-prompt] .companion-prompt {
+  gap: 0.35rem;
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt-action {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: color-mix(in srgb, var(--ui-companion-text) 74%, transparent);
+  font-size: 11px;
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt b {
+  display: inline-block;
+  min-width: 20px;
+  padding: 3px 6px;
+  color: var(--ui-companion-text);
+  background: color-mix(in srgb, var(--ui-companion-text) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-text) 24%, transparent);
+  border-radius: var(--radius-label);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* One right-edge instrument, with the Companion presence seated in its header seam. */
+#shell .companion-encounter[data-state='open'] {
+  --companion-text: var(--ink);
+  --companion-ink: var(--ink);
+  position: fixed;
+  inset: 6vh 5vw auto auto;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(520px, 46vw);
+  max-height: 87vh;
+  box-sizing: border-box;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--ink);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0%,
+      transparent 32%
+    ),
+    color-mix(in srgb, var(--atlas-plane) 94%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--app-shadow);
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
+  pointer-events: auto;
+  translate: none;
+  transform: perspective(1400px) rotateY(-3deg);
+  transform-origin: right center;
+  animation: diegetic-plane-arrive var(--motion-standard) var(--motion-easing);
+}
+
+#shell .companion-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 104px;
+  box-sizing: border-box;
+  padding: 24px 22px 18px 126px;
+  background: color-mix(in srgb, var(--raised) 96%, transparent);
+  border-bottom: 1px solid var(--edge);
+}
+
+#shell .companion-encounter[data-state='open'] :is(.companion-speech, .companion-choice-rail) {
+  position: static;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  translate: none;
+  transform: none;
+}
+
+#shell .companion-encounter[data-state='open'] :is(
+  .companion-speaker,
+  .companion-utterance,
+  .companion-refusal-detail,
+  .companion-provenance,
+  .companion-question-echo
+) {
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-shadow: none;
+  font-family: var(--ui-font-body);
+}
+
+#shell .companion-identity {
+  display: grid;
+  gap: 4px;
+}
+
+#shell .companion-surface-kicker {
+  color: var(--accent);
+  font: 600 10px/1.2 var(--ui-font-utility);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+#shell .companion-surface-title {
+  color: var(--ink);
+  font: 450 25px/1.15 var(--ui-font-display);
+  letter-spacing: -0.035em;
+}
+
+#shell .companion-toolbar .companion-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-panel);
+  font-size: 11px;
+}
+
+#shell .companion-toolbar .companion-dismiss:hover,
+#shell .companion-toolbar .companion-dismiss:focus-visible {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--edge);
+}
+
+#shell .companion-toolbar .companion-dismiss kbd {
+  padding: 2px 5px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-label);
+  font: 500 9px/1.2 var(--ui-font-utility);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-speech {
+  padding: 28px 28px 24px;
+  border-bottom: 1px solid var(--edge);
+  border-radius: var(--ui-speech-radius);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-choice-rail {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 22px;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-speaker {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0 0 7px;
+  overflow: visible;
+  color: var(--accent);
+  font: 600 10px/1.2 var(--ui-font-utility);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 1;
+  clip-path: none;
+  transform: none;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-utterance {
+  margin: 0;
+  color: var(--ink);
+  font: 420 17px/1.55 var(--ui-font-body);
+  letter-spacing: -0.012em;
+}
+
+#shell .companion-speech ul,
+#shell .companion-choice-rail ul,
+#shell .companion-choice-rail ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-question-echo {
+  margin: 0 0 14px;
+  padding-left: 12px;
+  color: var(--ink-soft);
+  border-left: 1px solid var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-provenance {
+  margin: 18px 0 0;
+  padding-top: 12px;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--edge);
+  font: 500 10px/1.45 var(--ui-font-utility);
+}
+
+#shell .companion-refusal {
+  margin: 0.65rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-choices {
+  display: grid;
+  gap: 6px;
+}
+
+#shell .choice-item {
+  min-width: 0;
+}
+
+#shell .companion-choice,
+#shell .companion-choices-submit,
+#shell .companion-composer {
+  width: 100%;
+  min-height: 2.4rem;
+  color: var(--companion-ink);
+  background: none;
+  border: 0;
+  border-radius: var(--ui-choice-radius);
+  box-shadow: none;
+  font: inherit;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 46px;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ui-companion-text) 4%, transparent);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-panel);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--motion-quick) var(--motion-easing),
+    border-color var(--motion-quick) var(--motion-easing),
+    background var(--motion-quick) var(--motion-easing);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-choice:hover:not([disabled]),
+#shell .companion-encounter[data-state='open'] .companion-choice:focus-visible,
+#shell .companion-encounter[data-state='open'] .multi-choice:focus-within {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ui-companion-accent) 11%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 68%, transparent);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+#shell .companion-choice kbd {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.34rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  border-radius: var(--radius-label);
+  font: 500 0.7rem/1 var(--ui-font-utility);
+}
+
+#shell .choice-label {
+  min-width: 0;
+}
+
+#shell .companion-choice.consequential {
+  border-color: color-mix(in srgb, var(--ui-companion-accent) 21%, transparent);
+}
+
+#shell .choice-item.unavailable {
+  padding-bottom: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--ui-companion-unavailable) 42%, transparent);
+  border-radius: var(--ui-choice-radius);
+}
+
+#shell .choice-item.unavailable .companion-choice {
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+#shell .choice-unavailable-reason {
+  display: block;
+  padding: 0 1rem 0 3.1rem;
+  color: var(--ink-faint);
+  font: 500 0.68rem/1.35 var(--companion-utility-font);
+}
+
+#shell .multi-choice {
+  cursor: pointer;
+}
+
+#shell .choice-checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--ui-companion-secondary);
+}
+
+#shell .companion-choices-submit {
+  margin-top: 0.55rem;
+  padding: 0.62rem 1rem;
+  color: var(--ui-companion-ink);
+  background: var(--ui-companion-accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#shell .companion-other {
+  min-height: 3.05rem;
+}
+
+#shell .companion-other-reveal[hidden],
+#shell .companion-composer[hidden] {
+  display: none;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-escapes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 2px 0 0 !important;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-escapes .choice-item {
+  min-width: 0;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-escapes .companion-choice {
+  min-height: 36px;
+  justify-content: center;
+  padding: 7px 8px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 11px;
+  text-align: center;
+}
+
+#shell .companion-rail-foot {
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--edge);
+}
+
+#shell .companion-rail-foot .companion-evidence-action {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-evidence-action {
+  min-height: 2rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, transparent);
+  border-radius: var(--radius-pill);
+  font: 600 0.75rem/1 var(--ui-font-companion);
+  letter-spacing: 0.03em;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-evidence-action:hover,
+#shell .companion-encounter[data-state='open'] .companion-evidence-action:focus-visible {
+  background: var(--surface);
+}
+
+#shell .companion-composer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.48rem 0.42rem 1rem;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-composer {
+  min-height: 46px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ui-shadow) 32%, transparent);
+  border: 1px solid var(--edge);
+}
+
+#shell .companion-reply-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+}
+
+#shell .companion-reply-input::placeholder {
+  color: var(--ink-faint);
+}
+
+#shell .companion-reply-input:focus {
+  outline: none;
+}
+
+#shell .companion-reply-submit {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.05rem;
+  height: 2.05rem;
+  padding: 0;
+  color: var(--ui-companion-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+#shell .companion-reply-submit:hover,
+#shell .companion-reply-submit:focus-visible {
+  background: var(--ui-companion-text);
+  outline: 2px solid color-mix(in srgb, var(--ui-companion-accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+#shell .reply-arrow {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#shell .companion-choice .command-action-label,
+#shell .companion-escapes .companion-choice,
+#shell .companion-rail-foot .command-action-label {
+  color: inherit;
+}
+
+#shell .companion-stage {
+  position: absolute;
+  top: 8px;
+  right: auto;
+  left: 18px;
+  z-index: 36;
+  width: 96px;
+  height: 96px;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 12px 18px color-mix(in srgb, var(--ui-shadow) 50%, transparent));
+  transform: none;
+  transition: opacity var(--motion-deliberate) var(--motion-easing);
+}
+
+#shell .companion-stage[data-shown][data-ready] {
+  opacity: 1;
+}
+
+#shell .companion-stage[data-shown][data-ready]::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  border-radius: 50%;
+}
+
+#shell .companion-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+#shell .companion-avatar-body,
+#shell .companion-avatar-dot {
+  vector-effect: non-scaling-stroke;
+}
+
+#shell .companion-avatar-gaze {
+  transition: transform var(--motion-standard) var(--motion-easing);
+}
+
+#shell .companion-avatar-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-avatar-blink var(--motion-idle-cycle) var(--motion-easing) infinite;
+}
+
+#shell .companion-avatar-thinking {
+  display: none;
+}
+
+#shell .companion-stage[data-state='working'] .companion-avatar-orb {
+  display: none;
+}
+
+#shell .companion-stage[data-state='working'] .companion-avatar-thinking {
+  display: block;
+}
+
+#shell .companion-stage[data-state='working'] .companion-avatar-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: companion-avatar-dot var(--motion-working-cycle) var(--motion-easing) infinite;
+}
+
+#shell .companion-stage[data-state='working'] .companion-avatar-dot-2 {
+  animation-delay: var(--motion-stagger);
+}
+
+#shell .companion-stage[data-state='working'] .companion-avatar-dot-3 {
+  animation-delay: calc(var(--motion-stagger) * 2);
+}
+
+@keyframes companion-avatar-blink {
+  0%, 43%, 47%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(0.08); }
+}
+
+@keyframes companion-avatar-dot {
+  0%, 58%, 100% { opacity: 0.45; transform: scale(0.78); }
+  29% { opacity: 1; transform: scale(1.08); }
+}
+
+:root[data-transparency='reduced'] #shell .companion-encounter[data-state='open'] {
+  background: var(--raised);
+  backdrop-filter: none;
+}
+
+@media (max-width: 760px) {
+  #shell .companion-encounter[data-state='open'] {
+    inset: 56px 12px 12px;
+    width: auto;
+    transform: none;
+  }
+
+  #shell .companion-toolbar {
+    min-height: 88px;
+    padding: 18px 14px 14px 104px;
+  }
+
+  #shell .companion-stage {
+    top: 5px;
+    right: auto;
+    left: 14px;
+    width: 78px;
+    height: 78px;
+  }
+
+  #shell .companion-encounter[data-state='open'] .companion-speech {
+    padding: 22px 18px 20px;
+  }
+
+  #shell .companion-encounter[data-state='open'] .companion-choice-rail {
+    padding: 14px 14px 18px;
+  }
+
+  #shell .companion-encounter[data-state='open'] .companion-escapes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 620px) and (min-width: 761px) {
+  #shell .companion-encounter[data-state='open'] {
+    top: 18px;
+    bottom: auto;
+    max-height: calc(100dvh - 36px);
+  }
+
+  #shell .companion-toolbar {
+    min-height: 78px;
+    padding-block: 14px 12px;
+  }
+
+  #shell .companion-stage {
+    top: 0;
+  }
+
+  #shell .companion-encounter[data-state='open'] .companion-speech {
+    padding-block: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #shell .companion-encounter[data-first-use],
+  #shell .companion-encounter[data-state='open'],
+  #shell .companion-avatar-blink,
+  #shell .companion-stage[data-state='working'] .companion-avatar-dot {
+    animation: none;
+  }
+
+  #shell .companion-stage,
+  #shell .companion-avatar-gaze {
+    transition: none;
+  }
+}

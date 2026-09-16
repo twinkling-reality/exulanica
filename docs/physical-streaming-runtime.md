@@ -1,9 +1,12 @@
 # Physical residency and renderer hardening
 
-Status: **RENDERER CONTRACT IMPLEMENTED; production asset publication and target-hardware gate
-BLOCKED**. The repository has no authorised real reconstruction asset, authenticated world-asset
-route, target-hardware trace, or deployed object-store response to measure. This document does not
-turn predecoded fixture maps or mocked HTTP responses into a production streaming claim.
+Status, corrected 2026-09-13: **RENDERER CONTRACT IMPLEMENTED; production streaming and
+target-hardware gate OPEN**. Authenticated point-map, splat and authored-asset routes now exist.
+The point-map and splat routes serve whole objects with `Cache-Control: no-store` and
+`Accept-Ranges: none`; their existence does not establish useful range streaming. The app
+does not yet instantiate `PhysicalResidencyRuntime`, and deployed object-store responses
+and an end-to-end target-hardware trace remain unverified. Predecoded fixture maps and
+mocked HTTP responses do not establish production streaming.
 
 ## Physical residency executor
 
@@ -24,7 +27,7 @@ The executor accepts only local authenticated API paths. `fetchAuthenticatedAsse
 bearer in the request header, never the path, verifies an expected SHA-256 when supplied, and records
 whether a requested byte range returned an observed `206` plus `Content-Range` or was ignored with a
 whole-object `200`. Tests exercise both outcomes. This is instrumentation of the real response, not
-evidence that the currently absent production asset route honors Range usefully.
+evidence that a production asset route honors Range usefully.
 
 `AtlasBinding.onResidencyActions` is now the production seam. With no executor, already decoded
 fixture maps settle immediately. With an executor installed, a visual stays at its current physical
@@ -38,6 +41,21 @@ bytes divided by a declared budget. Two overloaded windows lower the maximum phy
 the residency budget; five healthy windows restore one level. It receives no device name, user
 agent, GPU model, display class, or hardware allowlist. Hidden-tab and non-positive frame samples do
 not influence the renderer. The binding replans only when the measured pressure level changes.
+
+## Representation inspection is a separate bounded layer
+
+The application now instantiates a renderer representation registry and a **World to data**
+inspector for currently borrowed draws. It can blend compatible rendered geometry with bounded
+points, use an existing retained point draw without taking ownership, or generate deterministic
+surface samples from the triangles of a static mesh. Generated samples are labeled as presentation,
+not recovered measurements or extracted objects. Unsupported draws keep their existing appearance.
+
+The registry is capped at 256 draws and 65,536 allocated points by default. It tracks only the
+mutable point allocations it creates; shared source buffers remain owned by their existing
+renderers. Current source availability, existing parent visibility and residency state override the
+requested view. Withdrawal disposes generated points and withholds the selected display record.
+This implemented inspector does not instantiate `PhysicalResidencyRuntime`, fetch new geometry,
+provide original artifact-byte inspection or establish a universal rendered-to-semantic slider.
 
 ## Precision and scale
 

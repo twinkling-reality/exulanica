@@ -9,7 +9,7 @@ Four things, and the interesting one is the second.
     startup instead of quietly running queries as the writer. A defence that is off and silent
     is worse than one that is absent, because it still reads as present.
 *   **The object store**, which is what an evidence citation resolves against.
-*   **The model client**, built lazily. Two endpoints out of the whole surface need a model, and
+*   **The model client**, built lazily. Model-dependent endpoints need a configured client, and
     an instance with no credential should serve the other endpoints rather than refuse to start.
 *   **Whether this instance drains the derivative queue.** ``POST /intake`` runs the intake stage
     in the request and queues the rest by capture id, so something has to drain it. In one
@@ -25,13 +25,17 @@ rather than a thing that would need to be discovered.
 from __future__ import annotations
 
 import os
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
+from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
+from exulanica.api.society_control_worker import SocietyControlWorker
+from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.epistemics.caption_embeddings import embed_capture
@@ -42,10 +46,15 @@ from exulanica.models.manifest import Role
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 
+if TYPE_CHECKING:
+    from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
+    from exulanica.world.society_decisions import SocietyDecisionProvider
+
 __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
+    "SOCIETY_CONTROL_WORKER_ENV",
     "Services",
     "build_services",
 ]
@@ -62,6 +71,10 @@ DATA_DIR_ENV: Final = env_name("DATA_DIR")
 #: default to arrive at by saying nothing.
 DERIVATIVE_WORKER_ENV: Final = env_name("DERIVATIVE_WORKER")
 
+#: Account-wide society playback remains off unless the host opts in. Static
+#: ``society_control_workspaces`` remain an independent, narrower enablement path.
+SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
+
 
 @dataclass(frozen=True, slots=True)
 class Services:
@@ -73,7 +86,7 @@ class Services:
     tokens: TokenDirectory
     #: True when the executor is running as the writer because no read-only role was configured.
     executor_shares_the_write_role: bool
-    #: None when no model credential is configured. The two endpoints that need one say so.
+    #: None when no model credential is configured. Model-dependent endpoints say so.
     model_client: ModelClient | None
     #: The only directory whose already-local files the environment admission route may name.
     #: None disables that write surface while retaining metadata and byte reads.
@@ -84,6 +97,42 @@ class Services:
     runs_derivative_worker: bool = False
     #: Independent of the database and blob backups, set by the offline restore protocol.
     restore_state_path: Path | None = None
+    #: Optional explicit scoped district/affordance adapter, configured by the host.
+    society_runtime: SocietyRuntime | None = None
+    #: Explicit server-selected provider for bounded social choices. No automatic promotion.
+    society_decision_provider: SocietyDecisionProvider | None = None
+    #: Explicit family definitions and current source authority for version-scoped appearance.
+    character_appearance: CharacterAppearanceRuntime | None = None
+    #: Dedicated account persistence and verified Google browser sessions, when configured.
+    accounts: AccountRuntime | None = None
+    #: Explicit host allowlist. Empty leaves automatic society playback disabled.
+    society_control_workspaces: tuple[uuid.UUID, ...] = ()
+    #: Explicit host opt-in to discover all currently active account-owned workspaces.
+    runs_society_control_worker: bool = False
+    society_base_tick_interval_ms: int = 1000
+
+    @property
+    def society_control_enabled(self) -> bool:
+        return self.runs_society_control_worker or bool(self.society_control_workspaces)
+
+    def build_society_control_worker(self) -> SocietyControlWorker | None:
+        if not self.society_control_enabled:
+            return None
+        if self.society_runtime is None:
+            raise ValueError("society playback requires a configured current-input runtime")
+        if self.runs_society_control_worker and self.accounts is None:
+            raise ValueError("account-wide society playback requires configured accounts")
+        return SocietyControlWorker(
+            self.database,
+            runtime=self.society_runtime,
+            workspaces=self.society_control_workspaces,
+            workspace_source=(
+                self.accounts.active_owned_workspaces
+                if self.runs_society_control_worker and self.accounts is not None
+                else None
+            ),
+            base_tick_interval_ms=self.society_base_tick_interval_ms,
+        )
 
     @property
     def warnings(self) -> tuple[str, ...]:
@@ -126,10 +175,11 @@ class Services:
     def build_derivative_worker(self) -> DerivativeWorker | None:
         """The thread that finishes what ``POST /intake`` starts, or None when it is off.
 
-        **The worker is handed the workspaces as a value.** ``exulanica.ingest`` sits under
-        ``exulanica.api`` in the layers contract, so a worker that imported the token directory to
-        find out which workspaces exist would invert the layering, and ``uv run lint-imports``
-        says so rather than a reviewer.
+        **The worker is handed workspace UUIDs and an optional callback.**
+        ``exulanica.ingest`` sits under ``exulanica.api`` in the layers contract, so the callback
+        stays owned here and opens the dedicated account-role connection. The ingest worker sees
+        only the returned UUID snapshot, then opens its ordinary workspace-scoped world
+        connections. It never imports account or bearer-token code.
 
         **No depth model**, deliberately. The reconstruction stack is a large optional
         dependency and an API image that carries it is a different image. An uploaded photograph
@@ -155,6 +205,9 @@ class Services:
             self.database,
             self.store,
             self.tokens.workspaces,
+            workspace_source=(
+                self.accounts.active_owned_workspaces if self.accounts is not None else None
+            ),
             vision=NebiusVisionModel(self.model_client) if self.model_client else None,
             embedding_pass=partial(embed_capture, client=self.model_client)
             if self.model_client
@@ -183,6 +236,12 @@ def build_services(
     database = Database.from_env(environ)
     readonly_url = env_get("READONLY_DATABASE_URL", environ)
     data_dir = resolve_data_dir(environ)
+    accounts = load_account_runtime(environ)
+    tokens = (
+        TokenDirectory(sessions={})
+        if accounts is not None and API_TOKENS_ENV not in environ
+        else load_token_directory(environ)
+    )
 
     client = model_client
     if client is None and environ.get("NEBIUS_API_KEY"):
@@ -192,11 +251,13 @@ def build_services(
         database=database,
         readonly_database=Database(url=readonly_url) if readonly_url else database,
         store=LocalContentAddressedStore(data_dir / "blobs"),
-        tokens=load_token_directory(environ),
+        tokens=tokens,
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
+        accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
+        runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
@@ -208,6 +269,16 @@ def _enabled(value: str | None) -> bool:
     return (value or "").strip().lower() not in ("0", "false", "off", "no")
 
 
+def _explicitly_enabled(value: str | None) -> bool:
+    """Parse an opt-in switch; absence and explicit false are both safely off."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "0", "false", "off", "no"):
+        return False
+    if normalized in ("1", "true", "on", "yes"):
+        return True
+    raise ValueError(f"{SOCIETY_CONTROL_WORKER_ENV} must be an explicit boolean")
+
+
 def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str, str]:
     """What an operator needs to set, and whether it is set. Never the values themselves."""
     environ = os.environ if environ is None else environ
@@ -216,8 +287,15 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         READONLY_DATABASE_URL_ENV,
         DATA_DIR_ENV,
         DERIVATIVE_WORKER_ENV,
+        SOCIETY_CONTROL_WORKER_ENV,
         API_TOKENS_ENV,
         "NEBIUS_API_KEY",
+        "EXULANICA_GOOGLE_CLIENT_ID",
+        "EXULANICA_GOOGLE_CLIENT_SECRET",
+        "EXULANICA_GOOGLE_CALLBACK_URI",
+        "EXULANICA_GOOGLE_RETURN_URIS",
+        "EXULANICA_ACCOUNT_BROWSER_ORIGINS",
+        "EXULANICA_ACCOUNT_DATABASE_URL",
     )
     return {
         name: (

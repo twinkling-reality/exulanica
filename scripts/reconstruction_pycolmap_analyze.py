@@ -139,7 +139,7 @@ def analyze_run(run_dir, gt_by_name):
 
 
 def parser_check(spike, run_dir, res):
-    """Call orimera/reconstruction/pose.py's private parsers on pycolmap's text export."""
+    """Call exulanica/reconstruction/pose.py's private parsers on pycolmap's text export."""
     pose = load_pose_module()
     # The run wrote its text export to sparse/<best>_text; derive it from the run directory
     # rather than trusting the absolute path recorded in result.json, so a moved spike works.

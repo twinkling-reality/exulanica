@@ -250,7 +250,7 @@ def test_the_manifest_data_file_sits_beside_the_module():
 def test_the_model_package_is_not_excluded_from_version_control():
     """A `models/` ignore rule meant for weight caches silently swallowed this whole package.
 
-    The consequence was not a lint warning: hatchling honours these rules, so `orimera/models`
+    The consequence was not a lint warning: hatchling honours these rules, so `exulanica/models`
     and the manifest JSON beside it were absent from the built wheel, and an installed copy
     raised ImportError. This asserts the negation that fixes it is still there.
     """

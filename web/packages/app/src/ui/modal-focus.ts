@@ -14,7 +14,7 @@ const FOCUSABLE = [
 
 function focusableChildren(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (item) => item.closest('[hidden]') === null,
+    (item) => item.closest('[hidden]') === null && !item.matches(':disabled'),
   );
 }
 

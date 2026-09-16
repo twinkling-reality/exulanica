@@ -1,0 +1,179 @@
+/* Character inspection is a quiet full-height stage, with the model as its center. */
+#shell .character-studio {
+  position: fixed; inset: 6vh 5vw 7vh auto; width: min(780px, 72vw); z-index: 35; pointer-events: auto;
+  color: #202a2f; background: #eef2f0e8; overflow: hidden;
+  border: 1px solid #c5cfd2; border-radius: 4px; box-shadow: 0 12px 38px #1723291a;
+  backdrop-filter: blur(22px) saturate(106%);
+  transform: perspective(1400px) rotateY(-3deg); transform-origin: right center;
+  animation: diegetic-plane-arrive 220ms cubic-bezier(.2,.8,.2,1);
+  font: 14px/1.5 var(--ui-font-body);
+}
+#shell .character-studio[hidden] { display: none; }
+#shell[data-primary='character'] > :not(.character-studio):not(.viewport-boundary) { visibility: hidden; pointer-events: none; }
+#shell .character-stage { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#shell .character-stage:active { cursor: grabbing; }
+#shell .character-studio[data-fitting='true'] .character-stage { opacity: .72; filter: saturate(.65); transition: opacity 180ms ease, filter 180ms ease; }
+#shell .character-fitting {
+  position: absolute; z-index: 2; left: 50%; bottom: 96px; transform: translateX(-50%);
+  width: min(320px, 34vw); box-sizing: border-box; display: grid; grid-template-columns: 28px 1fr;
+  gap: 3px 12px; padding: 13px 16px 15px; overflow: hidden; pointer-events: none;
+  color: #26343a; background: #f4f7f5d9; border: 1px solid #bdc9cc;
+  box-shadow: 0 12px 36px #23343b1f; backdrop-filter: blur(12px);
+}
+#shell .character-fitting[hidden] { display: none; }
+#shell .character-fitting::after {
+  content: ''; position: absolute; left: -35%; bottom: 0; width: 35%; height: 2px;
+  background: linear-gradient(90deg, transparent, #526b75, transparent);
+  animation: character-fitting-line 1.25s ease-in-out infinite;
+}
+#shell .character-fitting-pulse {
+  grid-row: 1 / 3; align-self: center; width: 24px; height: 24px; box-sizing: border-box;
+  border: 1px solid #71838a; border-radius: 50%; box-shadow: inset 0 0 0 6px #e1e8e6;
+  animation: character-fitting-pulse 1.25s ease-in-out infinite;
+}
+#shell .character-fitting-copy { display: grid; gap: 2px; }
+#shell .character-fitting-copy strong { font-size: 13px; font-weight: 600; }
+#shell .character-fitting-copy small { color: #5a696f; font-size: 11px; line-height: 1.4; }
+@keyframes character-fitting-line { 0% { left: -35%; } 65%, 100% { left: 100%; } }
+@keyframes character-fitting-pulse { 0%, 100% { opacity: .55; transform: scale(.88); } 50% { opacity: 1; transform: scale(1); } }
+#shell .character-header { position: absolute; top: 36px; left: 4%; right: 4%; display: flex; justify-content: space-between; align-items: start; pointer-events: none; }
+#shell .character-header > * { pointer-events: auto; }
+#shell .character-eyebrow { margin: 0 0 8px; color: #56666c; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+#shell .character-header h1 { margin: 0; font: 400 34px/1.2 var(--ui-font-display); letter-spacing: -.035em; }
+#shell .character-studio button { min-height: 40px; padding: 10px 14px; border: 1px solid transparent; background: transparent; color: inherit; font: 500 14px/1.3 var(--ui-font-body); border-radius: 3px; }
+#shell .character-studio button:hover { background: #ffffff66; border-color: #aebdc1; }
+#shell .character-studio button:disabled { opacity: .5; }
+#shell .character-sidebar { position: absolute; top: 24%; bottom: 110px; left: 4%; width: 270px; display: flex; flex-direction: column; gap: 32px; }
+#shell .character-tabs { display: flex; gap: 8px; border-bottom: 1px solid #b9c4c7; }
+#shell .character-tabs button { padding: 8px 6px 14px; border: 0; border-radius: 0; font-size: 13px; }
+#shell .character-tabs button[aria-pressed='true'] { box-shadow: 0 2px 0 #40545d; color: #263940; }
+#shell .character-editor { border: 0; padding: 0; margin: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+#shell .character-look-list { display: flex; flex-direction: column; align-items: stretch; }
+#shell .character-look-list button { text-align: left; font: 400 26px/1.2 var(--ui-font-display); letter-spacing: -.03em; padding: 16px 10px; border-radius: 0; }
+#shell .character-look-list button[aria-pressed='true'] { background: #ffffff70; color: #263940; box-shadow: inset 0 0 0 1px #9faeb3; }
+#shell .character-description { position: absolute; top: 29%; right: 4%; width: 235px; }
+#shell .character-description h2 { margin: 0 0 12px; font: 400 32px/1.2 var(--ui-font-display); letter-spacing: -.03em; }
+#shell .character-description > p { line-height: 1.6; }
+#shell .character-description .character-status { min-height: 42px; margin-block: 28px 20px; padding-top: 20px; border-top: 1px solid #b9c4c7; font-size: 13px; }
+#shell .character-description .character-apply { display: block; width: 100%; margin-top: 10px; background: #40545d; color: white; padding: 14px; }
+#shell .character-description .character-apply:hover { background: #31454e; }
+#shell .character-session-note { margin-top: 18px; color: #56666c; font-size: 12px; }
+#shell .character-source { font-size: 11px; color: #56666c; }
+#shell .character-gesture-setting { display: flex; align-items: center; gap: 9px; margin-top: 20px; font-size: 13px; }
+#shell .character-gesture-setting input { accent-color: #40545d; }
+#shell .first-person-gesture { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9; }
+#shell .first-person-gesture[hidden] { display: none; }
+:root[data-transparency='reduced'] #shell .first-person-gesture { background: transparent; }
+#shell .character-preview-controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 340px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+#shell .character-preview-controls label { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+#shell .character-preview-controls input { min-width: 0; width: 100%; accent-color: #40545d; }
+#shell .character-preview-controls > span { grid-column: 1 / -1; text-align: center; color: #56666c; font-size: 11px; }
+#shell .character-color-list label { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid #c1cbce; padding: 12px 0; }
+#shell .character-color-list input { width: 40px; height: 32px; padding: 2px; border: 1px solid #96a7ac; background: transparent; cursor: pointer; }
+#shell .character-motion-list > button { display: block; width: 100%; text-align: left; margin-top: 10px; border-color: #b9c4c7; }
+#shell .character-motion-list > button[aria-pressed='true'] { background: #ffffff77; border-color: #40545d; }
+#shell .character-editor [hidden] { display: none; }
+:root[data-contrast='high'] #shell .character-studio { color: #10191d; }
+:root[data-contrast='high'] #shell .character-description { background: #e7edeb; padding: 16px; }
+:root[data-transparency='reduced'] #shell { --atlas-plane: #f7f7fa; }
+:root[data-transparency='reduced'] #shell .character-fitting { background: #f6f2f8; backdrop-filter: none; }
+@media (prefers-reduced-motion: reduce) {
+  #shell .character-fitting::after, #shell .character-fitting-pulse { animation: none; }
+  #shell .character-studio[data-fitting='true'] .character-stage { transition: none; }
+}
+@media (max-width: 1100px) {
+  #shell .character-sidebar { left: 3%; width: 190px; }
+  #shell .character-description { right: 3%; width: 200px; }
+  #shell .character-header h1 { font-size: 30px; }
+  #shell .character-look-list button { font-size: 24px; }
+}
+@media (max-height: 690px) {
+  #shell .character-header { top: 22px; }
+  #shell .character-sidebar { top: 22%; bottom: 70px; gap: 16px; }
+  #shell .character-description { top: 22%; }
+  #shell .character-description .character-status { margin-block: 14px 8px; padding-top: 12px; }
+  #shell .character-preview-controls { bottom: 12px; }
+}
+
+#shell .character-body { padding-right: 10px; }
+#shell .character-body fieldset { border: 0; padding: 0; margin: 22px 0; }
+#shell .character-body legend { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+#shell .character-body label { display: grid; gap: 5px; margin-bottom: 13px; }
+#shell .character-body label > span { display: flex; justify-content: space-between; gap: 8px; }
+#shell .character-body output, .character-body small { color: #515a6b; font-size: 11px; }
+#shell .character-body input[type=range] { width: 100%; accent-color: #40545d; }
+#shell .character-body select { width: 100%; padding: 8px; }
+#shell .character-body > p { font-size: 12px; line-height: 1.5; }
+
+
+/* Body, face and wardrobe are steps for one person; examples remain secondary. */
+#shell .character-editor > .character-eyebrow { margin-bottom: 18px; }
+#shell .character-body h3 { margin: 14px 0 6px; font-size: 15px; font-weight: 500; }
+#shell .character-body p { font-size: 12px; line-height: 1.6; }
+#shell .character-body-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+#shell .character-body-presets > h3, #shell .character-body-presets > p { width: 100%; margin: 0 0 6px; }
+#shell .character-body-presets button { flex: 1 0 auto; border-color: #b9c4c7; padding: 9px; font-size: 12px; }
+#shell .character-body-presets button[aria-pressed='true'] { background: #ffffff88; border-color: #40545d; color: #263940; }
+#shell .character-likeness-note { margin: 26px 0; padding-top: 12px; border-top: 1px solid #b9c4c7; color: #56666c; }
+#shell .character-editor > .character-next { display: block; width: 100%; margin-top: 16px; text-align: right; }
+#shell .character-editor > .character-next[hidden] { display: none; }
+#shell .character-examples { margin-top: 30px; padding-top: 14px; border-top: 1px solid #b9c4c7; font-size: 12px; }
+#shell .character-examples summary { cursor: pointer; }
+#shell .character-examples p { color: #56666c; }
+#shell .character-examples .character-look-list button { font: 400 14px/1.5 var(--ui-font-body); letter-spacing: 0; padding: 10px; }
+@media (max-width: 1100px) {
+  #shell .character-sidebar { width: 225px; }
+  #shell .character-tabs { gap: 4px; }
+  #shell .character-fitting { width: min(280px, 32vw); }
+}
+
+#shell .character-body > .character-fit-status { padding-left: 10px; color: #56666c; }
+#shell .character-body > .character-fit-status[data-updating='true'] { color: #263940; }
+
+/* Match the other right-edge instruments without flattening the character stage. */
+#shell .character-studio {
+  color: var(--ink);
+  background: color-mix(in srgb, #101a20 88%, transparent);
+  border-color: var(--edge);
+  box-shadow: var(--app-shadow);
+}
+#shell .character-eyebrow,
+#shell .character-session-note,
+#shell .character-source,
+#shell .character-preview-controls > span,
+#shell .character-body output,
+#shell .character-body small,
+#shell .character-examples p,
+#shell .character-body > .character-fit-status {
+  color: var(--ink-soft);
+}
+#shell .character-studio button:hover,
+#shell .character-look-list button[aria-pressed='true'],
+#shell .character-motion-list > button[aria-pressed='true'],
+#shell .character-body-presets button[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--accent);
+}
+#shell .character-tabs,
+#shell .character-description .character-status,
+#shell .character-color-list label,
+#shell .character-likeness-note,
+#shell .character-examples,
+#shell .character-body-presets button,
+#shell .character-motion-list > button {
+  border-color: var(--edge);
+}
+#shell .character-tabs button[aria-pressed='true'] { color: var(--ink); box-shadow: 0 2px 0 var(--accent); }
+#shell .character-description .character-apply { color: #0d1b16; background: var(--accent); }
+#shell .character-description .character-apply:hover { color: #07110d; background: #d9f2e8; }
+#shell .character-fitting {
+  color: var(--ink);
+  background: color-mix(in srgb, #15232a 92%, transparent);
+  border-color: var(--edge);
+}
+#shell .character-fitting-copy small { color: var(--ink-soft); }
+:root[data-contrast='high'] #shell .character-studio { color: var(--ink); }
+:root[data-contrast='high'] #shell .character-description { background: #071014e8; }
+:root[data-transparency='reduced'] #shell .character-studio,
+:root[data-transparency='reduced'] #shell .character-fitting { background: #101a20; backdrop-filter: none; }

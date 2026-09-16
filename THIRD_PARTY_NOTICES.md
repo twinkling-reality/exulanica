@@ -239,7 +239,7 @@ LGPL's relinking obligation is discharged by the fact that Python imports it dyn
 time. Neither has been answered here. Item **T-6** in section 9.
 
 **Enumeration limit.** The rows above are the complete contents of `uv.lock`, which resolves 27
-packages plus the `orimera` project itself. The Python dependency tree is small enough to enumerate
+packages plus the `exulanica` project itself. The Python dependency tree is small enough to enumerate
 by hand and it has been enumerated in full.
 
 ---

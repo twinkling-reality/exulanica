@@ -51,6 +51,8 @@ export class ApiError extends Error {
 export interface TransportOptions {
   readonly baseUrl: string;
   readonly token: string;
+  /** Present only for an authenticated browser account session. Never persisted by this client. */
+  readonly csrfToken?: string;
   /** Injectable so a test drives this without a server and without a global. */
   readonly fetch?: typeof globalThis.fetch;
   readonly signal?: AbortSignal;
@@ -59,6 +61,7 @@ export interface TransportOptions {
 export class Transport {
   readonly #baseUrl: string;
   readonly #token: string;
+  readonly #csrfToken: string | undefined;
   readonly #fetch: typeof globalThis.fetch;
   readonly #signal: AbortSignal | undefined;
 
@@ -66,6 +69,7 @@ export class Transport {
     // Trailing slashes are stripped once here rather than guarded at every call site.
     this.#baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.#token = options.token;
+    this.#csrfToken = options.csrfToken;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#signal = options.signal;
   }
@@ -77,6 +81,11 @@ export class Transport {
 
   async postJson<T>(path: string, body: unknown): Promise<T> {
     const response = await this.#request('POST', path, { body });
+    return (await response.json()) as T;
+  }
+
+  async putJson<T>(path: string, body: unknown): Promise<T> {
+    const response = await this.#request('PUT', path, { body });
     return (await response.json()) as T;
   }
 
@@ -112,12 +121,20 @@ export class Transport {
     options: { query?: Record<string, string>; body?: unknown },
   ): Promise<Response> {
     const url = this.url(path, options.query);
-    const headers: Record<string, string> = { authorization: `Bearer ${this.#token}` };
+    const headers: Record<string, string> = {};
+    // No bearer header permits the API to resolve its HttpOnly account cookie. Sending an
+    // explicit empty bearer would correctly fail closed and prevent that cookie fallback.
+    if (this.#token) headers['authorization'] = `Bearer ${this.#token}`;
+    if (this.#csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      headers['x-csrf-token'] = this.#csrfToken;
+    }
     if (options.body !== undefined) headers['content-type'] = 'application/json';
 
     // Built up rather than declared with undefined members: `exactOptionalPropertyTypes` is on,
     // and a present-but-undefined body is not the same thing as an absent one.
-    const init: RequestInit = { method, headers, signal: this.#signal ?? null };
+    const init: RequestInit = {
+      method, headers, signal: this.#signal ?? null, credentials: 'include',
+    };
     if (options.body !== undefined) init.body = JSON.stringify(options.body);
 
     const response = await this.#fetch(url, init);

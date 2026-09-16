@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.reviewed-asset-import/v1",
+  "asset_key": "quaternius.modular.casual-f.v2",
+  "title": "Quaternius casual-f, complete geometry v2",
+  "summary": "Corrected CC0 skinned artist character with complete mirrored body and original locomotion, reach and wave.",
+  "content_sha256": "1dc3b8c8299fb90c86efdfdcceaa2a2dff2da2548004899a0ef6c4287d87d838",
+  "byte_size": 1122528,
+  "licence_id": "CC0-1.0",
+  "licence_sha256": "e8dbf915a2b82229913e301a0787696611241bdefec4832bc084f54161db1efe",
+  "source_url": "https://quaternius.com/packs/ultimatemodularwomen.html",
+  "source_revision": "sha256:e478c764a329f5ba8a425df865e2b9061bba42add8afe8e7324cc2cb257fc8de",
+  "producer": "quaternius-modular-prepare/2"
+}

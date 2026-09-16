@@ -685,9 +685,7 @@ class EnvironmentSelectionBody(BaseModel):
 
     @model_validator(mode="after")
     def complete(self) -> EnvironmentSelectionBody:
-        if self.kind == "feature" and (
-            self.feature_id is None or self.render_batch_id is None
-        ):
+        if self.kind == "feature" and (self.feature_id is None or self.render_batch_id is None):
             raise ValueError("feature selection requires feature_id and render_batch_id")
         if self.kind == "whole_asset" and (
             self.feature_id is not None or self.render_batch_id is not None
@@ -838,8 +836,19 @@ def object_write_repository(
     connection: ScopedConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    request: Request,
 ) -> WorldObjectRepository:
-    return WorldObjectRepository(connection, session.workspace_id, store=services.store)
+    observer = getattr(request.app.state, "society_authored_edit", None)
+    return WorldObjectRepository(
+        connection,
+        session.workspace_id,
+        store=services.store,
+        on_edit=(
+            None
+            if observer is None
+            else lambda version_id: observer(connection, session, version_id)
+        ),
+    )
 
 
 ReadObjects = Annotated[WorldObjectRepository, Depends(object_read_repository)]

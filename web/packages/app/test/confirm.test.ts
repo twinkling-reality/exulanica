@@ -103,3 +103,16 @@ describe('proposal confirmation copy', () => {
     expect(panel.root.textContent).toContain('does not yet expose the undo control');
   });
 });
+
+
+it('routes Escape through cancellation and restores the opening control', () => {
+  const opener = document.createElement('button'); document.body.append(opener); opener.focus();
+  const cancelled = vi.fn();
+  const panel = buildConfirm({ onConfirm: vi.fn(), onCancel: cancelled });
+  document.body.append(panel.root);
+  panel.show('escape-proposal', summary(pendingRow('row.note', 'test')), 'A proposed change');
+  panel.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  expect(cancelled).toHaveBeenCalledWith('escape-proposal');
+  panel.hide(); expect(document.activeElement).toBe(opener);
+  panel.root.remove(); opener.remove();
+});

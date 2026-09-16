@@ -18,6 +18,10 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Any, Final
 
+from exulanica.db.account_workspaces import (
+    ACCOUNT_DATABASE_URL_ENV,
+    AccountWorkspaceSource,
+)
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
@@ -30,6 +34,7 @@ from exulanica.models.manifest import Role
 from exulanica.store.local import LocalContentAddressedStore
 
 __all__ = [
+    "ACCOUNT_DATABASE_URL_ENV",
     "DATA_DIR_ENV",
     "DEPTH_MODEL_ENV",
     "PERSON_DETECTOR_ENV",
@@ -52,8 +57,10 @@ SEGMENTATION_MODEL_ENV: Final = env_name("SEGMENTATION_MODEL")
 SEGMENTATION_DEVICE_ENV: Final = env_name("SEGMENTATION_DEVICE")
 
 
-def parse_workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset[uuid.UUID]:
-    """Resolve explicit flags plus a comma-separated deployment value, refusing an empty set."""
+def parse_workspaces(
+    values: list[str], environ: Mapping[str, str], *, allow_empty: bool = False
+) -> frozenset[uuid.UUID]:
+    """Resolve explicit scope, allowing empty only when another verified source exists."""
     raw = list(values)
     raw.extend(
         part.strip()
@@ -64,7 +71,7 @@ def parse_workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset
         workspaces = frozenset(uuid.UUID(value) for value in raw)
     except ValueError as exc:
         raise ValueError(f"{WORKSPACES_ENV} and --workspace accept UUIDs only: {exc}") from exc
-    if not workspaces:
+    if not workspaces and not allow_empty:
         raise ValueError(
             f"no workspace was configured. Set {WORKSPACES_ENV} or pass --workspace; a worker "
             "that silently drains nothing is not healthy."
@@ -92,6 +99,10 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
     verify_schema(database)
     with database.unscoped() as connection:
         assert_runtime_role(connection)
+    account_url = environ.get(ACCOUNT_DATABASE_URL_ENV)
+    workspace_source = (
+        AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
+    )
 
     client = ModelClient(max_attempts=1) if environ.get(MODEL_KEY_ENV) else None
     vision = NebiusVisionModel(client) if client is not None else None
@@ -104,10 +115,11 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         else None
     )
     data_dir = resolve_data_dir(environ)
-    return DerivativeWorker(
+    worker = DerivativeWorker(
         database,
         LocalContentAddressedStore(data_dir / "blobs"),
-        parse_workspaces(args.workspace, environ),
+        parse_workspaces(args.workspace, environ, allow_empty=workspace_source is not None),
+        workspace_source=workspace_source,
         vision=vision,
         embedding_pass=partial(embed_capture, client=client) if client is not None else None,
         depth=depth,
@@ -117,6 +129,9 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         poll_seconds=args.poll_seconds,
         lease_seconds=lease_seconds,
     )
+    if workspace_source is not None:
+        worker.refresh_workspaces()
+    return worker
 
 
 def _build_depth(environ: Mapping[str, str]) -> Any:

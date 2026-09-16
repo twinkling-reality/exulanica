@@ -27,6 +27,22 @@ describe('the transport', () => {
     expect((seen!.init.headers as Record<string, string>).authorization).toBe(
       'Bearer secret-token',
     );
+    expect(seen!.init.credentials).toBe('include');
+  });
+
+  it('uses the browser session without emitting an empty bearer and binds writes to CSRF', async () => {
+    const seen: RequestInit[] = [];
+    const transport = new Transport({
+      baseUrl: 'https://example.invalid', token: '', csrfToken: 'csrf-session-value',
+      fetch: async (_url, init) => { seen.push(init ?? {}); return ok({ ok: true }); },
+    });
+    await transport.getJson('/graph');
+    await transport.putJson('/world/control', { mode: 'playing' });
+    expect((seen[0]!.headers as Record<string, string>).authorization).toBeUndefined();
+    expect((seen[0]!.headers as Record<string, string>)['x-csrf-token']).toBeUndefined();
+    expect(seen[0]!.credentials).toBe('include');
+    expect(seen[1]!.method).toBe('PUT');
+    expect((seen[1]!.headers as Record<string, string>)['x-csrf-token']).toBe('csrf-session-value');
   });
 
   it('turns a problem body into an error carrying the code, not the status', async () => {

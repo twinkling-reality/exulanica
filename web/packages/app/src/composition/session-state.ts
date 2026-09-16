@@ -16,6 +16,7 @@
  */
 
 import { createPersonalIntakeSession, type PersonalIntakeSession } from './personal-intake.js';
+import type { CharacterLook, CharacterSelection } from '../character-catalog.js';
 import type { IslandId, SceneDisplayFrame } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 import type {
@@ -44,6 +45,7 @@ import type { SourceMediaSession } from '../source-media-api.js';
 import type { CompanionStage } from '../ui/companion-stage.js';
 import type { ReconstructionRungDisclosure } from '../ui/status.js';
 import type { WorldStyleClient, WorldStyleConnection } from '../world-style-api.js';
+import type { Credentials } from '../config.js';
 
 /** What the document and the URL settled before a session existed. Never written by a mount. */
 export interface AppEnvironment {
@@ -71,8 +73,14 @@ export interface AppEnvironment {
  * builds them, which is what makes "this surface is rebuilt each mount" true by construction.
  */
 export interface SessionState {
+  characterSelection: CharacterSelection | null;
+  /** The one generated preview look retained across graph-driven remounts in this page session. */
+  characterGeneratedLook: CharacterLook | null;
+  characterGestures: boolean;
+  disposeCharacter: (() => void) | null;
+  disposeObjects: (() => void) | null;
   personalIntake: PersonalIntakeSession;
-  credentials: { baseUrl: string; token: string } | null;
+  credentials: Credentials | null;
   session: Session | null;
   snapshot: GraphSnapshot | null;
   evidence: EvidenceCache | null;
@@ -187,6 +195,11 @@ export function createAppEnvironment(): AppEnvironment {
 /** The empty session. Every field starts at the value the single-file version initialised it to. */
 export function createSessionState(): SessionState {
   return {
+    characterSelection: null,
+    characterGeneratedLook: null,
+    characterGestures: true,
+    disposeCharacter: null,
+    disposeObjects: null,
     personalIntake: createPersonalIntakeSession(),
     credentials: null,
     session: null,

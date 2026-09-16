@@ -34,6 +34,7 @@ import type { SessionState } from './session-state.js';
 
 export interface CompanionDependencies {
   readonly state: SessionState;
+  readonly onOpen?: () => void;
   /** The turn engine, which outlives a mount and is told about the new graph rather than rebuilt. */
   readonly engine: CompanionSession;
   readonly evidence: EvidenceCache;
@@ -84,8 +85,8 @@ export interface CompanionDependencies {
    * cannot propose" and "this sentence was a question" the same observation.
    */
   readonly proposeAppearance?: (utterance: string) => Promise<CompanionProposal>;
-  /** The element the presence draws into. Created by the root, because the world shows through it. */
-  readonly stageParent: HTMLElement;
+  /** Retained for harness compatibility; the presence now docks directly into the encounter. */
+  readonly stageParent?: HTMLElement;
   /**
    * The confirmation surface, read late.
    *
@@ -162,7 +163,9 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     deps.engine.adoptPersistedMemory(persisted, Date.now());
   }
 
-  const stage = buildCompanionStage({ parent: deps.stageParent });
+  // Built detached and inserted once by the encounter toolbar. Appending it to the world stage
+  // first caused a visible fixed-to-docked layout pass during startup.
+  const stage = buildCompanionStage();
   const appearance = (): ReturnType<typeof companionAppearanceConfiguration> =>
     companionAppearanceConfiguration({
       body: state.preferences.companionBody,
@@ -282,10 +285,14 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
 
   stopPreviousOutcomes = stopOutcomes;
 
-  const controller = createCompanionController({
+  let controller: CompanionController;
+  controller = createCompanionController({
     companion: deps.engine,
     askQuestion: (question) => askOrPropose(question),
-    onWorking: (working) => stage.setState(working ? 'working' : 'attending'),
+    onWorking: (working) => {
+      if (working) stage.setState('working');
+      else reflectTurnState(controller.current());
+    },
     onAwaitingConfirmation: (proposalId, summary, utterance) => {
       // A staged proposal is still unconfirmed. It may not borrow the settled presentation.
       stage.setState('uncertain');
@@ -322,6 +329,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     },
     },
     {
+    presence: stage.root,
     /*
      * The write-back, and the ordering is the point rather than a detail.
      *
@@ -334,6 +342,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
      * Not awaited, for the same reason. The person has their answer; storing it is this session's
      * problem and not theirs to wait on.
      */
+    onDismiss: () => dismiss(),
     onAnswerShown: (answer) => {
       const remember = deps.rememberAnswer;
       if (remember === undefined) return;
@@ -355,8 +364,9 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
   });
   controller.attach(panel);
 
-  /** Open the fixed visual-novel composition over the current memory backdrop. */
+  /** Open the docked Companion instrument over the current world. */
   function summon(): void {
+    deps.onOpen?.();
     // Pointer Lock freezes clientX/clientY by specification. The SVG Companion follows the free
     // page pointer, so summoning releases the real browser lock instead of fabricating a cursor.
     if (document.pointerLockElement !== null) document.exitPointerLock();

@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any, Final
 
 import psycopg
@@ -117,11 +117,13 @@ class WorldObjectRepository:
         *,
         world_id: str = DEFAULT_WORLD_ID,
         store: ContentAddressedStore | None = None,
+        on_edit: Callable[[uuid.UUID], None] | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.world_id = world_id
         self.store = store
+        self.on_edit = on_edit
 
     # -- reviewed catalogs ------------------------------------------------------------------
 
@@ -793,6 +795,20 @@ class WorldObjectRepository:
                 version_id,
             ),
         )
+        # Each intermediate authored state must reach the society in this same transaction.
+        # Reconstructing only the newest state at the next tick loses intervening edits.
+        if self.on_edit is not None:
+            self.on_edit(version_id)
+        elif (
+            self.connection.execute(
+                "select 1 from world_society where workspace_id=%s and world_id=%s "
+                "and version_id=%s and engine_version in "
+                "('exulanica-society/v2','exulanica-society/v3')",
+                (self.workspace_id, self.world_id, version_id),
+            ).fetchone()
+            is not None
+        ):
+            raise InvalidObjectState("purposeful society requires an atomic authored-input adapter")
 
     def _insert_object(
         self, version_id: uuid.UUID, obj: AuthoredObject, edit_ids: tuple[uuid.UUID, uuid.UUID]

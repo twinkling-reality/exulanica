@@ -11,7 +11,8 @@
 # EXULANICA_DATABASE_URL (for example postgresql://<os-user>@127.0.0.1:5433/exulanica_spine_test).
 # A job scope is required. Explicit --job flags replace inherited environment scope.
 # Optional: EXULANICA_DATA_DIR (default ~/exulanica-data), PGOPTIONS (default -c role=exulanica_app),
-# REPO_DIR (default ~/orimera, must hold deploy/gsplat/compressor/node_modules), NODE_DIR (~/node),
+# REPO_DIR (default ~/exulanica, or ~/orimera on existing GPU hosts; must hold
+# deploy/gsplat/compressor/node_modules), NODE_DIR (~/node),
 # EXULANICA_SCENE_JOB_IDS (comma separated; the worker then claims only those jobs instead of
 # draining the workspaces oldest first, which on a rented GPU can spend the pass on a stale job),
 # EXULANICA_COMPRESSOR_GPU (default 0 here: the WebGPU adapter index the SOG compressor uses for
@@ -46,7 +47,13 @@ fi
 : "${EXULANICA_WORKSPACE_IDS:?set EXULANICA_WORKSPACE_IDS}"
 : "${EXULANICA_DATABASE_URL:?set EXULANICA_DATABASE_URL}"
 DATA_DIR="${EXULANICA_DATA_DIR:-$HOME/exulanica-data}"
-REPO_DIR="${REPO_DIR:-$HOME/orimera}"
+if [[ -z "${REPO_DIR:-}" ]]; then
+  if [[ -d "$HOME/exulanica" ]]; then
+    REPO_DIR="$HOME/exulanica"
+  else
+    REPO_DIR="$HOME/orimera"
+  fi
+fi
 NODE_DIR="${NODE_DIR:-$HOME/node}"
 WORKER_IMAGE="$(docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/exulanica-scene-worker:${CODE_REVISION:0:7}")"
 case "$WORKER_IMAGE" in *@sha256:*) ;; *) echo "worker image has no registry digest; push it first" >&2; exit 1 ;; esac

@@ -104,7 +104,7 @@ class Purged:
         """Delete a capture the way the product does, which is one call and nothing else.
 
         **This helper used to run ``update capture set deleted_at = now()`` first, and that line
-        was the defect.** Nothing in ``orimera/`` ever wrote that column, so the helper was
+        was the defect.** Nothing in ``exulanica/`` ever wrote that column, so the helper was
         supplying a production step the shipping code did not have, and every test below passed
         against a flow that did not exist. Measured with the line removed and before migration
         0015: three jobs queued, zero destroyed, three skipped for ever, and the tombstone never
@@ -307,7 +307,7 @@ def test_a_purger_that_cannot_see_the_other_tenant_would_destroy_those_bytes(pur
 
 
 def test_the_whole_deletion_is_one_call_through_the_product(purged):
-    """The finding that mattered most: nothing in `orimera/` ever wrote `capture.deleted_at`.
+    """The finding that mattered most: nothing in `exulanica/` ever wrote `capture.deleted_at`.
 
     `purge_releases_bytes` decides liveness from that column, `insert_tombstone` wrote a row and
     nothing else, and the test helper supplied the missing step. So the suite was green against a

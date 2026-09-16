@@ -324,8 +324,8 @@ describe('free text that turns out to be a question', () => {
     /*
      * A question can be out for as long as `ASK_TIMEOUT_MS`, and the reasoning core has been
      * measured in tens of seconds. In that time the person can press Escape or open the Index,
-     * both of which dismiss the Companion. Without this the answer replaced "Press X to call"
-     * with a paragraph nobody had asked to see any more.
+     * both of which dismiss the Companion. Without this the answer would reveal a paragraph
+     * nobody had asked to see any more.
      */
     let resolve = (_: CompanionAnswer) => undefined as void;
     const controller = createCompanionController({
@@ -345,7 +345,8 @@ describe('free text that turns out to be a question', () => {
     await vi.waitFor(() => expect(controller.answer()).not.toBeNull());
 
     expect(panel.root.textContent).not.toContain('The earliest of them is from that winter.');
-    expect(panel.root.textContent).toContain('to call');
+    expect(panel.root.hidden).toBe(true);
+    expect(panel.root.textContent).toBe('');
 
     // Not discarded. It is what they asked for, so summoning again shows it.
     panel.setState('open');

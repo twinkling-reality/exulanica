@@ -34,6 +34,8 @@ written it to disk.
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Final
@@ -41,9 +43,12 @@ from typing import Final
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from exulanica.api.account_repository import AccountUnavailable
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.routes import (
+    accounts,
+    character_appearance,
     companion,
     environment_sources,
     evidence,
@@ -61,6 +66,9 @@ from exulanica.api.routes import (
     scene_segments,
     selection,
     society,
+    society_actions,
+    society_control,
+    society_district,
     world,
     world_read,
     world_write,
@@ -143,13 +151,29 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # evidence path cannot write either, so it is a broken deployment rather than a degraded
     # feature, and it should say so at boot instead of at the first asset read.
     seed_reviewed_assets(services.store)
+    society_worker = services.build_society_control_worker()
+    society_stop = threading.Event()
+    society_thread = (
+        threading.Thread(
+            target=society_worker.run, args=(society_stop,), name="society-playback", daemon=True
+        )
+        if society_worker is not None
+        else None
+    )
+    app.state.society_control_worker = society_worker
+    app.state.society_control_thread = society_thread
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:
         worker.start()
     try:
+        if society_thread is not None:
+            society_thread.start()
         yield
     finally:
+        society_stop.set()
+        if society_thread is not None:
+            await asyncio.to_thread(society_thread.join)
         if worker is not None:
             worker.stop()
 
@@ -170,17 +194,29 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         lifespan=_lifespan,
     )
     app.state.services = services or build_services()
+    app.state.society_decision_provider = app.state.services.society_decision_provider
+    app.state.society_base_tick_interval_ms = app.state.services.society_base_tick_interval_ms
+    if app.state.services.society_runtime is not None:
+        runtime = app.state.services.society_runtime
+        app.state.society_initial_input = runtime.initial_input
+        app.state.society_input_authorizer = runtime.authorize
+        app.state.society_authored_edit = runtime.authored_edit
     app.state.verify_schema_at_boot = verify
     # Pure ASGI and outermost, so it runs before routing and before any body is read.
     app.add_middleware(BodyLimit)
 
     app.include_router(health.router)
+    app.include_router(accounts.router)
     app.include_router(graph.router)
     app.include_router(geometry.router)
     app.include_router(geometry.scene_router)
     app.include_router(scene_segments.router)
     app.include_router(selection.router)
     app.include_router(society.router)
+    app.include_router(society_actions.router)
+    app.include_router(society_control.router)
+    app.include_router(society_district.router)
+    app.include_router(character_appearance.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)
     app.include_router(identity.router)
@@ -205,6 +241,14 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(TokenNotAccepted)
     async def _unauthenticated(_request: Request, exc: TokenNotAccepted) -> JSONResponse:
         return _problem(401, "unauthenticated", str(exc))
+
+    @app.exception_handler(AccountUnavailable)
+    async def _account_unavailable(_request: Request, _exc: AccountUnavailable) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={"code": "account_unavailable", "detail": "Account service is unavailable"},
+            headers={"Cache-Control": "private, no-store"},
+        )
 
     @app.exception_handler(SelectionRejected)
     async def _rejected(_request: Request, exc: SelectionRejected) -> JSONResponse:

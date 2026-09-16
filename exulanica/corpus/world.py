@@ -172,7 +172,7 @@ SUBJECTS: dict[str, str] = {
 #: cannot know what a model will call a low-poly carmine box: "satchel", "red bag", "red cube",
 #: "maroon box". Everything else in MANIFEST.json is a fact the generator produced; this is the
 #: one entry that is a guess, and it is written down here, in a reviewed diff, rather than
-#: buried in a scorer, for the same reason `orimera/epistemics/vocabulary.py` exists.
+#: buried in a scorer, for the same reason `exulanica/epistemics/vocabulary.py` exists.
 #:
 #: **What this is for now, which is not what it was added for.** It was added so M6 could be
 #: scored against the corpus, and M6 turned out not to be a corpus metric at all: it filters on

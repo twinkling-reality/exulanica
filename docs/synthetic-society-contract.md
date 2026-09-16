@@ -1,120 +1,498 @@
 # Synthetic society contract
 
-Status: **IMPLEMENTED BOUNDED SIMULATION; NOT A LEARNED SOCIETY MODEL**.
+Status: **BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL**.
 
-Exulanica's current society is a deterministic, fictional simulation attached to the bounded owned
-district. It tests stable synthetic identity, persisted state, replayable events, retrieval and
-bounded rendering. It does not model real residents, infer demographic facts, or demonstrate
-general social intelligence.
+The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
+`exulanica-society/v2` adds reachable goals, routes, reviewed visit/rest actions and reactions to
+versioned authored inputs. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
+local observations, communicated beliefs and explicitly requested, validated model proposals.
+All profiles are fictional simulation, separate from personal evidence. They do not model real
+residents, infer demographic facts or demonstrate general social intelligence.
+
+## Connection to the personal world
+
+The product direction is a persistent society inside a person's composed world. Inhabitants
+interact with permitted places and authored objects through declared affordances. Personal meaning
+comes from what the person brings into and changes in that world. Inhabitants never impersonate
+remembered people. The Companion must explain actions from recorded goals, referenced objects and
+simulation events while keeping personal evidence distinct.
+
+The pure engine and PostgreSQL lifecycle have synthetic fixture coverage. The connected
+personal-world demonstration additionally needs the server composition/rights adapter, accepted
+authored edits, shared selection, renderer presentation and grounded Companion integration.
+A fixture establishes mechanics, not personal relevance or visual acceptance. Default operation
+remains manual. A separately hosted, explicitly enabled playback worker can advance a saved
+playing v2/v3 society under the bounded lease policy below; persistence alone starts no worker.
 
 Implementation:
 
-- pure transition system: `exulanica/world/society.py`;
+- legacy state and transitions: `exulanica/world/society.py`;
+- purposeful policy and input validation: `exulanica/world/society_planner.py`;
+- bounded observations and communication: `exulanica/world/society_social.py`;
 - persistence and compare-and-swap: `exulanica/world/society_repository.py`;
-- API: `exulanica/api/society.py`;
-- retrieval: `exulanica/selection/executor.py`;
-- rendering: `web/packages/atlas-react/src/playcanvas/owned-district-runtime.ts`; and
-- controls/preview: `web/packages/app/src/composition/environment-selection.ts`.
+- typed user action policy and persistence: `exulanica/world/society_actions.py` and
+  `exulanica/world/society_action_repository.py`;
+- persisted playback controls and worker: `exulanica/world/society_controls.py`,
+  `exulanica/world/society_control_repository.py` and
+  `exulanica/api/society_control_worker.py`; and
+- authenticated API: `exulanica/api/routes/society.py`,
+  `exulanica/api/routes/society_actions.py` and
+  `exulanica/api/routes/society_control.py`.
 
-## State and identity
+## Identity, branches and compatibility
 
-The engine profile is `exulanica-society/v1`. The default population is 128 and the accepted range
-is 100–512. UUIDv5 inhabitant identities are derived from the society identity and ordinal. Given
-the same society ID, seed and population, initialization is deterministic.
+The default population is 128; the pure initializer accepts 100–512. The population is canonical
+state, independent of the 24-avatar display budget. Inhabitant UUIDv5 identities derive from
+society identity and ordinal. The same society ID/seed/population preserves those identities across
+profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
+authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
 
-Current inhabitant state includes:
+One society belongs to one workspace, world and authored version. V2/v3 `branch_id` equals that version
+UUID; the authored version supplies its user-facing name. Same-named objects in two versions remain
+different targets. This slice does not fork existing simulation history. To opt in when a version
+already has another profile, create a new authored version and a new society. No implicit migration,
+identity substitution, tick reset or history rewrite occurs.
 
-- explicit synthetic marker, ordinal and display name;
-- role, household, home node and work node;
-- daily departure schedule;
-- two-dimensional local position and current destination;
-- one scalar need; and
-- up to sixteen event references.
+V1 initialization and successful transitions remain byte-compatible, pinned by deterministic digest
+vectors. V1's home/work nodes are labels; its motion ignores them and has no obstacle or arrival
+semantics. Replay now additionally checks every persisted v1 event against regenerated events.
+Unknown engine/input profiles are refused. WMP 1.0 and the authored-world 1.0 extension still omit
+society and its input/event history; they cannot resume this simulation.
 
-Society state also includes household relationships, weather and two aggregate resource values.
-These fields are simulation variables only. The names, roles, households and relationships are
-generated from small fixed vocabularies and arithmetic rules. They are not inferred from district
-evidence or population statistics.
+## V2 input authority
 
-## Transition and event semantics
+The policy consumes `exulanica.society-input/v1`, a validated projection from an authorized server
+composition adapter. It does not compile a second district, infer navigation, or accept geometry
+from browser request JSON. Inputs contain:
 
-One transition advances one simulated minute. It:
+- `input_seq`, beginning at 1, independent of simulation ticks;
+- `world_id`, authored `version_id`, `district_id`, district interpretation and base artifact digests;
+- the explicit `flatiron-local-mm` frame, east/south axes and integer millimetres;
+- `authored_state: {edit_seq, delta_sha256}`;
+- `bounded-sidewalk-graph/v1` nodes, undirected edges, destinations and unavailable reason;
+- targets with stable `target_id`, spatial `subject_id`, `node_id`, `affordance`, `duration_ticks`,
+  `origin`, authored string `object_id` or null, `version_id`, and boolean `enabled`;
+- digest-bound dependency references, availability and its explicit reason; and
+- `document_sha256`, covering canonical no-float JSON excluding only that field.
 
-1. changes a destination at the configured home/work departure minute;
-2. emits a deterministic `departed` event;
-3. appends that event ID to bounded inhabitant memory;
-4. applies a seeded, bounded two-dimensional position delta; and
-5. increments the scalar need.
+Nodes/targets/edges are sorted by their IDs; dependencies sort by `(kind,identity,sha256)`.
+Edge lengths are positive ceil Euclidean millimetres. Unknown references, duplicate IDs, wrong
+frames, booleans masquerading as numbers, altered digests and unsupported actions fail closed.
+Bounds are 16,384 nodes, 65,536 edges, 4,096 targets/destinations and 8,192 dependencies per input.
 
-The repository stores current state with its digest and persists emitted events with subject,
-place, world, version, tick and document digest. Updates use compare-and-swap; stale state is
-refused. The transition is deterministic and uses no wall time, random service or model call.
+The adapter owns geometric clearance, accepted authored transforms, reviewed affordance assignment,
+object identity and current rights. A navigation graph or stored dependency is not authorization.
+It must validate all connectors and obstacles, including negative-space dependencies. Exterior
+visit markers are not real doors, and the policy does not enter interiors or invent street crossings.
+Initial v2 creation requires an available graph and an enabled reachable target. Initial subjects
+are distributed deterministically among declared nodes in components containing enabled targets.
 
-The event log supports audit and retrieval, but current state is stored as snapshots rather than
-being reconstructed exclusively from events. Consequently this is replayable deterministic
-simulation with an event history, not complete event sourcing.
+## Goals, routes and actions
 
-## Epistemic boundary
+Each tick is one simulated minute. Travel budget is 60,000 mm per tick, at most one metre per
+simulated second. Shortest routes minimize integer edge length with lexicographic node-path ties.
+A scalar need of at least 750 prefers rest; otherwise visit is preferred. Among reachable candidates,
+the policy prefers a different target from the last completed one, then lower route cost and target
+ID. This is a small deterministic utility policy, not learned preference or biography.
 
-Society rows and events occupy the simulation plane and carry `synthetic: true`. Selection emits
-`synthetic_inhabitant` and `simulation_event` results under the `simulation` content truth class.
-Answers must say that inhabitants are simulated and events are not real-world visits.
+Only two object affordances are supported: `visit` takes one subsequent tick; `rest` takes three.
+Arrival starts the action timer and does not spend its first tick. Each subsequent tick validates
+availability and access position before progressing. Completion reduces the scalar need by 20 for
+a visit or 500 for rest, clamped at zero. No capacity, crowd avoidance, resource depletion,
+conversation or newly learned relationship is implied by the v2 movement policy. Existing role/household/relationship fields
+remain explicitly synthetic labels and do not create extra supported activities.
 
-Synthetic identities must never be resolved to observed people merely because names, embeddings,
-places or motions are similar. A later fictional character inspired by personal evidence needs an
-explicit authored derivation without importing private person identity into the simulation.
+The existing envelope and synthetic inhabitant fields remain. V2 adds:
 
-Simulation events may explain what happened inside a named simulation branch. They are not evidence
-for claims about historical reality. Promotion into authored canon is an explicit user action that
-creates a new authored assertion while preserving simulation provenance.
+- envelope/state `branch_id`, consumed `input_seq` and `input_sha256`;
+- state `movement_budget_mm_per_tick` and `seed_sha256`;
+- inhabitant `goal: {kind, target_id, reason}` or null;
+- `route: {node_ids, edge_index, edge_progress_mm, destination_node_id, input_sha256}` or null;
+- `action: {kind, status, target_id, remaining_ticks, reason}`;
+- `motion_path_mm`, every segment traversed last tick, including start/end, or one stationary point;
+- `explanation: {summary, event_ids}`, grounded in recorded decisions.
 
-## Rendering boundary
+Additional engine state retains exact node/edge position, target binding and bounded event memory.
+Rendering interpolates along `motion_path_mm`, never directly across its corners, and must retain
+stable synthetic subject identity. Render motion cannot create canonical actions or events.
 
-The browser renders at most 24 inhabitants. This is a representation budget, not society
-population. Rendered avatar identity must remain stable while visible and selection must resolve
-back to the simulation subject.
+## Opt-in local activity failures
 
-Current movement is a visualization of stored or previewed positions, not route planning on a
-street graph. Home and work nodes are labels rather than spatial destinations; motion is a seeded
-random walk bounded to the district. The implemented capability is therefore described as
-deterministic synthetic motion, not purposeful commuting, emergent social life, or physically
-grounded navigation.
+The legacy `exulanica.society-composition/v1` projection keeps its original behavior, including
+making the whole input unavailable when an active authored affordance has no supported access
+node. Both `build_society_input` and `SocietyRuntime` retain this default. A host can explicitly
+select `composition_profile="exulanica.society-composition/v2"` to enable local failure handling.
+Persist this choice with the host configuration; it is not selected by browser request JSON.
 
-## Training boundary
+Under that policy, a known reviewed stationary object's unreachable activity is omitted from
+usable targets. The object's reviewed collision footprint still prunes navigation through the
+same district geometry predicates. Independently validated nodes, edges, district activities and
+reachable authored activities remain usable. No access node, connector, teleport or alternative
+obstacle geometry is invented. An empty graph still blocks movement. Unknown active assets,
+unsupported motion, invalid transforms/frames, structural overrides, invalidated sources and
+withdrawn rights still produce a globally unavailable input with no materializable targets or
+local records.
 
-Current society data is useful for testing APIs, replay, retrieval, rendering budgets and
-counterfactual branches. It is not valid evidence about people or cities and must not be mixed into
-a factual-memory training corpus.
+The new projection is `exulanica.society-input/v2`. It keeps the original fields and adds sorted
+`unavailable_affordances`, each containing exactly `target_id`, `subject_id`, `object_id`,
+`version_id`, `affordance` and `reason: authored_affordance_unreachable`. These identify an authored
+activity without claiming an access `node_id`. Usable and unavailable target IDs are disjoint;
+their combined count is bounded to 4,096. Records bind the same version and deterministic authored
+subject/target identity as a reachable target. Full authored-object and reviewed-asset dependency
+references remain present even when an activity is unreachable. An unavailable global input has
+an empty local list, so withdrawal does not become a permission to display inaccessible data.
 
-A future learned dynamics module may propose distributions over next simulation states. Its model
-version, training-data scope, branch, horizon, uncertainty and realized-vs-predicted status must be
-recorded. Generated rollouts remain generated until explicitly realized by the simulator; they do
-not overwrite prior simulation events.
+An inhabitant already pursuing the affected activity records a `replanned` event with reason
+`authored_affordance_unreachable`, its prior target and the new input sequence/digest, then can
+choose another reachable activity. Other inhabitants continue under the existing policy unless
+the object's actual collision effect independently invalidates their route. A move or restoration
+that supplies a valid access node returns the same target ID to the usable list. These are new
+ordered inputs, never rewrites of prior failure records or completed actions.
 
-## Package and lifecycle gaps
+Migration 0057 admits strict input/v1 and input/v2 profiles without modifying migrations 0053 or
+0055. Engines v2/v3 accept both input profiles and replay each retained input with its original
+semantics; v1 engine behavior is unchanged. Legacy projection, state and event digest vectors are
+pinned in tests. Historical authorization selects policy references from the stored input profile,
+not the currently selected projection policy, while continuing to recheck current rights and
+asset bytes. The runtime binding structure and its digest do not change.
 
-Society state and events are absent from WMP 1.0 and the authored-world extension. A future package
-extension must define:
+Apply the reader/schema support before opting a host into the new composition. Future accepted
+edits append the chosen projection. To recover an already paused society immediately, explicitly
+append a fresh authorized projection through the runtime input-refresh/edit hook and then advance;
+a configuration change alone does not rewrite the persisted state. A policy refresh can keep the
+same authored edit cursor/delta digest while increasing `input_seq`. Replay therefore retains the
+old global pause and the later locally degraded input exactly. Local records are available in the
+stored input document for authorized adapters; no new browser endpoint is introduced.
 
-- complete engine/profile compatibility;
-- seed and state-digest handling;
-- event-chain closure and replay expectations;
-- branch and counterfactual identity;
-- behavior when the referenced district or authored version is unavailable;
-- privacy/deletion behavior for any evidence-linked characters; and
-- a receiver capability declaration for resuming versus inspecting a simulation.
+## Authored edits and inability to act
 
-## Validation gates
+Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
+even if several edits happen between simulation ticks. The next committed step consumes every input
+in sequence before moving or acting. The repository checks contiguous input sequences and monotonic
+authored edit cursors; the adapter must ensure no relevant accepted edit is omitted. Equal authored
+cursors require equal delta digests; a rights-only input can retain the cursor.
 
-Complete bounded-society validation requires:
+Moving, disabling or removing a current target invalidates its plan before action use. Changed
+navigation conservatively invalidates plans. New enabled reachable targets wake blocked inhabitants.
+If a changed graph no longer supports the inhabitant's current node/edge position, it stops there
+with `current_position_invalidated`; there is no nearest-node snap or teleport. If the same position
+becomes valid after a supported restoration, planning can resume. Disconnected or absent targets
+produce `no_reachable_affordance` or `no_enabled_affordance`. Unavailable dependencies pause action
+with their recorded reason. Repeated unchanged blockage does not emit another event every tick.
 
-1. deterministic initialization and transition replay across supported runtimes;
-2. stale-write refusal, reload continuity and event/state lineage;
-3. explicit separation from observed people and historical events in retrieval;
-4. stable subject selection despite the 24-avatar representation cap;
-5. route and action claims no stronger than the implemented dynamics;
-6. measured frame-time and memory bounds; and
-7. visible behavior evaluated from live captures.
+Undo/restore is a later authored edit and input sequence. It can restore a target or route under
+current authorization. It never reverses completed actions, rewinds society time, deletes events or
+resurrects withdrawn sources. A move followed by undo before a tick still has two retained inputs;
+replay must verify both. Earlier simulated observations remain in their original version/input scope.
 
-Visual motion changes do not expand the underlying society-model capability unless spatial
-destinations, walkable routes and action affordances are represented in simulation state.
+## Events, persistence and replay
+
+V2 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and `blocked`.
+Event documents contain deterministic `summary`, `synthetic: true`, profile, branch, subject, tick,
+order, input sequence/digest, typed target, reason/outcome, goal/action facts, position/path and
+previous-state/seed lineage. Event UUIDs bind society, tick, order and document digest. Authored
+string IDs stay inside typed targets; SQL `object_id` remains null rather than coercing a string
+into a UUID. Summaries are deterministic templates, never invented biographies.
+
+`world_society` retains the state and digest. `world_society_event` retains events. V2 additionally
+requires `world_society_input` and `world_society_transition`, supplied by the integration migration.
+Inputs and transitions are append-only during normal operation with workspace isolation. Each
+transition records previous/result state digests, its inclusive consumed input span, ordered event
+IDs and a digest of the ordered event identities/documents. Snapshot, events and transition receipt
+are committed atomically. Advances compare both base tick and digest under the shared authored
+workspace lock; a stale writer changes nothing.
+
+Replay starts from the initial seed/population and historical input 1. It checks all stored input
+bindings/order, every transition's state digest and ordered events, the full persisted event set,
+and final state equality. Queued but unconsumed inputs are validated too. It never substitutes
+current world geometry. Historical materialization/replay still checks current authorization;
+withdrawn or unavailable dependencies return unavailable rather than reviving old geometry.
+
+This is deterministic replay with immutable input/event/transition history and current snapshots,
+not a claim that events alone reconstruct all state. Losing required input bytes prevents exact
+replay and must be reported.
+
+## Server integration and HTTP
+
+Existing authenticated society create/read/step/events/replay routes remain. Creation optionally
+selects `profile: exulanica-society/v2` or `exulanica-society/v3`; omission keeps v1. Step bodies still contain only
+`base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
+
+The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
+and `society_input_authorizer(connection, session, document)` on application state. The repository
+accepts an `input_authorizer(document)` callback and exposes internal `record_input(version_id, doc)`
+for the authored-edit transaction. The adapter must take appropriate source/asset locks and validate
+current bindings. An absent authorizer/provider fails closed. The public routes report
+`424 unavailable_society_input`; invalid state/replay is a `409`, malformed creation a `422`, and
+stale state remains `409 stale_society_state`. Existing unknown/cross-workspace handling remains `404`.
+
+An explicitly unavailable latest input may be authorized for recording a pause even when older
+inputs have lost rights. Advance authorizes that latest input; historical state/event reads and
+replay authorize what they materialize individually. That distinction allows recording withdrawal
+consequences without granting permission to display withdrawn historical geometry.
+
+The Companion adapter must use the same recorded goal/action/event references, labeled simulation.
+Historical answer clauses still require personal evidence; simulated visits are never evidence of
+real visits. Selection/Companion integration, authored composition and live visual acceptance are
+separate integration responsibilities, not capabilities inferred from a fixture.
+
+## V3 bounded observations and communication
+
+V3 preserves the complete population and existing navigation/action enforcement. Only the first
+three stable inhabitant IDs participate in the social policy. Other inhabitants retain the v2
+utility policy. This is a bounded social cast, not a claim of 128 independent model agents.
+Existing v1/v2 states are never upgraded in place; their transition and event bytes remain stable.
+
+The state adds `social: {profile, cast_ids, last_decision_seq, agents}` with profile
+`exulanica.social-state/v1`. Each cast member has `observations`, `beliefs` keyed by target ID,
+and `communication_ids`. Each collection is capped at 16 records; a decision context includes at
+most eight observations and 16 beliefs belonging to that subject. Earlier records remain in the
+immutable event/input history, not an unbounded prompt. The social engine does not read wall time;
+optional playback schedules calls to the unchanged deterministic step operation.
+
+An inhabitant stopped at a declared navigation node observes authored affordances within 4,000 mm
+of graph travel. This is synthetic graph proximity, not recovered vision or line of sight. Observed
+facts record `fact_id`, `observer_id`, `observed_tick`, exact `input_seq`/`input_sha256`, a typed
+`target`, and `available`. A removed, disabled or locally vacated target can be observed as
+unavailable. Noticing a vacated location does not reveal a distant new location. Retained ordered
+inputs allow multiple edits between ticks to be noticed in order at that tick's starting position;
+this does not claim perception at the edits' actual wall-clock times.
+
+A stopped cast member can communicate one retained fact per tick to another stopped cast member
+within 8,000 mm of graph travel. It cannot transmit something it first learned that same tick.
+Deterministic cast and target ordering chooses the interaction. A recipient's belief records
+`origin: communication`, sender `source_subject_id`, original `source_fact_id`, `communication_id`,
+original input sequence/digest, `learned_tick`, target and availability. Direct beliefs instead use
+`origin: observation` and a null communication ID. Newer factual input sequences supersede older
+ones; an existing belief wins a same-input tie. Relaying old information later does not make its
+source newer. These are bounded records of claims, not trusted global truth or learned relationships.
+
+Cast members know public district destinations. They can choose an authored goal only when their
+own available belief matches the current authoritative target exactly and its route is reachable.
+Missing or outdated knowledge can produce `no_known_reachable_affordance`. Current physical route
+and action preconditions always apply, including to a mistaken or outdated belief. Undo/restore
+is another input: it can produce a new observation and later communication, but does not erase
+prior beliefs, interactions, completed actions or simulation time. An authorized unavailable pause
+clears materialized cast memory; historical records remain rights-gated.
+
+V3 adds `observed`, `communicated` and `decision_applied` events to the existing event envelope.
+Use envelope `event_kind`, document `reason`/`outcome` and these structured fields:
+
+- `observed`: `observation` holds the complete fact;
+- `communicated`: `communication_id`, `sender_id`, `receiver_id`, `belief`, and `dialogue: null`;
+- `decision_applied`: `decision_seq`, `request_id`, `decision_sha256`, and `disposition`.
+
+`decision_applied` records consumption, including rejection/staleness; only `disposition: applied`
+means a proposal influenced the step. Inhabitant `explanation.event_ids` and bounded `memory` cite
+actual events. Communication records transmission of information; the implementation does not
+supply dialogue or imply a model-generated conversation. All identity, goals and summaries remain
+explicitly synthetic. Companion explanations must preserve observation versus hearsay and cite
+these facts; they must not invent biography from a displayed label.
+
+## Explicit model proposals and exact replay
+
+Models are optional and never called by stepping, reading or replaying. An explicit server
+`SocietyDecisionProvider(client, role, manifest_sha256)` uses the existing `ModelClient.structured`
+boundary, a fixed prompt version and strict `GoalProposal` schema. The client cannot select a role,
+model, prompt or context. A missing provider produces a durable `provider_not_configured` receipt.
+No production model quality or learned social behavior is established by offline transport tests.
+
+The bounded context profile is `exulanica.society-decision-context/v1`. It contains subject/branch,
+tick, position, `can_choose_goal`, that subject's `own_beliefs`/`own_observations`, current goal and
+allowed actions. Canonical context bytes may not exceed 64,000. Only `choose_goal` with a known,
+available target or `wait` with a null target is allowed. The validator checks the current target,
+reachability and absence of an action in progress. Wait lasts one explicit step. A chosen goal
+uses `remembered_target_selected`; replay revalidates the stored choice without new inference.
+
+For a v3 society, `POST /world/versions/{version_id}/society/decisions` accepts exactly
+`{idempotency_key: UUID, subject_id: UUID, base_tick: integer, base_state_sha256: SHA256}`.
+`GET` at the same path plus `/{request_id}` reads the result. Both return
+`{request, decision: receipt-or-null, status: in_progress|completed}`. The idempotency key is the
+request ID. Queued authored inputs must first be consumed by an explicit step. A request does not
+advance society time, and a completed accepted receipt affects only a subsequent explicit step.
+
+Preparation commits an immutable reservation with profile `exulanica.society-decision-request/v1`,
+subject/branch/base tick/state digest, exact input reference, full context and its hash, configured
+role/primary model/manifest hash or null, and the request document hash. At most one request is
+reserved per subject and base tick, even with different keys. An identical retry returns its
+existing pending/completed envelope without another inference. A crash after reservation remains
+honestly pending; there is no automatic retry or fabricated success.
+
+The preparation connection closes before inference. No database transaction, workspace advisory
+lock or asset lock remains held during the provider call. Completion opens a new transaction,
+reauthorizes current inputs and all historical context dependencies, and compares the exact state
+and input again. Changed state or input yields `stale`; withdrawn dependencies yield a persisted
+`unavailable` receipt and HTTP 424 without returning the context. Semantic/schema violations yield
+`rejected`. Results store validated proposal or null plus actual successful call metadata: served
+model, role, manifest/prompt/schema/messages hashes, attempts/fallback/cache status, token usage and
+cost. Failed calls without that metadata retain the explicit failure and null provider, not an
+invented execution record. No raw reasoning or unrestricted prose is admitted.
+
+`world_society_decision_request` stores the immutable request. `world_society_decision` stores the
+contiguous receipt sequence, profile `exulanica.society-decision/v1`, request/hash binding, subject,
+branch, base state/tick, input/context hashes, status/reason, proposal/provider and document hash.
+`world_society_transition_decision` binds each consumed receipt exactly once to a committed
+transition, with `applied`, `rejected`, `unavailable`, `stale` or `superseded` disposition. These
+workspace-isolated tables and v3 guards are supplied by migration 0055. State, events, transition
+and consumption bindings commit atomically. Replay uses the exact stored receipts consumed by
+that transition, checks context/decision hashes and dispositions, regenerates state/events, and
+verifies the final digest. A provider change cannot retroactively change replay.
+
+## Validation
+
+Dedicated society tests distinguish pure policy fixtures from PostgreSQL scratch-schema evidence.
+They cover legacy digest compatibility, reachable/disconnected routes, turn-preserving motion,
+action timing, edit/undo reactions, no-snap blockage, population independence, malformed inputs,
+authenticated reload, stale writes, branch/workspace isolation and event-history forgery refusal.
+The database cases use real migrations and a synthetic authorized-input adapter, not production
+sources or personal material. Live connected acceptance and renderer performance require the
+integrated experience and explicit user evaluation.
+
+V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
+vacated locations, stale hearsay, wait, proposal rejection and replay. Authenticated PostgreSQL
+cases exercise committed reservations, pending/completed retries, stale input/state admission,
+withdrawal, provider absence, transition consumption and reload/replay. Those HTTP operations use
+a provisioned nonowner role with neither superuser nor BYPASSRLS privileges. The model path uses
+the real client adapter with a scripted offline transport; this is not live-provider quality
+evidence, admitted personal-scene evidence or browser acceptance.
+
+
+## Persisted playback controls and bounded host progression
+
+Playback is separate from engine versions and deterministic simulation time. Migration 0059 adds
+`world_society_control` and append-only `world_society_control_event`, both workspace scoped under
+forced row-level security. It depends on the existing society tables and workspace guards, not
+migration 0058's account tables. No stored v1/v2/v3 states, seeds, input digests or event histories
+are rewritten. A missing control row means virtual paused state, revision 0. Reading, importing a
+module, creating a society or configuring play never starts a worker. The host must register the
+router, supply its existing input authorizer and manage worker startup/shutdown. It can explicitly
+configure a fixed workspace allowlist, or opt into fresh discovery of active account-owned
+workspaces through the isolated account role. Account-wide discovery is off by default and refuses
+startup without configured accounts and the reviewed current-input runtime. There are no model
+calls in the worker.
+
+The authenticated base route is `/world/versions/{version_id}/society/control`:
+
+- `GET` returns `exulanica.society-control/v1`: society/branch identity, persistence flag, revision,
+  mode, speed, base interval, effective `tick_interval_ms`, simulated seconds per tick, catch-up
+  cap, next due time, pause reason, lease expiry, last control event sequence, current tick and
+  state digest. `interval_semantics` is `minimum_wait_after_batch_completion`;
+  `last_batch_execution` is null until a completed automatic batch, then contains its event sequence,
+  receipt hash, committed tick count, execution duration in whole milliseconds and completion time.
+  Duration measures authorization and stepping within execution; it excludes claim/connection,
+  final receipt commit and polling overhead, and is not an end-to-end delivery-rate promise.
+  `play_eligible` and `play_ineligible_reason` describe engine eligibility only;
+  current source authority is checked when configuring play and executing a batch.
+- `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful
+  configuration increments the control revision and cancels any pending claim. Stale revision
+  returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;
+  unsupported settings or legacy play are 409. Unavailable current inputs are 424.
+- `POST /steps` accepts `{base_revision, base_tick, base_state_sha256}` and requires paused mode.
+  It performs exactly one existing deterministic step and returns `{control, society, receipt}`.
+  Both control revision and simulation tick/digest must match. First successful use persists
+  paused settings; a failed step rolls back that configuration too. V1 remains manually usable.
+- `GET /events?limit=64` returns newest-first hash-checked scheduling receipts, capped at 128.
+  These explain control changes, claimed/reclaimed leases, committed tick spans, discarded timing
+  debt and failures. They are distinct from inhabitants' action/event explanations.
+
+The older `/society/steps` endpoint retains its existing semantics and can explicitly advance a
+playing or paused society. The authenticated browser playback UI uses `/control/steps` to enforce
+pause-before-step and reads the control after connection, refresh and control conflicts. It exposes
+play, pause, 1x/2x/4x speed and one simulated-minute advancement without deriving canonical ticks
+from render frames.
+Control revision tracks user configuration or automatic pause, while simulation tick/digest track
+progress. A normal automatic tick does not increment control revision. It still uses the existing
+simulation compare-and-swap operation and workspace edit lock, serializing authored edits and
+manual or model-decision reservations through the existing domain boundary.
+
+Speed is a playback multiplier, never a real-time claim: a simulated tick still represents 60
+simulated seconds. The host default base wait is 1,000 ms; 1x/2x/4x request minimum waits of
+1,000/500/250 ms after batch completion. Computation, polling and contention add time. The host
+may configure a base of 1,000–60,000 whole milliseconds divisible by four. Each configuration
+receipt retains the chosen base; changing deployment defaults does not silently rewrite saved
+controls. A subsequent user configuration adopts the host's current base. Renderers may interpolate
+between committed positions, but must not fabricate future goals, actions or positions as evidence.
+
+A worker claims one due society per configured workspace per round, ordered by oldest due time
+then stable society identity. Claims skip a workspace whose edit lock is busy. PostgreSQL
+`clock_timestamp()` is authoritative; clients cannot supply deadlines. Claiming commits a random
+lease token, the control revision, initiating actor and a 30-second expiry before work starts on a
+fresh connection. Execution checks workspace, branch, revision, token and deadline before and after
+ticks and before returning to commit. A revoked, replaced or expired claim cannot commit its batch.
+At most three overdue ticks run in one transaction; a receipt records overdue/executed/skipped tick
+counts, timing, speed, previous/result hashes and exact transition input ranges and event hashes.
+The next deadline is completion plus the configured wait. Excess wall-clock debt is discarded;
+it is not silently replayed as unlimited offline time.
+
+Pause uses the same workspace lock. An already executing bounded batch can finish before pause
+acknowledges; after acknowledgement its old token cannot advance again. A slow tick is not forcibly
+interrupted mid-computation, but crossing the lease deadline rolls the entire batch back. Shutdown
+stops new claims and lets current work reach that boundary. Unexpected exceptions roll back ticks
+and leave the previously committed lease recoverable. Expiry permits replacement claims; after
+three unsuccessful attempts the next recovery check persists paused `lease_recovery_limit`.
+A user may resume with the new revision. A source authorization failure instead rolls back the
+batch immediately and persists paused `source_unavailable`; invalid state records
+`invalid_society_state`. These records claim zero committed ticks. Local unavailable affordances
+under composition/v2 continue to produce their existing per-action reasons and do not pause an
+otherwise available district.
+
+Playback receipts reference completed engine transitions; wall timestamps and random lease tokens
+are not replay inputs to the engine. Exact state replay still uses the original ordered district
+inputs, authored edits and optional persisted decision receipts, including intervening input
+changes. It neither reads current geometry as a substitute nor schedules new work. Control
+configuration and undo do not rewind society time. Object undo/restore continues to append an
+ordered authored input under the existing supported version semantics. Historical source withdrawal
+continues to deny historical replay even when control metadata remains readable. No sleeping
+process is required for default/manual use, and no production rollout is implied by these modules.
+
+## Typed user-directed actions
+
+Migration 0060 adds append-only `world_society_action_request` and
+`world_society_transition_action`. This is a bounded external-input foundation for v2/v3 societies,
+separate from optional model decisions and playback controls. It does not broaden the affordance
+registry or accept free-form movement.
+
+The authenticated base route is
+`/world/versions/{version_id}/society/actions`:
+
+- `POST` accepts exactly an idempotency key, base tick/state digest, synthetic subject ID and
+  either `{kind: "go_to", target_id}` or
+  `{kind: "perform", target_id, affordance: "visit" | "rest"}`;
+- `GET` returns newest-first authorized request envelopes; and
+- `GET /{request_id}` returns one request and its pending or consumed status.
+
+The client supplies no position, route, target document, workspace, actor or branch. Under the
+workspace lock the server resolves the current v2/v3 society and latest consumed input, rechecks
+current source authority, freezes the exact canonical target and records the requesting actor.
+Requests require an idle/blocked/completed inhabitant, current available input, an enabled reachable
+target and no other request for that inhabitant at the same state. Exact retries return the existing
+envelope; changed reuse or stale bases fail without another write.
+
+Recording a request does not advance society time. The next normal deterministic step consumes
+ordered pending requests through the existing goal-policy seam. `go_to` constrains the next goal to
+the target; `perform` additionally binds its existing affordance. Each request receives one
+`applied`, `stale`, `unavailable`, `rejected` or `superseded` disposition and a
+`user_action_requested` event. The transition binding requires the exact request, previous state,
+input span, tick and event digest. Replay regenerates the disposition and event from genesis using
+the stored request and original inputs; it never calls a model or treats the request itself as
+completed movement.
+
+There is no cancellation, expiry or mid-action interruption in this version. A request can direct
+only the next eligible goal and ordinary navigation/action checks remain authoritative. It cannot
+teleport, cross unsupported space, undo completed actions or simulation history, or replace a
+withdrawn target. The current browser can inspect inhabitants and destinations but does not issue
+this API, so directed-action interaction and manual acceptance remain open.
+
+## Traffic boundary
+
+Cars likewise remain outside the pedestrian implementation. A future traffic producer must supply
+a separate versioned road input contract: stable road/lane/junction and movement IDs, directional
+lane connectivity, permitted turns and vehicle classes, lane geometry and clearance envelopes in
+the agreed coordinate frame, speed limits, right-of-way/signal rules and their effective ordering,
+plus rights/source provenance and exact per-edit input digests. A vehicle policy would additionally
+need explicit spawn/removal rules, stable synthetic vehicle identities, collision/occupancy and
+headway rules, bounded routing, intersection arbitration, gridlock/failure reasons and deterministic
+branch/seed lineage. Playback clocks must declare how pedestrian and vehicle ticks synchronize;
+shared rendered coordinates alone do not establish collision safety. Historical road geometry,
+rule changes and interventions must be retained for replay. Neither the pedestrian graph nor a
+visual road mesh is an adequate traffic contract, and this slice supplies no vehicle simulation.

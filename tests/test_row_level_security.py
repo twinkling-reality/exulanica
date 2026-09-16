@@ -53,7 +53,7 @@ pytestmark = pytest.mark.postgres
 #: Suffixed, because **a role is a CLUSTER object** and the harness's "the database name must
 #: contain test" guard does not reach one. Under the deployment's own names, every run of this
 #: file rewrote the grants on the developer's live `exulanica_app` and `exulanica_ro` in the same
-#: cluster the `orimera` database lives in. `tests/test_purge.py` moved for that reason and this
+#: cluster the `exulanica` database lives in. `tests/test_purge.py` moved for that reason and this
 #: file follows it. The privilege set under test does not change: `provision_runtime_role` takes
 #: the role name as an argument and composes every grant and revoke from it, so the suffix moves
 #: the identifier and nothing else.
@@ -70,7 +70,7 @@ def isolated():
     The roles are the deployment's, under suffixed names. A role is a CLUSTER object and the
     harness's "the database name must contain test" guard does not reach one, so provisioning
     `exulanica_app` and `exulanica_ro` here rewrote the grants on the developer's live roles, in the
-    same cluster the `orimera` database lives in. That is what the suffix is for, and
+    same cluster the `exulanica` database lives in. That is what the suffix is for, and
     `tests/test_purge.py` carries the same one.
 
     It costs nothing that matters: `provision_runtime_role` takes the role name as an argument

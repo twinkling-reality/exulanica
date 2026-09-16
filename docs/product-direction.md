@@ -1,6 +1,6 @@
 # Product roadmap
 
-Updated 2026-09-12. This roadmap defines delivery milestones and their acceptance criteria.
+Updated 2026-09-14. This roadmap defines delivery milestones and their acceptance criteria.
 Implementation status is recorded below; API and package contracts remain authoritative for
 supported capabilities.
 
@@ -11,6 +11,36 @@ Build your own world from your life, then change what's possible inside it.
 Exulanica remains a Personal World Memory Model. Personal experiences supply meaningful places,
 people, objects, and context. Creation lets a person reshape that world, introduce fictional
 material, and combine it with their experiences. Simulation adds movement and interaction governed by physical or fictional rules.
+
+The intended experience is a persistent living personal world. Memories, permitted imported
+places and authored creations give that world its meaning; synthetic inhabitants add routines,
+relationships and an evolving simulated history. A person's changes can influence inhabitants
+and their activities, and those consequences become part of the world's continuing story. The
+Companion should explain both the personal sources and the simulated developments, with each
+answer grounded in the appropriate evidence or event history. This connection is intended product
+behavior, not a claim that the current bounded society already delivers it. Simulation can enrich
+a personal world without becoming evidence that an event happened in the person's life.
+
+People should be able to switch between first-person exploration and a third-person view of their
+own controllable character. Both views share the same position, movement constraints and world
+interactions. Third person supports character expression and spatial awareness; first person
+supports close inspection. The camera choice is a presentation preference, not a separate world
+or simulation identity. Comfortable walking, running, turning and camera obstruction handling
+belong to the living-world experience. These controls remain an implementation target until tested
+in the live application. Both views require coherent geometry and readable visual composition.
+
+The player, synthetic inhabitants and people observed in scenes share a high-quality character
+foundation: continuous abstract human form, coherent materials, proportion-aware movement and
+stable subject bindings. Blank, colored and textured appearances are deliberate representations;
+future sourced faces, bodies and heights extend the same model. Appearance, identity and agency
+remain separate. The [character contract](character-representation-contract.md) defines visual
+quality, movement, provenance and staged source-to-character mapping. Deliver the abstract base
+and shared representation first; source-linked person placement and likeness fitting follow with
+explicit evidence and current availability, not inferred identity or personality.
+The current code supplies the versioned representation, native rig playback, development
+catalog/studio and authenticated appearance-history foundations. Production family configuration,
+an authenticated studio connection, movement/visual acceptance and source-linked person mapping
+remain later gates.
 
 The technical meaning of that name is fixed by the
 [world-memory model architecture](world-memory-model.md). Exulanica composes observations,
@@ -43,6 +73,42 @@ claim that extraction, unified content search or general NLP scene editing alrea
 works. The World Memory Model is the system architecture and world representation;
 it does not imply an already-trained universal world-generation model.
 
+## Inspectable representations and durable worlds
+
+The inspection control should expose a spatial-detail slider for compatible rendered surfaces
+and point representations, with separate overlays for supported bounds, segmentation, labels
+and stable identifiers. A selected item can open its structured records, source references and
+bounded authorized artifact-byte inspection. Semantic records are not the final geometric rung
+of a slider. A binary or Matrix-like visual treatment must be labeled as a visualization unless
+it directly encodes identified artifact bytes. It does not establish additional scene evidence.
+Pixels, splats and meshes do not imply complete segmentation or reusable object extraction.
+Available views therefore depend on each scene or subject's actual representations and current
+source authority. These controls are an active implementation milestone, not a delivered global
+view switch.
+
+The intended world interface offers rendered appearance, available point geometry and semantic
+structure/data views for the same selected subjects, place, time and branch. This is a product
+requirement, not a claim that the current distance-based representation tiers implement a global
+view switch. A continuous blend/density slider can accompany compatible spatial representations;
+semantic records remain an inspectable layer rather than pretending to be a geometric endpoint.
+A missing point map is shown as unavailable. Sampling an authored or generated mesh into points
+must retain that origin and must never be labeled a recovered measurement. Changing the view
+preserves subject selection, camera position, navigation authority and current source permissions.
+
+Worlds are retained assets and state, not continuously regenerated experiences. Preserve sources,
+versioned derived geometry/textures/rigs, source lineage and authored changes in content-addressed
+storage; retain identities, simulation snapshots and ordered events in the database. Build expensive
+representations asynchronously, reuse unchanged content, and stream/cache only what a view needs.
+Private personal worlds require authenticated delivery and deletion propagation through derived
+assets and caches. Explicitly public showcase artifacts can use a separate public delivery path.
+
+Current runtime uses local content-addressed storage and PostgreSQL; a shared cloud object-store
+backend and retained hosted world are additional delivery work, not established by the local
+preview. The [deployment plan](deployment.md) and [model stack review](model-and-service-selection.md)
+distinguish proposals from running services. Measure storage, egress, build/inference and active
+simulation costs separately before selecting a hosted scale target. Reconstruction and asset
+creation use scheduled compute; a stored world does not require a permanently running GPU.
+
 ## Relationship to the engineering roadmap
 
 This document supersedes narrower product definitions in product-specification.md and the
@@ -54,19 +120,57 @@ Identity confirmation, permissions, deletion, evidence, and versioning remain fo
 Evidence supports claims about the source world; authored changes remain distinct from that source.
 Object behavior uses reviewed runtime capabilities separately from appearance recipes.
 
+## Accounts and simulation controls
+
+Google OpenID Connect now has an account/session backend with application-owned stable user
+and actor identities, an owned workspace and current membership checks. Browser sign-in uses
+one-use state, nonce and PKCE; expiring, revocable cookies require CSRF validation for writes.
+Configured bearer clients remain available separately. Google client configuration, HTTPS,
+live-provider acceptance and new-workspace onboarding are deployment milestones. The browser now
+resolves an HttpOnly account session, retains its CSRF value only in memory and presents Google as
+the normal entry when the host enables accounts; local operator bearer access remains available.
+Existing bearer-owned worlds are not automatically linked to new accounts.
+Configured derivative workers can discover currently active account-owned workspaces through the
+isolated account role. Account-wide society playback can use the same current-membership source only
+under a separate explicit host opt-in and with a reviewed society runtime; a browser session is not
+worker authority.
+
+Society playback now has persisted play/pause, speed settings and pause-aware explicit steps,
+with exclusive worker leases, bounded catch-up and recovery receipts. Simulation events determine
+state; browser frames do not create canonical ticks. Automatic playback accepts current-authorized
+v2/v3 inputs. The worker is available through an explicit programmatic Services configuration;
+the default application does not automatically start it. The authenticated world UI reads the
+persisted control and exposes play, pause, 1x/2x/4x speed, refresh and pause-aware one-minute steps.
+Reviewed deployment configuration remains to be connected. Speed settings change minimum waits
+after completed batches, not a guaranteed real-time rate. The [society contract](synthetic-society-contract.md) specifies
+pause, recovery, source withdrawal and replay behavior. Typed `go_to` and `perform` requests are now
+persisted against a current inhabitant, branch, state/input digest and canonical destination. The
+next deterministic transition records their disposition and exact event binding, and replay consumes
+that receipt without inference. Browser controls for issuing those requests and live acceptance
+remain open; selecting or inspecting a destination does not direct an inhabitant.
+
+Vehicle traffic follows the pedestrian/control foundation. It requires independently validated
+road lanes, vehicle routes, intersection and right-of-way policies, pedestrian crossings, parking
+and collision behavior. A pedestrian graph or moving car asset does not establish those
+capabilities. Traffic remains a separate implementation milestone. Delivery order is production
+account/worker configuration, continuous pedestrian activity and richer social interactions, then bounded
+vehicle traffic. Higher-level decisions may use evaluated models; navigation, timing and traffic
+rules remain deterministic runtime responsibilities.
+
 ## Implementation status
 
 The inventory below identifies existing code and the extensions required by each milestone.
 
 | Area | Existing basis | New work for this direction |
 | --- | --- | --- |
-| Reconstruction and memory | Reconstruction modules, scene graph, identity decisions and lifted scene segments | Validate a personal scene; reusable complete-object extraction and cross-source alignment remain separate work |
+| Reconstruction and memory | Reconstruction modules, scene graph, identity decisions, lifted scene segments and source-bound GPU-run preflight | Validate a personal scene; reusable complete-object extraction and cross-source alignment remain separate work |
 | Appearance and language | Reviewed appearance capabilities and bounded conversational preview/apply/rollback proposals | General structural edits, geometry blending and generated-asset creation through typed operations |
+| Character appearance | Authenticated version-scoped recipes with save/reset history and current source checks; validated native GLB/rig playback and a session-only development studio | Connect the studio to authenticated history, configure production families, validate visual/movement quality and define explicit cross-version inheritance |
 | World Read and Selection | Scene/place reads and capture/entity Selection with place, time and text constraints | Unified authorized reads/queries for memories, imported geography, assets and authored versions with explainable matches |
 | Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
 | Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
-| Simulation | Reviewed bounded object behaviors and a persisted deterministic synthetic society; no learned or general simulation capability established | Spatial goals, navigation, supported physics, calibrated learned dynamics and fictional rules through measured scenarios |
+| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -78,10 +182,24 @@ objects. This is a strong product direction when it makes the world feel inhabit
 person's creations continue developing between visits. It must remain a simulation plane, not a
 claim about the people or events preserved in personal memories.
 
-The current deterministic society is a foundation only. It establishes synthetic identities,
-roles, schedules, relationships, needs, positions, bounded memory, fixed ticks and replayable
-events. It does not yet establish independently reasoning inhabitants, meaningful navigation,
-conversation, object use or emergent social behavior.
+The implemented society remains bounded. The v2 profile follows admitted district navigation,
+selects declared visit/rest affordances and responds to recorded authored edits. The opt-in v3
+backend adds a small cast with local observations, communicated beliefs and stored decisions;
+authenticated persistence and deterministic replay are tested. Its model adapter validates choices
+against each inhabitant's available context and records stale or unavailable outcomes. Existing
+societies retain their original profile and history.
+
+The live browser currently uses v2. It can inspect persisted inhabitants and events and control
+configured playback; its development path can also show an explicitly labeled recorded fixture.
+It does not yet issue the implemented directed-action requests. V3 browser interaction and live-model quality have not been
+validated. Recorded fact transmission does not establish natural conversation, evolving social
+relationships, general object manipulation or emergent social behavior. Background progression
+between visits remains delivery work. The opt-in composition/v2 adapter records an unreachable
+reviewed activity locally while preserving its collision footprint and independently validated
+movement and activities. Unknown obstacle geometry, invalid frames and withdrawn source rights
+still make the composed input unavailable. PostgreSQL persistence, mixed historical input replay
+and recovery from a prior global pause are tested. Legacy composition remains the default; the
+running browser has not been switched to the new policy.
 
 Research the next layer as a bounded agent-and-affordance system:
 
@@ -96,9 +214,30 @@ Research the next layer as a bounded agent-and-affordance system:
   react to authored world edits, resources, weather and other synthetic inhabitants.
 - A person can inspect, address or interact with an inhabitant or object through stable semantic
   identity. The Companion can explain behavior from cited simulation state and events.
-- Deterministic state machines, utility scoring or bounded planners run the ordinary population.
-  A model may be evaluated for rare high-level decisions or dialogue, but never once per inhabitant
-  or frame and never without a deterministic fallback, cost ceiling and recorded result.
+- Deterministic state machines, utility scoring and bounded planners handle locomotion and
+  enforce available actions. Evaluate strong models for high-level decisions, dialogue and memory
+  reflection on relevant events, with recorded inputs/outputs, explicit work budgets and an honest
+  unavailable state. Model calls are not tied to rendered frames or blindly repeated for the entire
+  population at every simulation tick.
+
+The next social-depth milestone connects the bounded cast to the browser, evaluates live-model
+choices, and extends remembered experiences and beliefs into preferences and evolving relationships. Each agent observes only its available world
+context, retrieves relevant simulated memories, proposes an allowed action, and updates state
+through a recorded event. Conversations must affect later choices through explicit memory and
+relationship changes; roles and biographies alone do not establish this behavior. Inspecting a
+person should reveal the supporting events and a concise explanation, not an invented explanation
+for a scripted animation.
+
+A useful acceptance scenario introduces a place, object or event into the personal world, shows
+one inhabitant noticing it, another learning about it through conversation, and a later group
+activity changing because of those interactions. Save/reopen retains that history. A separate
+scenario branch can compare an intervention while retaining the original. Test individual
+consistency, memory recall, information boundaries, relationship changes, action validity and
+meaningful variation; evaluate model quality on this scenario before expanding the population.
+
+Social simulation is evaluated through coherent behavior, remembered interactions and
+reproducible scenario outcomes. These capabilities do not establish sentience or predictive
+accuracy about real people.
 
 Synthetic inhabitants must never reuse a real person's identity, imply that a simulated event
 happened in the source world, or turn a memory-derived observation into a fictional biography.
@@ -117,11 +256,22 @@ population feel alive within the measured frame budget. Acceptance requires a li
 which several inhabitants pursue explainable goals, use objects, react to a world edit, persist the
 result, and answer a grounded Companion question after reload.
 
+For the first connected living-world demonstration, use one meaningful place or object with
+explicit origin, compose an authored variation in the district, and show several inhabitants
+responding through declared affordances. Inspect why one inhabitant acted, reopen the world with
+its saved consequences, and ask the Companion what changed and why. Demonstrate restoration under
+the implemented version semantics without rewriting historical evidence or prior simulation
+events. A labeled authored fixture may establish the mechanics; the personal-world claim requires
+authorized personal material and user validation. Flatiron remains a useful environment for this
+sequence, but district appearance and a populated street alone do not establish the connection.
+This sharpens the existing society acceptance gate; it does not make general autonomous life or
+the entire research program a requirement for the October release.
+
 ### Measured experience work on September 12
 
-The four experience lanes are integrated on main. The
-[integration record](evaluation/2026-09-12-experience-integration.json) retains 2,974 passing
-backend tests, 3 skips and 1,238 passing web tests, including the initial failures and repairs.
+The four experience lanes have a dated retained integration record. The
+[integration record](evaluation/2026-09-12-experience-integration.json) retains its executed
+suite results, including the initial failures and repairs.
 The [local activation record](evaluation/2026-09-12-experience-activation.json) verifies the
 copy at migration 0047 and the preview running from main on ports 8001 and 5182. The retained
 database remains unchanged at 0038. The dated reports distinguish implemented contracts,
@@ -141,28 +291,19 @@ executed fixture checks and remaining personal-source acceptance.
   currency checks and a digest-bound evaluation corpus. Scripted retrieval tests passed;
   actual model answers, accessible citations and human quality judgments are still pending.
 
-The operator authorized necessary Brev GPU work on September 12. The
+The September 12
 [trainer validation](evaluation/2026-09-12-place-compute-readiness.json) passed production
 image decoding and eight generated-data CUDA rendering/backward steps on an L40S. The instance
-was deleted; the provider posted a $0.23 total. This establishes trainer packaging and execution,
+was deleted. This establishes trainer packaging and execution,
 not a usable walk-around capture or place coverage. The first personal-place demonstration and the complete
 scene-to-Companion rehearsal remain acceptance gates before calling the experience complete.
 
 ## Optional Earth foundation and September demo scope
 
-Corrected 2026-09-12 after the operator rejected the orbital viewer. The
-[experience correction](briefs/2026-09-12-earth-experience-correction.md) supersedes
-the globe-navigation and separate-handoff outcome in the original
-[Earth wave](briefs/2026-09-12-earth-wave.md) and lane brief. That original scope
-misunderstood the requested product. The orbital implementation is not accepted
-or integrated.
-
-The subsequent ground-level native prototype was also rejected for visual quality.
-An untextured block city and a synthetic interaction marker do not satisfy the
-requested rendered world. Assess detailed ground-level appearance and reuse rights
-alongside integration, geometry and performance; a reference-only photorealistic
-feed cannot silently become the editable corpus. Neither rejected prototype has
-been accepted as completion of the Earth product requirement.
+The Earth foundation requires an integrated ground-level experience with detailed
+appearance and usable interactions. Its visual and integration acceptance gates
+remain open. Assess appearance and reuse rights alongside geometry and performance;
+a reference-only photorealistic feed does not establish an editable corpus.
 
 Earth is an optional environment inside Exulanica's interactive world. The person
 stands on its streamed terrain, moves with the existing first-person controls,
@@ -193,7 +334,7 @@ training a model. Personal-place reconstruction remains a separate scene run.
 Assess rights for the actual chosen provider and use, including runtime geometry
 processing, separately from renderer licensing. Preserve provider attribution,
 keep provider credentials and private memories separate, and preserve the
-UI/composition boundary for the operator's later interface redesign. Ordinary
+UI/composition boundary so interface design can evolve independently. Ordinary
 personal use must remain available when Earth is disabled or unavailable.
 September18 may limit exposed features, but does not justify substituting a
 different experience or weakening long-term integration contracts.
@@ -254,7 +395,7 @@ into a delivery commitment. Use these gates to make progress visible and bound u
 
 | Gate | Required demonstration | Scheduling consequence |
 | --- | --- | --- |
-| Scene viability | Existing trained output opens in the real app; inspect coverage, navigation and visible defects | Diagnose the limiting stage before commissioning training or dispatching dependent renderer work. A small object scan is a pipeline check, not proof of a reconstructed place. |
+| Scene viability | Existing trained output opens in the real app; inspect coverage, navigation and visible defects | Diagnose the limiting stage before commissioning training or starting dependent renderer work. A small object scan is a pipeline check, not proof of a reconstructed place. |
 | Memory and useful model interaction | Ask about the selected place through the actual Companion; ground the answer in available evidence and show missing information honestly | Verify the existing runtime path and record the executed model, task, latency and output. Persistent Companion shared history remains separate planned work. |
 | Small complete experience | Explore the place, ask the grounded question, accept one supported appearance change, reload and restore the original state | This is the minimum release candidate. Existing appearance persistence may support it; it must be executed, and it must not be called complete alternate-world branching. |
 | Creative extension | Add one persistent authored object, then its bounded motion, following the first-milestone contracts | Admit these extensions only with enough time to integrate, rehearse and fix them. Preserve them in the product roadmap if they miss the submission window. |
@@ -264,16 +405,10 @@ The memory interaction is essential to the world-memory demonstration; reconstru
 alone do not establish that experience. Nemotron use must be functional in that interaction if
 claimed, with the actual executed variant recorded rather than inferred from configuration.
 
-One owner should integrate the scene-to-browser path. A second bounded task may validate the
-existing Companion/model path against the same source contract once its inputs are available.
-Assign disjoint writable files, migration ownership if needed, and a merge order before dispatch;
-serialize shared app entry-point changes and database suites. More concurrent tasks are useful
-only when their outputs can be integrated into the same demonstration.
-
-At each handoff, require a runnable result and a short visual check before expanding scope.
-Use focused tests for changed behavior; run the applicable integrated gates once for the executable
-candidate and reuse valid results for documentation-only changes. Permission, deletion and byte
-integrity checks still apply where the demonstration exercises those boundaries.
+Integration acceptance requires one runnable scene-to-browser path and the actual Companion/model
+path against the same source contract. Use focused checks for changed behavior and run the
+applicable integrated gates for the executable candidate. Permission, deletion and byte-integrity
+checks still apply wherever the demonstration exercises those boundaries.
 
 The infrastructure contribution follows the scene's measured bottleneck. A reproducible workflow
 or an upstream fix can be a useful result without a novel algorithm. Full simulation, a new package
@@ -283,7 +418,22 @@ release dependencies if a live retained-data deployment is selected.
 
 ## Model selection and compute priorities
 
-Decision dated 2026-09-12, following the operator's request for the strongest justified stack.
+Character and object content should grow through reusable asset pipelines, declarative
+catalogs and compatible parameter sets. Prefer existing parametric bodies, rigs and animation
+tools for editable people; evaluate pretrained models for source fitting or new asset generation.
+Model inference, per-asset fitting and model training are separate stages. Fine-tuning or
+training requires a diagnosed failure, suitable data, an explicit compute budget and held-out
+acceptance. Learned generation does not replace deterministic identity, permission, collision
+or replay contracts. See the [character pipeline](character-representation-contract.md#extensible-asset-and-customization-pipeline).
+
+Architecture priorities, updated 2026-09-13: optimize each task for demonstrated quality,
+correctness, efficiency and long-term maintainability. NVIDIA models and compute, Nebius,
+and open-source infrastructure are preferred paths when they meet the task. Preserve
+replaceable implementations and durable results so model and provider improvements can
+be adopted without rebuilding the personal memory core or losing world history. A choice
+outside those preferences needs a concrete product or operational reason, not brand ranking.
+
+Model selection policy, dated 2026-09-12.
 Add the work below to delivery planning; retain current runtime models as the baseline until a
 candidate passes its comparison. The [current stack review](model-and-service-selection.md#0-current-stack-and-selection-decision)
 separates implemented roles from reserved configurations and historical plans. This is a
@@ -333,8 +483,6 @@ permission identity in cache keys and invalidate affected descendants after mode
 Use staged small comparisons before full scene runs. Cache prepared model weights on approved
 storage where useful, record cold and warm timings, and avoid idle rented GPUs. Higher compute is
 justified by measured task improvement or a verified hardware requirement, not by model size alone.
-Existing operator Brev authorization remains in force within its scope; it does not extend to
-hosted model spending, new private inputs or additional data rights through this document.
 
 A promotion binds the tested source/model/input versions and results, passes the same user-facing
 workflow, and retains the previous route/output version for rollback without resurrecting removed
@@ -351,9 +499,9 @@ the submission build, not the long-term architecture or the depth of subsequent 
 ## Working delivery schedule through October 2026
 
 These are decision checkpoints, not measured duration estimates or promises of completion.
-The operator supplied an October 30 deadline. Plan to submit on October 28 and freeze features
+The working deadline is October 30. Target submission on October 28 and freeze features
 on October 16. All working dates use America/New_York. Reassess feasibility after the first
-scene inspection; no paid run or deployment is authorized by this schedule.
+scene inspection.
 
 | Checkpoint | Required outcome | If the gate fails |
 | --- | --- | --- |
@@ -386,7 +534,7 @@ First inspect the previously trained Gaussian output in the actual application. 
 any failure comes from source coverage, camera registration, training, conversion, or rendering.
 The single-photo depth preview does not establish a coherent reconstructed place. Reuse existing
 outputs before proposing another paid run, then select an authorized source set appropriate to
-one usable place. Scope implementation with a file set and branch before dispatch.
+one usable place.
 
 The product exit is a recognizable place that can be explored and reopened, with observed
 coverage and failures recorded. Visual acceptance is required; unit tests and a completed

@@ -17,7 +17,7 @@ import { createCompanionAvatar } from './companion-avatar.js';
 export type CompanionPresenceState = CompanionOperationalState;
 
 export interface CompanionStageOptions {
-  readonly parent: HTMLElement;
+  readonly parent?: HTMLElement;
 }
 
 export interface CompanionStage {
@@ -32,7 +32,7 @@ export interface CompanionStage {
   dispose(): void;
 }
 
-export function buildCompanionStage(options: CompanionStageOptions): CompanionStage {
+export function buildCompanionStage(options: CompanionStageOptions = {}): CompanionStage {
   const root = document.createElement('div');
   root.className = 'companion-stage';
   root.dataset['renderer'] = 'svg';
@@ -41,7 +41,7 @@ export function buildCompanionStage(options: CompanionStageOptions): CompanionSt
 
   const avatar = createCompanionAvatar();
   root.append(avatar.root);
-  options.parent.append(root);
+  options.parent?.append(root);
 
   const motionQuery = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)')

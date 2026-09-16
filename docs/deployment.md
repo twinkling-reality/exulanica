@@ -358,6 +358,25 @@ is done, no claim is made here about range requests being on the browser path.
 
 ---
 
+### 4.6 Scene reconstruction preflight
+
+`uv run python scripts/prepare_scene_run.py --workspace WORKSPACE_UUID --scene SCENE_UUID`
+inspects an existing published scene using `EXULANICA_DATABASE_URL` and the current local
+content-addressed store. It reads current source permissions and pose receipts, then reports
+stage-specific blockers before compute allocation. It does not modify the scene or queue work.
+
+For an eligible scene, supply `--manifest`, `--source-manifest`, `--dataset`, `--pose-receipt`,
+`--run-output` and `--resources`. The source set, held-out split, pose, runtime, seed and checkpoint
+identity remain bound to the run. Resources declare hardware/time/storage allowances and dated
+quote inputs; absent values block a complete plan. Completed training or conversion artifacts
+are checked for reuse before recommending another training run. Checkpoint inspection requires
+the optional PyTorch dependency and validates complete optimizer and RNG state on CPU.
+
+Exit code 0 and `plan_ready` mean the specification is ready for review. Execution still uses
+the existing source admission, job lease, stage checks and managed-container cleanup, with current
+host capacity, runtime and compute authorization. A saved report is not continuing authority.
+Training, conversion and authenticated visual acceptance are separate gates.
+
 ## 5. Environment configuration
 
 ### 5.1 What exists today
@@ -387,6 +406,74 @@ is done, no claim is made here about range requests being on the browser path.
 | `EXULANICA_POSE_RUNTIME_IMAGE` | Digest-pinned image reference recorded in every production pose manifest | Required by `exulanica-scene-worker`; a mutable tag does not provide complete provenance |
 | `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD` | Passwords for the three roles `exulanica-db` provisions | Optional. Set only when supplied, because a deployment authenticating by certificate or by peer has none, and inventing one would create a credential nobody asked for |
 | `EXULANICA_PURGE_DATABASE_URL` | The connection `exulanica-purge` uses | No default and **no fallback to the writer**. The purge role holds a cross-workspace read the runtime role must never have, and the runtime role holds writes the purger must never need. Running as the wrong one either destroys another tenant's photograph or cannot tell that it would |
+
+### Browser accounts and society playback
+
+Google sign-in is optional. All six settings are required together:
+
+| Variable | Purpose |
+| --- | --- |
+| `EXULANICA_GOOGLE_CLIENT_ID` | Registered Google web OAuth client |
+| `EXULANICA_GOOGLE_CLIENT_SECRET` | Server-only client credential |
+| `EXULANICA_GOOGLE_CALLBACK_URI` | Exact HTTPS `/auth/google/callback` URL registered with Google |
+| `EXULANICA_GOOGLE_RETURN_URIS` | JSON array of exact permitted post-login URLs |
+| `EXULANICA_ACCOUNT_BROWSER_ORIGINS` | JSON array of permitted HTTPS browser origins |
+| `EXULANICA_ACCOUNT_DATABASE_URL` | Dedicated authentication role on the application's database/schema |
+| `EXULANICA_SOCIETY_CONTROL_WORKER` | Explicit account-wide playback-worker opt-in: absent/`off` disables it; `true`/`yes`/`on`/`1` enables current account-owned workspace discovery |
+
+Migration 0058 creates six pre-workspace account tables. An administrator explicitly provisions
+`exulanica_accounts` using `exulanica.db.account_roles.provision_account_role`; application startup
+never creates roles. This non-owner, NOINHERIT role can access the account tables but not world
+records. Application/read roles cannot access account tables, including after reprovisioning.
+Google configuration checks role isolation at startup. Provider HTTP runs outside DB transactions.
+The callback and session cookie require HTTPS; a plain HTTP preview is not a live sign-in deployment.
+
+`GET /auth/google/start` begins sign-in, `GET /auth/google/callback` completes it,
+`GET /auth/session` returns the current membership and CSRF token, and `POST /auth/logout`
+revokes the cookie. Cookie-authenticated writes require the matching `X-CSRF-Token` and exact
+permitted `Origin`. Explicit Authorization headers use the bearer path and never fall back to a
+cookie. Without accounts configured, account endpoints return 503. Account-only startup is allowed
+when accounts are valid and `EXULANICA_API_TOKENS` is absent; an explicitly invalid token setting
+is still rejected. Readiness checks account persistence without contacting Google.
+
+The browser checks `/auth/session` when no development bearer token is configured. An authenticated
+session opens the owned workspace with cookie credentials and adds its in-memory CSRF value to
+writes. A signed-out session presents Google sign-in. A host without account configuration keeps
+Google disabled and reveals the existing developer-token entry. The static preview remains isolated
+from live sign-in.
+
+New accounts receive an empty owned workspace, without copied demo worlds or an inferred link to
+existing bearer data. Background derivative workers combine token-configured workspaces with a
+fresh account-role query for currently active owner memberships when accounts are configured.
+Account-wide society playback uses the same fresh discovery only when the separate worker switch is
+enabled; it refuses startup without configured accounts and a reviewed current-input runtime.
+Discovery is not onboarding and does not treat an active browser session as membership authority.
+Account revocation preserves historical attribution. Full account-data deletion, invitations,
+retention cleanup, request rate limits and live Google acceptance remain separate capabilities.
+Access logs must redact callback query values, cookies and CSRF tokens.
+
+Migration 0059 adds saved society controls and their event receipts. Automatic playback is off
+by default. A host can construct `Services` with a reviewed `society_runtime`, an explicit
+`society_control_workspaces` allowlist and `society_base_tick_interval_ms` (default 1000), or
+enable account-wide discovery with `EXULANICA_SOCIETY_CONTROL_WORKER`. The normal
+environment-based service loader does not yet load reviewed district runtime bindings, so the
+environment switch alone cannot create a usable playback deployment.
+The API starts this explicitly configured worker only after schema/restore validation, stops new
+claims on shutdown and waits for an active batch to finish or roll back. Readiness reports its
+thread and latest completed round; this does not promise a simulation delivery rate.
+The 1/2/4 settings divide the minimum wait after completion; execution and polling add latency.
+Play/pause/step endpoints and recovery semantics are in the [society contract](synthetic-society-contract.md).
+The authenticated world UI connects these endpoints to saved play/pause state, 1x/2x/4x speed,
+manual one-minute advancement and refresh. A configured playing state only progresses while an
+authorized worker is online; the UI reports the saved state without claiming that browser rendering
+advances simulation time.
+
+Migration 0060 adds typed, append-only society action requests and their exact transition
+consumption bindings. The API can record `go_to` or `perform` for a current v2/v3 inhabitant and
+canonical target, then the next ordinary step applies or records a deterministic disposition.
+Recording a request neither moves a character nor starts playback. The current browser world does
+not expose this request surface, so it remains an API foundation rather than a demonstrated
+end-user control.
 
 ### 5.1.1 The three roles, and why the purger has its own
 
@@ -960,7 +1047,7 @@ has happened at least once with a stopwatch running.
 | D-11 | Whether a preview grade service survives the window at all | The canary endpoint's outage log |
 | D-14 | Nothing limits in-flight requests, so a single process can demand more backends than the cluster has slots. Section 5.4.3 measured 48 concurrent streams holding 48 backends against a 40-thread pool and 97 usable slots | Setting `uvicorn --limit-concurrency`, which is the only lever that counts requests where they are actually held. Not set today, and not urgent at one person watching one upload |
 | D-15 | Section 5.4.2's container-restart consequence is arithmetic over a measured latency and the Dockerfile. No container was built or run to observe it | Running the image, saturating it, and watching whether Docker restarts it |
-| D-16 | ~~The runtime connects as the database owner, bypassing row-level security~~ **CLOSED 2026-08-31.** The owner credential is confined to migrations; API and derivative-worker composition URLs name `orimera_app`, and both processes refuse unsafe roles at startup | PostgreSQL role tests plus deployment text contract |
+| D-16 | ~~The runtime connects as the database owner, bypassing row-level security~~ **CLOSED 2026-08-31.** The owner credential is confined to migrations; API and derivative-worker composition URLs name `exulanica_app`, and both processes refuse unsafe roles at startup | PostgreSQL role tests plus deployment text contract |
 
 ---
 

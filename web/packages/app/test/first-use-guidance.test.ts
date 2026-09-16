@@ -19,25 +19,31 @@ describe('first-use Atlas guidance', () => {
     const guidance = createFirstUseGuidance(new MemoryStorage());
     expect(guidance.phase()).toBe('arrival');
     expect(guidance.prompt('converse')).toEqual({
-      statement: 'Atlas arranges your memories as a world.',
+      statement: 'Welcome to Exulanica',
       actions: [{ label: 'Click to enter' }],
     });
   });
 
-  it('progresses only after entering and actually moving', () => {
+  it('presents movement and Companion actions immediately after entering', () => {
     const storage = new MemoryStorage();
     const guidance = createFirstUseGuidance(storage);
     expect(guidance.observeMode('converse')).toBe(false);
     expect(guidance.observeMode('traverse')).toBe(true);
-    expect(guidance.prompt('traverse')?.actions).toEqual([
-      { key: 'W A S D', label: 'Move' },
-      { key: 'X', label: 'Companion' },
-    ]);
+    expect(guidance.prompt('traverse')).toEqual({
+      statement: 'Welcome to Exulanica',
+      actions: [
+        { key: 'W A S D', label: 'Move' },
+        { key: 'X', label: 'Call your Unnamed Companion' },
+        { key: 'Esc', label: 'Dismiss' },
+      ],
+    });
     expect(guidance.observeMovement()).toBe(true);
     expect(guidance.prompt('traverse')).toEqual({
-      statement: 'Press',
-      actions: [{ key: 'X', label: 'to call Unnamed Companion' }],
-      compact: true,
+      statement: 'Welcome to Exulanica',
+      actions: [
+        { key: 'X', label: 'Call your Unnamed Companion' },
+        { key: 'Esc', label: 'Dismiss' },
+      ],
     });
     expect(storage.getItem(FIRST_USE_GUIDANCE_KEY)).toBe('companion');
   });
@@ -49,7 +55,14 @@ describe('first-use Atlas guidance', () => {
     expect(guidance.complete()).toBe(true);
     expect(guidance.phase()).toBe('complete');
     expect(guidance.prompt('converse')).toBeNull();
-    expect(createFirstUseGuidance(storage).phase()).toBe('complete');
+    const nextVisit = createFirstUseGuidance(storage);
+    expect(nextVisit.phase()).toBe('complete');
+    expect(nextVisit.prompt('converse')).toEqual({
+      statement: 'Welcome to Exulanica',
+      actions: [{ label: 'Click to enter' }],
+    });
+    nextVisit.observeMode('traverse');
+    expect(nextVisit.prompt('converse')).toBeNull();
   });
 
   it('falls back safely when storage is unavailable or contains a future value', () => {

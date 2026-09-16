@@ -6,6 +6,15 @@ import {
 } from '../src/world-shell.js';
 
 describe('the Atlas shell', () => {
+  it('opens one World menu and returns from its destinations through the same hub', () => {
+    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
+    expect(menu).toMatchObject({ primary: 'menu', camera: 'ground' });
+    const settings = updateWorldShell(menu, { type: 'toggle-controls' });
+    expect(settings.primary).toBe('controls');
+    expect(updateWorldShell(settings, { type: 'step-back' })).toEqual(menu);
+    expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
+  });
+
   it('allows one primary surface and clears Index detail when switching', () => {
     const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
     const detail = updateWorldShell(index, { type: 'show-detail', id: 'entity-1' });
@@ -45,6 +54,15 @@ describe('the Atlas shell', () => {
     ).toEqual(initialWorldShell());
   });
 
+  it('returns from Character to the exact prior library selection', () => {
+    const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
+    const detail = updateWorldShell(index, { type: 'show-detail', id: 'person-1' });
+    const character = updateWorldShell(detail, { type: 'toggle-character' });
+    expect(character.primary).toBe('character');
+    expect(character.detailId).toBeNull();
+    expect(updateWorldShell(character, { type: 'toggle-character' })).toEqual(detail);
+  });
+
   it('has an unconditional complete-Index recovery transition for renderer loss', () => {
     const map = updateWorldShell(initialWorldShell(), { type: 'toggle-map' });
     // Recovery is unconditional, so it clears the return stack rather than leaving somewhere to
@@ -65,9 +83,11 @@ describe('shell command ownership', () => {
   });
 
   it.each([
+    ['KeyH', 'h', 'toggle-menu'],
     ['KeyI', 'i', 'toggle-index'],
     ['KeyM', 'm', 'toggle-map'],
     ['KeyO', 'o', 'toggle-options'],
+    ['KeyK', 'k', 'toggle-character'],
     ['Slash', '?', 'toggle-controls'],
     ['Backspace', 'Backspace', 'selection-back'],
   ])('maps %s to its one shell command', (code, key, command) => {

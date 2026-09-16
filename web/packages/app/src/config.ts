@@ -1,10 +1,9 @@
 /**
  * Where the API is, and how this session is credentialed.
  *
- * **There is no account system, and this file does not invent one.**
- * `exulanica/api/authorisation.py` says so plainly: bearer-token authentication against a table of
- * tokens the operator configures out of band, with no registration, no password, no expiry and
- * no refresh. A sign-in form here would be a product decision taken by a config module.
+ * Browser accounts use the API's revocable HttpOnly session cookie. The client retains the
+ * returned CSRF value only for the life of this page. Operator bearer tokens remain a development
+ * path and are never persisted.
  *
  * **The token is never persisted.** Not in `localStorage`, not in `sessionStorage`, not in a
  * cookie, not in the URL. It is held in a closure for the life of the tab and handed to the
@@ -31,9 +30,13 @@ import {
 } from '@exulanica/atlas-react/playcanvas';
 import {
   parseOwnedDistrict,
+  parseDistrictInterpretation,
+  districtInterpretationAvailability,
+  type DistrictInterpretation,
   type OwnedDistrict,
 } from '@exulanica/atlas-core';
 import ownedDistrictAsset from '../../../../assets/owned-world/flatiron/flatiron-owned-district.json?url';
+import districtInterpretationAsset from '../../../../assets/owned-world/flatiron-interpretation-v1/district-interpretation.json?url';
 
 const API_PATH = '/api';
 const PREVIEW_API_PATH = '/preview-api';
@@ -42,15 +45,10 @@ export const PREVIEW_NYC_OPEN_DATA_ADMISSION_ID = '9d152259-13d1-5025-8f72-8bcb6
 const PRODUCT_TITLE = 'Exulanica';
 const PREVIEW_TITLE = 'Exulanica: synthetic read-only development preview';
 
-/** Reconstruction review keeps originals in the inspector instead of world-space photo veils. */
-export function sourcePresentation(): 'world' | 'inspection' {
-  return import.meta.env['VITE_EXULANICA_SOURCE_PRESENTATION'] === 'inspection'
-    ? 'inspection' : 'world';
-}
-
 export interface Credentials {
   readonly baseUrl: string;
   readonly token: string;
+  readonly csrfToken?: string;
 }
 
 /** The development token, or null. Never read from the page, never written back to it. */
@@ -59,8 +57,11 @@ export function developmentToken(): string | null {
   return typeof supplied === 'string' && supplied.length > 0 ? supplied : null;
 }
 
-export function credentials(token: string): Credentials {
-  return { baseUrl: `${window.location.origin}${API_PATH}`, token };
+export function credentials(token: string, csrfToken?: string): Credentials {
+  return {
+    baseUrl: `${window.location.origin}${API_PATH}`, token,
+    ...(csrfToken === undefined ? {} : { csrfToken }),
+  };
 }
 
 /**
@@ -84,15 +85,43 @@ export function googlePhotorealisticTiles(): GoogleTilesConfig {
   return googleTilesConfig(import.meta.env);
 }
 
-export async function ownedDistrict(): Promise<{
+export async function ownedDistrict(options: {
+  readonly preview?: boolean;
+  readonly currentDependencies?: Readonly<Record<string, string>>;
+} = {}): Promise<{
   readonly document: OwnedDistrict;
   readonly residentBytes: number;
+  readonly interpretation?: DistrictInterpretation;
 }> {
   const response = await fetch(ownedDistrictAsset, { credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Owned district unavailable: HTTP ${response.status}`);
   const bytes = await response.arrayBuffer();
   const document = parseOwnedDistrict(JSON.parse(new TextDecoder().decode(bytes)));
-  return Object.freeze({ document, residentBytes: bytes.byteLength });
+  const previewFixture = import.meta.env.DEV && options.preview === true;
+  if (!previewFixture && options.currentDependencies === undefined) {
+    return Object.freeze({ document, residentBytes: bytes.byteLength });
+  }
+  const derived = await fetch(districtInterpretationAsset, { credentials: 'same-origin' });
+  if (!derived.ok) throw new Error(`District interpretation unavailable: HTTP ${derived.status}`);
+  const derivedBytes = await derived.arrayBuffer();
+  const hash = async (value: ArrayBuffer): Promise<string> =>
+    Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', value)),
+      b => b.toString(16).padStart(2, '0')).join('');
+  const interpretation = await parseDistrictInterpretation(
+    JSON.parse(new TextDecoder().decode(derivedBytes)), document, {
+      baseArtifactSha256: await hash(bytes),
+      sha256: text => hash(new TextEncoder().encode(text).buffer),
+    },
+  );
+  // Development fixtures establish local visual mechanics only. Authenticated callers must
+  // supply current dependency resolution; a retained artifact is never a live rights grant.
+  const current = previewFixture
+    ? Object.fromEntries(interpretation.source_dependencies.map(source => [source.sha256, 'available']))
+    : options.currentDependencies!;
+  const unavailable = districtInterpretationAvailability(interpretation, current);
+  if (unavailable.length) throw new Error('District interpretation dependencies are unavailable');
+  return Object.freeze({ document, interpretation,
+    residentBytes: bytes.byteLength + derivedBytes.byteLength });
 }
 
 /** One explicitly admitted NYC Open Data source. Empty means the semantic workflow is unavailable. */

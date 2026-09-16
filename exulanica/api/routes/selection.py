@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -298,6 +299,17 @@ class AnswerView(BaseModel):
     execution: ExecutionView
 
 
+def _society_authorizer(
+    request: Request,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+) -> Callable[[dict[str, Any]], None] | None:
+    authorize = getattr(request.app.state, "society_input_authorizer", None)
+    if authorize is None:
+        return None
+    return lambda document: authorize(connection, session, document)
+
+
 @router.post("", summary="Resolve a Selection to captures, entities and evidence.")
 def resolve_selection(
     plan: SelectionPlan,
@@ -306,7 +318,14 @@ def resolve_selection(
     session: CurrentSession,
 ) -> SelectionView:
     validated = validate(connection, plan, session)
-    return _view(execute(connection, validated, store=get_services(request).store))
+    return _view(
+        execute(
+            connection,
+            validated,
+            store=get_services(request).store,
+            society_authorizer=_society_authorizer(request, connection, session),
+        )
+    )
 
 
 @router.get("/place-bridges", summary="List confirmed canonical-to-memory place bridges.")
@@ -429,6 +448,7 @@ def ask(
         session,
         plan=plan,
         store=get_services(request).store,
+        society_authorizer=_society_authorizer(request, connection, session),
     )
     answer = outcome.answer
     if city_clause is not None:
@@ -525,7 +545,7 @@ def _city_selection(
 
 @router.post("/packet", summary="The evidence a Selection would offer, without composing text.")
 def packet(
-    plan: SelectionPlan, connection: ReadOnlyConnection, session: CurrentSession
+    plan: SelectionPlan, request: Request, connection: ReadOnlyConnection, session: CurrentSession
 ) -> dict[str, Any]:
     """The deterministic half of the answer path, exposed on its own.
 
@@ -534,7 +554,12 @@ def packet(
     composition.
     """
     validated = validate(connection, plan, session)
-    result = execute(connection, validated)
+    result = execute(
+        connection,
+        validated,
+        store=get_services(request).store,
+        society_authorizer=_society_authorizer(request, connection, session),
+    )
     if result.intent is Intent.CONTENT:
         content = build_content_packet(result)
         return {

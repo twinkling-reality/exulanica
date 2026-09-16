@@ -28,16 +28,17 @@ interface ControlsGuideOptions {
 }
 
 const controlRows: readonly (readonly [string, string])[] = [
-  ['W A S D', 'Move through the Atlas'],
-  ['Mouse', 'Look around'],
+  ['W A S D', 'Move and turn your character toward travel'],
+  ['Mouse', 'Orbit the view independently'],
   ['Shift', 'Move faster'],
   ['E · Space · Enter', 'Interact with what is centred'],
   ['X · Right click', 'Call the Companion'],
+  ['H', 'Open the World hub'],
   ['I', 'Open Index'],
   ['M', 'Tap for the Atlas Map, hold to look and drop back'],
   ['O', 'Open Customize'],
   ['?', 'Open Settings'],
-  ['Escape', 'Release the mouse, then step back one level'],
+  ['Escape', 'Release the mouse, dismiss, or step back'],
 ];
 
 function option(value: string, label: string): HTMLOptionElement {

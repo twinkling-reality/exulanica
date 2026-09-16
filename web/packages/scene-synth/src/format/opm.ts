@@ -6,7 +6,7 @@ export { TAG_ONE_SIDED } from '../pointmap.js';
 /**
  * THE INTERCHANGE FORMAT, AND WHY IT IS THIS ONE.
  *
- * `.opm` (Orimera Point Map): a binary container holding a JSON header followed by planar
+ * `.opm` (Exulanica Point Map): a binary container holding a JSON header followed by planar
  * typed-array sections, the first of them 16-byte aligned. One file, one fetch, zero parsing.
  *
  * The requirement is narrow and it is not "a good point cloud format". It is: BOTH RENDERER

@@ -358,7 +358,7 @@ def _project_components(
     # clause.** `tombstone_blocks_scene` covers interval scope, so a redaction over a member's
     # whole frame withdraws the scene. The per-capture clause tests `deleted_at`, which an
     # interval tombstone never sets, so a redacted photograph's own point map is still described
-    # here while `orimera/graph/geometry.py` answers 410 for it. Measured, not supposed. That is
+    # here while `exulanica/graph/geometry.py` answers 410 for it. Measured, not supposed. That is
     # a pre-existing inconsistency in the clause this change did not write.
     #
     # `a.scene_id is null` on the first branch is REDUNDANT and is kept anyway. Migration 0024's

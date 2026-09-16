@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = ["httpx>=0.27"]
 # ///
-"""Platform verification harness for Orimera.
+"""Platform verification harness for Exulanica.
 
 Runs the first real runtime calls against Nebius Token Factory and archives the
 evidence. Until this passes, the project may not claim NVIDIA model use.
@@ -27,7 +27,7 @@ import httpx
 
 BASE = "https://api.tokenfactory.nebius.com/v1"
 CATALOG = "https://tokenfactory.nebius.com/api/public/models_info"
-OUT = pathlib.Path(__file__).resolve().parents[1] / ".orimera" / "experiments" / "platform"
+OUT = pathlib.Path(__file__).resolve().parents[1] / ".exulanica" / "experiments" / "platform"
 
 # The model manifest. Every id here is checked against the live catalog before use.
 # Roles map to docs/model-and-service-selection.md.
@@ -117,7 +117,7 @@ def main():
         r = client.post(f"{BASE}/chat/completions", json={
             "model": mid,
             "messages": [{"role": "user",
-                          "content": "Reply with exactly the word: ORIMERA"}],
+                          "content": "Reply with exactly the word: EXULANICA"}],
             "max_tokens": 800, "temperature": 0,
         })
         dt = time.time() - t0

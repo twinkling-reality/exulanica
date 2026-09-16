@@ -199,7 +199,9 @@ function harness(
     atlas: {
       binding: {
         objects,
-        cameraPose: () => ({ position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) }),
+        // A third-person camera is behind the player, outside this region's placement reach.
+        cameraPose: () => ({ position: atlasVec3(12, 3, 12), forward: atlasVec3(-1, 0, -1) }),
+        playerPose: () => ({ position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) }),
         engageFocusedAnchor: () => null,
         table: { atlasPositions: new Float32Array([0, 0, 0]) },
       },
@@ -257,7 +259,78 @@ async function place(h: ReturnType<typeof harness>, motion = false): Promise<voi
 
 beforeEach(() => { document.body.replaceChildren(); });
 
+describe('authorized district placement', () => {
+  const district = () => ({ versionId: version().versionId, regionId: String(REGION),
+    translationMm: [10000, 3000, -7000] as const,
+    boundsMm: [-20000, -20000, 20000, 20000] as const });
+
+  it('uses district-local ground and translation without changing the memory island', async () => {
+    const h = harness({ districtPlacement: district, awayBy: 1000 });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    await place(h);
+    expect(h.mounted.confirm.root.textContent).toContain('district’s authored ground');
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
+    const request = h.authority.calls.find(call => call.name === 'place')!.args[1] as {transform: unknown};
+    expect(request.transform).toMatchObject({xMm: -10000, yMm: -3000, zMm: 4500});
+  });
+
+  it('refuses an unavailable binding, a different version and a target beyond the district', async () => {
+    for (const binding of [null, { ...district(), versionId: 'other' }, { ...district(), boundsMm: [-1000, -1000, 1000, 1000] as const }]) {
+      const h = harness({ districtPlacement: () => binding });
+      h.state.placedPointMaps = [];
+      await h.mounted.begin();
+      await place(h);
+      expect(h.mounted.confirm.root.hidden).toBe(true);
+      expect(writes(h.authority.calls)).toEqual([]);
+      h.mounted.dispose();
+    }
+  });
+
+  it('does not draw late asset bytes after the district is withdrawn', async () => {
+    let binding: ReturnType<typeof district> | null = district();
+    let resolve!: (bytes: ArrayBuffer) => void;
+    const bytes = new Promise<ArrayBuffer>(done => { resolve = done; });
+    const loadBytes = vi.fn(() => bytes);
+    const h = harness({ districtPlacement: () => binding, loadBytes,
+      initial: version({ objects: [objectRecord()] }) });
+    h.state.placedPointMaps = [];
+    const loading = h.mounted.begin();
+    await vi.waitFor(() => expect(loadBytes).toHaveBeenCalled());
+    binding = null;
+    resolve(new ArrayBuffer(784));
+    await loading;
+    expect(h.objects.place).not.toHaveBeenCalled();
+  });
+
+  it('refuses a confirmation after the authorized frame is withdrawn', async () => {
+    let binding: ReturnType<typeof district> | null = district();
+    const h = harness({ districtPlacement: () => binding });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    await place(h);
+    binding = null;
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('district binding changed'));
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+});
+
 describe('nothing reaches the authority without a confirmation', () => {
+  it('refreshes society only after a recorded edit and preserves save success if refresh fails', async () => {
+    const onAuthoredEdit = vi.fn(async () => { throw new Error('refresh failed'); });
+    const h = harness({ onAuthoredEdit });
+    await h.mounted.begin();
+    await place(h);
+    expect(onAuthoredEdit).not.toHaveBeenCalled();
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(onAuthoredEdit).toHaveBeenCalledWith(version().versionId));
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
+    expect(writes(h.authority.calls)).toEqual(['place']);
+    expect(h.travel.some(item => item.message.includes('Your change was saved.'))).toBe(true);
+  });
+
   it('shows the confirmation surface and writes nothing when an object is placed', async () => {
     const h = harness();
     await h.mounted.begin();
@@ -270,7 +343,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(writes(h.authority.calls)).toEqual([]);
   });
 
-  it('sends the placement only once confirm is pressed, in the contract’s own fields', async () => {
+  it('places from the player despite an offset third-person camera, only after confirmation', async () => {
     const h = harness();
     await h.mounted.begin();
     await place(h);
@@ -285,6 +358,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(String(request['objectId'])).toMatch(/^object-/);
     // Region-local millimetres, a step ahead of a visitor looking down region -Z.
     const pose = request['transform'] as Record<string, number>;
+    expect(pose['xMm']).toBe(0);
     expect(pose['yMm']).toBe(0);
     expect(pose['zMm']).toBeCloseTo(-2500, 0);
     expect(pose['scaleMilli']).toBe(1000);
@@ -344,7 +418,8 @@ describe('nothing reaches the authority without a confirmation', () => {
   });
 
   it('treats a moved base as a refusal that re-reads, never as an overwrite', async () => {
-    const h = harness({ initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
+    const onAuthoredEdit = vi.fn(async () => undefined);
+    const h = harness({ onAuthoredEdit, initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
     await h.mounted.begin();
     h.authority.answerWith({ kind: 'stale', current: version({ objects: [] }) });
     button(h.mounted.panel.root, 'Remove').click();
@@ -352,6 +427,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     await vi.waitFor(() =>
       expect(h.mounted.panel.root.textContent).toContain('This world changed while you were deciding'));
     expect(writes(h.authority.calls)).toEqual(['remove']);
+    expect(onAuthoredEdit).not.toHaveBeenCalled();
   });
 
   it('refuses to add to a version whose source was deleted, before staging anything', async () => {
@@ -396,7 +472,7 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
     button(h.mounted.panel.root, 'Place before me').click();
-    expect(h.mounted.panel.root.textContent).toContain('No region in this world draws a reconstruction');
+    expect(h.mounted.panel.root.textContent).toContain('No authorized district or reconstructed ground is available');
     expect(writes(h.authority.calls)).toEqual([]);
   });
 
@@ -657,6 +733,21 @@ describe('teardown', () => {
     (h.mounted as MountedObjects).dispose();
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft' }));
     expect(h.objects.setTransform).not.toHaveBeenCalled();
+  });
+
+  it('ignores an authority connection that finishes after disposal', async () => {
+    let resolve!: (value: { assets: readonly ReviewedAsset[]; version: AlternateVersion }) => void;
+    const connected = new Promise<{ assets: readonly ReviewedAsset[]; version: AlternateVersion }>(
+      (done) => { resolve = done; },
+    );
+    const client = { connect: vi.fn(() => connected) } as unknown as WorldObjectsClient;
+    const h = harness({ client });
+    const beginning = h.mounted.begin();
+    h.mounted.dispose();
+    resolve({ assets: [asset()], version: version({ objects: [objectRecord()] }) });
+    await beginning;
+    expect(h.objects.place).not.toHaveBeenCalled();
+    expect(h.mounted.panel.root.textContent).not.toContain('Marker pillar');
   });
 });
 

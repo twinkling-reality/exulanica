@@ -1,9 +1,17 @@
+import type { NativeCharacterFrame } from './native-character-runtime.js';
 import type {
   OwnedDistrict,
+  DistrictInterpretation,
+  DistrictSubject,
+  DistrictRecipe,
   OwnedDistrictBuilding,
   OwnedDistrictMaterial,
 } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
+import { buildingRayDistance, pointInRing, ringArea, surfaceTriangles } from './district-surfaces.js';
+import { sampleMotionPath } from './society-presentation.js';
+import { PlayerAvatar } from './player-avatar.js';
+import { abstractCharacter, syntheticCharacterStyle } from './character-shape.js';
 
 export interface OwnedDistrictMetrics {
   readonly logicalBuildings: number;
@@ -15,6 +23,9 @@ export interface OwnedDistrictMetrics {
 
 export interface OwnedAuthoredEnvironmentInstance {
   readonly instanceId: string;
+  /** Supplied only after pinned source and destination-frame resolution by composition. */
+  readonly providerFeatureId?: string;
+  readonly coordinateFrame?: 'flatiron-local-mm';
   readonly transform: {
     readonly xMm: number;
     readonly yMm: number;
@@ -28,12 +39,23 @@ export interface OwnedAuthoredEnvironmentInstance {
 }
 
 export interface OwnedSocietyState {
+  readonly profile?: 'exulanica-society/v1' | 'exulanica-society/v2';
+  readonly society_id?: string;
+  readonly branch_id?: string;
+  readonly input_seq?: number;
+  readonly input_sha256?: string;
   readonly tick: number;
   readonly inhabitants: readonly {
     readonly id: string;
     readonly synthetic: true;
+    readonly display_name?: string;
     readonly role?: string;
     readonly position_mm: readonly [number, number];
+    readonly goal?: null | { readonly kind: 'visit' | 'rest'; readonly target_id: string; readonly reason: string };
+    readonly action?: { readonly kind: 'idle' | 'move' | 'visit' | 'rest'; readonly status: 'active' | 'completed' | 'blocked'; readonly target_id: string | null; readonly remaining_ticks: number; readonly reason: string };
+    readonly route?: null | { readonly node_ids: readonly string[]; readonly edge_index: number; readonly edge_progress_mm: number; readonly destination_node_id: string; readonly input_sha256: string };
+    readonly motion_path_mm?: readonly (readonly [number, number])[];
+    readonly explanation?: { readonly summary: string; readonly event_ids: readonly string[] };
   }[];
 }
 
@@ -52,6 +74,7 @@ interface SocietyAnimation {
     readonly ordinal: number;
     readonly from: readonly [number, number];
     readonly to: readonly [number, number];
+    readonly path: readonly (readonly [number, number])[];
   }[];
 }
 
@@ -69,7 +92,7 @@ function color(hex: string): pc.Color {
 function material(source: OwnedDistrictMaterial): pc.StandardMaterial {
   const result = new pc.StandardMaterial();
   const base = color(source.base);
-  result.diffuse = base;
+  result.diffuse = new pc.Color(base.r*.60+.29,base.g*.60+.29,base.b*.60+.29);
   result.emissive = new pc.Color(base.r * 0.14, base.g * 0.14, base.b * 0.14);
   result.emissiveIntensity = 0.8;
   result.metalness = source.metalness_milli / 1000;
@@ -164,40 +187,22 @@ function addBuilding(
 ): void {
   const height = building.height_cm / 100;
   for (const polygon of building.polygons) {
-    const ring = polygon[0];
-    if (ring === undefined || ring.length < 4) continue;
-    let cx = 0;
-    let cz = 0;
-    for (const [x, z] of ring.slice(0, -1)) {
-      cx += x / 100;
-      cz += z / 100;
-    }
-    cx /= ring.length - 1;
-    cz /= ring.length - 1;
-    const roofCentre = includeRoof ? target.positions.length / 3 : -1;
-    if (includeRoof) {
-      target.positions.push(cx, height, cz);
-      target.normals.push(0, 1, 0);
-    }
-    for (let index = 1; index < ring.length; index += 1) {
-      const [ax, az] = ring[index - 1]!;
-      const [bx, bz] = ring[index]!;
-      const a: [number, number, number] = [ax / 100, 0, az / 100];
-      const b: [number, number, number] = [bx / 100, 0, bz / 100];
-      const c: [number, number, number] = [bx / 100, height, bz / 100];
-      const d: [number, number, number] = [ax / 100, height, az / 100];
-      const dx = b[0] - a[0];
-      const dz = b[2] - a[2];
-      const length = Math.max(Math.hypot(dx, dz), 1e-6);
-      quad(target, a, b, c, d, [-dz / length, 0, dx / length]);
-      if (includeRoof) {
-        const roofA = target.positions.length / 3;
-        target.positions.push(d[0], height, d[2], c[0], height, c[2]);
-        target.normals.push(0, 1, 0, 0, 1, 0);
-        target.indices.push(roofCentre, roofA, roofA + 1);
+    polygon.forEach((sourceRing, ringIndex) => {
+      // Consistent outward faces regardless of provider winding, including holes.
+      const wantPositive = ringIndex === 0;
+      const ring = (ringArea(sourceRing) > 0) === wantPositive ? sourceRing : [...sourceRing].reverse();
+      for (let index = 1; index < ring.length; index++) {
+        const [ax, az] = ring[index - 1]!, [bx, bz] = ring[index]!;
+        const dx = (bx - ax) / 100, dz = (bz - az) / 100;
+        const length = Math.hypot(dx, dz);
+        if (length < 1e-8) continue;
+        quad(target, [bx / 100, 0, bz / 100], [ax / 100, 0, az / 100],
+          [ax / 100, height, az / 100], [bx / 100, height, bz / 100],
+          [dz / length, 0, -dx / length]);
       }
-    }
+    });
   }
+  if (includeRoof) addFlatPolygon(target, building.polygons, height);
 }
 
 function addRoof(target: Batch, building: OwnedDistrictBuilding): void {
@@ -205,8 +210,8 @@ function addRoof(target: Batch, building: OwnedDistrictBuilding): void {
   addFlatPolygon(target, building.polygons, height);
 }
 
-function addWindows(target: Batch, building: OwnedDistrictBuilding): void {
-  if (building.name === null && building.render_batch_id % 9 !== 0) return;
+function addWindows(target: Batch, building: OwnedDistrictBuilding, recipe?: Extract<DistrictRecipe, { kind: 'facade-grid' }>): void {
+  if (!recipe && building.name === null && building.render_batch_id % 9 !== 0) return;
   const height = building.height_cm / 100;
   for (const polygon of building.polygons) {
     const ring = polygon[0];
@@ -217,24 +222,27 @@ function addWindows(target: Batch, building: OwnedDistrictBuilding): void {
       const dx = bx - ax;
       const dz = bz - az;
       const length = Math.hypot(dx, dz);
-      const columns = Math.floor(length / 5.5);
+      const columns = Math.floor(length / ((recipe?.bay_width_mm ?? 5500) / 1000));
       if (columns < 1) continue;
       const nx = -dz / length;
       const nz = dx / length;
-      const levels = Math.min(18, Math.floor((height - 3) / 4.2));
+      const floor = (recipe?.floor_height_mm ?? 4200) / 1000;
+      const sill = (recipe?.sill_height_mm ?? 2700) / 1000;
+      const windowHeight = (recipe?.window_height_mm ?? 1450) / 1000;
+      const levels = Math.max(0, Math.floor((height - sill - windowHeight) / floor) + 1);
       for (let level = 0; level < levels; level += 1) {
         for (let column = 0; column < columns; column += 1) {
           const centre = (column + 0.5) / columns;
-          const half = Math.min(0.62 / length, 0.28 / columns);
-          const y = 2.7 + level * 4.2;
+          const half = Math.min((recipe?.window_width_mm ?? 1240) / 2000 / length, 0.4 / columns);
+          const y = sill + level * floor;
           // NYC rings are retained with provider winding; this offset follows their exterior.
-          const front = -0.055;
+          const front = (ringArea(ring) > 0 ? -1 : 1) * (recipe?.recess_mm ?? 55) / 1000;
           quad(
             target,
             [ax + dx * (centre - half) + nx * front, y, az + dz * (centre - half) + nz * front],
             [ax + dx * (centre + half) + nx * front, y, az + dz * (centre + half) + nz * front],
-            [ax + dx * (centre + half) + nx * front, y + 1.45, az + dz * (centre + half) + nz * front],
-            [ax + dx * (centre - half) + nx * front, y + 1.45, az + dz * (centre - half) + nz * front],
+            [ax + dx * (centre + half) + nx * front, y + windowHeight, az + dz * (centre + half) + nz * front],
+            [ax + dx * (centre - half) + nx * front, y + windowHeight, az + dz * (centre - half) + nz * front],
             [nx, 0, nz],
           );
         }
@@ -312,15 +320,6 @@ function addArchitecturalDetails(target: Batch, building: OwnedDistrictBuilding)
   );
 }
 
-function addInhabitant(target: Batch, x: number, z: number, ordinal: number): void {
-  const stride = ordinal % 2 === 0 ? 0.055 : -0.055;
-  addBox(target, [x - 0.105, 0.39 + stride, z], [0.075, 0.39, 0.09]);
-  addBox(target, [x + 0.105, 0.39 - stride, z], [0.075, 0.39, 0.09]);
-  addBox(target, [x, 1.08, z], [0.25, 0.34, 0.15]);
-  addBox(target, [x, 1.43, z], [0.31, 0.08, 0.16]);
-  addOctahedron(target, [x, 1.72, z], 0.2);
-}
-
 function sidewalkCentre(
   sidewalk: OwnedDistrict['sidewalks'][number],
 ): readonly [number, number] | null {
@@ -341,26 +340,13 @@ function addFlatPolygon(
   height: number,
 ): void {
   for (const polygon of polygons) {
-    const ring = polygon[0];
-    if (ring === undefined || ring.length < 4) continue;
-    let cx = 0;
-    let cz = 0;
-    for (const [x, z] of ring.slice(0, -1)) {
-      cx += x / 100;
-      cz += z / 100;
-    }
-    cx /= ring.length - 1;
-    cz /= ring.length - 1;
-    const centre = target.positions.length / 3;
-    target.positions.push(cx, height, cz);
-    target.normals.push(0, 1, 0);
-    for (let index = 1; index < ring.length; index += 1) {
+    for (const triangle of surfaceTriangles(polygon)) {
       const first = target.positions.length / 3;
-      const [ax, az] = ring[index - 1]!;
-      const [bx, bz] = ring[index]!;
-      target.positions.push(ax / 100, height, az / 100, bx / 100, height, bz / 100);
-      target.normals.push(0, 1, 0, 0, 1, 0);
-      target.indices.push(centre, first, first + 1);
+      for (const [x, z] of triangle) {
+        target.positions.push(x / 100, height, z / 100);
+        target.normals.push(0, 1, 0);
+      }
+      target.indices.push(first, first + 1, first + 2);
     }
   }
 }
@@ -373,22 +359,6 @@ function mesh(device: pc.GraphicsDevice, source: Batch): pc.Mesh | null {
   result.setIndices(source.indices);
   result.update(pc.PRIMITIVE_TRIANGLES);
   return result;
-}
-
-function inside(
-  point: readonly [number, number],
-  ring: readonly (readonly [number, number])[],
-): boolean {
-  let value = false;
-  for (let index = 0, prior = ring.length - 1; index < ring.length; prior = index++) {
-    const a = ring[index]!;
-    const b = ring[prior]!;
-    if (
-      (a[1] > point[1]) !== (b[1] > point[1]) &&
-      point[0] < (b[0] - a[0]) * (point[1] - a[1]) / (b[1] - a[1]) + a[0]
-    ) value = !value;
-  }
-  return value;
 }
 
 function rayBox(
@@ -451,10 +421,20 @@ export class OwnedDistrictRuntime {
   readonly metrics: OwnedDistrictMetrics;
   private readonly meshes: pc.Mesh[] = [];
   private readonly materials: pc.Material[] = [];
+  private authoredMeshes: pc.Mesh[] = [];
+  private authoredMaterials: pc.Material[] = [];
   private societyMeshes: pc.Mesh[] = [];
   private societyMaterials: pc.Material[] = [];
-  private readonly societyMeshesByRole = new Map<string, pc.Mesh>();
+  private readonly societyCharacters = new Map<string, PlayerAvatar>();
+  private lastSocietyFrameMs=0;
+  private nativeSocietyDiscontinuity=true;
+  private settleSocietyUntilMs=0;
+  private promotedInhabitant:string|null=null;
   private readonly societyPositions = new Map<string, readonly [number, number]>();
+  private latestSociety: OwnedSocietyState | null = null;
+  private lastObserver: readonly [number, number] | null = null;
+  private societyScope = '';
+  private societyTick = -1;
   private societyAnimation: SocietyAnimation | null = null;
   private destroyed = false;
 
@@ -463,12 +443,14 @@ export class OwnedDistrictRuntime {
     parent: pc.Entity,
     readonly district: OwnedDistrict,
     sourceBytes: number,
+    readonly interpretation?: DistrictInterpretation,
   ) {
+    if (interpretation && interpretation.district_id !== district.district_id) throw new Error('District interpretation binding mismatch');
     parent.addChild(this.root);
     parent.addChild(this.authoredRoot);
     parent.addChild(this.societyRoot);
     const asphalt = new pc.StandardMaterial();
-    asphalt.diffuse = new pc.Color(0.255, 0.27, 0.265);
+    asphalt.diffuse = new pc.Color(0.43, 0.465, 0.49);
     asphalt.emissive = new pc.Color(0.028, 0.032, 0.03);
     asphalt.emissiveIntensity = 0.32;
     asphalt.gloss = 0.12;
@@ -485,7 +467,7 @@ export class OwnedDistrictRuntime {
     const sidewalkMesh = mesh(device, sidewalkBatch);
     if (sidewalkMesh !== null) {
       const sidewalkMaterial = new pc.StandardMaterial();
-      sidewalkMaterial.diffuse = new pc.Color(0.69, 0.66, 0.59);
+      sidewalkMaterial.diffuse = new pc.Color(0.76, 0.76, 0.71);
       sidewalkMaterial.emissive = new pc.Color(0.025, 0.023, 0.019);
       sidewalkMaterial.emissiveIntensity = 0.15;
       sidewalkMaterial.gloss = 0.1;
@@ -509,9 +491,22 @@ export class OwnedDistrictRuntime {
     for (const building of district.buildings) {
       addBuilding(batches[building.material % batches.length]!, building, false);
       addRoof(roofBatch, building);
-      addWindows(windowsBatch, building);
-      addFacadeBands(facadeBandBatch, building);
-      addArchitecturalDetails(architecturalDetailBatch, building);
+      const facade = interpretation?.subjects.find(subject => subject.recipe.kind === 'facade-grid' && subject.recipe.feature_id === building.id);
+      if (!interpretation || facade?.recipe.kind === 'facade-grid') addWindows(windowsBatch, building, facade?.recipe.kind === 'facade-grid' ? facade.recipe : undefined);
+      if (!interpretation) {
+        addFacadeBands(facadeBandBatch, building);
+        addArchitecturalDetails(architecturalDetailBatch, building);
+      } else {
+        const roof = interpretation.subjects.find(subject => subject.recipe.kind === 'roof-parapet' && subject.recipe.feature_id === building.id);
+        if (roof?.recipe.kind === 'roof-parapet') {
+          // Parapet face follows every source ring; no invented rooftop equipment.
+          const parapet = { ...building, height_cm: (roof.recipe.height_mm + roof.recipe.parapet_height_mm) / 10 };
+          const wallBatch = batch(); addBuilding(wallBatch, parapet, false);
+          for (let i = 1; i < wallBatch.positions.length; i += 3) if (wallBatch.positions[i] === 0) wallBatch.positions[i] = roof.recipe.height_mm / 1000;
+          const start = facadeBandBatch.positions.length / 3;
+          facadeBandBatch.positions.push(...wallBatch.positions); facadeBandBatch.normals.push(...wallBatch.normals); facadeBandBatch.indices.push(...wallBatch.indices.map(i => i + start));
+        }
+      }
     }
     let drawCalls = sidewalkMesh === null ? 1 : 2;
     for (let index = 0; index < batches.length; index += 1) {
@@ -550,8 +545,8 @@ export class OwnedDistrictRuntime {
     const windowsMesh = mesh(device, windowsBatch);
     if (windowsMesh !== null) {
       const windowsMaterial = new pc.StandardMaterial();
-      windowsMaterial.diffuse = new pc.Color(0.105, 0.16, 0.18);
-      windowsMaterial.emissive = new pc.Color(0.19, 0.16, 0.105);
+      windowsMaterial.diffuse = new pc.Color(0.25, 0.34, 0.39);
+      windowsMaterial.emissive = new pc.Color(0.15, 0.19, 0.23);
       windowsMaterial.emissiveIntensity = 0.3;
       windowsMaterial.gloss = 0.72;
       windowsMaterial.cull = pc.CULLFACE_NONE;
@@ -610,7 +605,7 @@ export class OwnedDistrictRuntime {
     const trunks = batch();
     const foliage = batch();
     const lamps = batch();
-    district.sidewalks.forEach((sidewalk, index) => {
+    (interpretation ? [] : district.sidewalks).forEach((sidewalk, index) => {
       const centre = sidewalkCentre(sidewalk);
       if (centre === null) return;
       const [x, z] = centre;
@@ -661,6 +656,35 @@ export class OwnedDistrictRuntime {
       this.root.addChild(entity);
       drawCalls += 1;
     }
+    if (interpretation) {
+      const civic = batch();
+      for (const subject of interpretation.subjects) {
+        if (!subject.permitted_uses.includes('render')) continue;
+        const recipe = subject.recipe;
+        if (recipe.kind === 'rest-pad') {
+          const [x, z] = recipe.position_mm.map(v => v / 1000);
+          const radius = recipe.radius_mm / 1000;
+          for (let i = 0; i < 24; i++) {
+            const a = i * Math.PI / 12, b = (i + 1) * Math.PI / 12;
+            quad(civic, [x! + Math.cos(a) * radius, .008, z! + Math.sin(a) * radius],
+              [x! + Math.cos(b) * radius, .008, z! + Math.sin(b) * radius],
+              [x! + Math.cos(b) * radius * .75, .008, z! + Math.sin(b) * radius * .75],
+              [x! + Math.cos(a) * radius * .75, .008, z! + Math.sin(a) * radius * .75], [0, 1, 0]);
+          }
+        } else if (recipe.kind === 'entrance-marker') {
+          const [x, z] = recipe.position_mm.map(v => v / 1000);
+          // A thin upright arrival marker, not a door or supported interior.
+          addBox(civic, [x!, recipe.height_mm / 2000, z!], [recipe.width_mm / 2000, recipe.height_mm / 2000, .025]);
+        }
+      }
+      const civicMesh = mesh(device, civic);
+      if (civicMesh) {
+        const mat = new pc.StandardMaterial(); mat.diffuse = new pc.Color(.22, .54, .58); mat.emissive = new pc.Color(.07, .16, .17); mat.cull = pc.CULLFACE_NONE; mat.update();
+        const entity = new pc.Entity('interpreted-civic-markers');
+        entity.addComponent('render', {meshInstances:[new pc.MeshInstance(civicMesh, mat, entity)],castShadows:false,receiveShadows:true});
+        this.root.addChild(entity); this.meshes.push(civicMesh); this.materials.push(mat); drawCalls++;
+      }
+    }
     this.metrics = Object.freeze({
       logicalBuildings: district.buildings.length,
       logicalSidewalks: district.sidewalks.length,
@@ -672,11 +696,15 @@ export class OwnedDistrictRuntime {
 
   setAuthoredInstances(instances: readonly OwnedAuthoredEnvironmentInstance[]): void {
     for (const child of [...this.authoredRoot.children]) child.destroy();
+    for (const held of this.authoredMeshes) held.destroy();
+    for (const held of this.authoredMaterials) held.destroy();
+    this.authoredMeshes = [];
+    this.authoredMaterials = [];
     for (const instance of instances) {
       if (instance.removed || instance.availability !== 'available') continue;
-      const providerId = instance.instanceId.match(/doitt_id[-:]([1-9][0-9]*)/)?.[1];
+      if (instance.coordinateFrame !== 'flatiron-local-mm' || instance.providerFeatureId === undefined) continue;
       const building = this.district.buildings.find(
-        (candidate) => candidate.id === `doitt_id:${providerId}`,
+        (candidate) => candidate.id === instance.providerFeatureId,
       );
       if (building === undefined) continue;
       const [west, north, east, south] = building.bbox_cm;
@@ -710,7 +738,7 @@ export class OwnedDistrictRuntime {
         castShadows: true,
         receiveShadows: true,
       });
-      entity.setPosition(
+      entity.setLocalPosition(
         instance.transform.xMm / 1000,
         instance.transform.yMm / 1000,
         instance.transform.zMm / 1000,
@@ -732,14 +760,33 @@ export class OwnedDistrictRuntime {
           meshInstances: [new pc.MeshInstance(lanternMesh, surface, lantern)],
           castShadows: false,
         });
-        lantern.setPosition(0, building.height_cm / 100 + 8, 0);
+        lantern.setLocalPosition(0, building.height_cm / 100 + 8, 0);
         entity.addChild(lantern);
-        this.meshes.push(lanternMesh);
+        this.authoredMeshes.push(lanternMesh);
       }
-      this.meshes.push(geometry);
-      this.materials.push(surface);
+      this.authoredMeshes.push(geometry);
+      this.authoredMaterials.push(surface);
       this.authoredRoot.addChild(entity);
     }
+  }
+
+  /** Release the unavailable population without inventing an authoritative snapshot. */
+  clearSociety(): void {
+    this.latestSociety = null;
+    this.societyAnimation = null;
+    this.settleSocietyUntilMs = 0;
+    this.lastObserver = null;
+    this.promotedInhabitant = null;
+    this.societyScope = '';
+    this.societyTick = -1;
+    this.nativeSocietyDiscontinuity = true;
+    this.societyPositions.clear();
+    for (const character of this.societyCharacters.values()) character.destroy();
+    this.societyCharacters.clear();
+    for (const value of this.societyMeshes) value.destroy();
+    for (const value of this.societyMaterials) value.destroy();
+    this.societyMeshes = [];
+    this.societyMaterials = [];
   }
 
   setSociety(
@@ -747,95 +794,154 @@ export class OwnedDistrictRuntime {
     visibleCap = 24,
     observer?: readonly [number, number],
   ): number {
-    for (const child of [...this.societyRoot.children]) child.destroy();
-    for (const held of this.societyMeshes) held.destroy();
-    for (const held of this.societyMaterials) held.destroy();
-    this.societyMeshes = [];
-    this.societyMaterials = [];
-    this.societyMeshesByRole.clear();
+    this.latestSociety = state;
+    this.lastObserver = observer ?? null;
+    const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
+    if(scope!==this.societyScope){for(const character of this.societyCharacters.values())character.destroy();this.societyCharacters.clear();}
+    const consecutive = scope === this.societyScope && state.tick === this.societyTick + 1;
+    this.nativeSocietyDiscontinuity ||= !consecutive;
+    this.societyScope = scope;
+    this.societyTick = state.tick;
+    // Picking follows only currently visible display positions, never a stale capped subset.
+    this.societyPositions.clear();
     const visible = [...state.inhabitants]
       .filter((inhabitant) => inhabitant.synthetic === true)
       .sort((a, b) => observer === undefined ? 0 :
         Math.hypot(a.position_mm[0] / 1000 - observer[0], a.position_mm[1] / 1000 - observer[1]) -
         Math.hypot(b.position_mm[0] / 1000 - observer[0], b.position_mm[1] / 1000 - observer[1]))
       .slice(0, Math.max(0, Math.min(visibleCap, 24)));
-    const roleOrder = ['baker', 'designer', 'gardener', 'student', 'steward', 'teacher'] as const;
-    const batches = new Map<string, Batch>(roleOrder.map((role) => [role, batch()]));
+    const visibleIds=new Set(visible.map(person=>person.id));
+    for(const [id,character] of this.societyCharacters)if(!visibleIds.has(id)){character.destroy();this.societyCharacters.delete(id);}
     const animated = visible.map((inhabitant, ordinal) => {
-      const role = roleOrder.includes(inhabitant.role as typeof roleOrder[number])
-        ? inhabitant.role!
-        : roleOrder[ordinal % roleOrder.length]!;
+      const role=inhabitant.role??'inhabitant';
+      let character=this.societyCharacters.get(inhabitant.id);
+      if(!character){character=new PlayerAvatar(this.device,this.societyRoot,{name:`synthetic:${inhabitant.id}`,detail:'mid',representation:abstractCharacter({kind:'synthetic-inhabitant',societyId:state.society_id??'preview',branchId:state.branch_id??'preview',inhabitantId:inhabitant.id},'mid',syntheticCharacterStyle(inhabitant.id))});this.societyCharacters.set(inhabitant.id,character);}
       const to = [
         inhabitant.position_mm[0] / 1000,
         inhabitant.position_mm[1] / 1000,
       ] as const;
-      const from = this.societyPositions.get(inhabitant.id) ?? to;
-      this.societyPositions.set(inhabitant.id, to);
-      addInhabitant(batches.get(role)!, from[0], from[1], ordinal);
-      return { id: inhabitant.id, role, ordinal, from, to };
+      const candidatePath = inhabitant.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
+      // Legacy snapshots have no supported path. Do not fabricate travel between endpoints.
+      const path = state.profile === 'exulanica-society/v2' && consecutive && candidatePath?.length
+        ? candidatePath : [to];
+      const from = path[0]!;
+      this.societyPositions.set(inhabitant.id, from);
+      character.update({x:from[0],y:character.body.heightMm/1000*.89,z:from[1],yaw:0,pitch:0},0,0,1/60,true,true,0);
+      return { id: inhabitant.id, role, ordinal, from, to, path };
     });
-    const roleColors: Readonly<Record<string, pc.Color>> = {
-      baker: new pc.Color(0.67, 0.42, 0.24),
-      designer: new pc.Color(0.35, 0.43, 0.56),
-      gardener: new pc.Color(0.3, 0.46, 0.3),
-      student: new pc.Color(0.55, 0.37, 0.47),
-      steward: new pc.Color(0.27, 0.43, 0.48),
-      teacher: new pc.Color(0.48, 0.39, 0.27),
-    };
-    for (const role of roleOrder) {
-      const geometry = mesh(this.device, batches.get(role)!);
-      if (geometry === null) continue;
-      const surface = new pc.StandardMaterial();
-      surface.diffuse = roleColors[role]!;
-      surface.emissive = new pc.Color(0.018, 0.012, 0.01);
-      surface.emissiveIntensity = 0.18;
-      surface.gloss = 0.28;
-      surface.update();
-      const entity = new pc.Entity(`synthetic-${role}-tick-${state.tick}`);
-      entity.addComponent('render', {
-        meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
-        castShadows: true,
-        receiveShadows: true,
-      });
-      this.societyMeshes.push(geometry);
-      this.societyMeshesByRole.set(role, geometry);
-      this.societyMaterials.push(surface);
-      this.societyRoot.addChild(entity);
-    }
-    this.societyAnimation = {
+    this.societyAnimation = animated.some(person=>person.path.length>1) ? {
       startedAtMs: performance.now(),
       durationMs: 1_850,
       inhabitants: animated,
-    };
+    } : null;
+    this.applyCoincidentVisibility();
+    this.lastSocietyFrameMs=performance.now();
     return visible.length;
   }
 
   /** Interpolate display meshes only; authoritative endpoints remain the society snapshots. */
   tickSociety(nowMs: number): void {
     const animation = this.societyAnimation;
-    if (animation === null) return;
+    if (animation === null) {
+      if(nowMs<this.settleSocietyUntilMs){
+        const dt=Math.max(.001,Math.min(.05,(nowMs-this.lastSocietyFrameMs)/1000));this.lastSocietyFrameMs=nowMs;
+        for(const [id,character] of this.societyCharacters){const p=this.societyPositions.get(id)!;character.update({x:p[0],y:character.body.heightMm/1000*.89,z:p[1],yaw:0,pitch:0},0,0,dt,true,false,0);}
+        this.applyCoincidentVisibility();
+      }else this.settleSocietyUntilMs=0;
+      return;
+    }
     const linear = Math.max(0, Math.min(1, (nowMs - animation.startedAtMs) / animation.durationMs));
     const progress = linear * linear * (3 - 2 * linear);
-    const batches = new Map<string, Batch>();
+    const dt=Math.max(.001,Math.min(.05,(nowMs-this.lastSocietyFrameMs)/1000));
+    this.lastSocietyFrameMs=nowMs;
     for (const inhabitant of animation.inhabitants) {
-      const target = batches.get(inhabitant.role) ?? batch();
-      batches.set(inhabitant.role, target);
-      addInhabitant(
-        target,
-        inhabitant.from[0] + (inhabitant.to[0] - inhabitant.from[0]) * progress,
-        inhabitant.from[1] + (inhabitant.to[1] - inhabitant.from[1]) * progress,
-        inhabitant.ordinal,
-      );
+      const position = sampleMotionPath(inhabitant.path, progress);
+      const previous=this.societyPositions.get(inhabitant.id)??position;
+      this.societyPositions.set(inhabitant.id, position);
+      const character=this.societyCharacters.get(inhabitant.id);
+      character?.update({x:position[0],y:character.body.heightMm/1000*.89,z:position[1],yaw:0,pitch:0},position[0]-previous[0],position[1]-previous[1],dt,true,nowMs===Number.MAX_SAFE_INTEGER,0);
     }
-    for (const [role, source] of batches) {
-      const geometry = this.societyMeshesByRole.get(role);
-      if (geometry === undefined) continue;
-      geometry.setPositions(source.positions);
-      geometry.setNormals(source.normals);
-      geometry.setIndices(source.indices);
-      geometry.update(pc.PRIMITIVE_TRIANGLES);
+    this.applyCoincidentVisibility();
+    if (linear >= 1) {this.societyAnimation = null;this.settleSocietyUntilMs=nowMs===Number.MAX_SAFE_INTEGER?0:nowMs+600;}
+  }
+
+  refreshNearby(observer: readonly [number, number]): void {
+    if (this.societyAnimation || !this.latestSociety || (this.lastObserver && Math.hypot(observer[0] - this.lastObserver[0], observer[1] - this.lastObserver[1]) < 4)) return;
+    this.setSociety(this.latestSociety, 24, observer);
+  }
+
+  /** GPU buffer residency, separate from the serialized source document byte count. */
+  get characterTextureBytes():number{return [...this.societyCharacters.values()].reduce((bytes,character)=>bytes+character.textureResidentBytes,0);}
+  get geometryResidentBytes(): number {
+    return [...this.societyCharacters.values()].reduce((sum,character)=>sum+character.residentBytes,0)+[...this.meshes, ...this.authoredMeshes, ...this.societyMeshes].reduce((sum, mesh) => sum + (mesh.vertexBuffer?.numBytes ?? 0) + mesh.indexBuffer.reduce((bytes, buffer) => bytes + (buffer?.numBytes ?? 0), 0), 0);
+  }
+
+  /** Resolves shared subjects, independent of renderer batch IDs. */
+  pickSubject(origin: readonly [number, number, number], direction: readonly [number, number, number]): DistrictSubject | null {
+    if (!this.interpretation) return null;
+    const building = this.pickBuilding(origin, direction);
+    let nearest = building ? buildingRayDistance(building, origin, direction) ?? Infinity : Infinity;
+    let selected = building ? this.interpretation.subjects.find(s => s.subject_id === building.id) ?? null : null;
+    for (const subject of this.interpretation.subjects) {
+      if (!subject.permitted_uses.includes('select')) continue;
+      const recipe = subject.recipe;
+      let distance: number | null = null;
+      if (recipe.kind === 'entrance-marker') {
+        const [x,z] = recipe.position_mm.map(v => v / 1000), half = recipe.width_mm / 2000;
+        distance = rayBox(origin, direction, [x! - half, 0, z! - .025], [x! + half, recipe.height_mm / 1000, z! + .025]);
+      } else if (recipe.kind === 'rest-pad' && Math.abs(direction[1]) > 1e-8) {
+        const t = (.008 - origin[1]) / direction[1];
+        const dx = origin[0] + direction[0] * t - recipe.position_mm[0] / 1000;
+        const dz = origin[2] + direction[2] * t - recipe.position_mm[1] / 1000;
+        if (t >= 0 && Math.hypot(dx,dz) <= recipe.radius_mm / 1000) distance = t;
+      } else if (recipe.kind === 'source-footprint' && subject.kind === 'sidewalk' && Math.abs(direction[1]) > 1e-8) {
+        const t = (.025 - origin[1]) / direction[1];
+        const point = [(origin[0] + direction[0] * t) * 100, (origin[2] + direction[2] * t) * 100] as const;
+        const sidewalk = this.district.sidewalks.find(s => s.id === recipe.feature_id);
+        if (t >= 0 && sidewalk?.polygons.some(p => p[0] && pointInRing(point,p[0]) && !p.slice(1).some(r => pointInRing(point,r)))) distance = t;
+      }
+      if (distance !== null && distance < nearest) { nearest = distance; selected = subject; }
     }
-    if (linear >= 1) this.societyAnimation = null;
+    return selected;
+  }
+
+  get societyAnimating(): boolean { return this.societyAnimation !== null || this.settleSocietyUntilMs>0; }
+
+  private applyCoincidentVisibility():void {
+    const groups=new Map<string,string[]>();
+    for(const [id,p] of this.societyPositions){const key=p.map(n=>n.toFixed(3)).join(':');const ids=groups.get(key)??[];ids.push(id);groups.set(key,ids);}
+    for(const ids of groups.values()){
+      const shown=ids.includes(this.promotedInhabitant??'')?this.promotedInhabitant:ids.slice().sort()[0];
+      for(const id of ids){const character=this.societyCharacters.get(id);if(character)character.root.enabled=id===shown;}
+    }
+  }
+  revealInhabitant(id:string):void {if(!this.societyPositions.has(id))return;this.promotedInhabitant=id;this.applyCoincidentVisibility();}
+  get drawnInhabitantCount():number{return [...this.societyCharacters.values()].filter(character=>character.root.enabled&&!character.root.tags.has('native-character-hidden')).length;}
+  coincidentInhabitants(id:string):readonly string[]{const p=this.societyPositions.get(id);return p?[...this.societyPositions].filter(([,q])=>Math.hypot(p[0]-q[0],p[1]-q[1])<.001).map(([key])=>key):[];}
+  inhabitantRepresentation(id:string){return this.societyCharacters.get(id)?.representation??null;}
+
+  nativeCharacterFrames(deltaSeconds:number,reducedMotion:boolean):readonly NativeCharacterFrame[]{
+    const discontinuity=this.nativeSocietyDiscontinuity;this.nativeSocietyDiscontinuity=false;
+    return [...this.societyCharacters.values()].map(character=>{
+      const p=character.root.getLocalPosition();
+      return {subject:character.representation.subject,parent:this.societyRoot,fallback:character.root,visible:character.root.enabled,position:[p.x,p.y,p.z],yaw:character.facing,deltaSeconds,reducedMotion,discontinuity};
+    });
+  }
+
+  get visibleInhabitantIds(): readonly string[] { return [...this.societyPositions.keys()]; }
+
+  /** Stable subject selection against the displayed avatar, with building occlusion. */
+  pickInhabitant(origin: readonly [number, number, number], direction: readonly [number, number, number]): string | null {
+    let nearest = Infinity;
+    for (const building of this.district.buildings) nearest = Math.min(nearest, buildingRayDistance(building, origin, direction) ?? Infinity);
+    let selected: string | null = null;
+    for (const [id, [x, z]] of this.societyPositions) {
+      if(!this.societyCharacters.get(id)?.root.enabled||this.societyCharacters.get(id)?.root.tags.has('native-character-hidden'))continue;
+      const height=(this.societyCharacters.get(id)?.body.heightMm??1820)/1000;
+      const distance = rayBox(origin, direction, [x - .34, 0, z - .34], [x + .34, height, z + .34]);
+      if (distance !== null && distance < nearest) { nearest = distance; selected = id; }
+    }
+    return selected;
   }
 
   /** Exact semantic hit against admitted extruded footprints, independent of mesh names. */
@@ -845,27 +951,8 @@ export class OwnedDistrictRuntime {
   ): OwnedDistrictBuilding | null {
     let selected: { building: OwnedDistrictBuilding; distance: number } | null = null;
     for (const building of this.district.buildings) {
-      const [west, north, east, south] = building.bbox_cm.map((value) => value / 100) as [
-        number, number, number, number,
-      ];
-      const distance = rayBox(
-        origin,
-        direction,
-        [west, 0, north],
-        [east, building.height_cm / 100, south],
-      );
-      if (distance === null || (selected !== null && distance >= selected.distance)) continue;
-      const sampleDistance = distance + 0.01;
-      const point: [number, number] = [
-        (origin[0] + direction[0] * sampleDistance) * 100,
-        (origin[2] + direction[2] * sampleDistance) * 100,
-      ];
-      const hit = building.polygons.some((polygon) => {
-        const exterior = polygon[0];
-        return exterior !== undefined && inside(point, exterior) &&
-          polygon.slice(1).every((hole) => !inside(point, hole));
-      });
-      if (hit) selected = { building, distance };
+      const distance = buildingRayDistance(building, origin, direction);
+      if (distance !== null && (selected === null || distance < selected.distance)) selected = { building, distance };
     }
     return selected?.building ?? null;
   }
@@ -873,11 +960,12 @@ export class OwnedDistrictRuntime {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.clearSociety();
     this.root.destroy();
     this.authoredRoot.destroy();
     this.societyRoot.destroy();
-    for (const value of this.societyMeshes) value.destroy();
-    for (const value of this.societyMaterials) value.destroy();
+    for (const value of this.authoredMeshes) value.destroy();
+    for (const value of this.authoredMaterials) value.destroy();
     for (const value of this.meshes) value.destroy();
     for (const value of this.materials) value.destroy();
   }

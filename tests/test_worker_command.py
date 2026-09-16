@@ -26,6 +26,7 @@ def test_workspace_configuration_is_explicit_deduplicated_and_validated():
     assert resolved == frozenset({first, second})
     with pytest.raises(ValueError, match="silently drains nothing"):
         worker_command.parse_workspaces([], {})
+    assert worker_command.parse_workspaces([], {}, allow_empty=True) == frozenset()
     with pytest.raises(ValueError, match="UUIDs only"):
         worker_command.parse_workspaces(["all"], {})
 
@@ -148,6 +149,62 @@ def test_the_worker_hands_the_configured_segmenter_to_its_jobs(monkeypatch, tmp_
     )
     assert isinstance(built["segmenter"], _RecordingSegmenter)
     assert built["segmenter"].kwargs == {"device": "mps"}
+
+
+def test_account_role_discovery_can_be_the_dedicated_workers_only_scope(monkeypatch, tmp_path):
+    built = {}
+    source_calls = []
+
+    class Database:
+        url = "postgresql://world-role@database/world"
+
+        @classmethod
+        def from_env(cls, _environ):
+            return cls()
+
+        @contextmanager
+        def unscoped(self):
+            yield object()
+
+    class Source:
+        def __init__(self, account_url, application_url):
+            source_calls.append((account_url, application_url, "created"))
+
+        def verify(self):
+            source_calls.append((None, None, "verified"))
+            return self
+
+    monkeypatch.setattr(worker_command, "Database", Database)
+    monkeypatch.setattr(worker_command, "verify_schema", lambda _database: None)
+    monkeypatch.setattr(worker_command, "assert_runtime_role", lambda _connection: None)
+    monkeypatch.setattr(worker_command, "AccountWorkspaceSource", Source)
+
+    class Worker:
+        def __init__(self, *args, **kwargs):
+            built.update(args=args, kwargs=kwargs)
+
+        def refresh_workspaces(self):
+            built["refreshed"] = True
+
+    monkeypatch.setattr(worker_command, "DerivativeWorker", Worker)
+    args = SimpleNamespace(workspace=[], name="account-owned", poll_seconds=2.0)
+    account_url = "postgresql://account-role@database/world"
+
+    worker_command._build_worker(
+        args,
+        {
+            worker_command.DATA_DIR_ENV: str(tmp_path),
+            worker_command.ACCOUNT_DATABASE_URL_ENV: account_url,
+        },
+    )
+
+    assert source_calls == [
+        (account_url, Database.url, "created"),
+        (None, None, "verified"),
+    ]
+    assert built["args"][2] == frozenset()
+    assert isinstance(built["kwargs"]["workspace_source"], Source)
+    assert built["refreshed"] is True
 
 
 def test_neither_worker_imports_the_native_runtime_the_other_one_loads():

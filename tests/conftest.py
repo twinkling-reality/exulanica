@@ -95,7 +95,7 @@ def photo_bytes(
     when: str | None = "2026:08:27 10:00:00",
     offset: str | None = "+00:00",
     gps: tuple[float, float] | None = None,
-    make: str | None = "Orimera",
+    make: str | None = "Exulanica",
     model: str | None = "TestCam 1",
     size: tuple[int, int] = (160, 100),
 ) -> bytes:
@@ -105,7 +105,7 @@ def photo_bytes(
     them: sensor readout plus a tag saying how to display it.
     """
     image = upright_pixels(*size)
-    # The display-to-sensor table lives in orimera.corpus.photograph and is imported rather
+    # The display-to-sensor table lives in exulanica.corpus.photograph and is imported rather
     # than repeated: four of the eight entries include a mirror, and a second table is a
     # second place for those four to drift.
     inverse = TO_SENSOR_TRANSPOSE.get(orientation)

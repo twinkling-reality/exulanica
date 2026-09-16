@@ -81,7 +81,8 @@ describe('world topology composition', () => {
     expect(contentByRegion.get(islandId('r2'))?.moduleKey).toBe('region.source-register');
     expect(contentByRegion.get(islandId('r3'))?.moduleKey).toBe('region.photographic-panels');
     expect(contentByRegion.get(islandId('r4'))?.moduleKey).toBe('region.evidence-cards');
-    expect(snapshot.diagnostics.map((value) => value.instanceId)).toEqual([
+    expect(snapshot.diagnostics.map((value) =>
+      value.code === 'region-unlocated' ? value.islandId : value.instanceId)).toEqual([
       contentByRegion.get(islandId('r2'))!.instanceId,
     ]);
     for (const value of snapshot.instances) {
@@ -165,5 +166,41 @@ describe('world topology composition', () => {
       neighborhood,
       evidenceBindings: new Map(),
     })).toThrow(/explicit span or missing reason/);
+  });
+
+  /*
+   * The gate is a PLACE, not geometry.
+   *
+   * A fully reconstructed region can still be sitting wherever the phyllotaxis packing dropped it,
+   * so rung cannot be the test. Measured on the Flatiron district, the packing put one memory
+   * outside the district entirely, one inside a 47 metre building, and all four below the street.
+   */
+  it('gives a body only to a memory whose location is real', () => {
+    const located = island({ key: 'located', createdAt: 1, footprint: 8, position: [10, 0, 0], anchors: [] });
+    const invented = makeIsland({
+      ...island({ key: 'invented', createdAt: 2, footprint: 8, position: [40, 0, 0], anchors: [] }),
+      placementLocated: false,
+    });
+    const snapshot = composeAtlasWorld(scene([located, invented]));
+
+    const owners = new Set(snapshot.instances
+      .filter((value) => value.provenance.owner.kind === 'region')
+      .map((value) => value.provenance.owner.id));
+    expect(owners.has(located.islandId)).toBe(true);
+    expect(owners.has(invented.islandId)).toBe(false);
+
+    // Refused out loud, not silently dropped: a missing memory and a memory nobody placed look
+    // identical in a world that simply stops drawing one.
+    expect(snapshot.diagnostics.filter((value) => value.code === 'region-unlocated')
+      .map((value) => (value.code === 'region-unlocated' ? value.islandId : null)))
+      .toEqual([invented.islandId]);
+
+    // Reconstruction does not buy a place. Rung 3 with an invented position stays bodiless.
+    const reconstructed = makeIsland({ ...invented, rung: 3 as const });
+    const withGeometry = composeAtlasWorld(scene([reconstructed]), {
+      availableReconstruction: new Set([reconstructed.islandId]),
+    });
+    expect(withGeometry.instances.some((value) =>
+      value.provenance.owner.kind === 'region' && value.provenance.owner.id === reconstructed.islandId)).toBe(false);
   });
 });

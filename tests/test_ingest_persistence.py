@@ -444,7 +444,7 @@ def _pil_image_open_calls(tree: ast.Module) -> list[ast.Call]:
 
 
 def _image_open_call_sites() -> list[str]:
-    """Every call to ``PIL.Image.open`` under ``orimera/``, as ``module:function``.
+    """Every call to ``PIL.Image.open`` under ``exulanica/``, as ``module:function``.
 
     An AST walk rather than a grep, so the prose in a docstring that talks *about* ``Image.open``
     is not counted as a call to it. Attributed to the innermost enclosing function, and a call at
@@ -509,9 +509,9 @@ def test_a_photograph_becomes_pixels_in_exactly_one_module():
     ``ingest/resolve.py`` opened and loaded an original itself, reached from a synchronous route,
     with no comparison in front of it. A sentence that has been false once is worth a test.
 
-    The sweep is over the whole of ``orimera/`` rather than over the ingest package, because the
-    caller that broke it was in ingest and the next one need not be. ``orimera/corpus`` and
-    ``orimera/reconstruction`` both import Pillow and are allowed to; what they must not do is
+    The sweep is over the whole of ``exulanica/`` rather than over the ingest package, because the
+    caller that broke it was in ingest and the next one need not be. ``exulanica/corpus`` and
+    ``exulanica/reconstruction`` both import Pillow and are allowed to; what they must not do is
     turn somebody's uploaded bytes into pixels without asking ``decode`` first.
 
     **What this covers, exactly.** Every statically spelled call that reaches
@@ -521,7 +521,7 @@ def test_a_photograph_becomes_pixels_in_exactly_one_module():
     ``PIL.Image.open``, ``pim.open`` after ``import PIL.Image as pim``, and a bare ``_open(...)``
     after ``from PIL.Image import open as _open``. An earlier version of this sweep matched the
     literal ``Image.open`` and nothing else, so the other four walked past it with the assertion
-    still green. Each of the four was planted in ``orimera/`` in turn and each turns it red.
+    still green. Each of the four was planted in ``exulanica/`` in turn and each turns it red.
 
     **What it does not cover, said rather than implied.** Pillow has other doors into a decode:
     ``ImageFile.Parser``, ``Image.frombytes``, ``open`` reached through ``getattr`` or rebound at
@@ -809,7 +809,7 @@ def test_an_explicit_hash_blocklist_refuses_the_write_and_cancels_the_run(ingest
 
 _STORE_WRITE_METHODS = frozenset({"put_bytes", "put_stream", "put_file"})
 
-#: Every module in ``orimera/ingest/spine/``, written out by hand. Both sweeps below consume it,
+#: Every module in ``exulanica/ingest/spine/``, written out by hand. Both sweeps below consume it,
 #: and it is a literal rather than a directory listing on purpose: a required set derived from
 #: the walk it is checking is a tautology, which is the exact failure the store write sweep
 #: already had twice.
@@ -856,7 +856,7 @@ def _ingest_package_modules() -> list[pathlib.Path]:
     Recursively, and that word is half of this function. The sweep below used to glob one
     level, which was correct while every stage lived in ``pipeline.py`` and stopped being
     correct the moment the stages moved into ``stages/``. Measured, with an unguarded
-    ``put_bytes`` planted in a subpackage of ``orimera/ingest/``: the one-level version reported
+    ``put_bytes`` planted in a subpackage of ``exulanica/ingest/``: the one-level version reported
     the package clean and passed. That is a coverage check over a set that no longer holds the
     thing being checked, which is the failure mode the route sweep already had once.
 
@@ -926,7 +926,7 @@ def test_the_store_write_sweep_can_see_every_stage():
     """The sweep above is a coverage check, so what it covers is asserted rather than assumed.
 
     A one-level ``glob`` was measured against a planted ``put_bytes`` in a subpackage of
-    ``orimera/ingest/``: it reported the package clean and passed, while the recursive walk
+    ``exulanica/ingest/``: it reported the package clean and passed, while the recursive walk
     named the offending file and function. The stages then moved into ``stages/``, which is
     exactly where that blind spot was. So this asserts the walk reaches them by name.
 
@@ -1055,7 +1055,7 @@ def _annotations_naming_a_connection() -> list[str]:
 def test_every_spine_function_takes_a_workspace_scope():
     """Nothing in the spine package is reachable by a session that named no workspace.
 
-    84 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
+    94 tables are under FORCE row-level security keyed on ``current_workspace()``, which is what
     those policies compare against, and the tombstone and epistemic guards go further: they call
     ``assert_workspace_context()`` and raise when it is unset, because a guard that silently sees
     no tombstones is worse than no guard. So no path into the spine package may begin with a

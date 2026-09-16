@@ -4,7 +4,7 @@ Two things happen here that are easy to get wrong and that the rest of the pipel
 
 **The pixels are written in sensor space, not display space.** A phone stores the sensor readout
 unrotated and records how to display it in one EXIF tag, which is why
-`orimera/ingest/exif.py` exists at all. A corpus that wrote upright pixels and then tagged them
+`exulanica/ingest/exif.py` exists at all. A corpus that wrote upright pixels and then tagged them
 `Orientation = 6` would not be a corpus of rotated photographs; it would be a corpus of correctly
 oriented photographs that ingest then turns sideways. So the renderer draws the picture the right
 way up, and this module applies the INVERSE of the display transform before encoding. Ingest then
@@ -113,7 +113,7 @@ def _rational_dms(value_e7: int) -> tuple[IFDRational, IFDRational, IFDRational]
     """Signed ten-millionths of a degree to an exact EXIF degrees/minutes/seconds triple.
 
     Exact rather than rounded: the seconds component keeps a denominator of ten million, so
-    reading the triple back through `orimera.ingest.exif` reproduces the original integer with no
+    reading the triple back through `exulanica.ingest.exif` reproduces the original integer with no
     drift. A corpus whose recorded position differed from its stated position by a rounding step
     would make every clustering radius slightly untrue.
     """

@@ -7,7 +7,7 @@ is the whole of the change, and it is worth saying which half is which:
 
 *   **A method here is a thing the ingest path does.** ``lock_stored_object``,
     ``refuse_ingest_if_tombstoned``, ``upsert_span``. The stages read as prose because these
-    names are prose, and ``orimera/ingest/stages/writes.py`` declares this class as the complete
+    names are prose, and ``exulanica/ingest/stages/writes.py`` declares this class as the complete
     surface a stage may reach for. A stage never sees a
     :class:`~exulanica.ingest.spine.scope.WorkspaceScope`, so that declaration stays exhaustive.
 *   **A function in the spine is a table.** Which columns, which conflict clause, which guard
@@ -15,7 +15,7 @@ is the whole of the change, and it is worth saying which half is which:
 
 **No caller lost its route in the move.** Every method with a call site is still here, and the
 two names that went were counted first: ``span_address_columns`` and ``vision_payloads_by_blob``
-had no caller anywhere in ``orimera/`` or ``tests/``, and this repository does not keep a path
+had no caller anywhere in ``exulanica/`` or ``tests/``, and this repository does not keep a path
 for a caller that does not exist. ``count`` was renamed to ``rows_in_schema`` because it never
 counted a workspace; see :mod:`exulanica.ingest.spine.counts`.
 
@@ -89,7 +89,7 @@ class IngestRepository:
         # measured fact rather than a suspicion: AssertionWriter.__init__ calls set_workspace on
         # the same connection. Deleting either call therefore leaves the connection scoped, so
         # neither one can be shown to be load bearing by removing it and watching a test fail.
-        # Both stay: the writer is constructed directly by orimera.identity on connections that
+        # Both stay: the writer is constructed directly by exulanica.identity on connections that
         # never see a repository, and the scope is what makes a spine module unreachable with an
         # undeclared connection. The rule that holds the second sentence is structural, not
         # behavioural; test_every_spine_function_takes_a_workspace_scope is where it lives.
@@ -593,7 +593,7 @@ class IngestRepository:
 
     # -- epistemics ---------------------------------------------------------------------
     #
-    # Delegated rather than reimplemented, and to orimera.epistemics rather than to the spine.
+    # Delegated rather than reimplemented, and to exulanica.epistemics rather than to the spine.
     # The identity path writes the kind='user' naming assertion that entity.display_name depends
     # on, and it must not reach through this class to do it: two implementations of "insert an
     # assertion" would be two places for the support-span rule and the allows-kind check to

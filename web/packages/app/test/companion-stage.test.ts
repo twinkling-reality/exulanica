@@ -22,6 +22,13 @@ function mediaQuery(reducedMotion: boolean): MediaQueryList {
 }
 
 describe('the geometric Companion stage', () => {
+  it('can be built detached for one-time docking in the encounter toolbar', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue(mediaQuery(false));
+    const stage = buildCompanionStage();
+    expect(stage.root.isConnected).toBe(false);
+    stage.dispose();
+  });
+
   it('renders one silhouette and two slit eyes with no robot anatomy or second renderer', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue(mediaQuery(false));
     const parent = document.createElement('div');

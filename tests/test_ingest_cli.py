@@ -127,7 +127,7 @@ def test_replay_prints_the_ledger_for_a_run(tmp_path, photo_dir, cli_database):
 # -- the model wiring --------------------------------------------------------------------
 #
 # Every test above runs --offline, so none of them touch the model client. These four cover the
-# two places the CLI reaches into orimera.models. None of them issues a request: constructing a
+# two places the CLI reaches into exulanica.models. None of them issues a request: constructing a
 # client opens no connection, and the preflight is given a catalog rather than fetching one.
 #
 # None of them opens a database either, so none of them asks for cli_database.

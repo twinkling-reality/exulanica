@@ -62,6 +62,13 @@ export interface IslandSpec {
   readonly footprint?: number;
 }
 
+/**
+ * A fixture region has a real location.
+ *
+ * Production regions mostly do not, and the composer now refuses to give those a body. Tests about
+ * recipes, layout and navigation are not about that refusal, so the fixture states the location is
+ * known and `world-composer.test.ts` covers the refusal directly.
+ */
 export function island(spec: IslandSpec): Island {
   const p = spec.position ?? [0, 0, 0];
   const entities = new Set<EntityId>((spec.entities ?? []).map(entityId));
@@ -69,6 +76,7 @@ export function island(spec: IslandSpec): Island {
     islandId: islandId(spec.key),
     createdAt: spec.createdAt,
     placement: placement(atlasVec3(p[0], p[1], p[2]), spec.yaw ?? 0, spec.scale ?? 1),
+    placementLocated: true,
     rung: 3,
     scaleIsMetric: spec.metric ?? true,
     footprintRadiusLocal: spec.footprint ?? 30,

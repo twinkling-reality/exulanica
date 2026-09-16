@@ -27,8 +27,9 @@ holds SELECT and nothing else.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 import psycopg
 from psycopg import sql
@@ -49,6 +50,8 @@ from exulanica.selection.plan import (
 )
 from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society_planner import validate_input_successor, validate_society_input
 
 __all__ = [
     "SelectedCapture",
@@ -171,6 +174,7 @@ def execute(
     *,
     query_embedding: QueryEmbedding | None = None,
     store: ContentAddressedStore | None = None,
+    society_authorizer: Callable[[dict[str, Any]], None] | None = None,
 ) -> SelectionResult:
     """Run a validated plan. The only function in this package that touches data."""
     plan = validated.plan
@@ -180,7 +184,9 @@ def execute(
         )
         connection.execute("set local transaction read only")
         if plan.intent is Intent.CONTENT:
-            content, total, next_page = _matching_content(connection, validated, store)
+            content, total, next_page = _matching_content(
+                connection, validated, store, society_authorizer
+            )
             captures: tuple[SelectedCapture, ...] = ()
             entities: tuple[SelectedEntity, ...] = ()
         else:
@@ -388,6 +394,8 @@ select 'synthetic_inhabitant','simulated','inhabitant',null::text,
   join selected_places selected on selected.place_id=s.place_id
   cross join lateral jsonb_array_elements(s.state->'inhabitants') inhabitant
  where s.workspace_id=%(workspace)s
+   and (s.engine_version='exulanica-society/v1'
+        or s.society_id=any(%(authorized_societies)s::uuid[]))
 union all
 select 'simulation_event','simulated','event',null::text,
        'simulated_at','recorded_simulation_event',
@@ -406,14 +414,69 @@ select 'simulation_event','simulated','event',null::text,
     on s.workspace_id=e.workspace_id and s.society_id=e.society_id
   join selected_places selected on selected.place_id=e.place_id
  where e.workspace_id=%(workspace)s
+   and (s.engine_version='exulanica-society/v1'
+        or s.society_id=any(%(authorized_societies)s::uuid[]))
 """
 )
+
+
+def _authorized_societies(
+    connection: psycopg.Connection,
+    validated: ValidatedPlan,
+    authorize: Callable[[dict[str, Any]], None] | None,
+) -> list[uuid.UUID]:
+    """Gate input-driven societies before counts/pagination; events need all input history."""
+    if authorize is None:
+        return []
+    connection.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s,880024))",
+        (str(validated.workspace_id),),
+    )
+    societies = connection.execute(
+        "select distinct s.society_id,s.world_id,s.version_id from world_society s "
+        "join confirmed_place_entity_bridge b "
+        "on b.workspace_id=s.workspace_id and b.place_id=s.place_id "
+        "where s.workspace_id=%s and b.entity_id=any(%s::uuid[]) "
+        "and s.engine_version in ('exulanica-society/v2','exulanica-society/v3')",
+        (validated.workspace_id, list(validated.place_ids)),
+    ).fetchall()
+    allowed = []
+    for society in societies:
+        inputs = connection.execute(
+            "select input_seq,document,document_sha256 from world_society_input "
+            "where workspace_id=%s and society_id=%s order by input_seq",
+            (validated.workspace_id, society["society_id"]),
+        ).fetchall()
+        if not inputs:
+            continue
+        previous = None
+        try:
+            for sequence, row in enumerate(inputs, start=1):
+                document = row["document"]
+                validate_society_input(document)
+                if (
+                    document["input_seq"] != sequence
+                    or row["input_seq"] != sequence
+                    or document["document_sha256"] != row["document_sha256"]
+                    or document["world_id"] != society["world_id"]
+                    or document["version_id"] != str(society["version_id"])
+                ):
+                    raise ValueError("society input binding mismatch")
+                if previous is not None:
+                    validate_input_successor(previous, document)
+                authorize(document)
+                previous = document
+        except (UnavailableSocietyInput, ValueError):
+            continue
+        allowed.append(society["society_id"])
+    return allowed
 
 
 def _matching_content(
     connection: psycopg.Connection,
     validated: ValidatedPlan,
     store: ContentAddressedStore | None,
+    society_authorizer: Callable[[dict[str, Any]], None] | None,
 ) -> tuple[tuple[SelectedContent, ...], int, ContentPageCursor | None]:
     plan = validated.plan
     assert plan.content is not None
@@ -425,6 +488,11 @@ def _matching_content(
     parameters: dict[str, object] = {
         "workspace": validated.workspace_id,
         "place_ids": list(validated.place_ids),
+        "authorized_societies": (
+            _authorized_societies(connection, validated, society_authorizer)
+            if plan.content.scope is not ContentScope.MEMORIES_ONLY
+            else []
+        ),
     }
     total_row = connection.execute(
         sql.SQL("select count(*) total from ({}) candidates").format(candidate_sql),
@@ -492,9 +560,7 @@ def _content_from_row(
         result_kind=str(row["result_kind"]),
         origin_kind=str(row["origin_kind"]),
         content_kind=str(row["content_kind"]),
-        authored_role=(
-            row["authored_role"] if isinstance(row["authored_role"], str) else None
-        ),
+        authored_role=(row["authored_role"] if isinstance(row["authored_role"], str) else None),
         place_relationship=str(row["place_relationship"]),
         match_reason=str(row["match_reason"]),
         memory_place_entity_id=row["memory_place_entity_id"],  # type: ignore[arg-type]

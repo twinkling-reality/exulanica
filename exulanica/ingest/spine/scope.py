@@ -3,7 +3,7 @@
 This exists to be the first parameter of every function in this package, so that "the
 connection under this statement declared a workspace" is a property of the type rather than a
 property of the caller's memory. There is no constructor that skips
-:func:`~orimera.db.session.set_workspace`, so there is no way to hand a spine module an
+:func:`~exulanica.db.session.set_workspace`, so there is no way to hand a spine module an
 undeclared connection.
 
 **The scoping is doubled today, and that is worth stating rather than discovering.** A

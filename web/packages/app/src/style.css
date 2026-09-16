@@ -47,6 +47,20 @@ body {
   display: none;
 }
 
+:root[data-reloading] :is(#atlas, #shell) {
+  visibility: hidden !important;
+}
+
+#shell[data-booting] > :not(.gate):not(.startup-thinking) {
+  display: none !important;
+}
+
+#shell[data-booting] > .startup-thinking {
+  display: flex !important;
+  z-index: 100;
+  pointer-events: auto;
+}
+
 /*
  * THE WORLD IS THE PRODUCT. The shell is a layer of chrome floating over it, not a frame it sits
  * inside.
@@ -287,10 +301,85 @@ body {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  width: 100%;
 }
 
 .credential-action > .gate-failure {
   margin: 0;
+}
+
+.account-sign-in {
+  --credential-control-height: 2.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(26.3rem, 82vw);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-light-canvas);
+  font: inherit;
+}
+
+.account-sign-in-label {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-width: 0;
+  height: var(--credential-control-height);
+  padding: 0 1.4rem;
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  background: var(--ui-light-ink);
+}
+
+.account-sign-in-arrow {
+  display: grid;
+  flex: 0 0 var(--credential-control-height);
+  width: var(--credential-control-height);
+  height: var(--credential-control-height);
+  place-items: center;
+  box-sizing: border-box;
+  color: var(--ui-light-canvas);
+  background: var(--ui-light-ink);
+  border-radius: 50%;
+  font-size: 1rem;
+  transition: transform var(--motion-standard) var(--motion-easing);
+}
+
+.account-sign-in:not(:disabled):hover .account-sign-in-arrow {
+  transform: scale(1.06);
+}
+
+.account-sign-in:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.credential-operator {
+  width: min(26.3rem, 82vw);
+  color: var(--ui-light-ink-faint);
+  font-size: 0.82rem;
+}
+
+.credential-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0.15rem 0 0.9rem;
+  color: var(--ui-light-ink-faint);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.credential-divider::before,
+.credential-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: color-mix(in srgb, var(--ui-light-ink-faint) 24%, transparent);
 }
 
 .gate-note {
@@ -310,9 +399,11 @@ body {
 }
 
 .credential-entry {
-  width: min(21rem, 54vw);
+  width: auto;
+  flex: 1;
   height: var(--credential-control-height);
   padding: 0 1rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -402,6 +493,29 @@ body {
   display: block;
 }
 
+.startup-mark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.9rem;
+  height: 2.9rem;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 18%, transparent);
+  border-radius: 42% 58% 54% 46%;
+  animation: startup-mark-turn var(--motion-working-cycle) linear infinite;
+}
+
+.startup-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 52%, transparent);
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+@keyframes startup-mark-turn {
+  to { rotate: 1turn; }
+}
+
 .startup-thinking-copy {
   display: grid;
   gap: 0.32rem;
@@ -465,6 +579,11 @@ body {
     width: min(22rem, calc(100vw - 3rem));
   }
 
+  .credential-operator,
+  .account-sign-in {
+    width: min(22rem, calc(100vw - 3rem));
+  }
+
   .startup-thinking {
     flex-direction: column;
   }
@@ -479,6 +598,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .startup-mark {
+    animation: none;
+  }
+
   .startup-thinking-label {
     background: none;
     color: var(--ui-light-ink);
@@ -1760,550 +1883,6 @@ kbd {
   rotate: var(--angle, 0rad);
 }
 
-.companion-stage {
-  position: fixed;
-  left: 50%;
-  top: clamp(2.5rem, 9vh, 5.25rem);
-  z-index: 5;
-  width: clamp(9rem, 16vw, 13rem);
-  aspect-ratio: 1;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity var(--motion-deliberate) var(--motion-easing),
-    transform var(--motion-deliberate) var(--motion-easing);
-  transform: translate(-50%, 12px) scale(0.97);
-}
-
-.companion-stage[data-shown][data-ready] {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(-50%);
-}
-
-.companion-avatar {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.companion-avatar-body,
-.companion-avatar-dot {
-  vector-effect: non-scaling-stroke;
-}
-
-.companion-avatar-gaze {
-  transition: transform var(--motion-standard) var(--motion-easing);
-}
-
-.companion-avatar-blink {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: companion-avatar-blink var(--motion-idle-cycle) var(--motion-easing) infinite;
-}
-
-.companion-avatar-thinking {
-  display: none;
-}
-
-.companion-stage[data-state='working'] .companion-avatar-orb {
-  display: none;
-}
-
-.companion-stage[data-state='working'] .companion-avatar-thinking {
-  display: block;
-}
-
-.companion-stage[data-state='working'] .companion-avatar-dot {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: companion-avatar-dot var(--motion-working-cycle) var(--motion-easing) infinite;
-}
-
-.companion-stage[data-state='working'] .companion-avatar-dot-2 { animation-delay: var(--motion-stagger); }
-.companion-stage[data-state='working'] .companion-avatar-dot-3 { animation-delay: calc(var(--motion-stagger) * 2); }
-
-@keyframes companion-avatar-blink {
-  0%, 43%, 47%, 100% { transform: scaleY(1); }
-  45% { transform: scaleY(0.08); }
-}
-
-@keyframes companion-avatar-dot {
-  0%, 58%, 100% { opacity: 0.45; transform: scale(0.78); }
-  29% { opacity: 1; transform: scale(1.08); }
-}
-
-/* -- composed Companion encounter --------------------------------------------------------- */
-.companion-encounter {
-  position: fixed;
-  left: 50%;
-  bottom: 2.4rem;
-  z-index: 4;
-  color: var(--ink);
-  transform: translateX(-50%);
-  transition:
-    opacity var(--motion-standard) var(--motion-easing),
-    transform var(--motion-standard) var(--motion-easing);
-}
-
-.companion-encounter[data-state='enter'],
-.companion-encounter[data-state='summon'] {
-  display: block;
-  padding: 0.48rem 0.82rem;
-  background: var(--material-instrument);
-  border: 1px solid color-mix(in srgb, var(--edge) 78%, transparent);
-  border-radius: var(--radius-control);
-  backdrop-filter: blur(var(--blur-world));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--material-shadow) 32%, transparent);
-}
-
-.companion-prompt {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  white-space: nowrap;
-  text-shadow: none;
-}
-
-.companion-prompt b {
-  display: inline-block;
-  min-width: 1.15rem;
-  padding: 0.02rem 0.3rem;
-  color: var(--ink);
-  font-weight: 500;
-  text-align: center;
-  border: 1px solid var(--edge);
-  border-radius: var(--radius-label);
-}
-
-.companion-encounter[data-first-use] .companion-prompt {
-  display: flex;
-  gap: 0.85rem;
-  align-items: center;
-}
-
-.companion-prompt-statement {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.companion-prompt-actions {
-  display: flex;
-  gap: 0.65rem;
-  align-items: center;
-  padding-left: 0.8rem;
-  border-left: 1px solid color-mix(in srgb, var(--edge) 72%, transparent);
-}
-
-.companion-encounter[data-compact-prompt] .companion-prompt-actions {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.companion-encounter[data-compact-prompt] .companion-prompt {
-  gap: 0.35rem;
-}
-
-.companion-prompt-action {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-  color: var(--ink-soft);
-}
-
-.companion-encounter[data-state='open'] {
-  --speech-width: min(58rem, calc(100vw - 12rem));
-  --choice-width: min(27rem, 31vw);
-
-  inset: 0;
-  pointer-events: none;
-  transform: none;
-}
-
-/*
- * The Atlas commands do not move when the Companion opens.
- *
- * They used to be pinned to the four corners of a 66rem by 9.6rem box centred on the speech band,
- * which was a real composition while the band was a slab that size. With the band a subtitle those
- * corners are nowhere: four circles hanging in empty field, unattached to anything, and the same
- * control wearing two different looks depending on whether somebody was talking. They stay in the
- * rail they always live in.
- */
-
-/* Fixed visual-novel composition: memory backdrop, central character, bottom speech, right choices. */
-.companion-speech {
-  /*
-   * A subtitle, not a panel.
-   *
-   * It was a fixed 58rem slab with a 9.6rem floor, so one short sentence sat in the top-left of a
-   * large empty rectangle and every line looked the same size regardless of what was said. A
-   * person talking in a game gets a band that is exactly as wide as the words and grows outward
-   * from the centre, which is why subtitles read as speech and panels read as furniture.
-   * `max-content` with a max width does that: it hugs one line, wraps at the limit, and stays
-   * centred either way. The minimum only exists so the speaker pill always has somewhere to sit.
-   */
-  position: fixed;
-  right: auto;
-  bottom: clamp(1.4rem, 3vh, 2.4rem);
-  left: 50%;
-  width: max-content;
-  min-width: 0;
-  max-width: min(52rem, calc(100vw - 10rem));
-  max-height: min(15rem, calc(100vh - 16rem));
-  padding: 0.62rem 1.05rem 0.68rem;
-  overflow: visible;
-  /*
-   * A scrim, not a surface.
-   *
-   * The held plates are light because a plate is somewhere you go and the world behind it is
-   * incidental. A subtitle is different: it is read straight over whatever the world happens to
-   * be showing, which here is a near-white field one moment and a photograph the next, and it has
-   * to stay legible over both without the world having to get out of its way. Every game subtitle
-   * solves that the same way, with a dark box and light type, and there is no reason to solve it
-   * differently. Square, because a subtitle is a caption and not a card.
-   */
-  color: var(--ui-companion-surface);
-  background: var(--companion-scrim);
-  border: 0;
-  border-radius: var(--ui-speech-radius);
-  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
-  box-shadow: none;
-  pointer-events: auto;
-  font-family: var(--companion-font);
-  transform: translateX(-50%);
-}
-
-/* Signature: the speaker name is a real component that physically bisects the lens boundary. */
-.companion-speaker {
-  position: absolute;
-  top: 0;
-  left: 0;
-  min-width: 0;
-  margin: 0;
-  padding: 0.28rem 0.62rem 0.3rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.045em;
-  color: var(--ui-companion-surface);
-  text-align: left;
-  background: var(--ui-companion-text);
-  border: 0;
-  border-radius: var(--ui-speech-radius);
-  transform: translateY(-100%);
-}
-
-.companion-utterance {
-  margin: 0;
-  font-size: clamp(0.98rem, 1.25vw, 1.12rem);
-  line-height: 1.47;
-  font-weight: 500;
-  /* The scrim under it is dark, so the line is light. It was still the reading colour meant for
-   * a paper plate, which put near-black type on a near-black box at 1.75:1. */
-  color: var(--ui-companion-surface);
-  text-shadow: none;
-}
-
-.companion-speech ul,
-.companion-choice-rail ul,
-.companion-choice-rail ol {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.companion-evidence-action {
-  /* "Every claim resolves to its source" is the product, and this button is where a person does
-   * it. Drawn as bare muted text under the utterance it read as a stray caption crowding the
-   * panel rather than as the one thing worth pressing. */
-  min-height: 2rem;
-  padding: 0.4rem 0.85rem;
-  font: 600 0.75rem/1 var(--companion-font);
-  letter-spacing: 0.03em;
-  color: var(--ui-companion-ink);
-  background: var(--ui-companion-secondary);
-  border: 1px solid var(--ui-companion-secondary);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
-.companion-evidence-action:hover,
-.companion-evidence-action:focus-visible {
-  color: var(--ui-companion-secondary);
-  background: var(--ui-companion-ink);
-  outline: 1px solid var(--ui-companion-secondary);
-  outline-offset: 2px;
-}
-
-.companion-refusal {
-  margin: 0.65rem 0 0;
-  font-size: 0.78rem;
-  color: color-mix(in srgb, var(--ui-companion-text) 56%, transparent);
-}
-
-.companion-choice-rail {
-  /*
-   * One panel, not a stack of floating pills.
-   *
-   * Four separate capsules hanging in the air read as four unrelated objects; the answers to one
-   * question are one thing. It takes the material and the squircle of every other held surface,
-   * and its rows carry the same key caps as the command row at the foot of the Index, so pressing
-   * 2 here looks like pressing Tab there.
-   */
-  position: fixed;
-  top: 49%;
-  right: clamp(1.5rem, 3.6vw, 4rem);
-  bottom: auto;
-  left: auto;
-  width: var(--choice-width);
-  max-height: min(28rem, calc(100vh - 5rem));
-  /*
-   * The same glass the subtitle is, for the same reason: it floats over the live world rather
-   * than replacing it. Square, one hairline, light type. It is the panel the reference draws.
-   */
-  padding: 0.7rem 0.9rem 0.6rem;
-  overflow-y: auto;
-  color: var(--ui-companion-surface);
-  background: var(--companion-scrim-soft);
-  border: 1px solid var(--companion-edge);
-  border-radius: var(--ui-speech-radius);
-  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
-  pointer-events: auto;
-  font-family: var(--companion-font);
-  scrollbar-width: thin;
-  scrollbar-color: var(--companion-edge) transparent;
-  transform: translateY(-50%);
-}
-
-.companion-choices {
-  display: grid;
-  gap: 0.1rem;
-}
-
-.choice-item {
-  min-width: 0;
-}
-
-.companion-choice,
-.companion-choices-submit,
-.companion-composer {
-  width: 100%;
-  min-height: 2.4rem;
-  font: inherit;
-  color: var(--companion-ink);
-  background: none;
-  border: 0;
-  border-radius: var(--ui-choice-radius);
-  backdrop-filter: none;
-  box-shadow: none;
-}
-
-.companion-choice {
-  display: flex;
-  gap: 0.65rem;
-  align-items: center;
-  padding: 0.64rem 1rem;
-  font-size: 0.88rem;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    color var(--motion-quick) var(--motion-easing),
-    border-color var(--motion-quick) var(--motion-easing),
-    background var(--motion-quick) var(--motion-easing);
-}
-
-.companion-choice:hover:not([disabled]),
-.companion-choice:focus-visible {
-  /*
-   * Selection is a brightness change, not an inversion.
-   *
-   * This row read light-on-dark at rest and dark-on-light under the cursor, so the same control
-   * had two polarities and the eye had to re-learn it on every hover. Lifting the row's own fill
-   * says "this one" without repainting the text.
-   */
-  color: var(--companion-ink);
-  background: color-mix(in srgb, var(--ui-companion-surface) 14%, transparent);
-  border-color: color-mix(in srgb, var(--ui-companion-accent) 45%, transparent);
-  outline: none;
-}
-
-/* The same cap as the command rows, so pressing 2 here looks like pressing Tab in the Index. */
-/* Outlined, light on the glass. The reference draws its keys as a thin box around the letter, not
- * as a filled chip, and a filled dark chip on dark glass would disappear anyway. */
-.companion-choice kbd {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  padding: 0 0.34rem;
-  font: 500 0.7rem/1 var(--ui-font-utility);
-  color: var(--ui-companion-surface);
-  background: none;
-  border: 1px solid var(--companion-key-edge);
-  border-radius: var(--radius-label);
-}
-
-.choice-label {
-  min-width: 0;
-}
-
-.companion-choice.consequential {
-  border-color: color-mix(in srgb, var(--ui-companion-accent) 21%, transparent);
-}
-
-.choice-item.unavailable {
-  padding-bottom: 0.55rem;
-  background: color-mix(in srgb, var(--ui-companion-surface) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ui-companion-unavailable) 42%, transparent);
-  border-radius: var(--ui-choice-radius);
-  backdrop-filter: blur(var(--ui-companion-blur));
-}
-
-.choice-item.unavailable .companion-choice {
-  color: color-mix(in srgb, var(--ui-companion-text) 40%, transparent);
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.choice-unavailable-reason {
-  display: block;
-  padding: 0 1rem 0 3.1rem;
-  font: 500 0.68rem/1.35 var(--companion-utility-font);
-  color: color-mix(in srgb, var(--ui-companion-secondary) 52%, transparent);
-}
-
-.multi-choice {
-  cursor: pointer;
-}
-
-.choice-checkbox {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  accent-color: var(--ui-companion-secondary);
-}
-
-.companion-choices-submit {
-  margin-top: 0.55rem;
-  padding: 0.62rem 1rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ui-companion-ink);
-  background: var(--ui-companion-accent);
-  cursor: pointer;
-}
-
-.companion-other {
-  min-height: 3.05rem;
-}
-
-.companion-other-reveal[hidden],
-.companion-composer[hidden] {
-  display: none;
-}
-
-.companion-composer {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.42rem 0.48rem 0.42rem 1rem;
-}
-
-.companion-reply-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.3rem 0;
-  font: inherit;
-  font-size: 0.88rem;
-  color: var(--ui-companion-text);
-  background: none;
-  border: 0;
-}
-
-.companion-reply-input::placeholder {
-  color: color-mix(in srgb, var(--ui-companion-text) 42%, transparent);
-}
-
-.companion-reply-input:focus {
-  outline: none;
-}
-
-.companion-reply-submit {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 2.05rem;
-  height: 2.05rem;
-  padding: 0;
-  color: var(--ui-companion-ink);
-  background: var(--ui-companion-accent);
-  border: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
-.reply-arrow {
-  width: 1.05rem;
-  height: 1.05rem;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.companion-reply-submit:hover,
-.companion-reply-submit:focus-visible {
-  background: var(--ui-companion-text);
-  outline: 2px solid color-mix(in srgb, var(--ui-companion-accent) 30%, transparent);
-  outline-offset: 2px;
-}
-
-/* Escapes are the quiet way out of a question, so they sit under one hairline as secondary text
- * rather than as four more rows competing with the answers. */
-.companion-escapes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.42rem;
-  margin-top: 0.55rem !important;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--companion-edge-faint);
-}
-
-.companion-escapes .choice-item {
-  flex: 1 1 auto;
-}
-
-.companion-escapes .companion-choice {
-  min-height: 2.15rem;
-  justify-content: center;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.72rem;
-  /* Quiet, not unreadable. At 62% these were 3.83:1 at 10.8px, which is a way out of a question
-   * that a person has to squint at. The hairline above already says they are secondary. */
-  color: var(--companion-ink-soft);
-  background: none;
-  box-shadow: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .companion-stage,
-  .companion-encounter {
-    transition: none;
-  }
-
-  .companion-stage[data-shown][data-ready] { transform: translateX(-50%); }
-
-  .companion-avatar-blink,
-  .companion-stage[data-state='working'] .companion-avatar-dot {
-    animation: none;
-  }
-}
-
-/* 1012 × 324 keeps the same reading order: character centre, answers right, speech at bottom. */
 @media (max-height: 420px) and (min-width: 960px) {
   .confirm {
     top: 0.5rem;
@@ -2321,115 +1900,6 @@ kbd {
     font-size: 0.72rem;
   }
 
-  .companion-encounter[data-state='enter'],
-  .companion-encounter[data-state='summon'] {
-    bottom: 0.65rem;
-  }
-
-  .companion-encounter[data-first-use] .companion-prompt {
-    gap: 0.55rem;
-    font-size: 0.72rem;
-  }
-
-  .companion-prompt-actions {
-    gap: 0.45rem;
-    padding-left: 0.55rem;
-  }
-
-  .companion-stage {
-    top: 0.25rem;
-    width: 7rem;
-    height: 7rem;
-    transform: translate(-50%, 8px) scale(0.97);
-  }
-
-  .companion-stage[data-shown][data-ready] {
-    transform: translateX(-50%);
-  }
-
-  .companion-encounter[data-state='open'] {
-    --speech-width: calc(100vw - 8rem);
-    --choice-width: 19rem;
-  }
-
-  .companion-speech {
-    bottom: 0.5rem;
-    min-height: 6.4rem;
-    max-height: 6.4rem;
-    padding: 1.35rem 1rem 0.65rem;
-    border-radius: min(var(--ui-speech-radius), 1.35rem);
-  }
-
-  .companion-choice-rail {
-    top: 0.55rem;
-    right: 0.55rem;
-    max-height: 11.5rem;
-    transform: none;
-  }
-
-  .companion-encounter[data-state='open'] ~ .atlas-commands {
-    bottom: 0.5rem;
-    width: calc(100vw - 0.75rem);
-    height: 6.4rem;
-  }
-
-  .companion-encounter[data-state='open'] ~ .atlas-commands button {
-    width: 2.35rem;
-    height: 2.35rem;
-  }
-
-  .companion-encounter[data-state='open'] ~ .atlas-commands .atlas-command-icon {
-    width: 1rem;
-    height: 1rem;
-  }
-
-  .companion-encounter[data-state='open'] ~ .atlas-commands .atlas-command-tooltip {
-    display: none;
-  }
-
-  .companion-speaker {
-    left: 1rem;
-    min-width: 6rem;
-    padding: 0.34rem 0.75rem 0.38rem;
-    font-size: 0.66rem;
-  }
-
-  .companion-utterance {
-    font-size: 0.8rem;
-    line-height: 1.34;
-  }
-
-  .companion-evidence-action {
-    font-size: 0.63rem;
-  }
-
-  .companion-choices {
-    gap: 0.3rem;
-  }
-
-  .companion-choice,
-  .companion-composer {
-    min-height: 2rem;
-    padding: 0.3rem 0.65rem;
-    font-size: 0.7rem;
-  }
-
-  .choice-key {
-    width: 1.15rem;
-    height: 1.15rem;
-    font-size: 0.58rem;
-  }
-
-  .companion-escapes {
-    gap: 0.25rem;
-    margin-top: 0.35rem !important;
-  }
-
-  .companion-escapes .companion-choice {
-    min-height: 1.6rem;
-    padding: 0.2rem 0.45rem;
-    font-size: 0.61rem;
-  }
 }
 
 /* ------------------------------------------------------------------ Atlas evidence workspace */
@@ -3048,40 +2518,6 @@ button.command-action:focus-visible {
 }
 
 /* Nothing pulses or grows while you walk. The wedge moving is the only change worth noticing. */
-
-/*
- * The citation sits at the foot of the panel, under its own rule.
- *
- * It is not an answer to the question and not a way out of it: it is how a person looks at the
- * photograph before deciding. Separated so it does not read as a fifth option, and keyed to `E`,
- * which is already the Atlas verb for interacting with what is in front of you.
- */
-.companion-rail-foot {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--companion-edge-faint);
-}
-
-.companion-rail-foot .companion-evidence-action {
-  display: flex;
-  gap: 0.65rem;
-  align-items: center;
-  padding: 0.4rem 0.5rem;
-  cursor: pointer;
-}
-
-/*
- * The command label inverts inside the encounter.
- *
- * `.command-action-label` is authored once for the held plates, where it is dark type on paper.
- * The Companion's surfaces are the opposite: a scrim over the live world. Reusing the one command
- * element is right, and it has to be told which side it is on, or the labels arrive at 1.18:1.
- */
-.companion-choice .command-action-label,
-.companion-escapes .companion-choice,
-.companion-rail-foot .command-action-label {
-  color: inherit;
-}
 
 .reconstruction-inspector-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
 .reconstruction-inspector-header h2 { margin: 0; }

@@ -10,7 +10,10 @@ lists the living contracts, capability guides, and decision records.
 **Product.** [product-direction.md](product-direction.md) is the roadmap and delivery
 order. [world-composition-contract.md](world-composition-contract.md) is the intended
 world semantics: memories, permitted real-world selections, and authored variations
-in one interactive world. [product-specification.md](product-specification.md)
+in one interactive world. The intended living-world experience adds synthetic inhabitants whose
+activities respond to that world and develop a persistent simulated history; the
+[society contract](synthetic-society-contract.md) separates this ambition from the current bounded
+implementation. [product-specification.md](product-specification.md)
 sections 1 to 4 and 11 retain research-backed limits. Those pages are subordinate
 to the roadmap.
 
@@ -43,6 +46,7 @@ client code: it records platform behaviour that otherwise causes silent bugs.
 - [World Memory Package](world-memory-package.md)
 - [Owned district and source admission](owned-district-and-admission.md)
 - [Synthetic society contract](synthetic-society-contract.md)
+- [Character representation and movement](character-representation-contract.md)
 
 ## Capability status
 
@@ -50,10 +54,14 @@ The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate o
 training dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned
 general learned simulation runtime or the bounded deterministic society. World Read serves scene and place bundles; World Write records
 generation receipts. Authored object add, move, remove, undo, and alternate versions
-have code and synthetic checks. A deterministic synthetic society is persisted and rendered as a
-bounded simulation; learned dynamics and complete social behavior remain roadmap work. General
-structural language editing also remains open. This status describes the current implementation
-separately from the product experience in the root README.
+have code and synthetic checks. Optional Google account sessions, account-owned workspaces,
+persisted society controls, typed user action requests, version-scoped character appearance
+history and authenticated district reads are implemented foundations that still require
+deployment configuration and live acceptance. A deterministic synthetic society is persisted
+and rendered as a bounded simulation; learned dynamics, natural social behavior and browser
+controls for directed actions remain roadmap work. General structural language editing also
+remains open. Preview recordings, fixtures and local tests establish mechanics only. This status
+describes the current implementation separately from the product experience in the root README.
 
 ## Contracts
 
@@ -67,6 +75,7 @@ These are the living specifications. Edit them when the system changes.
 | [world-memory-package.md](world-memory-package.md) | Portable signed world snapshot |
 | [owned-district-and-admission.md](owned-district-and-admission.md) | Licensed geographic source, interpretation, and renderer boundary |
 | [synthetic-society-contract.md](synthetic-society-contract.md) | Synthetic identity, replay, retrieval, and representation limits |
+| [character-representation-contract.md](character-representation-contract.md) | Shared human form, identity bindings, appearance and movement quality |
 | [personal-admission.md](personal-admission.md) | `POST /intake` and screening |
 | [privacy-consent-threat-model.md](privacy-consent-threat-model.md) | Consent, deletion, and threat model |
 | [domain-and-evidence-model.md](domain-and-evidence-model.md) | Evidence address and schema |
@@ -93,8 +102,8 @@ Documents are filed by how they change over time.
 
 **Where a new document goes**, first yes wins:
 
-1. Dispatch brief, handoff, procurement, or personal-run note? `.orimera/briefs/`,
-   not this git tree.
+1. Dispatch brief, handoff, procurement, or personal-run note? Private gitignored
+   operator notes, not this git tree.
 2. Machine-readable evidence with a digest? A script may write `evaluation/` on
    disk. Do not hand-edit a record. Do not `git add` a new campaign unless it
    belongs on the public catalog.

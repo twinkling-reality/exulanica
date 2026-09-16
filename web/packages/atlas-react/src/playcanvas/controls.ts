@@ -63,6 +63,31 @@ export interface CameraState {
   pitch: number;
 }
 
+export interface PlanarMovement {
+  readonly x: number;
+  readonly z: number;
+}
+
+/** Convert normalized keyboard intent into the horizontal camera basis. */
+export function cameraRelativeMovement(
+  right: number,
+  forward: number,
+  yaw: number,
+): PlanarMovement {
+  const length = Math.hypot(right, forward);
+  if (!Number.isFinite(length) || length === 0 || !Number.isFinite(yaw)) {
+    return Object.freeze({ x: 0, z: 0 });
+  }
+  const normalizedRight = right / Math.max(1, length);
+  const normalizedForward = forward / Math.max(1, length);
+  const sine = Math.sin(yaw);
+  const cosine = Math.cos(yaw);
+  return Object.freeze({
+    x: normalizedForward * -sine + normalizedRight * cosine,
+    z: normalizedForward * -cosine - normalizedRight * sine,
+  });
+}
+
 export class FirstPersonControls {
   readonly state: CameraState;
 
@@ -74,6 +99,7 @@ export class FirstPersonControls {
   private readonly keys = new Set<string>();
   private vx = 0;
   private vz = 0;
+  private intent: PlanarMovement = Object.freeze({ x: 0, z: 0 });
   private locked = false;
   private lastSafe: AtlasVec3 | null = null;
   private readonly navigationWorld: NavigationWorld | null;
@@ -87,17 +113,39 @@ export class FirstPersonControls {
   onInteract: (() => void) | null = null;
   /** Summon or dismiss Companion. Bound to X and right click. */
   onSummon: (() => void) | null = null;
+  private walkAssist:'off'|'walk'|'run'='off';
+  setWalkAssist(mode:'off'|'walk'|'run'):void {this.walkAssist=mode;}
+
+  onCameraToggle: (() => void) | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
     start: CameraState,
     config = DEFAULT_CONTROLS,
     navigationWorld: NavigationWorld | null = null,
+    options: { readonly groundStart?: boolean } = {},
   ) {
     this.canvas = canvas;
     this.config = config;
     this.navigationWorld = navigationWorld;
     this.state = { ...start };
+    const initialGround = navigationWorld?.surface.sample(start.x, start.z);
+    if (navigationWorld !== null && initialGround != null) {
+      const grounded = initialGround.height + navigationWorld.eyeHeight;
+      /*
+       * Ground the start pose only when it is meant to be one.
+       *
+       * `atlasLandscapeSurface` samples everywhere and never returns null, so grounding every
+       * start pose silently teleports the deliberate aerial poses too: the city overview at
+       * y = 95 lands at roughly 0.3 with its -0.48 pitch intact, aimed at the dirt. Recovery
+       * still seeds from the grounded point either way.
+       */
+      if (options.groundStart !== false) this.state.y = grounded;
+      this.lastSafe = atlasVec3(this.state.x, grounded, this.state.z);
+    }
+    const previousTabIndex = canvas.getAttribute('tabindex');
+    canvas.tabIndex = 0;
+    this.disposers.push(() => { if (previousTabIndex === null) canvas.removeAttribute('tabindex'); else canvas.setAttribute('tabindex', previousTabIndex); });
 
     const on = <K extends keyof DocumentEventMap>(
       target: Document | HTMLElement | Window,
@@ -115,6 +163,7 @@ export class FirstPersonControls {
         this.keys.clear();
         this.vx = 0;
         this.vz = 0;
+        this.intent = Object.freeze({ x: 0, z: 0 });
       }
       this.onModeChange?.(this.locked ? 'traverse' : 'converse');
     });
@@ -132,7 +181,9 @@ export class FirstPersonControls {
       if (!this.locked) {
         if (!this.enabled || this.conversationActive) return;
         // A real user gesture, which is the only thing that may request the lock.
-        void this.canvas.requestPointerLock();
+        this.canvas.focus();
+        // Some embedded browsers refuse pointer lock. Focused keyboard navigation still works.
+        void this.canvas.requestPointerLock()?.catch(() => undefined);
         return;
       }
       // A left click belongs exclusively to entering/maintaining camera look. Treating the same
@@ -144,17 +195,20 @@ export class FirstPersonControls {
     on(window, 'keydown', (e: KeyboardEvent) => {
       // While this renderer may own movement, Escape belongs to the browser's unlock gesture.
       // Converse-mode UI can handle it only after pointer lock has already been released.
-      if (e.code === 'Escape') return;
+      if (e.code === 'Escape') {this.walkAssist='off';return;}
       const target = e.target;
       if (
         target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select') !== null)
+        (target.isContentEditable || target.closest('input, textarea, select, button, summary') !== null)
       ) {
         return;
       }
       if (!this.enabled) return;
+      if (e.code === 'KeyC' && !e.repeat) { e.preventDefault(); this.onCameraToggle?.(); return; }
+      if(['KeyW','KeyA','KeyS','KeyD'].includes(e.code))this.walkAssist='off';
       this.keys.add(e.code);
-      if (this.locked && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter')) {
+      if (document.activeElement === this.canvas && (e.code.startsWith('Arrow') || ['KeyW','KeyA','KeyS','KeyD'].includes(e.code))) e.preventDefault();
+      if ((this.locked || document.activeElement === this.canvas) && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter')) {
         e.preventDefault();
         this.onInteract?.();
       }
@@ -163,11 +217,20 @@ export class FirstPersonControls {
         this.onSummon?.();
       }
     });
+    on(document, 'focusin', (event: FocusEvent) => {
+      if(event.target instanceof HTMLElement && event.target.closest('input,textarea,select,[contenteditable]'))this.walkAssist='off';
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, summary, [contenteditable]')) {
+        this.keys.clear(); this.vx = 0; this.vz = 0;
+        this.intent = Object.freeze({ x: 0, z: 0 });
+      }
+    });
     on(window, 'keyup', (e: KeyboardEvent) => this.keys.delete(e.code));
     on(window, 'blur', () => {
+      this.walkAssist='off';
       this.keys.clear();
       this.vx = 0;
       this.vz = 0;
+      this.intent = Object.freeze({ x: 0, z: 0 });
     });
   }
 
@@ -177,6 +240,13 @@ export class FirstPersonControls {
 
   get movementSpeed(): number {
     return Math.hypot(this.vx, this.vz);
+  }
+
+  /** Camera-relative heading requested this frame, before collision and acceleration. */
+  get movementHeading(): number | null {
+    return Math.hypot(this.intent.x, this.intent.z) > 0.0001
+      ? Math.atan2(-this.intent.x, -this.intent.z)
+      : null;
   }
 
   get spatialClassification(): SpatialClassification | null {
@@ -197,11 +267,13 @@ export class FirstPersonControls {
 
   /** Map is a camera presentation, so ground movement pauses without changing input mode. */
   setEnabled(enabled: boolean): void {
+    if(!enabled)this.walkAssist='off';
     this.enabled = enabled;
     if (!enabled) {
       this.keys.clear();
       this.vx = 0;
       this.vz = 0;
+      this.intent = Object.freeze({ x: 0, z: 0 });
     }
   }
 
@@ -211,50 +283,48 @@ export class FirstPersonControls {
    */
   setConversationActive(active: boolean): void {
     this.conversationActive = active;
+    this.keys.clear();
+    this.vx = 0;
+    this.vz = 0;
+    this.intent = Object.freeze({ x: 0, z: 0 });
     if (active && this.locked && document.pointerLockElement === this.canvas) {
       document.exitPointerLock();
     }
-    if (!active) {
-      this.keys.clear();
-      this.vx = 0;
-      this.vz = 0;
-    }
   }
 
-  /** Advance by `dt` seconds. Ordinary converse pauses; an active answer overlay opts into WASD. */
+  /** Advance by `dt` seconds. System surfaces never share ownership with locomotion. */
   update(dt: number): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !Number.isFinite(dt) || dt <= 0) return;
+    dt = Math.min(dt, .05);
     let ix = 0;
     let iz = 0;
-    if (this.locked || this.conversationActive) {
+    if (!this.conversationActive && (this.locked || document.activeElement === this.canvas)) {
+      const turn = 1.35 * dt;
+      if (this.keys.has('ArrowLeft')) this.state.yaw += turn;
+      if (this.keys.has('ArrowRight')) this.state.yaw -= turn;
+      if (this.keys.has('ArrowUp')) this.state.pitch = Math.min(PITCH_LIMIT, this.state.pitch + turn);
+      if (this.keys.has('ArrowDown')) this.state.pitch = Math.max(-PITCH_LIMIT, this.state.pitch - turn);
       if (this.keys.has('KeyW')) iz += 1;
       if (this.keys.has('KeyS')) iz -= 1;
       if (this.keys.has('KeyA')) ix -= 1;
       if (this.keys.has('KeyD')) ix += 1;
     }
-    const len = Math.hypot(ix, iz);
-    if (len > 0) {
-      ix /= len;
-      iz /= len;
-    }
-
-    const sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    if(this.walkAssist!=='off')iz=1;
+    const sprint = this.walkAssist==='run' || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
     const speed = this.config.moveSpeed * (sprint ? this.config.sprintMultiplier : 1);
+    const intent = cameraRelativeMovement(ix, iz, this.state.yaw);
+    this.intent = intent;
 
     // Critically damped ramp. An instant velocity step reads as a teleport and is a comfort cost.
     const k = 1 - Math.exp(-dt / Math.max(this.config.accelTime, 1e-4));
-    this.vx += (ix * speed - this.vx) * k;
-    this.vz += (iz * speed - this.vz) * k;
+    this.vx += (intent.x * speed - this.vx) * k;
+    this.vz += (intent.z * speed - this.vz) * k;
 
-    // Forward is -Z at yaw 0, the convention both candidate engines share, so a yaw of y gives
-    // forward = (-sin y, 0, -cos y) and right = (cos y, 0, -sin y).
-    const s = Math.sin(this.state.yaw);
-    const c = Math.cos(this.state.yaw);
     const current = atlasVec3(this.state.x, this.state.y, this.state.z);
     const desired = atlasVec3(
-      this.state.x + (this.vz * -s + this.vx * c) * dt,
+      this.state.x + this.vx * dt,
       this.state.y,
-      this.state.z + (this.vz * -c - this.vx * s) * dt,
+      this.state.z + this.vz * dt,
     );
     if (this.navigationWorld === null) {
       this.state.x = desired.x;

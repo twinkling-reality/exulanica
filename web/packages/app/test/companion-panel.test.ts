@@ -126,6 +126,40 @@ describe('dismissal belongs to the shell rather than a floating close button', (
     input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(said).toBe(0);
   });
+
+  it('owns Escape once, traps focus, and restores the opening control', () => {
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    let dismissed = 0;
+    let escapedToShell = 0;
+    const shellEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') escapedToShell += 1;
+    };
+    const panel = buildCompanionPanel(NOOP, { onDismiss: () => (dismissed += 1) });
+    document.body.append(panel.root);
+    document.body.addEventListener('keydown', shellEscape);
+
+    panel.setState('open');
+    panel.render(turn());
+    expect(document.activeElement).toBe(panel.root.querySelector('.companion-dismiss'));
+    const last = [...panel.root.querySelectorAll<HTMLButtonElement>('button:not([disabled])')].at(-1);
+    panel.root.querySelector('.companion-dismiss')?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(document.activeElement).toBe(last);
+    panel.root.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(dismissed).toBe(1);
+    expect(escapedToShell).toBe(0);
+
+    panel.setState('summon');
+    expect(document.activeElement).toBe(opener);
+    document.body.removeEventListener('keydown', shellEscape);
+    panel.root.remove();
+    opener.remove();
+  });
 });
 
 describe('the exchange stays subordinate to the Companion presence', () => {
@@ -271,23 +305,21 @@ describe('nothing stands on screen until it is called', () => {
     );
   });
 
-  it('shows how to get into the world while the mouse is free', () => {
+  it('shows nothing persistently while the Companion has not been called', () => {
     const panel = buildCompanionPanel(NOOP);
     expect(panel.state()).toBe('enter');
-    expect(panel.root.querySelector('.companion-prompt')?.textContent ?? '').toContain('Click');
-    expect(panel.root.querySelector('.companion-choices')).toBeNull();
+    expect(panel.root.hidden).toBe(true);
+    expect(panel.root.textContent).toBe('');
   });
 
-  it('offers the summon key once the user is in the world', () => {
+  it('leaves the summon key to the World menu and direct shortcut', () => {
     const panel = buildCompanionPanel(NOOP);
     panel.setState('summon');
-    expect(panel.root.querySelector('.companion-prompt')?.textContent ?? '').toContain(
-      'Press X to call Unnamed Companion',
-    );
-    expect(panel.root.querySelector('.companion-escapes')).toBeNull();
+    expect(panel.root.hidden).toBe(true);
+    expect(panel.root.textContent).toBe('');
   });
 
-  it('returns to the ordinary summon copy after first-use guidance completes', () => {
+  it('removes the prompt entirely after first-use guidance completes', () => {
     const panel = buildCompanionPanel(NOOP);
     panel.setState('summon');
     panel.setFirstUsePrompt({
@@ -296,8 +328,8 @@ describe('nothing stands on screen until it is called', () => {
     });
     panel.setFirstUsePrompt(null);
     expect(panel.root.hasAttribute('data-first-use')).toBe(false);
-    expect(panel.root.querySelector('.companion-prompt')?.textContent ?? '').toContain('X');
-    expect(panel.root.textContent).not.toContain('Move through this memory');
+    expect(panel.root.hidden).toBe(true);
+    expect(panel.root.textContent).toBe('');
   });
 
   it('keeps the turn while dismissed, so summoning resumes rather than re-asks', () => {

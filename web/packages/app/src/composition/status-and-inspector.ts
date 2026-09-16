@@ -23,7 +23,6 @@ import {
 } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 
-import { sourcePresentation } from '../config.js';
 import {
   ObservationsClient,
   ObservationsUnavailable,
@@ -526,23 +525,24 @@ export function mountStatusAndInspector(
     // `applyProofLens` and nothing else: no scene is rebuilt and this panel is not re-rendered,
     // which is what makes "toggling the lens changes no scene, no rung and no receipt" checkable
     // rather than merely asserted.
-    proofLens: {
+    ...((state.atlas?.binding.memoryLayerVisible ?? true) ? { proofLens: {
       enabled: state.proofLensEnabled,
       theme: themeForPreferences(state.preferences, env.systemAppearance.matches),
-      onToggle: (enabled) => {
+      onToggle: (enabled: boolean) => {
         state.proofLensEnabled = enabled;
         applyProofLens();
       },
+    } } : {}),
+    // Unconditional now. This was gated on a flag that chose between hanging source photographs
+    // in the world and keeping them in the inspector; the world side has been deleted, so the
+    // inspector is not an alternative to anything, it is where a source is.
+    reconstructionFocus: {
+      collections: current.islands.map((island) => {
+        const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
+          ?? island.islandId;
+        return { sceneId, sourceCount: sourcesForScene(sceneId).length };
+      }),
     },
-    ...(sourcePresentation() === 'inspection' ? {
-      reconstructionFocus: {
-        collections: current.islands.map((island) => {
-          const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
-            ?? island.islandId;
-          return { sceneId, sourceCount: sourcesForScene(sceneId).length };
-        }),
-      },
-    } : {}),
   });
 
   let statusElement = renderReconstructionStatus();

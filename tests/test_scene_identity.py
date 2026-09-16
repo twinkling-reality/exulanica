@@ -8,7 +8,7 @@ it: "a tombstone path that reaches a scene artifact through any of its members".
 **The reduction inverts, and that is what every test here is about.** For an artifact of one
 photograph the question is an OR over the captures holding a blob: imported twice is one artifact
 and two captures, and deleting one withdraws nothing. ``purge_releases_bytes`` and
-``orimera/graph/geometry.py`` both read that way and are right to. For a fact about eight
+``exulanica/graph/geometry.py`` both read that way and are right to. For a fact about eight
 photographs, deleting ONE withdraws it, because a receipt over eight is not a claim about the
 seven that are left.
 
@@ -21,7 +21,7 @@ workspace is read in is ``started_at`` then ``capture_id``, so a deletion at eit
 indistinguishable from an off-by-one in anything that walks the list.
 
 Both halves of the no-ship rule are here, under "the export" below: the bytes go through the
-purge queue and the export through ``orimera/world_package/projector.py``. They are in one file
+purge queue and the export through ``exulanica/world_package/projector.py``. They are in one file
 rather than split across this and ``tests/test_world_package_postgres.py`` because D9 states them
 as one rule, and a reader checking whether it is met should not have to find the second half.
 """
@@ -169,7 +169,7 @@ class SceneWorkspace:
 def _insert_scene(
     workspace, capture_ids, *, registered: list[bool | None] | None = None
 ) -> uuid.UUID:
-    """Write a scene and its members with raw SQL, because nothing in ``orimera/`` writes one.
+    """Write a scene and its members with raw SQL, because nothing in ``exulanica/`` writes one.
 
     That is deliberate rather than missing. D9 says no scene-level artifact ships before this
     test exists, so the identity and the deletion path land before any producer does, and a test
@@ -432,7 +432,7 @@ def test_a_scene_with_no_members_blocks(scene):
 def test_the_deletion_of_one_member_reaches_a_scene_two_members_still_stand_in(scene):
     """The inversion, asked of the predicate directly.
 
-    This is the test that goes red on the reduction ``orimera/graph/geometry.py`` warns about.
+    This is the test that goes red on the reduction ``exulanica/graph/geometry.py`` warns about.
     ``_LIVE_HOLDER`` is an OR over the captures holding a blob and is right for a per-capture
     artifact; copied to a scene it asks "is any member still live", which after this deletion is
     emphatically true, and a corridor would be served after a photograph in it was deleted.

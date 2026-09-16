@@ -197,6 +197,30 @@ https://caniuse.com/pointerlock
 
 ### 2.3 Controls
 
+**Camera direction, updated 2026-09-13; implementation pending.** A person can switch between
+first-person and third-person views of the same controllable player. Provide a visible camera
+control and a keyboard binding that does not fire while typing. Switching preserves the player's
+position, grounded collision state and interaction context. The player avatar is distinct from the
+synthetic population; its visibility does not create a simulated inhabitant or a new personal
+identity. Simultaneous split-screen rendering is outside this camera milestone.
+
+Third-person camera placement must shorten its follow distance around obstructions and avoid
+clipping through ground or buildings. Picking begins at the displayed camera, while interaction
+reach and traversal authority remain with the player. Character facing and movement animation
+must follow actual resolved motion, including blocked movement. Camera transitions respect reduced
+motion. Optional appearance customization can extend the player representation later without
+changing navigation or identity authority.
+
+Tune pedestrian walk/run speeds, acceleration, braking and turning against the actual street
+scale. Verify diagonal speed, frame-rate behavior, collision sliding, focus loss, camera switching,
+input in panels and recovery at coverage boundaries in the live experience. The existing city
+speed override is not an accepted pedestrian movement target. Keep first-person inspection and
+third-person movement legible in the same geometry.
+
+The [character representation contract](character-representation-contract.md) extends this quality
+requirement to every represented person: shared continuous human form, distance-driven stride,
+planted stance feet, proportion-aware gait, and appearance independent of subject identity.
+
 Mouse-look with raw input requested where the browser offers it, falling back silently rather than
 surfacing an error. Pitch range is nearly full (a small epsilon short of straight up and straight
 down) because the user must be able to look up at overhead connection threads. Mouse sensitivity is a
@@ -297,6 +321,77 @@ image must be reachable from a flat keyboard-navigable list.
 
 ---
 
+### Default desktop application workspace
+
+The application presents labeled Character, Library, Companion, Map, Customize and Settings controls.
+Geographic exploration uses a place heading, a compact camera strip and separate Nearby,
+Create and World details panels. Opening one contextual panel closes the previous one;
+selecting a subject opens its inspection. Person activity and source/fiction distinctions
+remain in the foreground, while identifiers, event references and provenance details use
+explicit disclosures. Recorded preview controls and their limitations remain in World details.
+Background simulation refreshes update an existing inspection without reopening a dismissed one.
+
+Character opens with K; C retains the first/third-person camera toggle. The development preview
+provides a full-body character studio backed by a pinned asset catalogue. People can rotate and
+zoom the model, choose an available look, edit its supported material colors and inspect its
+standing, walking and running animations. Controls follow the selected asset's capabilities;
+the screen does not invent garment combinations, morph targets or equipment statistics.
+Use in world applies the selected look to the existing player presentation and opens third person.
+This is session appearance, explicitly not an account save. An authenticated character catalogue
+and durable character customization are not connected to this application composition.
+
+The native character renderer validates the pinned GLB container, rig joints, idle/walk/run clips,
+material slots and optional variants before instantiation. It drives gait from collision-resolved
+distance, keeps shared asset data separate from mutable skin/material instances, caps the displayed
+synthetic set at 24 and rechecks current presence/source authority. Source withdrawal restores the
+abstract fallback; denied presence hides both forms. These are renderer and fixture contracts, not
+visual acceptance of garment fit, foot contact, crowd spacing or a production character family.
+
+When enabled, opening a contextual tool in first person plays the selected character's original
+right-hand reach once in a camera-relative presentation. The panel is usable immediately and
+remains stable after the gesture ends. The gesture changes no world pose, collision, identity,
+simulation or write authority. It is not a held palm-up pose or a physical interaction with a
+world object. Movement, camera/surface changes, Escape and reduced motion interrupt or skip it;
+unavailable gesture assets leave ordinary controls usable. Character provides a session toggle
+for hand gestures. The independent preview and gesture stages release their resources on remount.
+
+Library search is visible by default. Original-photo intake is inside the library and groups
+its existing operations into choosing originals, authorizing processing, inspecting people,
+and confirming review. These groups describe the workflow, not completed processing states.
+The development preview disables upload and review and explains that an authenticated workspace
+is required. Authenticated operations retain their existing authorization, exact-request retry,
+consent, review and eligibility checks. File identifiers remain available through disclosure.
+
+The Companion reads as one panel with the question, response choices and evidence actions in
+order. Closing it retains the existing conversation lifecycle. Confirmation keeps its staged
+proposal boundary; Escape cancels through the same handler as Cancel and returns focus to the
+opening control. World panels release pointer lock before focusing their controls.
+
+Application sheets currently apply a fixed cool-neutral reading palette and consistent control
+geometry. This does not alter world materials, scene identity or the versioned world-profile
+schema. High contrast and reduced-motion overrides remain authoritative. Broader theme authority
+across world profiles still needs visual acceptance; this application pass does not establish
+arbitrary user-supplied interface themes. The desktop viewport restriction remains in force.
+
+The object catalog is reachable from Create. Availability is determined by the existing placement
+contract: the geographic street does not itself establish a reconstructed region on which an
+object can be placed. Development-preview objects, where placement is supported, are temporary
+session state and are not saved. A refusal must remain visible rather than claiming placement.
+
+World details includes a bounded **World to data** inspector for renderer subjects that actually
+declare a compatible surface/point pair. It preserves camera and selection, samples only existing
+mesh triangles or borrows retained points, identifies generated samples as presentation rather than
+measurement, and disables the slider for unsupported surfaces. Its record is a resident display
+descriptor, not source artifact bytes. Current source availability and parent/residency visibility
+remain authoritative and can remove both geometry and the record.
+
+In an authenticated configured world, the same panel can read persisted society state and controls,
+show saved play/pause and 1x/2x/4x settings, advance one simulated minute while paused, and inspect
+recorded activity/event references. The development preview instead plays an explicitly labeled
+recording and is not persistence or model evidence. The backend also accepts typed user requests for
+an inhabitant to go to or perform a canonical target, but no browser control currently issues those
+requests. Selecting a destination or inhabitant for inspection must not be described as directing it.
+
 ## 3. Two verbs, and the contextual affordance system
 
 The entire verb set is `Interact` (contextual, acts on the focused anchor) and `Summon Companion`
@@ -374,12 +469,11 @@ and a **separate decision rail**. The presence remains a rendered object. Speech
 and custom reply remain accessible DOM. They use one fixed visual-novel composition and one optical
 material language, not one generic card or a mirrored dashboard layout.
 
-**DECISION, CORRECTED 2026-08-31: verified SVG geometric avatar.** The supplied crop matches the
-Grok Bot visual grammar documented by the MIT-licensed Bloub project: one geometric silhouette and
-two slit eyes. The product path is an original DOM/SVG implementation of that verified grammar.
+**DECISION, updated 2026-08-31: SVG geometric avatar.** The geometric silhouette and
+two slit eyes draw on the visual grammar documented by the MIT-licensed Bloub project.
+The product path is an original DOM/SVG implementation.
 Shape, colour, and two-eye expression are saved device preferences resolved through a versioned
-presentation contract. The rejected humanoid robot and the Spline runtime, scene, and fallback
-route are removed.
+presentation contract. The implementation has no Spline runtime dependency.
 
 Resting, attending, uncertain, working, and settled remain operational states, not an emotional
 performance. Only `working` has a distinct semantic render: three pulsing dots. Expression
@@ -399,11 +493,9 @@ has the same no-penalty meaning as Later.
 anchors the bottom and decisions remain on the right. The presence is the Companion; the lens is
 its accessible utterance and evidence; the right rail is what the person can decide. Index, Map,
 Options, and Controls become circular icon controls around the speech band while an encounter is
-open, matching the supplied reference's control rhythm without copying its game chrome.
+open, maintaining a consistent control rhythm.
 
-Rejected alternatives were the humanoid primitive robot, generated mesh gradient orb, aperture,
-constellation, mote field, Spline scene, and CSS source-plane stack. They either guessed at the
-reference or kept an unnecessary renderer after a verified SVG path existed.
+SVG supports the geometric design without an additional scene renderer.
 
 Rejected alternative: putting the text inside the body or tethering a speech bubble to it. The
 separate glass surface can still hold evidence and multi-select without turning the body into a
@@ -420,13 +512,11 @@ centre, and decisions remain right. The short 1012 × 324 stress layout preserve
 order with a smaller character and shallower speech band rather than mirroring or recombining it.
 
 `companion-placement.ts` reports `reference-fixed`. The current memory is intentionally backdrop,
-so its projected rectangle does not reorder answers or move the question. A prior mirrored resolver
-was removed after live review because it could put choices on the left and the dialogue in a side
-column, contradicting the supplied reference.
+so its projected rectangle does not reorder answers or move the question. Choices remain on
+the right and dialogue remains below, preserving a stable reading order.
 
-The rejected in-world placement model had a tested home and errand solver. It was not wired after
-the presence became a 2D canvas overlay. Keeping it would preserve two incompatible answers to where
-the Companion exists, so the solver and its station abstraction were deleted rather than wired back.
+The screen-space presence does not use an in-world home or errand solver. One placement
+model determines where the Companion appears.
 
 Attention now happens inside the stable silhouette. A local gather marks an open question, and the world
 anchor itself carries any required focus or evidence highlight. This keeps the presence findable and
@@ -965,18 +1055,15 @@ and formation labels are identical in both modes.
 
 ---
 
-## 10. Renderer, and the disagreement that is not yet settled
+## 10. Renderer decision
 
 Every interaction mechanism above is described in engine-neutral terms except where a verified source
-is quoted. The concrete stack is not yet fixed.
+is quoted. **CLOSED:** [ADR-0003](adr/0003-renderer-selection.md) selected PlayCanvas Engine
+2.21.4 through the matched-resolution bake-off. The current application, owned district, native
+characters and representation runtime use the PlayCanvas binding. Three.js/Spark remains a
+separate implementation and is not the production browser path.
 
-**UNRESOLVED, and owned elsewhere.** The renderer is the largest unreconciled architectural
-disagreement in the research corpus: this interaction design's verified sources are three.js APIs,
-while the browser-rendering stream recommends PlayCanvas, and neither stream cited the other. It is
-**not** decided here. See [adr/0003-renderer-selection.md](adr/0003-renderer-selection.md) for the
-evidence on both sides, the bake-off, and the deadline.
-
-What this document commits to regardless of the outcome:
+The interaction contracts retain these engine-independent requirements:
 
 - All world targeting is reticle-based, because that is forced by the Pointer Lock specification
   (2.1), not by any engine.
@@ -985,9 +1072,8 @@ What this document commits to regardless of the outcome:
 - Emphasis is a per-instance numeric attribute plus a uniform, never a per-object material change
   (7.5).
 
-**The consequence of delay is asymmetric and should be stated plainly: every mechanism in sections 3,
-4 and 7 is described in engine-neutral terms here, but the implementation is not portable for free.
-Switching engines after the interaction layer is built means rewriting it.**
+The implementation is not portable for free. A future renderer change would require a new measured
+decision and replacement bindings.
 
 ---
 
@@ -996,7 +1082,7 @@ Switching engines after the interaction layer is built means rewriting it.**
 | # | Item | Settled by |
 | --- | --- | --- |
 | I-1 | Cross-capture co-registration success rate, which gates the shared-frame exception in 1.3 | An experiment that does not yet exist in the plan. Until it does, do not ship pooled frames |
-| I-2 | Renderer (section 10) | The bake-off in [adr/0003-renderer-selection.md](adr/0003-renderer-selection.md), forced at its stated deadline |
+| I-2 | Renderer (section 10) | Closed by [ADR-0003](adr/0003-renderer-selection.md): PlayCanvas Engine 2.21.4 |
 | I-3 | Per-stage counters, which gate section 8 | A-29, two hours, do it first |
 | I-4 | Layout at three regions: algorithmic or hand-placed (1.4) | Side-by-side comparison on the three real captures, two hours |
 | I-5 | The Companion uses the fixed centre/right/bottom encounter composition and needs no tether (4.1) | Closed |

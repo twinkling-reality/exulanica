@@ -8,7 +8,12 @@ from pathlib import Path
 from exulanica.api.routes.evidence import _clock_headers, _evidence_headers
 from exulanica.api.routes.geometry import POINT_MAP_MEDIA_TYPE
 from exulanica.db.roles import EXECUTOR_ROLE, PURGE_ROLE, RUNTIME_ROLE
-from exulanica.env import env_get, resolve_corpus_dir, resolve_data_dir
+from exulanica.env import (
+    env_get,
+    resolve_briefs_path,
+    resolve_corpus_dir,
+    resolve_data_dir,
+)
 from exulanica.errors import ExulanicaError
 from exulanica.evidence.address import URI_SCHEME, parse_uri
 from exulanica.evidence.blob import BlobId
@@ -38,6 +43,18 @@ def test_data_dir_default_is_exulanica(tmp_path, monkeypatch) -> None:
 
 def test_corpus_dir_default_is_exulanica() -> None:
     assert resolve_corpus_dir() == Path(".exulanica/media/intake/synthetic")
+
+
+def test_briefs_prefer_exulanica_and_fall_back_to_legacy(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert resolve_briefs_path("note.md") == Path(".exulanica/briefs/note.md")
+    (tmp_path / ".orimera" / "briefs").mkdir(parents=True)
+    (tmp_path / ".orimera" / "briefs" / "note.md").write_text("old", encoding="utf-8")
+    assert resolve_briefs_path("note.md") == Path(".orimera/briefs/note.md")
+    (tmp_path / ".exulanica" / "briefs").mkdir(parents=True)
+    (tmp_path / ".exulanica" / "briefs" / "note.md").write_text("new", encoding="utf-8")
+    assert resolve_briefs_path("note.md") == Path(".exulanica/briefs/note.md")
+    assert resolve_briefs_path("note.md", explicit="/tmp/explicit") == Path("/tmp/explicit")
 
 
 def test_cli_scripts_are_exulanica_only() -> None:

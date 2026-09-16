@@ -1,6 +1,6 @@
 # Model and service selection
 
-Status: current implementation reviewed 2026-09-12; model upgrades require task-specific evidence.
+Status: current implementation reviewed 2026-09-14; model upgrades require task-specific evidence.
 
 ## 0. Current stack and selection decision
 
@@ -9,21 +9,21 @@ it is the living correction of [ADR-0002](adr/0002-model-routing.md). ADR-0002 r
 accepted original decision (Nemotron Lightning as the reasoning core). The Companion caller
 implemented today is Nemotron 3 Nano 30B-A3B with Lightning as fallback. The ADR number is
 not reused. Sections 1-8 retain the August research, its prices and rejected alternatives;
-they are historical rationale, not a current runtime inventory. Inspect actual call sites as well as the manifest:
-its `structured_extraction` rationale still says reserved although product code uses that role.
+they are historical rationale, not a current runtime inventory. The manifest now describes the implemented structured-extraction callers and distinguishes
+configured reasoning candidates from actual production routes.
 The [product roadmap](product-direction.md#model-selection-and-compute-priorities) records the
 ordered work and adoption gates. No model configuration changes are made by this review.
 
 ### Implemented roles
 
-Reviewed against main `e84663086fc4900eeca5082f0aca5595096ac130`. Implemented means there is a
-production call path; it does not mean every configured model is running or has passed a quality
-comparison. Provider availability and prices must be checked again before an execution campaign.
+Reviewed against the current integration tree. Implemented means there is a production call path;
+it does not mean every configured model is running, deployed or has passed a quality comparison.
+Provider availability and prices must be checked again before an execution campaign.
 
 | Role | Current implementation | Evidence and boundary |
 | --- | --- | --- |
 | Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. |
-| Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role, despite the stale reserved-role rationale in the manifest. |
+| Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. No broad comparison establishes M3 as the most accurate option for our photographs. |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
@@ -34,6 +34,14 @@ comparison. Provider availability and prices must be checked again before an exe
 | Browser | TypeScript, Vite, DOM UI, PlayCanvas 2.21.4 | The app imports the PlayCanvas binding. Three.js/Spark is retained as a separate implementation; the `atlas-react` package name does not establish a React application. |
 | API, durable state and jobs | Python 3.11, FastAPI, Pydantic, PostgreSQL, pgvector, PostgreSQL-backed job leases/retries | Existing replaceable model/stage interfaces and enforced module boundaries are the extension points. No new orchestration framework is selected. |
 | Original bytes and compute | Local content-addressed file store; local API/workers and Docker GPU execution; hosted model calls on Nebius | `exulanica/api/services.py` constructs `LocalContentAddressedStore`. Brev/MassedCompute L40S execution is measured; Nebius GPU hosting and an S3 store implementation are not established by that run. |
+
+Google OIDC account resolution, deterministic society stepping and playback, typed user-directed
+society actions, reviewed-asset admission, scene-surface candidate extraction, scene-run preflight,
+character appearance history, native character playback and the representation inspector are
+deterministic application/runtime paths. They do not invoke a model merely because a model client is
+configured. Optional v3 society decisions remain the only model proposal path in that foundation,
+and they are explicitly requested, schema-validated and replayed from stored receipts rather than
+recalled during stepping.
 
 Nemotron Super and Ultra are configured roles but have no production caller in the reviewed
 Python code. Fallback in the hosted client is provider-error handling, not a quality escalation
@@ -57,7 +65,67 @@ checks and an evaluation corpus; live answers and human quality judgments remain
 [segmentation record](evaluation/2026-09-11-scene-segments-production.json) records masks but no
 positive first-place person lift because pose was absent. The
 [GPU record](evaluation/2026-09-12-place-compute-readiness.json) establishes generated CUDA
-execution and cleanup at a displayed provider charge of $0.23. None proves an optimal model set.
+execution and cleanup. None proves an optimal model set.
+
+### Quality and runtime requirements, updated 2026-09-13
+
+The living-world preview uses source-footprint building meshes and catalog-backed rigged characters,
+with an abstract procedural fallback. Its appearance is not evidence of frontier scene-generation
+or character-generation quality. The live society uses the deterministic v2 visit/rest policy.
+The opt-in v3 backend adds local simulated observations, communicated beliefs and a bounded decision
+adapter through the existing ModelClient. No model role is enabled for that adapter by default.
+Its authenticated persistence and provider path are tested with scripted responses; live-model
+quality, dialogue and memory reflection remain separate evaluation work. A configured model role,
+an expensive GPU or a working API response does not establish these capabilities.
+
+The quality target is the strongest demonstrated result for each user task. Compare stronger
+reasoning models for grounded Companion answers and the small-cast social scenario; compare
+perception/geometry candidates against actual source failures; evaluate reusable rigged assets,
+materials and animation for character quality. Rendering and collision retain their existing local
+runtime. Save expensive outputs and reuse them. Track model/provider/checkpoint, quality judgments,
+latency, memory and cost for each comparison. Promote quality improvements within an explicit
+interactive or offline execution budget; do not select solely by model size or price.
+
+### Stronger candidates to compare, checked 2026-09-13
+
+These are challengers for targeted comparisons, not established winners or enabled runtime roles.
+Comparative inference results are pending; the implemented baseline remains unchanged.
+
+For customizable people, first compare established parametric/rigged asset pipelines rather
+than training a model solely to obtain body and wardrobe variation. [MPFB](https://static.makehumancommunity.org/mpfb/docs.html)
+provides character, asset, rigging and export workflows; its [core assets](https://static.makehumancommunity.org/about/license.html)
+are CC0 while the authoring code uses a separate license. [MHR](https://github.com/facebookresearch/MHR)
+provides a parametric body, skinned mesh, detail levels and corrective shapes. MPFB now powers the
+local editable-human preview with fitted rigs and clothing; MHR remains a candidate. Version-scoped
+appearance storage now has an authenticated backend with revision history. The development editor
+uses a loopback-only MPFB preparation adapter and applies its result to session presentation.
+Connecting that editor to authenticated history, configuring production families and authenticated
+production generation remain work. Garment fit, contact, stylization and browser performance still
+require visual acceptance; a functioning editor is not a measured visual-quality selection.
+
+Pretrained inference, per-source body fitting, and model training have different inputs and
+costs. Evaluate inference first where an existing model addresses a real gap. TRELLIS.2 provides
+textured asset generation and training code, but its image-to-GLB output alone does not establish
+an animation-ready human. Fine-tuning requires a defined target failure and dataset; budget
+inference hardware separately from training hardware. Retain generator versions, inputs,
+seeds, material/rig dependencies and outputs for reuse and reproducibility.
+
+| Task | First comparison | Remaining condition |
+| --- | --- | --- |
+| Grounded answers and bounded social decisions | Current Nano versus Nemotron Super; include [Nemotron 3 Ultra](https://research.nvidia.com/labs/nemotron/Nemotron-3-Ultra/) when healthy | The [Nebius public catalog](https://tokenfactory.nebius.com/api/public/models_info) reported Super active and Ultra error during this check. Recheck before execution; listing alone does not establish inference health. |
+| Photograph understanding | Current M3 versus [Kimi-K3](https://huggingface.co/moonshotai/Kimi-K3), listed active and image-capable | Compare supported observations and omissions on the same authorized images; do not inherit vendor rankings. |
+| Mask quality | [SAM 2.1 Large](https://github.com/facebookresearch/sam2) versus current Tiny with the same boxes | Test SAM 3 separately for concept/detection failures. SAM 3.1 video tracking improvements alone do not justify changing the still-image pipeline. |
+| Scene geometry | [MoGe-3](https://github.com/microsoft/MoGe) versus MoGe-2; [MapAnything Apache](https://github.com/facebookresearch/map-anything) for adequate multi-view captures that fail registration | Separate single-image shape from multi-view pose; verify scale, held-out views, memory and Linux GPU compatibility. |
+| Authored textured 3D assets | [TRELLIS.2](https://github.com/microsoft/TRELLIS.2) for generated PBR assets; [SAM 3D Objects](https://github.com/facebookresearch/sam-3d-objects) for masked objects | Generated completion is not observed geometry. The TRELLIS.2 reference runtime needs Linux and at least 24 GB NVIDIA memory; rigging and in-app visual acceptance remain separate work. |
+| Scene-derived character bodies | [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) as a source-to-body fitting candidate | A fitted body is not established identity, a complete texture or a finished animation pipeline. Preserve uncertainty, source lineage and existing person-link authority. |
+| Retrieval | [Qwen3-Reranker-8B](https://huggingface.co/Qwen/Qwen3-Reranker-8B) for misranking; [SigLIP 2 SO400M](https://huggingface.co/google/siglip2-so400m-patch14-384) for visual details omitted by captions | Use only after diagnosing the retrieval failure; version a changed vector space and retain permission filtering. |
+
+Begin with a small fixed set of representative failures, ordinary tasks and cases that should
+abstain. Score factual support, task success, visual/mask/geometry quality and human preference
+separately from latency and cost. Include source withdrawal and branch isolation cases. The first
+screening narrows candidates; it cannot prove a universal best model or establish human behavior
+prediction from a fluent answer. For model-driven society decisions, persist the accepted proposal
+and its inputs/model identity so replay consumes recorded decisions instead of repeating inference.
 
 ### Candidate capabilities checked against primary sources
 
@@ -656,12 +724,12 @@ theatre if the Qwen embedder is measurably better for retrieval. Undecided.
 
 | # | Open item | What settles it |
 | --- | --- | --- |
-| 1 | No model identifier has been invoked. Section 7 | One archived chat completion against `nvidia/Nemotron-3_5-Lightning`, blocked on credentials (Q1) |
-| 2 | Whether `use_cases` or `type` is authoritative in the catalog. Section 4 | One `image_url` call to `MiniMaxAI/MiniMax-M3`, with `openbmb/MiniCPM-V-4_5` as the control |
+| 1 | ~~No model identifier has been invoked~~ **CLOSED.** Lightning was invoked and archived as described in section 7 and runtime verification | Retained execution evidence |
+| 2 | ~~Whether `use_cases` or `type` is authoritative in the catalog~~ **CLOSED for the implemented rule.** MiniMax-M3 accepted an image despite its `text2text` type | [runtime-verification.md](runtime-verification.md) section 3 |
 | 3 | The embedding role has no same-tier runtime fallback. Sections 2.4 and 6 | A decision between a warm self-hosted standby, an accepted single point of failure, or freezing all embeddings before deployment |
 | 4 | Whether to self-host `nvidia/Nemotron-3-Embed-1B-BF16` as a second NVIDIA asset. Section 8 | A retrieval-quality comparison against `Qwen/Qwen3-Embedding-8B`, plus a deployment cost estimate |
 | 5 | Whether `/v1/rerank` accepts `Qwen/Qwen3-Embedding-8B`. Section 2.1 | One call. The endpoint is verified to exist, the model pairing is not |
-| 6 | Renderer choice, PlayCanvas versus three.js. Section 1.3 | Bake-off X-R1 by end of week 3. Recorded here only because it sits on the browser boundary |
+| 6 | ~~Renderer choice, PlayCanvas versus three.js~~ **CLOSED.** PlayCanvas Engine 2.21.4 | [ADR-0003](adr/0003-renderer-selection.md) |
 
 ---
 

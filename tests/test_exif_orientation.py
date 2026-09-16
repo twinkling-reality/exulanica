@@ -5,7 +5,7 @@ the tag and every portrait photograph is processed sideways: the model describes
 scene and every box it returns lands on the wrong axis. Four of the eight values also include
 a mirror, which no amount of rotation can express.
 
-These tests pin the decision recorded in ``orimera/ingest/exif.py``: normalise pixels at
+These tests pin the decision recorded in ``exulanica/ingest/exif.py``: normalise pixels at
 ingest, record that it happened, and put every region in upright display space.
 """
 
