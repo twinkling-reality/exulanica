@@ -18,17 +18,15 @@ pnpm run test         # vitest
 | `@exulanica/companion-runtime` | turn generation, option pools, proposal drafting, escape handling, initiative gate | renderer, React, DOM |
 | `@exulanica/world-index` | index UI, entity detail, provenance panel | renderer |
 | `@exulanica/graph-client` | entity graph reads and writes, assertion log, evidence resolution | all of the above |
-| `@exulanica/atlas-three` | the three.js r185 + Spark 2.1.0 renderer binding, ADR-0003 option A | React, and every workspace package except atlas-core |
 | `@exulanica/scene-synth` | the synthetic scene generator for the ADR-0003 bake-off | everything except atlas-core; offline only |
-| `@exulanica/bakeoff` | the ADR-0003 X-R1 harness page | everything except atlas-core and atlas-three |
 | `@exulanica/landing` | the public title, Purpose, and Capabilities surfaces; a configured link opens the real application | every renderer, and every workspace package except presentation |
 
-From `docs/architecture-overview.md` section 1.1, plus four packages that are not among the
-five shipped modules: `presentation` owns visual policy without owning a surface, `scene-synth` is a build-time tool, `bakeoff` is a harness,
-`atlas-three` is one of the two competing renderer bindings ADR-0003 exists to choose between,
-and `landing` is the signed-out surface, which deliberately takes no renderer at all so that the
-first paint does not depend on the ADR's outcome. Only `atlas-three`, `atlas-react` and `bakeoff`
-may name a renderer, which is what keeps the ADR's outcome to a two-package blast radius.
+From `docs/architecture-overview.md` section 1.1, plus three packages that are not among the
+five shipped modules: `presentation` owns visual policy without owning a surface, `scene-synth` is
+a build-time tool, and `landing` is the signed-out surface, which deliberately takes no renderer at
+all. ADR-0003 chose PlayCanvas, and the three.js binding and bake-off harness it was measured
+against have been deleted. Only `atlas-react` (and the `companion-forms` prototype bench) may name a
+renderer, which is what keeps a renderer switch to a small blast radius.
 
 ## How the boundaries are actually enforced
 
@@ -71,6 +69,5 @@ normal URL still requires the live API. The preview endpoint exists only in Vite
 server and cannot be activated in a production build.
 
 `pnpm synth --out ./fixtures` writes the bake-off ladder (250k, 1M, 2M, 3M, 4M)
-in about ten seconds. `pnpm bakeoff` then serves the harness; see
-`packages/bakeoff/README.md` for the URL parameters and the measured results. See `packages/scene-synth/README.md`. Fixtures are
+in about ten seconds. See `packages/scene-synth/README.md`. Fixtures are
 gitignored; regenerate rather than commit them.

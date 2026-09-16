@@ -10,7 +10,7 @@
   // is checked by nothing. That is a known hole and this is where it is written down: the
   // fixture's scene group was missing `rung` and `rung_capture_count` for as long as those
   // fields existed, and no build ever said so. Adding `test/**/*.ts` here is the obvious fix and
-  // is what atlas-core, atlas-react, atlas-three, formation, landing, scene-synth and app all
+  // is what atlas-core, atlas-react, formation, landing, scene-synth and app all
   // do, but it also puts the test files into every downstream build, since this project is
   // composite and is referenced by the root solution and by packages/app. That call is a
   // workspace-wide one about where tests sit in the build graph, and it is not this package's to

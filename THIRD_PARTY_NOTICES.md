@@ -254,14 +254,11 @@ Read on **2026-08-28** from `web/package.json`, the `web/packages/*/package.json
 | Package | Version | License | Required attribution | Where |
 | --- | --- | --- | --- | --- |
 | `playcanvas` | 2.21.4 | MIT | Copyright (c) 2011-2026 PlayCanvas Ltd. | `@exulanica/atlas-react`, the selected renderer per [docs/adr/0003-renderer-selection.md](docs/adr/0003-renderer-selection.md) |
-| `three` | 0.185.1 | MIT | Copyright © 2010-2026 three.js authors | `@exulanica/atlas-three` and `@exulanica/bakeoff` |
-| `@sparkjsdev/spark` | 2.1.0 | MIT | Copyright © 2025 World Labs Technologies, Inc. | `@exulanica/atlas-three` |
 
-**Honest note on the three.js rows.** The renderer decision is PlayCanvas. The three.js plus Spark
-binding is **retained in the repository as the measured alternative and as insurance, and is not
-built or shipped** (ADR-0003, Consequences). It is listed here because it is a declared dependency
-of a package in this repository and a reader auditing the manifests will find it, not because it
-reaches a browser today.
+**three.js and Spark are gone.** The three.js plus Spark binding (`@exulanica/atlas-three`) and the
+ADR-0003 harness (`@exulanica/bakeoff`) were deleted on 2026-09-16. They were the only packages that
+declared `three`, `@sparkjsdev/spark` or `@types/three`, and none of the three is declared or
+resolved anywhere in the workspace now.
 
 ### 5.2 Build and development tooling
 
@@ -271,30 +268,32 @@ an Apache-2.0 entry (`typescript`) carries its own attribution requirement.
 | Package | Version | License | Required attribution |
 | --- | --- | --- | --- |
 | `typescript` | 5.9.3 | Apache-2.0 | Copyright (c) Microsoft Corporation. The package ships its own `ThirdPartyNoticeText.txt`, whose contents are not reproduced here |
-| `vite` | 6.4.3 and 8.2.2 (two majors resolved across the workspace) | MIT | Copyright (c) 2019 to present, VoidZero Inc. and Vite contributors |
+| `vite` | 6.4.3 | MIT | Copyright (c) 2019 to present, VoidZero Inc. and Vite contributors |
 | `vitest` | 2.1.9 | MIT | Copyright (c) 2021 to present Vitest Team. Copyright (c) 2021 Anthony Fu |
 | `tsx` | 4.23.12 | MIT | Copyright (c) Hiroki Osame |
 | `dependency-cruiser` | 16.10.4 | MIT | Copyright (c) 2016-2025 Sander Verweij |
 | `@types/node` | 22.20.1 | MIT | Copyright (c) Microsoft Corporation, DefinitelyTyped contributors |
-| `@types/three` | 0.185.4 | MIT | Copyright (c) Microsoft Corporation, DefinitelyTyped contributors |
 
 ### 5.3 Enumeration limit, stated plainly
 
-`web/pnpm-lock.yaml` resolves **246** package versions. The tables above cover the **direct**
+`web/pnpm-lock.yaml` resolves **228** package versions (recounted on 2026-09-16 from the lockfile's
+`packages:` section). The tables above cover the **direct**
 dependencies declared in the workspace manifests. The remaining entries are the transitive build
 toolchain (bundler internals, compiler plugins, test runner internals and their platform specific
 binaries) and have **not** been enumerated or license checked one by one.
 
 That is a real gap, and it is smaller than it looks for one reason: none of the unenumerated packages
-is shipped to the browser. The browser bundle is produced from the three packages in section 5.1 plus
+is shipped to the browser. The browser bundle is produced from the one package in section 5.1 plus
 this repository's own TypeScript. It is still a gap, and closing it is a scripted pass rather than a
 judgement call. Item **T-7** in section 9.
 
 ### 5.4 Workspace packages
 
-`@exulanica/atlas-core`, `@exulanica/atlas-react`, `@exulanica/atlas-three`, `@exulanica/bakeoff`,
-`@exulanica/companion-runtime`, `@exulanica/graph-client`, `@exulanica/landing`, `@exulanica/scene-synth`
-and `@exulanica/world-index` are private packages in this repository. They are covered by Exulanica's
+`@exulanica/app`, `@exulanica/atlas-core`, `@exulanica/atlas-react`, `@exulanica/companion-forms`,
+`@exulanica/companion-runtime`, `@exulanica/formation`, `@exulanica/graph-client`,
+`@exulanica/landing`, `@exulanica/loom-gate`, `@exulanica/loom-tess`, `@exulanica/loom-texture`,
+`@exulanica/presentation`, `@exulanica/scene-synth` and `@exulanica/world-index` are private packages
+in this repository. They are covered by Exulanica's
 own Apache-2.0 license and require no separate notice.
 
 ---

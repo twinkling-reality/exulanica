@@ -9,9 +9,6 @@
  * ADR-0003, resolved on 2026-08-28 in favour of PlayCanvas Engine 2.21.4 by matched-resolution
  * measurement. Everything engine-specific belongs in this package, because the module contract is
  * what turns a renderer switch from a front-end rewrite into a two-package rewrite.
- *
- * The three.js binding in `@exulanica/atlas-three` is deliberately retained rather than deleted:
- * the ADR records that keeping a second implementation is what proves the boundary holds.
  */
 
 export const ATLAS_REACT_PACKAGE = '@exulanica/atlas-react';
