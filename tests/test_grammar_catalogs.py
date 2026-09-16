@@ -31,6 +31,7 @@ import pytest
 from exulanica.grammar.catalogs import (
     LICENCE_VERDICTS,
     CatalogSchema,
+    ReferenceField,
     catalog_digest,
     load_catalog,
     text_field,
@@ -41,7 +42,12 @@ from exulanica.grammar.grammars.city.catalogs import (
     city_catalog_schemas,
     load_city_catalogs,
 )
-from exulanica.grammar.textures import MANIFEST_PROFILE, TextureSet, read_texture_manifest
+from exulanica.grammar.textures import (
+    MANIFEST_PROFILE,
+    TEXTURE_SET_ID,
+    TextureSet,
+    read_texture_manifest,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENT = ROOT / "docs" / "grammar-package.md"
@@ -439,10 +445,16 @@ def test_a_missing_manifest_is_refused_rather_than_read_as_empty(tmp_path):
 
 @pytest.mark.parametrize("set_id", ["Test-texture-set", "1set", "test_set", "test set", "", "-x"])
 def test_a_texture_set_id_outside_the_contract_is_refused(tmp_path, set_id):
+    """Refused as malformed, not merely as unpublished, even when the malformed name resolves."""
     entry = {**_MATERIAL_ENTRY, "texture_set_id": set_id}
     path = _write(tmp_path, "material", [entry])
-    with pytest.raises(CatalogError):
+    with pytest.raises(CatalogError) as refused:
         load_catalog(path, _schema("material", texture_sets=_TEST_SETS))
+    assert not isinstance(refused.value, UnresolvedReferenceError), refused.value
+    field = ReferenceField("a texture set", TEXTURE_SET_ID, {set_id: {"set_id": set_id}})
+    with pytest.raises(CatalogError) as malformed:
+        field("texture_set_id", set_id)
+    assert not isinstance(malformed.value, UnresolvedReferenceError), malformed.value
 
 
 def test_a_rebaked_texture_set_moves_the_catalog_digest_with_the_file_unchanged(tmp_path):
