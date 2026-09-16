@@ -21,7 +21,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = join(here, '..', '..', '..', '..');
 const reconciliation = JSON.parse(
-  readFileSync(join(repository, 'docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json'), 'utf8'),
+  readFileSync(join(repository, 'docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json'), 'utf8'),
 ) as {
   record: {
     keySet: string;
@@ -83,7 +83,7 @@ function passing(): Record<MechanicalKey, Record<string, number>> {
 }
 
 describe('the key set is the reconciled one', () => {
-  it('matches the retained reconciliation record exactly', () => {
+  it('matches the latest retained reconciliation record exactly', () => {
     const record = reconciliation.record;
     expect(record.keySet).toBe(GATE_KEY_SET_VERSION);
     expect(record.canonicalKeys.map((entry) => entry.key)).toEqual([...CANONICAL_KEYS]);

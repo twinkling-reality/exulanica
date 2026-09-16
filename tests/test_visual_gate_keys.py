@@ -1,9 +1,13 @@
-"""The nine canonical visual gate keys, the drift table, and the reconciliation record.
+"""The nine canonical visual gate keys, the drift table, and the reconciliation records.
 
 The three retained rejection records are local-only evidence: they are listed in the checkout's
 exclude file and exist only where they were produced. Every assertion that reads one runs when the
 file is present and skips, naming the file, when it is not, so a checkout without them says what
 it could not check instead of passing it silently.
+
+Two reconciliation records are retained. Version 1 fixed the keys and the first rubric; version 2
+superseded it before anything was scored, changing only the judged key. The latest is checked
+against this module, and version 1 against the wording :data:`RUBRIC_V1` keeps for it.
 """
 
 from __future__ import annotations
@@ -16,19 +20,30 @@ import pytest
 from exulanica.canonical import canonical_json
 from exulanica.evaluation import gate_keys
 from exulanica.evaluation.gate_keys import (
+    ANSWER_OPTIONS,
     CANONICAL_KEYS,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
+    GATE_KEY_SET_VERSION,
+    JUDGED_KEY,
     MELBOURNE_ENVELOPE,
+    NOT_ASKED,
+    PICTURE_TITLES,
     RETAINED_RECORDS,
-    RUBRIC_QUESTIONS,
+    RUBRIC_GUIDANCE,
+    RUBRIC_PATH,
+    RUBRIC_QUESTION,
+    RUBRIC_V1,
+    RUBRIC_VERSION,
     THRESHOLDS,
     UnknownGateKey,
     resolve,
 )
 
 _ROOT = Path(__file__).resolve().parents[1]
-_RECONCILIATION = _ROOT / "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json"
+_SUPERSEDED = "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json"
+_LATEST = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
+_RECONCILIATIONS = (_SUPERSEDED, _LATEST)
 
 #: The drift the operator's plan proposed, restated here so the module is checked against it
 #: rather than against itself.
@@ -70,9 +85,10 @@ def _retained(path: str) -> dict:
     return json.loads(file.read_bytes())
 
 
-def _reconciliation() -> dict:
-    assert _RECONCILIATION.is_file(), "the key reconciliation record is a retained deliverable"
-    return json.loads(_RECONCILIATION.read_bytes())
+def _reconciliation(path: str = _LATEST) -> dict:
+    file = _ROOT / path
+    assert file.is_file(), f"{path} is a retained deliverable"
+    return json.loads(file.read_bytes())
 
 
 def test_the_canonical_set_has_exactly_nine_members_in_one_spelling_each():
@@ -162,13 +178,17 @@ def test_the_retained_key_counts_are_six_seven_and_nine():
     }
 
 
-def test_the_reconciliation_record_reproduces_its_digest_and_binds_the_three_rejections():
-    document = _reconciliation()
+@pytest.mark.parametrize("path", _RECONCILIATIONS)
+def test_each_reconciliation_record_reproduces_its_digest_and_binds_the_three_rejections(path):
+    document = _reconciliation(path)
     record = document["record"]
     assert document["profile"] == "exulanica.digest-bound-record/v1"
     assert document["record_sha256"] == hashlib.sha256(canonical_json(record)).hexdigest()
     bindings = {item["path"]: item["record_sha256"] for item in record["predecessor_records"]}
-    assert bindings == {record.path: record.record_sha256 for record in RETAINED_RECORDS}
+    expected = {record.path: record.record_sha256 for record in RETAINED_RECORDS}
+    if path == _LATEST:
+        expected[_SUPERSEDED] = _reconciliation(_SUPERSEDED)["record_sha256"]
+    assert bindings == expected
     assert record["mappingChecks"] == {
         "retainedSpellings": 17,
         "retainedSpellingsResolved": 17,
@@ -178,9 +198,10 @@ def test_the_reconciliation_record_reproduces_its_digest_and_binds_the_three_rej
     }
 
 
-def test_the_reconciliation_record_states_the_module_it_was_written_from():
+def test_the_latest_reconciliation_record_states_the_module_it_was_written_from():
     """A later edit to the definitions has to come with a new record, not drift past this one."""
     record = _reconciliation()["record"]
+    assert record["keySet"] == GATE_KEY_SET_VERSION
     assert [entry["key"] for entry in record["canonicalKeys"]] == list(CANONICAL_SPELLINGS)
     for entry, item in zip(record["canonicalKeys"], CANONICAL_KEYS, strict=True):
         assert entry["definition"] == item.definition
@@ -190,22 +211,74 @@ def test_the_reconciliation_record_states_the_module_it_was_written_from():
             assert entry["measurement"] == item.measurement
             assert entry["decidedBy"] == list(item.decided_by)
         else:
-            assert entry["rubric"] == "docs/visual-gate-rubric.md"
+            assert entry["rubric"] == RUBRIC_PATH
     assert record["thresholds"] == dict(THRESHOLDS)
     assert record["melbourneEnvelope"] == dict(MELBOURNE_ENVELOPE)
-    assert record["judgedKey"]["captures"] == list(CAPTURE_LABELS)
-    assert [(q["id"], q["text"]) for q in record["judgedKey"]["questions"]] == list(
-        RUBRIC_QUESTIONS
-    )
+    judged = record["judgedKey"]
+    assert judged["captures"] == list(CAPTURE_LABELS)
+    assert judged["rubricVersion"] == RUBRIC_VERSION
+    assert judged["question"] == RUBRIC_QUESTION
+    assert judged["guidance"] == RUBRIC_GUIDANCE
+    assert judged["options"] == list(ANSWER_OPTIONS)
+    assert judged["notAsked"] == NOT_ASKED
+    assert {item["label"]: item["title"] for item in judged["pictures"]} == dict(PICTURE_TITLES)
+    assert "questions" not in judged
 
 
+def test_the_latest_reconciliation_fixes_the_rubric_on_disk_and_retains_a_copy():
+    record = _reconciliation()["record"]
+    rubric = (_ROOT / RUBRIC_PATH).read_bytes()
+    digest = hashlib.sha256(rubric).hexdigest()
+    assert record["judgedKey"]["rubricSha256"] == digest
+    copy = record["judgedKey"]["rubricCopy"]
+    bound = next(item for item in record["artifacts"] if item["path"] == copy)
+    assert bound == {"path": copy, "byte_size": len(rubric), "sha256": digest}
+    assert (_ROOT / copy).read_bytes() == rubric
+    judge = record["judgedKey"]["judge"]
+    assert f"Named human judge: {judge}\n".encode() in rubric
+
+
+def test_the_revision_came_before_anything_was_scored_and_changed_only_the_judged_key():
+    record = _reconciliation()["record"]
+    assert record["scoredBeforeRevision"]["corridors"] == []
+    assert record["scoredBeforeRevision"]["againstVersion1"] == []
+    supersedes = record["supersedes"]
+    assert supersedes["path"] == _SUPERSEDED
+    assert supersedes["record_sha256"] == _reconciliation(_SUPERSEDED)["record_sha256"]
+    assert supersedes["changedKeys"] == [JUDGED_KEY]
+    assert supersedes["unchangedKeys"] == [
+        spelling for spelling in CANONICAL_SPELLINGS if spelling != JUDGED_KEY
+    ]
+    assert supersedes["keySet"] == RUBRIC_V1.key_set != GATE_KEY_SET_VERSION
+    assert record["mapping"] == _reconciliation(_SUPERSEDED)["record"]["mapping"]
+
+
+def test_the_superseded_record_still_states_version_1():
+    """Version 1 is retained as written. Only the judged key's wording differs from the module."""
+    record = _reconciliation(_SUPERSEDED)["record"]
+    assert record["keySet"] == RUBRIC_V1.key_set
+    judged = record["judgedKey"]
+    assert [(q["id"], q["text"]) for q in judged["questions"]] == list(RUBRIC_V1.questions)
+    assert judged["composition"] == RUBRIC_V1.composition
+    for entry, item in zip(record["canonicalKeys"], CANONICAL_KEYS, strict=True):
+        assert entry["key"] == item.spelling
+        if item.spelling == JUDGED_KEY:
+            assert entry["definition"] == RUBRIC_V1.judged_definition != item.definition
+        else:
+            assert entry["definition"] == item.definition
+            assert entry["decidedBy"] == list(item.decided_by)
+    assert record["thresholds"] == dict(THRESHOLDS)
+    assert record["melbourneEnvelope"] == dict(MELBOURNE_ENVELOPE)
+
+
+@pytest.mark.parametrize("path", _RECONCILIATIONS)
 @pytest.mark.parametrize("retained", RETAINED_RECORDS, ids=lambda record: record.label)
-def test_the_reconciliation_declares_each_records_actual_spellings(retained):
+def test_each_reconciliation_declares_each_records_actual_spellings(retained, path):
     document = _retained(retained.path)
     actual = set(document["record"]["hardPass"])
     entry = next(
         item
-        for item in _reconciliation()["record"]["retainedRecords"]
+        for item in _reconciliation(path)["record"]["retainedRecords"]
         if item["label"] == retained.label
     )
     assert entry["record_sha256"] == retained.record_sha256
@@ -227,8 +300,9 @@ def _booleans(node) -> list:
     return []
 
 
-def test_absence_is_recorded_as_absence_and_never_as_a_boolean():
-    entries = {item["label"]: item for item in _reconciliation()["record"]["retainedRecords"]}
+@pytest.mark.parametrize("path", _RECONCILIATIONS)
+def test_absence_is_recorded_as_absence_and_never_as_a_boolean(path):
+    entries = {item["label"]: item for item in _reconciliation(path)["record"]["retainedRecords"]}
     expected_absent = {
         "helsinki-visual-feasibility": {
             "completeCapsuleClearanceVerification",
@@ -252,8 +326,9 @@ def test_absence_is_recorded_as_absence_and_never_as_a_boolean():
             assert "retainedValue" not in keys[name]
 
 
-def test_the_shell_key_is_anchored_to_melbournes_preview_condition():
-    anchor = _reconciliation()["record"]["authenticatedShellUnderMelbourne"]
+@pytest.mark.parametrize("path", _RECONCILIATIONS)
+def test_the_shell_key_is_anchored_to_melbournes_preview_condition(path):
+    anchor = _reconciliation(path)["record"]["authenticatedShellUnderMelbourne"]
     assert anchor["retainedValue"] is True
     assert [item["status"] for item in anchor["previewApi404s"]] == [404, 404, 404]
     assert all("/preview-api/" in item["url"] for item in anchor["previewApi404s"])

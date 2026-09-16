@@ -18,6 +18,11 @@ reconciliation record and no canonical value is asserted for any predecessor run
 threshold can enter a digest input as it stands. ``exulanica.canonical`` refuses floats there, and
 a record that restated a threshold as a float would not be writable at all.
 
+**Version 2 changed the judged key and nothing else.** The rubric now asks one plain question of
+each picture and stops at the first no, where version 1 asked three questions of each. The eight
+mechanical keys, the spellings and the thresholds are version 1's, and :data:`RUBRIC_V1` keeps
+version 1's wording so the retained version 1 record can still be checked against what it said.
+
 Pure: this module imports nothing from the product, performs no I/O and holds no clock.
 """
 
@@ -29,6 +34,7 @@ from types import MappingProxyType
 from typing import Final, Literal
 
 __all__ = [
+    "ANSWER_OPTIONS",
     "AUTHENTICATION_CONDITIONS",
     "CANONICAL_KEYS",
     "CANONICAL_SPELLINGS",
@@ -38,13 +44,21 @@ __all__ = [
     "GATE_KEY_SET_VERSION",
     "JUDGED_KEY",
     "MELBOURNE_ENVELOPE",
+    "NOT_ASKED",
+    "PICTURE_TITLES",
     "RETAINED_RECORDS",
+    "RUBRIC_GUIDANCE",
     "RUBRIC_PATH",
-    "RUBRIC_QUESTIONS",
+    "RUBRIC_QUESTION",
+    "RUBRIC_V1",
+    "RUBRIC_VERSION",
     "THRESHOLDS",
+    "WORDS_STORAGE",
     "GateKey",
     "RetainedRecord",
+    "SupersededRubric",
     "UnknownGateKey",
+    "judge_prompt",
     "key",
     "resolve",
 ]
@@ -52,7 +66,7 @@ __all__ = [
 EvidenceKind = Literal["mechanical", "judged"]
 
 #: Bumped only by a new reconciliation record. The corridor is scored against this version.
-GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v1"
+GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v2"
 
 EVIDENCE_KINDS: Final[tuple[EvidenceKind, ...]] = ("mechanical", "judged")
 
@@ -61,19 +75,89 @@ CAPTURE_LABELS: Final[tuple[str, ...]] = ("start", "midpoint", "endpoint")
 
 RUBRIC_PATH: Final = "docs/visual-gate-rubric.md"
 
-#: The rubric's three questions, as the operator fixed them. Ids are what a judged record carries.
-RUBRIC_QUESTIONS: Final[tuple[tuple[str, str], ...]] = (
-    (
-        "premises",
-        "Can the viewer name a plausible use for at least three ground-floor premises?",
+#: The rubric's own version line reads ``Rubric version: 2``.
+RUBRIC_VERSION: Final = 2
+
+#: How each capture is labelled when it is shown to the judge, alone, in route order.
+PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        label: f"Picture {index} of {len(CAPTURE_LABELS)}"
+        for index, label in enumerate(CAPTURE_LABELS, start=1)
+    }
+)
+
+#: The one question, asked of each picture in these words and never paraphrased.
+RUBRIC_QUESTION: Final = (
+    "Does this look like a real street where people live, shop and work? "
+    "Yes or no, and say why in your own words."
+)
+
+#: Shown directly under the question. Guidance for what a yes means, not three more questions.
+RUBRIC_GUIDANCE: Final = (
+    "A yes means: you could name what at least three ground-floor shops or entrances are; the "
+    "buildings form an unbroken street edge with no cut or hole; you can see things near (about "
+    "30 m), middle (about 100 m) and far (about 300 m)."
+)
+
+#: The only options the judge is offered, in this order, neither marked or preselected.
+ANSWER_OPTIONS: Final[tuple[str, ...]] = ("Yes", "No")
+
+#: What a record says of each picture after the first no. Those pictures are never asked.
+NOT_ASKED: Final = "not asked after a decisive no"
+
+#: Where the judge's words are kept, as every rubric version states it. The words never enter the
+#: repository; a public record carries their SHA-256 and byte count in their place.
+WORDS_STORAGE: Final = (
+    "The judge's own words are kept exactly as typed in a private companion record under "
+    ".exulanica/judge-words/, which never enters the repository. The public record binds that "
+    "companion by SHA-256 and carries, for each reply, the SHA-256 and byte count of its words in "
+    "their place."
+)
+
+
+def judge_prompt(label: str) -> str:
+    """Exactly what the judge reads for one capture: its label, the question and the guidance."""
+    if label not in PICTURE_TITLES:
+        raise ValueError(f"{label!r} is not a route capture; expected one of {CAPTURE_LABELS}")
+    return f"{PICTURE_TITLES[label]}\n\n{RUBRIC_QUESTION}\n\n{RUBRIC_GUIDANCE}"
+
+
+@dataclass(frozen=True, slots=True)
+class SupersededRubric:
+    """A rubric version no record may be scored against any longer, as its record stated it."""
+
+    key_set: str
+    questions: tuple[tuple[str, str], ...]
+    judged_definition: str
+    composition: str
+
+
+#: Version 1, superseded before any corridor was scored. Its record is retained, not rewritten.
+RUBRIC_V1: Final = SupersededRubric(
+    key_set="exulanica.visual-gate-keys/v1",
+    questions=(
+        (
+            "premises",
+            "Can the viewer name a plausible use for at least three ground-floor premises?",
+        ),
+        (
+            "frontage",
+            "Is the frontage continuous, with no gap that reads as a cut?",
+        ),
+        (
+            "depth",
+            "Is there a legible depth cue at roughly 30 m, 100 m and 300 m?",
+        ),
     ),
-    (
-        "frontage",
-        "Is the frontage continuous, with no gap that reads as a cut?",
+    judged_definition=(
+        "True only when the human judge named in docs/visual-gate-rubric.md answers yes to all "
+        "three rubric questions for each of the start, midpoint and endpoint captures, nine "
+        "yes answers of nine, and never when an answer is missing or was given by a model."
     ),
-    (
-        "depth",
-        "Is there a legible depth cue at roughly 30 m, 100 m and 300 m?",
+    composition=(
+        "Each of the three questions is answered yes or no for each of the three captures. The "
+        "key is true only for nine yes answers of nine. The score is the number of yes answers, "
+        "and a corridor fails unless its score is strictly greater than the Flatiron baseline's."
     ),
 )
 
@@ -202,9 +286,12 @@ CANONICAL_KEYS: Final[tuple[GateKey, ...]] = (
     GateKey(
         spelling=JUDGED_KEY,
         definition=(
-            "True only when the human judge named in docs/visual-gate-rubric.md answers yes to all "
-            "three rubric questions for each of the start, midpoint and endpoint captures, nine "
-            "yes answers of nine, and never when an answer is missing or was given by a model."
+            "True only when the human judge named in docs/visual-gate-rubric.md, shown the start, "
+            "midpoint and endpoint captures one at a time and in that order, answers yes to the "
+            "rubric's one question for all three, each answer with the judge's own words; the "
+            "first no makes it false and the pictures after it are not asked, and it is never "
+            "true while a picture is unasked or when an answer was given, suggested or pre-filled "
+            "by a model."
         ),
         evidence_kind="judged",
         measurement=None,
