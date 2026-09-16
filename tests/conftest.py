@@ -529,6 +529,103 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.postgres)
 
 
+# ---------------------------------------------------------------------------------------
+# A private server per test process.
+#
+# EXULANICA_TEST_POSTGRES=private gives every process that runs tests, each pytest-xdist
+# worker or a plain serial run, a PostgreSQL server of its own, started before collection and
+# deleted at exit. Schema isolation is not enough for two processes at once: migration 0041's
+# asset-read barrier is a database-wide advisory lock, and runtime roles are cluster-wide. The
+# measurements are in scripts/test_postgres.py.
+#
+# The URL is exported as EXULANICA_TEST_DATABASE_URL, so the harness, the fixtures and any
+# subprocess a test starts all read the one variable they always read. A child pytest that
+# loads this file sees _PRIVATE_OWNER and uses its parent's server instead of starting one.
+# ---------------------------------------------------------------------------------------
+
+_PRIVATE_OWNER = "EXULANICA_TEST_POSTGRES_OWNER"
+_private_server = None
+
+
+def _distributing(config) -> bool:
+    """True in the pytest-xdist controller, which schedules tests and runs none itself."""
+    return bool(getattr(config.option, "numprocesses", None)) and (
+        getattr(config.option, "dist", "no") != "no"
+    )
+
+
+def _test_postgres_helper():
+    import importlib.util
+    import sys
+
+    name = "exulanica_test_postgres"
+    if name in sys.modules:
+        return sys.modules[name]
+    path = Path(__file__).resolve().parents[1] / "scripts" / "test_postgres.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    # Registered before it runs: its dataclass looks its own module up while being defined.
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def pytest_configure(config):
+    import os
+
+    from exulanica.env import env_get, env_name
+
+    global _private_server
+    mode = env_get("TEST_POSTGRES")
+    worker = getattr(config, "workerinput", None)
+    explicit = env_get("TEST_DATABASE_URL")
+    if mode is None:
+        if explicit and (worker is not None or _distributing(config)):
+            raise pytest.UsageError(
+                f"{env_name('TEST_DATABASE_URL')} names one database, and parallel workers "
+                "sharing one database collide on its advisory locks and on cluster-wide roles. "
+                f"Unset it and set {env_name('TEST_POSTGRES')}=private for a parallel run."
+            )
+        return
+    if mode != "private":
+        raise pytest.UsageError(f"{env_name('TEST_POSTGRES')} accepts only 'private'")
+    if os.environ.get(_PRIVATE_OWNER):
+        if not explicit:
+            raise pytest.UsageError(f"{_PRIVATE_OWNER} is set without a database URL")
+        return
+    if explicit:
+        raise pytest.UsageError(
+            f"set {env_name('TEST_DATABASE_URL')} or {env_name('TEST_POSTGRES')}=private, not both"
+        )
+    if worker is None and _distributing(config):
+        return
+    label = worker["workerid"] if worker is not None else "serial"
+    helper = _test_postgres_helper()
+    try:
+        server, url = helper.start_test_server(label)
+    except Exception as error:
+        raise pytest.UsageError(f"could not start a private PostgreSQL server: {error}") from error
+    _private_server = (helper, server)
+    os.environ[env_name("TEST_DATABASE_URL")] = url
+    os.environ[_PRIVATE_OWNER] = str(os.getpid())
+
+
+def pytest_unconfigure(config):
+    import os
+
+    from exulanica.env import env_name
+
+    global _private_server
+    if _private_server is None:
+        return
+    helper, server = _private_server
+    _private_server = None
+    helper.remove_test_server(server)
+    os.environ.pop(env_name("TEST_DATABASE_URL"), None)
+    os.environ.pop(_PRIVATE_OWNER, None)
+
+
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """Say loudly, and accurately, which guarantees this run did not check.
 
@@ -545,7 +642,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
     from exulanica.env import env_get
 
-    if env_get("TEST_DATABASE_URL"):
+    # Under pytest-xdist this runs in the controller, which never holds the workers' URL.
+    if env_get("TEST_DATABASE_URL") or env_get("TEST_POSTGRES"):
         return
     skipped = [
         report
@@ -567,6 +665,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     terminalreporter.write_line(
         "Run them with:  "
         "EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test uv run pytest"
+    )
+    terminalreporter.write_line(
+        "or, each worker on a private server:  EXULANICA_TEST_POSTGRES=private uv run pytest -n 6"
     )
 
 
