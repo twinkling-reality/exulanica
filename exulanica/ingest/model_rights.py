@@ -382,6 +382,12 @@ def grant_model_right(
     refuses anything else as well. The term ends at ``valid_until`` and the right lapses earlier if
     that authority does. Recording the same grant twice returns the existing right.
     """
+    if not isinstance(identity, ModelIdentity):
+        raise TypeError("a model right names a ModelIdentity")
+    # One spelling of each identifier, the one the database writes back into the receipt.
+    capture_id = uuid.UUID(str(capture_id))
+    authorization_id = uuid.UUID(str(authorization_id))
+    granted_by = uuid.UUID(str(granted_by))
     destination = _destination(destination)
     if destination == LOCAL_PROCESS and identity.provider != LOCAL_PROVIDER:
         raise ValueError("bytes kept in this process can only reach a local checkpoint")
@@ -485,10 +491,11 @@ def withdraw_model_right(
     Withdrawing a right that is already withdrawn returns it unchanged, keeping the first
     withdrawal's actor and time.
     """
+    right_id = uuid.UUID(str(right_id))
     repository.connection.execute(
         "update personal_model_right set withdrawn_at=clock_timestamp(),withdrawn_by=%s "
         "where workspace_id=%s and right_id=%s and withdrawn_at is null",
-        (withdrawn_by, repository.workspace_id, right_id),
+        (uuid.UUID(str(withdrawn_by)), repository.workspace_id, right_id),
     )
     stored = model_right(repository, right_id)
     if stored is None:
@@ -628,11 +635,14 @@ def require_model_right(
     screening = repository.privacy_screening(screening_id)
     if screening is None or screening.capture_id != capture_id:
         raise PrivacyAdmissionError("privacy screening is missing for the exact capture")
-    identities: Sequence[ModelIdentity] = handoff.identities if handoff is not None else ()
+    # Only a real hand-over naming at least one model states anything. A look-alike object, or one
+    # built around the constructor's checks with no identities, is treated as stating nothing.
+    stated = handoff if isinstance(handoff, ModelHandoff) and handoff.identities else None
+    identities: Sequence[ModelIdentity] = stated.identities if stated is not None else ()
     resolved = [
-        _candidate(repository, capture_id, identity, handoff.destination)
+        _candidate(repository, capture_id, identity, stated.destination)
         for identity in identities
-        if handoff is not None
+        if stated is not None
     ]
 
     with _final_check(connection) as at:
@@ -650,7 +660,7 @@ def require_model_right(
                 "c": capture_id,
                 "s": screening_id,
                 "at": at,
-                "d": handoff.destination if handoff is not None else None,
+                "d": stated.destination if stated is not None else None,
                 "rights": resolved,
                 "providers": [identity.provider for identity in identities],
                 "roles": [identity.role for identity in identities],
@@ -665,7 +675,7 @@ def require_model_right(
         )
     # Unknown is required. Only an explicit exemption, evaluated here, spares a capture a right.
     required = checked["required"] is not False
-    if required and handoff is None:
+    if required and stated is None:
         raise ModelRightRefused(
             "undeclared",
             "this model does not state which model it is or where the bytes go, so no right can "
@@ -674,7 +684,7 @@ def require_model_right(
     if required:
         for identity, allowed in zip(identities, checked["allowed"], strict=True):
             if not allowed:
-                raise _refusal(repository, capture_id, identity, handoff.destination, at)
+                raise _refusal(repository, capture_id, identity, stated.destination, at)
     rights: tuple[ModelRightRow, ...] = ()
     if required:
         rights = tuple(
@@ -685,7 +695,7 @@ def require_model_right(
     return ModelRightDecision(
         capture_id=capture_id,
         screening_id=screening_id,
-        handoff=handoff,
+        handoff=stated,
         required=required,
         rights=rights,
         checked_at=at,

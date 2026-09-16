@@ -19,12 +19,14 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import json
+import types
 import uuid
 from decimal import Decimal
 from pathlib import Path
 
 import psycopg
 import pytest
+from exulanica.canonical import canonical_json, sha256_digest
 from exulanica.db.roles import provision_runtime_role
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest import derivative_queue
@@ -674,6 +676,43 @@ def test_a_capture_anybody_claimed_as_personal_stays_personal(repository, store)
         )
 
 
+def test_bytes_once_authorized_as_personal_stay_personal_after_a_re_import(personal, store):
+    """Deleting a capture and uploading the same bytes again does not launder them as benchmark."""
+    repository = personal.repository
+    repository.connection.execute(
+        "update capture set deleted_at=clock_timestamp() where capture_id=%s",
+        (personal.capture_id,),
+    )
+    repository.insert_tombstone(
+        scope="capture", capture_id=personal.capture_id, requested_by=ACCOUNT, reason="test"
+    )
+    capture_id, _, screening = _benchmark(repository, store, "f")
+    assert capture_id != personal.capture_id
+    assert repository.capture(capture_id).blob_id == repository.capture(personal.capture_id).blob_id
+    decision = "select personal_model_right_required(%s,%s,%s) as required"
+    arguments = (repository.workspace_id, capture_id, screening.screening_id)
+    assert repository.connection.execute(decision, arguments).fetchone()["required"] is True
+    with pytest.raises(ModelRightRefused) as refused:
+        require_model_right(repository, capture_id, screening.screening_id, HOSTED)
+    assert refused.value.reason == "missing"
+
+
+def test_a_look_alike_hand_over_states_nothing(personal):
+    """Only a real hand-over naming at least one model can be matched to a right."""
+    grant_all(personal, HOSTED)
+
+    class Unchecked(ModelHandoff):
+        def __post_init__(self):
+            pass
+
+    for pretender in (
+        Unchecked(identities=(), destination=HOSTED.destination),
+        types.SimpleNamespace(identities=(), destination=HOSTED.destination),
+        types.SimpleNamespace(identities=HOSTED.identities, destination=HOSTED.destination),
+    ):
+        assert refusal(personal, pretender) == "undeclared"
+
+
 def test_a_session_that_names_no_workspace_is_never_exempt(repository, store):
     """The owner connection bypasses row-level security, so only the predicate itself decides."""
     capture_id, _, screening = _benchmark(repository, store, "e")
@@ -824,6 +863,112 @@ def test_a_right_is_never_deleted_or_rewritten(personal):
             "withdrawn_by=%s where right_id=%s",
             (ACCOUNT, good.right_id),
         )
+
+
+def _bypass_triggers_and_insert(connection, row, **changes):
+    """Insert a copy of ``row`` with its receipt rebuilt, triggers off, so only CHECKs decide."""
+    values = {**row, "right_id": uuid.uuid4(), **changes}
+    record = {**row["receipt_record"]}
+    if "destination" in changes:
+        record["destination"] = changes["destination"]
+    if "purpose" in changes:
+        record["purpose"] = changes["purpose"]
+    values["receipt_record"] = record
+    values["receipt_canonical"] = canonical_json(record)
+    values["receipt_sha256"] = sha256_digest(values["receipt_canonical"])
+    columns = [key for key in values if key not in {"withdrawn_at", "withdrawn_by"}]
+    connection.execute(
+        f"insert into personal_model_right ({','.join(columns)}) "
+        f"values ({','.join(['%s'] * len(columns))})",
+        [Jsonb(values[c]) if c == "receipt_record" else values[c] for c in columns],
+    )
+
+
+def test_the_database_holds_one_spelling_of_each_destination(personal):
+    """The CHECK itself, with the triggers switched off in a transaction that never commits."""
+    connection = personal.repository.connection
+    good = grant(personal, DEPTH_DOUBLE, LOCAL_PROCESS)
+    row = connection.execute(
+        "select * from personal_model_right where right_id=%s", (good.right_id,)
+    ).fetchone()
+    accepted = (
+        "local-process",
+        "https://api.tokenfactory.nebius.com",
+        "https://models.example.org:8443",
+        "https://localhost",
+        "http://localhost:8080",
+        "https://cdn.0xbeef.example.org",
+    )
+    refused = (
+        "https://models.example.org:443",
+        "https://models.example.org:0443",
+        "https://models.example.org:0",
+        "https://models.example.org:65536",
+        "http://localhost:80",
+        "https://localhost:443",
+        "http://models.example.org",
+        "https://127.0.0.1",
+        "https://127.1",
+        "https://127.0x1",
+        "https://0x7f.0x1",
+        "https://models",
+        "https://Models.example.org",
+        "https://" + "a" * 60 + "." + ".".join(["b" * 60] * 4) + ".org",
+    )
+    for destination in accepted:
+        assert destination == LOCAL_PROCESS or egress_origin(destination) == destination
+    with connection.transaction():
+        connection.execute("alter table personal_model_right disable trigger user")
+        for index, destination in enumerate(accepted):
+            with connection.transaction():
+                _bypass_triggers_and_insert(
+                    connection, row, destination=destination, purpose=f"accepted {index}"
+                )
+        for destination in refused:
+            with (
+                pytest.raises(psycopg.errors.CheckViolation) as violated,
+                connection.transaction(),
+            ):
+                _bypass_triggers_and_insert(connection, row, destination=destination)
+            assert violated.value.diag.constraint_name == "personal_model_right_destination_check"
+        with (
+            pytest.raises(psycopg.errors.CheckViolation) as violated,
+            connection.transaction(),
+        ):
+            _bypass_triggers_and_insert(connection, row, purpose="bell\x07ringing")
+        assert violated.value.diag.constraint_name == "personal_model_right_purpose_check"
+        raise psycopg.Rollback()
+    assert len(model_rights_for_capture(personal.repository, personal.capture_id)) == 1
+    assert (
+        connection.execute(
+            "select count(*) as n from pg_trigger where tgrelid='personal_model_right'::regclass "
+            "and not tgisinternal and tgenabled='O'"
+        ).fetchone()["n"]
+        == 4
+    )
+
+
+def test_a_purpose_in_any_script_survives_the_receipt_check(personal):
+    """Python's canonical JSON and the database's must agree byte for byte on free text."""
+    purpose = 'Grand-m\u00e8re\u2019s "brick" wall \\ \u5bb6 \U0001f9f1 line\u2028sep \u00a0kept'
+    right = grant_model_right(
+        personal.repository,
+        capture_id=str(personal.capture_id).upper(),
+        authorization_id=str(personal.authorization_id).replace("-", ""),
+        identity=DEPTH_DOUBLE,
+        destination=LOCAL_PROCESS,
+        granted_by=ACCOUNT,
+        purpose=purpose,
+        valid_until=_now(personal.repository) + dt.timedelta(minutes=5),
+    )
+    row = personal.repository.connection.execute(
+        "select purpose,receipt_canonical,receipt_record from personal_model_right "
+        "where right_id=%s",
+        (right.right_id,),
+    ).fetchone()
+    assert row["purpose"] == purpose.strip()
+    assert bytes(row["receipt_canonical"]) == canonical_json(row["receipt_record"])
+    assert row["receipt_record"]["capture_id"] == str(personal.capture_id)
 
 
 def test_a_grant_is_checked_before_it_is_written(personal):

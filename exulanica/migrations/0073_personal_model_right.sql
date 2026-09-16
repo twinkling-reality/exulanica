@@ -22,15 +22,21 @@ create table personal_model_right (
   model_id text not null check(model_id ~ '^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$'),
   model_revision text check(model_revision is null or model_revision ~ '^[0-9a-f]{40}$'),
   -- 'local-process', or the exact origin the egress allowlist would have to declare. Default ports
-  -- are omitted, as exulanica.models.egress.Origin writes them, so one origin has one spelling.
+  -- are omitted, as exulanica.models.egress.Origin writes them, so one origin has one spelling, and
+  -- an address in any spelling a resolver accepts is refused, as the allowlist refuses it.
   destination text not null check(
-    destination='local-process'
-    or (destination ~ '^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[0-9]{1,5})?$'
-        and destination !~ ':443$' and destination !~ '\.[0-9]+(:[0-9]{1,5})?$')
-    or (destination ~ '^https?://localhost(:[0-9]{1,5})?$'
-        and destination !~ '^https://localhost:443$' and destination !~ '^http://localhost:80$')),
+    length(destination)<=270
+    and (destination='local-process'
+      or (destination ~ '^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+(:[1-9][0-9]{0,4})?$'
+          and destination !~ '\.([0-9]+|0x[0-9a-f]*)(:[0-9]+)?$')
+      or destination ~ '^https?://localhost(:[1-9][0-9]{0,4})?$')
+    and destination !~ '^https://[^/]*:443$' and destination !~ '^http://[^/]*:80$'
+    and coalesce(substring(destination from ':([0-9]+)$')::integer,1) between 1 and 65535),
+  -- The control characters named explicitly rather than as [[:cntrl:]], whose meaning follows the
+  -- database's character classification; Python refuses exactly this set.
   purpose text not null check(
-    purpose=btrim(purpose) and length(purpose) between 1 and 2000 and purpose !~ '[[:cntrl:]]'),
+    purpose=btrim(purpose) and length(purpose) between 1 and 2000
+    and purpose !~ '[\x01-\x1f\x7f-\x9f]'),
   granted_by uuid not null,
   granted_at timestamptz not null,
   valid_until timestamptz not null,
@@ -57,6 +63,9 @@ create table personal_model_right (
 );
 create index personal_model_right_model_idx
   on personal_model_right(workspace_id,capture_id,model_provider,model_role,model_id);
+-- Whether these bytes were ever authorized as personal is asked on every model read.
+create index capture_reconstruction_authorization_bytes_idx
+  on capture_reconstruction_authorization(workspace_id,source_sha256);
 
 alter table personal_model_right enable row level security;
 alter table personal_model_right force row level security;
@@ -180,9 +189,10 @@ returns boolean language sql stable as $fn$
 $fn$;
 
 -- Whether handing these bytes to any model needs a personal model right. Deny by default: only a
--- screening issued under a synthetic or benchmark authority, over a capture that no other kind of
--- authority has ever claimed, is exempt. A capture any account holder has authorized as personal
--- stays personal whichever receipt a caller presents.
+-- screening issued under a synthetic or benchmark authority, over bytes that no other kind of
+-- authority in this workspace has ever claimed, is exempt. Bytes any account holder has authorized
+-- as personal stay personal whichever receipt a caller presents, including under a capture that
+-- re-imported them after the first one was deleted.
 create function personal_model_right_required(p_workspace uuid,p_capture uuid,p_screening uuid)
 returns boolean language sql stable as $fn$
   select coalesce(not (
@@ -192,8 +202,10 @@ returns boolean language sql stable as $fn$
         on a.workspace_id=s.workspace_id and a.authorization_id=s.authorization_id
       where s.workspace_id=p_workspace and s.capture_id=p_capture and s.screening_id=p_screening
         and a.capture_id=p_capture and a.corpus_class in ('synthetic','benchmark'))
-    and not exists(select 1 from capture_reconstruction_authorization a
-      where a.workspace_id=p_workspace and a.capture_id=p_capture
+    and not exists(select 1 from capture c
+      join capture_reconstruction_authorization a
+        on a.workspace_id=c.workspace_id and a.source_sha256=c.blob_sha256
+      where c.workspace_id=p_workspace and c.capture_id=p_capture
         and a.corpus_class not in ('synthetic','benchmark'))), true);
 $fn$;
 

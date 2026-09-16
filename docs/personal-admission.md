@@ -32,9 +32,10 @@ current at the grant, a future grant, a deletion and any update other than one w
 lapses with the authority it was granted under.
 
 **Deny by default.** A capture needs no right only when the presented screening was issued under a
-synthetic or benchmark authority and no other kind of authority exists for that capture. A capture
-anybody has authorized as personal stays personal whichever receipt a caller presents, and a
-session whose workspace is unknown is never treated as exempt.
+synthetic or benchmark authority and no other kind of authority in the workspace covers the same
+bytes. Bytes anybody has authorized as personal stay personal whichever receipt a caller presents,
+including under a capture that re-imported them after the first was deleted, and a session whose
+workspace is unknown is never treated as exempt.
 
 **The one check.** Every model read of personal bytes goes through
 `exulanica.ingest.model_rights.require_model_right`:
@@ -94,6 +95,11 @@ test doubles that discard the image are not bound.
 - The caption embedding pass sends text derived from a photograph's observation, not its pixels,
   to the hosted embedding model.
 - Benchmark captures keep their recorded license as their model permission.
+- The observation half of the final check restates `privacy_screening_allows_observation`, whose
+  detection-only branch does not consult withdrawn people or tombstoned entities, so the check does
+  not narrow what a detection receipt already permits.
+- Rights are append-only against every row-level write, but the table owner can still `TRUNCATE`
+  the table, as for the other receipt tables; the runtime role holds no such privilege.
 
 **Existing data.** Captures screened before migration 0073 have no right, and the migration writes
 none. Their receipts keep their meaning, but no model receives their bytes until the account
