@@ -1,0 +1,880 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.visual-gate-key-reconciliation/v5",
+    "date": "2026-09-16",
+    "status": "reconciled",
+    "base": "f89f25fe4837ca84b17add51f43a23da716ade1a",
+    "branch": "lane/gate-private",
+    "keySet": "exulanica.visual-gate-keys/v5",
+    "rubricVersion": 5,
+    "supersedes": {
+      "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json",
+      "record_sha256": "707680307dc962d4bb9fa73392ac5a0a0ef97480a9a0d8de0b38f248850f35d2",
+      "keySet": "exulanica.visual-gate-keys/v4",
+      "rubricVersion": 4,
+      "rubricSha256": "ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b",
+      "changes": {
+        "typedReplyRule": {
+          "before": "A typed reply with no pick counts only when its first word is yes or no, and then as that word.",
+          "after": "A typed reply with no pick counts as no when it contains the whole word no, in any case, and does not contain the whole word yes. A typed reply never counts as yes; a yes must be picked. Any other typed reply is not an answer."
+        },
+        "composition": {
+          "before": "Each capture is shown alone, in route order, and the judge answers the one question with the option they mean and their own words. An answer that arrives without words may be followed once, with the picture shown alone again, by a request for the reason, and that reply never changes the answer. A pick that the judge's own words, given right after it, may contradict is not recorded. Words the judge wrote about a picture before its question was reworded are carried into its next ask, under a line that says so; they are part of the reason for a no, and a yes needs new words. The first no makes the key false and the pictures after it are not asked. The key is true only when all three pictures got yes. There is no score.",
+          "after": "Each capture is shown alone, in route order, and the judge answers the one question with the option they mean and their own words. A typed reply with no pick counts as no when it holds the whole word no and not the whole word yes, and never counts as yes. An answer that arrives without words may be followed once, with the picture shown alone again, by a request for the reason, and that reply never changes the answer. A pick that the judge's own words, given right after it, may contradict is not recorded. Words the judge wrote about a picture before its question was reworded are carried into its next ask, under a line that says so; they are part of the reason for a no, and a yes needs new words. The first no makes the key false and the pictures after it are not asked. The key is true only when all three pictures got a picked yes. There is no score."
+        },
+        "corridorBar": {
+          "before": "all three pictures answered yes by the named judge, plus every mechanical key, against a baseline that does not itself hold every key",
+          "after": "all three pictures answered by picking yes, by the named judge, plus every mechanical key, against a baseline that does not itself hold every key"
+        },
+        "writerRefuses": {
+          "before": [
+            "a missing or placeholder judge",
+            "a missing reason in the judge's own words, including a follow-up that gets no words",
+            "a reply that does not say when it was given",
+            "a rubric digest mismatch",
+            "a capture not bound by digest, or an answer about another capture",
+            "a yes key with any picture unasked",
+            "an answer given after a decisive no",
+            "a reply that begins with neither yes nor no",
+            "a follow-up for an answer that already gave its reason, or one not in the rubric's words",
+            "a pick that is not one of the options",
+            "carried words without the line that says they are kept, or from a rubric version that was never fixed",
+            "a yes whose only words are carried words, and a follow-up for a picture whose earlier words are carried",
+            "any answer or follow-up reply not typed by the judge",
+            "a public record that would carry any of the judge's words, or a quoted part of them"
+          ],
+          "after": [
+            "a missing or placeholder judge",
+            "a missing reason in the judge's own words, including a follow-up that gets no words",
+            "a reply that does not say when it was given",
+            "a rubric digest mismatch, except a judgement given against the version this one superseded when that version showed the judge exactly what this one shows",
+            "a capture not bound by digest, or an answer about another capture",
+            "a yes key with any picture unasked",
+            "an answer given after a decisive no",
+            "a typed reply that does not hold the whole word no, or that holds the whole word yes",
+            "a follow-up for an answer that already gave its reason, or one not in the rubric's words",
+            "a pick that is not one of the options",
+            "carried words without the line that says they are kept, or from a rubric version that was never fixed",
+            "a yes whose only words are carried words, and a follow-up for a picture whose earlier words are carried",
+            "any answer or follow-up reply not typed by the judge",
+            "a public record that would carry any of the judge's words, or a quoted part of them"
+          ]
+        },
+        "definitions": {}
+      },
+      "shownUnchanged": true,
+      "keysWithUnchangedDefinitions": [
+        "continuousTexturedStreetAndFacades",
+        "readsAsInhabitedStreet",
+        "noCutsOrFloatingGeometry",
+        "usefulEyeLevelMovement",
+        "completeCapsuleClearanceVerification",
+        "practicalBrowserBudget",
+        "companionPresent",
+        "reticlePresent",
+        "authenticatedShellAndAuthoredHandlersPreserved"
+      ],
+      "measurementsUnchanged": true,
+      "keyValuesChanged": [],
+      "unchanged": [
+        "every spelling, definition and resolution",
+        "every measurement, threshold and mechanical decision, so no key value changes",
+        "everything the judge is shown: the picture titles, the question, the guidance, the line asking for words, the two options, the carried-words line and the one follow-up",
+        "that the answer is the option the judge picks",
+        "that each picture is shown alone, the first no decides, and the key holds only for three yes answers",
+        "that there is no score",
+        "the named judge",
+        "that no model may answer, suggest, pre-fill or break a tie",
+        "that the judge's own words are kept exactly as typed in a private companion record, never in a public one, and are the reason; and that an answer without a reason is not recorded",
+        "that the rubric SHA-256 is bound",
+        "that captures are bound by path, byte size and SHA-256"
+      ],
+      "why": {
+        "typedReplyRule": "Under version 4 a typed reply counted only when its first word was yes or no, so a reply that says no without opening with it could not be read. Version 5 reads a typed reply as no when it holds the whole word no and not the whole word yes, and never as yes. A typed reply can therefore only fail a key, never pass one. That is the cautious direction for a stop condition, so the rule cannot inflate a result.",
+        "corridorBar": "The bar stays absolute: three picked yes answers from the named judge, plus every mechanical key. It now says picked, because a typed reply can never be a yes."
+      },
+      "adoption": "This rule was adopted after the version 4 reply described under calibrationEvidence was given, and that reply is the rule's first application. The judge had declined further questions about these pictures, so none was asked again.",
+      "knownCost": "The whole word no inside a favourable sentence would read as a no. That can only ever fail a key, never pass one. Every ask therefore presents the two options, so that a reply typed in place of a pick stays rare.",
+      "notReRead": "The replies given under version 2, kept as calibration evidence by the version 3 reconciliation record, are not re-read. They were given under version 2, which asked a different question. One of them, typed in place of a pick, holds the whole word no and not the whole word yes, so this rule would read it as a no; the rule is not applied to them, and nothing is taken from them.",
+      "answersAcceptedFromVersion4": "A judgement given against version 4 is read under version 5, because version 4 showed the judge exactly what version 5 shows. A record written from one carries both digests and labels the judge's reasons with version 4. A judgement given against any other version is refused.",
+      "strictness": "Version 4 could read a typed reply as a yes; version 5 reads one only as a no, and the key still needs three picked yes answers, so version 5 is at least as strict as version 4."
+    },
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json",
+        "record_sha256": "707680307dc962d4bb9fa73392ac5a0a0ef97480a9a0d8de0b38f248850f35d2"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "record_sha256": "caf3c54cbd14cc7be35702b4b0abb583d3db8f821628a6e6312d02b84758087a"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "record_sha256": "6cc00994c74ddf976c1bd3899dd637fdea4f4acf9e1b4e7605ea63426dd26c85"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+        "record_sha256": "97b66da014db8457b6ef60e31ffea84eb3e3c37c821b019862bf2838f7bc8206"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
+        "byte_size": 6324,
+        "sha256": "de3d017c3c9c641524318057b828367050962461cc46469b347ad8766d8901c7"
+      },
+      {
+        "path": "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
+        "byte_size": 7002,
+        "sha256": "d4a8ee7d1e41f38cea0c7a985867307006fdba41635d2e5cd38e928ec1f883f4"
+      },
+      {
+        "path": "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
+        "byte_size": 7821,
+        "sha256": "3929a90e55a95956e45e0213f2300a9c97f4043498caad96447bb0dacdecc272"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5/visual-gate-rubric.md",
+        "byte_size": 13705,
+        "sha256": "8ae8a34a65c5102bbaa1a35e4661c75661b720e0b05f916f475fdd8761f38e84"
+      }
+    ],
+    "captures": [
+      {
+        "label": "start",
+        "path": "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v3/calibration-capture-01-route-start.png",
+        "byte_size": 444447,
+        "sha256": "76ed5e64314833c8d264055f287250c540b209ff9b0ccf405e260cc30fb74371"
+      }
+    ],
+    "canonicalKeys": [
+      {
+        "key": "continuousTexturedStreetAndFacades",
+        "definition": "True only when at least one walking-surface or facade triangle is drawn, every drawn walking-surface and facade triangle is textured, and the drawn walking surface has no gap at any route sample.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "continuousTexturedGround",
+          "continuousTexturedStreet",
+          "continuousSourceTexturedStreetAndFacades"
+        ],
+        "measurement": "textured-surface-coverage/v1",
+        "decidedBy": [
+          "streetAndFacadeTriangles",
+          "untexturedStreetAndFacadeTriangles",
+          "routeSupportGapSamples"
+        ]
+      },
+      {
+        "key": "readsAsInhabitedStreet",
+        "definition": "True only when the human judge named in docs/visual-gate-rubric.md, shown the start, midpoint and endpoint captures one at a time and in that order, answers yes to the rubric's one question for all three, each answer with the judge's own words; the first no makes it false and the pictures after it are not asked, and it is never true while a picture is unasked or when an answer was given, suggested or pre-filled by a model.",
+        "evidenceKind": "judged",
+        "predecessorSpellings": [
+          "recognizableUrbanStreet",
+          "recognizableUrbanScene",
+          "recognizableMelbourneUrbanScene"
+        ],
+        "rubric": "docs/visual-gate-rubric.md"
+      },
+      {
+        "key": "noCutsOrFloatingGeometry",
+        "definition": "True only when the drawn walking surface has no gap at any route sample, every building exterior ring edge has drawn geometry within 0.05 m of its midpoint at 1 m above the support, every drawn component reaches the walking surface through a chain of contacts, and no drawn triangle lies inside a building volume.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "noFloatingOrCutGeometry",
+          "noCutOrFloatingGeometry",
+          "noLargeCutsOrFloatingGeometry"
+        ],
+        "measurement": "drawn-geometry-integrity/v1",
+        "decidedBy": [
+          "routeSupportGapSamples",
+          "ringEdgesWithoutDrawnFacade",
+          "componentsDetachedFromSupport",
+          "trianglesInsideBuildings"
+        ]
+      },
+      {
+        "key": "usefulEyeLevelMovement",
+        "definition": "True only when key events delivered to the product's own handlers, with no position written by the harness, carried the player at least 120 m along the route heading with at most 0.34 m of lateral deviation and no recovery event, and every route sample of the live per-frame trace had drawn walking surface beneath it and stood 1.62 m, within 0.05 m, above it, where the product's navigation support and the drawn support agree within 0.05 m.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [
+          "eyeLevelMovement",
+          "verifiedEyeLevelMovement"
+        ],
+        "measurement": "product-driven-route-trace/v1",
+        "decidedBy": [
+          "walkedDisplacementMm",
+          "maxLateralDeviationMm",
+          "recoveryEvents",
+          "harnessPositionWrites",
+          "traceSamples",
+          "routeSupportGapSamples",
+          "maxEyeHeightErrorMm",
+          "maxSupportResampleDeltaMm"
+        ]
+      },
+      {
+        "key": "completeCapsuleClearanceVerification",
+        "definition": "True only when, at every route sample, a vertical capsule of radius 0.34 m and total height 1.9 m standing on the drawn walking surface keeps at least 0.34 m from every drawn triangle that rises more than 0.18 m above that surface and lies outside every building exterior ring with at least 0.34 m to its nearest edge, with no sample skipped.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "capsule-clearance/v1",
+        "decidedBy": [
+          "capsuleSamples",
+          "capsuleSamplesChecked",
+          "capsuleTriangleContactSamples",
+          "capsuleRingContactSamples"
+        ]
+      },
+      {
+        "key": "practicalBrowserBudget",
+        "definition": "True only when the environment's transferred bytes, the drawn triangles, the environment's decoded texture bytes and the run's maximum per-frame draw calls are each no greater than Melbourne's envelope of 28,247,006 bytes, 227,173 triangles, 167,772,160 bytes and 87 draw calls, and the run recorded no GPU error and no uncaught page exception or unhandled rejection; frame time, low-percentile frame rate and heap are reported beside Melbourne's and do not decide the key, because they vary between runs of one build.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "browser-envelope/v1",
+        "decidedBy": [
+          "environmentTransferredBytes",
+          "drawnTriangles",
+          "environmentDecodedTextureBytes",
+          "maxDrawCalls",
+          "gpuErrors",
+          "pageErrors"
+        ]
+      },
+      {
+        "key": "companionPresent",
+        "definition": "True only when, at each of the three captures, the product's Companion presence element is connected, ready, marked shown and laid out with a nonzero box inside the viewport, and its encounter surface is connected and open.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "live-dom-companion/v1",
+        "decidedBy": [
+          "captures",
+          "capturesWithCompanionShown"
+        ]
+      },
+      {
+        "key": "reticlePresent",
+        "definition": "True only when, at each of the three captures, the product's reticle element is connected, displayed with nonzero opacity and a nonzero box, and centred on the viewport within 1 px.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "live-dom-reticle/v1",
+        "decidedBy": [
+          "captures",
+          "capturesWithReticleCentred"
+        ]
+      },
+      {
+        "key": "authenticatedShellAndAuthoredHandlersPreserved",
+        "definition": "True only when every capture was taken in the product's own shell document with a mounted world and no credential gate, empty-world or error surface, every listener on the window, the document and the world canvas comes from the product's own modules, the product's own keyboard and pointer listeners carried every interaction the harness made, and no page or handler was substituted. A key press counts as carried when the state its product handler controls changes as that handler defines it: the Companion opens, the Companion closes, or the player moves. A click counts as carried when it lands on the world canvas, whose listeners are all the product's own, and the canvas then holds keyboard focus. As the retained Melbourne record used it, the key does not by itself assert a bearer credential, so every record states its authentication condition in a separate field.",
+        "evidenceKind": "mechanical",
+        "predecessorSpellings": [],
+        "measurement": "product-shell-and-listeners/v1",
+        "decidedBy": [
+          "captures",
+          "capturesInProductShell",
+          "foreignListeners",
+          "productWindowKeydownListeners",
+          "interactionsNotCarriedByProduct",
+          "substitutedPages"
+        ]
+      }
+    ],
+    "evidenceKinds": [
+      "mechanical",
+      "judged"
+    ],
+    "judgedKey": {
+      "key": "readsAsInhabitedStreet",
+      "rubric": "docs/visual-gate-rubric.md",
+      "rubricVersion": 5,
+      "rubricSha256": "8ae8a34a65c5102bbaa1a35e4661c75661b720e0b05f916f475fdd8761f38e84",
+      "rubricCopy": "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5/visual-gate-rubric.md",
+      "judge": "Glendon",
+      "captures": [
+        "start",
+        "midpoint",
+        "endpoint"
+      ],
+      "pictures": [
+        {
+          "label": "start",
+          "title": "Picture 1 of 3"
+        },
+        {
+          "label": "midpoint",
+          "title": "Picture 2 of 3"
+        },
+        {
+          "label": "endpoint",
+          "title": "Picture 3 of 3"
+        }
+      ],
+      "question": "Is this a finished, lived-in street? Yes or no, and say why in your own words.",
+      "guidance": "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.",
+      "requirement": "Pick Yes or No and type a few words why in the notes; the answer cannot be recorded without them.",
+      "reasonFollowUp": "You answered {answer}. In a few words, why?",
+      "carriedWordsNotice": "The question now has one meaning. Pick the answer you mean. The words you already wrote about this picture are kept; add more if you like.",
+      "options": [
+        "Yes, a finished, lived-in street",
+        "No, a plain block mock-up"
+      ],
+      "optionAnswers": {
+        "Yes, a finished, lived-in street": "yes",
+        "No, a plain block mock-up": "no"
+      },
+      "wordsStorage": "The judge's own words are kept exactly as typed in a private companion record under .exulanica/judge-words/, which never enters the repository. The public record binds that companion by SHA-256 and carries, for each reply, the SHA-256 and byte count of its words in their place.",
+      "judgeWordsDirectory": ".exulanica/judge-words",
+      "typedReplyRule": "A typed reply with no pick counts as no when it contains the whole word no, in any case, and does not contain the whole word yes. A typed reply never counts as yes; a yes must be picked. Any other typed reply is not an answer.",
+      "answersAcceptedAgainst": [
+        {
+          "rubricVersion": 5,
+          "rubricSha256": "8ae8a34a65c5102bbaa1a35e4661c75661b720e0b05f916f475fdd8761f38e84"
+        },
+        {
+          "rubricVersion": 4,
+          "rubricSha256": "ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b"
+        }
+      ],
+      "notAsked": "not asked after a decisive no",
+      "composition": "Each capture is shown alone, in route order, and the judge answers the one question with the option they mean and their own words. A typed reply with no pick counts as no when it holds the whole word no and not the whole word yes, and never counts as yes. An answer that arrives without words may be followed once, with the picture shown alone again, by a request for the reason, and that reply never changes the answer. A pick that the judge's own words, given right after it, may contradict is not recorded. Words the judge wrote about a picture before its question was reworded are carried into its next ask, under a line that says so; they are part of the reason for a no, and a yes needs new words. The first no makes the key false and the pictures after it are not asked. The key is true only when all three pictures got a picked yes. There is no score.",
+      "corridorBar": "all three pictures answered by picking yes, by the named judge, plus every mechanical key, against a baseline that does not itself hold every key",
+      "scoredBy": "the human judge named in the rubric, never a model: no model may answer, suggest, pre-fill or break a tie",
+      "writerRefuses": [
+        "a missing or placeholder judge",
+        "a missing reason in the judge's own words, including a follow-up that gets no words",
+        "a reply that does not say when it was given",
+        "a rubric digest mismatch, except a judgement given against the version this one superseded when that version showed the judge exactly what this one shows",
+        "a capture not bound by digest, or an answer about another capture",
+        "a yes key with any picture unasked",
+        "an answer given after a decisive no",
+        "a typed reply that does not hold the whole word no, or that holds the whole word yes",
+        "a follow-up for an answer that already gave its reason, or one not in the rubric's words",
+        "a pick that is not one of the options",
+        "carried words without the line that says they are kept, or from a rubric version that was never fixed",
+        "a yes whose only words are carried words, and a follow-up for a picture whose earlier words are carried",
+        "any answer or follow-up reply not typed by the judge",
+        "a public record that would carry any of the judge's words, or a quoted part of them"
+      ]
+    },
+    "calibrationEvidence": {
+      "underRubricVersion": 4,
+      "rubricSha256": "ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b",
+      "wordsKept": "The rubric digest above names version 4 as published. When these replies were given, version 4 said the judge's words would be carried verbatim in records. Before this repository was first published, the storage clause of every rubric version was changed to keep the words in a private companion record, and nothing the judge is shown changed. The words of these replies are in this record's private companion.",
+      "judge": "Glendon",
+      "askedIn": "the Claude chat: the capture was sent alone as a file with its picture title, then asked with one question tool call whose question was the carried-words line above the version 4 prompt, offering the two version 4 options; the judge picked no option and typed a reply instead",
+      "pictures": [
+        {
+          "label": "start",
+          "picture": "Picture 1 of 3",
+          "captureSha256": "76ed5e64314833c8d264055f287250c540b209ff9b0ccf405e260cc30fb74371",
+          "replies": [
+            {
+              "kind": "typed",
+              "shown": "The question now has one meaning. Pick the answer you mean. The words you already wrote about this picture are kept; add more if you like.\n\nPicture 1 of 3\n\nIs this a finished, lived-in street? Yes or no, and say why in your own words.\n\nA yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.\n\nPick Yes or No and type a few words why in the notes; the answer cannot be recorded without them.",
+              "picked": null,
+              "rubricVersion": 4,
+              "givenAt": "2026-09-16T18:31:45Z",
+              "words_sha256": "6c7a4385b37ad89f3f80dd86be4ed5419a147aca7922dbc9a0b25cf2b247061d",
+              "words_bytes": 198,
+              "words_private": true,
+              "typedBy": "Glendon",
+              "carriedIntoTheAsk": [
+                {
+                  "words_sha256": "d598e7129517538a3edb80913d00ab19363ef9e76fca31631ce8005cd8386ebe",
+                  "words_bytes": 65,
+                  "words_private": true,
+                  "typedBy": "Glendon",
+                  "rubricVersion": 3,
+                  "rubricSha256": "2a1c9c62451dc8ad18b3f870d74a021e6ed419cb6059fa6da0bd11927f9fc560",
+                  "givenAt": "2026-09-16T18:19:16Z",
+                  "givenAs": "a message sent right after picking Yes under rubric version 3"
+                }
+              ],
+              "readUnderVersion4": {
+                "answer": null,
+                "why": "a typed reply counted only when its first word was yes or no, and this one begins with neither"
+              },
+              "readUnderVersion5": {
+                "answer": "no",
+                "why": "it holds the whole word no and not the whole word yes"
+              }
+            }
+          ]
+        }
+      ],
+      "notAsked": [
+        "Picture 2 of 3",
+        "Picture 3 of 3"
+      ],
+      "summary": {
+        "answersScoredUnderVersion4": 0,
+        "typedRepliesVersion4CouldNotRead": 1
+      },
+      "firstApplication": "Version 5's typed-reply rule was adopted after this reply was given. This reply is the first the rule reads, and no other reply has been read under it.",
+      "judgeDeclinedFurtherQuestions": true,
+      "finding": "Under version 4 a typed reply counted only when its first word was yes or no. The judge typed a reply in place of a pick that begins with neither and holds the whole word no, so version 4 could not read it and the judgement stopped unscored. Version 5 reads a typed reply as no when it holds the whole word no and not the whole word yes, and never as yes.",
+      "status": "Calibration evidence, not a key value. No answer was scored and no record was written under version 4. A gate record may read this reply under version 5, because version 4 showed the judge exactly what version 5 shows; this record takes no key value from it."
+    },
+    "judgeWords": {
+      "path": ".exulanica/judge-words/2026-09-16-visual-gate-key-reconciliation-v5.json",
+      "byte_size": 1532,
+      "sha256": "64f314165ac3e9411f4306266228b833449df7fe09d3649ab262aed6b8461aa2",
+      "tracked": false,
+      "holds": "every reply the judge gave for this record, words included, with the time and rubric version each was given under; this record carries the SHA-256 and byte count of the words in their place"
+    },
+    "thresholds": {
+      "eyeHeightMm": 1620,
+      "eyeHeightToleranceMm": 50,
+      "capsuleRadiusMm": 340,
+      "capsuleHeightMm": 1900,
+      "stepHeightMm": 180,
+      "walkableSlopeDegrees": 12,
+      "supportSampleSpacingMm": 50,
+      "supportAgreementMm": 50,
+      "contactToleranceMm": 50,
+      "facadeBandMm": 250,
+      "facadeProbeHeightMm": 1000,
+      "routeLengthMm": 125000,
+      "minimumWalkedMm": 120000,
+      "maximumLateralDeviationMm": 340,
+      "frontageSearchMm": 40000
+    },
+    "melbourneEnvelope": {
+      "environmentTransferredBytes": 28247006,
+      "drawnTriangles": 227173,
+      "environmentDecodedTextureBytes": 167772160,
+      "maxDrawCalls": 87
+    },
+    "classification": {
+      "drawnGeometry": "Every triangle of every enabled, visible mesh instance the application renders in its world layer, in world coordinates, read from the live renderer.",
+      "walkingSurfaceTriangle": "A drawn triangle whose unit normal has an upward component of at least cos(12 degrees) and whose centroid lies no more than 0.18 m above the navigation support.",
+      "facadeTriangle": "A drawn triangle whose unit normal has a vertical component of at most sin(12 degrees), whose centroid lies within 0.25 m horizontally of a building exterior ring edge and between the support and that building's top.",
+      "texturedTriangle": "A drawn triangle whose mesh carries a texture coordinate channel and whose material binds at least one texture with nonzero decoded bytes.",
+      "component": "A connected set of drawn triangles, joined where vertices coincide to the millimetre.",
+      "contact": "Two components are in contact when a vertex of one lies within 0.05 m of a triangle of the other, or inside the other's closed volume, or an edge of one crosses a triangle of the other.",
+      "buildingVolume": "The prism of a building exterior ring from its support to its top, shrunk by 0.05 m on every side.",
+      "routeSample": "A point of the walked trace resampled along its length at 0.05 m spacing."
+    },
+    "authenticationConditions": [
+      "credentialed-api",
+      "vite-preview-api"
+    ],
+    "retainedRecords": [
+      {
+        "label": "helsinki-visual-feasibility",
+        "path": "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "record_sha256": "caf3c54cbd14cc7be35702b4b0abb583d3db8f821628a6e6312d02b84758087a",
+        "brief": "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 6,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousTexturedGround",
+            "retainedValue": false,
+            "briefedCriterion": "Continuous source-textured ground along the initial route."
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableUrbanStreet",
+            "retainedValue": false,
+            "briefedCriterion": "A recognizable Helsinki urban street at the pilot."
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noFloatingOrCutGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "No floating or cut geometry visible on the initial route."
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "eyeLevelMovement",
+            "retainedValue": true,
+            "briefedCriterion": "Correct eye-level first-person movement on simplified verified support."
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "practicalBrowserBudget": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Existing Companion and reticle remain present."
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Existing Companion and reticle remain present."
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block",
+            "briefedCriterion": "Existing authored-object and authentication handlers are not replaced."
+          }
+        }
+      },
+      {
+        "label": "helsinki-terminal-lod-successor",
+        "path": "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "record_sha256": "6cc00994c74ddf976c1bd3899dd637fdea4f4acf9e1b4e7605ea63426dd26c85",
+        "brief": "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 7,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousTexturedStreet",
+            "retainedValue": false,
+            "briefedCriterion": "continuous source-textured street along the initial route;"
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableUrbanScene",
+            "retainedValue": false,
+            "briefedCriterion": "a recognizable Helsinki urban scene;"
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noCutOrFloatingGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "no cut, floating or camera-occluding geometry;"
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "verifiedEyeLevelMovement",
+            "retainedValue": false,
+            "briefedCriterion": "movement only over stable terminal support with full capsule clearance;"
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block",
+            "briefedCriterion": "A vertical capsule of radius 0.34 metres and total height 1.9 metres, grounded on that support, intersects no visual triangle except the support surface."
+          },
+          "practicalBrowserBudget": {
+            "state": "absent",
+            "note": "not scored in this record's hardPass block"
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "scored",
+            "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+            "retainedValue": true,
+            "briefedCriterion": "authenticated shell and authored handlers preserved."
+          }
+        }
+      },
+      {
+        "label": "melbourne-c4-29-visual-feasibility",
+        "path": "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+        "record_sha256": "97b66da014db8457b6ef60e31ffea84eb3e3c37c821b019862bf2838f7bc8206",
+        "brief": "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
+        "verdict": "FAIL",
+        "browserEngine": "Google Chrome via Playwright 1.55.0",
+        "viewport": [
+          1440,
+          900
+        ],
+        "hardPassKeyCount": 9,
+        "keys": {
+          "continuousTexturedStreetAndFacades": {
+            "state": "scored",
+            "spelling": "continuousSourceTexturedStreetAndFacades",
+            "retainedValue": false,
+            "briefedCriterion": "continuous source-textured street and facades along the complete route;"
+          },
+          "readsAsInhabitedStreet": {
+            "state": "scored",
+            "spelling": "recognizableMelbourneUrbanScene",
+            "retainedValue": false,
+            "briefedCriterion": "a recognizable Melbourne urban scene;"
+          },
+          "noCutsOrFloatingGeometry": {
+            "state": "scored",
+            "spelling": "noLargeCutsOrFloatingGeometry",
+            "retainedValue": false,
+            "briefedCriterion": "no large cuts, floating geometry, or camera-occluding surfaces;"
+          },
+          "usefulEyeLevelMovement": {
+            "state": "scored",
+            "spelling": "usefulEyeLevelMovement",
+            "retainedValue": false,
+            "briefedCriterion": "useful eye-level movement over verified route support;"
+          },
+          "completeCapsuleClearanceVerification": {
+            "state": "scored",
+            "spelling": "completeCapsuleClearanceVerification",
+            "retainedValue": false,
+            "briefedCriterion": "a vertical capsule of radius 0.34 metres and total height 1.9 metres, grounded on that support, has full clearance from visual geometry except the support surface;"
+          },
+          "practicalBrowserBudget": {
+            "state": "scored",
+            "spelling": "practicalBrowserBudget",
+            "retainedValue": true,
+            "briefedCriterion": "practical measured browser transfer, decoded-memory, draw-call and frame budgets."
+          },
+          "companionPresent": {
+            "state": "scored",
+            "spelling": "companionPresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "reticlePresent": {
+            "state": "scored",
+            "spelling": "reticlePresent",
+            "retainedValue": true,
+            "briefedCriterion": "Companion and reticle present;"
+          },
+          "authenticatedShellAndAuthoredHandlersPreserved": {
+            "state": "scored",
+            "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+            "retainedValue": true,
+            "briefedCriterion": "authenticated shell and authored handlers preserved;"
+          }
+        }
+      }
+    ],
+    "mapping": [
+      {
+        "spelling": "continuousTexturedStreetAndFacades",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "continuousTexturedGround",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "continuousTexturedStreet",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "continuousSourceTexturedStreetAndFacades",
+        "resolvesTo": "continuousTexturedStreetAndFacades",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "readsAsInhabitedStreet",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "recognizableUrbanStreet",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "recognizableUrbanScene",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "recognizableMelbourneUrbanScene",
+        "resolvesTo": "readsAsInhabitedStreet",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noCutsOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "noFloatingOrCutGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noCutOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "noLargeCutsOrFloatingGeometry",
+        "resolvesTo": "noCutsOrFloatingGeometry",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "usefulEyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "eyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "helsinki-visual-feasibility"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "verifiedEyeLevelMovement",
+        "resolvesTo": "usefulEyeLevelMovement",
+        "usedBy": [
+          "helsinki-terminal-lod-successor"
+        ],
+        "isCanonicalSpelling": false
+      },
+      {
+        "spelling": "completeCapsuleClearanceVerification",
+        "resolvesTo": "completeCapsuleClearanceVerification",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "practicalBrowserBudget",
+        "resolvesTo": "practicalBrowserBudget",
+        "usedBy": [
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "companionPresent",
+        "resolvesTo": "companionPresent",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "helsinki-visual-feasibility",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "reticlePresent",
+        "resolvesTo": "reticlePresent",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "helsinki-visual-feasibility",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      },
+      {
+        "spelling": "authenticatedShellAndAuthoredHandlersPreserved",
+        "resolvesTo": "authenticatedShellAndAuthoredHandlersPreserved",
+        "usedBy": [
+          "helsinki-terminal-lod-successor",
+          "melbourne-c4-29-visual-feasibility"
+        ],
+        "isCanonicalSpelling": true
+      }
+    ],
+    "mappingChecks": {
+      "retainedSpellings": 17,
+      "retainedSpellingsResolved": 17,
+      "total": true,
+      "unambiguous": true,
+      "canonicalKeys": 9
+    },
+    "scoredBeforeRevision": {
+      "corridors": [],
+      "againstEarlierKeySets": [],
+      "measuredAs": "retained records under docs/evaluation whose file name or record profile names a corridor, and those whose gate block names key set version 1, 2, 3 or 4, read when this record was written"
+    },
+    "authenticatedShellUnderMelbourne": {
+      "key": "authenticatedShellAndAuthoredHandlersPreserved",
+      "retainedValue": true,
+      "authenticatedShellPresent": true,
+      "previewApi404s": [
+        {
+          "url": "http://127.0.0.1:5183/preview-api/companion/memory/recent?limit=50",
+          "status": 404
+        },
+        {
+          "url": "http://127.0.0.1:5183/preview-api/graph/sources",
+          "status": 404
+        },
+        {
+          "url": "http://127.0.0.1:5183/preview-api/personal-admission",
+          "status": 404
+        }
+      ],
+      "statement": "Melbourne set authenticatedShellAndAuthoredHandlersPreserved to true while its browser block recorded these three 404 responses from the Vite-only preview API, not from a credentialed backend. As the retained evidence used it, the key means the product shell and its authored handlers were present and were not replaced by a bespoke harness page; it does not by itself assert a real bearer token. Every canonical record therefore carries authenticationCondition: vite-preview-api is Melbourne's condition, and credentialed-api, a real token against a real API, is strictly stronger."
+    },
+    "scopeNotes": {
+      "continuousTexturedStreetAndFacades": "All three briefs required SOURCE texture, and the first two named only the ground or the street. The canonical key drops the source condition, because a generated corridor has no source texture and a key naming one could not be scored against it, and it widens the surface to street and facades. It is also mechanised: the retained values were judged from captures.",
+      "readsAsInhabitedStreet": "Renamed and redefined by the operator's binding. The retained keys asked whether a real, named city was recognisable, were scored before the rubric existed, and are not rubric scores. Rubric version 4 asks one plain question of each capture, whether it is a finished, lived-in street, with options that say what they mean, and stops at the first no.",
+      "noCutsOrFloatingGeometry": "The retained criteria were judged from captures, Melbourne's only for LARGE cuts, and the successor briefs also named camera-occluding surfaces, which the canonical set measures under completeCapsuleClearanceVerification. The canonical key is measured over all drawn geometry.",
+      "usefulEyeLevelMovement": "The first Helsinki brief asked for correct movement on simplified verified support, the successor folded full capsule clearance into this key, and Melbourne asked for useful movement over verified support while its recorder retained only a static camera segment. The canonical key requires a live numeric trace and keeps capsule clearance separate.",
+      "completeCapsuleClearanceVerification": "Scored as its own key only by Melbourne. The successor brief required the same capsule inside its movement criterion and its record carries no separate key for it, so it is absent there, as it is in the first Helsinki record, whose brief never named a capsule.",
+      "practicalBrowserBudget": "Melbourne's brief named frame budgets among the practical budgets. The canonical key reports frame time and heap beside Melbourne's but decides only on the values that do not vary between runs of one build.",
+      "companionPresent": "Presence of the product's Companion, now read from the live document.",
+      "reticlePresent": "Presence of the product's reticle, now read from the live document.",
+      "authenticatedShellAndAuthoredHandlersPreserved": "The first Helsinki brief required authored-object and authentication handlers to remain, and its record says handler preservation was verified structurally, but its hardPass block has no key for it, so it is absent there and no value is inferred. Version 3 names pointer listeners beside keyboard listeners, because the product enters its world with a click."
+    },
+    "claimsNotMade": [
+      "No canonical value is asserted for any retained run. Retained values are quoted under the spelling each record used, and the retained records are not edited.",
+      "No key absent from a retained record is inferred true or false.",
+      "No generated geometry is scored here, and none existed in this repository when the rubric was revised.",
+      "The canonical definitions do not make any retained rejection pass or fail anew.",
+      "The version 4 record is superseded, not edited. No corridor was scored, and no record was written, under versions 1, 2, 3 or 4, and no answer was scored under version 4.",
+      "The version 4 reply is calibration evidence here, and this record takes no key value from it. Its words are not in this record: it carries their SHA-256 and byte count, and its private companion holds them.",
+      "The replies given under version 2 are not re-read under version 5, because they were given under version 2.",
+      "The typed-reply rule is not presented as fixed before any answer: it was adopted after the version 4 reply was given, and that reply is its first application.",
+      "Nothing here is an answer under version 5. The rubric fixes how the judge is asked and how a typed reply is read; only the named judge answers, and no model judged any picture."
+    ]
+  },
+  "record_sha256": "c2418457d2b415333b99e3f88eeffc25c5dd21cb56154094ec017f0ba06be0fe"
+}
