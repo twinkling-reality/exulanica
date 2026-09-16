@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from conftest import photo_bytes, scratch_role_database
 from test_place_alignment_build import world as world
+from tests_support_api import EVERY_PERMISSION
 
 
 def legacy_artifact_id(key, *, workspace_id):
@@ -58,7 +59,11 @@ def test_identical_uploads_remain_isolated_and_survive_other_workspace_deletion(
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                token: {"workspace_id": str(ws), "actor": str(uuid.uuid4())}
+                token: {
+                    "workspace_id": str(ws),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                }
                 for token, ws in zip(tokens, workspaces, strict=True)
             }
         ),

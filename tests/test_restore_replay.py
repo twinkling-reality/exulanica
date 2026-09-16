@@ -36,6 +36,7 @@ from test_purge import (
 from test_purge import (
     purged as purged,
 )
+from tests_support_api import EVERY_PERMISSION
 
 
 def _purge_database(purged):
@@ -55,6 +56,7 @@ def _app(purged, marker):
                         token: {
                             "workspace_id": str(purged.workspace_id),
                             "actor": str(uuid.uuid4()),
+                            "permissions": EVERY_PERMISSION,
                         }
                     }
                 )

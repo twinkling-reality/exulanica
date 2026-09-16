@@ -6,9 +6,10 @@ is the failures they catch, and here there are three that would each produce a j
 looks fine and is not.
 
 *   **The API connecting as** ``exulanica_app``. The judge deployment's whole boundary is that its
-    API holds no privilege to write a source row or a deletion marker. The bearer token carries no
-    permissions at all, so if that connection string names the ordinary runtime role there is
-    nothing anywhere enforcing the sentence this deployment is built to make true.
+    API holds no privilege to write a source row or a deletion marker. The bearer token's grant
+    refuses the intake, admission and consent routes, but it is coarser than the table grants, so
+    if that connection string names the ordinary runtime role, nothing enforces the rest of the
+    sentence this deployment is built to make true.
 *   **A worker in the stack.** A judge stack that can queue reconstruction is a judge stack that
     can spend money and change the world under the next visitor.
 *   **The proxy losing its trailing slash.** ``proxy_pass http://api:8000`` without it turns every
@@ -42,8 +43,10 @@ def test_the_api_connects_as_the_judge_role_and_never_as_the_runtime_role():
     """The one assertion this file exists for.
 
     ``exulanica_judge`` holds SELECT everywhere, INSERT and UPDATE on the thirteen tables a judge
-    writes, and DELETE on nothing. ``exulanica_app`` may write sources. Nothing above the database
-    can tell the two apart, because a token grants no permissions.
+    writes, and DELETE on nothing. ``exulanica_app`` may write sources. The judge token's
+    permissions (``JUDGE_PERMISSIONS`` in ``exulanica/orchestration/judge_seed.py``) are per route
+    rather than per table: ``deletion.write`` reaches identity revocation, which only this role
+    refuses. So the role is still the boundary that decides it.
     """
     directives = _directives(JUDGE_COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
+from exulanica.api.permissions import Permission
 from exulanica.db import Database, provision_workspace
 from exulanica.db.reference_target import writable_reference_url
 
@@ -104,6 +105,9 @@ def main():
                     entry["token"]: {
                         "workspace_id": entry["workspace_id"],
                         "actor": config["actor"],
+                        # The local reference is the operator's own instance, so its tokens
+                        # hold every permission; the API loads no grant that names none.
+                        "permissions": [str(permission) for permission in Permission],
                     }
                     for entry in config["scenes"].values()
                 }

@@ -47,7 +47,7 @@ from exulanica.reconstruction.testing import FlatDepthModel
 from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import CountingVisionModel, photo_bytes
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 #: Long enough that nothing in a test expires by accident, short enough to be pushed into the
 #: past by hand. Every test that wants an expired lease writes one rather than waiting.
@@ -881,7 +881,8 @@ def _services(tmp_path, monkeypatch, model_client):
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
         json.dumps({"a-token-long-enough-to-be-accepted-here": {
-            "workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4())}}),
+            "workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4()),
+            "permissions": EVERY_PERMISSION}}),
     )
     return Services(
         database=Database(url="postgresql://localhost:5433/never-connected-to"),

@@ -10,10 +10,16 @@ from __future__ import annotations
 
 import urllib.parse
 
+from exulanica.api.permissions import Permission
 from exulanica.db.session import Database
 from exulanica.env import env_get
 
-__all__ = ["scratch_database"]
+__all__ = ["EVERY_PERMISSION", "scratch_database"]
+
+#: Every permission a grant can name. A fixture token holding this reaches every route, which is
+#: what every token reached before grants existed, so an assertion written before then still means
+#: what it said. A test about a narrower grant names the permissions it wants instead.
+EVERY_PERMISSION = [str(permission) for permission in Permission]
 
 
 def scratch_database(scratch: str) -> Database:

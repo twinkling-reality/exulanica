@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 
 from conftest import scratch_role_database
 from test_screening_currency import ACTOR, Case
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 TOKEN = "asset-read-generated-owner-token"
 FOREIGN = "asset-read-generated-foreign-token"
@@ -96,8 +96,16 @@ def delivery(repository, tmp_path, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(ACTOR)},
-                FOREIGN: {"workspace_id": str(uuid.uuid4()), "actor": str(ACTOR)},
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(ACTOR),
+                    "permissions": EVERY_PERMISSION,
+                },
+                FOREIGN: {
+                    "workspace_id": str(uuid.uuid4()),
+                    "actor": str(ACTOR),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

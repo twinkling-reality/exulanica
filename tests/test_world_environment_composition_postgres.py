@@ -74,7 +74,7 @@ from conftest import (
 )
 from model_fakes import FakeTransport, chat_body
 from pg_harness import open_scratch_connection
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 from world_structure_fixtures import structural_candidate
 
 pytestmark = pytest.mark.postgres
@@ -558,6 +558,7 @@ def test_authenticated_environment_routes_add_move_reload_remove_and_undo(
                 token: {
                     "workspace_id": str(composed.worlds.workspace_id),
                     "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
                 }
             }
         ),
@@ -652,10 +653,12 @@ def test_environment_proposal_is_read_only_exact_and_workspace_scoped(
                 token: {
                     "workspace_id": str(composed.worlds.workspace_id),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 },
                 stranger_token: {
                     "workspace_id": str(stranger),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 },
             }
         ),
@@ -776,6 +779,7 @@ def test_environment_proposal_refuses_missing_selection_and_stale_base_without_m
                 token: {
                     "workspace_id": str(composed.worlds.workspace_id),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 }
             }
         ),
@@ -1184,6 +1188,7 @@ def test_authenticated_place_bridge_routes_create_list_and_revoke(
                 token: {
                     "workspace_id": str(memory_place.composed.worlds.workspace_id),
                     "actor": str(memory_place.actor),
+                    "permissions": EVERY_PERMISSION,
                 }
             }
         ),

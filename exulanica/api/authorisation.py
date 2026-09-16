@@ -22,6 +22,15 @@ refresh. The schema has no user table and inventing one here would be inventing 
 decision. What it does provide is the property the rest of the system depends on: a request
 arrives already bound to exactly one workspace, and nothing downstream can widen that.
 
+**What the token may do is part of its grant.** Each grant names its permissions from the closed
+vocabulary in :mod:`exulanica.api.permissions`, and
+:func:`exulanica.api.dependencies.authorise_route` refuses a route whose declaration the grant
+does not cover. A grant with no ``permissions`` does
+not load, and neither does one naming a permission outside the vocabulary. Absence is not read as
+"everything", because that reading is the gap this closes: a token issued to upload photographs
+reached every router. A :class:`TokenDirectory` built by hand with sessions and no permissions
+holds nothing, which is deny by default rather than a fallback grant.
+
 Tokens are compared with :func:`secrets.compare_digest` against the SHA-256 of the presented
 value, so the comparison is constant time and the configured secret is never held next to a
 user-supplied string in a way that a timing difference could separate.
@@ -35,9 +44,10 @@ import os
 import secrets
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
+from exulanica.api.permissions import Permission, parse_permissions
 from exulanica.env import env_get, env_name
 from exulanica.errors import ExulanicaError
 from exulanica.selection.validation import Session
@@ -49,9 +59,9 @@ __all__ = [
     "load_token_directory",
 ]
 
-#: A JSON object mapping token to ``{"workspace_id": ..., "actor": ..., "may_include_proposals":
-#: bool}``. Injected at run time and never committed, per the deployment rule that "secrets are
-#: not committed and are not baked into images".
+#: A JSON object mapping token to ``{"workspace_id": ..., "actor": ..., "permissions": [...],
+#: "may_include_proposals": bool}``. Injected at run time and never committed, per the deployment
+#: rule that "secrets are not committed and are not baked into images".
 API_TOKENS_ENV: Final = env_name("API_TOKENS")
 
 
@@ -69,6 +79,8 @@ class TokenDirectory:
 
     #: sha256 hex of the token -> the session it grants.
     sessions: Mapping[str, Session]
+    #: sha256 hex of the token -> what that session may do. A digest absent here holds nothing.
+    permissions: Mapping[str, frozenset[Permission]] = field(default_factory=dict)
 
     def __len__(self) -> int:
         return len(self.sessions)
@@ -85,22 +97,27 @@ class TokenDirectory:
         return frozenset(session.workspace_id for session in self.sessions.values())
 
     def session_for(self, presented: str | None) -> Session:
-        """Resolve a bearer token, in constant time, or refuse.
+        """Resolve a bearer token, in constant time, or refuse."""
+        return self.grant_for(presented)[0]
+
+    def grant_for(self, presented: str | None) -> tuple[Session, frozenset[Permission]]:
+        """Resolve a bearer token to its session and its permissions, in constant time, or refuse.
 
         The loop runs over every configured token even after a match, and the comparison is
         :func:`secrets.compare_digest`, so neither the number of configured tokens nor which one
-        matched is observable from how long this took.
+        matched is observable from how long this took. The permissions are read by the digest
+        that matched, after the loop, so they add nothing to what the timing could separate.
         """
         if not presented:
             raise TokenNotAccepted("no bearer token was presented")
         digest = hashlib.sha256(presented.encode("utf-8")).hexdigest()
-        found: Session | None = None
-        for candidate, session in self.sessions.items():
+        found: str | None = None
+        for candidate in self.sessions:
             if secrets.compare_digest(candidate, digest):
-                found = session
+                found = candidate
         if found is None:
             raise TokenNotAccepted("the presented bearer token is not configured")
-        return found
+        return self.sessions[found], self.permissions.get(found, frozenset())
 
 
 def load_token_directory(environ: Mapping[str, str] | None = None) -> TokenDirectory:
@@ -115,8 +132,8 @@ def load_token_directory(environ: Mapping[str, str] | None = None) -> TokenDirec
     if not raw:
         raise TokenNotAccepted(
             f"{API_TOKENS_ENV} is not set. It is a JSON object mapping a bearer token to "
-            '{"workspace_id": "<uuid>", "actor": "<uuid>"}. There is no default, because a '
-            "default would be a credential in a repository."
+            '{"workspace_id": "<uuid>", "actor": "<uuid>", "permissions": ["<permission>", ...]}. '
+            "There is no default, because a default would be a credential in a repository."
         )
     try:
         parsed = json.loads(raw)
@@ -126,6 +143,7 @@ def load_token_directory(environ: Mapping[str, str] | None = None) -> TokenDirec
         raise TokenNotAccepted(f"{API_TOKENS_ENV} must be a non-empty JSON object")
 
     sessions: dict[str, Session] = {}
+    permissions: dict[str, frozenset[Permission]] = {}
     for token, grant in parsed.items():
         if not isinstance(grant, dict):
             raise TokenNotAccepted(f"{API_TOKENS_ENV}: the grant for a token is not an object")
@@ -144,5 +162,16 @@ def load_token_directory(environ: Mapping[str, str] | None = None) -> TokenDirec
                 "a bearer token shorter than 32 characters is refused at load time rather than "
                 "accepted and relied upon"
             )
-        sessions[hashlib.sha256(token.encode("utf-8")).hexdigest()] = session
-    return TokenDirectory(sessions=sessions)
+        try:
+            # Named by the workspace rather than by the token, which is a secret and must not
+            # reach a startup log.
+            held = parse_permissions(
+                grant.get("permissions"),
+                where=f"{API_TOKENS_ENV}: the grant for workspace {session.workspace_id}",
+            )
+        except ValueError as exc:
+            raise TokenNotAccepted(str(exc)) from exc
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        sessions[digest] = session
+        permissions[digest] = held
+    return TokenDirectory(sessions=sessions, permissions=permissions)

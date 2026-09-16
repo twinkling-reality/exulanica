@@ -19,6 +19,8 @@ from typing import Any
 import httpx
 import pytest
 
+from tests_support_api import EVERY_PERMISSION
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "world_client_example.py"
 CUBE = "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
@@ -263,7 +265,15 @@ def test_the_client_makes_an_accepted_change_through_the_real_api(
     repository.connection.commit()
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
-        json.dumps({TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(actor)}}),
+        json.dumps(
+            {
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                }
+            }
+        ),
     )
     monkeypatch.setenv("EXULANICA_TOKEN", TOKEN)
     database = scratch_database(scratch)

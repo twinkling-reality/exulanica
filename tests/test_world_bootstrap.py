@@ -29,7 +29,7 @@ from fastapi.testclient import TestClient
 
 from conftest import write_photo
 from test_world_objects_api import CUBE, TOKEN, transform
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
 
@@ -65,7 +65,11 @@ def bootstrap_api(repository, composed, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(actor)},
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

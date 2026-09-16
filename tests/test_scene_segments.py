@@ -41,6 +41,7 @@ from test_scene_reconstruction_pipeline import (
     _processor,
     _queued_scene,
 )
+from tests_support_api import EVERY_PERMISSION
 
 np = pytest.importorskip("numpy")
 
@@ -1125,8 +1126,16 @@ def _client(repository, store, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                _OWNER: {"workspace_id": str(repository.workspace_id), "actor": str(ACTOR)},
-                _STRANGER: {"workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4())},
+                _OWNER: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(ACTOR),
+                    "permissions": EVERY_PERMISSION,
+                },
+                _STRANGER: {
+                    "workspace_id": str(uuid.uuid4()),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

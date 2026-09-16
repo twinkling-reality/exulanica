@@ -14,6 +14,7 @@ from conftest import scratch_role_database
 from test_society_controls_postgres import create
 from test_society_runtime import runtime_world
 from test_world_objects_api import STRANGER_TOKEN, TOKEN, ObjectsApi
+from tests_support_api import EVERY_PERMISSION
 
 pytestmark = pytest.mark.postgres
 # Imported fixtures are deliberately registered in this module.
@@ -28,8 +29,16 @@ def control_api(runtime_world, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(w["workspace"]), "actor": str(actor)},
-                STRANGER_TOKEN: {"workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4())},
+                TOKEN: {
+                    "workspace_id": str(w["workspace"]),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
+                STRANGER_TOKEN: {
+                    "workspace_id": str(uuid.uuid4()),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

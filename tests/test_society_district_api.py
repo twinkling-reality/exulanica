@@ -17,7 +17,7 @@ from exulanica.store.base import PurgeAuthorization, privileged_purger
 from fastapi.testclient import TestClient
 
 import test_society_runtime as helpers
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 runtime_world = helpers.runtime_world
 pytestmark = pytest.mark.postgres
@@ -38,8 +38,16 @@ def district_app(runtime_world, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(w["workspace"]), "actor": str(w["session"].actor)},
-                FOREIGN: {"workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4())},
+                TOKEN: {
+                    "workspace_id": str(w["workspace"]),
+                    "actor": str(w["session"].actor),
+                    "permissions": EVERY_PERMISSION,
+                },
+                FOREIGN: {
+                    "workspace_id": str(uuid.uuid4()),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

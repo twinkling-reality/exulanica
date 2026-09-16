@@ -39,6 +39,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
 
 from conftest import CountingVisionModel, iso, write_photo, write_point_map
+from tests_support_api import EVERY_PERMISSION
 
 _TOKEN = "geometry-owner-token-that-is-long-enough"
 _STRANGER = "geometry-stranger-token-that-is-long-enough"
@@ -108,8 +109,13 @@ def delivered(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
                 _TOKEN: {
                     "workspace_id": str(repository.workspace_id),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 },
-                _STRANGER: {"workspace_id": str(uuid.uuid4()), "actor": str(uuid.uuid4())},
+                _STRANGER: {
+                    "workspace_id": str(uuid.uuid4()),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

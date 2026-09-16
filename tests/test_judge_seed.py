@@ -35,6 +35,7 @@ from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.orchestration.judge_seed import (
     GLOBAL_TABLES,
     INSTANCE_TABLES,
+    JUDGE_PERMISSIONS,
     JUDGE_ROLE,
     JUDGE_WRITE_TABLES,
     REACHED_TABLES,
@@ -536,10 +537,14 @@ def test_the_minted_token_is_one_the_api_actually_accepts(monkeypatch):
     directory = mint_judge_token(workspace_id=workspace, actor=actor, token=token)
     monkeypatch.setenv("EXULANICA_API_TOKENS", json.dumps(directory))
     loaded = load_token_directory()
-    session = loaded.session_for(token)
+    session, held = loaded.grant_for(token)
     assert session.workspace_id == workspace
     assert session.actor == actor
     assert session.may_include_proposals is False
+    # Every name the minter writes is one the loader accepts, and nothing a judge is not given.
+    names = {str(permission) for permission in held}
+    assert names == set(JUDGE_PERMISSIONS)
+    assert not {"intake.write", "admission.write", "consent.write", "operations.write"} & names
 
 
 def test_a_token_under_the_apis_own_floor_is_refused_at_mint_time():

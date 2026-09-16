@@ -14,7 +14,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
 
 from conftest import photo_bytes
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 TOKEN = "reference-admission-synthetic-test-token-0001"
 ACTOR = uuid.UUID("8dbf7c37-7f3c-4703-8bc3-722ed38e3950")
@@ -25,7 +25,15 @@ def reviewed_api(tmp_path, repository, spine_schema, monkeypatch):
     _, scratch = spine_schema
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
-        json.dumps({TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(ACTOR)}}),
+        json.dumps(
+            {
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(ACTOR),
+                    "permissions": EVERY_PERMISSION,
+                }
+            }
+        ),
     )
     database = scratch_database(scratch)
     services = Services(

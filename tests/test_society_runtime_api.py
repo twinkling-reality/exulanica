@@ -13,7 +13,7 @@ from exulanica.api.society_runtime import SocietyRuntime, SocietyRuntimeBinding
 from fastapi.testclient import TestClient
 
 import test_society_runtime as runtime_helpers
-from tests_support_api import scratch_database
+from tests_support_api import EVERY_PERMISSION, scratch_database
 
 runtime_world = runtime_helpers.runtime_world
 pytestmark = pytest.mark.postgres
@@ -34,10 +34,12 @@ def runtime_app(runtime_world, spine_schema, monkeypatch):
                 TOKEN: {
                     "workspace_id": str(w["workspace"]),
                     "actor": str(w["session"].actor),
+                    "permissions": EVERY_PERMISSION,
                 },
                 STRANGER_TOKEN: {
                     "workspace_id": str(uuid.uuid4()),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 },
             }
         ),

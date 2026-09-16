@@ -46,6 +46,7 @@ from conftest import (
     write_point_map,
 )
 from model_fakes import chat_body
+from tests_support_api import EVERY_PERMISSION
 
 #: Routes that are deliberately unauthenticated, with the reason each one is.
 PUBLIC_ROUTES: dict[str, str] = {
@@ -479,8 +480,16 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                _OWNER_TOKEN: {"workspace_id": str(owner), "actor": str(actor)},
-                _STRANGER_TOKEN: {"workspace_id": str(stranger), "actor": str(uuid.uuid4())},
+                _OWNER_TOKEN: {
+                    "workspace_id": str(owner),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
+                _STRANGER_TOKEN: {
+                    "workspace_id": str(stranger),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

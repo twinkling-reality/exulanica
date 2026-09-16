@@ -30,6 +30,16 @@ through ``/readyz`` rather than looking identical to one whose worker is wedged.
 **The body limit.** :mod:`exulanica.api.body_limit` refuses an over-large declared body before any
 route sees it, which is the only place it can be refused before a multipart parser has already
 written it to disk.
+
+**The permission floor.** :func:`exulanica.api.dependencies.authorise_route` is installed as an
+application-level dependency, so it runs for every route before the route's own dependencies and
+before any validation, and no route can leave it out. :func:`create_app` refuses to build an
+application with a route :mod:`exulanica.api.permissions` does not declare, or a declaration for
+a route it does not serve. A missing permission follows the error map's own rule: 404
+``unknown_reference`` on a route addressed by an id, 403 ``not_authorised`` everywhere else. A
+tile quota refusal is 429, like a budget ceiling, because in both cases this instance is
+declining to spend rather than failing, and an egress refusal is 502 ``egress_refused``, a
+dependency this instance will not reach rather than one that failed.
 """
 
 from __future__ import annotations
@@ -40,12 +50,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Final
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from exulanica.api.account_repository import AccountUnavailable
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
+from exulanica.api.dependencies import authorise_route
+from exulanica.api.permissions import PermissionRefused, require_complete_declaration
+from exulanica.api.quotas import TileQuotaExceeded, TileQuotaUndeclared
 from exulanica.api.routes import (
     accounts,
     character_appearance,
@@ -90,6 +103,7 @@ from exulanica.identity.subjects import (
     NotUndoable,
     UnknownSubject,
 )
+from exulanica.models.egress import EgressRefused
 from exulanica.models.errors import BudgetExceededError, ModelError, TruncatedResponseError
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
@@ -192,6 +206,9 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         summary="A personal world memory model. Every historical claim resolves to its source.",
         version="0.1.0",
         lifespan=_lifespan,
+        # Every route, by construction. See exulanica.api.dependencies for why it is here rather
+        # than in each route.
+        dependencies=[Depends(authorise_route)],
     )
     app.state.services = services or build_services()
     app.state.society_decision_provider = app.state.services.society_decision_provider
@@ -231,6 +248,9 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(interaction.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)
+    # After the last router and before the application is handed to anybody: a route nobody
+    # declared, or a declaration for a route that is gone, is a build failure with its name in it.
+    require_complete_declaration(app)
 
     @app.exception_handler(BodyTooLarge)
     async def _too_large(_request: Request, exc: BodyTooLarge) -> JSONResponse:
@@ -249,6 +269,20 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
             content={"code": "account_unavailable", "detail": "Account service is unavailable"},
             headers={"Cache-Control": "private, no-store"},
         )
+
+    @app.exception_handler(PermissionRefused)
+    async def _refused(_request: Request, exc: PermissionRefused) -> JSONResponse:
+        # 404 on an id-addressed route and 403 elsewhere, decided in exulanica.api.permissions
+        # from the route template alone, so the answer cannot depend on whether the id exists.
+        return _problem(exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(TileQuotaExceeded)
+    async def _tile_quota(_request: Request, exc: TileQuotaExceeded) -> JSONResponse:
+        return _problem(429, "tile_quota_exceeded", str(exc))
+
+    @app.exception_handler(TileQuotaUndeclared)
+    async def _tile_quota_undeclared(_request: Request, exc: TileQuotaUndeclared) -> JSONResponse:
+        return _problem(429, "tile_quota_undeclared", str(exc))
 
     @app.exception_handler(SelectionRejected)
     async def _rejected(_request: Request, exc: SelectionRejected) -> JSONResponse:
@@ -320,6 +354,8 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # wrong conclusion". Filing it as `model_refused` would be that reading.
         if isinstance(exc, BudgetExceededError):
             return _problem(429, "budget_exceeded", str(exc))
+        if isinstance(exc, EgressRefused):
+            return _problem(502, "egress_refused", str(exc))
         if isinstance(exc, TruncatedResponseError):
             return _problem(500, "model_output_truncated", str(exc))
         return _problem(502, "model_refused", str(exc))

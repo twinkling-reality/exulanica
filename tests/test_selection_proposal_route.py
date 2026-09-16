@@ -41,6 +41,7 @@ from fastapi.testclient import TestClient
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
 from model_fakes import FakeTransport, chat_body
+from tests_support_api import EVERY_PERMISSION
 
 pytestmark = pytest.mark.postgres
 
@@ -172,8 +173,16 @@ def proposal_api(repository, spine_schema, tmp_path, photo_dir, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(actor)},
-                STRANGER_TOKEN: {"workspace_id": str(stranger), "actor": str(uuid.uuid4())},
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
+                STRANGER_TOKEN: {
+                    "workspace_id": str(stranger),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )
@@ -445,7 +454,13 @@ def test_an_instance_with_no_model_credential_says_so_rather_than_guessing(
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
         json.dumps(
-            {TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(uuid.uuid4())}}
+            {
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                }
+            }
         ),
     )
     from tests_support_api import scratch_database

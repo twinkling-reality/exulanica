@@ -41,6 +41,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from fastapi.testclient import TestClient
 
 from conftest import CountingVisionModel, bomb_png, photo_bytes
+from tests_support_api import EVERY_PERMISSION
 
 _TOKEN = "intake-owner-token-that-is-long-enough-ok"
 
@@ -123,7 +124,15 @@ def upload(tmp_path, repository, spine_schema, monkeypatch):
     workspace_id = repository.workspace_id
     monkeypatch.setenv(
         "EXULANICA_API_TOKENS",
-        json.dumps({_TOKEN: {"workspace_id": str(workspace_id), "actor": str(uuid.uuid4())}}),
+        json.dumps(
+            {
+                _TOKEN: {
+                    "workspace_id": str(workspace_id),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                }
+            }
+        ),
     )
     from tests_support_api import scratch_database
 

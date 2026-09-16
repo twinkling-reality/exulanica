@@ -26,6 +26,8 @@ from exulanica.world import WorldObjectRepository, WorldStyleRepository
 from fastapi.testclient import TestClient
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
+from tests_support_api import EVERY_PERMISSION
+
 TABLES = (
     "world_structure_snapshot",
     "world_structure_preview",
@@ -50,7 +52,11 @@ def run():
     writer = Database(make_conninfo(base, options="-c role=exulanica_app"))
     reader = Database(make_conninfo(base, options="-c role=exulanica_ro"))
     tokens = {
-        row["token"]: {"workspace_id": row["workspace_id"], "actor": access["actor"]}
+        row["token"]: {
+            "workspace_id": row["workspace_id"],
+            "actor": access["actor"],
+            "permissions": EVERY_PERMISSION,
+        }
         for row in selected.values()
     }
     services = Services(

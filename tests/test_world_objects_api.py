@@ -21,6 +21,7 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import GLB_MEDIA_TYPE, WorldStructureRepository, reviewed_assets
 from fastapi.testclient import TestClient
 
+from tests_support_api import EVERY_PERMISSION
 from world_structure_fixtures import structural_candidate
 
 pytestmark = pytest.mark.postgres
@@ -117,8 +118,16 @@ def objects_api(repository, spine_schema, tmp_path, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(actor)},
-                STRANGER_TOKEN: {"workspace_id": str(stranger), "actor": str(uuid.uuid4())},
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
+                STRANGER_TOKEN: {
+                    "workspace_id": str(stranger),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                },
             }
         ),
     )

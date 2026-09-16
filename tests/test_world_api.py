@@ -16,6 +16,7 @@ from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepo
 from fastapi.testclient import TestClient
 
 from conftest import write_photo
+from tests_support_api import EVERY_PERMISSION
 
 pytestmark = pytest.mark.postgres
 
@@ -93,10 +94,15 @@ def world_api(repository, spine_schema, tmp_path, monkeypatch):
         "EXULANICA_API_TOKENS",
         json.dumps(
             {
-                TOKEN: {"workspace_id": str(repository.workspace_id), "actor": str(actor)},
+                TOKEN: {
+                    "workspace_id": str(repository.workspace_id),
+                    "actor": str(actor),
+                    "permissions": EVERY_PERMISSION,
+                },
                 STRANGER_TOKEN: {
                     "workspace_id": str(stranger),
                     "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
                 },
             }
         ),

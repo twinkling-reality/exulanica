@@ -64,6 +64,7 @@ from exulanica.store.base import ContentAddressedStore
 __all__ = [
     "GLOBAL_TABLES",
     "INSTANCE_TABLES",
+    "JUDGE_PERMISSIONS",
     "JUDGE_ROLE",
     "JUDGE_WRITE_TABLES",
     "REACHED_TABLES",
@@ -250,6 +251,27 @@ JUDGE_WRITE_TABLES: Final[tuple[str, ...]] = (
     "companion_answer",
     "companion_answer_citation",
     "companion_escape",
+)
+
+#: What the judge's bearer token may do, named from ``exulanica.api.permissions.Permission``.
+#:
+#: The same routes as :data:`JUDGE_WRITE_TABLES`, stated at the other boundary: every read, the
+#: authored world and its appearance, the Companion and what it remembers, deleting a memory the
+#: judge made, and the model calls those routes need. Intake, admission, consent writes,
+#: operations writes and tile materialisation are absent, and absence is the grant. Plain strings
+#: rather than the enum, because importing the API package would load the whole application into
+#: the seed job; ``load_token_directory`` refuses any name outside the vocabulary, and
+#: ``tests/test_judge_seed.py`` loads what :func:`mint_judge_token` mints.
+JUDGE_PERMISSIONS: Final[tuple[str, ...]] = (
+    "admission.read",
+    "consent.read",
+    "deletion.write",
+    "library.read",
+    "library.write",
+    "model.invoke",
+    "operations.read",
+    "world.read",
+    "world.write",
 )
 
 #: Tables a reset may not empty, because migration 0013 put a BEFORE TRUNCATE guard on them.
@@ -1226,7 +1248,9 @@ def mint_judge_token(*, workspace_id: uuid.UUID, actor: uuid.UUID, token: str) -
     a token minted here and refused there is a deployment that starts and accepts nobody.
 
     ``may_include_proposals`` is false. A judge is shown what the system has confirmed rather
-    than what it has guessed, and the Selection plan must not be able to widen that.
+    than what it has guessed, and the Selection plan must not be able to widen that. The grant
+    carries :data:`JUDGE_PERMISSIONS`, because the API loads no grant that does not name its
+    permissions.
     """
     if len(token) < 32:
         raise SeedRefused(
@@ -1237,6 +1261,7 @@ def mint_judge_token(*, workspace_id: uuid.UUID, actor: uuid.UUID, token: str) -
         token: {
             "workspace_id": str(workspace_id),
             "actor": str(actor),
+            "permissions": list(JUDGE_PERMISSIONS),
             "may_include_proposals": False,
         }
     }
