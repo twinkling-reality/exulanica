@@ -39,7 +39,9 @@ reviewed outlines; see ``exulanica/ingest/scene_segments.py``.
 
 **Nothing leaves the machine.** Both models run locally, on MPS where the host has it and on the
 CPU otherwise. The stage is still gated on an eligible privacy screening, the receipt depth
-requires, because what it produces is lifted into geometry.
+requires, because what it produces is lifted into geometry. A personal photograph also needs a
+current model right naming each checkpoint that will read it, at this process; see
+:mod:`exulanica.ingest.model_rights`.
 
 **Not bit-reproducible, and declared so.** A neural forward pass differs across accelerators and
 library versions, so the stage is ``deterministic=False`` (ADR-0017). It carries no
@@ -70,6 +72,12 @@ from exulanica.evidence.region import PPM, DisplayGeometry, Rect, Region, to_ppm
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.model_rights import (
+    ModelHandoff,
+    ModelIdentity,
+    ModelRightRefused,
+    require_model_right,
+)
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
@@ -97,6 +105,7 @@ __all__ = [
     "SegmentedMask",
     "SegmenterUnavailable",
     "local_model_roles",
+    "model_handoff",
     "outline_from_mask",
     "run",
 ]
@@ -317,6 +326,37 @@ class ObjectSegmenter(Protocol):
     ) -> list[SegmentedMask | None]: ...
 
 
+def model_handoff(segmenter: ObjectSegmenter, *, detecting: bool) -> ModelHandoff | None:
+    """The checkpoints one segmentation reaches, all in this process, or None when unstated.
+
+    A segmenter may state this with a ``model_handoff`` attribute. Otherwise its ``identity`` is
+    read, because the protocol is local by contract and that mapping already pins every checkpoint
+    by revision. The segmenter always reads the pixels; the detector and its fallback read them
+    only when the hosted pass located nothing, which is what ``detecting`` says. A pin that is
+    missing or unpinned leaves the hand-over unstated.
+    """
+    declared = getattr(segmenter, "model_handoff", None)
+    if declared is not None:
+        return declared if isinstance(declared, ModelHandoff) else None
+    identity = segmenter.identity
+    pins: list[tuple[str, Any]] = [(SEGMENTATION_ROLE, identity.get("segmenter"))]
+    if detecting:
+        pins.append((DETECTION_ROLE, identity.get("detector")))
+        if identity.get("detector_fallback") is not None:
+            pins.append((DETECTION_ROLE, identity.get("detector_fallback")))
+    if not all(isinstance(pin, Mapping) for _, pin in pins):
+        return None
+    try:
+        return ModelHandoff.local(
+            *(
+                ModelIdentity.local(role, str(pin["repo_id"]), str(pin["revision"]))
+                for role, pin in pins
+            )
+        )
+    except (KeyError, ValueError):
+        return None
+
+
 def _policies(params: Mapping[str, Any]) -> tuple[DetectionPolicy, OutlinePolicy]:
     outline = params["outline"]
     return (
@@ -440,6 +480,25 @@ def run(
         inputs.append(vision.artifact_id)
     if masked is not None:
         inputs.append(masked.artifact_id)
+
+    # The same last check depth makes: a personal photograph reaches these checkpoints only under a
+    # current right naming each one that will read it, asked under the final read check.
+    try:
+        require_model_right(
+            writes.repository,
+            capture_id,
+            screening.screening_id,
+            model_handoff(segmenter, detecting=not hosted),
+        )
+    except ModelRightRefused as refusal:
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(
+            spec,
+            reason=f"no personal model right permits these models to receive the bytes: {refusal}",
+            input_blob=blob_id,
+        )
+        return None
 
     with ledger.stage(spec, input_artifact_ids=inputs, input_blob=blob_id) as recorder:
         started = time.monotonic()

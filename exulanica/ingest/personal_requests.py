@@ -6,6 +6,11 @@ changed operation/body refuses. Receipts retain only hashes and existing receipt
 indefinitely like the underlying append-only consent audit. Deletion does not remove that stub;
 current access checks suppress its delivery. Returned receipt IDs are history, not permission.
 No bytes, outlines, names, authority prose or model content are copied into this table.
+
+Model rights granted by an admission are kept the same way, as identities. A replayed response
+reports whether each one is current now, as it reports whether each screening is eligible now,
+and neither answer is a permission: a model read asks
+:func:`~exulanica.ingest.model_rights.require_model_right` itself.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.errors import PrivacyAdmissionError
+from exulanica.ingest.model_rights import model_rights_for_capture
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.repository import IngestRepository
 
@@ -74,10 +80,30 @@ def _references(result: dict[str, Any]) -> dict[str, Any]:
     refs = {key: value for key, value in result.items() if key in allowed}
     if "receipts" in result:
         refs["receipts"] = [
-            {key: item[key] for key in ("capture_id", "authorization_id", "screening_id")}
+            {
+                key: item[key]
+                for key in ("capture_id", "authorization_id", "screening_id", "model_right_ids")
+                if key in item
+            }
             for item in result["receipts"]
         ]
     return refs
+
+
+def _right_states(repository: IngestRepository, item: dict[str, Any]) -> list[dict[str, Any]]:
+    """Each granted right, in the order it was granted, and whether it is current now.
+
+    History, not permission. A right this workspace can no longer see is left out.
+    """
+    recorded = {
+        str(right.right_id): (right, current)
+        for right, current in model_rights_for_capture(repository, uuid.UUID(item["capture_id"]))
+    }
+    return [
+        {**recorded[key][0].as_reference(), "state": "current" if recorded[key][1] else "ended"}
+        for key in item["model_right_ids"]
+        if key in recorded
+    ]
 
 
 def receipt_response(
@@ -98,7 +124,10 @@ def receipt_response(
                 state = "eligible"
             except PrivacyAdmissionError:
                 state = "blocked-or-stale"
-            receipts.append({**item, "eligibility_state": state})
+            receipt = {**item, "eligibility_state": state}
+            if "model_right_ids" in item:
+                receipt["model_rights"] = _right_states(repository, item)
+            receipts.append(receipt)
         response["receipts"] = receipts
     return response
 
@@ -188,6 +217,7 @@ def admission_status(
             "and b.purged_at is null and b.storage_key is not null order by c.capture_id",
             (actor, workspace),
         ).fetchall()
+        repository = IngestRepository(connection, workspace)
         sources = []
         for row in rows:
             authority = None
@@ -208,6 +238,14 @@ def admission_status(
                     "bytes": row["byte_size"],
                     "media_type": row["media_type"],
                     "authority": authority,
+                    # The rights this actor granted over the source, and whether each is current.
+                    "model_rights": [
+                        {**right.as_reference(), "state": "current" if current else "ended"}
+                        for right, current in model_rights_for_capture(
+                            repository, row["capture_id"]
+                        )
+                        if right.granted_by == actor
+                    ],
                 }
             )
         requests = []

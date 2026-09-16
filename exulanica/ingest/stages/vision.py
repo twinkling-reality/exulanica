@@ -23,6 +23,7 @@ from exulanica.evidence.region import DisplayGeometry, Rect, Region
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.model_rights import ModelHandoff, ModelRightRefused, require_model_right
 from exulanica.ingest.privacy import require_observation_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
@@ -31,16 +32,34 @@ from exulanica.ingest.vision import (
     OBSERVATION_SCHEMA_NAME,
     PROMPT_VERSION,
     SCHEMA_VERSION,
+    NebiusVisionModel,
     VisionModel,
     VisionObservation,
     prompt_digest,
 )
+from exulanica.models.manifest import Role
 
-__all__ = ["run"]
+__all__ = ["model_handoff", "run"]
 
 #: Written onto every occurrence this stage creates, so a re-run at a new version is
 #: distinguishable in the ledger from the same detector running twice.
 DETECTOR_VERSION: Final = "vision:1"
+
+
+def model_handoff(model: VisionModel) -> ModelHandoff | None:
+    """Every model a call to ``model`` can reach, and where the photograph goes, or None.
+
+    A model states this with a ``model_handoff`` attribute. The hosted client predates the
+    attribute, so its chain and endpoint are read from the manifest that client was built with,
+    which is where every request it sends is addressed. Anything else is unstated, and a personal
+    photograph is not sent to a model that cannot say which model it is or where the bytes go.
+    """
+    declared = getattr(model, "model_handoff", None)
+    if declared is not None:
+        return declared if isinstance(declared, ModelHandoff) else None
+    if isinstance(model, NebiusVisionModel):
+        return ModelHandoff.hosted(model._client.manifest, Role.VISION)
+    return None
 
 
 def run(
@@ -137,6 +156,24 @@ def run(
         )
 
     image_bytes = writes.store.get(BlobId(rendition.content_sha256))
+    # The third question, after "may this be looked at" above: may THIS model, at THIS
+    # destination, receive these bytes. Asked last, under the final read check, with the bytes
+    # already read and verified, because it is the check that has to hold when they leave. A
+    # personal photograph with no current right naming every model in the chain is not sent, and
+    # like the missing screening above that is unavailable rather than failed: nobody granted it.
+    try:
+        require_model_right(
+            writes.repository, capture_id, screening.screening_id, model_handoff(model)
+        )
+    except ModelRightRefused as refusal:
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(
+            spec,
+            reason=f"no personal model right permits this model to receive these bytes: {refusal}",
+            input_blob=blob_id,
+        )
+        return None
     with ledger.stage(
         spec, input_artifact_ids=[rendition.artifact_id], input_blob=blob_id
     ) as recorder:

@@ -24,6 +24,12 @@ from PIL import Image
 
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.model_rights import (
+    ModelHandoff,
+    ModelIdentity,
+    ModelRightRefused,
+    require_model_right,
+)
 from exulanica.ingest.privacy import require_privacy_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
@@ -38,8 +44,31 @@ from exulanica.reconstruction import (
     encode_opm,
     validate_opm,
 )
+from exulanica.reconstruction.moge import MoGeDepthModel
 
-__all__ = ["run"]
+__all__ = ["model_handoff", "run"]
+
+
+def model_handoff(model: DepthModel) -> ModelHandoff | None:
+    """The checkpoint a depth call reaches and where the pixels go, or None when unstated.
+
+    A model states this with a ``model_handoff`` attribute. MoGe runs in this process and names
+    itself ``repo@revision``, which is the whole identity a right needs; loaded without a pinned
+    revision it names no checkpoint a right could, and anything else is unstated.
+    """
+    declared = getattr(model, "model_handoff", None)
+    if declared is not None:
+        return declared if isinstance(declared, ModelHandoff) else None
+    if not isinstance(model, MoGeDepthModel):
+        return None
+    repo, pinned, revision = model.model_id.rpartition("@")
+    if not pinned:
+        return None
+    try:
+        identity = ModelIdentity.local(str(stage("depth").model_role), repo, revision)
+        return ModelHandoff.local(identity)
+    except ValueError:
+        return None
 
 
 def run(
@@ -100,6 +129,28 @@ def run(
         ledger.reused(spec, existing.artifact_id, input_blob=blob_id)
         return
 
+    # The masked derivative when anybody in this photograph is hidden, the original otherwise.
+    # This is the line that makes "mask before, not only after" true: a person who never
+    # consented is neutral fill before the depth model sees a pixel, so they cannot become a
+    # point map, and therefore cannot become Gaussians further down.
+    source = masked_image if masked_image is not None else upright
+    # Geometry permission is not permission for this checkpoint. A personal photograph goes to the
+    # depth model only under a current right naming it, checked last, under the final read check.
+    # Unavailable rather than raised, unlike a missing screening: a person who has not let this
+    # model see the photograph has made a choice, and the photograph stays a rung 4 region.
+    try:
+        require_model_right(
+            writes.repository, capture_id, screening.screening_id, model_handoff(model)
+        )
+    except ModelRightRefused as refusal:
+        outcome.stages_skipped.append(spec.key)
+        outcome.stages_unavailable.append(spec.key)
+        ledger.unavailable(
+            spec,
+            reason=f"no personal model right permits this model to receive these bytes: {refusal}",
+            input_blob=blob_id,
+        )
+        return
     with ledger.stage(
         spec,
         input_artifact_ids=[
@@ -109,11 +160,6 @@ def run(
         ],
         input_blob=blob_id,
     ) as recorder:
-        # The masked derivative when anybody in this photograph is hidden, the original otherwise.
-        # This is the line that makes "mask before, not only after" true: a person who never
-        # consented is neutral fill before the depth model sees a pixel, so they cannot become a
-        # point map, and therefore cannot become Gaussians further down.
-        source = masked_image if masked_image is not None else upright
         prediction = model.predict(source)
         points = build_point_map(
             prediction,

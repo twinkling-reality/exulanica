@@ -5,10 +5,12 @@ import uuid
 
 import pytest
 from exulanica.errors import PrivacyAdmissionError
+from exulanica.ingest.model_rights import ModelHandoff
 from exulanica.ingest.personal_admission import HUMAN_ATTESTATION
 from exulanica.ingest.privacy import require_privacy_screening
+from exulanica.models.manifest import Role, load_manifest
 
-from conftest import photo_bytes
+from conftest import CountingVisionModel, photo_bytes
 from test_intake_upload import _TOKEN
 from test_intake_upload import upload as upload
 
@@ -17,24 +19,42 @@ def post(upload, path, body):
     return upload.client.post(path, json=body, headers={"Authorization": f"Bearer {_TOKEN}"})
 
 
+class HostedVisionDouble(CountingVisionModel):
+    """The counting vision double, stating the hand-over the hosted client it stands in for makes.
+
+    A personal photograph reaches a vision model only under a right naming every model the role can
+    reach at the endpoint the bytes go to, and the hosted client states both from its manifest.
+    """
+
+    @property
+    def model_handoff(self) -> ModelHandoff:
+        return ModelHandoff.hosted(load_manifest(), Role.VISION)
+
+
 def batch(upload, count=2):
+    if type(upload.vision) is CountingVisionModel:
+        upload.vision = HostedVisionDouble()
     data = [photo_bytes(when=f"2026:08:27 10:00:0{i}") for i in range(count)]
     uploaded = upload.post([("files", (f"{i}.jpg", item)) for i, item in enumerate(data)])
     assert uploaded.status_code == 202
     now = dt.datetime.now(dt.UTC)
+    valid_until = (now + dt.timedelta(hours=1)).isoformat()
     return {
         "operation": "detect",
         "purpose": "Inspect my photographs",
         "authority": {
             "account_authority_basis": "I own these test photographs",
             "authorized_at": (now - dt.timedelta(minutes=1)).isoformat(),
-            "valid_until": (now + dt.timedelta(hours=1)).isoformat(),
+            "valid_until": valid_until,
         },
         "recorded_at": now.isoformat(),
         "members": [
             {"capture_id": item["capture_id"], "sha256": item["blob_sha256"], "bytes": len(source)}
             for item, source in zip(uploaded.json()["accepted"], data, strict=True)
         ],
+        # A receipt names no model. Without this explicit right the worker sends these
+        # photographs to no model at all, and the detection pass below finds nobody.
+        "model_rights": [{"role": "vision", "valid_until": valid_until}],
     }
 
 

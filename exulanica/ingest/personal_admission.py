@@ -11,6 +11,12 @@ from typing import Any, Literal, NoReturn
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from exulanica.evidence.blob import BlobId
+from exulanica.ingest.model_rights import (
+    LOCAL_PROVIDER,
+    ModelHandoff,
+    ModelIdentity,
+    grant_model_right,
+)
 from exulanica.ingest.person_review import record_region_edits, review_list
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.privacy import (
@@ -21,6 +27,8 @@ from exulanica.ingest.privacy import (
     require_privacy_screening,
 )
 from exulanica.ingest.repository import IngestRepository
+from exulanica.ingest.stages.segmentation import local_model_roles
+from exulanica.models import manifest as models_manifest
 
 
 class StrictInput(BaseModel):
@@ -324,6 +332,17 @@ class BatchMember(StrictInput):
     _capture_identifier = field_validator("capture_id")(identifier)
 
 
+class ModelRightRequest(StrictInput):
+    """A role whose models may process every photograph in the batch, until ``valid_until``.
+
+    A role, never an identifier: the server resolves it against the manifest and records a right
+    for each exact model the role can reach, which the response names.
+    """
+
+    role: str = Field(min_length=1, max_length=63)
+    valid_until: str
+
+
 class PersonalBatch(StrictInput):
     """An exact upload inventory; identity always comes from the authenticated session."""
 
@@ -340,6 +359,34 @@ class PersonalBatch(StrictInput):
     operation: Literal["detect", "review"]
     reviewed_by_name: str | None = None
     attestation: str | None = None
+    #: Empty unless the account holder names roles. A receipt lets a photograph be looked at or
+    #: built from and names no model, so without a right here no model receives these bytes.
+    model_rights: list[ModelRightRequest] = Field(default_factory=list, max_length=8)
+
+
+def role_handoff(role: str, manifest: models_manifest.Manifest | None = None) -> ModelHandoff:
+    """Every model a manifest role can reach, and where its bytes go.
+
+    A hosted role resolves to its whole chain at the manifest's endpoint; a local role to its
+    pinned checkpoint and fallback in this process. A role the manifest does not state is
+    refused. Depth is one of those: its checkpoint is chosen by the worker's configuration rather
+    than stated in the manifest, so a depth right names its checkpoint explicitly through
+    :func:`~exulanica.ingest.model_rights.grant_model_right`.
+    """
+    if role in {member.value for member in models_manifest.Role}:
+        return ModelHandoff.hosted(manifest or models_manifest.load_manifest(), role)
+    local = local_model_roles().get(role)
+    if local is None:
+        raise ValueError(f"the manifest states no model role {role!r}")
+    return ModelHandoff.local(
+        *(
+            ModelIdentity(
+                provider=LOCAL_PROVIDER, role=role, model_id=pin.repo_id, revision=pin.revision
+            )
+            for pin in (local.primary, local.fallback)
+            if pin is not None
+        )
+    )
 
 
 HUMAN_ATTESTATION = (
@@ -380,6 +427,17 @@ def admit_batch(
         or any(member.review != "not-reviewed" or member.edits for member in body.members)
     ):
         raise ValueError("detection-only permission cannot contain human review decisions")
+    # Every requested right is resolved and checked before anything is written, like the members.
+    if len({request.role for request in body.model_rights}) != len(body.model_rights):
+        raise ValueError("a batch names each model role at most once")
+    rights = []
+    for request in body.model_rights:
+        until = instant(request.valid_until)
+        if not now < until <= end:
+            raise ValueError(
+                "a model right must end in the future and no later than the authority granting it"
+            )
+        rights.append((role_handoff(request.role), until))
     # Check all originals, including storage bytes, before the first receipt is written.
     for member in body.members:
         capture = repository.capture(uuid.UUID(member.capture_id))
@@ -446,6 +504,25 @@ def admit_batch(
                     "eligibility_state": screening.eligibility_state,
                     "regions": review_list(repository, capture_id),
                 }
+            # A separate object from the receipt above, granted by the same account holder under
+            # the same authority, and only for the roles the request names.
+            granted = [
+                grant_model_right(
+                    repository,
+                    capture_id=capture_id,
+                    authorization_id=authorization.authorization_id,
+                    identity=identity,
+                    destination=handoff.destination,
+                    granted_by=actor,
+                    purpose=body.purpose,
+                    valid_until=until,
+                    granted_at=at,
+                )
+                for handoff, until in rights
+                for identity in handoff.identities
+            ]
+            result["model_right_ids"] = [str(right.right_id) for right in granted]
+            result["model_rights"] = [right.as_reference() for right in granted]
             results.append(result)
         batch = IntakeBatch.open(repository, label="personal admission")
         batch.declare_size(len(body.members))
