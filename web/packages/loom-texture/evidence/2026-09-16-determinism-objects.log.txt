@@ -49,7 +49,7 @@ for f in $FILES; do cmp -s "$OUT/node24-arm64-a/$f" "../assets/textures/$f" || {
 echo "committed: $differing of ${#FILES[@]} files differ; $(cd ../assets/textures && find . -type f | wc -l | tr -d ' ') files present"
 
 == source
-commit 0b314547fc72e1d318af522a6dc880508cc84c52
+commit 4c118819ad1538cd906e0806e8dc91f1c0b74a26
 working tree changes under web/packages/loom-texture/src: 0
 
 == run node24-arm64-a

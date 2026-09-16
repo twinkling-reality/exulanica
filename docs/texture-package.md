@@ -206,7 +206,9 @@ id and version, and the makers' code.
 the script printed at its top. It baked the catalog five times: twice on Node 24.15.0 (arm64), once
 on Node 26.7.0 (arm64), once on Node 20.10.0 (arm64) and once on Node 20.10.0 running as x86_64
 under Rosetta 2. Every one of the 11 files in every run was compared with `cmp` against the first
-run and against the committed `assets/textures/`: 0 differ.
+run and against the committed `assets/textures/`: 0 differ. It names commit 15a2e3d, from before
+this lane was rebased onto main; the rebased commit ff9914f has the same package source and the
+same published files.
 
 `web/packages/loom-texture/evidence/2026-09-16-determinism-objects.log.txt` is the same script run
 again once the sets were baked from recipes, at the commit it names and with no uncommitted change
