@@ -24,7 +24,7 @@ icon.write_text(symbol)
 renderer = shutil.which('rsvg-convert')
 if renderer is None:
     raise SystemExit('Install librsvg to provide rsvg-convert.')
-for package in ('landing', 'app', 'bakeoff'):
+for package in ('landing', 'app'):
     public = ROOT / 'web/packages' / package / 'public'
     public.mkdir(exist_ok=True)
     shutil.copyfile(icon, public / 'favicon.svg')
