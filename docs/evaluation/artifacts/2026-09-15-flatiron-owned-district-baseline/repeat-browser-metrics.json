@@ -1,0 +1,296 @@
+{
+  "profile": "exulanica.visual-gate-browser-metrics/v1",
+  "engine": "Chrome/152.0.7977.84 over the Chrome DevTools Protocol, driven by scripts/capture_visual_gate.mjs (no Playwright)",
+  "viewport": [
+    1440,
+    900
+  ],
+  "deviceScaleFactor": 1,
+  "mountMs": 54881,
+  "productValidationReport": {
+    "profile": "exulanica.browser-reconstruction-validation/v1",
+    "measurement": {
+      "driver": "requestAnimationFrame",
+      "warmup_seconds": 2,
+      "duration_seconds": 60,
+      "first_meaningful_render_ms": 54606,
+      "time_to_full_detail_ms": null,
+      "geometry_load_ms": "18701.7",
+      "frames": 3585,
+      "frameMeanMs": "16.74",
+      "frameP50Ms": "16.7",
+      "frameP95Ms": "16.7",
+      "frameP99Ms": "16.8",
+      "framesOver16_7Ms": 650,
+      "frameOver16_7Fraction": "0.181311",
+      "fpsP1Low": "59.52",
+      "hidden_during_run": false
+    },
+    "runtime": {
+      "platform": "MacIntel",
+      "logical_cpu_count": 12,
+      "device_memory_gb": 16,
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+      "engine": "PlayCanvas 2.21.4",
+      "viewport_css_px": [
+        1440,
+        900
+      ],
+      "canvas_px": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 1,
+      "peak_js_heap_mb": "516.84"
+    },
+    "renderer": {
+      "max_draw_calls": 29,
+      "gpu_error": 0,
+      "draw_submission_valid": true
+    },
+    "network": {
+      "transfer_bytes": 6924445,
+      "decoded_body_bytes": 6849445,
+      "resource_count": 250
+    },
+    "memoryWorkspace": {
+      "scene": {
+        "scene_id": "45ad50b7-aea4-52b4-b6f4-2811b93deb88",
+        "member_count": 210,
+        "registered_member_count": 210,
+        "excluded_member_count": 0,
+        "recorded_rung": 3,
+        "displayed_rung": 3,
+        "rendering_substrate": "posed_point_maps",
+        "withholding_reasons": [
+          "Rung 1 withheld: no reviewed splat receipt is available.",
+          "Rung 2 withheld: no physically validated scale receipt is available.",
+          "Rung 2 withheld: no measured coverage receipt is available.",
+          "Rung 2 withheld: no measured corridor receipt is available."
+        ],
+        "pose_receipt_sha256": "f44362e2840ef4f997082774d4b4cf665a734e810460aa48141887b7eb0363bb",
+        "placement_receipt_sha256": "d2e5f53c210171a1091e42646b3ae7ecd4085b00a3c42c3af5c6b74dc6aacf75"
+      },
+      "uploadedPointMaps": 210,
+      "uploadedPoints": 19493182,
+      "authenticatedNetworkBytes": 390141944
+    }
+  },
+  "environment": {
+    "requestPath": "assets/owned-world/flatiron/flatiron-owned-district.json",
+    "transferredBytes": 232730,
+    "decodedBytes": 232454,
+    "status": 200
+  },
+  "scene": {
+    "meshes": [
+      {
+        "id": "geographic-environment/owned-district/owned-district-visible-support#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 2
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-sidewalks#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 24062
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-0#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 946
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-1#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 974
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-2#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 928
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-3#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 1094
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-4#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 1198
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-5#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 882
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-buildings-6#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 1220
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-building-roofs#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 7216
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-building-memory-windows#0",
+        "cull": "none",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 17524
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-building-cornices#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 5272
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-building-architectural-details#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 1388
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-street-tree-trunks#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 384
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-street-tree-canopies#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 256
+      },
+      {
+        "id": "geographic-environment/owned-district/owned-street-lamps#0",
+        "cull": "back",
+        "hasUv": false,
+        "textureCount": 0,
+        "decodedTextureBytes": 0,
+        "triangles": 384
+      }
+    ],
+    "skipped": {
+      "disabledOrHidden": 215,
+      "notInCameraLayers": 0,
+      "notTriangles": 0
+    },
+    "layerInventory": {
+      "renderComponentInstancesRead": 16,
+      "otherInstances": {
+        "triangles": 0,
+        "points": 0,
+        "lines": 0,
+        "other": 0
+      },
+      "gsplatComponents": 0
+    },
+    "renderOrigin": {
+      "x": 192,
+      "y": 0,
+      "z": 0
+    },
+    "environmentTextures": 0,
+    "environmentTextureBytes": 0,
+    "deviceTextureBytes": 16818072,
+    "deviceVram": {
+      "texShadow": 16777220,
+      "texAsset": 0,
+      "texLightmap": 0,
+      "tex": 16818072,
+      "vb": 393985676,
+      "ib": 656964,
+      "ub": 3520,
+      "sb": 0
+    },
+    "supportQueries": 77614
+  },
+  "pageNetwork": {
+    "requests": 1127,
+    "finishedRequests": 1125,
+    "failedRequests": [
+      {
+        "url": "/api/formation/01a083aa-af5d-755e-b43d-1361c7d13f85",
+        "error": "net::ERR_ABORTED"
+      },
+      {
+        "url": "/api/formation/01a083aa-af5d-755e-b43d-1361c7d13f85",
+        "error": "net::ERR_ABORTED"
+      }
+    ],
+    "httpErrors": [],
+    "transferredBytes": 1632825170
+  },
+  "errors": {
+    "exceptions": [],
+    "consoleErrors": [],
+    "networkLogErrors": []
+  },
+  "authentication": {
+    "condition": "credentialed-api",
+    "anonymousGraphReadStatus": 401,
+    "apiResponses": {
+      "GET /api/graph 200": 2,
+      "GET /api/world/styles/catalog 200": 1,
+      "GET /api/world/styles/current 200": 1,
+      "GET /api/world/styles/versions 200": 1,
+      "GET /api/world/interactions/current 200": 1,
+      "GET /api/graph/sources 200": 2,
+      "GET /api/world/source-media 200": 2,
+      "GET /api/evidence/{id}/masked 200": 420,
+      "GET /api/geometry/{id} 200": 210,
+      "GET /api/geometry 200": 1,
+      "GET /api/companion/memory/recent 200": 1,
+      "GET /api/formation 200": 2,
+      "GET /api/world/assets 200": 1,
+      "GET /api/world/versions 200": 1,
+      "GET /api/formation/{id} 200": 2,
+      "GET /api/person-regions/{id} 200": 210,
+      "GET /api/personal-admission 200": 1
+    },
+    "previewApiRequests": []
+  }
+}

@@ -1,0 +1,67 @@
+Checks run before the Flatiron baseline record was written.
+The two tests that read the Flatiron baseline record are expected to fail here: the
+record did not exist yet.
+Only the gate's own checks were run here. The whole backend suite and the whole web
+check (pnpm run check) run on the finished branch before it is merged.
+
+$ uv run lint-imports
+exit 0
+
+Analyzed 447 files, 3649 dependencies.
+--------------------------------------
+
+The backend is layered, and the core is at the bottom KEPT
+The model client knows nothing about evidence, storage or the database KEPT
+Reconstruction cannot produce a citation, because it cannot name one KEPT
+Generated content cannot name a citation, because it cannot name one KEPT
+The capture verdict is pure: no database, store, evidence address or numeric 
+stack KEPT
+Material objects cannot name a citation, open a database, or load a model KEPT
+The pure core does not know a database exists KEPT
+
+Contracts: 7 kept, 0 broken.
+
+$ uv run pytest tests/test_visual_gate_keys.py tests/test_visual_gate.py tests/test_visual_gate_judge_words.py tests/test_retained_evaluation_records.py
+exit 1
+
+tests/test_visual_gate_judge_words.py:119: AssertionError
+=============================== warnings summary ===============================
+tests/test_retained_evaluation_records.py::test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent
+  tests/test_retained_evaluation_records.py:196: UserWarning: predecessor chain: 139 bindings verified across 100 of 122 retained records. 22 declare no predecessor and are not required to: 2026-09-04-benchmark-browser.json, 2026-09-04-benchmark-pose.json, 2026-09-04-benchmark-scene-withdrawal.json, 2026-09-04-linux-amd64-depth-forward.json, 2026-09-04-reconstruction-validation-campaign.json, 2026-09-04-synthetic-browser.json, 2026-09-04-synthetic-person-withdrawal-browser.json, 2026-09-04-synthetic-person-withdrawal.json, 2026-09-05-atlas-reconstruction-negative-controls.json, 2026-09-05-gsplat-trainer-negative-controls.json, 2026-09-05-gsplat-trainer-verification.json, 2026-09-05-person-consent-first-pass.json, 2026-09-05-reference-bowl-inputs.json, 2026-09-05-reference-volcanic-inputs.json, 2026-09-05-reference-workflow-negative-controls.json, 2026-09-05-retained-reference-progress.json, 2026-09-06-phase-10-atlas.json, 2026-09-06-phase-10-read-paths.json, 2026-09-06-world-read-negative-controls.json, 2026-09-12-personal-browser.json, 2026-09-13-owned-world-local-proof.json, 2026-09-13-owned-world-source-decision.json
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_visual_gate.py::test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names
+FAILED tests/test_visual_gate_judge_words.py::test_every_record_that_reads_a_reply_binds_a_private_companion
+2 failed, 209 passed, 3 skipped, 1 warning in 6.42s
+
+$ uv run ruff check <lane python files>
+exit 0
+All checks passed!
+
+$ uv run ruff format --check <lane python files>
+exit 0
+6 files already formatted
+
+$ node --check scripts/capture_visual_gate.mjs
+exit 0
+
+$ tsc -p packages/loom-gate/tsconfig.test.json
+exit 0
+
+$ vitest run packages/loom-gate
+exit 0
+ RUN  v2.1.9 web
+
+ ✓ packages/loom-gate/test/geometry.test.ts (7 tests) 4ms
+ ✓ packages/loom-gate/test/keys.test.ts (8 tests) 8ms
+ ✓ packages/loom-gate/test/scene.test.ts (10 tests) 33ms
+ ✓ packages/loom-gate/test/measure.test.ts (5 tests) 137ms
+ ✓ packages/loom-gate/test/route.test.ts (9 tests) 167ms
+
+ Test Files  5 passed (5)
+      Tests  39 passed (39)
+   Start at  21:00:41
+   Duration  818ms (transform 170ms, setup 0ms, collect 576ms, tests 349ms, environment 0ms, prepare 361ms)
+

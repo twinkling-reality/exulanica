@@ -1,0 +1,1306 @@
+{
+  "profile": "exulanica.visual-gate-measurements/v1",
+  "keySet": "exulanica.visual-gate-keys/v2",
+  "route": {
+    "rule": {
+      "lengthMm": 125000,
+      "stopMarginMm": 6000,
+      "frontageSearchMm": 40000,
+      "headingStepMillidegrees": 500,
+      "frontageSampleSpacingMm": 1000
+    },
+    "startMm": [
+      26320,
+      58170
+    ],
+    "headingMillidegrees": 61000,
+    "clearRunMm": 416547,
+    "frontageSamples": 126,
+    "frontageBothSidesSamples": 114,
+    "meanFrontageSkewMillionths": 2010,
+    "candidatesTried": 720,
+    "candidatesQualified": 242,
+    "obstacles": 400,
+    "fieldBoundsCm": [
+      -33800,
+      -33200,
+      33800,
+      33200
+    ]
+  },
+  "arrival": {
+    "x": "26.32",
+    "y": "1.62",
+    "z": "58.16999999999999",
+    "yaw": "-3.141592653589793",
+    "pitch": "0.08",
+    "speed": 0,
+    "mode": "converse",
+    "conversationActive": false,
+    "enabled": true
+  },
+  "interactions": [
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "start",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "dismiss-companion",
+      "key": "Escape",
+      "at": "start",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "focus-world",
+      "input": "left click on the world canvas",
+      "at": "start",
+      "point": {
+        "x": 720,
+        "y": 450
+      },
+      "carriedByProduct": true
+    },
+    {
+      "kind": "walk",
+      "key": "KeyW",
+      "heldMs": 37879,
+      "autoRepeat": {
+        "delayMs": 250,
+        "intervalMs": 33,
+        "repeatedKeyDowns": 1141
+      },
+      "targetAlongMm": 62500,
+      "displacementMillimetres": 62505,
+      "carriedByProduct": true
+    },
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "midpoint",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "dismiss-companion",
+      "key": "Escape",
+      "at": "midpoint",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "walk",
+      "key": "KeyW",
+      "heldMs": 37997,
+      "autoRepeat": {
+        "delayMs": 250,
+        "intervalMs": 33,
+        "repeatedKeyDowns": 1144
+      },
+      "targetAlongMm": 125000,
+      "displacementMillimetres": 62505,
+      "carriedByProduct": true
+    },
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "endpoint",
+      "carriedByProduct": true
+    }
+  ],
+  "harnessWrites": [
+    {
+      "field": "controls.state.yaw",
+      "valueMicroradians": 1064651,
+      "why": "mouse look needs pointer movement under a held lock, which the harness does not synthesize; the heading is written once and no position is written"
+    }
+  ],
+  "harnessObservers": [
+    "one engine update listener that copies the controls state each frame while the walk runs",
+    "one engine frameend listener that keeps the largest per-frame draw call count from the start capture to the endpoint capture",
+    "one MutationObserver on the travel status that records failure messages while the walk runs"
+  ],
+  "measured": {
+    "drawnTriangles": 63730,
+    "drawnMeshes": 16,
+    "walkingTriangles": 23993,
+    "facadeTriangles": 30999,
+    "untexturedWalkingTriangles": 23993,
+    "untexturedFacadeTriangles": 30999,
+    "classifiedByMesh": {
+      "geographic-environment/owned-district/owned-district-visible-support#0": {
+        "walking": 2,
+        "facade": 0,
+        "drawn": 2
+      },
+      "geographic-environment/owned-district/owned-sidewalks#0": {
+        "walking": 23991,
+        "facade": 0,
+        "drawn": 24062
+      },
+      "geographic-environment/owned-district/owned-buildings-0#0": {
+        "walking": 0,
+        "facade": 946,
+        "drawn": 946
+      },
+      "geographic-environment/owned-district/owned-buildings-1#0": {
+        "walking": 0,
+        "facade": 974,
+        "drawn": 974
+      },
+      "geographic-environment/owned-district/owned-buildings-2#0": {
+        "walking": 0,
+        "facade": 928,
+        "drawn": 928
+      },
+      "geographic-environment/owned-district/owned-buildings-3#0": {
+        "walking": 0,
+        "facade": 1094,
+        "drawn": 1094
+      },
+      "geographic-environment/owned-district/owned-buildings-4#0": {
+        "walking": 0,
+        "facade": 1190,
+        "drawn": 1198
+      },
+      "geographic-environment/owned-district/owned-buildings-5#0": {
+        "walking": 0,
+        "facade": 882,
+        "drawn": 882
+      },
+      "geographic-environment/owned-district/owned-buildings-6#0": {
+        "walking": 0,
+        "facade": 1208,
+        "drawn": 1220
+      },
+      "geographic-environment/owned-district/owned-building-roofs#0": {
+        "walking": 0,
+        "facade": 956,
+        "drawn": 7216
+      },
+      "geographic-environment/owned-district/owned-building-memory-windows#0": {
+        "walking": 0,
+        "facade": 17524,
+        "drawn": 17524
+      },
+      "geographic-environment/owned-district/owned-building-cornices#0": {
+        "walking": 0,
+        "facade": 5272,
+        "drawn": 5272
+      },
+      "geographic-environment/owned-district/owned-building-architectural-details#0": {
+        "walking": 0,
+        "facade": 25,
+        "drawn": 1388
+      },
+      "geographic-environment/owned-district/owned-street-tree-trunks#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 384
+      },
+      "geographic-environment/owned-district/owned-street-tree-canopies#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 256
+      },
+      "geographic-environment/owned-district/owned-street-lamps#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 384
+      }
+    },
+    "texturedMeshes": 0,
+    "supportSamplesQueried": 77614,
+    "integrity": {
+      "components": 11382,
+      "supportComponents": 44,
+      "componentsDetachedFromSupport": 9323,
+      "detachedTriangles": 19244,
+      "detachedByMesh": {
+        "geographic-environment/owned-district/owned-building-memory-windows#0": 8641,
+        "geographic-environment/owned-district/owned-building-cornices#0": 682
+      },
+      "detachedExamples": [
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            2700,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            2700,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            2700,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            2700,
+            -113100
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            6900,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            6900,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            6900,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            6900,
+            -113100
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            11100,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            11100,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            11100,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            11100,
+            -113100
+          ]
+        }
+      ],
+      "trianglesInsideBuildings": 5695,
+      "componentsInsideBuildings": 2523,
+      "insideByMesh": {
+        "geographic-environment/owned-district/owned-buildings-0#0": 10,
+        "geographic-environment/owned-district/owned-buildings-1#0": 8,
+        "geographic-environment/owned-district/owned-buildings-2#0": 2,
+        "geographic-environment/owned-district/owned-buildings-4#0": 12,
+        "geographic-environment/owned-district/owned-buildings-5#0": 2,
+        "geographic-environment/owned-district/owned-buildings-6#0": 15,
+        "geographic-environment/owned-district/owned-building-roofs#0": 3,
+        "geographic-environment/owned-district/owned-building-memory-windows#0": 3795,
+        "geographic-environment/owned-district/owned-building-cornices#0": 1541,
+        "geographic-environment/owned-district/owned-building-architectural-details#0": 13,
+        "geographic-environment/owned-district/owned-street-tree-trunks#0": 90,
+        "geographic-environment/owned-district/owned-street-tree-canopies#0": 72,
+        "geographic-environment/owned-district/owned-street-lamps#0": 132
+      },
+      "buildingsWithDrawnGeometryInside": [
+        "doitt_id:1001203",
+        "doitt_id:1014857",
+        "doitt_id:1026073",
+        "doitt_id:1031870",
+        "doitt_id:1040714",
+        "doitt_id:105267",
+        "doitt_id:105594",
+        "doitt_id:1075771",
+        "doitt_id:1081732",
+        "doitt_id:1094856",
+        "doitt_id:1107079",
+        "doitt_id:1108005",
+        "doitt_id:1109618",
+        "doitt_id:1114315",
+        "doitt_id:111766",
+        "doitt_id:1117751",
+        "doitt_id:1118932",
+        "doitt_id:1119061",
+        "doitt_id:1119067",
+        "doitt_id:1223536",
+        "doitt_id:124131",
+        "doitt_id:126638",
+        "doitt_id:127355",
+        "doitt_id:1279565",
+        "doitt_id:1284463",
+        "doitt_id:1284682",
+        "doitt_id:1290571",
+        "doitt_id:1290984",
+        "doitt_id:1303193",
+        "doitt_id:134188",
+        "doitt_id:135329",
+        "doitt_id:137870",
+        "doitt_id:146248",
+        "doitt_id:148924",
+        "doitt_id:149336",
+        "doitt_id:15122",
+        "doitt_id:151674",
+        "doitt_id:154087",
+        "doitt_id:155819",
+        "doitt_id:157961",
+        "doitt_id:161884",
+        "doitt_id:166588",
+        "doitt_id:174303",
+        "doitt_id:185474",
+        "doitt_id:190047",
+        "doitt_id:193746",
+        "doitt_id:198213",
+        "doitt_id:201567",
+        "doitt_id:203088",
+        "doitt_id:204150",
+        "doitt_id:206555",
+        "doitt_id:207768",
+        "doitt_id:214759",
+        "doitt_id:219573",
+        "doitt_id:220559",
+        "doitt_id:224533",
+        "doitt_id:232206",
+        "doitt_id:23541",
+        "doitt_id:237118",
+        "doitt_id:242070",
+        "doitt_id:245862",
+        "doitt_id:246299",
+        "doitt_id:247843",
+        "doitt_id:252993",
+        "doitt_id:254694",
+        "doitt_id:256199",
+        "doitt_id:271789",
+        "doitt_id:285504",
+        "doitt_id:289399",
+        "doitt_id:289528",
+        "doitt_id:298804",
+        "doitt_id:30191",
+        "doitt_id:302231",
+        "doitt_id:30441",
+        "doitt_id:306802",
+        "doitt_id:306803",
+        "doitt_id:308428",
+        "doitt_id:316289",
+        "doitt_id:316825",
+        "doitt_id:3247",
+        "doitt_id:325322",
+        "doitt_id:326975",
+        "doitt_id:329611",
+        "doitt_id:334863",
+        "doitt_id:337334",
+        "doitt_id:337492",
+        "doitt_id:343622",
+        "doitt_id:344619",
+        "doitt_id:345056",
+        "doitt_id:346150",
+        "doitt_id:348114",
+        "doitt_id:353727",
+        "doitt_id:355751",
+        "doitt_id:361098",
+        "doitt_id:365172",
+        "doitt_id:368018",
+        "doitt_id:368155",
+        "doitt_id:372851",
+        "doitt_id:374818",
+        "doitt_id:384829",
+        "doitt_id:385738",
+        "doitt_id:394065",
+        "doitt_id:398035",
+        "doitt_id:398337",
+        "doitt_id:407381",
+        "doitt_id:408699",
+        "doitt_id:414238",
+        "doitt_id:419370",
+        "doitt_id:419959",
+        "doitt_id:431596",
+        "doitt_id:431838",
+        "doitt_id:435142",
+        "doitt_id:439560",
+        "doitt_id:442697",
+        "doitt_id:443368",
+        "doitt_id:44716",
+        "doitt_id:448228",
+        "doitt_id:450428",
+        "doitt_id:459502",
+        "doitt_id:467682",
+        "doitt_id:469025",
+        "doitt_id:48371",
+        "doitt_id:487694",
+        "doitt_id:491967",
+        "doitt_id:494058",
+        "doitt_id:502262",
+        "doitt_id:506044",
+        "doitt_id:50656",
+        "doitt_id:507159",
+        "doitt_id:523226",
+        "doitt_id:526761",
+        "doitt_id:53088",
+        "doitt_id:532718",
+        "doitt_id:537532",
+        "doitt_id:538655",
+        "doitt_id:542401",
+        "doitt_id:543227",
+        "doitt_id:55021",
+        "doitt_id:554300",
+        "doitt_id:556804",
+        "doitt_id:557493",
+        "doitt_id:558022",
+        "doitt_id:558964",
+        "doitt_id:559700",
+        "doitt_id:559702",
+        "doitt_id:568534",
+        "doitt_id:569441",
+        "doitt_id:58036",
+        "doitt_id:585106",
+        "doitt_id:587981",
+        "doitt_id:588734",
+        "doitt_id:589077",
+        "doitt_id:591564",
+        "doitt_id:597212",
+        "doitt_id:606309",
+        "doitt_id:60754",
+        "doitt_id:611499",
+        "doitt_id:613009",
+        "doitt_id:619083",
+        "doitt_id:619454",
+        "doitt_id:623672",
+        "doitt_id:628210",
+        "doitt_id:63187",
+        "doitt_id:632385",
+        "doitt_id:639224",
+        "doitt_id:640216",
+        "doitt_id:641061",
+        "doitt_id:645461",
+        "doitt_id:650961",
+        "doitt_id:653237",
+        "doitt_id:653292",
+        "doitt_id:659850",
+        "doitt_id:664502",
+        "doitt_id:668399",
+        "doitt_id:669181",
+        "doitt_id:671400",
+        "doitt_id:677357",
+        "doitt_id:681861",
+        "doitt_id:700068",
+        "doitt_id:701241",
+        "doitt_id:702116",
+        "doitt_id:703617",
+        "doitt_id:711564",
+        "doitt_id:71159",
+        "doitt_id:718548",
+        "doitt_id:72049",
+        "doitt_id:756986",
+        "doitt_id:758585",
+        "doitt_id:758711",
+        "doitt_id:762688",
+        "doitt_id:763165",
+        "doitt_id:764827",
+        "doitt_id:766252",
+        "doitt_id:766320",
+        "doitt_id:770658",
+        "doitt_id:772270",
+        "doitt_id:772464",
+        "doitt_id:777783",
+        "doitt_id:780044",
+        "doitt_id:781216",
+        "doitt_id:786980",
+        "doitt_id:812979",
+        "doitt_id:814160",
+        "doitt_id:817209",
+        "doitt_id:833389",
+        "doitt_id:833876",
+        "doitt_id:834935",
+        "doitt_id:84585",
+        "doitt_id:848706",
+        "doitt_id:853274",
+        "doitt_id:867730",
+        "doitt_id:89840",
+        "doitt_id:94965",
+        "doitt_id:96025",
+        "doitt_id:970360",
+        "doitt_id:974209",
+        "doitt_id:978387",
+        "doitt_id:990153",
+        "doitt_id:990197",
+        "doitt_id:996655",
+        "doitt_id:99924"
+      ],
+      "ringEdges": 3611,
+      "ringEdgesWithoutDrawnFacade": 0,
+      "ringEdgeExamples": []
+    },
+    "walk": {
+      "walkedDisplacementMm": 125009,
+      "walkedPathMm": 125009,
+      "maxLateralDeviationMm": 0,
+      "traceSamples": 2502,
+      "routeSupportGapSamples": 0,
+      "maxEyeHeightErrorMm": 25,
+      "maxSupportResampleDeltaMm": 25,
+      "eyeHeightAboveDrawnSupportMm": {
+        "minimum": 1595,
+        "maximum": 1620
+      }
+    },
+    "capsule": {
+      "capsuleSamples": 2502,
+      "capsuleSamplesChecked": 2502,
+      "capsuleTriangleContactSamples": 0,
+      "capsuleRingContactSamples": 0,
+      "minCapsuleTriangleClearanceMm": 3451,
+      "minCapsuleRingClearanceMm": 3531,
+      "contactExamples": []
+    }
+  },
+  "observation": {
+    "captures": [
+      {
+        "label": "start",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      },
+      {
+        "label": "midpoint",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      },
+      {
+        "label": "endpoint",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      }
+    ],
+    "foreignListeners": 0,
+    "productWindowKeydownListeners": 5,
+    "interactionsNotCarriedByProduct": 0,
+    "substitutedPages": 0,
+    "recoveryEvents": 0,
+    "harnessPositionWrites": 0,
+    "environmentTransferredBytes": 232730,
+    "environmentDecodedTextureBytes": 0,
+    "maxDrawCalls": 29,
+    "gpuErrors": 0,
+    "pageErrors": 0
+  },
+  "mechanical": {
+    "continuousTexturedStreetAndFacades": {
+      "streetAndFacadeTriangles": 54992,
+      "untexturedStreetAndFacadeTriangles": 54992,
+      "routeSupportGapSamples": 0
+    },
+    "noCutsOrFloatingGeometry": {
+      "routeSupportGapSamples": 0,
+      "ringEdgesWithoutDrawnFacade": 0,
+      "componentsDetachedFromSupport": 9323,
+      "trianglesInsideBuildings": 5695
+    },
+    "usefulEyeLevelMovement": {
+      "walkedDisplacementMm": 125009,
+      "maxLateralDeviationMm": 0,
+      "recoveryEvents": 0,
+      "harnessPositionWrites": 0,
+      "traceSamples": 2502,
+      "routeSupportGapSamples": 0,
+      "maxEyeHeightErrorMm": 25,
+      "maxSupportResampleDeltaMm": 25
+    },
+    "completeCapsuleClearanceVerification": {
+      "capsuleSamples": 2502,
+      "capsuleSamplesChecked": 2502,
+      "capsuleTriangleContactSamples": 0,
+      "capsuleRingContactSamples": 0
+    },
+    "practicalBrowserBudget": {
+      "environmentTransferredBytes": 232730,
+      "drawnTriangles": 63730,
+      "environmentDecodedTextureBytes": 0,
+      "maxDrawCalls": 29,
+      "gpuErrors": 0,
+      "pageErrors": 0
+    },
+    "companionPresent": {
+      "captures": 3,
+      "capturesWithCompanionShown": 3
+    },
+    "reticlePresent": {
+      "captures": 3,
+      "capturesWithReticleCentred": 3
+    },
+    "authenticatedShellAndAuthoredHandlersPreserved": {
+      "captures": 3,
+      "capturesInProductShell": 3,
+      "foreignListeners": 0,
+      "productWindowKeydownListeners": 5,
+      "interactionsNotCarriedByProduct": 0,
+      "substitutedPages": 0
+    }
+  },
+  "keys": {
+    "continuousTexturedStreetAndFacades": false,
+    "readsAsInhabitedStreet": "awaiting-named-judge",
+    "noCutsOrFloatingGeometry": false,
+    "usefulEyeLevelMovement": true,
+    "completeCapsuleClearanceVerification": true,
+    "practicalBrowserBudget": true,
+    "companionPresent": true,
+    "reticlePresent": true,
+    "authenticatedShellAndAuthoredHandlersPreserved": true
+  },
+  "listeners": {
+    "counts": {
+      "product": 30,
+      "dev-server": 1,
+      "foreign": 0
+    },
+    "productWindowKeydownListeners": 5,
+    "inventory": [
+      {
+        "target": "canvas",
+        "type": "camera-mode-change",
+        "source": "web/packages/app/src/composition/environment-selection.ts",
+        "kind": "product",
+        "line": 88
+      },
+      {
+        "target": "canvas",
+        "type": "contextmenu",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 98
+      },
+      {
+        "target": "canvas",
+        "type": "mousedown",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 89
+      },
+      {
+        "target": "canvas",
+        "type": "pointerup",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 90
+      },
+      {
+        "target": "canvas",
+        "type": "society-nearby-change",
+        "source": "web/packages/app/src/composition/environment-selection.ts",
+        "kind": "product",
+        "line": 285
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextlost",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 24423
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextlost",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 98
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextrestored",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 24427
+      },
+      {
+        "target": "document",
+        "type": "focusin",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 126
+      },
+      {
+        "target": "document",
+        "type": "mousemove",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 82
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/app/src/composition/character.ts",
+        "kind": "product",
+        "line": 90
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/app/src/ui/world-workspace.ts",
+        "kind": "product",
+        "line": 99
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 72
+      },
+      {
+        "target": "document",
+        "type": "visibilitychange",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 82856
+      },
+      {
+        "target": "window",
+        "type": "beforeunload",
+        "source": "/@vite/client",
+        "kind": "dev-server",
+        "line": 855
+      },
+      {
+        "target": "window",
+        "type": "beforeunload",
+        "source": "web/packages/app/src/bootstrap.ts",
+        "kind": "product",
+        "line": 10
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 209
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/app/src/ui/companion-stage.ts",
+        "kind": "product",
+        "line": 49
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 136
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/character.ts",
+        "kind": "product",
+        "line": 87
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 110
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/objects.ts",
+        "kind": "product",
+        "line": 661
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/ui/world-workspace.ts",
+        "kind": "product",
+        "line": 92
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 99
+      },
+      {
+        "target": "window",
+        "type": "keyup",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 204
+      },
+      {
+        "target": "window",
+        "type": "keyup",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 135
+      },
+      {
+        "target": "window",
+        "type": "pagehide",
+        "source": "web/packages/app/src/main.ts",
+        "kind": "product",
+        "line": 53
+      },
+      {
+        "target": "window",
+        "type": "pageshow",
+        "source": "web/packages/app/src/bootstrap.ts",
+        "kind": "product",
+        "line": 13
+      },
+      {
+        "target": "window",
+        "type": "pointermove",
+        "source": "web/packages/app/src/ui/companion-stage.ts",
+        "kind": "product",
+        "line": 35
+      },
+      {
+        "target": "window",
+        "type": "popstate",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 212
+      },
+      {
+        "target": "window",
+        "type": "resize",
+        "source": "web/packages/app/src/atlas.ts",
+        "kind": "product",
+        "line": 34
+      }
+    ]
+  },
+  "authoredObjects": {
+    "objectIds": [],
+    "district": {
+      "logicalBuildings": 400,
+      "logicalSidewalks": 32,
+      "drawCalls": 16,
+      "residentBytes": 232454,
+      "visibleTiles": 1
+    }
+  },
+  "captureStates": [
+    {
+      "label": "start",
+      "pose": {
+        "x": "26.32",
+        "y": "1.62",
+        "z": "58.16999999999999",
+        "yaw": "1.064650843716541",
+        "pitch": "0.08",
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 0,
+        "frame": 228
+      },
+      "alongMetres": 0,
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "arrival",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d7265b8c2cac11ac",
+          "worldModules": "1",
+          "ownedDistrict": "nyc-flatiron-owned-v1",
+          "ownedBuildings": "400",
+          "ownedDrawCalls": "16",
+          "ownedResidentBytes": "232454",
+          "companionRenderer": "svg",
+          "ownedFrameMs": "16.80",
+          "ownedGeometryBytes": "4342608",
+          "characterTextureBytes": "0",
+          "actualDrawCalls": "0",
+          "playerPosition": "[26.32,1.62,58.16999999999999]",
+          "displayCameraPosition": "[-165.67999267578125,1.6200000047683716,58.16999816894531]",
+          "societyRendered": "0",
+          "societyNearby": "0"
+        },
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "resting",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "65.61698150634766",
+              "width": "92.70245361328125",
+              "height": "94.8440170288086",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "368.9375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "body",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 453883188,
+        "pointerLocked": false
+      }
+    },
+    {
+      "label": "midpoint",
+      "pose": {
+        "x": "-28.347851097296463",
+        "y": "1.62",
+        "z": "27.86711531329791",
+        "yaw": "1.064650843716541",
+        "pitch": "0.08",
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 0,
+        "frame": 2639
+      },
+      "alongMetres": "62.504709933986106",
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "companion",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d7265b8c2cac11ac",
+          "worldModules": "1",
+          "ownedDistrict": "nyc-flatiron-owned-v1",
+          "ownedBuildings": "400",
+          "ownedDrawCalls": "16",
+          "ownedResidentBytes": "232454",
+          "companionRenderer": "svg",
+          "ownedFrameMs": "16.80",
+          "ownedGeometryBytes": "4342608",
+          "characterTextureBytes": "0",
+          "actualDrawCalls": "29",
+          "playerPosition": "[-28.347851097296463,1.62,27.86711531329791]",
+          "displayCameraPosition": "[-220.3478546142578,1.6200000047683716,27.867115020751953]",
+          "societyRendered": "0",
+          "societyNearby": "0"
+        },
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "resting",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "65.61698150634766",
+              "width": "92.70245361328125",
+              "height": "94.8440170288086",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "368.9375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "button",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 444732122,
+        "pointerLocked": false
+      }
+    },
+    {
+      "label": "endpoint",
+      "pose": {
+        "x": "-83.01570428931008",
+        "y": "1.62",
+        "z": "-2.4357705345242318",
+        "yaw": "1.064650843716541",
+        "pitch": "0.08",
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 29,
+        "frame": 5022
+      },
+      "alongMetres": "125.00942226297529",
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "companion",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d7265b8c2cac11ac",
+          "worldModules": "1",
+          "ownedDistrict": "nyc-flatiron-owned-v1",
+          "ownedBuildings": "400",
+          "ownedDrawCalls": "16",
+          "ownedResidentBytes": "232454",
+          "companionRenderer": "svg",
+          "ownedFrameMs": "16.60",
+          "ownedGeometryBytes": "4342608",
+          "characterTextureBytes": "0",
+          "actualDrawCalls": "0",
+          "playerPosition": "[-83.01570428931008,1.62,-2.4357705345242318]",
+          "displayCameraPosition": "[-275.0157165527344,1.6200000047683716,-2.4357705116271973]",
+          "societyRendered": "0",
+          "societyNearby": "0"
+        },
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "resting",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "65.61698150634766",
+              "width": "92.70245361328125",
+              "height": "94.8440170288086",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "368.9375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "button",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 463185739,
+        "pointerLocked": false
+      }
+    }
+  ],
+  "trace": {
+    "frames": 4774,
+    "first": {
+      "x": "26.32",
+      "y": "1.62",
+      "z": "58.16999999999999",
+      "yaw": "1.064650843716541",
+      "pitch": "0.08",
+      "speed": 0
+    },
+    "last": {
+      "x": "-83.01570428931008",
+      "y": "1.62",
+      "z": "-2.4357705345242318",
+      "yaw": "1.064650843716541",
+      "pitch": "0.08",
+      "speed": 0
+    },
+    "recoveryMessages": []
+  }
+}

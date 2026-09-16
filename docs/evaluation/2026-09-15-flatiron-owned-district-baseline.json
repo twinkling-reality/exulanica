@@ -1,0 +1,1341 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "profile": "exulanica.visual-gate-flatiron-baseline/v1",
+    "date": "2026-09-16",
+    "status": "baseline_measured",
+    "verdict": "FAIL",
+    "base": "44bc1e4cfb8bf27d834cbbc5cf45b13ff444f46a",
+    "branch": "lane/gate-private",
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json",
+        "record_sha256": "c2418457d2b415333b99e3f88eeffc25c5dd21cb56154094ec017f0ba06be0fe"
+      },
+      {
+        "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json",
+        "record_sha256": "707680307dc962d4bb9fa73392ac5a0a0ef97480a9a0d8de0b38f248850f35d2"
+      },
+      {
+        "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json",
+        "record_sha256": "740118a00c0b084fbd179aca71cfff7f1d6d2b9be54b9fc74bde0094e26c4aef"
+      },
+      {
+        "path": "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json",
+        "record_sha256": "1499bed9ad55cbd3298c52c6be43386ac7ef6a8c6761782a39c9176148c6c01a"
+      },
+      {
+        "path": "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json",
+        "record_sha256": "30c3bd75047b1da83b6db6616f6deb8412ea40924e4b169bc6ff4644fc29342d"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "record_sha256": "caf3c54cbd14cc7be35702b4b0abb583d3db8f821628a6e6312d02b84758087a"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "record_sha256": "6cc00994c74ddf976c1bd3899dd637fdea4f4acf9e1b4e7605ea63426dd26c85"
+      },
+      {
+        "path": "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+        "record_sha256": "97b66da014db8457b6ef60e31ffea84eb3e3c37c821b019862bf2838f7bc8206"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5/visual-gate-rubric.md",
+        "byte_size": 13705,
+        "sha256": "8ae8a34a65c5102bbaa1a35e4661c75661b720e0b05f916f475fdd8761f38e84"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/browser-metrics.json",
+        "byte_size": 8550,
+        "sha256": "4e549bad534cc7e64b690f759b88f7de5d39886674218e9461c11f02f1699dcf"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/gate-measurements.json",
+        "byte_size": 36267,
+        "sha256": "5f03eb29ab9eff367473909d6a45e417a80e8976022189cf1d3f435907f0af9c"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/route-trace.json",
+        "byte_size": 182816,
+        "sha256": "1504888d2297a6daeef8ee7cb6b3f754b3cfa7270e56fc8b982177d8e32eb486"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-browser-metrics.json",
+        "byte_size": 8550,
+        "sha256": "d18f34e83551f12c61d06e909cd2a7ea12e72fc8c83c1a31ed69f4e3a0be426a"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-gate-measurements.json",
+        "byte_size": 36267,
+        "sha256": "dd9aa45cdcaae37ee2c2b2295c05b57e3ac6b1229c064a879a7fbb64f6c4331d"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-route-trace.json",
+        "byte_size": 183049,
+        "sha256": "154121e25ce0b2ed720551cb9658ab0d34a285c29a730b22569d9e488296751f"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/checks.log.txt",
+        "byte_size": 3768,
+        "sha256": "64340d2249bf7f841f9c00b178dadd9f2658ea3ce86672230750777274855668"
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-01-route-start.png",
+        "byte_size": 444447,
+        "sha256": "76ed5e64314833c8d264055f287250c540b209ff9b0ccf405e260cc30fb74371",
+        "label": "start",
+        "pose": {
+          "xMm": 26320,
+          "yMm": 1620,
+          "zMm": 58170,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-02-route-midpoint.png",
+        "byte_size": 465555,
+        "sha256": "53a1d0003624718ae88e40590ed0064a412371d35f1a307a870c75fd93d07ac3",
+        "label": "midpoint",
+        "pose": {
+          "xMm": -28348,
+          "yMm": 1620,
+          "zMm": 27867,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-03-route-endpoint.png",
+        "byte_size": 424391,
+        "sha256": "f138c4127aefc966b6ca3595b2e02f8585309afcddeb25fbdd009a7fd95e1823",
+        "label": "endpoint",
+        "pose": {
+          "xMm": -83016,
+          "yMm": 1620,
+          "zMm": -2436,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-01-route-start.png",
+        "byte_size": 432158,
+        "sha256": "b020be49fec353512d2da002f29b9fe0f41db07f984573c3bf738c4413ecd6c3",
+        "label": "start",
+        "pose": {
+          "xMm": 26320,
+          "yMm": 1620,
+          "zMm": 58170,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-02-route-midpoint.png",
+        "byte_size": 465555,
+        "sha256": "53a1d0003624718ae88e40590ed0064a412371d35f1a307a870c75fd93d07ac3",
+        "label": "midpoint",
+        "pose": {
+          "xMm": -28348,
+          "yMm": 1620,
+          "zMm": 27867,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-03-route-endpoint.png",
+        "byte_size": 424404,
+        "sha256": "45061622763f065228897ca7743df94449d55ab3333434ef60fee667471fc5ee",
+        "label": "endpoint",
+        "pose": {
+          "xMm": -83016,
+          "yMm": 1620,
+          "zMm": -2436,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      }
+    ],
+    "captures": [
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-01-route-start.png",
+        "byte_size": 444447,
+        "sha256": "76ed5e64314833c8d264055f287250c540b209ff9b0ccf405e260cc30fb74371",
+        "label": "start",
+        "pose": {
+          "xMm": 26320,
+          "yMm": 1620,
+          "zMm": 58170,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-02-route-midpoint.png",
+        "byte_size": 465555,
+        "sha256": "53a1d0003624718ae88e40590ed0064a412371d35f1a307a870c75fd93d07ac3",
+        "label": "midpoint",
+        "pose": {
+          "xMm": -28348,
+          "yMm": 1620,
+          "zMm": 27867,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      },
+      {
+        "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/capture-03-route-endpoint.png",
+        "byte_size": 424391,
+        "sha256": "f138c4127aefc966b6ca3595b2e02f8585309afcddeb25fbdd009a7fd95e1823",
+        "label": "endpoint",
+        "pose": {
+          "xMm": -83016,
+          "yMm": 1620,
+          "zMm": -2436,
+          "yawMicroradians": 1064651,
+          "pitchMicroradians": 80000
+        }
+      }
+    ],
+    "browser": {
+      "engine": "Chrome/152.0.7977.84 over the Chrome DevTools Protocol, driven by scripts/capture_visual_gate.mjs (no Playwright)",
+      "viewport": [
+        1440,
+        900
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+      "peakJsHeapMb": "523.47",
+      "firstMeaningfulRenderMs": "62911",
+      "frames": 3581,
+      "frameP95Ms": "16.7",
+      "fpsP1Low": "59.52",
+      "maxDrawCalls": 29,
+      "drawCallSources": {
+        "productWindowMax": 29,
+        "productWindowSeconds": 60,
+        "routeMax": 29,
+        "routeRenderedFrames": 4845,
+        "decidingMax": 29
+      },
+      "gpuError": 0,
+      "reticlePresent": true,
+      "companionPresent": true,
+      "authenticatedShellPresent": true,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "previewApi404s": [],
+      "authoredObjectIds": [],
+      "eyeHeightMetres": "1.62",
+      "measuredBy": "the product's own validation=1 recorder, read after its window closed"
+    },
+    "authenticationCondition": "credentialed-api",
+    "hardPass": {
+      "continuousTexturedStreetAndFacades": false,
+      "readsAsInhabitedStreet": false,
+      "noCutsOrFloatingGeometry": false,
+      "usefulEyeLevelMovement": true,
+      "completeCapsuleClearanceVerification": true,
+      "practicalBrowserBudget": true,
+      "companionPresent": true,
+      "reticlePresent": true,
+      "authenticatedShellAndAuthoredHandlersPreserved": true
+    },
+    "gate": {
+      "keySet": "exulanica.visual-gate-keys/v5",
+      "corridorBar": "all three pictures answered by picking yes, by the named judge, plus every mechanical key, against a baseline that does not itself hold every key",
+      "keys": {
+        "continuousTexturedStreetAndFacades": {
+          "evidenceKind": "mechanical",
+          "measurement": "textured-surface-coverage/v1",
+          "decidedBy": {
+            "streetAndFacadeTriangles": 54992,
+            "untexturedStreetAndFacadeTriangles": 54992,
+            "routeSupportGapSamples": 0
+          },
+          "value": false
+        },
+        "readsAsInhabitedStreet": {
+          "evidenceKind": "judged",
+          "rubric": "docs/visual-gate-rubric.md",
+          "rubricVersion": 5,
+          "rubricSha256": "8ae8a34a65c5102bbaa1a35e4661c75661b720e0b05f916f475fdd8761f38e84",
+          "answeredAgainst": {
+            "rubricVersion": 4,
+            "rubricSha256": "ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b",
+            "acceptedBecause": "version 5 shows the judge exactly what version 4 showed: the same question, guidance, requirement line, options, carried-words line and follow-up"
+          },
+          "judge": "Glendon",
+          "judgedOn": "2026-09-16",
+          "question": "Is this a finished, lived-in street? Yes or no, and say why in your own words.",
+          "guidance": "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.",
+          "requirement": "Pick Yes or No and type a few words why in the notes; the answer cannot be recorded without them.",
+          "options": [
+            "Yes, a finished, lived-in street",
+            "No, a plain block mock-up"
+          ],
+          "optionAnswers": {
+            "Yes, a finished, lived-in street": "yes",
+            "No, a plain block mock-up": "no"
+          },
+          "typedReplyRule": "A typed reply with no pick counts as no when it contains the whole word no, in any case, and does not contain the whole word yes. A typed reply never counts as yes; a yes must be picked. Any other typed reply is not an answer.",
+          "composition": "Each capture is shown alone, in route order, and the judge answers the one question with the option they mean and their own words. A typed reply with no pick counts as no when it holds the whole word no and not the whole word yes, and never counts as yes. An answer that arrives without words may be followed once, with the picture shown alone again, by a request for the reason, and that reply never changes the answer. A pick that the judge's own words, given right after it, may contradict is not recorded. Words the judge wrote about a picture before its question was reworded are carried into its next ask, under a line that says so; they are part of the reason for a no, and a yes needs new words. The first no makes the key false and the pictures after it are not asked. The key is true only when all three pictures got a picked yes. There is no score.",
+          "pictures": [
+            {
+              "label": "start",
+              "picture": "Picture 1 of 3",
+              "captureSha256": "76ed5e64314833c8d264055f287250c540b209ff9b0ccf405e260cc30fb74371",
+              "state": "answered",
+              "picked": null,
+              "answer": "no",
+              "readFrom": "the typed-reply rule",
+              "rubricVersion": 4,
+              "givenAt": "2026-09-16T18:31:45Z",
+              "words_sha256": "6c7a4385b37ad89f3f80dd86be4ed5419a147aca7922dbc9a0b25cf2b247061d",
+              "words_bytes": 198,
+              "words_private": true,
+              "typedBy": "Glendon",
+              "noticeAboveTheQuestion": "The question now has one meaning. Pick the answer you mean. The words you already wrote about this picture are kept; add more if you like.",
+              "carried": [
+                {
+                  "words_sha256": "d598e7129517538a3edb80913d00ab19363ef9e76fca31631ce8005cd8386ebe",
+                  "words_bytes": 65,
+                  "words_private": true,
+                  "typedBy": "Glendon",
+                  "rubricVersion": 3,
+                  "rubricSha256": "2a1c9c62451dc8ad18b3f870d74a021e6ed419cb6059fa6da0bd11927f9fc560",
+                  "givenAt": "2026-09-16T18:19:16Z",
+                  "givenAs": "a message sent right after picking Yes under rubric version 3"
+                }
+              ],
+              "reason": [
+                {
+                  "from": "earlier words",
+                  "rubricVersion": 3,
+                  "givenAt": "2026-09-16T18:19:16Z",
+                  "givenAs": "a message sent right after picking Yes under rubric version 3",
+                  "words_sha256": "d598e7129517538a3edb80913d00ab19363ef9e76fca31631ce8005cd8386ebe",
+                  "words_bytes": 65,
+                  "words_private": true
+                },
+                {
+                  "from": "reply",
+                  "rubricVersion": 4,
+                  "givenAt": "2026-09-16T18:31:45Z",
+                  "givenAs": "in reply to this ask",
+                  "words_sha256": "6c7a4385b37ad89f3f80dd86be4ed5419a147aca7922dbc9a0b25cf2b247061d",
+                  "words_bytes": 198,
+                  "words_private": true
+                }
+              ]
+            },
+            {
+              "label": "midpoint",
+              "picture": "Picture 2 of 3",
+              "captureSha256": "53a1d0003624718ae88e40590ed0064a412371d35f1a307a870c75fd93d07ac3",
+              "state": "not asked after a decisive no"
+            },
+            {
+              "label": "endpoint",
+              "picture": "Picture 3 of 3",
+              "captureSha256": "f138c4127aefc966b6ca3595b2e02f8585309afcddeb25fbdd009a7fd95e1823",
+              "state": "not asked after a decisive no"
+            }
+          ],
+          "decisiveNo": "start",
+          "value": false
+        },
+        "noCutsOrFloatingGeometry": {
+          "evidenceKind": "mechanical",
+          "measurement": "drawn-geometry-integrity/v1",
+          "decidedBy": {
+            "routeSupportGapSamples": 0,
+            "ringEdgesWithoutDrawnFacade": 0,
+            "componentsDetachedFromSupport": 9323,
+            "trianglesInsideBuildings": 5695
+          },
+          "value": false
+        },
+        "usefulEyeLevelMovement": {
+          "evidenceKind": "mechanical",
+          "measurement": "product-driven-route-trace/v1",
+          "decidedBy": {
+            "walkedDisplacementMm": 125009,
+            "maxLateralDeviationMm": 0,
+            "recoveryEvents": 0,
+            "harnessPositionWrites": 0,
+            "traceSamples": 2502,
+            "routeSupportGapSamples": 0,
+            "maxEyeHeightErrorMm": 25,
+            "maxSupportResampleDeltaMm": 25
+          },
+          "value": true
+        },
+        "completeCapsuleClearanceVerification": {
+          "evidenceKind": "mechanical",
+          "measurement": "capsule-clearance/v1",
+          "decidedBy": {
+            "capsuleSamples": 2502,
+            "capsuleSamplesChecked": 2502,
+            "capsuleTriangleContactSamples": 0,
+            "capsuleRingContactSamples": 0
+          },
+          "value": true
+        },
+        "practicalBrowserBudget": {
+          "evidenceKind": "mechanical",
+          "measurement": "browser-envelope/v1",
+          "decidedBy": {
+            "environmentTransferredBytes": 232730,
+            "drawnTriangles": 63730,
+            "environmentDecodedTextureBytes": 0,
+            "maxDrawCalls": 29,
+            "gpuErrors": 0,
+            "pageErrors": 0
+          },
+          "value": true
+        },
+        "companionPresent": {
+          "evidenceKind": "mechanical",
+          "measurement": "live-dom-companion/v1",
+          "decidedBy": {
+            "captures": 3,
+            "capturesWithCompanionShown": 3
+          },
+          "value": true
+        },
+        "reticlePresent": {
+          "evidenceKind": "mechanical",
+          "measurement": "live-dom-reticle/v1",
+          "decidedBy": {
+            "captures": 3,
+            "capturesWithReticleCentred": 3
+          },
+          "value": true
+        },
+        "authenticatedShellAndAuthoredHandlersPreserved": {
+          "evidenceKind": "mechanical",
+          "measurement": "product-shell-and-listeners/v1",
+          "decidedBy": {
+            "captures": 3,
+            "capturesInProductShell": 3,
+            "foreignListeners": 0,
+            "productWindowKeydownListeners": 5,
+            "interactionsNotCarriedByProduct": 0,
+            "substitutedPages": 0
+          },
+          "value": true
+        }
+      },
+      "failedKeys": [
+        "continuousTexturedStreetAndFacades",
+        "readsAsInhabitedStreet",
+        "noCutsOrFloatingGeometry"
+      ]
+    },
+    "reason": "The shipped Flatiron district, scored unmodified inside the authenticated product shell, fails the reconciled block. It fails continuousTexturedStreetAndFacades, because 54,992 walking-surface and facade triangles were drawn and 54,992 of them are untextured; readsAsInhabitedStreet, because the named judge typed a reply to Picture 1 of 3 (start) in place of a pick, and the rubric's typed-reply rule reads it as no, so Picture 2 of 3 and Picture 3 of 3 were not asked; noCutsOrFloatingGeometry, because 9,323 drawn components have no chain of contact to the walking surface and 5,695 drawn triangles lie inside building volumes. It holds usefulEyeLevelMovement, because the product's own movement carried the player 125,009 mm with 0 mm lateral deviation, 0 support gaps and a largest eye-height error of 25 mm over 2,502 samples; completeCapsuleClearanceVerification, because 2,502 of 2,502 samples were checked with 0 triangle and 0 ring contacts; practicalBrowserBudget, because 232,730 environment bytes, 63,730 drawn triangles, 0 decoded environment texture bytes and 29 draw calls, with 0 GPU errors and 0 uncaught page exceptions; companionPresent, because the Companion was shown in 3 of 3 captures; reticlePresent, because the reticle was drawn and centred in 3 of 3 captures; authenticatedShellAndAuthoredHandlersPreserved, because 3 of 3 captures were taken in the product shell with a mounted world; of the listeners on the window, document and canvas, 30 came from the product's modules and 0 from anywhere else; 0 interactions were not carried by the product's own handlers and 0 pages were substituted.",
+    "checks": {
+      "harnessRuns": 2,
+      "repeatKeySetIdentical": true,
+      "recordBuilderAgreedWithHarnessOnEveryMechanicalKey": true,
+      "scoredFilesIdenticalToHead": true,
+      "checksRunBeforeThisRecordWasWritten": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/checks.log.txt"
+    },
+    "claimsNotMade": [
+      "No capture shows observed street geometry. The building footprints and heights come from NYC Open Data and are extruded by the renderer; the ground and the road are generated, and the artifact marks both generated: true; windows, cornices, doors, rooftop boxes, trees, lamps and every colour are invented by the compiler or the renderer and observe nothing.",
+      "No texture is claimed. None is bound anywhere in the district, and the decoded environment texture bytes were measured as zero.",
+      "Frame time, low-percentile frame rate, heap and first render are measurements of this machine in this run, over the product's own measuring window of 60 seconds. They are reported and do not decide any key.",
+      "The page also fetched the credentialed workspace's retained reconstruction (210 geometry reads), which weighs on the page transfer and the heap. When the scene was read, the cameras' layers drew nothing but the 16 render mesh instances the triangle measurements read: no point instance, no line, no other mesh and no enabled splat.",
+      "Pointer lock was not held at any sampled moment (when the heading was written, after each focus click and at each capture). The heading was set by writing the controls' yaw once, and every position came from the product's own movement.",
+      "readsAsInhabitedStreet was answered by the named judge, one picture at a time, under rubric version 4, and read under rubric version 5, which shows the judge the same words and changes only how a typed reply is read. No model judged any picture: no model produced, suggested, pre-filled or ranked an answer, and the key stays reserved to the named human judge. Nothing beyond the rubric's typed-reply rule was inferred from the judge's words, which are kept exactly as typed in this record's private companion; this record carries their SHA-256 and byte count.",
+      "The typed-reply rule of rubric version 5 was adopted after the reply this record reads was given, and that reply is the rule's first application. The judge had declined further questions about these pictures, so none was asked again.",
+      "What the judge gave about these captures under rubric version 2, and the pick given under version 3, are not this record's answer. They are calibration evidence in the version 3 and version 4 reconciliation records, and no key value here is taken from them; the version 2 reply is not re-read under version 5. Where a picture's reason includes words the judge wrote under an earlier version, the ask said they were kept, and each is labelled with when and under which version it was given.",
+      "A picture listed as not asked after a decisive no was not shown to the judge for an answer, and nothing is claimed about how it would have been answered.",
+      "The three retained rejections are not scored or re-scored here.",
+      "The Flatiron artifact and its renderer were scored unmodified and were not regenerated.",
+      "Nothing is claimed about any street, district or city beyond the route walked.",
+      "The credential is a lane-local development token for a scratch copy of the retained judge seed. Nothing is claimed about accounts or production credentials."
+    ],
+    "judgeWords": {
+      "path": ".exulanica/judge-words/2026-09-15-flatiron-owned-district-baseline.json",
+      "byte_size": 1531,
+      "sha256": "48325d905b432674d0bd4d24b2b66e557a6d1ef20aa6547003148910f9d26533",
+      "tracked": false,
+      "holds": "every reply the judge gave for this record, words included, with the time and rubric version each was given under; this record carries the SHA-256 and byte count of the words in their place"
+    },
+    "naming": "The file name carries 2026-09-15, the date the phase 0 plan fixed for it; date is the day the run was made.",
+    "procedure": {
+      "companion": "The product gives the keyboard to one owner at a time and turns walking off while the Companion is open. The Companion was therefore summoned with X for each capture, so it is open in all three, and dismissed with Escape before each walk.",
+      "click": "Without pointer lock the product walks only while the world canvas has keyboard focus. Before each walk that needed it, one left click landed on the world canvas, the gesture the product's arrival prompt asks for; every listener on the canvas is the product's own, and the canvas then held keyboard focus, which is how key set version 3 counts a click as carried by the product.",
+      "interactions": [
+        "summon-companion",
+        "dismiss-companion",
+        "focus-world",
+        "walk",
+        "summon-companion",
+        "dismiss-companion",
+        "walk",
+        "summon-companion"
+      ]
+    },
+    "measuredUnder": {
+      "keySet": "exulanica.visual-gate-keys/v2",
+      "commit": "83b17ea6cca0dfaac35bcfab255702ed001b6536",
+      "scoredUnder": "exulanica.visual-gate-keys/v5",
+      "note": "The runs were measured by the code at this commit, whose loom-gate package still named key set version 2. Versions 3, 4 and 5 moved no measurement, threshold or mechanical decision, as their reconciliation records state, so the same numbers decide every key under the version this record is scored under."
+    },
+    "scored": {
+      "artifact": {
+        "path": "assets/owned-world/flatiron/flatiron-owned-district.json",
+        "byte_size": 232454,
+        "sha256": "22fbde04028124ded8cb5e6bf08642706ed845a946f627499e8245aae9d28580",
+        "gitBlob": "34c14f2532bb324e2b59cba52849a18fee1e6437",
+        "identicalToHead": true,
+        "profile": "exulanica.owned-district/v1",
+        "districtId": "nyc-flatiron-owned-v1"
+      },
+      "renderer": {
+        "path": "web/packages/atlas-react/src/playcanvas/owned-district-runtime.ts",
+        "byte_size": 43086,
+        "sha256": "4e3147c9ab7b5bbc09cf6d86439c14dd81f35e1a547ae50303e69dab345bd2d3",
+        "gitBlob": "4307b868a7bbbb3590a804bd6a9cac49419e29ea",
+        "identicalToHead": true
+      },
+      "measuredBy": [
+        {
+          "path": "scripts/capture_visual_gate.mjs",
+          "byte_size": 56718,
+          "sha256": "38a92819f0123897ff329aef2741a39a9211169ff3d12020e1699f6df2eb9a83",
+          "gitBlob": "b32ee00d92800c8f3a51efae2d73e90ddde414b7",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/geometry.ts",
+          "byte_size": 8806,
+          "sha256": "60da7e1646bc804d80d9b9b83cff284712cd15f1edb78f2fcdae3965890d7f30",
+          "gitBlob": "6f875c9ba5dea3b9d03795df4ae7333dbafcd4be",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/grid.ts",
+          "byte_size": 2129,
+          "sha256": "099d0e3ad496cc5ee5d3cff7b6de8d0d374d67776a3332414f6f943b17916a00",
+          "gitBlob": "8ccacb13a356d0e4084561ae05b0a025fe1a104b",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/index.ts",
+          "byte_size": 1414,
+          "sha256": "17f16ccc81037a880d96cff19bb124e76036c90109ddf12a0f07f96451d98bf0",
+          "gitBlob": "0c5060a94602192a3829f4f812a9da48851a8527",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/keys.ts",
+          "byte_size": 8181,
+          "sha256": "4a7fdd5b68d5065347aae27b9e8d0c944474b3ceb6ad78485d6a7eb59f38aeba",
+          "gitBlob": "6dc7df20e59d180f97a45c542c5b5ba2c5472ab1",
+          "identicalToHead": false
+        },
+        {
+          "path": "web/packages/loom-gate/src/measure.ts",
+          "byte_size": 7391,
+          "sha256": "2b82072a991121754b0623a9a83f8970fefa4d5db2559cf9d52b2bf0d423c633",
+          "gitBlob": "bb007bcbd169f8f98537f8f25441d9b16c52ed3a",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/route.ts",
+          "byte_size": 17698,
+          "sha256": "e808d82c5a11d408b618596d4985bbf8bda9f4cbcb60358b1d2efb5e35ff89f8",
+          "gitBlob": "eb18a18f9d17d13b57907a42cd984719f7aa58b6",
+          "identicalToHead": true
+        },
+        {
+          "path": "web/packages/loom-gate/src/scene.ts",
+          "byte_size": 24949,
+          "sha256": "6a768673b962d4b82639716bd30c47df2647b61292eaef930d2f3d2bc62b5dc6",
+          "gitBlob": "c72cc402cc562d43d71f1bde8e9d07389b327374",
+          "identicalToHead": true
+        }
+      ],
+      "earlierRecordOfThisArtifact": {
+        "path": "docs/evaluation/2026-09-13-owned-world-local-proof.json",
+        "record_sha256": "aebbde9e2d0d8d641c9fe1618842fcc87166785ce308129bb5d7d8e9550e3fd0",
+        "boundArtifactByteSize": 232452,
+        "boundArtifactSha256": "7d9a0c2fb8dbe4d875cbf61b162caa8484fa962b2b8841cdeba9bf657f540782",
+        "sameArtifact": false,
+        "hasHardPassBlock": false
+      }
+    },
+    "contentPlanes": {
+      "buildingFootprintsAndHeights": "source-derived, NYC Open Data dataset 5zhs-2jue, as recorded in the artifact's source records",
+      "sidewalkOutlines": "source-derived, NYC Open Data dataset 52n9-sdep, drawn by the renderer as fans from each outline's centroid",
+      "groundAndRoad": "generated: the artifact's ground and road_completion are generated: true",
+      "facadeDetailAndStreetFurniture": "invented at draw time by the renderer and not present in the artifact",
+      "materials": "assigned by the compiler from an integer index, not observed"
+    },
+    "authentication": {
+      "condition": "credentialed-api",
+      "relativeToMelbourne": "stronger: Melbourne used the Vite-only preview API; this run used a real bearer token against a real API that refused the same read without one",
+      "anonymousGraphReadStatus": 401,
+      "apiResponses": {
+        "GET /api/graph 200": 2,
+        "GET /api/world/styles/catalog 200": 1,
+        "GET /api/world/styles/current 200": 1,
+        "GET /api/world/styles/versions 200": 1,
+        "GET /api/world/interactions/current 200": 1,
+        "GET /api/graph/sources 200": 2,
+        "GET /api/world/source-media 200": 2,
+        "GET /api/evidence/{id}/masked 200": 420,
+        "GET /api/geometry/{id} 200": 210,
+        "GET /api/geometry 200": 1,
+        "GET /api/companion/memory/recent 200": 1,
+        "GET /api/formation 200": 2,
+        "GET /api/world/assets 200": 1,
+        "GET /api/world/versions 200": 1,
+        "GET /api/formation/{id} 200": 2,
+        "GET /api/person-regions/{id} 200": 210,
+        "GET /api/personal-admission 200": 1
+      },
+      "previewApiRequests": [],
+      "apiDatabase": {
+        "role": "exulanica_app",
+        "database": "exulanica_gatebaseline_0916_test",
+        "superuser": false,
+        "bypassRls": false,
+        "ownsRowLevelSecurityTable": false,
+        "schemaHead": "0063"
+      },
+      "bootGuard": "exulanica/api/app.py calls assert_runtime_role at startup, which refuses a superuser, a BYPASSRLS role or an owner of a row-level-security table",
+      "workspace": {
+        "id": "79004d44-ca24-4d17-9eef-56786415e233",
+        "description": "the judge seed's volcanic workspace, the only workspace in that seed with a scene group, which the Atlas needs before it mounts"
+      },
+      "credential": "a lane-local development token given to the dev server as VITE_EXULANICA_TOKEN, never read by the harness and never recorded"
+    },
+    "route": {
+      "rule": "From the product's arrival pose, every heading at half-degree steps; a heading qualifies when a 0.34 m capsule clears the route length plus the stop margin; the most 1 m samples with collision rings within the frontage search on both sides wins, then the heading most parallel to that frontage, then the smaller angle.",
+      "startMm": [
+        26320,
+        58170
+      ],
+      "headingMillidegrees": 61000,
+      "clearRunMm": 416547,
+      "frontageSamples": 126,
+      "frontageBothSidesSamples": 114,
+      "meanFrontageSkewMillionths": 2010,
+      "candidatesTried": 720,
+      "candidatesQualified": 242,
+      "obstacles": 400,
+      "fieldBoundsCm": [
+        -33800,
+        -33200,
+        33800,
+        33200
+      ],
+      "ruleParameters": {
+        "lengthMm": 125000,
+        "stopMarginMm": 6000,
+        "frontageSearchMm": 40000,
+        "headingStepMillidegrees": 500,
+        "frontageSampleSpacingMm": 1000
+      },
+      "arrivalPose": {
+        "xMm": 26320,
+        "yMm": 1620,
+        "zMm": 58170,
+        "yawMicroradians": -3141593,
+        "pitchMicroradians": 80000
+      },
+      "captureAlongRouteMm": [
+        0,
+        62505,
+        125009
+      ]
+    },
+    "movement": {
+      "interactions": [
+        {
+          "kind": "summon-companion",
+          "key": "KeyX",
+          "at": "start",
+          "carriedByProduct": true
+        },
+        {
+          "kind": "dismiss-companion",
+          "key": "Escape",
+          "at": "start",
+          "carriedByProduct": true
+        },
+        {
+          "kind": "focus-world",
+          "input": "left click on the world canvas",
+          "at": "start",
+          "point": {
+            "x": 720,
+            "y": 450
+          },
+          "carriedByProduct": true
+        },
+        {
+          "kind": "walk",
+          "key": "KeyW",
+          "heldMs": 37879,
+          "autoRepeat": {
+            "delayMs": 250,
+            "intervalMs": 33,
+            "repeatedKeyDowns": 1141
+          },
+          "targetAlongMm": 62500,
+          "displacementMillimetres": 62505,
+          "carriedByProduct": true
+        },
+        {
+          "kind": "summon-companion",
+          "key": "KeyX",
+          "at": "midpoint",
+          "carriedByProduct": true
+        },
+        {
+          "kind": "dismiss-companion",
+          "key": "Escape",
+          "at": "midpoint",
+          "carriedByProduct": true
+        },
+        {
+          "kind": "walk",
+          "key": "KeyW",
+          "heldMs": 37997,
+          "autoRepeat": {
+            "delayMs": 250,
+            "intervalMs": 33,
+            "repeatedKeyDowns": 1144
+          },
+          "targetAlongMm": 125000,
+          "displacementMillimetres": 62505,
+          "carriedByProduct": true
+        },
+        {
+          "kind": "summon-companion",
+          "key": "KeyX",
+          "at": "endpoint",
+          "carriedByProduct": true
+        }
+      ],
+      "harnessWrites": [
+        {
+          "field": "controls.state.yaw",
+          "valueMicroradians": 1064651,
+          "why": "mouse look needs pointer movement under a held lock, which the harness does not synthesize; the heading is written once and no position is written"
+        }
+      ],
+      "harnessObservers": [
+        "one engine update listener that copies the controls state each frame while the walk runs",
+        "one engine frameend listener that keeps the largest per-frame draw call count from the start capture to the endpoint capture",
+        "one MutationObserver on the travel status that records failure messages while the walk runs"
+      ],
+      "traceFrames": 4774,
+      "walk": {
+        "walkedDisplacementMm": 125009,
+        "walkedPathMm": 125009,
+        "maxLateralDeviationMm": 0,
+        "traceSamples": 2502,
+        "routeSupportGapSamples": 0,
+        "maxEyeHeightErrorMm": 25,
+        "maxSupportResampleDeltaMm": 25,
+        "eyeHeightAboveDrawnSupportMm": {
+          "minimum": 1595,
+          "maximum": 1620
+        }
+      }
+    },
+    "integrity": {
+      "components": 11382,
+      "supportComponents": 44,
+      "componentsDetachedFromSupport": 9323,
+      "detachedTriangles": 19244,
+      "detachedByMesh": {
+        "geographic-environment/owned-district/owned-building-memory-windows#0": 8641,
+        "geographic-environment/owned-district/owned-building-cornices#0": 682
+      },
+      "detachedExamples": [
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            2700,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            2700,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            2700,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            2700,
+            -113100
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            6900,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            6900,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            6900,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            6900,
+            -113100
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -47693,
+            11100,
+            -127590
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -50378,
+            11100,
+            -122760
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -53063,
+            11100,
+            -117930
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/owned-district/owned-building-memory-windows#0"
+          ],
+          "triangles": 2,
+          "lowestMm": [
+            -55748,
+            11100,
+            -113100
+          ]
+        }
+      ],
+      "trianglesInsideBuildings": 5695,
+      "componentsInsideBuildings": 2523,
+      "insideByMesh": {
+        "geographic-environment/owned-district/owned-buildings-0#0": 10,
+        "geographic-environment/owned-district/owned-buildings-1#0": 8,
+        "geographic-environment/owned-district/owned-buildings-2#0": 2,
+        "geographic-environment/owned-district/owned-buildings-4#0": 12,
+        "geographic-environment/owned-district/owned-buildings-5#0": 2,
+        "geographic-environment/owned-district/owned-buildings-6#0": 15,
+        "geographic-environment/owned-district/owned-building-roofs#0": 3,
+        "geographic-environment/owned-district/owned-building-memory-windows#0": 3795,
+        "geographic-environment/owned-district/owned-building-cornices#0": 1541,
+        "geographic-environment/owned-district/owned-building-architectural-details#0": 13,
+        "geographic-environment/owned-district/owned-street-tree-trunks#0": 90,
+        "geographic-environment/owned-district/owned-street-tree-canopies#0": 72,
+        "geographic-environment/owned-district/owned-street-lamps#0": 132
+      },
+      "buildingsWithDrawnGeometryInside": [
+        "doitt_id:1001203",
+        "doitt_id:1014857",
+        "doitt_id:1026073",
+        "doitt_id:1031870",
+        "doitt_id:1040714",
+        "doitt_id:105267",
+        "doitt_id:105594",
+        "doitt_id:1075771",
+        "doitt_id:1081732",
+        "doitt_id:1094856",
+        "doitt_id:1107079",
+        "doitt_id:1108005",
+        "doitt_id:1109618",
+        "doitt_id:1114315",
+        "doitt_id:111766",
+        "doitt_id:1117751",
+        "doitt_id:1118932",
+        "doitt_id:1119061",
+        "doitt_id:1119067",
+        "doitt_id:1223536",
+        "doitt_id:124131",
+        "doitt_id:126638",
+        "doitt_id:127355",
+        "doitt_id:1279565",
+        "doitt_id:1284463",
+        "doitt_id:1284682",
+        "doitt_id:1290571",
+        "doitt_id:1290984",
+        "doitt_id:1303193",
+        "doitt_id:134188",
+        "doitt_id:135329",
+        "doitt_id:137870",
+        "doitt_id:146248",
+        "doitt_id:148924",
+        "doitt_id:149336",
+        "doitt_id:15122",
+        "doitt_id:151674",
+        "doitt_id:154087",
+        "doitt_id:155819",
+        "doitt_id:157961",
+        "doitt_id:161884",
+        "doitt_id:166588",
+        "doitt_id:174303",
+        "doitt_id:185474",
+        "doitt_id:190047",
+        "doitt_id:193746",
+        "doitt_id:198213",
+        "doitt_id:201567",
+        "doitt_id:203088",
+        "doitt_id:204150",
+        "doitt_id:206555",
+        "doitt_id:207768",
+        "doitt_id:214759",
+        "doitt_id:219573",
+        "doitt_id:220559",
+        "doitt_id:224533",
+        "doitt_id:232206",
+        "doitt_id:23541",
+        "doitt_id:237118",
+        "doitt_id:242070",
+        "doitt_id:245862",
+        "doitt_id:246299",
+        "doitt_id:247843",
+        "doitt_id:252993",
+        "doitt_id:254694",
+        "doitt_id:256199",
+        "doitt_id:271789",
+        "doitt_id:285504",
+        "doitt_id:289399",
+        "doitt_id:289528",
+        "doitt_id:298804",
+        "doitt_id:30191",
+        "doitt_id:302231",
+        "doitt_id:30441",
+        "doitt_id:306802",
+        "doitt_id:306803",
+        "doitt_id:308428",
+        "doitt_id:316289",
+        "doitt_id:316825",
+        "doitt_id:3247",
+        "doitt_id:325322",
+        "doitt_id:326975",
+        "doitt_id:329611",
+        "doitt_id:334863",
+        "doitt_id:337334",
+        "doitt_id:337492",
+        "doitt_id:343622",
+        "doitt_id:344619",
+        "doitt_id:345056",
+        "doitt_id:346150",
+        "doitt_id:348114",
+        "doitt_id:353727",
+        "doitt_id:355751",
+        "doitt_id:361098",
+        "doitt_id:365172",
+        "doitt_id:368018",
+        "doitt_id:368155",
+        "doitt_id:372851",
+        "doitt_id:374818",
+        "doitt_id:384829",
+        "doitt_id:385738",
+        "doitt_id:394065",
+        "doitt_id:398035",
+        "doitt_id:398337",
+        "doitt_id:407381",
+        "doitt_id:408699",
+        "doitt_id:414238",
+        "doitt_id:419370",
+        "doitt_id:419959",
+        "doitt_id:431596",
+        "doitt_id:431838",
+        "doitt_id:435142",
+        "doitt_id:439560",
+        "doitt_id:442697",
+        "doitt_id:443368",
+        "doitt_id:44716",
+        "doitt_id:448228",
+        "doitt_id:450428",
+        "doitt_id:459502",
+        "doitt_id:467682",
+        "doitt_id:469025",
+        "doitt_id:48371",
+        "doitt_id:487694",
+        "doitt_id:491967",
+        "doitt_id:494058",
+        "doitt_id:502262",
+        "doitt_id:506044",
+        "doitt_id:50656",
+        "doitt_id:507159",
+        "doitt_id:523226",
+        "doitt_id:526761",
+        "doitt_id:53088",
+        "doitt_id:532718",
+        "doitt_id:537532",
+        "doitt_id:538655",
+        "doitt_id:542401",
+        "doitt_id:543227",
+        "doitt_id:55021",
+        "doitt_id:554300",
+        "doitt_id:556804",
+        "doitt_id:557493",
+        "doitt_id:558022",
+        "doitt_id:558964",
+        "doitt_id:559700",
+        "doitt_id:559702",
+        "doitt_id:568534",
+        "doitt_id:569441",
+        "doitt_id:58036",
+        "doitt_id:585106",
+        "doitt_id:587981",
+        "doitt_id:588734",
+        "doitt_id:589077",
+        "doitt_id:591564",
+        "doitt_id:597212",
+        "doitt_id:606309",
+        "doitt_id:60754",
+        "doitt_id:611499",
+        "doitt_id:613009",
+        "doitt_id:619083",
+        "doitt_id:619454",
+        "doitt_id:623672",
+        "doitt_id:628210",
+        "doitt_id:63187",
+        "doitt_id:632385",
+        "doitt_id:639224",
+        "doitt_id:640216",
+        "doitt_id:641061",
+        "doitt_id:645461",
+        "doitt_id:650961",
+        "doitt_id:653237",
+        "doitt_id:653292",
+        "doitt_id:659850",
+        "doitt_id:664502",
+        "doitt_id:668399",
+        "doitt_id:669181",
+        "doitt_id:671400",
+        "doitt_id:677357",
+        "doitt_id:681861",
+        "doitt_id:700068",
+        "doitt_id:701241",
+        "doitt_id:702116",
+        "doitt_id:703617",
+        "doitt_id:711564",
+        "doitt_id:71159",
+        "doitt_id:718548",
+        "doitt_id:72049",
+        "doitt_id:756986",
+        "doitt_id:758585",
+        "doitt_id:758711",
+        "doitt_id:762688",
+        "doitt_id:763165",
+        "doitt_id:764827",
+        "doitt_id:766252",
+        "doitt_id:766320",
+        "doitt_id:770658",
+        "doitt_id:772270",
+        "doitt_id:772464",
+        "doitt_id:777783",
+        "doitt_id:780044",
+        "doitt_id:781216",
+        "doitt_id:786980",
+        "doitt_id:812979",
+        "doitt_id:814160",
+        "doitt_id:817209",
+        "doitt_id:833389",
+        "doitt_id:833876",
+        "doitt_id:834935",
+        "doitt_id:84585",
+        "doitt_id:848706",
+        "doitt_id:853274",
+        "doitt_id:867730",
+        "doitt_id:89840",
+        "doitt_id:94965",
+        "doitt_id:96025",
+        "doitt_id:970360",
+        "doitt_id:974209",
+        "doitt_id:978387",
+        "doitt_id:990153",
+        "doitt_id:990197",
+        "doitt_id:996655",
+        "doitt_id:99924"
+      ],
+      "ringEdges": 3611,
+      "ringEdgesWithoutDrawnFacade": 0,
+      "ringEdgeExamples": []
+    },
+    "capsule": {
+      "capsuleSamples": 2502,
+      "capsuleSamplesChecked": 2502,
+      "capsuleTriangleContactSamples": 0,
+      "capsuleRingContactSamples": 0,
+      "minCapsuleTriangleClearanceMm": 3451,
+      "minCapsuleRingClearanceMm": 3531,
+      "contactExamples": []
+    },
+    "classification": {
+      "drawnMeshes": 16,
+      "drawnTriangles": 63730,
+      "walkingTriangles": 23993,
+      "facadeTriangles": 30999,
+      "untexturedWalkingTriangles": 23993,
+      "untexturedFacadeTriangles": 30999,
+      "texturedMeshes": 0,
+      "deviceTextureBytes": 16818072,
+      "environmentTextures": 0
+    },
+    "listeners": {
+      "product": 30,
+      "dev-server": 1,
+      "foreign": 0
+    },
+    "melbourneComparison": {
+      "note": "Melbourne's values are quoted from its retained record for comparison. Only the first four decide practicalBrowserBudget; the rest vary between runs and are reported, not gated.",
+      "environmentTransferredBytes": {
+        "flatiron": 232730,
+        "melbourne": 28247006
+      },
+      "drawnTriangles": {
+        "flatiron": 63730,
+        "melbourne": 227173
+      },
+      "environmentDecodedTextureBytes": {
+        "flatiron": 0,
+        "melbourne": 167772160
+      },
+      "maxDrawCalls": {
+        "flatiron": 29,
+        "melbourne": 87
+      },
+      "frames": {
+        "flatiron": 3581,
+        "melbourne": 1321
+      },
+      "frameP95Ms": {
+        "flatiron": "16.7",
+        "melbourne": "16.7"
+      },
+      "fpsP1Low": {
+        "flatiron": "59.52",
+        "melbourne": "59.52"
+      },
+      "peakJsHeapMb": {
+        "flatiron": "523.47",
+        "melbourne": "88.51"
+      },
+      "firstMeaningfulRenderMs": {
+        "flatiron": "62911",
+        "melbourne": "455.1"
+      },
+      "gpuError": {
+        "flatiron": 0,
+        "melbourne": 0
+      },
+      "completeCapsuleClearanceVerification": {
+        "flatiron": true,
+        "melbourne": false
+      },
+      "gpu": {
+        "flatiron": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+        "melbourne": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)"
+      }
+    },
+    "repeatRun": {
+      "run": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-gate-measurements.json",
+      "keySetIdentical": true,
+      "mechanicalKeysIdentical": true,
+      "mechanicalFieldsThatDiffered": {},
+      "captures": [
+        {
+          "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-01-route-start.png",
+          "byte_size": 432158,
+          "sha256": "b020be49fec353512d2da002f29b9fe0f41db07f984573c3bf738c4413ecd6c3",
+          "label": "start",
+          "pose": {
+            "xMm": 26320,
+            "yMm": 1620,
+            "zMm": 58170,
+            "yawMicroradians": 1064651,
+            "pitchMicroradians": 80000
+          }
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-02-route-midpoint.png",
+          "byte_size": 465555,
+          "sha256": "53a1d0003624718ae88e40590ed0064a412371d35f1a307a870c75fd93d07ac3",
+          "label": "midpoint",
+          "pose": {
+            "xMm": -28348,
+            "yMm": 1620,
+            "zMm": 27867,
+            "yawMicroradians": 1064651,
+            "pitchMicroradians": 80000
+          }
+        },
+        {
+          "path": "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/repeat-capture-03-route-endpoint.png",
+          "byte_size": 424404,
+          "sha256": "45061622763f065228897ca7743df94449d55ab3333434ef60fee667471fc5ee",
+          "label": "endpoint",
+          "pose": {
+            "xMm": -83016,
+            "yMm": 1620,
+            "zMm": -2436,
+            "yawMicroradians": 1064651,
+            "pitchMicroradians": 80000
+          }
+        }
+      ],
+      "captureDisplacementFromFirstRunMm": [
+        0,
+        0,
+        0
+      ],
+      "variableMeasurements": {
+        "frames": [
+          3581,
+          3585
+        ],
+        "frameP95Ms": [
+          "16.7",
+          "16.7"
+        ],
+        "fpsP1Low": [
+          "59.52",
+          "59.52"
+        ],
+        "peakJsHeapMb": [
+          "523.47",
+          "516.84"
+        ],
+        "firstMeaningfulRenderMs": [
+          "62911",
+          "54606"
+        ],
+        "maxDrawCalls": [
+          29,
+          29
+        ]
+      },
+      "judgedKey": "Not re-scored. The judge answered for the first run's captures. The repeat run's captures are start 0 mm from the first run's pose, midpoint byte-identical to the first run's, endpoint 0 mm from the first run's pose."
+    },
+    "judgement": {
+      "judge": "Glendon",
+      "judgedOn": "2026-09-16",
+      "rubric": "docs/visual-gate-rubric.md",
+      "rubricVersion": 5,
+      "rubricCopy": "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5/visual-gate-rubric.md",
+      "answeredAgainst": {
+        "rubricVersion": 4,
+        "rubricSha256": "ad66410202ee39eca938db435fa7417dabd342a075f48567df316c2db706bb0b",
+        "acceptedBecause": "version 5 shows the judge exactly what version 4 showed: the same question, guidance, requirement line, options, carried-words line and follow-up"
+      },
+      "answeredFrom": "each capture above, shown alone at full size under its picture title and followed by its one question, in route order, stopping at the first no",
+      "askedIn": "the Claude chat: the start capture was sent alone as a file with its picture title, then asked with one question tool call whose question was the carried-words line above the rubric version 4 prompt, offering the two version 4 options; the judge picked no option and typed a reply, which rubric version 5 reads; the judge declined further questions, and the pictures after the decisive no were not asked",
+      "prompts": {
+        "start": "Picture 1 of 3\n\nIs this a finished, lived-in street? Yes or no, and say why in your own words.\n\nA yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.\n\nPick Yes or No and type a few words why in the notes; the answer cannot be recorded without them."
+      },
+      "shown": {
+        "start": "The question now has one meaning. Pick the answer you mean. The words you already wrote about this picture are kept; add more if you like.\n\nPicture 1 of 3\n\nIs this a finished, lived-in street? Yes or no, and say why in your own words.\n\nA yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.\n\nPick Yes or No and type a few words why in the notes; the answer cannot be recorded without them."
+      },
+      "followUps": {},
+      "options": [
+        "Yes, a finished, lived-in street",
+        "No, a plain block mock-up"
+      ]
+    },
+    "observations": [
+      "owned-sidewalks#0 draws 24,062 flat triangles with back-face culling, and only 23,991 of them face upward as a floor; the rest face down and are not drawn from above.",
+      "Components with no chain of contact to the walking surface, by mesh: owned-building-cornices#0 682, owned-building-memory-windows#0 8,641. They are planes offset from their walls with nothing joining them.",
+      "Drawn triangles inside building volumes, by mesh: owned-building-architectural-details#0 13, owned-building-cornices#0 1,541, owned-building-memory-windows#0 3,795, owned-building-roofs#0 3, owned-buildings-0#0 10, owned-buildings-1#0 8, owned-buildings-2#0 2, owned-buildings-4#0 12, owned-buildings-5#0 2, owned-buildings-6#0 15, owned-street-lamps#0 132, owned-street-tree-canopies#0 72, owned-street-tree-trunks#0 90, across 221 buildings."
+    ],
+    "limitations": [
+      "The heading was written once rather than looked, so the product's mouse-look path was not exercised. Walking used the product's keyboard path without pointer lock, which needs the focus a click on the world canvas gives.",
+      "The product turns walking off while the Companion is open, so the Companion was summoned for each capture and dismissed with Escape before each walk; its open encounter is visible in every capture.",
+      "The credentialed workspace is the only retained workspace in the judge seed with a scene group, so the Atlas mounts only for it.",
+      "Contact and inside-building tests use a 0.05 m tolerance and even-odd containment; hidden geometry counts exactly as visible geometry does.",
+      "Walking speed is the product's own. The live trace peaks at 1650 mm per second and holds one pose about every 26 mm of walking, and is resampled to 0.05 m by interpolation.",
+      "A held W key was delivered as one keydown followed by repeated keydowns after 250 ms, every 33 ms, as a held physical key sends them; the product clears its held keys whenever its shell refreshes and relies on the repeat.",
+      "The product's validation window closes after 60 seconds of frames, before a walk at the product's pace ends, so maxDrawCalls is the larger of that window's maximum (29) and a frame listener's maximum over the whole route (29).",
+      "Transferred bytes for the environment include the response headers the browser counted; the body alone is reported beside it."
+    ]
+  },
+  "record_sha256": "291aa4f9bef18038b1e6bf3c558d97783e24c1d7b52674071f650d1f5e4e3b2f"
+}
