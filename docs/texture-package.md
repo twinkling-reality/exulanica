@@ -372,9 +372,13 @@ integers, the packing as a JSON array, the title and summary from each header, t
 `truth = 'invented'`. It inserts the eight pins above as literals and makes the table read-only
 for `exulanica_app` and `exulanica_ro`, the two runtime roles `exulanica/db/roles.py`
 provisions, with the same inline block 0042 uses, skipping a role the cluster does not have.
-Unlike 0042 it names no role from before the ADR-0011 rename. A trigger refuses every UPDATE and DELETE, even by the owner, and every INSERT by a role that
-is not a member of the owner, so a pinned version never names other bytes and a new version
-arrives only in a new migration.
+Unlike 0042 it names no role from before the ADR-0011 rename. `READ_ONLY_TABLES` in
+`exulanica/db/roles.py` names the table, so `provision_runtime_role`, which grants insert and
+update on every table and revokes them from that list, leaves a provisioned role with SELECT only.
+A trigger is the second wall: it refuses every UPDATE and DELETE, even by the owner, and every
+INSERT by a role that is not a member of the owner, so a pinned version never names other bytes, a
+new version arrives only in a new migration, and a role handed a write here by mistake is still
+refused. `tests/test_texture_set_migration.py` measures both walls on a provisioned role.
 
 The catalog has no `workspace_id`, no `ws_isolation` policy and no forced row-level security,
 because, like `world_reviewed_asset`, it is a global reviewed registry every workspace reads
@@ -390,9 +394,8 @@ default map or a flat colour.
 1. Change the set's recipe in `web/packages/loom-texture/library/<set_id>.json` and bump its
    `version` in the same file. A change to a maker's code that alters any texel for an existing
    recipe is a new maker version, and a new version of every set that uses it.
-2. From `web/`, run `pnpm texture --out ../assets/textures` (or
-   `npx tsx packages/loom-texture/src/cli.ts --out ../assets/textures` until the script is
-   registered). The directory is rewritten and superseded blobs are removed; they stay in history.
+2. From `web/`, run `pnpm texture --out ../assets/textures`. The directory is rewritten, and blobs
+   and objects the new publication no longer names are removed; they stay in history.
 3. Write a new migration that inserts the new `(set_id, version)` row. Never edit 0065: its checksum
    is verified at boot, and an edited migration is a silent schema fork.
 4. Update the table in section 1, run both suites, and bake twice into scratch directories and
@@ -404,22 +407,21 @@ manifest and the pinned rows disagree.
 
 ## 12. Follow-ups
 
-- **`world_texture_set` in `READ_ONLY_TABLES` (deferred, blocked on `exulanica/db/roles.py`).**
-  That file was closed to every lane when 0065 was written. `provision_runtime_role` grants insert
-  and update on every table and revokes them only from the tables `READ_ONLY_TABLES` names, so
-  until `world_texture_set` is added there, a provisioning run after 0065 grants the runtime role
-  INSERT and UPDATE on the catalog. The migration's trigger refuses both in the meantime, and
-  `tests/test_texture_set_migration.py` measures the grant and the refusal and asserts the table is
-  still absent from the list, so that test fails, and should be updated, on the day it is added.
-- **Done in this lane:** `world_texture_set` is classified in `GLOBAL_TABLES` in
-  `exulanica/orchestration/judge_seed.py` as migration-provided reviewed texture set pins, so a
-  judge-seed export no longer refuses a schema with 0065; it is in `_PRESERVED_TABLES` in
-  `tests/conftest.py`, so the per-test truncation leaves the catalog alone; and
-  `docs/all-documents.md` is regenerated with this document.
+- **Done in this lane.** `world_texture_set` is in `READ_ONLY_TABLES` in `exulanica/db/roles.py`
+  (deferred while that file was closed to every lane, and added once it was released). It is
+  classified in `GLOBAL_TABLES` in `exulanica/orchestration/judge_seed.py` as migration-provided
+  reviewed texture set pins, so a judge-seed export does not refuse a schema with 0065, and it is
+  in `_PRESERVED_TABLES` in `tests/conftest.py`, so the per-test truncation leaves it alone.
+  `tests/test_migration.py` reserves 0064 for the grammar lane's catalogs, the hole 0065 lands
+  above. `docs/all-documents.md` is regenerated with this document.
 - **Registration in `web/`.** The `web/tsconfig.json` reference and the `web/pnpm-lock.yaml`
-  importer for this package are on the fabrication-delete lane's branch; the `texture` script in
-  `web/package.json` and the two dependency-cruiser rules (nothing that ships to a browser imports
-  loom-texture; loom-texture reaches no workspace package but `atlas-core`) are requested from it.
+  importer came with the fabrication-delete lane. This lane added the `texture` script to
+  `web/package.json` and two dependency-cruiser rules to `web/.dependency-cruiser.cjs`: nothing that
+  ships to a browser imports loom-texture, and loom-texture reaches no workspace package but
+  `atlas-core`.
+- **Tier B, not started.** Workspace recipes and bakes in migration 0066, the Node bake worker that
+  runs a maker server-side, an inert photograph-derived recipe object with its consent dependency,
+  and any learned recipe model behind a process boundary (section 2).
 
 ## 13. What is not verified
 

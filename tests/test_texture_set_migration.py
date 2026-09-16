@@ -2,13 +2,12 @@
 
 Two schemas, for two reasons that were measured rather than guessed.
 
-The session's ``spine_schema`` is checked for structure. Its rows are not trusted here: the
-per-test truncation in ``tests/conftest.py`` empties every table outside ``_PRESERVED_TABLES``,
-which does not yet name ``world_texture_set``, and ``tests/test_personal_request_replay.py``
-provisions the real ``exulanica_app`` role on that schema, which grants it INSERT and UPDATE on
-every table ``READ_ONLY_TABLES`` does not name. Either would make a row or privilege assertion
-depend on test order. So the pins and the grants are checked on a schema this module migrates for
-itself, with every migration applied exactly as it is on disk, and nothing else touching it.
+The session's ``spine_schema`` is checked for structure. Its rows and grants are not trusted
+here, because other tests act on that schema between these: the per-test truncation in
+``tests/conftest.py`` runs against it, and ``tests/test_personal_request_replay.py`` provisions the
+real ``exulanica_app`` role on it. So the pins and the grants are checked on a schema this module
+migrates for itself, with every migration applied exactly as it is on disk, and nothing else
+touching it, and no row or privilege assertion here depends on test order.
 """
 
 from __future__ import annotations
@@ -97,15 +96,16 @@ def test_the_set_id_rule_is_the_asset_key_rule_character_for_character():
     assert f"export const SET_ID_PATTERN = /{TEXTURE_SET_ID_PATTERN}/;" in library
 
 
-def test_the_read_only_list_does_not_name_the_catalog_yet():
-    """The deferral, stated as a fact so it cannot go stale in the documentation.
+def test_the_read_only_list_names_the_catalog():
+    """0065 revokes writes on the catalog, and that revoke is not sufficient alone.
 
-    ``exulanica/db/roles.py`` was closed to every lane when 0065 was written. When the table joins
-    ``READ_ONLY_TABLES``, this test fails, and docs/texture-package.md and the provisioning test
-    below should change with it.
+    ``provision_runtime_role`` grants ``select, insert, update`` on every table in the schema and
+    then revokes insert and update on ``READ_ONLY_TABLES``. A pinned catalog absent from that tuple
+    has its migration-time revoke handed straight back on the next deployment, as
+    ``tests/test_world_objects.py`` says of 0042's registries.
     """
-    assert TABLE not in READ_ONLY_TABLES
-    assert TABLE in (ROOT / "docs" / "texture-package.md").read_text()
+    assert TABLE in READ_ONLY_TABLES
+    assert "world_reviewed_asset" in READ_ONLY_TABLES
 
 
 # -- the spine schema --------------------------------------------------------------------------
@@ -273,33 +273,60 @@ def _insert(target) -> None:
     )
 
 
-def test_provisioning_grants_writes_that_the_trigger_still_refuses(connection):
-    """The deferral, measured, and the reason the trigger exists.
+def _privileges(connection, role: str) -> dict[str, bool]:
+    return connection.execute(
+        "select has_table_privilege(%(role)s, %(table)s, 'SELECT') as can_read, "
+        "has_table_privilege(%(role)s, %(table)s, 'INSERT') as can_insert, "
+        "has_table_privilege(%(role)s, %(table)s, 'UPDATE') as can_update, "
+        "has_table_privilege(%(role)s, %(table)s, 'DELETE') as can_delete",
+        {"role": role, "table": TABLE},
+    ).fetchone()
 
-    ``provision_runtime_role`` grants insert and update on every table and revokes them only from
-    ``READ_ONLY_TABLES``. A role provisioned after 0065 therefore holds INSERT and UPDATE on the
-    catalog, and the trigger is what refuses it. A suffixed role, because a role is a cluster
-    object and this must not rewrite the developer's own ``exulanica_app``.
+
+def test_provisioning_leaves_the_catalog_read_only_and_the_trigger_is_the_second_wall(
+    connection,
+):
+    """Both walls, measured.
+
+    ``provision_runtime_role`` grants insert and update on every table and revokes them from
+    ``READ_ONLY_TABLES``, which names the catalog, so a role provisioned after 0065 can read it and
+    write nothing. The trigger is the second wall: the same role, handed INSERT and UPDATE by a
+    later mistake, is still refused. A suffixed role, because a role is a cluster object and this
+    must not rewrite the developer's own ``exulanica_app``.
     """
     role = f"texture_app_{uuid.uuid4().hex[:12]}"
     try:
         provision_runtime_role(connection, role=role)
-        granted = connection.execute(
-            "select has_table_privilege(%(role)s, %(table)s, 'INSERT') as can_insert, "
-            "has_table_privilege(%(role)s, %(table)s, 'UPDATE') as can_update, "
-            "has_table_privilege(%(role)s, %(table)s, 'DELETE') as can_delete",
-            {"role": role, "table": TABLE},
-        ).fetchone()
-        assert granted == {"can_insert": True, "can_update": True, "can_delete": False}
+        assert _privileges(connection, role) == {
+            "can_read": True,
+            "can_insert": False,
+            "can_update": False,
+            "can_delete": False,
+        }
+        connection.execute(sql.SQL("set role {}").format(sql.Identifier(role)))
+        try:
+            assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+            with pytest.raises(psycopg.errors.InsufficientPrivilege, match="permission denied"):
+                _insert(connection)
+            with pytest.raises(psycopg.errors.InsufficientPrivilege, match="permission denied"):
+                connection.execute(f"update {TABLE} set title = 'renamed'")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege, match="permission denied"):
+                connection.execute(f"delete from {TABLE}")
+        finally:
+            connection.execute("reset role")
 
+        connection.execute(
+            sql.SQL("grant insert, update on {} to {}").format(
+                sql.Identifier(TABLE), sql.Identifier(role)
+            )
+        )
+        assert _privileges(connection, role)["can_insert"] is True
         connection.execute(sql.SQL("set role {}").format(sql.Identifier(role)))
         try:
             with pytest.raises(psycopg.errors.InsufficientPrivilege, match="migrations"):
                 _insert(connection)
             with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="pinned"):
                 connection.execute(f"update {TABLE} set title = 'renamed'")
-            with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                connection.execute(f"delete from {TABLE}")
         finally:
             connection.execute("reset role")
         assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8

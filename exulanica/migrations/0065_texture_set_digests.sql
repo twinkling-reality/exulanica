@@ -109,11 +109,9 @@ from (values
 -- No role updates or deletes a pinned row, and only the role that owns the table, which is the
 -- role that runs migrations, adds one.  The ownership test is not decoration.
 -- exulanica.db.roles.provision_runtime_role grants insert and update on every table in the schema
--- and revokes them only from the tables its READ_ONLY_TABLES names, and world_texture_set is not
--- in that list yet: the file was closed to every lane when this migration was written, and
--- docs/texture-package.md carries the addition as a named follow-up.  Until it lands, provisioning
--- after this migration hands the runtime role INSERT and UPDATE here, and this trigger is what
--- still refuses both.
+-- and revokes them from the tables its READ_ONLY_TABLES names, which include world_texture_set, so
+-- a provisioned runtime role holds SELECT here and nothing more.  This trigger is the second wall:
+-- a role that is ever handed INSERT or UPDATE on this table by mistake is still refused.
 create function tg_world_texture_set_is_migration_data() returns trigger language plpgsql as $fn$
 begin
   if tg_op <> 'INSERT' then

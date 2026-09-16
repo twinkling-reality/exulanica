@@ -315,6 +315,28 @@ module.exports = {
       to: { path: notPkgRef('scene-synth', 'atlas-core') },
     },
 
+    // ---- the texture package is a build-time tool ------------------------------------------
+    {
+      name: 'loom-texture-is-offline-only',
+      severity: 'error',
+      comment:
+        'loom-texture bakes the texture sets with node:fs, node:crypto and node:zlib and writes ' +
+        'them under assets/textures. Nothing that ships to a browser may import it: a renderer ' +
+        'reads the published containers as bytes, never the baker.',
+      from: { path: String.raw`^packages/(?!loom-texture/)` },
+      to: { path: pkgRef('loom-texture') },
+    },
+    {
+      name: 'loom-texture-imports-atlas-core-only',
+      severity: 'error',
+      comment:
+        'Sets are named by surface, never by era, typology or height class; deriving a material ' +
+        'from those is the grammar material stage. loom-texture may reach atlas-core for types ' +
+        'and nothing else in the workspace, so that vocabulary cannot be rebuilt here.',
+      from: { path: pkg('loom-texture') },
+      to: { path: notPkgRef('loom-texture', 'atlas-core') },
+    },
+
     // ---- general hygiene -------------------------------------------------------------------
     { name: 'no-circular', severity: 'error', from: {}, to: { circular: true } },
     {

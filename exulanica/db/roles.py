@@ -25,6 +25,9 @@ So this module creates the role and grants it exactly what it needs:
 *   **SELECT only on the world style and interaction registries.** Profile and capability
     registration is a reviewed migration/code change. A runtime process may propose registered
     values; it cannot register its own renderer or interaction vocabulary.
+*   **SELECT only on the pinned asset catalogs.** ``world_reviewed_asset`` (migration 0042) and
+    ``world_texture_set`` (migration 0065) each pin reviewed bytes by digest, and a new pin is a
+    new migration. A runtime process resolves a pinned asset; it never pins one.
 *   **No ownership and no BYPASSRLS**, which is the whole point.
 
 Every statement here is built with :mod:`psycopg.sql` rather than an f-string. Role names,
@@ -84,6 +87,7 @@ READ_ONLY_TABLES: Final = (
     "world_style_module_registry",
     "world_object_behaviour_registry",
     "world_reviewed_asset",
+    "world_texture_set",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
