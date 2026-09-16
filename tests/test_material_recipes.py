@@ -1009,44 +1009,51 @@ def _holding_the_lifecycle_lock(materials, work):
     thread must be waiting on the lock itself, holding no bake row; this connection then updates
     the bake row, which is what a tombstone does next, and has to get it at once. Taking a row
     first and the lifecycle lock second, the order a bare guard would give, deadlocks right here.
+    The wait is observed on the other thread's own backend, so another session on a shared server
+    cannot stand in for it, and it is given as long as a loaded machine needs.
     """
     import threading
+    import time
 
     outcome: dict[str, object] = {}
+    started = threading.Event()
 
     def run() -> None:
         with materials.owner.session(materials.workspace_id) as connection:
+            outcome["pid"] = connection.info.backend_pid
+            started.set()
             try:
                 outcome["value"] = work(connection)
             except Exception as error:  # the assertion below names it
                 outcome["error"] = error
 
     with materials.owner.session(materials.workspace_id) as holder:
-        holder.execute("set lock_timeout = '3s'")
+        holder.execute("set lock_timeout = '30s'")
         with holder.transaction():
             holder.execute("select material_bake_lifecycle_lock(%s)", (materials.workspace_id,))
             thread = threading.Thread(target=run)
             thread.start()
-            waited = False
-            for _ in range(200):
+            assert started.wait(timeout=30), "the other thread never connected"
+            deadline = time.monotonic() + 30
+            waiting = 0
+            while not waiting and time.monotonic() < deadline:
                 waiting = holder.execute(
-                    "select count(*) as n from pg_locks l join pg_stat_activity a "
-                    "  on a.pid = l.pid "
-                    "where l.locktype = 'advisory' and not l.granted and a.pid <> pg_backend_pid()"
+                    "select count(*) as n from pg_locks "
+                    "where pid = %s and locktype = 'advisory' and not granted",
+                    (outcome["pid"],),
                 ).fetchone()["n"]
-                if waiting:
-                    waited = True
-                    break
-                holder.execute("select pg_sleep(0.01)")
-            assert waited, "the other thread never waited on the lifecycle lock"
+                if not waiting:
+                    time.sleep(0.02)
+            assert waiting, "the other thread never waited on the lifecycle lock"
             holder.execute(
                 "update material_bake set state = 'cancelled', claim_token = null, "
                 "  claimed_by = null, lease_expires_at = null, failure_class = 'withdrawn' "
                 "where workspace_id = %s and state in ('requested', 'running', 'failed')",
                 (materials.workspace_id,),
             )
-        thread.join(timeout=10)
+        thread.join(timeout=30)
     assert not thread.is_alive()
+    outcome.pop("pid")
     return outcome
 
 
