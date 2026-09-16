@@ -598,7 +598,8 @@ world service that writes the recipe, not by the object.
 - **Request.** `POST /materials/recipes/{recipe_id}/bake` queues it. The request counts against the
   workspace's quota: 64 a day and 8 waiting, unless a `material_bake_quota` row says otherwise.
 - **Claim.** The worker claims the bake with a lease and checks the recipe again before starting
-  anything.
+  anything. A pass takes one bake from each workspace in turn, so a busy workspace cannot take
+  every bake the pass allows, and an error in one workspace is recorded without stopping the rest.
 - **Bake.** The worker runs `src/workspace/cli.ts` in a new process session, with a minimal
   environment and four limits:
   - a V8 heap ceiling;
@@ -606,6 +607,10 @@ world service that writes the recipe, not by the object.
   - a 768 MiB resident-memory ceiling. The worker measures and enforces this itself and kills
     the whole process group, because macOS enforces no kernel memory limit on a child process;
   - the baker's own ceiling of 1024 x 1024 texels.
+
+  What the baker prints stays out of the row the workspace reads: a crash is recorded as "the
+  baker exited" and its code, with the output kept for the operator's log, and a refusal keeps only
+  printable text.
 
   Measured: a 1024 x 1024 brick bakes in 2.3 s at 119 MiB, and a 0.2 s timeout and a 64 MiB
   ceiling each stopped a bake.
@@ -658,7 +663,15 @@ three kinds of tombstone reach bakes:
 
 The rest of the machinery:
 
-- **The destroy question** is `material_bake_purge_is_authorized`.
+- **The destroy question** is `material_bake_purge_is_authorized`. It answers yes in three
+  cases:
+  - a workspace tombstone, for anything in that workspace's namespace;
+  - a capture or person tombstone, for a bake of a photo-derived recipe its scope reaches;
+  - either of those two, for bytes no bake row names at all.
+
+  The last case exists for a restore. A database backed up before a bake, beside a namespace that
+  still holds the bake, must not leave the replay unable to finish. A forged job still cannot
+  reach an authored bake.
 - **The purge role** holds SELECT on `workspace_id`, `content_sha256` and `purged_at` of
   `material_bake`, UPDATE on `purged_at`, and EXECUTE on that function, and nothing else.
   `tests/test_material_recipes.py` asserts exactly that.
@@ -666,7 +679,13 @@ The rest of the machinery:
 - **Restore.** `exulanica/deletion/restore.py` replays bake purges and checks the namespace. A
   checkpoint that names bakes is refused when no namespace is given.
 - **Serialisation.** A tombstone and a bake serialise on a per-workspace lock, in the shape of
-  0044, so a tombstone either sees a finished bake or refuses it.
+  0044, so a tombstone either sees a finished bake or the bake is refused.
+  - **Order.** Every writer takes that lock before it locks any bake row, because a tombstone takes
+    the lock first and then updates bake rows; the other order deadlocks.
+    `tests/test_material_recipes.py` holds both orders.
+  - **Reads during a write.** A read that finds a recorded bake's bytes missing first waits for the
+    bake's object lock, so a bake still being written is read a moment later instead of being
+    re-requested.
 
 **Routes.** `/materials/makers`, `/materials/library`, `/materials/recipes`, one recipe, its
 withdrawal, its bake request, its bake and the bake's bytes. Reads need `world.read` and writes
@@ -676,10 +695,11 @@ need `world.write`. The answers:
 | --- | --- |
 | 404 | the recipe never existed in this workspace |
 | 410 | the recipe was withdrawn or deleted |
+| 403 | the deployment's database role may not write material tables (the judge deployment), for every write whatever the id |
 | 409 | the bake is not ready, its bytes are missing, or the recipe is photo-derived |
 | 422 | the maker refuses the recipe |
 | 429 | the bake quota is spent |
-| 503 | the instance has no material catalog |
+| 503 | the instance has no material catalog, or a delivery kept a write waiting through every retry (with `Retry-After`) |
 
 The bytes route releases the container only after the 0041 final check.
 
