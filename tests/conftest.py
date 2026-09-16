@@ -611,7 +611,23 @@ def pytest_configure(config):
     os.environ[_PRIVATE_OWNER] = str(os.getpid())
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session, exitstatus):
+    """Stop the private server once session fixtures are torn down.
+
+    Here rather than only in ``pytest_unconfigure``: an xdist worker reports itself finished
+    straight after this hook, and the controller then ends the worker process before its
+    unconfigure hooks run. Measured 2026-09-16: a 12-worker run left all 12 servers running.
+    ``trylast`` puts this after pytest's own session teardown, which drops the scratch schema.
+    """
+    _stop_private_server()
+
+
 def pytest_unconfigure(config):
+    _stop_private_server()
+
+
+def _stop_private_server():
     import os
 
     from exulanica.env import env_name

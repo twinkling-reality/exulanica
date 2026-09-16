@@ -264,11 +264,33 @@ def start_test_server(label: str) -> tuple[Server, str]:
     try:
         server.initialise()
         server.start()
+        _watch_owner(server, os.getpid())
         url = server.create_database(f"exulanica_{label}_test")
     except BaseException:
         remove_test_server(server)
         raise
     return server, url
+
+
+def _watch_owner(server: Server, owner: int) -> None:
+    """Stop and delete ``server`` when ``owner`` exits, however it exits.
+
+    A worker that aborts (exit 134 after torch meets pycolmap) or is killed never runs its own
+    cleanup, and its postmaster would otherwise keep running until the next ``sweep``.
+    """
+    watch = (
+        f"while kill -0 {owner} 2>/dev/null; do sleep 1; done; "
+        f'"{binaries() / "pg_ctl"}" -D "{server.data}" -m immediate -w stop >/dev/null 2>&1; '
+        f'rm -rf "{server.root}"'
+    )
+    # The outer shell backgrounds the watcher and exits at once, so nothing is left for this
+    # process to reap and no ResourceWarning joins the suite's warning summary.
+    subprocess.run(
+        ["/bin/sh", "-c", f"({watch}) </dev/null >/dev/null 2>&1 &"],
+        env=_environment(),
+        start_new_session=True,
+        check=True,
+    )
 
 
 def remove_test_server(server: Server) -> None:
