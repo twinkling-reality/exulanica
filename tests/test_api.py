@@ -108,6 +108,15 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/world-read/places/{place_id}"): {},
     ("POST", "/selection/environment"): {"json": {}},
     ("GET", "/world/versions/{version_id}/society"): {},
+    ("GET", "/materials/makers"): {},
+    ("GET", "/materials/library"): {},
+    ("GET", "/materials/recipes"): {},
+    ("POST", "/materials/recipes"): {"json": {}},
+    ("GET", "/materials/recipes/{recipe_id}"): {},
+    ("POST", "/materials/recipes/{recipe_id}/withdraw"): {},
+    ("POST", "/materials/recipes/{recipe_id}/bake"): {},
+    ("GET", "/materials/recipes/{recipe_id}/bake"): {},
+    ("GET", "/materials/recipes/{recipe_id}/bake/bytes"): {},
     ("GET", "/world/versions/{version_id}/society/events"): {},
     ("GET", "/world/versions/{version_id}/society/actions"): {},
     ("GET", "/world/versions/{version_id}/society/actions/{request_id}"): {},
@@ -422,6 +431,7 @@ class Deployment:
             .replace("{right_id}", str(uuid.uuid4()))
             .replace("{subject_kind}", "avatar")
             .replace("{subject_id}", str(uuid.uuid4()))
+            .replace("{recipe_id}", str(uuid.uuid4()))
         )
 
 

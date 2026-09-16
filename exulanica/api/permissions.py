@@ -355,6 +355,12 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", _APPEARANCE): _WORLD_READ,
         ("GET", _APPEARANCE + "/history"): _WORLD_READ,
         ("GET", _APPEARANCE + "/families"): _WORLD_READ,
+        ("GET", "/materials/makers"): _WORLD_READ,
+        ("GET", "/materials/library"): _WORLD_READ,
+        ("GET", "/materials/recipes"): _WORLD_READ,
+        ("GET", "/materials/recipes/{recipe_id}"): _WORLD_READ,
+        ("GET", "/materials/recipes/{recipe_id}/bake"): _WORLD_READ,
+        ("GET", "/materials/recipes/{recipe_id}/bake/bytes"): _WORLD_READ,
         # -- the authored world, write -----------------------------------------------------
         ("POST", "/world/styles/previews"): _WORLD_WRITE,
         ("DELETE", "/world/styles/previews/{preview_id}"): _WORLD_WRITE,
@@ -385,6 +391,10 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("POST", "/world/versions/{version_id}/society/actions"): _WORLD_WRITE,
         ("PUT", _APPEARANCE): _WORLD_WRITE,
         ("POST", _APPEARANCE + "/reset"): _WORLD_WRITE,
+        # A bake request is a compute amplifier, bounded per workspace by migration 0066's quota.
+        ("POST", "/materials/recipes"): _WORLD_WRITE,
+        ("POST", "/materials/recipes/{recipe_id}/withdraw"): _WORLD_WRITE,
+        ("POST", "/materials/recipes/{recipe_id}/bake"): _WORLD_WRITE,
         ("POST", "/world-write/scenes/{scene_id}/generated"): _WORLD_WRITE,
     }
 )

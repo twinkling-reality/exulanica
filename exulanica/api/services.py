@@ -45,6 +45,9 @@ from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import Role
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
+from exulanica.world.material_recipes import MaterialRuntime
+from exulanica.world.texture_assets import TextureCatalogError, load_material_catalog
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
@@ -103,6 +106,9 @@ class Services:
     society_decision_provider: SocietyDecisionProvider | None = None
     #: Explicit family definitions and current source authority for version-scoped appearance.
     character_appearance: CharacterAppearanceRuntime | None = None
+    #: The published material catalog and each workspace's bake namespace. None when this
+    #: instance was started without ``assets/textures``, which ``warnings`` says.
+    materials: MaterialRuntime | None = None
     #: Dedicated account persistence and verified Google browser sessions, when configured.
     accounts: AccountRuntime | None = None
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
@@ -162,6 +168,11 @@ class Services:
                 "photographs get a rendition and no observations. A later pass with a "
                 "credential configured completes them: every stage is keyed by content and "
                 "re-running costs nothing for the stages that already ran."
+            )
+        if self.materials is None:
+            notes.append(
+                "the published material catalog is not readable here, so the /materials routes "
+                "answer 503 and no recipe can be created or baked."
             )
         if self.runs_derivative_worker:
             notes.append(
@@ -248,18 +259,34 @@ def build_services(
     return Services(
         database=database,
         readonly_database=Database(url=readonly_url) if readonly_url else database,
-        store=LocalContentAddressedStore(data_dir / "blobs"),
+        store=LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
         tokens=tokens,
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
+        materials=_material_runtime(data_dir),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
     )
+
+
+def _material_runtime(data_dir: Path) -> MaterialRuntime | None:
+    """The published makers and each workspace's bake namespace, when the catalog is here.
+
+    The catalog is verified against its pins on the way in, so a directory that is present but
+    not the reviewed one is a startup failure rather than a quiet absence.
+    """
+    try:
+        catalog = load_material_catalog()
+    except FileNotFoundError:
+        return None
+    except TextureCatalogError:
+        raise
+    return MaterialRuntime(catalog=catalog, stores=material_stores(data_dir))
 
 
 def _enabled(value: str | None) -> bool:

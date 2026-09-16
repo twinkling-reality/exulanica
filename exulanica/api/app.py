@@ -72,6 +72,7 @@ from exulanica.api.routes import (
     identity,
     intake,
     interaction,
+    materials,
     operations,
     person_consent,
     personal_admission,
@@ -234,6 +235,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(society_control.router)
     app.include_router(society_district.router)
     app.include_router(character_appearance.router)
+    app.include_router(materials.router)
     app.include_router(companion.router)
     app.include_router(environment_sources.router)
     app.include_router(identity.router)
