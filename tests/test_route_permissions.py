@@ -420,6 +420,9 @@ GRANTS: dict[str, tuple[str, list[str]]] = {
     "reader": ("a", ["library.read"]),
     "writer": ("a", ["library.read", "library.write"]),
     "operator": ("a", ["operations.read"]),
+    "reads": ("a", sorted(str(p) for p in Permission if p.endswith(".read"))),
+    "viewer": ("a", ["world.read"]),
+    "world_writer": ("a", ["world.read", "world.write"]),
     "stranger": ("b", ALL_PERMISSIONS),
 }
 
@@ -700,3 +703,89 @@ def test_the_browser_grant_is_the_owner_grant_and_holds_no_tiles():
     assert resolved is session
     assert held is ACCOUNT_OWNER_PERMISSIONS
     assert Permission.TILES_MATERIALISE not in held
+
+
+_OUR_404 = "nothing at this address is available to this credential"
+
+
+def _refused_by_the_floor(response) -> bool:
+    body = (
+        response.json()
+        if response.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    return (response.status_code, body.get("code")) in {
+        (404, "unknown_reference"),
+        (403, "not_authorised"),
+    } and (body.get("detail") == _OUR_404 or "which" in str(body.get("detail", "")))
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("who", ["reads", "viewer"])
+def test_a_token_missing_a_routes_permission_is_refused_on_the_wire(floor, who):
+    """Generated from the map: every route the token's grant does not cover is refused, by the
+    floor, before the route runs. Declared-but-wrong is what this catches that the declaration
+    sweep cannot: a mutation declared as a read would reach its route here and fail the test."""
+    held = frozenset(Permission(p) for p in GRANTS[who][1])
+    refused = []
+    for method, path in AUTHENTICATED:
+        rule = ROUTE_RULES[(method, path)]
+        assert isinstance(rule, Requires)
+        if rule.permissions <= held:
+            continue
+        response = floor.request(who, method, _fill(path), **_probe_kwargs(method, path))
+        assert _refused_by_the_floor(response), (method, path, response.status_code, response.text)
+        refused.append((method, path))
+    # Every state-changing route is among the refused, for a token that holds only reads.
+    writes = {
+        key
+        for key in AUTHENTICATED
+        if key[0] != "GET" and key not in {("POST", "/selection"), ("POST", "/selection/packet")}
+    }
+    assert writes <= set(refused), sorted(writes - set(refused))
+
+
+#: Integration's state-changing routes, named so a declaration that drifts to a read fails here by
+#: name rather than only in the generated sweep above.
+_WORLD_MUTATIONS = [
+    ("PUT", "/world/versions/{version_id}/society/control"),
+    ("POST", "/world/versions/{version_id}/society/control/steps"),
+    ("POST", "/world/versions/{version_id}/society/actions"),
+    ("POST", "/world/versions/{version_id}/society/decisions"),
+    ("PUT", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"),
+    (
+        "POST",
+        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
+    ),
+]
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(("method", "path"), _WORLD_MUTATIONS)
+def test_a_world_reader_cannot_change_the_world(floor, method, path):
+    before = _refusal_rows(floor, floor.workspace_a, "viewer").get((method, path))
+    response = floor.request("viewer", method, _fill(path), json={})
+    assert (response.status_code, response.json()) == (
+        404,
+        {"code": "unknown_reference", "detail": _OUR_404},
+    )
+    row = _refusal_rows(floor, floor.workspace_a, "viewer")[(method, path)]
+    assert row["refusals"] == (before["refusals"] if before else 0) + 1
+    assert "world.write" in row["missing_permissions"]
+
+
+@pytest.mark.postgres
+def test_a_society_decision_needs_model_invoke_as_well_as_world_write(floor):
+    path = "/world/versions/{version_id}/society/decisions"
+    response = floor.request("world_writer", "POST", _fill(path), json={})
+    assert (response.status_code, response.json()["detail"]) == (404, _OUR_404)
+    row = _refusal_rows(floor, floor.workspace_a, "world_writer")[("POST", path)]
+    assert row["missing_permissions"] == ["model.invoke"]
+    # The same token reaches the action route, whose declaration it does cover: the body is then
+    # refused by the route's own validation, which proves the floor let it through.
+    passed = floor.request(
+        "world_writer", "POST", _fill("/world/versions/{version_id}/society/actions"), json={}
+    )
+    assert passed.status_code == 422, passed.text
+    # And the owner, who holds both, reaches the decision route's validation too.
+    assert floor.request("owner", "POST", _fill(path), json={}).status_code == 422
