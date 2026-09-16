@@ -571,3 +571,14 @@ source_modules = [
   "exulanica.store",
 ]
 forbidden_modules = ["psycopg"]
+
+[[tool.importlinter.contracts]]
+# The training code in `ml/` is not part of the product: its own environment, its own container,
+# and torch at a version the product never imports for it. What crosses back is data, a model's
+# weights by digest and the receipt of the run that made them. `tests/test_training_boundary.py`
+# holds the same rule by reading the source, for a tree where the package is not installed and so
+# not in this graph at all.
+name = "The product never imports the training code"
+type = "forbidden"
+source_modules = ["exulanica"]
+forbidden_modules = ["exulanica_training"]
