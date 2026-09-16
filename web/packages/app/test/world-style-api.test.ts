@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  WORLD_STYLE_CONTRACT_COMMIT,
+  WORLD_STYLE_REGISTRY_DOCUMENT,
   WORLD_STYLE_RECIPES,
   worldStyleRecipe,
 } from '@exulanica/presentation';
@@ -20,7 +20,7 @@ const binding = (profileId = 'origin-landscape', profileVersion = 1) => {
   const recipe = worldStyleRecipe(profileId, profileVersion)!;
   return {
     schemaVersion: 1,
-    frontendCommit: WORLD_STYLE_CONTRACT_COMMIT,
+    frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit,
     availability: recipe.availability,
     origin: recipe.origin,
     profileId,
@@ -34,7 +34,7 @@ const binding = (profileId = 'origin-landscape', profileVersion = 1) => {
 
 const catalog = () => ({
   schemaVersion: 1,
-  contractSource: { frontendCommit: WORLD_STYLE_CONTRACT_COMMIT },
+  contractSource: { frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit },
   defaultProfile: {
     profileId: 'origin-landscape', profileVersion: 1,
     parameters: validateLocalReference({ profileId: 'origin-landscape', profileVersion: 1 }).parameters,
@@ -202,6 +202,32 @@ describe('world style API boundary', () => {
     await expect(new WorldStyleClient({
       baseUrl: 'https://exulanica.test/api', token: 't', fetch: unknownCurrent,
     }).connect()).rejects.toMatchObject({ code: 'unknown_profile_version' });
+  });
+
+  it('compares the served payload with the shared registry rather than a commit label', async () => {
+    const refused = async (broken: unknown, code: string) => {
+      const fetch = connectedFetch((url) =>
+        url.pathname.endsWith('/world/styles/catalog') ? json(broken) : undefined);
+      await expect(new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 't', fetch })
+        .connect()).rejects.toMatchObject({ code });
+    };
+    // The drift measured on 2026-09-16: the browser described Aeroheart in its own words while
+    // carrying the same commit label as the server. The label agreed; the payload did not.
+    const described = catalog();
+    described.profiles[0]!.description =
+      'A clear memory field shaped by diffuse colour entering from its edges.';
+    await refused(described, 'catalog_contract_mismatch');
+    const promoted = catalog();
+    promoted.profiles[1]!.status = 'supported';
+    await refused(promoted, 'catalog_contract_mismatch');
+    // A matching label no longer vouches for anything, and a different one is just a different
+    // payload.
+    const relabelled = catalog();
+    relabelled.profiles[0]!.recipeBinding.frontendCommit = '0'.repeat(40);
+    await refused(relabelled, 'recipe_binding_mismatch');
+    expect(catalog().profiles[0]!.description).toBe(
+      WORLD_STYLE_REGISTRY_DOCUMENT.profiles[0]!.description,
+    );
   });
 
   it('recovers a stale preview by refreshing and linking a new refinement proposal', async () => {

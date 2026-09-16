@@ -1,5 +1,6 @@
 import type { WorldStyleParameterDefinition } from '@exulanica/atlas-core';
 import type { WorldArtProfileSource } from './world-style-model.js';
+import { WORLD_STYLE_REGISTRY_V1_JSON } from './world-style-registry-v1.generated.js';
 
 export type WorldStyleAvailability = 'product' | 'developer';
 export type WorldStyleRecipeOrigin = 'authored' | 'generated';
@@ -22,94 +23,90 @@ export interface WorldStyleRecipeV1 {
   }[];
 }
 
-export const AEROHEART_CONTROLS: readonly WorldStyleParameterDefinition[] = [
-  {
-    key: 'vitality', capability: 'world.vitality', kind: 'range', group: 'world',
-    // It used to claim the interface too. Once the interface had its own four controls, two
-    // modules were writing the same output and the later one silently won, which is the exact
-    // shape of bug that costs an afternoon. One owner per output: this one owns the field.
-    label: 'Color vitality', description: 'Tunes the colour of the memory field itself.',
-    min: 0, max: 1, step: 0.05, defaultValue: 0.82,
-  },
-  {
-    key: 'glass', capability: 'material.transmission', kind: 'range', group: 'material',
-    label: 'Veil clarity', description: 'Changes the memory weave from soft optical thread to a crisp source image.',
-    min: 0, max: 1, step: 0.05, defaultValue: 0.76,
-  },
-  {
-    key: 'relationship-energy', capability: 'relationships.energy', kind: 'range', group: 'motion',
-    label: 'Relationship energy', description: 'Controls the visual strength of confirmed relationship filaments.',
-    min: 0, max: 1, step: 0.05, defaultValue: 0.68,
-  },
-  {
-    key: 'garden-density', capability: 'detail.ecology', kind: 'range', group: 'detail',
-    label: 'Weave detail', description: 'Controls bounded source-thread detail without adding, removing, or implying evidence.',
-    min: 0, max: 1, step: 0.05, defaultValue: 0.72,
-  },
-  {
-    key: 'horizon-softness', capability: 'atmosphere.softness', kind: 'range', group: 'atmosphere',
-    label: 'Horizon softness', description: 'Changes atmospheric depth without hiding destinations.',
-    min: 0, max: 1, step: 0.05, defaultValue: 0.46,
-  },
-  {
-    key: 'surface-finish', capability: 'surface.finish', kind: 'choice', group: 'material',
-    label: 'Surface finish', description: 'Uses one registered finish across the field and summoned interface surfaces.',
-    options: [
-      { value: 'source-paper', label: 'Source paper' },
-      { value: 'clear-lens', label: 'Clear lens' },
-    ],
-    defaultValue: 'source-paper',
-  },
-  {
-    key: 'source-hue', capability: 'interface.hue', kind: 'range', group: 'world',
-    label: 'Interface hue',
-    description: 'The colour the interface is built from. Reading it from your photographs sets this.',
-    min: 0, max: 1, step: 0.01, defaultValue: 0.6,
-  },
-  {
-    key: 'source-warmth', capability: 'interface.warmth', kind: 'range', group: 'world',
-    label: 'Evidence warmth',
-    description: 'How warm the mark for your own words and your own photographs runs.',
-    min: 0, max: 1, step: 0.01, defaultValue: 0.19,
-  },
-  {
-    key: 'source-depth', capability: 'interface.depth', kind: 'range', group: 'world',
-    label: 'Reading depth',
-    description: 'How deep the reading colour sits. It never goes light enough to be hard to read.',
-    min: 0, max: 1, step: 0.01, defaultValue: 0.36,
-  },
-  {
-    key: 'source-light', capability: 'interface.light', kind: 'range', group: 'world',
-    label: 'Plate light',
-    description: 'How much light the summoned surfaces hold.',
-    min: 0, max: 1, step: 0.01, defaultValue: 0.86,
-  },
-  {
-    key: 'world-tempo', capability: 'motion.tempo', kind: 'range', group: 'motion',
-    label: 'Memory tempo', description: 'Changes the shared ambient and interface cadence inside a calm, bounded range.',
-    min: 0.75, max: 1.25, step: 0.05, defaultValue: 1,
-  },
-];
+/*
+ * One authored source for what a world profile IS.
+ *
+ * Which profiles exist, their names and descriptions, who may use them, which reviewed modules
+ * they run and every control they expose are authored once, in the backend registry
+ * `exulanica/world/style-registry.v1.json`. This file used to restate all of it by hand, and the
+ * two copies were held together by a pinned commit hash rather than by comparing them; by
+ * 2026-09-16 the Aeroheart description had already drifted. The registry now arrives here as its
+ * exact bytes (see `world-style-registry-v1.generated.ts`) and everything below is read from it.
+ *
+ * What this file still authors is what the backend has no field for: how a profile LOOKS
+ * (`WorldArtAppearanceSource`), and the historical module bindings a saved world may still carry.
+ */
 
-export const SURVEY_RELIEF_CONTROLS: readonly WorldStyleParameterDefinition[] = [
-  {
-    key: 'contour-density', capability: 'detail.contours', kind: 'range', group: 'detail',
-    label: 'Contour density', description: 'Changes the number of non-semantic survey contour marks.',
-    min: 0, max: 1, step: 0.1, defaultValue: 0.55,
-  },
-  {
-    key: 'technical-contrast', capability: 'material.technical-contrast', kind: 'range', group: 'material',
-    label: 'Technical contrast', description: 'Controls separation between survey strata and their field.',
-    min: 0, max: 1, step: 0.1, defaultValue: 0.7,
-  },
-];
+export interface WorldStyleRegistryControlDocument {
+  readonly key: string;
+  readonly capability: string;
+  readonly kind: WorldStyleParameterDefinition['kind'];
+  readonly group: WorldStyleParameterDefinition['group'];
+  readonly label: string;
+  readonly description: string;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly options?: readonly (string | { readonly value: string; readonly label: string })[];
+  readonly default_value: number | string | boolean;
+}
 
-const AEROHEART_SOURCE: WorldArtProfileSource = {
-  profileId: 'origin-landscape',
-  profileVersion: 1,
-  displayName: 'Aeroheart',
-  description: 'A clear memory field shaped by diffuse colour entering from its edges.',
-  compatibilityKey: 'atlas-topology-v1',
+export interface WorldStyleRegistryProfileDocument {
+  readonly profile_id: string;
+  readonly profile_version: number;
+  readonly display_name: string;
+  readonly description: string;
+  readonly compatibility_key: string;
+  readonly status: string;
+  readonly fallback: { readonly profile_id: string; readonly profile_version: number };
+  readonly recipe: {
+    readonly schema_version: number;
+    readonly availability: string;
+    readonly origin: string;
+    readonly modules: readonly string[];
+  };
+  readonly controls: readonly WorldStyleRegistryControlDocument[];
+}
+
+/** The backend registry document, as authored. Snake case because that is its file form. */
+export interface WorldStyleRegistryDocument {
+  readonly schema_version: number;
+  readonly frontend_contract: { readonly commit: string; readonly recipe_schema_version: number };
+  readonly default_profile: { readonly profile_id: string; readonly profile_version: number };
+  readonly capabilities: readonly {
+    readonly capability: string;
+    readonly kind: string;
+    readonly group: string;
+    readonly min?: number;
+    readonly max?: number;
+    readonly options?: readonly string[];
+  }[];
+  readonly modules: readonly { readonly module_id: string; readonly capabilities: readonly string[] }[];
+  readonly profiles: readonly WorldStyleRegistryProfileDocument[];
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) deepFreeze(child);
+  return Object.freeze(value);
+}
+
+export const WORLD_STYLE_REGISTRY_DOCUMENT: WorldStyleRegistryDocument = deepFreeze(
+  JSON.parse(WORLD_STYLE_REGISTRY_V1_JSON) as WorldStyleRegistryDocument,
+);
+
+/** The identity half of a profile source. The backend registry authors it; nothing here does. */
+type WorldArtProfileIdentity =
+  | 'profileId'
+  | 'profileVersion'
+  | 'displayName'
+  | 'description'
+  | 'compatibilityKey';
+
+/** How a registered profile looks. The backend registry has no field for any of this. */
+export type WorldArtAppearanceSource = Omit<WorldArtProfileSource, WorldArtProfileIdentity>;
+
+const AEROHEART_APPEARANCE: WorldArtAppearanceSource = {
   geometry: {
     landmark: 'aero-beacon',
     evidence: 'memory-lens',
@@ -217,12 +214,7 @@ const AEROHEART_SOURCE: WorldArtProfileSource = {
   },
 };
 
-const SURVEY_RELIEF_SOURCE: WorldArtProfileSource = {
-  profileId: 'survey-relief',
-  profileVersion: 1,
-  displayName: 'Survey Relief (experimental)',
-  description: 'A topology-compatible field-ledger study for renderer regression tests.',
-  compatibilityKey: 'atlas-topology-v1',
+const SURVEY_RELIEF_APPEARANCE: WorldArtAppearanceSource = {
   geometry: {
     landmark: 'survey-strata',
     evidence: 'indexed-bays',
@@ -291,30 +283,134 @@ const SURVEY_RELIEF_SOURCE: WorldArtProfileSource = {
   },
 };
 
-export const WORLD_STYLE_RECIPES: readonly WorldStyleRecipeV1[] = [
-  {
+const profileKey = (profileId: string, profileVersion: number): string =>
+  `${profileId}@${profileVersion}`;
+
+const APPEARANCES: ReadonlyMap<string, WorldArtAppearanceSource> = new Map([
+  ['origin-landscape@1', AEROHEART_APPEARANCE],
+  ['survey-relief@1', SURVEY_RELIEF_APPEARANCE],
+]);
+
+type ReadCompatibleBindings = NonNullable<WorldStyleRecipeV1['readCompatibleBindings']>;
+
+/*
+ * Worlds saved before `source-light-v1` joined Aeroheart carry the three-module binding below.
+ * The backend registry describes only the current binding, so the exact historical one is kept
+ * here, next to the only reader of it (`validateBinding` in the app's world-style adapter).
+ */
+const READ_COMPATIBLE_BINDINGS: ReadonlyMap<string, ReadCompatibleBindings> = new Map([
+  ['origin-landscape@1', [{
+    modules: ['aeroheart-optics-v1', 'registered-surface-v1', 'bounded-tempo-v1'],
+    capabilityMapping: {
+      vitality: 'world.vitality', glass: 'material.transmission',
+      'relationship-energy': 'relationships.energy', 'garden-density': 'detail.ecology',
+      'horizon-softness': 'atmosphere.softness', 'surface-finish': 'surface.finish',
+      'world-tempo': 'motion.tempo',
+    },
+  }]],
+]);
+
+function finite(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`world style registry needs a finite ${label}`);
+  }
+  return value;
+}
+
+function textDefault(value: unknown, label: string): string {
+  if (typeof value !== 'string') throw new TypeError(`world style registry needs a text ${label}`);
+  return value;
+}
+
+/** The same camel-case control the backend catalog serves, so the two compare exactly. */
+export function worldStyleControlFromDocument(
+  control: WorldStyleRegistryControlDocument,
+): WorldStyleParameterDefinition {
+  const base = {
+    key: control.key,
+    capability: control.capability,
+    label: control.label,
+    description: control.description,
+    group: control.group,
+  };
+  const label = `${control.key} default`;
+  switch (control.kind) {
+    case 'range':
+      return {
+        ...base,
+        kind: 'range',
+        min: finite(control.min, `${control.key} min`),
+        max: finite(control.max, `${control.key} max`),
+        step: finite(control.step, `${control.key} step`),
+        defaultValue: finite(control.default_value, label),
+      };
+    case 'choice':
+      return {
+        ...base,
+        kind: 'choice',
+        options: (control.options ?? []).map((option) =>
+          typeof option === 'string' ? { value: option, label: option } : { ...option }),
+        defaultValue: textDefault(control.default_value, label),
+      };
+    case 'color':
+      return { ...base, kind: 'color', defaultValue: textDefault(control.default_value, label) };
+    case 'toggle':
+      if (typeof control.default_value !== 'boolean') {
+        throw new TypeError(`world style registry needs a boolean ${label}`);
+      }
+      return { ...base, kind: 'toggle', defaultValue: control.default_value };
+    default:
+      throw new TypeError(`world style registry names an unknown control kind for ${control.key}`);
+  }
+}
+
+function recipeFromDocument(profile: WorldStyleRegistryProfileDocument): WorldStyleRecipeV1 {
+  const key = profileKey(profile.profile_id, profile.profile_version);
+  const appearance = APPEARANCES.get(key);
+  if (appearance === undefined) {
+    throw new TypeError(`the backend registry names ${key}, which has no reviewed appearance`);
+  }
+  const { availability, origin } = profile.recipe;
+  if (profile.recipe.schema_version !== 1) {
+    throw new TypeError(`unsupported world style recipe schema in ${key}`);
+  }
+  if (availability !== 'product' && availability !== 'developer') {
+    throw new TypeError(`invalid world style availability: ${key}`);
+  }
+  if (origin !== 'authored' && origin !== 'generated') {
+    throw new TypeError(`invalid world style origin: ${key}`);
+  }
+  const compatibilityKey = profile.compatibility_key;
+  if (compatibilityKey !== 'atlas-topology-v1') {
+    throw new TypeError(`this Atlas cannot draw the ${key} topology ${compatibilityKey}`);
+  }
+  const readCompatibleBindings = READ_COMPATIBLE_BINDINGS.get(key);
+  return {
     schemaVersion: 1,
-    availability: 'product',
-    origin: 'authored',
-    profile: AEROHEART_SOURCE,
-    controls: AEROHEART_CONTROLS,
-    modules: ['aeroheart-optics-v1', 'registered-surface-v1', 'bounded-tempo-v1', 'source-light-v1'],
-    readCompatibleBindings: [{
-      modules: ['aeroheart-optics-v1', 'registered-surface-v1', 'bounded-tempo-v1'],
-      capabilityMapping: {
-        vitality: 'world.vitality', glass: 'material.transmission',
-        'relationship-energy': 'relationships.energy', 'garden-density': 'detail.ecology',
-        'horizon-softness': 'atmosphere.softness', 'surface-finish': 'surface.finish',
-        'world-tempo': 'motion.tempo',
-      },
-    }],
-  },
-  {
-    schemaVersion: 1,
-    availability: 'developer',
-    origin: 'authored',
-    profile: SURVEY_RELIEF_SOURCE,
-    controls: SURVEY_RELIEF_CONTROLS,
-    modules: ['survey-relief-response-v1'],
-  },
-];
+    availability,
+    origin,
+    profile: {
+      profileId: profile.profile_id,
+      profileVersion: profile.profile_version,
+      displayName: profile.display_name,
+      description: profile.description,
+      compatibilityKey,
+      ...appearance,
+    },
+    controls: profile.controls.map(worldStyleControlFromDocument),
+    modules: [...profile.recipe.modules],
+    ...(readCompatibleBindings === undefined ? {} : { readCompatibleBindings }),
+  };
+}
+
+export const WORLD_STYLE_RECIPES: readonly WorldStyleRecipeV1[] =
+  WORLD_STYLE_REGISTRY_DOCUMENT.profiles.map(recipeFromDocument);
+
+// An appearance or a historical binding for a profile the registry does not name is vocabulary
+// nothing can reach, so it fails here rather than lingering.
+for (const key of [...APPEARANCES.keys(), ...READ_COMPATIBLE_BINDINGS.keys()]) {
+  if (!WORLD_STYLE_RECIPES.some((recipe) =>
+    profileKey(recipe.profile.profileId, recipe.profile.profileVersion) === key)) {
+    throw new TypeError(`${key} is authored here but the backend registry does not register it`);
+  }
+}

@@ -12,6 +12,7 @@
     "test": "vitest run",
     "check": "pnpm run typecheck && pnpm run boundaries && pnpm run test",
     "synth": "tsx packages/scene-synth/src/cli.ts",
+    "world-style:sync": "tsx scripts/sync-world-style-registry.ts",
     "app": "pnpm --filter @exulanica/app dev",
     "app:build": "pnpm --filter @exulanica/app build",
     "landing": "pnpm --filter @exulanica/landing dev",

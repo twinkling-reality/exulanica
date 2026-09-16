@@ -13,6 +13,9 @@ from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, St
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "exulanica" / "world" / "style-registry.v1.json"
 RECIPES_TS = ROOT / "web" / "packages" / "presentation" / "src" / "world-style-recipes.ts"
+GENERATED_TS = (
+    ROOT / "web" / "packages" / "presentation" / "src" / "world-style-registry-v1.generated.ts"
+)
 FRONTEND_RECIPE_COMMIT = "55b123627314d328fba3850eb607d8a7682a8cad"
 FRONTEND_CAPABILITIES = {
     "world.vitality",
@@ -100,10 +103,19 @@ def test_the_backend_adapter_is_pinned_to_the_reviewed_frontend_recipe_contract(
     ]
 
 
-def test_the_backend_registry_matches_the_committed_world_profile_versions():
-    source = RECIPES_TS.read_text(encoding="utf-8")
-    declared_ids = set(re.findall(r"profileId: '([^']+)'", source))
-    assert declared_ids == {profile_id for profile_id, _version in STYLE_REGISTRY.profiles}
+def test_the_browser_reads_this_registry_rather_than_restating_it():
+    # The presentation package derives every profile, module list and control from an exact copy
+    # of this file. Only the appearance of each registered profile is authored on that side.
+    generated = GENERATED_TS.read_text(encoding="utf-8")
+    prefix = "export const WORLD_STYLE_REGISTRY_V1_JSON = String.raw`"
+    embedded = generated[generated.index(prefix) + len(prefix) : generated.rindex("`;")]
+    assert embedded == REGISTRY_PATH.read_text(encoding="utf-8")
+    appearances = set(
+        re.findall(r"\['([a-z][a-z0-9-]*@\d+)', \w+_APPEARANCE\]", RECIPES_TS.read_text())
+    )
+    assert appearances == {
+        f"{profile_id}@{version}" for profile_id, version in STYLE_REGISTRY.profiles
+    }
     assert {version for _profile_id, version in STYLE_REGISTRY.profiles} == {1}
 
 

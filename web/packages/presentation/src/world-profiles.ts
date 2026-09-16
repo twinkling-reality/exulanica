@@ -30,16 +30,19 @@ import {
   type WorldStyleParameters,
 } from './world-style-registry.js';
 import {
-  AEROHEART_CONTROLS,
-  SURVEY_RELIEF_CONTROLS,
   WORLD_STYLE_RECIPES,
+  WORLD_STYLE_REGISTRY_DOCUMENT,
+  worldStyleControlFromDocument,
+  type WorldArtAppearanceSource,
   type WorldStyleRecipeV1,
+  type WorldStyleRegistryDocument,
 } from './world-style-recipes.js';
 
 export type WorldArtProfileId = string;
 export type {
   MediaSample,
   SourceLightReading,
+  WorldArtAppearanceSource,
   WorldArtProfile,
   WorldArtProfileSource,
   WorldAtmosphereForm,
@@ -48,17 +51,17 @@ export type {
   WorldSurfaceForm,
   WorldStyleParameters,
   WorldStyleRecipeV1,
+  WorldStyleRegistryDocument,
   WorldUiColors,
   WorldUiRecipe,
   WorldUiStyle,
 };
 export {
-  AEROHEART_CONTROLS,
   MEDIA_SAMPLE_EDGE,
   MIN_SURFACE_PRESENCE,
-  SURVEY_RELIEF_CONTROLS,
   WORLD_STYLE_MODULES,
   WORLD_STYLE_RECIPES,
+  WORLD_STYLE_REGISTRY_DOCUMENT,
   WorldStyleRegistry,
   contrastRatio,
   deriveWorldUiColors,
@@ -68,17 +71,17 @@ export {
   sourceLightParameters,
   perceptualColour,
   worldSilhouetteTone,
+  worldStyleControlFromDocument,
 };
 
 export const WORLD_STYLE_REGISTRY = new WorldStyleRegistry({
   recipes: WORLD_STYLE_RECIPES,
   modules: WORLD_STYLE_MODULES,
-  defaultProfile: { profileId: 'origin-landscape', profileVersion: 1 },
+  defaultProfile: {
+    profileId: WORLD_STYLE_REGISTRY_DOCUMENT.default_profile.profile_id,
+    profileVersion: WORLD_STYLE_REGISTRY_DOCUMENT.default_profile.profile_version,
+  },
 });
-
-/** Exact inert recipe contract mirrored by the backend registry handshake. */
-export const WORLD_STYLE_CONTRACT_COMMIT =
-  '55b123627314d328fba3850eb607d8a7682a8cad';
 
 /** The authored Aeroheart base and developer comparison stay topology-compatible. */
 export const ORIGIN_LANDSCAPE = WORLD_STYLE_REGISTRY.profile('origin-landscape', 1);

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  WORLD_STYLE_CONTRACT_COMMIT,
+  WORLD_STYLE_REGISTRY_DOCUMENT,
   WORLD_STYLE_RECIPES,
   worldStyleRecipe,
 } from '@exulanica/presentation';
@@ -45,7 +45,7 @@ const binding = () => {
   const recipe = worldStyleRecipe(PROFILE.profileId, PROFILE.profileVersion)!;
   return {
     schemaVersion: 1,
-    frontendCommit: WORLD_STYLE_CONTRACT_COMMIT,
+    frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit,
     availability: recipe.availability,
     origin: recipe.origin,
     profileId: PROFILE.profileId,
@@ -59,7 +59,7 @@ const binding = () => {
 
 const catalog = () => ({
   schemaVersion: 1,
-  contractSource: { frontendCommit: WORLD_STYLE_CONTRACT_COMMIT },
+  contractSource: { frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit },
   defaultProfile: { ...PROFILE, parameters: PARAMETERS },
   profiles: WORLD_STYLE_RECIPES.map((recipe) => ({
     profileId: recipe.profile.profileId,

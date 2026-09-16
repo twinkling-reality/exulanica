@@ -5,14 +5,22 @@
  * file is the only translation layer. It validates the inert catalog against the reviewed local
  * recipe registry before any profile is rendered, completes and validates parameters locally,
  * and keeps preview handles transient.
+ *
+ * Server and browser agree when their PAYLOADS agree. Both are built from the one backend registry
+ * document, which this Atlas carries as exact bytes, so the catalog and every recipe binding the
+ * server sends are compared with what that document produces. The handshake used to compare a
+ * pinned commit hash instead, which said nothing about whether the two sides still said the same
+ * thing.
  */
 
 import type { WorldStyleParameterDefinition, WorldStyleParameterValue } from '@exulanica/atlas-core';
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import {
-  WORLD_STYLE_CONTRACT_COMMIT,
   WORLD_STYLE_RECIPES,
+  WORLD_STYLE_REGISTRY_DOCUMENT,
+  worldStyleControlFromDocument,
   worldStyleRecipe,
+  type WorldStyleRegistryDocument,
 } from '@exulanica/presentation';
 
 export type WorldStyleOrigin = 'user' | 'settings' | 'companion';
@@ -448,17 +456,63 @@ function validControlValue(control: WorldStyleParameterDefinition, value: unknow
         : typeof value === 'boolean';
 }
 
+type RegistryProfile = WorldStyleRegistryDocument['profiles'][number];
+
+function registryProfile(profileId: string, profileVersion: number): RegistryProfile | null {
+  return WORLD_STYLE_REGISTRY_DOCUMENT.profiles.find((profile) =>
+    profile.profile_id === profileId && profile.profile_version === profileVersion) ?? null;
+}
+
+/** The binding the backend registry serves for one profile, built as `registry.py` builds it. */
+function expectedBinding(profile: RegistryProfile): WorldStyleRecipeBinding {
+  return {
+    schemaVersion: 1,
+    frontendCommit: WORLD_STYLE_REGISTRY_DOCUMENT.frontend_contract.commit,
+    availability: profile.recipe.availability as WorldStyleRecipeBinding['availability'],
+    origin: profile.recipe.origin as WorldStyleRecipeBinding['origin'],
+    profileId: profile.profile_id,
+    profileVersion: profile.profile_version,
+    modules: profile.recipe.modules,
+    capabilityMapping: Object.fromEntries(
+      profile.controls.map((control) => [control.key, control.capability]),
+    ),
+  };
+}
+
+/** The whole catalog the backend registry serves, built as `StyleRegistry.catalog()` builds it. */
+function expectedCatalog(): unknown {
+  const document = WORLD_STYLE_REGISTRY_DOCUMENT;
+  const fallback = registryProfile(
+    document.default_profile.profile_id,
+    document.default_profile.profile_version,
+  );
+  return {
+    schemaVersion: 1,
+    contractSource: { frontendCommit: document.frontend_contract.commit },
+    defaultProfile: {
+      profileId: document.default_profile.profile_id,
+      profileVersion: document.default_profile.profile_version,
+      parameters: Object.fromEntries(
+        (fallback?.controls ?? []).map((control) => [control.key, control.default_value]),
+      ),
+    },
+    profiles: document.profiles.map((profile) => ({
+      profileId: profile.profile_id,
+      profileVersion: profile.profile_version,
+      displayName: profile.display_name,
+      description: profile.description,
+      compatibilityKey: profile.compatibility_key,
+      status: profile.status,
+      recipeBinding: expectedBinding(profile),
+      controls: profile.controls.map(worldStyleControlFromDocument),
+    })),
+  };
+}
+
 function validateCatalog(value: unknown): void {
   const catalog = record(value, 'world style catalog');
   if (catalog['schemaVersion'] !== 1) {
     throw new WorldStyleContractError('unknown_catalog_version', 'The server returned an unsupported world style catalog.');
-  }
-  const source = record(catalog['contractSource'], 'world style catalog source');
-  if (source['frontendCommit'] !== WORLD_STYLE_CONTRACT_COMMIT) {
-    throw new WorldStyleContractError(
-      'catalog_contract_mismatch',
-      'The server and this Atlas do not share the same reviewed world recipe contract.',
-    );
   }
   const profiles = array(catalog['profiles'], 'world style catalog profiles');
   const seen = new Set<string>();
@@ -484,6 +538,15 @@ function validateCatalog(value: unknown): void {
     if (!seen.has(key)) {
       throw new WorldStyleContractError('missing_server_profile', `The server is missing reviewed profile ${key}.`);
     }
+  }
+  // The specific checks above name what broke. This one is the contract: every byte of meaning in
+  // the served catalog, names, descriptions, statuses and defaults included, must be what the
+  // shared registry document says.
+  if (!sameValue(catalog, expectedCatalog())) {
+    throw new WorldStyleContractError(
+      'catalog_contract_mismatch',
+      'The server and this Atlas do not share the same reviewed world recipe contract.',
+    );
   }
 }
 
@@ -634,22 +697,17 @@ function validateBinding(
   historical = false,
 ): void {
   const recipe = worldStyleRecipe(profileId, profileVersion);
-  const executableBinding = recipe !== null && (
-    (sameValue(binding.modules, recipe.modules) && sameValue(binding.capabilityMapping,
-      Object.fromEntries(recipe.controls.map(control => [control.key, control.capability])))) ||
-    (historical && (recipe.readCompatibleBindings ?? []).some(compatible =>
-      sameValue(binding.modules, compatible.modules) &&
-      sameValue(binding.capabilityMapping, compatible.capabilityMapping)))
+  const profile = registryProfile(profileId, profileVersion);
+  const expected = profile === null ? null : expectedBinding(profile);
+  const executableBinding = recipe !== null && expected !== null && (
+    sameValue(binding, expected) ||
+    (historical && (recipe.readCompatibleBindings ?? []).some(compatible => sameValue(binding, {
+      ...expected,
+      modules: compatible.modules,
+      capabilityMapping: compatible.capabilityMapping,
+    })))
   );
-  if (
-    recipe === null ||
-    binding.frontendCommit !== WORLD_STYLE_CONTRACT_COMMIT ||
-    binding.profileId !== profileId ||
-    binding.profileVersion !== profileVersion ||
-    binding.availability !== recipe.availability ||
-    binding.origin !== recipe.origin ||
-    !executableBinding
-  ) {
+  if (!executableBinding) {
     throw new WorldStyleContractError(
       'recipe_binding_mismatch',
       `The server recipe binding for ${profileId}@${profileVersion} is not executable by this Atlas.`,

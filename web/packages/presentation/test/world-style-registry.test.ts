@@ -7,6 +7,8 @@ import {
   productWorldStyleIds,
   type WorldStyleRecipeV1,
 } from '../src/world-profiles.js';
+import { WORLD_STYLE_CAPABILITIES } from '../src/world-style-capabilities.js';
+import { WORLD_STYLE_REGISTRY_V1_JSON } from '../src/world-style-registry-v1.generated.js';
 
 const registryFrom = (recipes: readonly WorldStyleRecipeV1[]): WorldStyleRegistry =>
   new WorldStyleRegistry({
@@ -87,12 +89,22 @@ describe('world style recipe registry', () => {
   });
 });
 
-// Read the independently maintained backend manifest. A catalog generated from the frontend
-// under test cannot catch a missing module on the server.
-it('matches every reviewed backend module and control contract', () => {
+// Read the backend registry from disk. Recipes are derived from the embedded copy, so this is what
+// catches an edit to the JSON that nobody re-embedded with `pnpm run world-style:sync`.
+it('embeds the backend registry byte for byte', () => {
+  expect(WORLD_STYLE_REGISTRY_V1_JSON).toBe(readFileSync(new URL(
+    '../../../../exulanica/world/style-registry.v1.json', import.meta.url,
+  ), 'utf8'));
+});
+
+// The executable modules and the capability vocabulary are still written in this package, because
+// they are code the backend cannot carry. The registry's statement of them is compared here.
+it('matches every reviewed backend module, capability and control contract', () => {
   const backend = JSON.parse(readFileSync(new URL(
     '../../../../exulanica/world/style-registry.v1.json', import.meta.url,
   ), 'utf8'));
+  expect(Object.fromEntries(backend.capabilities.map((value: { capability: string }) =>
+    [value.capability, value]))).toEqual(WORLD_STYLE_CAPABILITIES);
   expect(backend.modules.map((module: { module_id: string; capabilities: string[] }) => ({
     moduleId: module.module_id, capabilities: [...module.capabilities].sort(),
   })).sort((a: { moduleId: string }, b: { moduleId: string }) => a.moduleId.localeCompare(b.moduleId)))
@@ -102,6 +114,9 @@ it('matches every reviewed backend module and control contract', () => {
   for (const recipe of WORLD_STYLE_RECIPES) {
     const profile = backend.profiles.find((value: { profile_id: string; profile_version: number }) =>
       value.profile_id === recipe.profile.profileId && value.profile_version === recipe.profile.profileVersion);
+    expect(recipe.profile.displayName).toBe(profile.display_name);
+    expect(recipe.profile.description).toBe(profile.description);
+    expect(recipe.profile.compatibilityKey).toBe(profile.compatibility_key);
     expect(profile.recipe.modules).toEqual(recipe.modules);
     expect(profile.recipe.availability).toBe(recipe.availability);
     expect(profile.recipe.origin).toBe(recipe.origin);
