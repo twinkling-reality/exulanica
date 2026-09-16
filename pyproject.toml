@@ -473,6 +473,35 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+# The capture verdict is cheap by construction, and that is the whole of its value. It says
+# whether a set of photographs can rebuild BEFORE any GPU spend, so a verdict that pulled in the
+# numeric stack it is meant to save would be the spend it exists to avoid, and a verdict that could
+# open the database, the store or the evidence spine would be a second writer nobody reviewed.
+#
+# Note what is deliberately NOT claimed here. `reconstruction` is not listed because it is this
+# package's sibling in the layer list, and siblings already may not import each other. `grammar`
+# is listed even though it sits below: a reconstructability verdict is about recorded photographs
+# and has no business reading a generated world. The external names are only checkable while
+# something in this package graph imports them; if the last importer of one goes, this contract
+# errors on a missing module and the name should be removed here rather than the check weakened.
+name = "The capture verdict is pure: no database, store, evidence address or numeric stack"
+type = "forbidden"
+source_modules = ["exulanica.capture"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.grammar",
+  "torch",
+  "numpy",
+  "cv2",
+  "pycolmap",
+]
+
+[[tool.importlinter.contracts]]
 # The pure core is testable with no server and no credentials, and that is a property worth
 # pinning rather than rediscovering. A psycopg import here would mean an evidence address had
 # learned how it is stored. The generator system is listed for the same reason: a generated
