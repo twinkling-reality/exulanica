@@ -333,7 +333,7 @@ class WorldStructureRepository:
             )
         placement_by_id = {
             value["element_id"]: sha256_of_canonical(value).hex()
-            for value in candidate.placement["elements"]
+            for value in _element_placements(candidate)
         }
         for element in sorted(
             candidate.topology["elements"], key=lambda value: value["element_id"]
@@ -602,7 +602,7 @@ class WorldStructureRepository:
         grouped: dict[str, list[Mapping[str, Any]]] = {
             value["region_id"]: [] for value in candidate.topology["regions"]
         }
-        for placement in candidate.placement["elements"]:
+        for placement in _element_placements(candidate):
             owner = owner_by_element[placement["element_id"]]
             if owner["kind"] == "region":
                 grouped[owner["id"]].append(placement)
@@ -789,3 +789,8 @@ class WorldStructureRepository:
                 Jsonb(dict(details)),
             ),
         )
+
+
+def _element_placements(candidate: SpatialCandidate) -> tuple[Mapping[str, Any], ...]:
+    """Every element's placement entry, placed or explicitly unplaced, as the snapshot states it."""
+    return (*candidate.placement["elements"], *candidate.placement.get("unplaced_elements", ()))

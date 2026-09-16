@@ -16,13 +16,15 @@ from exulanica.orchestration.reference_world import compose_reference_sources
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import (
     InvalidStructuralData,
+    TopologyContract,
     TopologySourceSlot,
     WorldObjectRepository,
     WorldStructureRepository,
     WorldStyleRepository,
 )
 from exulanica.world.bootstrap import bootstrap_world
-from exulanica.world.composed import composed_candidate
+from exulanica.world.composed import UNPLACED_REASON, composed_candidate
+from exulanica.world.structure import validate_candidate
 from fastapi.testclient import TestClient
 
 from conftest import write_photo
@@ -212,15 +214,49 @@ def test_missing_and_world_owned_slots_and_historical_topologies_are_preserved(
     assert len(snapshot.candidate.topology["elements"]) == 5
 
 
-def test_preservation_path_refuses_changed_candidate(repository, composed):
-    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
-    contract = styles.current_topology_contract()
-    candidate = composed_candidate(contract, "ab" * 32, "cd" * 32)
-    altered = replace(
+def _coincident_zeros(candidate):
+    """The composed candidate with every unplaced identity given the origin instead."""
+    placement = {
+        key: value
+        for key, value in candidate.placement.items()
+        if key not in {"unplaced_elements", "unplaced_destinations"}
+    }
+    placement["elements"] = [
+        {
+            "element_id": item["element_id"],
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0,
+            "yaw_microradians": 0,
+            "scale_milli": 1_000,
+        }
+        for item in candidate.placement["unplaced_elements"]
+    ]
+    placement["destinations"] = [
+        {"destination_id": item["destination_id"], "x_mm": 0, "y_mm": 0, "z_mm": 0}
+        for item in candidate.placement["unplaced_destinations"]
+    ]
+    return replace(candidate, placement=placement)
+
+
+def _dropped_last_source(candidate):
+    return replace(
         candidate,
         topology={**candidate.topology, "elements": candidate.topology["elements"][:-1]},
-        placement={**candidate.placement, "elements": candidate.placement["elements"][:-1]},
+        placement={
+            **candidate.placement,
+            "unplaced_elements": candidate.placement["unplaced_elements"][:-1],
+        },
     )
+
+
+@pytest.mark.parametrize("alter", [_dropped_last_source, _coincident_zeros])
+def test_preservation_path_refuses_changed_candidate(repository, composed, alter):
+    # Coincident zeros is a valid structural candidate, and it is still refused: a position
+    # nobody authored is not the composed sources, even when every coordinate is the same.
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    contract = styles.current_topology_contract()
+    altered = alter(composed_candidate(contract, "ab" * 32, "cd" * 32))
     structures = WorldStructureRepository(repository.connection, repository.workspace_id)
     preview = structures.preview(altered, proposed_by=uuid.uuid4())
     with pytest.raises(InvalidStructuralData, match="exact composed sources"):
@@ -234,6 +270,133 @@ def test_preservation_path_refuses_changed_candidate(repository, composed):
         )
     assert structures.current() is None
     assert styles.current_topology_contract() == contract
+
+
+def test_bootstrap_writes_every_source_and_destination_as_explicitly_unplaced(repository, composed):
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    bootstrap_world(
+        repository.connection,
+        workspace_id=repository.workspace_id,
+        actor=uuid.uuid4(),
+        base_topology_digest=styles.current_topology_digest(),
+    )
+    snapshot = WorldStructureRepository(repository.connection, repository.workspace_id).current()
+    topology = snapshot.candidate.topology
+    placement = snapshot.candidate.placement
+    assert placement["elements"] == []
+    assert placement["destinations"] == []
+    assert placement["unplaced_elements"] == [
+        {"element_id": element["element_id"], "reason": UNPLACED_REASON}
+        for element in topology["elements"]
+    ]
+    assert placement["unplaced_destinations"] == [
+        {"destination_id": destination["destination_id"], "reason": UNPLACED_REASON}
+        for destination in topology["navigation"]["destinations"]
+    ]
+    assert topology["navigation"]["edges"] == []
+    assert not {"x_mm", "y_mm", "z_mm"} & set(json.dumps(placement).replace('"', " ").split())
+    rows = repository.connection.execute(
+        "select element_id,placement_sha256 from world_structure_snapshot_element "
+        "where snapshot_id=%s order by element_id",
+        (snapshot.snapshot_id,),
+    ).fetchall()
+    assert [row["element_id"] for row in rows] == [e["element_id"] for e in topology["elements"]]
+
+
+def _regions_contract(*regions):
+    return TopologyContract(
+        "regions",
+        tuple(regions),
+        tuple(
+            TopologySourceSlot(uuid.uuid4(), f"slot-{region}", region, None, "No source chosen")
+            for region in regions
+        ),
+    )
+
+
+def test_separate_regions_get_no_route_between_them():
+    # Adjacency in a sorted list is not adjacency in a world. Two regions nobody has related stay
+    # unconnected, and a candidate that asserts an edge to a destination with no position fails.
+    candidate = composed_candidate(_regions_contract("region-b", "region-a"), "ab" * 32, "cd" * 32)
+    validate_candidate(candidate)
+    assert candidate.topology["navigation"]["edges"] == []
+    assert [item["destination_id"] for item in candidate.placement["unplaced_destinations"]] == [
+        "destination:region-a",
+        "destination:region-b",
+    ]
+    routed = replace(
+        candidate,
+        topology={
+            **candidate.topology,
+            "navigation": {
+                **candidate.topology["navigation"],
+                "edges": [
+                    {
+                        "from": "destination:region-a",
+                        "to": "destination:region-b",
+                        "kind": "field",
+                        "max_slope_millidegrees": 0,
+                    }
+                ],
+            },
+        },
+    )
+    with pytest.raises(InvalidStructuralData, match="has no position"):
+        validate_candidate(routed)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda p: {**p, "unplaced_destinations": []}, "omitted when nothing is unplaced"),
+        (
+            lambda p: {**p, "unplaced_elements": p["unplaced_elements"][::-1]},
+            "must be sorted",
+        ),
+        (
+            lambda p: {**p, "unplaced_elements": [{**p["unplaced_elements"][0], "reason": " "}]},
+            "reason must be a non-empty string",
+        ),
+        (
+            lambda p: {
+                **p,
+                "elements": [
+                    {
+                        "element_id": p["unplaced_elements"][0]["element_id"],
+                        "x_mm": 0,
+                        "y_mm": 0,
+                        "z_mm": 0,
+                        "yaw_microradians": 0,
+                        "scale_milli": 1_000,
+                    }
+                ],
+            },
+            "partition the topology elements",
+        ),
+        # A destination in neither list is taken as positioned, so it needs a route first.
+        (
+            lambda p: {k: v for k, v in p.items() if k != "unplaced_destinations"},
+            "unreachable",
+        ),
+        (
+            lambda p: {**p, "unplaced_destinations": p["unplaced_destinations"][:1]},
+            "partition the navigation destinations",
+        ),
+    ],
+)
+def test_unplaced_lists_have_one_encoding_and_cover_each_identity_once(change, message):
+    candidate = composed_candidate(_regions_contract("region-a", "region-b"), "ab" * 32, "cd" * 32)
+    with pytest.raises(InvalidStructuralData, match=message):
+        validate_candidate(replace(candidate, placement=change(dict(candidate.placement))))
+
+
+def test_a_collision_body_cannot_be_unplaced():
+    candidate = composed_candidate(_regions_contract("region-a"), "ab" * 32, "cd" * 32)
+    element = {**candidate.topology["elements"][0], "collision": {"kind": "circle", "radius_mm": 1}}
+    with pytest.raises(InvalidStructuralData, match="collision body but no position"):
+        validate_candidate(
+            replace(candidate, topology={**candidate.topology, "elements": [element]})
+        )
 
 
 def test_failed_version_creation_rolls_back_snapshot(repository, composed):

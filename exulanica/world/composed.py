@@ -1,15 +1,23 @@
 """Lift an authored gallery into a plain structural layout without changing source bindings.
 
-Positions are authored layout, never measured geometry. Each source keeps its own element,
-including missing sources and world-owned slots. Evidence cards have no collision geometry.
+Each source keeps its own element, including missing sources and world-owned slots. Evidence cards
+have no collision geometry.
+
+Nothing here has a position. The composer is given which sources belong to which region and
+nothing about where anything is, so every element and every region's destination is written as
+explicitly unplaced, and no navigation edge is asserted between regions. It used to space elements
+by their index in a sorted list and chain destinations in that same order, which is a sort
+presented as a place.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from exulanica.world.models import TopologyContract
 from exulanica.world.structure import SpatialCandidate
+
+UNPLACED_REASON: Final = "no authored or measured position"
 
 
 def composed_candidate(
@@ -18,15 +26,12 @@ def composed_candidate(
     regions = sorted(contract.region_ids)
     elements: list[dict[str, Any]] = []
     destinations: list[dict[str, Any]] = []
-    placements: list[dict[str, Any]] = []
-    destination_placements: list[dict[str, Any]] = []
-    source_ordinals: dict[str | None, int] = {}
+    unplaced_elements: list[dict[str, Any]] = []
+    unplaced_destinations: list[dict[str, Any]] = []
     for source in sorted(contract.source_slots, key=lambda s: str(s.source_id)):
         region = source.region_id
         element_id = f"element:source:{source.source_id}"
         span = source.evidence_span_id
-        local_ordinal = source_ordinals.get(region, 0)
-        source_ordinals[region] = local_ordinal + 1
         elements.append(
             {
                 "element_id": element_id,
@@ -54,34 +59,13 @@ def composed_candidate(
                 "streaming_key": "world-asset:region.evidence-cards@1",
             }
         )
-        placements.append(
-            {
-                "element_id": element_id,
-                "x_mm": regions.index(region) * 10_000 if region is not None else 0,
-                "y_mm": 0,
-                "z_mm": local_ordinal * 2_000,
-                "yaw_microradians": 0,
-                "scale_milli": 1_000,
-            }
-        )
-    for ordinal, region in enumerate(regions):
+        unplaced_elements.append({"element_id": element_id, "reason": UNPLACED_REASON})
+    for region in regions:
         destination_id = f"destination:{region}"
         destinations.append(
             {"destination_id": destination_id, "region_id": region, "required": True}
         )
-        destination_placements.append(
-            {"destination_id": destination_id, "x_mm": ordinal * 10_000, "y_mm": 1_600, "z_mm": 0}
-        )
-
-    edges = [
-        {
-            "from": f"destination:{regions[index]}",
-            "to": f"destination:{regions[index + 1]}",
-            "kind": "field",
-            "max_slope_millidegrees": 0,
-        }
-        for index in range(len(regions) - 1)
-    ]
+        unplaced_destinations.append({"destination_id": destination_id, "reason": UNPLACED_REASON})
 
     topology = {
         "schema_version": 1,
@@ -92,7 +76,7 @@ def composed_candidate(
             "agent_radius_mm": 300,
             "maximum_slope_millidegrees": 15_000,
             "destinations": destinations,
-            "edges": edges,
+            "edges": [],
         },
         "dependencies": [],
     }
@@ -104,12 +88,17 @@ def composed_candidate(
             for ordinal, region in enumerate(regions)
         ],
     }
-    placement = {
+    placement: dict[str, Any] = {
         "schema_version": 1,
         "coordinate_unit": "millimetre",
-        "elements": placements,
-        "destinations": destination_placements,
+        "elements": [],
+        "destinations": [],
     }
+    # An empty list is never written: absent means nothing is unplaced, so the digest has one input.
+    if unplaced_elements:
+        placement["unplaced_elements"] = unplaced_elements
+    if unplaced_destinations:
+        placement["unplaced_destinations"] = unplaced_destinations
     neighborhood = {
         "schema_version": 1,
         "neighborhood_version": 1,

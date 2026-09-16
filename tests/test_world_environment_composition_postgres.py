@@ -53,12 +53,15 @@ from exulanica.world import (
     ObjectOrigin,
     SourceAnchor,
     StaleObjectBase,
+    TopologyContract,
+    TopologySourceSlot,
     Transform,
     UnavailableAsset,
     UnknownWorldResource,
     WorldObjectRepository,
     WorldStructureRepository,
 )
+from exulanica.world.composed import UNPLACED_REASON, composed_candidate
 from fastapi.testclient import TestClient
 
 from conftest import (
@@ -158,9 +161,24 @@ class Composed:
 
 @pytest.fixture
 def composed(repository, tmp_path) -> Composed:
+    return _composed_over(repository, tmp_path, structural_candidate())
+
+
+@pytest.fixture
+def unplaced_composed(repository, tmp_path) -> Composed:
+    """The same composition over a snapshot the bootstrap composer wrote: nothing has a position."""
+    contract = TopologyContract(
+        "unplaced-composition",
+        ("region-a",),
+        (TopologySourceSlot(uuid.uuid4(), "no-source", "region-a", None, "No source chosen"),),
+    )
+    return _composed_over(repository, tmp_path, composed_candidate(contract, "ab" * 32, "cd" * 32))
+
+
+def _composed_over(repository, tmp_path, candidate) -> Composed:
     actor = uuid.uuid4()
     structures = WorldStructureRepository(repository.connection, repository.workspace_id)
-    preview = structures.preview(structural_candidate(), proposed_by=actor)
+    preview = structures.preview(candidate, proposed_by=actor)
     snapshot = structures.apply(
         preview.preview_id,
         base_snapshot_id=preview.base_snapshot_id,
@@ -263,6 +281,27 @@ def test_whole_asset_and_feature_placements_are_pinned_sorted_and_reload(compose
     reopened = composed.worlds.version(version.version_id)
     assert reopened.state_sha256 == version.state_sha256
     assert reopened.environment_instances == version.environment_instances
+
+
+def test_an_unplaced_source_region_takes_an_authored_environment_without_gaining_a_position(
+    unplaced_composed,
+) -> None:
+    version = _add(unplaced_composed, unplaced_composed.placement("environment:corridor"))
+    assert [item.availability for item in version.environment_instances] == ["available"]
+    assert version.environment_instances[0].region_id == "region-a"
+    assert version.environment_instances[0].transform == _transform()
+    stored = unplaced_composed.worlds.connection.execute(
+        "select topology,placement from world_structure_snapshot where snapshot_id=%s",
+        (version.source_snapshot_id,),
+    ).fetchone()
+    # The person's region-local transform is the only position in the composition. The source
+    # snapshot still says its region has none, and nothing was written to give it one.
+    assert stored["placement"]["elements"] == []
+    assert stored["placement"]["destinations"] == []
+    assert [item["reason"] for item in stored["placement"]["unplaced_destinations"]] == [
+        UNPLACED_REASON
+    ]
+    assert stored["topology"]["navigation"]["edges"] == []
 
 
 def test_move_changes_only_destination_then_remove_and_undo_restore_it(composed) -> None:

@@ -33,6 +33,9 @@ __all__ = [
 
 _SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _KEY: Final = re.compile(r"^[a-z][a-z0-9.-]*$")
+#: Optional placement lists for identities that have no authored or measured position. Absent
+#: means none, and a present list is never empty, so one placement has exactly one encoding.
+_UNPLACED: Final = {"unplaced_elements": "element_id", "unplaced_destinations": "destination_id"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,7 +262,8 @@ def validate_candidate(candidate: SpatialCandidate) -> SpatialDigests:
 
     region_ids = _topology_regions(topology)
     element_ids, region_elements = _topology_elements(topology, region_ids)
-    destination_ids = _navigation(topology, region_ids)
+    unplaced_destinations = _unplaced(placement, "unplaced_destinations")
+    destination_ids = _navigation(topology, region_ids, unplaced_destinations)
     _layout(layout, region_ids)
     _placement(placement, element_ids, destination_ids)
     _collision_issues(topology, placement, region_elements)
@@ -505,7 +509,12 @@ def _evidence(raw: Any, element_label: str) -> None:
         raise InvalidStructuralData(f"{element_label}.evidence.kind is invalid")
 
 
-def _navigation(topology: Mapping[str, Any], region_ids: set[str]) -> set[str]:
+def _navigation(topology: Mapping[str, Any], region_ids: set[str], unplaced: set[str]) -> set[str]:
+    """Validate destinations and edges; ``unplaced`` destinations take no edge and no route.
+
+    A destination with no position cannot be reached and cannot be adjacent to anything, so it is
+    exempt from the reachability rule rather than being given an edge nobody measured.
+    """
     nav = _object(topology["navigation"], "topology.navigation")
     _exact_keys(
         nav,
@@ -548,6 +557,8 @@ def _navigation(topology: Mapping[str, Any], region_ids: set[str]) -> set[str]:
         end = _string(value["to"], f"{label}.to")
         if start == end or start not in adjacency or end not in adjacency:
             raise InvalidStructuralData(f"{label} does not connect two known distinct destinations")
+        if start in unplaced or end in unplaced:
+            raise InvalidStructuralData(f"{label} connects a destination that has no position")
         slope = _integer(
             value["max_slope_millidegrees"], f"{label}.max_slope_millidegrees", minimum=0
         )
@@ -558,15 +569,16 @@ def _navigation(topology: Mapping[str, Any], region_ids: set[str]) -> set[str]:
         ordered_edges.append((start, end, value["kind"]))
         adjacency[start].add(end)
         adjacency[end].add(start)
+    reachable = required - unplaced
     visited: set[str] = set()
-    queue = deque([min(required)])
+    queue = deque([min(reachable)] if reachable else [])
     while queue:
         current = queue.popleft()
         if current in visited:
             continue
         visited.add(current)
         queue.extend(sorted(adjacency[current] - visited))
-    missing = sorted(required - visited)
+    missing = sorted(reachable - visited)
     if missing:
         raise InvalidStructuralData(f"required destinations are unreachable: {', '.join(missing)}")
     if ordered_destinations != sorted(ordered_destinations):
@@ -599,14 +611,39 @@ def _layout(layout: Mapping[str, Any], region_ids: set[str]) -> None:
         raise InvalidStructuralData("layout regions must be sorted by creation_ordinal and id")
 
 
+def _unplaced(placement: Mapping[str, Any], key: str) -> set[str]:
+    """Identities listed under an optional ``unplaced_*`` key, each with its stated reason."""
+    if not isinstance(placement, Mapping) or key not in placement:
+        return set()
+    identity_key = _UNPLACED[key]
+    values = _array(placement[key], f"placement.{key}")
+    if not values:
+        raise InvalidStructuralData(f"placement.{key} is omitted when nothing is unplaced")
+    ordered: list[str] = []
+    for index, raw in enumerate(values):
+        label = f"placement.{key}[{index}]"
+        value = _object(raw, label)
+        _exact_keys(value, {identity_key, "reason"}, label)
+        ordered.append(_string(value[identity_key], f"{label}.{identity_key}"))
+        _string(value["reason"], f"{label}.reason")
+    if len(set(ordered)) != len(ordered):
+        raise InvalidStructuralData(f"placement.{key} names an identity twice")
+    if ordered != sorted(ordered):
+        raise InvalidStructuralData(f"placement.{key} must be sorted by {identity_key}")
+    return set(ordered)
+
+
 def _placement(
     placement: Mapping[str, Any], element_ids: set[str], expected_destinations: set[str]
 ) -> None:
     _exact_keys(
         placement,
-        {"schema_version", "coordinate_unit", "elements", "destinations"},
+        {"schema_version", "coordinate_unit", "elements", "destinations"}
+        | (set(placement) & set(_UNPLACED)),
         "placement",
     )
+    unplaced_elements = _unplaced(placement, "unplaced_elements")
+    unplaced_destinations = _unplaced(placement, "unplaced_destinations")
     if placement["coordinate_unit"] != "millimetre":
         raise InvalidStructuralData("placement.coordinate_unit must be millimetre")
     by_id: dict[str, Mapping[str, Any]] = {}
@@ -627,8 +664,10 @@ def _placement(
         _integer(value["scale_milli"], f"{label}.scale_milli", minimum=1)
         by_id[element_id] = value
         ordered_elements.append(element_id)
-    if set(by_id) != element_ids:
-        raise InvalidStructuralData("placement elements must exactly equal topology elements")
+    if set(by_id) & unplaced_elements or set(by_id) | unplaced_elements != element_ids:
+        raise InvalidStructuralData(
+            "placed and unplaced elements must partition the topology elements exactly"
+        )
 
     destination_ids: set[str] = set()
     ordered_destinations: list[str] = []
@@ -643,9 +682,12 @@ def _placement(
         ordered_destinations.append(destination_id)
         for key in ("x_mm", "y_mm", "z_mm"):
             _integer(value[key], f"{label}.{key}")
-    if destination_ids != expected_destinations:
+    if (
+        destination_ids & unplaced_destinations
+        or destination_ids | unplaced_destinations != expected_destinations
+    ):
         raise InvalidStructuralData(
-            "destination placements must exactly equal topology navigation destinations"
+            "placed and unplaced destinations must partition the navigation destinations exactly"
         )
     if ordered_elements != sorted(ordered_elements):
         raise InvalidStructuralData("placement elements must be sorted by element_id")
@@ -670,6 +712,9 @@ def _collision_issues(
         collision = element["collision"]
         if collision["kind"] == "none":
             continue
+        if element_id not in placed:
+            # Overlap cannot be ruled out for a body that has no position.
+            raise InvalidStructuralData(f"{element_id} has a collision body but no position")
         if collision["kind"] == "circle":
             radius = collision["radius_mm"]
         else:
@@ -819,4 +864,7 @@ def _region_ids(topology: Mapping[str, Any]) -> set[str]:
 
 
 def _placement_digests(placement: Mapping[str, Any]) -> dict[str, str]:
-    return {value["element_id"]: _digest(value) for value in placement["elements"]}
+    return {
+        value["element_id"]: _digest(value)
+        for value in (*placement["elements"], *placement.get("unplaced_elements", ()))
+    }
