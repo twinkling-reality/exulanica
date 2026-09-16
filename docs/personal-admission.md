@@ -1,5 +1,106 @@
 # Personal admission and re-screening
 
+A personal photograph is admitted under account authority, screened for people, and read by a
+model only under a personal model right. This page is the contract for all three.
+
+## Personal model rights
+
+A screening receipt answers whether a photograph may be looked at (`person_detection_only`) or
+become geometry (an eligible human review). Neither names a model or a destination, so a receipt
+recorded for one model used to let every other model, local or hosted, receive the same bytes.
+Migration 0073 adds a separate object, the personal model right, and no byte of a personal
+photograph reaches a model unless one is current for that model and that destination. A right is
+not a screening and a screening is not a right: every model read requires both.
+
+A right (`personal_model_right`, workspace isolated under row-level security) binds:
+
+- the exact capture and its source SHA-256;
+- the operation, `model_processing`;
+- the model as the manifest states it: provider, role, identifier and full revision. Hosted
+  providers expose no per-model revision, so a hosted right carries none and never matches a right
+  that names one. A local checkpoint is always pinned to a full commit;
+- the destination: `local-process`, or the exact origin the egress allowlist would have to declare,
+  spelled as `exulanica.models.egress.Origin` spells it;
+- the personal authority it was granted under, the account holder that authority names as
+  `granted_by`, the grant time, a required expiry and a purpose;
+- a withdrawal (`withdrawn_at`, `withdrawn_by`), which is final. Rights are never deleted and
+  nothing else about them changes; a different model, destination or term is a new right.
+
+The receipt is canonical JSON bound by SHA-256, and the database refuses a receipt that disagrees
+with its columns, a grantor who is not the authority's account holder, an authority that was not
+current at the grant, a future grant, a deletion and any update other than one withdrawal. A right
+lapses with the authority it was granted under.
+
+**Deny by default.** A capture needs no right only when the presented screening was issued under a
+synthetic or benchmark authority and no other kind of authority exists for that capture. A capture
+anybody has authorized as personal stays personal whichever receipt a caller presents, and a
+session whose workspace is unknown is never treated as exempt.
+
+**The one check.** Every model read of personal bytes goes through
+`exulanica.ingest.model_rights.require_model_right`:
+
+```python
+def require_model_right(
+    repository: IngestRepository,
+    capture_id: uuid.UUID,
+    screening_id: uuid.UUID,
+    handoff: ModelHandoff | None,
+) -> ModelRightDecision
+```
+
+`ModelHandoff` names every model one call can reach and the one destination the bytes travel to.
+`ModelHandoff.hosted(manifest, role)` names a manifest role's whole chain at the manifest's
+endpoint, because the client falls back on a withdrawn identifier and either model can receive the
+request; a right for the primary does not cover the fallback. `ModelHandoff.local(...)` names
+checkpoints loaded in this process. `None` means the caller cannot state the model or destination,
+which is refused whenever a right is required.
+
+The function resolves a candidate right for each identity, then decides everything in one
+evaluation inside the same final read check the environment and graph read paths use: the global
+asset read lock, a read-only transaction and one evaluation instant. The screening must still
+permit these bytes to be looked at (`asset_observation_allows`, a lock-free statement of
+`privacy_screening_allows_observation`), and each identity must be named by a current right
+(`personal_model_right_allows`). A grant or withdrawal cannot commit while that check holds the
+lock, so a withdrawal is either seen or refused until the check finishes. The lock is released
+before the model is called. Call the function immediately before handing the bytes over, after
+they are read and verified; geometry callers still ask `require_privacy_screening` first.
+
+It raises `PrivacyAdmissionError` when the screening no longer holds, and `ModelRightRefused` (a
+subclass) otherwise, with `reason` one of `undeclared`, `missing`, `expired`, `withdrawn`,
+`lapsed`, `other_model` (another identifier or another revision), `other_destination` and
+`changed`. It returns a `ModelRightDecision` naming the rights that permitted the hand-over.
+`grant_model_right`, `withdraw_model_right` and `model_rights_for_capture` are the writers and the
+reader.
+
+**Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
+(local) call it immediately before their model; a refusal records `stage_unavailable` with the
+reason and sends nothing. The vision stage reads a `NebiusVisionModel`'s chain and endpoint from
+the manifest its client was built with; depth reads MoGe's `repo@revision`; segmentation reads the
+segmenter's pinned identity and adds the detector and its fallback only when the local detector
+will run. Any other model states its hand-over with a `model_handoff` attribute or is refused. The
+derivative worker binds any person detector that reads pixels to the same check, because the
+person-region stage asks for no receipt of its own; the recorded-observation detector and the
+test doubles that discard the image are not bound.
+
+**Not covered here, and why.**
+
+- The person-region stage itself does not call the check; only the worker binds its detector. A
+  pipeline built directly with a pixel-reading detector is not gated.
+- Scene pose runs COLMAP, classic feature matching with no learned weights, under the scene
+  privacy admission. Gaussian-splat training runs a learned perceptual metric (LPIPS) inside its
+  container on whichever host runs the scene worker. Neither asks for a model right yet.
+- Place alignment's joint reconstruction stages original photographs for pose under a deletion
+  check only. No API or worker path calls it; a verification script and tests do.
+- The caption embedding pass sends text derived from a photograph's observation, not its pixels,
+  to the hosted embedding model.
+- Benchmark captures keep their recorded license as their model permission.
+
+**Existing data.** Captures screened before migration 0073 have no right, and the migration writes
+none. Their receipts keep their meaning, but no model receives their bytes until the account
+holder grants a right. The detection pass of the ordinary batch path, which used to send every
+admitted photograph to the hosted vision model, now sends nothing unless the batch names the
+vision role. The migration path is to admit the same captures again with `model_rights`.
+
 ## Ordinary API batch path
 
 `POST /intake` returns exact capture IDs and original digests. Send those captures to
@@ -21,6 +122,22 @@ otherwise it checks the SQL observation predicate for an explicit detection-only
 vision and the recorded-observation person detector under that receipt. This path supplies neither
 a depth model nor a geometry segmenter. Hosted vision still requires the deployment's configured
 model client and spending guard; admission does not create a spending authorization.
+
+The optional `model_rights` list (at most eight entries, default empty) is how the account holder
+lets models receive the admitted photographs. Each entry is `{"role": ..., "valid_until": ...}`
+naming a role the manifest states: a hosted role such as `vision`, or a local role
+(`object_segmentation`, `open_vocabulary_detection`). The server records one right per member for
+every model the role can reach, under that member's new personal authority, granted by the session
+actor at `recorded_at`. Each role appears once, and each term must end in the future and no later
+than the authority. `depth` is refused: its checkpoint is chosen by the worker's configuration, not
+stated in the manifest, so a depth right names its checkpoint through `grant_model_right`. The
+whole list is validated before any receipt is written. Each response receipt carries
+`model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never the
+purpose). A batch that names no role records no right, and the worker then sends its photographs to
+no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
+and `GET /personal-admission` lists the rights the actor granted over each source. Neither answer is
+a permission. There is no HTTP route to withdraw a right yet; `withdraw_model_right` is the
+withdrawal.
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
 on every member. The attestation must exactly read:

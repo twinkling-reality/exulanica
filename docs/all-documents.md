@@ -43,7 +43,7 @@ How the system works now. Edited as the system changes.
 - [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-14; model upgrades require task-specific evidence
 - [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
-- [personal-admission](personal-admission.md) : POST /intake returns exact capture IDs and original digests. Send those captures to
+- [personal-admission](personal-admission.md) : A personal photograph is admitted under account authority, screened for people, and read by a
 - [physical-streaming-runtime](physical-streaming-runtime.md) : Status, corrected 2026-09-13: RENDERER CONTRACT IMPLEMENTED; production streaming and
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
