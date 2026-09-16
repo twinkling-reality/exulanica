@@ -176,6 +176,8 @@ dev = [
   "import-linter>=2.0",
   "pytest>=8.3",
   "ruff>=0.7",
+  # One process per worker, each with a private PostgreSQL server: see scripts/test_postgres.py.
+  "pytest-xdist>=3.6",
 ]
 
 [build-system]
