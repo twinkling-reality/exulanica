@@ -9,8 +9,11 @@
 *   Which catalogs are **empty is pinned**, and the package document names every one of them, so
     an entry cannot land without the document that says what is missing being revisited.
 
-Catalog files written under ``tmp_path`` below are test inputs. Their texture set id,
-``test-texture-set``, names nothing real and never appears in a shipped catalog.
+*   A texture manifest outside its agreed shape is refused, and a **rebaked texture set moves the
+    catalog digest** while the catalog file stays byte-identical; a set no entry uses does not.
+
+Catalog files and manifests written under ``tmp_path`` below are test inputs. Their texture set
+ids, such as ``test-texture-set``, name nothing real and never appear in a shipped file.
 """
 
 from __future__ import annotations
@@ -20,7 +23,9 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 from exulanica.grammar.catalogs import (
@@ -36,6 +41,7 @@ from exulanica.grammar.grammars.city.catalogs import (
     city_catalog_schemas,
     load_city_catalogs,
 )
+from exulanica.grammar.textures import MANIFEST_PROFILE, TextureSet, read_texture_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENT = ROOT / "docs" / "grammar-package.md"
@@ -61,6 +67,9 @@ _ORIGINAL = {
     "content_source": "docs/grammar-package.md",
 }
 
+_NO_SETS: Mapping[str, TextureSet] = MappingProxyType({})
+_TEST_SETS = {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64)}
+
 _MATERIAL_ENTRY = {
     "key": "test_material",
     "label": "Test material",
@@ -83,8 +92,8 @@ def _write(directory: Path, stem: str, entries: list, **envelope: object) -> Pat
     return path
 
 
-def _schema(catalog_id: str, *, texture_set_ids: frozenset[str] = frozenset()) -> CatalogSchema:
-    schemas = city_catalog_schemas(texture_set_ids=texture_set_ids)
+def _schema(catalog_id: str, *, texture_sets: Mapping[str, TextureSet] = _NO_SETS) -> CatalogSchema:
+    schemas = city_catalog_schemas(texture_sets=texture_sets)
     return next(schema for schema in schemas if schema.catalog_id == catalog_id)
 
 
@@ -93,7 +102,7 @@ def _schema(catalog_id: str, *, texture_set_ids: frozenset[str] = frozenset()) -
 
 
 def test_the_shipped_catalogs_load_and_hold_what_is_pinned():
-    catalogs = load_city_catalogs(texture_set_ids=frozenset())
+    catalogs = load_city_catalogs(texture_sets={})
     assert {catalog.catalog_id: len(catalog.entries) for catalog in catalogs} == (
         EXPECTED_ENTRY_COUNTS
     )
@@ -114,7 +123,7 @@ def test_every_shipped_entry_carries_a_licence():
                 assert licence["spdx"] == "Apache-2.0"
                 assert (ROOT / licence["licence_source"]).is_file()
     assert entries == sum(EXPECTED_ENTRY_COUNTS.values())
-    for catalog in load_city_catalogs(texture_set_ids=frozenset()):
+    for catalog in load_city_catalogs(texture_sets={}):
         for entry in catalog.entries:
             assert entry.licence.verdict in LICENCE_VERDICTS
 
@@ -150,14 +159,14 @@ def test_the_package_document_names_every_catalog_and_the_empty_ones_as_empty():
 def test_a_directory_with_a_stray_or_a_missing_file_is_refused(tmp_path):
     shutil.copytree(CATALOG_DIRECTORY, tmp_path / "catalogs")
     directory = tmp_path / "catalogs"
-    load_city_catalogs(directory, texture_set_ids=frozenset())
+    load_city_catalogs(directory, texture_sets={})
     _write(directory, "lamp-post", [])
     with pytest.raises(CatalogError):
-        load_city_catalogs(directory, texture_set_ids=frozenset())
+        load_city_catalogs(directory, texture_sets={})
     (directory / "lamp-post.v1.json").unlink()
     (directory / "typology.v1.json").unlink()
     with pytest.raises(CatalogError):
-        load_city_catalogs(directory, texture_set_ids=frozenset())
+        load_city_catalogs(directory, texture_sets={})
 
 
 # ---------------------------------------------------------------------------------------------
@@ -170,7 +179,7 @@ from exulanica.grammar.catalogs import catalog_digest
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 
 print(exulanica.grammar.__file__)
-print(catalog_digest(load_city_catalogs(texture_set_ids=frozenset())))
+print(catalog_digest(load_city_catalogs(texture_sets={})))
 """
 
 
@@ -194,22 +203,22 @@ def test_the_catalog_digest_is_stable_across_two_processes():
     first = _digest_in_a_new_process("7")
     second = _digest_in_a_new_process("2718281828")
     assert first == second
-    assert first == catalog_digest(load_city_catalogs(texture_set_ids=frozenset()))
+    assert first == catalog_digest(load_city_catalogs(texture_sets={}))
 
 
 def test_the_catalog_digest_moves_when_an_entry_does(tmp_path):
     shutil.copytree(CATALOG_DIRECTORY, tmp_path / "catalogs")
     directory = tmp_path / "catalogs"
-    before = catalog_digest(load_city_catalogs(directory, texture_set_ids=frozenset()))
+    before = catalog_digest(load_city_catalogs(directory, texture_sets={}))
     band = json.loads((directory / "band.v1.json").read_text(encoding="utf-8"))
     band["entries"][0]["top_maximum_mm"] += 1
     (directory / "band.v1.json").write_text(json.dumps(band), encoding="utf-8")
-    after = catalog_digest(load_city_catalogs(directory, texture_set_ids=frozenset()))
+    after = catalog_digest(load_city_catalogs(directory, texture_sets={}))
     assert before != after
 
 
 def test_the_catalog_digest_does_not_depend_on_the_order_catalogs_are_passed_in():
-    catalogs = load_city_catalogs(texture_set_ids=frozenset())
+    catalogs = load_city_catalogs(texture_sets={})
     assert catalog_digest(catalogs) == catalog_digest(tuple(reversed(catalogs)))
 
 
@@ -222,12 +231,17 @@ def test_an_unresolvable_texture_set_reference_raises(tmp_path):
     with pytest.raises(UnresolvedReferenceError):
         load_catalog(path, _schema("material"))
     with pytest.raises(UnresolvedReferenceError):
-        load_catalog(path, _schema("material", texture_set_ids=frozenset({"another-set"})))
+        load_catalog(
+            path,
+            _schema(
+                "material", texture_sets={"another-set": TextureSet("another-set", 1, "a" * 64)}
+            ),
+        )
 
 
 def test_a_resolvable_texture_set_reference_loads(tmp_path):
     path = _write(tmp_path, "material", [_MATERIAL_ENTRY])
-    schema = _schema("material", texture_set_ids=frozenset({"test-texture-set"}))
+    schema = _schema("material", texture_sets=_TEST_SETS)
     [entry] = load_catalog(path, schema).entries
     assert dict(entry.values)["texture_set_id"] == "test-texture-set"
 
@@ -237,14 +251,14 @@ def test_a_missing_or_malformed_texture_set_reference_is_a_schema_error(tmp_path
     entry = {**_MATERIAL_ENTRY, "texture_set_id": texture_set_id}
     path = _write(tmp_path, "material", [entry])
     with pytest.raises(CatalogError):
-        load_catalog(path, _schema("material", texture_set_ids=frozenset({"test-texture-set"})))
+        load_catalog(path, _schema("material", texture_sets=_TEST_SETS))
 
 
 def test_a_material_entry_with_no_texture_set_field_is_refused(tmp_path):
     entry = {key: value for key, value in _MATERIAL_ENTRY.items() if key != "texture_set_id"}
     path = _write(tmp_path, "material", [entry])
     with pytest.raises(CatalogError):
-        load_catalog(path, _schema("material", texture_set_ids=frozenset({"test-texture-set"})))
+        load_catalog(path, _schema("material", texture_sets=_TEST_SETS))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -347,3 +361,119 @@ def test_a_band_whose_bounds_are_inverted_is_rejected(tmp_path):
 def test_a_schema_cannot_redeclare_key_or_licence():
     with pytest.raises(CatalogError):
         CatalogSchema("typology", 1, (("licence", text_field),))
+
+
+# ---------------------------------------------------------------------------------------------
+# The texture manifest, and the pins a resolved reference carries into the digest
+
+
+def _manifest_entry(set_id: str, content: str = "a" * 64, version: int = 1) -> dict:
+    return {
+        "set_id": set_id,
+        "version": version,
+        "content_sha256": content,
+        "byte_size": 1024,
+        "resolution": 1024,
+        "channels": 4,
+        "extent_mm": 2000,
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "b" * 64,
+    }
+
+
+def _manifest(tmp_path: Path, sets: list, **override: object) -> Path:
+    path = tmp_path / "manifest.json"
+    document = {"profile": MANIFEST_PROFILE, "sets": sets, **override}
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_a_well_formed_manifest_is_read_by_id(tmp_path):
+    path = _manifest(
+        tmp_path, [_manifest_entry("cc0.test-one"), _manifest_entry("cc0.test-two", "c" * 64, 3)]
+    )
+    sets = read_texture_manifest(path)
+    assert list(sets) == ["cc0.test-one", "cc0.test-two"]
+    assert sets["cc0.test-two"] == TextureSet("cc0.test-two", 3, "c" * 64)
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        [_manifest_entry("cc0.test-one")],
+        {"sets": [_manifest_entry("cc0.test-one")]},
+        {"profile": "exulanica.texture-manifest/v2", "sets": []},
+        {"profile": MANIFEST_PROFILE, "sets": [], "schema_version": 1},
+        {"profile": MANIFEST_PROFILE, "sets": {}},
+        {
+            "profile": MANIFEST_PROFILE,
+            "sets": [_manifest_entry("cc0.test-two"), _manifest_entry("cc0.test-one")],
+        },
+        {
+            "profile": MANIFEST_PROFILE,
+            "sets": [_manifest_entry("cc0.test-one"), _manifest_entry("cc0.test-one")],
+        },
+        {"profile": MANIFEST_PROFILE, "sets": [{**_manifest_entry("cc0.test-one"), "note": 1}]},
+        {"profile": MANIFEST_PROFILE, "sets": [_manifest_entry("Cc0.Test")]},
+        {"profile": MANIFEST_PROFILE, "sets": [_manifest_entry("cc0.test", "A" * 64)]},
+        {"profile": MANIFEST_PROFILE, "sets": [_manifest_entry("cc0.test", version=0)]},
+        {"profile": MANIFEST_PROFILE, "sets": [{**_manifest_entry("cc0.test"), "byte_size": 0}]},
+        {
+            "profile": MANIFEST_PROFILE,
+            "sets": [{**_manifest_entry("cc0.test"), "licence_sha256": "short"}],
+        },
+        {"profile": MANIFEST_PROFILE, "sets": [{**_manifest_entry("cc0.test"), "resolution": 0.5}]},
+    ],
+)
+def test_a_manifest_outside_its_shape_is_refused(tmp_path, document):
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(CatalogError):
+        read_texture_manifest(path)
+
+
+def test_a_missing_manifest_is_refused_rather_than_read_as_empty(tmp_path):
+    with pytest.raises(CatalogError):
+        read_texture_manifest(tmp_path / "manifest.json")
+
+
+@pytest.mark.parametrize("set_id", ["Test-texture-set", "1set", "test_set", "test set", "", "-x"])
+def test_a_texture_set_id_outside_the_contract_is_refused(tmp_path, set_id):
+    entry = {**_MATERIAL_ENTRY, "texture_set_id": set_id}
+    path = _write(tmp_path, "material", [entry])
+    with pytest.raises(CatalogError):
+        load_catalog(path, _schema("material", texture_sets=_TEST_SETS))
+
+
+def test_a_rebaked_texture_set_moves_the_catalog_digest_with_the_file_unchanged(tmp_path):
+    path = _write(tmp_path, "material", [_MATERIAL_ENTRY])
+    before_bytes = path.read_bytes()
+    first = read_texture_manifest(
+        _manifest(tmp_path, [_manifest_entry("test-texture-set", "a" * 64, 1)])
+    )
+    rebaked = read_texture_manifest(
+        _manifest(tmp_path, [_manifest_entry("test-texture-set", "d" * 64, 2)])
+    )
+    before = catalog_digest([load_catalog(path, _schema("material", texture_sets=first))])
+    after = catalog_digest([load_catalog(path, _schema("material", texture_sets=rebaked))])
+    assert path.read_bytes() == before_bytes
+    assert before != after
+    [entry] = load_catalog(path, _schema("material", texture_sets=rebaked)).entries
+    assert dict(entry.values) == {"label": "Test material", "texture_set_id": "test-texture-set"}
+
+
+def test_a_set_no_entry_uses_does_not_move_the_catalog_digest(tmp_path):
+    path = _write(tmp_path, "material", [_MATERIAL_ENTRY])
+    used = _manifest_entry("test-texture-set")
+    alone = read_texture_manifest(_manifest(tmp_path, [used]))
+    with_unused = read_texture_manifest(
+        _manifest(tmp_path, [_manifest_entry("cc0.unused-set", "e" * 64), used])
+    )
+    rebaked_unused = read_texture_manifest(
+        _manifest(tmp_path, [_manifest_entry("cc0.unused-set", "f" * 64, 9), used])
+    )
+    digests = {
+        catalog_digest([load_catalog(path, _schema("material", texture_sets=sets))])
+        for sets in (alone, with_unused, rebaked_unused, dict(reversed(with_unused.items())))
+    }
+    assert len(digests) == 1

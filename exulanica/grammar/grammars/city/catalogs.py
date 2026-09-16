@@ -10,10 +10,13 @@ Each schema below is as small as the architecture justifies: a key, a licence, a
 fields the architecture actually specifies. A field is added by the change that first reads it,
 with a catalog version bump.
 
-**Material entries must resolve a texture set.** The caller passes the set of published texture
-set ids, and there is no default for it. The texture lane owns those ids and has not published
-any, so today the only honest argument is an empty set, under which any material entry is
-refused. That is the intended behaviour: a material with no texture is a schema error.
+**Material entries must resolve a texture set.** The caller passes the published sets, as
+:func:`exulanica.grammar.textures.read_texture_manifest` returns them, and there is no default.
+An id must match the texture set id rule and must be published; a resolved entry carries its
+set's version and content digest into the catalog digest, while the file keeps the id alone. The
+texture lane owns the manifest and has published none, so today the only honest argument is an
+empty mapping, under which any material entry is refused. That is the intended behaviour: a
+material with no texture is a schema error.
 
 The catalog directory is found relative to this source file, so it is present in a checkout and
 absent from an installed wheel. Tiles are baked offline from a checkout.
@@ -21,6 +24,7 @@ absent from an installed wheel. Tiles are baked offline from a checkout.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
@@ -28,13 +32,14 @@ from exulanica.grammar.catalogs import (
     Catalog,
     CatalogSchema,
     FieldValue,
+    ReferenceField,
     integer_field,
     key_list_field,
     load_catalog_directory,
-    reference_field,
     text_field,
 )
 from exulanica.grammar.errors import CatalogError
+from exulanica.grammar.textures import TEXTURE_SET_ID, TextureSet
 
 __all__ = ["CATALOG_DIRECTORY", "city_catalog_schemas", "load_city_catalogs"]
 
@@ -51,7 +56,8 @@ def _band_bounds_ordered(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: top_minimum_mm is at most top_maximum_mm")
 
 
-def city_catalog_schemas(*, texture_set_ids: frozenset[str]) -> tuple[CatalogSchema, ...]:
+def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[CatalogSchema, ...]:
+    texture_pins = {set_id: texture_set.pin() for set_id, texture_set in texture_sets.items()}
     return (
         CatalogSchema("action-vocabulary", 1, (("label", text_field),)),
         CatalogSchema(
@@ -70,7 +76,10 @@ def city_catalog_schemas(*, texture_set_ids: frozenset[str]) -> tuple[CatalogSch
             1,
             (
                 ("label", text_field),
-                ("texture_set_id", reference_field("a texture set", texture_set_ids)),
+                (
+                    "texture_set_id",
+                    ReferenceField("a texture set", TEXTURE_SET_ID, texture_pins),
+                ),
             ),
         ),
         CatalogSchema("roof-family", 1, (("label", text_field),)),
@@ -86,6 +95,6 @@ def city_catalog_schemas(*, texture_set_ids: frozenset[str]) -> tuple[CatalogSch
 
 
 def load_city_catalogs(
-    directory: Path = CATALOG_DIRECTORY, *, texture_set_ids: frozenset[str]
+    directory: Path = CATALOG_DIRECTORY, *, texture_sets: Mapping[str, TextureSet]
 ) -> tuple[Catalog, ...]:
-    return load_catalog_directory(directory, city_catalog_schemas(texture_set_ids=texture_set_ids))
+    return load_catalog_directory(directory, city_catalog_schemas(texture_sets=texture_sets))

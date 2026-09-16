@@ -17,7 +17,8 @@ nothing here is an observation.
 contract and know nothing about what any grammar makes: ``seed`` validates a seed, ``draw``
 holds the one draw, ``parameters`` the closed schema and the cascade, ``records`` the canonical
 form, ``contract`` the grammar, its stages and its receipt, ``registry`` the lookup, and
-``catalogs`` the versioned, licensed vocabulary files. Grammars live under
+``catalogs`` the versioned, licensed vocabulary files, and ``textures`` the published texture
+sets a vocabulary entry may pin. Grammars live under
 ``exulanica.grammar.grammars`` and nothing at this level imports them. The city is the first and
 largest; the box exists to prove the contract carries something that is not architecture.
 
@@ -52,6 +53,7 @@ from exulanica.grammar.parameters import (
 )
 from exulanica.grammar.registry import GrammarRegistry
 from exulanica.grammar.seed import require_seed
+from exulanica.grammar.textures import TextureSet, read_texture_manifest
 
 __all__ = [
     "ADMISSIBLE_USES",
@@ -73,10 +75,12 @@ __all__ = [
     "Stage",
     "StageContext",
     "StageEmission",
+    "TextureSet",
     "UnimplementedStage",
     "catalog_digest",
     "draw_integer",
     "generate",
     "load_catalog",
+    "read_texture_manifest",
     "require_seed",
 ]

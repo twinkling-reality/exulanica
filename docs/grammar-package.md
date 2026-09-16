@@ -76,6 +76,7 @@ tracked or not. An AST test fails if any module names `EvidenceAddress`, `BlobId
 | `contract.py` | `Grammar`, stages, `StageEmission`, `GrammarReceipt`, `generate` |
 | `registry.py` | `GrammarRegistry`, empty by default |
 | `catalogs.py` | The versioned, licensed catalog loader and `catalog_digest` |
+| `textures.py` | The reader for the texture lane's manifest, and the pin a texture set carries |
 | `documents.py` | Strict JSON reading for every data file |
 | `grammars/` | The grammars, and `builtin_registry()`, the one place that names them |
 
@@ -190,9 +191,27 @@ one: `spdx`, `verdict`, `origin`, `licence_source` and `content_source`. Only `S
 and names `LICENSE` as the licence it was read from. A `derived` entry names its real source's
 licence and may not cite `LICENSE`.
 
-**A material entry must name a published texture set.** The caller passes the set of published
-ids and there is no default. The texture lane owns those ids and has published none, so any
-material entry is refused today. That is the intended behaviour.
+**A material entry must name a published texture set.** The texture set id contract was fixed
+with the orchestrator on 2026-09-16, before the texture lane started:
+
+- An id matches `^[a-z][a-z0-9.-]*$`, the rule an authored-world asset key already follows, by
+  convention `<licence>.<name>`. It is a stable name and never contains a version or a digest.
+  Both the material catalog and `SurfaceMaterialRecord` check it.
+- The texture lane publishes `assets/textures/manifest.json` as
+  `{"profile": "exulanica.texture-manifest/v1", "sets": [...]}`, with `sets` sorted by `set_id`,
+  each id once, and each entry carrying exactly `set_id`, `version`, `content_sha256`,
+  `byte_size`, `resolution`, `channels`, `extent_mm`, `licence_id` and `licence_sha256`.
+  `read_texture_manifest` refuses anything else, and refuses a missing file rather than reading
+  it as empty.
+- **A resolved reference carries a pin into the digest.** A catalog file and a material record
+  hold the id alone. When the loader resolves an id, it records the set's `set_id`, `version`
+  and `content_sha256` beside the entry, and `catalog_digest` covers them. A rebaked set moves
+  the catalog digest, and so every tile digest built on it, with the catalog file byte-identical;
+  a set no entry uses moves nothing. Both are tested with fixture manifests.
+
+The caller passes the published sets and there is no default. No manifest exists yet, so the
+only honest argument today is an empty mapping, and any material entry is refused. That is the
+intended behaviour.
 
 | File | Entries | Why |
 | --- | --- | --- |
@@ -233,8 +252,10 @@ Each of these is known and deliberately not done here.
   one. That file is outside this lane and is being changed elsewhere, so catalogs ship as data
   files first and are not in any table.
 - **The catalog table migration.** Migration number `0064` is reserved for it and is not written.
-- **Texture set ids.** None exist yet. The material catalog is empty and any material entry is
-  refused until the texture lane publishes its ids and their index format.
+- **Texture sets.** The id rule and manifest shape are agreed (section 8) and the reader exists,
+  but no manifest has been published, so nothing reads one by default and the material catalog
+  is empty. When the texture lane's manifest lands, the city catalog loader should read it
+  instead of taking the sets from its caller.
 - **Seven empty catalogs** (section 8), waiting on art direction.
 - **No stage has a generator.** Phase 2 builds six of them for one corridor.
 - **No deterministic `StageSpec` is registered.** That registration belongs in

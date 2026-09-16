@@ -10,9 +10,10 @@ nothing else. The id and version inside must match the file name.
 
 **Entries.** Each entry has a ``key``, exactly the fields its schema declares, and a
 ``licence``. An unknown field is refused, a missing one is refused, and a repeated key is
-refused. A field that names something elsewhere, such as a texture set, is checked by a
-resolver the caller passes, and a name that does not resolve raises
-:class:`~exulanica.grammar.errors.UnresolvedReferenceError`. It is never defaulted.
+refused. A field that names something elsewhere, such as a texture set, is a
+:class:`ReferenceField`: the caller passes what currently exists, a name that does not resolve
+raises :class:`~exulanica.grammar.errors.UnresolvedReferenceError` and is never defaulted, and a
+name that does resolve carries its referent's pin into the digest while the file keeps the name.
 
 **Licence.** Stated the way ``docs/license-matrix.md`` states one: a verdict plus the primary
 source that was read. Only the two shippable verdicts are accepted in a shipped catalog. An
@@ -28,7 +29,7 @@ database where registration would happen.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, TypeAlias
@@ -47,12 +48,12 @@ __all__ = [
     "CatalogEntry",
     "CatalogSchema",
     "Licence",
+    "ReferenceField",
     "catalog_digest",
     "integer_field",
     "key_list_field",
     "load_catalog",
     "load_catalog_directory",
-    "reference_field",
     "text_field",
 ]
 
@@ -101,19 +102,30 @@ def key_list_field(where: str, value: object) -> FieldValue:
     return tuple(value)
 
 
-def reference_field(what: str, known: frozenset[str]) -> FieldCheck:
-    """A field naming a ``what`` that must exist in ``known``. Unresolved is a schema error."""
+@dataclass(frozen=True, slots=True)
+class ReferenceField:
+    """A field naming a ``what`` that must exist, and the pin it carries into the digest.
 
-    def check(where: str, value: object) -> FieldValue:
+    ``pins`` maps every name that exists to what the name currently resolves to, such as a
+    version and a content digest. The file and the loaded value keep the stable name only; the
+    pin is recorded beside the entry and covered by :func:`catalog_digest`, so a referent that
+    changes under an unchanged name still moves the digest.
+    """
+
+    what: str
+    pattern: re.Pattern[str]
+    pins: Mapping[str, Mapping[str, int | str]]
+
+    def __call__(self, where: str, value: object) -> FieldValue:
         name = _text(where, value)
-        if name not in known:
+        if self.pattern.fullmatch(name) is None:
+            raise CatalogError(f"{where} names {self.what} {name!r}, which is not a valid name")
+        if name not in self.pins:
             raise UnresolvedReferenceError(
-                f"{where} names {what} {name!r}, which does not exist; "
+                f"{where} names {self.what} {name!r}, which does not exist; "
                 "a missing reference is a schema error, not a default"
             )
         return name
-
-    return check
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +190,8 @@ class CatalogEntry:
     key: str
     values: tuple[tuple[str, FieldValue], ...]
     licence: Licence
+    #: ``(field, pin)`` for every reference field, sorted by field. Digested, never written back.
+    pins: tuple[tuple[str, Mapping[str, int | str]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +214,7 @@ class Catalog:
                     "licence": {
                         name: getattr(entry.licence, name) for name in sorted(_LICENCE_KEYS)
                     },
+                    "pins": {field: dict(pin) for field, pin in entry.pins},
                 }
                 for entry in self.entries
             ],
@@ -249,9 +264,22 @@ def load_catalog(path: Path, schema: CatalogSchema) -> Catalog:
         values = tuple((name, check(f"{where}.{name}", raw[name])) for name, check in schema.fields)
         if schema.entry_check is not None:
             schema.entry_check(where, dict(values))
+        pins = tuple(
+            sorted(
+                (
+                    (name, check.pins[value])  # type: ignore[index]
+                    for (name, check), (_, value) in zip(schema.fields, values, strict=True)
+                    if isinstance(check, ReferenceField)
+                ),
+                key=lambda pair: pair[0],
+            )
+        )
         entries.append(
             CatalogEntry(
-                key=key, values=values, licence=Licence.read(f"{where}.licence", raw["licence"])
+                key=key,
+                values=values,
+                licence=Licence.read(f"{where}.licence", raw["licence"]),
+                pins=pins,
             )
         )
     catalog = Catalog(schema.catalog_id, schema.catalog_version, tuple(entries))

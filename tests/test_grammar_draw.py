@@ -66,6 +66,7 @@ from exulanica.grammar.grammars.city.tile import TileRecord, tile_inputs_digest
 from exulanica.grammar.grammars.city.vitrine import VitrineRecord
 from exulanica.grammar.records import MAX_SAFE_INTEGER, record_payload
 from exulanica.grammar.seed import require_seed
+from exulanica.grammar.textures import TextureSet
 
 ROOT = Path(__file__).resolve().parents[1]
 _PACKAGE = ROOT / "exulanica" / "grammar"
@@ -308,7 +309,7 @@ emitted = {
         domain: [str(_number(seed, domain, ordinal)) for ordinal in range(64)]
         for domain in {"streets.hierarchy", "box.parameters.width_mm", "vitrine.fitout"}
     },
-    "catalog_digest": catalog_digest(load_city_catalogs(texture_set_ids=frozenset())),
+    "catalog_digest": catalog_digest(load_city_catalogs(texture_sets={})),
 }
 print(exulanica.grammar.__file__)
 print(sha256_of_canonical(emitted).hex())
@@ -666,6 +667,8 @@ def test_the_generic_receipt_carries_the_same_six_facts():
         ("facade", {"parameters": (("b", 1), ("a", 2))}),
         ("facade", {"output_digest": "A" * 64}),
         ("material", {"texture_set_id": ""}),
+        ("material", {"texture_set_id": "Test_Set"}),
+        ("material", {"texture_set_id": "a" * 64 + "@1"}),
         ("material", {"uv_rotation_urad": 6_283_186}),
         ("material", {"soiling_gradient_millionths": 1_000_001}),
         ("vitrine", {"depth_mm": 599}),
@@ -690,8 +693,8 @@ def test_a_stage_refuses_a_record_type_it_does_not_declare():
 def test_a_material_whose_texture_set_is_not_published_is_refused():
     material = _FIXTURES["material"]
     with pytest.raises(UnresolvedReferenceError):
-        require_texture_set(material, frozenset())
-    require_texture_set(material, frozenset({"test-texture-set"}))
+        require_texture_set(material, {})
+    require_texture_set(material, {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64)})
 
 
 def test_the_tile_digest_moves_with_the_edit_subsequence():

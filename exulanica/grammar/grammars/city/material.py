@@ -1,9 +1,11 @@
 """Material: a ``surface_material`` record per surface. Record shape only; no generator.
 
 **A material with no texture set is a schema error, not a default.** ``texture_set_id`` is a
-required field of every record, and :func:`require_texture_set` refuses one that does not name
-a published set. The texture sets themselves are produced by the texture lane; this package
-does not know any, and does not make any up.
+required field of every record, it must follow the texture set id rule, and
+:func:`require_texture_set` refuses one that does not name a published set. The record carries
+the stable id only, never a version or a digest; those are pinned where the id is resolved. The
+texture sets themselves are produced by the texture lane; this package does not know any, and
+does not make any up.
 
 Rotation is in microradians, in ``[0, 6283185]``, which is one turn less the part of a
 microradian that 2 pi does not fill. Proportions are in millionths.
@@ -11,18 +13,19 @@ microradian that 2 pi does not fill. Proportions are in millionths.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import ClassVar, Final
 
-from exulanica.grammar.errors import UnresolvedReferenceError
+from exulanica.grammar.errors import InvalidRecordError, UnresolvedReferenceError
 from exulanica.grammar.grammars.city._skeleton import skeleton
 from exulanica.grammar.records import (
     require_identity,
     require_integer,
     require_key,
     require_record,
-    require_text,
 )
+from exulanica.grammar.textures import TEXTURE_SET_ID, TextureSet
 
 __all__ = [
     "MAXIMUM_ROTATION_URAD",
@@ -65,7 +68,12 @@ def validate_surface_material(candidate: object) -> None:
     require_identity("building_identity", record.building_identity)
     require_integer("edge_ordinal", record.edge_ordinal, minimum=0)
     require_key("material", record.material)
-    require_text("texture_set_id", record.texture_set_id)
+    if type(record.texture_set_id) is not str or not TEXTURE_SET_ID.fullmatch(
+        record.texture_set_id
+    ):
+        raise InvalidRecordError(
+            f"texture_set_id {record.texture_set_id!r} is not a texture set id"
+        )
     require_integer("uv_scale_millionths", record.uv_scale_millionths, minimum=1)
     require_integer(
         "uv_rotation_urad", record.uv_rotation_urad, minimum=0, maximum=MAXIMUM_ROTATION_URAD
@@ -80,7 +88,7 @@ def validate_surface_material(candidate: object) -> None:
         require_integer(name, getattr(record, name), minimum=0, maximum=MILLIONTHS)
 
 
-def require_texture_set(record: SurfaceMaterialRecord, published: frozenset[str]) -> None:
+def require_texture_set(record: SurfaceMaterialRecord, published: Mapping[str, TextureSet]) -> None:
     """The record's texture set exists among ``published``, or the record is refused."""
     if record.texture_set_id not in published:
         raise UnresolvedReferenceError(
