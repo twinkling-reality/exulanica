@@ -2,7 +2,7 @@
 
 A gate that cannot be made to fail in a test is not a gate. Every refusal below is a way a record
 could otherwise have been written with less evidence than its keys claim. The judged key follows
-rubric version 3: one question per picture, in route order, and the first no decides. The judge's
+rubric version 4: one question per picture, in route order, and the first no decides. The judge's
 words never enter a public record, which carries their SHA-256 and byte count; a private companion
 holds them.
 """
@@ -25,8 +25,10 @@ from exulanica.evaluation.gate_keys import (
     ANSWER_REQUIREMENT,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
+    CARRIED_WORDS_NOTICE,
     GATE_KEY_SET_VERSION,
     NOT_ASKED,
+    OPTION_ANSWERS,
     PICTURE_TITLES,
     RETAINED_RECORDS,
     RUBRIC_GUIDANCE,
@@ -35,6 +37,7 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_VERSION,
     THRESHOLDS,
     VERSION_2,
+    VERSION_3,
     WORDS_STORAGE,
     UnknownGateKey,
     judge_prompt,
@@ -42,6 +45,7 @@ from exulanica.evaluation.gate_keys import (
 )
 from exulanica.evaluation.visual_gate import (
     JUDGE_WORDS_PROFILE,
+    CarriedWords,
     GateEvidenceError,
     JudgedAnswers,
     PictureAnswer,
@@ -72,6 +76,7 @@ _RUBRIC_SHA = "0" * 63 + "2"
 _CAPTURES = {label: f"{index:064x}" for index, label in enumerate(CAPTURE_LABELS, start=3)}
 _JUDGE = "Ada Example"
 _REASON = "The ground floors read as a bakery, a pharmacy and a lobby, and the block runs on."
+_YES, _NO = ANSWER_OPTIONS
 
 
 def _passing_measurements() -> dict[str, dict[str, int]]:
@@ -126,7 +131,7 @@ def _passing_measurements() -> dict[str, dict[str, int]]:
 
 def _asked(
     label: str,
-    picked: str | None = "Yes",
+    picked: str | None = _YES,
     words: str | None = _REASON,
     typed_by: str | None = _JUDGE,
     given_at: str | None = _GIVEN_AT,
@@ -157,7 +162,7 @@ def _answers(*pictures: PictureAnswer, judge: str = _JUDGE) -> JudgedAnswers:
 
 def _no_at_start() -> JudgedAnswers:
     return _answers(
-        _asked("start", "No", "Plain coloured blocks; I cannot name a single shop."),
+        _asked("start", _NO, "Plain coloured blocks; I cannot name a single shop."),
         _unasked("midpoint"),
         _unasked("endpoint"),
     )
@@ -249,7 +254,7 @@ def test_every_single_key_can_fail_the_verdict_on_its_own(spelling):
         judged = _answers(
             _asked("start"),
             _asked("midpoint"),
-            _asked("endpoint", "No", "The far end is one flat wall with nothing behind it."),
+            _asked("endpoint", _NO, "The far end is one flat wall with nothing behind it."),
         )
         document = _record({**measured, "readsAsInhabitedStreet": judged})
     else:
@@ -351,13 +356,13 @@ def test_the_first_no_decides_and_the_pictures_after_it_are_not_asked():
 
     value, detail = _decide(
         _answers(
-            _asked("start"), _asked("midpoint", "No", "It stops at a hole."), _unasked("endpoint")
+            _asked("start"), _asked("midpoint", _NO, "It stops at a hole."), _unasked("endpoint")
         )
     )
     assert (value, detail["decisiveNo"]) == (False, "midpoint")
 
     value, detail = _decide(
-        _answers(_asked("start"), _asked("midpoint"), _asked("endpoint", "No", "Blank walls."))
+        _answers(_asked("start"), _asked("midpoint"), _asked("endpoint", _NO, "Blank walls."))
     )
     assert (value, detail["decisiveNo"]) == (False, "endpoint")
 
@@ -365,7 +370,15 @@ def test_the_first_no_decides_and_the_pictures_after_it_are_not_asked():
     assert (value, detail["decisiveNo"]) == (True, None)
     assert [entry["picture"] for entry in detail["pictures"]] == list(PICTURE_TITLES.values())
     assert (detail["question"], detail["guidance"]) == (RUBRIC_QUESTION, RUBRIC_GUIDANCE)
-    assert detail["options"] == list(ANSWER_OPTIONS) == ["Yes", "No"]
+    assert (
+        detail["options"]
+        == list(ANSWER_OPTIONS)
+        == [
+            "Yes, a finished, lived-in street",
+            "No, a plain block mock-up",
+        ]
+    )
+    assert detail["optionAnswers"] == dict(OPTION_ANSWERS) == {_YES: "yes", _NO: "no"}
 
 
 @pytest.mark.parametrize(
@@ -391,14 +404,14 @@ def test_a_yes_key_with_any_picture_unasked_is_refused(pictures):
 
 
 def test_an_answer_given_after_a_decisive_no_is_refused():
-    for later in (_asked("midpoint"), _asked("midpoint", "No", "Still blocks.")):
+    for later in (_asked("midpoint"), _asked("midpoint", _NO, "Still blocks.")):
         answers = _answers(
-            _asked("start", "No", "Coloured shapes, not a street."), later, _unasked("endpoint")
+            _asked("start", _NO, "Coloured shapes, not a street."), later, _unasked("endpoint")
         )
         with pytest.raises(GateEvidenceError, match="after the decisive no"):
             _decide(answers)
     answers = _answers(
-        _asked("start", "No", "Coloured shapes, not a street."),
+        _asked("start", _NO, "Coloured shapes, not a street."),
         _unasked("midpoint"),
         _asked("endpoint"),
     )
@@ -409,12 +422,12 @@ def test_an_answer_given_after_a_decisive_no_is_refused():
 @pytest.mark.parametrize(
     ("picked", "words"),
     [
-        ("No", None),
-        ("No", ""),
-        ("No", "   "),
-        ("No", "No"),
-        ("No", "no."),
-        ("Yes", "YES!"),
+        (_NO, None),
+        (_NO, ""),
+        (_NO, "   "),
+        (_NO, "No"),
+        (_NO, "no."),
+        (_YES, "YES!"),
         (None, "no"),
         (None, " No ... "),
     ],
@@ -430,10 +443,12 @@ def test_an_answer_without_a_reason_in_the_judges_own_words_is_refused(picked, w
 @pytest.mark.parametrize(
     ("picked", "words", "typed_by", "match"),
     [
-        ("No", "Plain blocks.", "Claude", "not typed by the judge"),
-        ("No", "Plain blocks.", None, "not typed by the judge"),
-        ("No", "Plain blocks.", "Somebody Else", "not typed by the judge"),
-        ("No", "Plain blocks.", "ada example", "not typed by the judge"),
+        (_NO, "Plain blocks.", "Claude", "not typed by the judge"),
+        (_NO, "Plain blocks.", None, "not typed by the judge"),
+        (_NO, "Plain blocks.", "Somebody Else", "not typed by the judge"),
+        (_NO, "Plain blocks.", "ada example", "not typed by the judge"),
+        ("Yes", "It looks lived in.", _JUDGE, "not one of the options"),
+        ("No", "Plain blocks.", _JUDGE, "not one of the options"),
         ("Yes (Recommended)", "It looks lived in.", _JUDGE, "not one of the options"),
         ("yes", "It looks lived in.", _JUDGE, "not one of the options"),
         ("Other", "It looks lived in.", _JUDGE, "not one of the options"),
@@ -479,7 +494,7 @@ def test_a_typed_reply_counts_only_by_the_answer_word_it_opens_with():
 
 def test_the_judges_words_are_fingerprinted_exactly_as_typed_and_kept_out_of_the_record():
     words = "  omg it is just shapes\nno shops, no people  "
-    answers = _answers(_asked("start", "No", words), _unasked("midpoint"), _unasked("endpoint"))
+    answers = _answers(_asked("start", _NO, words), _unasked("midpoint"), _unasked("endpoint"))
     _, detail = _decide(answers)
     entry = detail["pictures"][0]
     data = words.encode("utf-8")
@@ -488,7 +503,15 @@ def test_the_judges_words_are_fingerprinted_exactly_as_typed_and_kept_out_of_the
         len(data),
         True,
     )
-    assert entry["reason"] == words_fingerprint(words)
+    assert entry["reason"] == [
+        {
+            "from": "reply",
+            "rubricVersion": RUBRIC_VERSION,
+            "givenAt": _GIVEN_AT,
+            "givenAs": "in reply to this ask",
+            **words_fingerprint(words),
+        }
+    ]
     assert (entry["typedBy"], entry["givenAt"], entry["rubricVersion"]) == (
         _JUDGE,
         _GIVEN_AT,
@@ -509,34 +532,34 @@ def test_the_judges_words_are_fingerprinted_exactly_as_typed_and_kept_out_of_the
     document = json.loads(companion)
     assert (document["profile"], document["publicRecord"]) == (JUDGE_WORDS_PROFILE, _RECORD_PATH)
     (reply,) = document["replies"]
-    assert (reply["words"], reply["givenAt"], reply["picked"]) == (words, _GIVEN_AT, "No")
+    assert (reply["words"], reply["givenAt"], reply["picked"]) == (words, _GIVEN_AT, _NO)
 
 
 def test_a_reply_that_does_not_say_when_it_was_given_is_refused():
     for given_at in (None, "2026-09-16", "2026-09-16 12:00:00", "2026-09-15T23:59:59Z"):
         answers = _answers(
-            _asked("start", "No", "Blocks, not a street.", given_at=given_at),
+            _asked("start", _NO, "Blocks, not a street.", given_at=given_at),
             _unasked("midpoint"),
             _unasked("endpoint"),
         )
         with pytest.raises(GateEvidenceError, match="given"):
             _decide(answers)
     late = dataclasses.replace(
-        _without_words("start", "No"),
+        _without_words("start", _NO),
         follow_up=ReasonFollowUp(
-            shown=reason_follow_up("No"), words="Flat blocks.", typed_by=_JUDGE, given_at=None
+            shown=reason_follow_up("no"), words="Flat blocks.", typed_by=_JUDGE, given_at=None
         ),
     )
     with pytest.raises(GateEvidenceError, match="given"):
         _decide(_answers(late, _unasked("midpoint"), _unasked("endpoint")))
     stray = dataclasses.replace(_unasked("midpoint"), given_at=_GIVEN_AT)
     with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
-        _decide(_answers(_asked("start", "No", "Blocks."), stray, _unasked("endpoint")))
+        _decide(_answers(_asked("start", _NO, "Blocks."), stray, _unasked("endpoint")))
 
 
 def test_a_public_record_never_carries_the_judges_words():
     words = "Plain coloured blocks; I cannot name a single shop."
-    answers = _answers(_asked("start", "No", words), _unasked("midpoint"), _unasked("endpoint"))
+    answers = _answers(_asked("start", _NO, words), _unasked("midpoint"), _unasked("endpoint"))
     evidence = {**_passing_measurements(), "readsAsInhabitedStreet": answers}
     _record(evidence)
     for leak in (
@@ -559,7 +582,7 @@ def test_a_public_record_never_carries_the_judges_words():
     with pytest.raises(GateEvidenceError, match="judge's words"):
         refuse_private_words({"key": ["a", {"deep": "coloured blocks I cannot name"}]}, [words])
     refuse_private_words(["blocks I cannot name; only four words run on"], [words])
-    follow = _without_words("start", "No", "Every wall is one flat grey.")
+    follow = _without_words("start", _NO, "Every wall is one flat grey.")
     with pytest.raises(GateEvidenceError, match="judge's words"):
         _record(
             {
@@ -570,16 +593,30 @@ def test_a_public_record_never_carries_the_judges_words():
             },
             reason="The follow-up said every wall is one flat grey.",
         )
+    carrying = _with_carried(_NO)
+    with pytest.raises(GateEvidenceError, match="judge's words"):
+        _record(
+            {
+                **_passing_measurements(),
+                "readsAsInhabitedStreet": _answers(
+                    carrying, _unasked("midpoint"), _unasked("endpoint")
+                ),
+            },
+            reason=f"Carried: {_EARLIER}",
+        )
 
 
 def _without_words(
-    label: str, picked: str = "Yes", reply: str | None = "Brick fronts, a bakery."
+    label: str, picked: str = _YES, reply: str | None = "Brick fronts, a bakery."
 ) -> PictureAnswer:
     """An answer picked with no words, followed once for its reason unless ``reply`` is None."""
     follow = None
     if reply is not None:
         follow = ReasonFollowUp(
-            shown=reason_follow_up(picked), words=reply, typed_by=_JUDGE, given_at=_GIVEN_AT
+            shown=reason_follow_up(OPTION_ANSWERS[picked]),
+            words=reply,
+            typed_by=_JUDGE,
+            given_at=_GIVEN_AT,
         )
     return PictureAnswer(
         label=label,
@@ -599,31 +636,37 @@ def test_an_answer_without_words_takes_its_reason_from_one_follow_up():
     )
     assert value is True
     entry = detail["pictures"][0]
-    assert (entry["picked"], entry["answer"], entry["words_sha256"]) == ("Yes", "yes", None)
-    assert entry["reason"] == words_fingerprint("Brick fronts, a bakery.")
-    assert entry["reasonFrom"] == "follow-up"
+    assert (entry["picked"], entry["answer"], entry["words_sha256"]) == (_YES, "yes", None)
+    assert entry["reason"] == [
+        {
+            "from": "follow-up",
+            "rubricVersion": RUBRIC_VERSION,
+            "givenAt": _GIVEN_AT,
+            "givenAs": "in reply to the follow-up",
+            **words_fingerprint("Brick fronts, a bakery."),
+        }
+    ]
     assert entry["followUp"] == {
         "asked": "You answered Yes. In a few words, why?",
         **words_fingerprint("Brick fronts, a bakery."),
         "typedBy": _JUDGE,
         "givenAt": _GIVEN_AT,
     }
-    assert detail["pictures"][1]["reasonFrom"] == "reply"
-    assert detail["requirement"] == ANSWER_REQUIREMENT
     answers = _answers(_without_words("start"), _asked("midpoint"), _asked("endpoint"))
-    _, companion = judge_words_file(_RECORD_PATH, answers)
-    replies = json.loads(companion)["replies"]
+    replies = json.loads(judge_words_file(_RECORD_PATH, answers)[1])["replies"]
     assert [(reply["kind"], reply["words"]) for reply in replies[:2]] == [
         ("reply", None),
         ("follow-up", "Brick fronts, a bakery."),
     ]
     assert replies[1]["shown"] == "You answered Yes. In a few words, why?"
+    assert [item["from"] for item in detail["pictures"][1]["reason"]] == ["reply"]
+    assert detail["requirement"] == ANSWER_REQUIREMENT
 
 
 def test_a_follow_up_never_changes_the_answer():
     value, detail = _decide(
         _answers(
-            _without_words("start", "No", "yes the colours are fine but it is a block model"),
+            _without_words("start", _NO, "yes the colours are fine but it is a block model"),
             _unasked("midpoint"),
             _unasked("endpoint"),
         )
@@ -652,36 +695,36 @@ def _followed(
     ("picture", "match"),
     [
         (
-            _followed("Yes", "Real brick, a corner cafe.", reason_follow_up("Yes"), "Because."),
+            _followed(_YES, "Real brick, a corner cafe.", reason_follow_up("yes"), "Because."),
             "already gave",
         ),
-        (_followed("No", None, reason_follow_up("Yes"), "Flat blocks."), "rubric's words"),
+        (_followed(_NO, None, reason_follow_up("yes"), "Flat blocks."), "rubric's words"),
         (
-            _followed("Yes", None, "Why did you say yes? Was it the shops?", "Shops."),
+            _followed(_YES, None, "Why did you say yes? Was it the shops?", "Shops."),
             "rubric's words",
         ),
         (
-            _followed("Yes", None, reason_follow_up("Yes"), "Shops.", typed_by="Claude"),
+            _followed(_YES, None, reason_follow_up("yes"), "Shops.", typed_by="Claude"),
             "not typed by the judge",
         ),
         (
-            _followed("Yes", None, reason_follow_up("Yes"), None),
+            _followed(_YES, None, reason_follow_up("yes"), None),
             "no reason in the judge's own words",
         ),
         (
-            _followed("Yes", None, reason_follow_up("Yes"), "   "),
+            _followed(_YES, None, reason_follow_up("yes"), "   "),
             "no reason in the judge's own words",
         ),
         (
-            _followed("Yes", None, reason_follow_up("Yes"), "[No preference]"),
+            _followed(_YES, None, reason_follow_up("yes"), "[No preference]"),
             "no reason in the judge's own words",
         ),
         (
-            _followed("Yes", None, reason_follow_up("Yes"), "yes"),
+            _followed(_YES, None, reason_follow_up("yes"), "yes"),
             "no reason in the judge's own words",
         ),
         (
-            _followed("Yes", "yes", reason_follow_up("Yes"), "No."),
+            _followed(_YES, "yes", reason_follow_up("yes"), "No."),
             "no reason in the judge's own words",
         ),
     ],
@@ -703,10 +746,10 @@ def test_an_answer_with_no_words_and_no_follow_up_is_refused():
 def test_an_unasked_picture_cannot_carry_a_follow_up():
     carrying = dataclasses.replace(
         _unasked("midpoint"),
-        follow_up=ReasonFollowUp(shown=reason_follow_up("No"), words="Flat.", typed_by=_JUDGE),
+        follow_up=ReasonFollowUp(shown=reason_follow_up("no"), words="Flat.", typed_by=_JUDGE),
     )
     with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
-        _decide(_answers(_asked("start", "No", "Blocks."), carrying, _unasked("endpoint")))
+        _decide(_answers(_asked("start", _NO, "Blocks."), carrying, _unasked("endpoint")))
 
 
 def test_a_skipped_question_is_not_an_answer():
@@ -714,6 +757,153 @@ def test_a_skipped_question_is_not_an_answer():
         answers = _answers(_asked("start", None, words), _unasked("midpoint"), _unasked("endpoint"))
         with pytest.raises(GateEvidenceError, match="skipped"):
             _decide(answers)
+
+
+#: Words written under rubric version 3 and carried into a later ask. Invented for the tests.
+_EARLIER = "The walls still read as one flat colour, whatever the pick said."
+_EARLIER_AT = "2026-09-16T11:00:00Z"
+_EARLIER_AS = "a message sent right after a Yes pick under rubric version 3"
+
+
+def _earlier(**changes) -> CarriedWords:
+    fields = {
+        "words": _EARLIER,
+        "typed_by": _JUDGE,
+        "rubric_version": VERSION_3.rubric_version,
+        "rubric_sha256": VERSION_3.rubric_sha256,
+        "given_at": _EARLIER_AT,
+        "given_as": _EARLIER_AS,
+    }
+    fields.update(changes)
+    return CarriedWords(**fields)
+
+
+def _with_carried(
+    picked: str | None,
+    words: str | None = None,
+    carried: tuple[CarriedWords, ...] | None = None,
+    notice: str | None = CARRIED_WORDS_NOTICE,
+    follow_up: ReasonFollowUp | None = None,
+) -> PictureAnswer:
+    return PictureAnswer(
+        label="start",
+        capture_sha256=_CAPTURES["start"],
+        asked=True,
+        picked=picked,
+        words=words,
+        typed_by=_JUDGE,
+        follow_up=follow_up,
+        carried=(_earlier(),) if carried is None else carried,
+        notice=notice,
+        given_at=_GIVEN_AT,
+    )
+
+
+def _companion_words(answers: JudgedAnswers) -> dict[str, str]:
+    _, companion = judge_words_file(_RECORD_PATH, answers)
+    return words_from_companion(json.loads(companion), _RECORD_PATH)
+
+
+def test_a_no_takes_its_reason_from_words_carried_across_a_rewording():
+    value, detail = _decide(
+        _answers(_with_carried(_NO), _unasked("midpoint"), _unasked("endpoint"))
+    )
+    assert value is False
+    entry = detail["pictures"][0]
+    assert entry["noticeAboveTheQuestion"] == CARRIED_WORDS_NOTICE
+    assert entry["carried"] == [
+        {
+            **words_fingerprint(_EARLIER),
+            "typedBy": _JUDGE,
+            "rubricVersion": 3,
+            "rubricSha256": VERSION_3.rubric_sha256,
+            "givenAt": _EARLIER_AT,
+            "givenAs": _EARLIER_AS,
+        }
+    ]
+    assert entry["reason"] == [
+        {
+            "from": "earlier words",
+            "rubricVersion": 3,
+            "givenAt": _EARLIER_AT,
+            "givenAs": _EARLIER_AS,
+            **words_fingerprint(_EARLIER),
+        }
+    ]
+    answers = _answers(
+        _with_carried(_NO, "Flat colour, no shops."), _unasked("midpoint"), _unasked("endpoint")
+    )
+    value, detail = _decide(answers)
+    assert [item["from"] for item in detail["pictures"][0]["reason"]] == [
+        "earlier words",
+        "reply",
+    ]
+    rebuilt = judged_answers_from_record(detail, _companion_words(answers))
+    assert _decide(rebuilt) == (False, detail)
+    kinds = [
+        reply["kind"] for reply in json.loads(judge_words_file(_RECORD_PATH, answers)[1])["replies"]
+    ]
+    assert kinds == ["carried", "reply"]
+
+
+def test_a_yes_after_carried_words_needs_new_words():
+    with pytest.raises(GateEvidenceError, match="needs new words"):
+        _decide(_answers(_with_carried(_YES), _asked("midpoint"), _asked("endpoint")))
+    follow = ReasonFollowUp(
+        shown=reason_follow_up("yes"), words="Real brick.", typed_by=_JUDGE, given_at=_GIVEN_AT
+    )
+    with pytest.raises(GateEvidenceError, match="needs new words"):
+        _decide(
+            _answers(_with_carried(_YES, follow_up=follow), _asked("midpoint"), _asked("endpoint"))
+        )
+    value, detail = _decide(
+        _answers(
+            _with_carried(_YES, "Brick, glass and a corner cafe."),
+            _asked("midpoint"),
+            _asked("endpoint"),
+        )
+    )
+    assert value is True
+    assert [item["from"] for item in detail["pictures"][0]["reason"]] == ["reply"]
+    carried = detail["pictures"][0]["carried"][0]
+    assert carried["words_sha256"] == words_fingerprint(_EARLIER)["words_sha256"]
+
+
+@pytest.mark.parametrize(
+    ("picture", "match"),
+    [
+        (_with_carried(_NO, notice=None), "need the line"),
+        (_with_carried(_NO, notice="Please answer again."), "need the line"),
+        (_with_carried(_NO, carried=(), notice=CARRIED_WORDS_NOTICE), "with no reason"),
+        (_with_carried(_NO, carried=(_earlier(typed_by="Claude"),)), "not typed by the judge"),
+        (_with_carried(_NO, carried=(_earlier(rubric_version=9),)), "superseded rubric"),
+        (_with_carried(_NO, carried=(_earlier(rubric_sha256=_SHA),)), "superseded rubric"),
+        (_with_carried(_NO, carried=(_earlier(words="no"),)), "must say something"),
+        (_with_carried(_NO, carried=(_earlier(given_at="yesterday"),)), "when it was given"),
+        (_with_carried(_NO, carried=(_earlier(given_as=" "),)), "how they were given"),
+        (
+            _with_carried(
+                _NO,
+                follow_up=ReasonFollowUp(
+                    shown=reason_follow_up("no"), words="Flat.", typed_by=_JUDGE, given_at=_GIVEN_AT
+                ),
+            ),
+            "already gave",
+        ),
+    ],
+)
+def test_carried_words_that_are_not_allowed_are_refused(picture, match):
+    answers = _answers(picture, _unasked("midpoint"), _unasked("endpoint"))
+    with pytest.raises(GateEvidenceError, match=re.escape(match)):
+        _decide(answers)
+
+
+def test_an_unasked_picture_cannot_carry_earlier_words():
+    carrying = dataclasses.replace(
+        _unasked("midpoint"), carried=(_earlier(),), notice=CARRIED_WORDS_NOTICE
+    )
+    with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
+        _decide(_answers(_asked("start", _NO, "Blocks."), carrying, _unasked("endpoint")))
 
 
 def test_a_rubric_digest_mismatch_is_refused():
@@ -758,7 +948,7 @@ def test_answers_out_of_route_order_or_malformed_are_refused():
         _decide(_answers(ordered[0], dataclasses.replace(ordered[1], asked=1), ordered[2]))
     carrying = dataclasses.replace(_unasked("midpoint"), words="It was fine.")
     with pytest.raises(GateEvidenceError, match="cannot carry an answer"):
-        _decide(_answers(_asked("start", "No", "Blocks."), carrying, _unasked("endpoint")))
+        _decide(_answers(_asked("start", _NO, "Blocks."), carrying, _unasked("endpoint")))
     with pytest.raises(GateEvidenceError, match="needs the named judge's answers"):
         _decide({"start": "no"})  # type: ignore[arg-type]
     with pytest.raises(GateEvidenceError, match="ISO date"):
@@ -767,7 +957,7 @@ def test_answers_out_of_route_order_or_malformed_are_refused():
 
 def test_a_retained_record_is_decided_again_from_its_private_companion():
     answers = _answers(
-        _without_words("start", "No", "Flat blocks."), _unasked("midpoint"), _unasked("endpoint")
+        _with_carried(_NO, "Flat colour, no shops."), _unasked("midpoint"), _unasked("endpoint")
     )
     record = _record({**_passing_measurements(), "readsAsInhabitedStreet": answers})
     judged = record["record"]["gate"]["keys"]["readsAsInhabitedStreet"]
@@ -782,7 +972,7 @@ def test_a_retained_record_is_decided_again_from_its_private_companion():
     with pytest.raises(GateEvidenceError, match="not the private companion"):
         words_from_companion(json.loads(companion), "docs/evaluation/another-record.json")
     forged = json.loads(companion)
-    forged["replies"][1]["words"] = "Something else entirely."
+    forged["replies"][0]["words"] = "Something else entirely."
     with pytest.raises(GateEvidenceError, match="does not match its own digest"):
         words_from_companion(forged, _RECORD_PATH)
     tampered = copy.deepcopy(judged)
@@ -798,11 +988,18 @@ def test_a_retained_record_is_decided_again_from_its_private_companion():
     with pytest.raises(GateEvidenceError, match="not an answer the judge gave"):
         recompose_judged(tampered)
     tampered = copy.deepcopy(judged)
+    tampered["pictures"][0]["carried"][0]["typedBy"] = "Claude"
+    with pytest.raises(GateEvidenceError, match="did not give"):
+        recompose_judged(tampered)
+    tampered = copy.deepcopy(judged)
     tampered["value"] = True
     with pytest.raises(GateEvidenceError, match="does not follow"):
         recompose_judged(tampered)
     tampered = copy.deepcopy(judged)
-    tampered["pictures"][0]["reason"]["words_private"] = False
+    tampered["pictures"][0]["reason"][1]["words_private"] = False
+    with pytest.raises(GateEvidenceError, match="no fingerprint"):
+        recompose_judged(tampered)
+    tampered["pictures"][0]["reason"] = []
     with pytest.raises(GateEvidenceError, match="no fingerprint"):
         recompose_judged(tampered)
     del tampered["judge"]
@@ -865,7 +1062,7 @@ def test_the_corridor_bar_is_every_key_against_a_baseline_that_fails():
     assert beats_baseline(candidate["record"], failing_baseline)
     assert not beats_baseline(failing_baseline, candidate["record"])
 
-    one_no = _answers(_asked("start"), _asked("midpoint"), _asked("endpoint", "No", "A cut."))
+    one_no = _answers(_asked("start"), _asked("midpoint"), _asked("endpoint", _NO, "A cut."))
     weaker = _record(
         {**_passing_measurements(), "readsAsInhabitedStreet": one_no},
         baseline=failing_baseline,
@@ -906,6 +1103,8 @@ def test_the_rubric_names_a_judge_and_fixes_the_one_question():
     for _, question in RUBRIC_V1.questions:
         assert question not in text, "the rubric still asks a version 1 question"
     assert VERSION_2.question not in text, "the rubric still asks the version 2 question"
+    assert VERSION_3.question not in text, "the rubric still asks the version 3 question"
+    assert CARRIED_WORDS_NOTICE in text
     assert RUBRIC_GUIDANCE.index("real materials") < RUBRIC_GUIDANCE.index("ground-floor")
     assert "No model may score `readsAsInhabitedStreet`" in text
     for label, title in PICTURE_TITLES.items():
@@ -932,17 +1131,21 @@ def test_the_judge_reads_exactly_the_rubrics_words_for_each_picture():
         assert (question, guidance) == (RUBRIC_QUESTION, RUBRIC_GUIDANCE)
         assert requirement == ANSWER_REQUIREMENT
         assert question in text and guidance in text and requirement in text
-    for option in ANSWER_OPTIONS:
-        assert reason_follow_up(option) == f"You answered {option}. In a few words, why?"
-        assert reason_follow_up(option) in text
-    with pytest.raises(ValueError, match="not an option"):
-        reason_follow_up("Maybe")
+    for answer in ("yes", "no"):
+        wording = reason_follow_up(answer)
+        assert wording == f"You answered {answer.capitalize()}. In a few words, why?"
+        assert wording in text
+    for wrong in ("Maybe", "Yes", _YES):
+        with pytest.raises(ValueError, match="not an answer"):
+            reason_follow_up(wrong)
     with pytest.raises(ValueError, match="not a route capture"):
         judge_prompt("overview")
 
 
+_V2_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
 _V3_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json"
-_V3_ARTIFACTS = "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v3"
+_V4_RECORD = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json"
+_V4_ARTIFACTS = "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v4"
 
 
 def _writer(monkeypatch, root: Path):
@@ -955,26 +1158,37 @@ def _writer(monkeypatch, root: Path):
     spec.loader.exec_module(module)
     root = root.resolve()
     monkeypatch.setattr(module, "ROOT", root)
-    monkeypatch.setattr(module, "RECONCILIATION", root / _V3_RECORD)
-    monkeypatch.setattr(module, "RUBRIC_COPY", root / _V3_ARTIFACTS / "visual-gate-rubric.md")
+    monkeypatch.setattr(module, "RECONCILIATION", root / _V4_RECORD)
+    monkeypatch.setattr(module, "RUBRIC_COPY", root / _V4_ARTIFACTS / "visual-gate-rubric.md")
     return module
 
 
-def _scratch_root(tmp_path: Path, rubric: bytes, measurements_unchanged: bool = True) -> Path:
+def _scratch_root(tmp_path: Path, rubric: bytes, v3_measurements_unchanged: bool = True) -> Path:
+    """A document root holding the rubric and stubs of the reconciliation chain, v4 at its head."""
     root = tmp_path / "root"
-    (root / _V3_ARTIFACTS).mkdir(parents=True)
+    (root / _V4_ARTIFACTS).mkdir(parents=True)
     (root / "docs/visual-gate-rubric.md").write_bytes(rubric)
-    (root / _V3_ARTIFACTS / "visual-gate-rubric.md").write_bytes(rubric)
-    fixed = {
-        "record": {
+    (root / _V4_ARTIFACTS / "visual-gate-rubric.md").write_bytes(rubric)
+    chain = {
+        _V4_RECORD: {
             "judgedKey": {"rubricSha256": hashlib.sha256(rubric).hexdigest()},
             "supersedes": {
-                "keySet": VERSION_2.key_set,
-                "measurementsUnchanged": measurements_unchanged,
+                "keySet": VERSION_3.key_set,
+                "measurementsUnchanged": True,
+                "path": _V3_RECORD,
             },
-        }
+        },
+        _V3_RECORD: {
+            "supersedes": {
+                "keySet": VERSION_2.key_set,
+                "measurementsUnchanged": v3_measurements_unchanged,
+                "path": _V2_RECORD,
+            }
+        },
+        _V2_RECORD: {"supersedes": {"keySet": RUBRIC_V1.key_set, "path": "unused"}},
     }
-    (root / _V3_RECORD).write_text(json.dumps(fixed), encoding="utf-8")
+    for relative, record in chain.items():
+        (root / relative).write_text(json.dumps({"record": record}), encoding="utf-8")
     return root
 
 
@@ -986,7 +1200,7 @@ def _judgement_file(path: Path, rubric: bytes, **changes) -> Path:
         "rubric": "docs/visual-gate-rubric.md",
         "rubricSha256": hashlib.sha256(rubric).hexdigest(),
         "askedIn": "test",
-        "options": ["Yes", "No"],
+        "options": list(ANSWER_OPTIONS),
         "pictures": [
             {
                 "label": "start",
@@ -994,7 +1208,7 @@ def _judgement_file(path: Path, rubric: bytes, **changes) -> Path:
                 "prompt": judge_prompt("start"),
                 "captureSha256": _CAPTURES["start"],
                 "asked": True,
-                "picked": "No",
+                "picked": _NO,
                 "words": "Blocks, not a street.",
                 "typedBy": "Glendon",
                 "givenAt": "2026-09-16T12:00:00Z",
@@ -1060,9 +1274,13 @@ def test_the_writer_accepts_a_superseded_key_set_only_when_its_measurements_are_
 ):
     rubric = _RUBRIC.read_bytes()
     writer = _writer(monkeypatch, _scratch_root(tmp_path / "same", rubric))
-    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION, VERSION_2.key_set}
+    assert writer._key_sets_measured_alike() == {
+        GATE_KEY_SET_VERSION,
+        VERSION_3.key_set,
+        VERSION_2.key_set,
+    }
     writer = _writer(monkeypatch, _scratch_root(tmp_path / "moved", rubric, False))
-    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION}
+    assert writer._key_sets_measured_alike() == {GATE_KEY_SET_VERSION, VERSION_3.key_set}
     run = tmp_path / "run.json"
     run.write_text(
         json.dumps({"profile": "exulanica.visual-gate-run/v1", "keySet": VERSION_2.key_set}),
@@ -1078,10 +1296,10 @@ def test_the_writer_reads_a_follow_up_exactly_as_it_was_asked(monkeypatch, tmp_p
     pictures = json.loads(_judgement_file(tmp_path / "base.json", rubric).read_text())["pictures"]
     pictures[0].update(
         {
-            "picked": "No",
+            "picked": _NO,
             "words": None,
             "followUp": {
-                "shown": reason_follow_up("No"),
+                "shown": reason_follow_up("no"),
                 "words": "Flat colour everywhere.",
                 "typedBy": "Glendon",
                 "givenAt": "2026-09-16T12:01:00Z",
@@ -1091,16 +1309,56 @@ def test_the_writer_reads_a_follow_up_exactly_as_it_was_asked(monkeypatch, tmp_p
     answers, asked_as = writer._judgement(
         _judgement_file(tmp_path / "follow.json", rubric, pictures=pictures), rubric
     )
-    assert asked_as["followUps"] == {"start": reason_follow_up("No")}
+    assert asked_as["followUps"] == {"start": reason_follow_up("no")}
     value, detail = _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
     assert value is False
-    assert detail["pictures"][0]["reason"] == words_fingerprint("Flat colour everywhere.")
+    assert [item["words_sha256"] for item in detail["pictures"][0]["reason"]] == [
+        words_fingerprint("Flat colour everywhere.")["words_sha256"]
+    ]
     pictures[0]["followUp"]["shown"] = "You said no. Why not?"
     answers, _ = writer._judgement(
         _judgement_file(tmp_path / "reworded.json", rubric, pictures=pictures), rubric
     )
     with pytest.raises(GateEvidenceError, match="rubric's words"):
         _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+
+
+def test_the_writer_reads_carried_words_under_the_line_that_was_shown(monkeypatch, tmp_path):
+    rubric = _RUBRIC.read_bytes()
+    writer = _writer(monkeypatch, _scratch_root(tmp_path, rubric))
+    pictures = json.loads(_judgement_file(tmp_path / "base.json", rubric).read_text())["pictures"]
+    pictures[0].update(
+        {
+            "words": None,
+            "notice": CARRIED_WORDS_NOTICE,
+            "shown": f"{CARRIED_WORDS_NOTICE}\n\n{judge_prompt('start')}",
+            "carried": [
+                {
+                    "words": _EARLIER,
+                    "typedBy": "Glendon",
+                    "rubricVersion": 3,
+                    "rubricSha256": VERSION_3.rubric_sha256,
+                    "givenAt": _EARLIER_AT,
+                    "givenAs": _EARLIER_AS,
+                }
+            ],
+        }
+    )
+    answers, asked_as = writer._judgement(
+        _judgement_file(tmp_path / "carried.json", rubric, pictures=pictures), rubric
+    )
+    assert asked_as["shown"]["start"].startswith(CARRIED_WORDS_NOTICE)
+    value, detail = _decide(answers, rubric_sha256=hashlib.sha256(rubric).hexdigest())
+    assert value is False
+    assert (
+        detail["pictures"][0]["reason"][0]["words_sha256"]
+        == (words_fingerprint(_EARLIER)["words_sha256"])
+    )
+    pictures[0]["shown"] = judge_prompt("start")
+    with pytest.raises(SystemExit, match="shown something other"):
+        writer._judgement(
+            _judgement_file(tmp_path / "unshown.json", rubric, pictures=pictures), rubric
+        )
 
 
 def test_the_writer_keeps_the_judges_words_in_the_private_companion(monkeypatch, tmp_path):
@@ -1156,12 +1414,23 @@ def test_the_retained_baseline_scores_all_nine_keys_against_the_rubric_it_names(
     for entry in judged["pictures"]:
         if entry["state"] == "answered":
             assert record["judgement"]["prompts"][entry["label"]] == judge_prompt(entry["label"])
-            assert entry["reason"] and entry["typedBy"] == judged["judge"]
+            assert entry["typedBy"] == judged["judge"]
+            assert entry["reason"], "an answer is recorded with its reason"
+            for reason in entry["reason"]:
+                assert reason["words_private"] is True and reason["words_bytes"] > 0
+                assert reason["rubricVersion"] <= RUBRIC_VERSION
+            prompt = judge_prompt(entry["label"])
+            notice = entry.get("noticeAboveTheQuestion")
+            shown = prompt if notice is None else f"{notice}\n\n{prompt}"
+            assert record["judgement"]["shown"][entry["label"]] == shown
+            if entry.get("carried"):
+                assert notice == CARRIED_WORDS_NOTICE
+                assert entry["answer"] == "no" or any(
+                    reason["from"] != "earlier words" for reason in entry["reason"]
+                )
             if "followUp" in entry:
-                assert entry["words_sha256"] is None or entry["reasonFrom"] == "follow-up"
-                shown = record["judgement"]["followUps"][entry["label"]]
-                assert shown == entry["followUp"]["asked"]
-                assert shown == reason_follow_up(entry["picked"] or entry["answer"].capitalize())
+                asked = record["judgement"]["followUps"][entry["label"]]
+                assert asked == entry["followUp"]["asked"] == reason_follow_up(entry["answer"])
     for spelling, detail in record["gate"]["keys"].items():
         if detail["evidenceKind"] == "mechanical":
             assert decide_mechanical(spelling, detail["decidedBy"]) is record["hardPass"][spelling]

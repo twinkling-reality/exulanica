@@ -57,12 +57,13 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_PATH,
     RUBRIC_V1,
     RUBRIC_VERSION,
-    VERSION_2,
+    SUPERSEDED_VERSIONS,
     judge_prompt,
     key,
 )
 from exulanica.evaluation.visual_gate import (
     GateEvidenceError,
+    CarriedWords,
     JudgedAnswers,
     PictureAnswer,
     ReasonFollowUp,
@@ -81,11 +82,16 @@ SOURCE_ROOT = Path(__file__).resolve().parents[1]
 #: Where documents are read from and written to. The repository itself, except in a dry run of
 #: the writer against a scratch copy of docs/, which never touches the retained tree.
 ROOT = Path(os.environ.get("VISUAL_GATE_DOCUMENT_ROOT", SOURCE_ROOT)).resolve()
-FIRST_RECONCILIATION = "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json"
-SUPERSEDED_RECONCILIATION = "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json"
-RECONCILIATION = ROOT / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json"
+#: The reconciliation records before the current one, oldest first. Each supersedes the last.
+EARLIER_RECONCILIATIONS = (
+    "docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json",
+    "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json",
+    "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json",
+)
+SUPERSEDED_RECONCILIATION = EARLIER_RECONCILIATIONS[-1]
+RECONCILIATION = ROOT / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json"
 RECONCILIATION_ARTIFACTS = (
-    ROOT / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v3"
+    ROOT / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v4"
 )
 RUBRIC_COPY = RECONCILIATION_ARTIFACTS / "visual-gate-rubric.md"
 BASELINE = ROOT / "docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json"
@@ -168,24 +174,32 @@ def _scored_before_revision() -> tuple[list[str], list[str]]:
         if "corridor" in path.name.casefold() or "corridor" in profile.casefold():
             corridors.append(_relative(path))
         gate = record.get("gate")
-        if isinstance(gate, dict) and gate.get("keySet") in (RUBRIC_V1.key_set, VERSION_2.key_set):
+        earlier_key_sets = {RUBRIC_V1.key_set, *(item.key_set for item in SUPERSEDED_VERSIONS)}
+        if isinstance(gate, dict) and gate.get("keySet") in earlier_key_sets:
             earlier.append(_relative(path))
     return corridors, earlier
 
 
-def _calibration_captures(run_path: Path, calibration: dict[str, Any]) -> list[tuple[Path, str]]:
-    """The pictures the version 2 answers are about, found in the run that produced them."""
-    run = json.loads(run_path.read_bytes())
-    shown = {capture["label"]: capture for capture in run["captures"]}
-    sources = []
+def _calibration_captures(calibration: dict[str, Any]) -> list[dict[str, Any]]:
+    """The pictures the calibration evidence is about, as the superseded record retained them."""
+    retained = json.loads((ROOT / SUPERSEDED_RECONCILIATION).read_bytes())["record"]["captures"]
+    by_label = {capture["label"]: capture for capture in retained}
+    captures = []
     for picture in calibration["pictures"]:
-        capture = shown[picture["label"]]
-        source = run_path.parent / capture["file"]
-        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        capture = by_label[picture["label"]]
+        data = (ROOT / capture["path"]).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
         if digest != capture["sha256"] or digest != picture["captureSha256"]:
-            raise SystemExit(f"{capture['file']} is not the picture the answers are about")
-        sources.append((source, picture["label"]))
-    return sources
+            raise SystemExit(f"{capture['path']} is not the picture the evidence is about")
+        captures.append(
+            {
+                "label": capture["label"],
+                "path": capture["path"],
+                "byte_size": len(data),
+                "sha256": digest,
+            }
+        )
+    return captures
 
 
 def reconciliation(arguments: argparse.Namespace) -> int:
@@ -208,24 +222,7 @@ def reconciliation(arguments: argparse.Namespace) -> int:
     corridors, earlier = _scored_before_revision()
     rubric = (ROOT / RUBRIC_PATH).read_bytes()
     calibration = json.loads(Path(arguments.calibration).read_bytes())
-    sources = _calibration_captures(Path(arguments.calibration_run).resolve(), calibration)
-    staged = [
-        (
-            source,
-            RECONCILIATION_ARTIFACTS / f"calibration-capture-{index:02d}-route-{label}.png",
-            label,
-        )
-        for index, (source, label) in enumerate(sources, start=1)
-    ]
-    captures = [
-        {
-            "label": label,
-            "path": _relative(target),
-            "byte_size": source.stat().st_size,
-            "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-        }
-        for source, target, label in staged
-    ]
+    captures = _calibration_captures(calibration)
     try:
         document = reconciliation_record(
             date=arguments.date,
@@ -257,8 +254,6 @@ def reconciliation(arguments: argparse.Namespace) -> int:
     RUBRIC_COPY.write_bytes(rubric)
     if RUBRIC_COPY.read_bytes() != rubric:
         raise SystemExit("the rubric did not copy byte for byte")
-    for source, target, _ in staged:
-        _copy(source, target)
     _write_private(companion_path, companion, replace=arguments.replace)
     words, lines = _private_words(companion)
     _write(RECONCILIATION, document, replace=arguments.replace, private=words, lines=lines)
@@ -386,12 +381,22 @@ def _interaction(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _key_sets_measured_alike() -> set[str]:
-    """The current key set, and any it superseded without moving a measurement."""
+    """The current key set, and every key set before it that no revision since has re-measured.
+
+    Walks the chain of reconciliation records from the current one, and stops at the first
+    revision that does not state its measurements unchanged.
+    """
     alike = {GATE_KEY_SET_VERSION}
-    supersedes = json.loads(RECONCILIATION.read_bytes())["record"]["supersedes"]
-    if supersedes.get("measurementsUnchanged") is True:
+    record = json.loads(RECONCILIATION.read_bytes())["record"]
+    while True:
+        supersedes = record.get("supersedes", {})
+        if supersedes.get("measurementsUnchanged") is not True:
+            return alike
         alike.add(supersedes["keySet"])
-    return alike
+        earlier = ROOT / supersedes["path"]
+        if not earlier.is_file():
+            return alike
+        record = json.loads(earlier.read_bytes())["record"]
 
 
 def _load_run(path: Path) -> dict[str, Any]:
@@ -502,6 +507,12 @@ def _judgement(path: Path, rubric: bytes) -> tuple[JudgedAnswers, dict[str, Any]
         asked = entry["asked"]
         if asked and entry.get("prompt") != judge_prompt(entry["label"]):
             raise SystemExit(f"{entry['label']} was not asked in the rubric's words")
+        notice = entry.get("notice")
+        if asked:
+            prompt = entry["prompt"]
+            shown = prompt if notice is None else f"{notice}\n\n{prompt}"
+            if entry.get("shown", shown) != shown:
+                raise SystemExit(f"{entry['label']} was shown something other than its ask")
         follow = entry.get("followUp")
         pictures.append(
             PictureAnswer(
@@ -519,6 +530,18 @@ def _judgement(path: Path, rubric: bytes) -> tuple[JudgedAnswers, dict[str, Any]
                     typed_by=follow.get("typedBy"),
                     given_at=follow.get("givenAt"),
                 ),
+                carried=tuple(
+                    CarriedWords(
+                        words=item["words"],
+                        typed_by=item["typedBy"],
+                        rubric_version=item["rubricVersion"],
+                        rubric_sha256=item["rubricSha256"],
+                        given_at=item["givenAt"],
+                        given_as=item["givenAs"],
+                    )
+                    for item in entry.get("carried", [])
+                ),
+                notice=notice,
                 given_at=entry.get("givenAt"),
             )
         )
@@ -532,6 +555,11 @@ def _judgement(path: Path, rubric: bytes) -> tuple[JudgedAnswers, dict[str, Any]
         "askedIn": given["askedIn"],
         "prompts": {
             entry["label"]: entry["prompt"] for entry in given["pictures"] if entry["asked"]
+        },
+        "shown": {
+            entry["label"]: entry.get("shown", entry["prompt"])
+            for entry in given["pictures"]
+            if entry["asked"]
         },
         "followUps": {
             entry["label"]: entry["followUp"]["shown"]
@@ -1007,8 +1035,7 @@ def baseline(arguments: argparse.Namespace) -> int:
             branch=_git("branch", "--show-current"),
             predecessor_records=[
                 _binding(_relative(RECONCILIATION)),
-                _binding(SUPERSEDED_RECONCILIATION),
-                _binding(FIRST_RECONCILIATION),
+                *(_binding(path) for path in reversed(EARLIER_RECONCILIATIONS)),
                 *(_binding(record.path) for record in RETAINED_RECORDS),
             ],
             artifacts=artifacts,
@@ -1072,9 +1099,11 @@ def baseline(arguments: argparse.Namespace) -> int:
                 "an answer, and nothing was inferred from the judge's words. The words are kept "
                 "exactly as typed in this record's private companion, and this record carries their "
                 "SHA-256 and byte count.",
-                "Answers the judge gave about these captures under rubric version 2 are not this "
-                "record's. They are calibration evidence in the version 3 reconciliation record, "
-                "and no key value here is taken from them.",
+                "What the judge gave about these captures under rubric versions 2 and 3 is not "
+                "this record's answer. It is calibration evidence in the version 3 and version 4 "
+                "reconciliation records, and no key value here is taken from it. Where a picture's "
+                "reason includes words the judge wrote under an earlier version, the ask said they "
+                "were kept, and each is labelled with when and under which version it was given.",
                 "A picture listed as not asked after a decisive no was not shown to the judge for an "
                 "answer, and nothing is claimed about how it would have been answered.",
                 "The three retained rejections are not scored or re-scored here.",
@@ -1112,9 +1141,10 @@ def baseline(arguments: argparse.Namespace) -> int:
                     "scoredUnder": GATE_KEY_SET_VERSION,
                     "note": (
                         "The runs were measured by the code at this commit, whose loom-gate "
-                        "package still named key set version 2. Version 3 moved no measurement, "
-                        "threshold or mechanical decision, as its reconciliation record states, so "
-                        "the same numbers decide every key under version 3."
+                        "package still named key set version 2. Versions 3 and 4 moved no "
+                        "measurement, threshold or mechanical decision, as their reconciliation "
+                        "records state, so the same numbers decide every key under the version "
+                        "this record is scored under."
                     ),
                 },
                 "scored": {
@@ -1303,10 +1333,7 @@ def main(argv: list[str] | None = None) -> int:
     reconcile = verbs.add_parser("reconciliation", help="write the key reconciliation record")
     reconcile.add_argument("--date", required=True, help="ISO date the record is produced")
     reconcile.add_argument(
-        "--calibration", required=True, help="the answers given under rubric version 2"
-    )
-    reconcile.add_argument(
-        "--calibration-run", required=True, help="the run whose pictures those answers are about"
+        "--calibration", required=True, help="the pick and words given under rubric version 3"
     )
     reconcile.add_argument("--replace", action="store_true")
     reconcile.set_defaults(handler=reconciliation)

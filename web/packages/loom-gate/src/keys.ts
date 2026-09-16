@@ -2,7 +2,7 @@
  * The nine hard-pass keys, their thresholds and the mechanical decisions, as the harness runs them.
  *
  * `exulanica/evaluation/gate_keys.py` is the reconciled vocabulary and
- * `docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json` is the retained statement of it,
+ * `docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json` is the retained statement of it,
  * superseding earlier versions only in how the judged key is asked and in the wording of one
  * definition; no number this module holds has changed.
  * This module restates the same numbers so a browser run can decide without a Python process, and
@@ -14,7 +14,7 @@
  * renderer entity. A key is decided from counts and lengths alone.
  */
 
-export const GATE_KEY_SET_VERSION = 'exulanica.visual-gate-keys/v3';
+export const GATE_KEY_SET_VERSION = 'exulanica.visual-gate-keys/v4';
 
 export const CANONICAL_KEYS = [
   'continuousTexturedStreetAndFacades',

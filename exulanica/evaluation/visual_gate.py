@@ -6,7 +6,7 @@ only possible if the gate can say FAIL. So this module decides; it does not tran
 *   **Every mechanical key is re-decided here** from the measured fields its canonical definition
     names. A caller cannot hand in ``True``; it hands in the numbers, and a number that is missing
     is a key with no evidence, which is refused rather than emitted.
-*   **The judged key is decided only from a named human's answers**, under version 3 of
+*   **The judged key is decided only from a named human's answers**, under version 4 of
     docs/visual-gate-rubric.md: one question per picture, asked in route order, and the first no
     decides. No name, a placeholder in place of a name, a rubric other than the one the record is
     written with, a picture other than the one bound, an answer somebody else typed, an answer with
@@ -48,12 +48,14 @@ from exulanica.evaluation.gate_keys import (
     CANONICAL_KEYS,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
+    CARRIED_WORDS_NOTICE,
     CLASSIFICATION,
     EVIDENCE_KINDS,
     GATE_KEY_SET_VERSION,
     JUDGED_KEY,
     MELBOURNE_ENVELOPE,
     NOT_ASKED,
+    OPTION_ANSWERS,
     PICTURE_TITLES,
     REASON_FOLLOW_UP,
     RETAINED_RECORDS,
@@ -62,8 +64,9 @@ from exulanica.evaluation.gate_keys import (
     RUBRIC_QUESTION,
     RUBRIC_V1,
     RUBRIC_VERSION,
+    SUPERSEDED_VERSIONS,
     THRESHOLDS,
-    VERSION_2,
+    VERSION_3,
     WORDS_STORAGE,
     GateKey,
     key,
@@ -78,6 +81,7 @@ __all__ = [
     "DIGEST_BOUND_PROFILE",
     "JUDGE_WORDS_DIRECTORY",
     "JUDGE_WORDS_PROFILE",
+    "CarriedWords",
     "GateEvidenceError",
     "JudgedAnswers",
     "PictureAnswer",
@@ -103,13 +107,16 @@ __all__ = [
 
 DIGEST_BOUND_PROFILE: Final = "exulanica.digest-bound-record/v1"
 
-#: How the judged answers compose under rubric version 3, as the records state it.
+#: How the judged answers compose under rubric version 4, as the records state it.
 COMPOSITION: Final = (
-    "Each capture is shown alone, in route order, and the judge answers the one question yes or "
-    "no with their own words. An answer that arrives without words may be followed once, with the "
-    "picture shown alone again, by a request for the reason, and that reply never changes the "
-    "answer. The first no makes the key false and the pictures after it are not asked. The key is "
-    "true only when all three pictures got yes. There is no score."
+    "Each capture is shown alone, in route order, and the judge answers the one question with the "
+    "option they mean and their own words. An answer that arrives without words may be followed "
+    "once, with the picture shown alone again, by a request for the reason, and that reply never "
+    "changes the answer. A pick that the judge's own words, given right after it, may contradict "
+    "is not recorded. Words the judge wrote about a picture before its question was reworded are "
+    "carried into its next ask, under a line that says so; they are part of the reason for a no, "
+    "and a yes needs new words. The first no makes the key false and the pictures after it are "
+    "not asked. The key is true only when all three pictures got yes. There is no score."
 )
 
 #: What a corridor has to clear, as the records state it.
@@ -212,16 +219,36 @@ class ReasonFollowUp:
 
 
 @dataclass(frozen=True, slots=True)
+class CarriedWords:
+    """Words the judge wrote about a picture under an earlier rubric version, kept for its ask.
+
+    ``rubric_version`` and ``rubric_sha256`` name the version they were written under,
+    ``given_at`` when they reached the asking session, as an ISO time in UTC, and ``given_as``
+    how they were given, in words that quote nothing the judge wrote. The words go only to the
+    record's private companion and are never an answer.
+    """
+
+    words: str
+    typed_by: str
+    rubric_version: int
+    rubric_sha256: str
+    given_at: str
+    given_as: str
+
+
+@dataclass(frozen=True, slots=True)
 class PictureAnswer:
     """What the judge gave for one picture, exactly as given, or that the picture was not asked.
 
-    ``picked`` is the option the judge picked, ``"Yes"`` or ``"No"``, or None when the judge typed
-    a reply instead. ``words`` is the judge's own words exactly as typed: the notes added to the
-    pick, or the typed reply, or None when the judge picked an option and wrote nothing. They go
-    only to the record's private companion. ``typed_by`` names who gave them, which has to be the
-    judge, and ``given_at`` when the reply reached the asking session, as an ISO time in UTC.
+    ``picked`` is the option the judge picked, one of the rubric's options, or None when the judge
+    typed a reply instead. ``words`` is the judge's own words exactly as typed: the notes added to
+    the pick, or the typed reply, or None when the judge picked an option and wrote nothing. They
+    go only to the record's private companion. ``typed_by`` names who gave them, which has to be
+    the judge, and ``given_at`` when the reply reached the asking session, as an ISO time in UTC.
     ``follow_up`` is the one request for a reason a picture may get when its answer arrived
-    without words. A picture that was not asked carries none of these.
+    without words. ``carried`` holds words the judge wrote about this picture under an earlier
+    rubric version, and ``notice`` the line shown above the question because of them. A picture
+    that was not asked carries none of these.
     """
 
     label: str
@@ -231,6 +258,8 @@ class PictureAnswer:
     words: str | None = None
     typed_by: str | None = None
     follow_up: ReasonFollowUp | None = None
+    carried: tuple[CarriedWords, ...] = ()
+    notice: str | None = None
     given_at: str | None = None
 
 
@@ -493,8 +522,57 @@ def _words_or_none(words: object) -> str | None:
     return words if isinstance(words, str) and words.strip() != "" else None
 
 
-def _answer(label: str, picture: PictureAnswer, judge: str, judged_on: str) -> dict[str, Any]:
-    """The judge's answer for an asked picture and the words it is recorded with, or a refusal."""
+def _carried(where: str, picture: PictureAnswer, judge: str) -> list[dict[str, Any]]:
+    """The earlier words an ask carries, checked, or a refusal. Empty when there are none."""
+    carried = tuple(picture.carried)
+    if not carried:
+        if picture.notice is not None:
+            raise GateEvidenceError(
+                f"{where}: a notice was shown above the question with no reason"
+            )
+        return []
+    if picture.notice != CARRIED_WORDS_NOTICE:
+        raise GateEvidenceError(
+            f"{where}: carried words need the line {CARRIED_WORDS_NOTICE!r} above the question"
+        )
+    superseded = {version.rubric_version: version for version in SUPERSEDED_VERSIONS}
+    entries = []
+    for item in carried:
+        if not isinstance(item, CarriedWords):
+            raise GateEvidenceError(f"{where}: carried words must be CarriedWords")
+        if item.typed_by != judge:
+            raise GateEvidenceError(f"{where}: carried words were not typed by the judge")
+        version = superseded.get(item.rubric_version)
+        if version is None or version.rubric_sha256 != item.rubric_sha256:
+            raise GateEvidenceError(
+                f"{where}: carried words must name a superseded rubric version and its digest"
+            )
+        if not isinstance(item.words, str) or not _has_reason(item.words):
+            raise GateEvidenceError(f"{where}: carried words must say something")
+        _given_at(f"{where}: carried words", item.given_at)
+        if not isinstance(item.given_as, str) or item.given_as.strip() == "":
+            raise GateEvidenceError(f"{where}: carried words must say how they were given")
+        entries.append(
+            {
+                **words_fingerprint(item.words),
+                "typedBy": judge,
+                "rubricVersion": item.rubric_version,
+                "rubricSha256": item.rubric_sha256,
+                "givenAt": item.given_at,
+                "givenAs": item.given_as,
+            }
+        )
+    return entries
+
+
+def _answer(
+    label: str, picture: PictureAnswer, judge: str, judged_on: str, answered_version: int
+) -> dict[str, Any]:
+    """The judge's answer for an asked picture and the fingerprints it is recorded with.
+
+    ``answered_version`` is the rubric version the judge was asked under, and every reason the
+    judge gave in this ask is labelled with it and with the time it was given.
+    """
     where = f"{JUDGED_KEY}: {PICTURE_TITLES[label]} ({label})"
     if picture.typed_by != judge:
         raise GateEvidenceError(
@@ -518,12 +596,12 @@ def _answer(label: str, picture: PictureAnswer, judge: str, judged_on: str) -> d
                 "no, so there is no answer the judge gave; nothing is inferred from their words"
             )
         answer = opening.group(1).casefold()
-    elif picture.picked in ANSWER_OPTIONS:
-        answer = picture.picked.casefold()
+    elif picture.picked in OPTION_ANSWERS:
+        answer = OPTION_ANSWERS[picture.picked]
     else:
         raise GateEvidenceError(
             f"{where}: {picture.picked!r} is not one of the options the judge is offered, "
-            f"{' and '.join(ANSWER_OPTIONS)}"
+            f"{' and '.join(repr(option) for option in ANSWER_OPTIONS)}"
         )
     own_reason = not blank and _has_reason(words)
     entry: dict[str, Any] = {
@@ -535,29 +613,59 @@ def _answer(label: str, picture: PictureAnswer, judge: str, judged_on: str) -> d
             if picture.picked is not None
             else "the first word of the typed reply"
         ),
-        "rubricVersion": RUBRIC_VERSION,
+        "rubricVersion": answered_version,
         "givenAt": picture.given_at,
         **words_fingerprint(None if blank else words),
         "typedBy": judge,
     }
+    reasons: list[dict[str, Any]] = []
+    carried = _carried(where, picture, judge)
+    if carried:
+        entry["noticeAboveTheQuestion"] = picture.notice
+        entry["carried"] = carried
+        if answer == "no":
+            reasons.extend(
+                {
+                    "from": "earlier words",
+                    "rubricVersion": item["rubricVersion"],
+                    "givenAt": item["givenAt"],
+                    "givenAs": item["givenAs"],
+                    **words_fingerprint(earlier.words),
+                }
+                for item, earlier in zip(carried, picture.carried, strict=True)
+            )
+        elif not own_reason:
+            raise GateEvidenceError(
+                f"{where}: a yes after carried words needs new words, because the earlier words "
+                "may contradict it; the picture is not asked again"
+            )
+    if own_reason:
+        reasons.append(
+            {
+                "from": "reply",
+                "rubricVersion": answered_version,
+                "givenAt": picture.given_at,
+                "givenAs": "in reply to this ask",
+                **words_fingerprint(words),
+            }
+        )
     follow = picture.follow_up
     if follow is None:
-        if not own_reason:
+        if not reasons:
             raise GateEvidenceError(
                 f"{where} has no reason in the judge's own words: an answer without the judge's "
                 "own words about why is not recorded"
             )
-        entry.update({"reason": words_fingerprint(words), "reasonFrom": "reply"})
+        entry["reason"] = reasons
         return entry
     if not isinstance(follow, ReasonFollowUp):
         raise GateEvidenceError(f"{where}: a follow-up must be a ReasonFollowUp")
-    if own_reason:
+    if reasons:
         raise GateEvidenceError(
             f"{where} was asked for a reason its answer already gave; only an answer without "
             "words gets a follow-up"
         )
-    option = ANSWER_OPTIONS[0] if answer == "yes" else ANSWER_OPTIONS[1]
-    wording = reason_follow_up(option)
+    wording = reason_follow_up(answer)
     if follow.shown != wording:
         raise GateEvidenceError(
             f"{where}: the follow-up was not asked in the rubric's words, {wording!r}"
@@ -576,25 +684,28 @@ def _answer(label: str, picture: PictureAnswer, judge: str, judged_on: str) -> d
         raise GateEvidenceError(
             f"{where} has no reason in the judge's own words: the follow-up reply does not say why"
         )
-    entry.update(
+    entry["followUp"] = {
+        "asked": follow.shown,
+        **words_fingerprint(reply),
+        "typedBy": judge,
+        "givenAt": follow.given_at,
+    }
+    entry["reason"] = [
         {
-            "followUp": {
-                "asked": follow.shown,
-                **words_fingerprint(reply),
-                "typedBy": judge,
-                "givenAt": follow.given_at,
-            },
-            "reason": words_fingerprint(reply),
-            "reasonFrom": "follow-up",
+            "from": "follow-up",
+            "rubricVersion": answered_version,
+            "givenAt": follow.given_at,
+            "givenAs": "in reply to the follow-up",
+            **words_fingerprint(reply),
         }
-    )
+    ]
     return entry
 
 
 def decide_judged(
     evidence: JudgedAnswers, *, rubric_sha256: str, captures: Mapping[str, str]
 ) -> tuple[bool, dict[str, Any]]:
-    """The judged key's value and what it was decided from, under rubric version 3.
+    """The judged key's value and what it was decided from, under rubric version 4.
 
     ``rubric_sha256`` is the digest of the rubric the record is written with, and ``captures``
     maps each route label to the SHA-256 of the capture the record binds. The judge's answers
@@ -649,7 +760,7 @@ def decide_judged(
                     f"{JUDGED_KEY}: {PICTURE_TITLES[label]} ({label}) was answered after the "
                     f"decisive no at {decisive}; the rubric does not ask it"
                 )
-            entry.update(_answer(label, picture, judge, evidence.judged_on))
+            entry.update(_answer(label, picture, judge, evidence.judged_on, RUBRIC_VERSION))
             if entry["answer"] == "no":
                 decisive = label
         elif picture.asked is False:
@@ -658,9 +769,11 @@ def decide_judged(
                 picture.words,
                 picture.typed_by,
                 picture.follow_up,
+                tuple(picture.carried),
+                picture.notice,
                 picture.given_at,
             )
-            if given != (None, None, None, None, None):
+            if given != (None, None, None, None, (), None, None):
                 raise GateEvidenceError(
                     f"{JUDGED_KEY}: {PICTURE_TITLES[label]} ({label}) was not asked and cannot "
                     "carry an answer"
@@ -687,6 +800,7 @@ def decide_judged(
         "guidance": RUBRIC_GUIDANCE,
         "requirement": ANSWER_REQUIREMENT,
         "options": list(ANSWER_OPTIONS),
+        "optionAnswers": dict(OPTION_ANSWERS),
         "composition": COMPOSITION,
         "pictures": entries,
         "decisiveNo": decisive,
@@ -695,19 +809,36 @@ def decide_judged(
     return value, detail
 
 
-def judge_words(evidence: JudgedAnswers) -> list[dict[str, Any]]:
+def judge_words(
+    evidence: JudgedAnswers, answered_version: int = RUBRIC_VERSION
+) -> list[dict[str, Any]]:
     """Every reply the judge gave, words included, as the record's private companion keeps them."""
     replies: list[dict[str, Any]] = []
     for picture in evidence.pictures:
         if picture.asked is not True:
             continue
         common = {"label": picture.label, "picture": PICTURE_TITLES[picture.label]}
+        for item in picture.carried:
+            replies.append(
+                {
+                    **common,
+                    "kind": "carried",
+                    "rubricVersion": item.rubric_version,
+                    "rubricSha256": item.rubric_sha256,
+                    "givenAt": item.given_at,
+                    "givenAs": item.given_as,
+                    "picked": None,
+                    "words": _words_or_none(item.words),
+                    "typedBy": item.typed_by,
+                }
+            )
         replies.append(
             {
                 **common,
                 "kind": "reply",
-                "rubricVersion": RUBRIC_VERSION,
+                "rubricVersion": answered_version,
                 "givenAt": picture.given_at,
+                "shownAbove": picture.notice,
                 "picked": picture.picked,
                 "words": _words_or_none(picture.words),
                 "typedBy": picture.typed_by,
@@ -719,7 +850,7 @@ def judge_words(evidence: JudgedAnswers) -> list[dict[str, Any]]:
                 {
                     **common,
                     "kind": "follow-up",
-                    "rubricVersion": RUBRIC_VERSION,
+                    "rubricVersion": answered_version,
                     "givenAt": follow.given_at,
                     "shown": follow.shown,
                     "picked": None,
@@ -730,10 +861,14 @@ def judge_words(evidence: JudgedAnswers) -> list[dict[str, Any]]:
     return replies
 
 
-def judge_words_file(record_path: str, evidence: JudgedAnswers) -> tuple[str, bytes]:
+def judge_words_file(
+    record_path: str, evidence: JudgedAnswers, answered_version: int = RUBRIC_VERSION
+) -> tuple[str, bytes]:
     """The private companion of the record at ``record_path``: where it lives, and its bytes."""
     document = judge_words_record(
-        record_path=record_path, judge=evidence.judge, replies=judge_words(evidence)
+        record_path=record_path,
+        judge=evidence.judge,
+        replies=judge_words(evidence, answered_version),
     )
     return judge_words_path(record_path), _companion_bytes(document)
 
@@ -747,8 +882,9 @@ def _shown_texts() -> list[str]:
         RUBRIC_QUESTION,
         RUBRIC_GUIDANCE,
         ANSWER_REQUIREMENT,
+        CARRIED_WORDS_NOTICE,
         *ANSWER_OPTIONS,
-        *(reason_follow_up(option) for option in ANSWER_OPTIONS),
+        *(reason_follow_up(answer) for answer in OPTION_ANSWERS.values()),
     ]
 
 
@@ -776,22 +912,35 @@ def judged_answers_from_record(
         pictures = []
         for entry in detail["pictures"]:
             follow = entry.get("followUp")
+            title = entry["picture"]
             pictures.append(
                 PictureAnswer(
                     label=entry["label"],
                     capture_sha256=entry["captureSha256"],
                     asked=entry["state"] == "answered",
                     picked=entry.get("picked"),
-                    words=_words_for(entry, words, entry["picture"]),
+                    words=_words_for(entry, words, title),
                     typed_by=entry.get("typedBy"),
                     follow_up=None
                     if follow is None
                     else ReasonFollowUp(
                         shown=follow["asked"],
-                        words=_words_for(follow, words, f"the follow-up of {entry['picture']}"),
+                        words=_words_for(follow, words, f"the follow-up of {title}"),
                         typed_by=follow["typedBy"],
                         given_at=follow["givenAt"],
                     ),
+                    carried=tuple(
+                        CarriedWords(
+                            words=_words_for(item, words, f"the earlier words of {title}"),
+                            typed_by=item["typedBy"],
+                            rubric_version=item["rubricVersion"],
+                            rubric_sha256=item["rubricSha256"],
+                            given_at=item["givenAt"],
+                            given_as=item["givenAs"],
+                        )
+                        for item in entry.get("carried", [])
+                    ),
+                    notice=entry.get("noticeAboveTheQuestion"),
                     given_at=entry.get("givenAt"),
                 )
             )
@@ -819,7 +968,7 @@ def recompose_judged(detail: Mapping[str, Any]) -> bool:
     A clone without the private companion cannot read a reply again. It can still check that the
     stated answers compose to the stated value, that no picture was answered after the first no,
     and that every answer was typed by the judge, says when it was given and carries the
-    fingerprint of the judge's words for its reason.
+    fingerprints of the judge's words for each of its reasons.
     """
     try:
         entries = list(detail["pictures"])
@@ -833,9 +982,16 @@ def recompose_judged(detail: Mapping[str, Any]) -> bool:
                     raise GateEvidenceError(f"{where} was answered after the decisive no")
                 if entry["answer"] not in ("yes", "no") or entry["typedBy"] != detail["judge"]:
                     raise GateEvidenceError(f"{where} is not an answer the judge gave")
-                if not _fingerprinted(entry["reason"]):
+                reasons = list(entry["reason"])
+                if not reasons or not all(_fingerprinted(reason) for reason in reasons):
                     raise GateEvidenceError(f"{where} carries no fingerprint of the judge's words")
                 _given_at(where, entry["givenAt"], detail["judgedOn"])
+                for reason in reasons:
+                    _given_at(where, reason["givenAt"])
+                for item in entry.get("carried", []):
+                    if item["typedBy"] != detail["judge"] or not _fingerprinted(item):
+                        raise GateEvidenceError(f"{where} carries words the judge did not give")
+                    _given_at(where, item["givenAt"])
                 follow = entry.get("followUp")
                 if follow is not None:
                     if follow["typedBy"] != detail["judge"] or not _fingerprinted(follow):
@@ -1169,8 +1325,9 @@ _SCOPE_NOTES: Final[Mapping[str, str]] = {
     "readsAsInhabitedStreet": (
         "Renamed and redefined by the operator's binding. The retained keys asked whether a real, "
         "named city was recognisable, were scored before the rubric existed, and are not rubric "
-        "scores. Rubric version 3 asks one plain question of each capture, whether it looks like "
-        "a finished, lived-in street rather than a plain block mock-up, and stops at the first no."
+        "scores. Rubric version 4 asks one plain question of each capture, whether it is a "
+        "finished, lived-in street, with options that say what they mean, and stops at the first "
+        "no."
     ),
     "noCutsOrFloatingGeometry": (
         "The retained criteria were judged from captures, Melbourne's only for LARGE cuts, and "
@@ -1212,12 +1369,17 @@ _RUBRIC_LINES: Final = (
     RUBRIC_QUESTION,
     RUBRIC_GUIDANCE,
     ANSWER_REQUIREMENT,
+    CARRIED_WORDS_NOTICE,
     WORDS_STORAGE,
-    *(reason_follow_up(option) for option in ANSWER_OPTIONS),
+    *(reason_follow_up(answer) for answer in OPTION_ANSWERS.values()),
+    *(f"**{option}**" for option in ANSWER_OPTIONS),
     f"`{NOT_ASKED}`",
     "**No model may score `readsAsInhabitedStreet`.**",
     *(f"| `{label}` | {title} |" for label, title in PICTURE_TITLES.items()),
 )
+
+#: The two claims version 3's question joined.
+_V3_CLAIMS: Final = ("a finished, lived-in street", "not a plain block mock-up")
 
 
 def _storage_note(version: int) -> str:
@@ -1242,12 +1404,16 @@ def _brief_quote_holds(quote: str, brief_text: str) -> bool:
 
 
 def _rubric_binding(rubric: bytes, copy_path: str) -> dict[str, Any]:
-    """The rubric the record fixes: checked for the version 3 wording, then bound by digest."""
+    """The rubric the record fixes: checked for the version 4 wording, then bound by digest."""
     text = rubric.decode("utf-8")
     for line in _RUBRIC_LINES:
         if line not in text:
             raise GateEvidenceError(f"FINDING: the rubric does not carry {line.strip()!r}")
-    for question in (*(question for _, question in RUBRIC_V1.questions), VERSION_2.question):
+    earlier = (
+        *(question for _, question in RUBRIC_V1.questions),
+        *(version.question for version in SUPERSEDED_VERSIONS),
+    )
+    for question in earlier:
         if question in text:
             raise GateEvidenceError(f"FINDING: the rubric still asks {question!r}")
     judges = re.findall(r"^Named human judge: (.*)$", text, flags=re.MULTILINE)
@@ -1265,7 +1431,7 @@ def _rubric_binding(rubric: bytes, copy_path: str) -> dict[str, Any]:
 
 
 def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any]:
-    """The version 2 record, checked to say what version 2 said and to differ only where it may."""
+    """The version 3 record, checked to say what version 3 said and to differ only where it may."""
     if document.get("profile") != DIGEST_BOUND_PROFILE:
         raise GateEvidenceError(f"{path} is not a digest-bound record")
     body = document["record"]
@@ -1279,32 +1445,38 @@ def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any
         judged["rubricSha256"],
         judged["question"],
         judged["guidance"],
+        judged["requirement"],
+        judged["reasonFollowUp"],
+        judged["options"],
         judged["composition"],
         judged["wordsStorage"],
     )
     expected = (
-        VERSION_2.key_set,
-        VERSION_2.rubric_version,
-        VERSION_2.rubric_sha256,
-        VERSION_2.question,
-        VERSION_2.guidance,
-        VERSION_2.composition,
+        VERSION_3.key_set,
+        VERSION_3.rubric_version,
+        VERSION_3.rubric_sha256,
+        VERSION_3.question,
+        VERSION_3.guidance,
+        VERSION_3.requirement,
+        REASON_FOLLOW_UP,
+        list(VERSION_3.options),
+        VERSION_3.composition,
         WORDS_STORAGE,
     )
     if stated != expected:
-        raise GateEvidenceError(f"FINDING: {path} is not the version 2 record this supersedes")
+        raise GateEvidenceError(f"FINDING: {path} is not the version 3 record this supersedes")
     changed: dict[str, dict[str, str]] = {}
     unchanged: list[str] = []
     for entry, item in zip(body["canonicalKeys"], CANONICAL_KEYS, strict=True):
         current = _canonical_entry(item)
         if entry["key"] != item.spelling:
             raise GateEvidenceError(f"FINDING: {path} orders the canonical keys differently")
-        before = VERSION_2.definitions.get(item.spelling, item.definition)
+        before = VERSION_3.definitions.get(item.spelling, item.definition)
         if entry["definition"] != before:
             raise GateEvidenceError(f"FINDING: {path} defines {item.spelling} unexpectedly")
         if {**entry, "definition": current["definition"]} != current:
             raise GateEvidenceError(
-                f"FINDING: {item.spelling} changed more than its wording since {path}; version 3 "
+                f"FINDING: {item.spelling} changed more than its wording since {path}; version 4 "
                 "moves no measurement"
             )
         if before == item.definition:
@@ -1318,29 +1490,30 @@ def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any
         ("authenticationConditions", list(AUTHENTICATION_CONDITIONS)),
     ):
         if body[name] != value:
-            raise GateEvidenceError(f"FINDING: {name} moved since {path}; version 3 moves none")
+            raise GateEvidenceError(f"FINDING: {name} moved since {path}; version 4 moves none")
     return {
         "path": path,
         "record_sha256": digest,
-        "keySet": VERSION_2.key_set,
-        "rubricVersion": VERSION_2.rubric_version,
-        "rubricSha256": VERSION_2.rubric_sha256,
+        "keySet": VERSION_3.key_set,
+        "rubricVersion": VERSION_3.rubric_version,
+        "rubricSha256": VERSION_3.rubric_sha256,
         "changes": {
-            "question": {"before": VERSION_2.question, "after": RUBRIC_QUESTION},
-            "guidance": {"before": VERSION_2.guidance, "after": RUBRIC_GUIDANCE},
-            "askRequirement": {"before": None, "after": ANSWER_REQUIREMENT},
-            "reasonFollowUp": {"before": None, "after": REASON_FOLLOW_UP},
-            "composition": {"before": VERSION_2.composition, "after": COMPOSITION},
+            "question": {"before": VERSION_3.question, "after": RUBRIC_QUESTION},
+            "guidance": {"before": VERSION_3.guidance, "after": RUBRIC_GUIDANCE},
+            "options": {"before": list(VERSION_3.options), "after": list(ANSWER_OPTIONS)},
+            "carriedWordsNotice": {"before": None, "after": CARRIED_WORDS_NOTICE},
+            "composition": {"before": VERSION_3.composition, "after": COMPOSITION},
             "definitions": changed,
         },
         "keysWithUnchangedDefinitions": unchanged,
         "measurementsUnchanged": True,
         "keyValuesChanged": [],
         "unchanged": [
-            "every spelling and its resolution",
+            "every spelling, definition and resolution",
             "every measurement, threshold and mechanical decision, so no key value changes",
-            "readsAsInhabitedStreet's definition: one question per picture, shown alone in route "
-            "order, the first no decides, and the key holds only for three yes answers",
+            "the guidance for a yes, the line asking for words and the one follow-up",
+            "that each picture is shown alone, the first no decides, and the key holds only for "
+            "three yes answers",
             "that there is no score, and that the corridor bar is three yes answers from the named "
             "judge plus every mechanical key",
             "the named judge",
@@ -1349,46 +1522,33 @@ def _superseded_binding(document: Mapping[str, Any], path: str) -> dict[str, Any
             "never in a public one, and that an answer without a reason is not recorded",
             "that the rubric SHA-256 is bound",
             "that captures are bound by path, byte size and SHA-256",
+            "every refusal the record writer makes",
         ],
         "why": {
             "question": (
-                "Version 2's question was answered yes for all three pictures of the shipped "
-                "Flatiron district while the judge's own words, kept in this record's private "
-                "companion, found fault with how its surfaces looked. So it did not separate a "
-                "finished street from a block mock-up, and a corridor that is textured and uncut "
-                "but still reads as a block-out would have cleared it. Version 3 asks that "
-                "directly and lists real-looking materials first in its guidance."
+                "Version 3's question joined two claims, a finished, lived-in street and not a "
+                "plain block mock-up, so a yes, a no, or a short negation in the judge's own "
+                "words, could attach to either. The first answer given under it, described under "
+                "calibrationEvidence, could not be read without inferring. Version 4 asks one "
+                "thing."
             ),
-            "askRequirement": (
-                "Two of version 2's three yes answers arrived without words, and an answer "
-                "without a reason is not recorded. Version 3 states the requirement in every ask "
-                "and allows one follow-up for the reason, which never changes the answer."
+            "options": (
+                "Each option now states its meaning, so a pick cannot be read as agreeing with "
+                "one half of a question and disagreeing with the other."
             ),
-            "definitions": (
-                "Version 2 said the product's keyboard listeners carried every interaction the "
-                "harness made. The product enters its world with a click on the world canvas, "
-                "which its arrival prompt asks for and its own mousedown listener takes, so the "
-                "harness makes that click. Version 3 names keyboard and pointer listeners and says "
-                "what carrying a click means. The measurement the key is decided by is unchanged."
+            "carriedWords": (
+                "Words the judge wrote about a picture before its question was reworded are kept "
+                "for its next ask, and the ask says so. A pick that such words, given right after "
+                "it, may contradict is not recorded; a no may take its reason from them; a yes "
+                "needs new words."
             ),
         },
         "strictness": (
-            "Version 3's question asks for more than version 2's: a picture that reads as a real "
-            "street but also as a block mock-up gets a no under version 3. The composition and "
-            "the corridor bar are unchanged, so version 3 is at least as strict as version 2."
+            "Version 4 asks what version 3 meant to ask, with one meaning. The composition and "
+            "the corridor bar are unchanged, and a pick that may be contradicted is not recorded, "
+            "so version 4 is at least as strict as version 3."
         ),
     }
-
-
-def _reply_is_answer(picked: object, words: object) -> str | None:
-    """The answer a version 2 reply gave, by version 2's own rule, or None when it gave none."""
-    if picked in ANSWER_OPTIONS:
-        return str(picked).casefold()
-    if picked is None and isinstance(words, str) and not _is_skip(words):
-        opening = _OPENING_ANSWER.match(words)
-        if opening is not None:
-            return opening.group(1).casefold()
-    return None
 
 
 def _calibration(
@@ -1396,144 +1556,133 @@ def _calibration(
     captures: Sequence[Mapping[str, Any]],
     judge: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
-    """The version 2 answers, checked reply by reply, with their words kept apart.
+    """The pick and message given under version 3, checked, with their words kept apart.
 
-    Returns the public evidence, which carries each reply's pick, reading, time and the SHA-256
-    and byte count of its words, and the replies and lines shown above a question that the
-    record's private companion keeps word for word.
+    Returns the public evidence, which carries each reply's pick, time and the SHA-256 and byte
+    count of its words, the replies the record's private companion keeps word for word, and the
+    lines shown above a question beside them, of which version 3's ask had none.
     """
     if calibration.get("judge") != judge:
-        raise GateEvidenceError("FINDING: the calibration answers are not the rubric's judge's")
-    if calibration.get("rubricSha256") != VERSION_2.rubric_sha256:
-        raise GateEvidenceError("FINDING: the calibration answers were not given under version 2")
-    if [capture.get("label") for capture in captures] != list(CAPTURE_LABELS):
-        raise GateEvidenceError("the calibration captures must be start, midpoint, endpoint")
+        raise GateEvidenceError("FINDING: the calibration evidence is not the rubric's judge's")
+    if calibration.get("rubricSha256") != VERSION_3.rubric_sha256:
+        raise GateEvidenceError("FINDING: the calibration evidence was not given under version 3")
+    for claim in _V3_CLAIMS:
+        if claim not in VERSION_3.question:
+            raise GateEvidenceError(f"FINDING: version 3's question does not say {claim!r}")
+    pictures = list(calibration.get("pictures", []))
+    labels = [picture.get("label") for picture in pictures]
+    if labels != list(CAPTURE_LABELS[: len(labels)]) or not labels:
+        raise GateEvidenceError("the calibration evidence must start at the first picture")
+    if [capture.get("label") for capture in captures] != labels:
+        raise GateEvidenceError("the calibration captures must be the pictures asked")
     for index, capture in enumerate(captures):
         _bound_file(capture, f"captures[{index}]")
+    not_asked = list(CAPTURE_LABELS[len(labels) :])
+    if list(calibration.get("notAsked", [])) != not_asked:
+        raise GateEvidenceError("the calibration evidence must list the pictures not asked")
     bound = {capture["label"]: capture["sha256"] for capture in captures}
-    pictures = list(calibration.get("pictures", []))
-    if [picture.get("label") for picture in pictures] != list(CAPTURE_LABELS):
-        raise GateEvidenceError("the calibration answers must cover the three pictures in order")
     entries: list[dict[str, Any]] = []
     private_replies: list[dict[str, Any]] = []
-    private_lines: list[dict[str, Any]] = []
-    answers: list[str] = []
-    without_words: list[str] = []
-    uncounted = 0
+    picks = messages = 0
     for picture in pictures:
         label = picture["label"]
         title = PICTURE_TITLES[label]
         if picture.get("captureSha256") != bound[label]:
             raise GateEvidenceError(f"FINDING: {title} was answered about another capture")
         replies = list(picture.get("replies", []))
-        if not 1 <= len(replies) <= 2:
-            raise GateEvidenceError(f"FINDING: {title} carries {len(replies)} replies")
+        kinds = [reply.get("kind") for reply in replies]
+        if kinds != ["pick", "message"]:
+            raise GateEvidenceError(f"FINDING: {title} does not carry a pick and then a message")
         carried = []
-        for position, reply in enumerate(replies):
-            last = position == len(replies) - 1
+        for reply in replies:
             if reply.get("typedBy") != judge:
-                raise GateEvidenceError(f"FINDING: a reply to {title} was not typed by the judge")
-            given_at = _given_at(f"FINDING: a reply to {title}", reply.get("givenAt"))
-            shown = reply.get("shown")
-            prompt = VERSION_2.prompt(label)
-            if not isinstance(shown, str) or not shown.endswith(prompt):
-                raise GateEvidenceError(f"FINDING: {title} was not asked in version 2's words")
-            added = shown[: -len(prompt)].rstrip("\n") or None
-            if added is not None and position == 0:
-                raise GateEvidenceError(f"FINDING: {title}'s first ask added words to the question")
-            words = reply.get("words")
-            answer = _reply_is_answer(reply.get("picked"), words)
-            if reply.get("counted") is not last:
-                raise GateEvidenceError(f"FINDING: only {title}'s last reply may count")
-            if last and answer is None:
-                raise GateEvidenceError(f"FINDING: {title}'s counted reply is not an answer")
-            if not last and (answer is not None or not isinstance(words, str)):
-                raise GateEvidenceError(
-                    f"FINDING: {title} was asked again after a reply that was an answer"
-                )
-            has_words = isinstance(words, str) and words.strip() != "" and _has_reason(words)
-            kept = _words_or_none(words)
-            item: dict[str, Any] = {
-                "prompt": prompt,
-                "addedAboveTheQuestion": None,
-                "picked": reply.get("picked"),
-                "rubricVersion": VERSION_2.rubric_version,
-                "givenAt": given_at,
-                **words_fingerprint(kept),
-                "typedBy": judge,
-                "counted": last,
-            }
-            if added is not None:
-                # A line written for one ask may quote the judge, so it is kept with the words.
-                item["addedAboveTheQuestion"] = {
-                    **words_fingerprint(added),
-                    "keptPrivate": "a line written for this ask, which may quote the judge",
-                }
-                private_lines.append(
+                raise GateEvidenceError(f"FINDING: a reply about {title} was not the judge's")
+            given_at = _given_at(f"FINDING: a reply about {title}", reply.get("givenAt"))
+            words = _words_or_none(reply.get("words"))
+            if reply["kind"] == "pick":
+                if reply.get("shown") != VERSION_3.prompt(label):
+                    raise GateEvidenceError(f"FINDING: {title} was not asked in version 3's words")
+                if reply.get("picked") not in VERSION_3.options:
+                    raise GateEvidenceError(f"FINDING: {title}'s pick is not a version 3 option")
+                picks += 1
+                carried.append(
                     {
-                        "label": label,
-                        "picture": title,
-                        "kind": "line shown above the question",
-                        "rubricVersion": VERSION_2.rubric_version,
-                        "givenBefore": given_at,
-                        "words": added,
+                        "kind": "pick",
+                        "shown": reply["shown"],
+                        "picked": reply["picked"],
+                        "rubricVersion": VERSION_3.rubric_version,
+                        "givenAt": given_at,
+                        **words_fingerprint(words),
+                        "typedBy": judge,
+                        "counted": False,
+                        "whyNotCounted": (
+                            "the judge's own words, sent right after the pick, may contradict "
+                            "it, and a pick they may contradict is not recorded"
+                        ),
+                    }
+                )
+            else:
+                if reply.get("shown") is not None or words is None:
+                    raise GateEvidenceError(f"FINDING: {title}'s message must be unasked words")
+                if _OPENING_ANSWER.match(words):
+                    raise GateEvidenceError(f"FINDING: {title}'s message opens with an answer")
+                messages += 1
+                carried.append(
+                    {
+                        "kind": "message",
+                        "shown": None,
+                        "rubricVersion": VERSION_3.rubric_version,
+                        "givenAt": given_at,
+                        **words_fingerprint(words),
+                        "typedBy": judge,
+                        "sentWith": reply.get("sentWith"),
+                        "counted": False,
+                        "whyNotCounted": (
+                            "not a reply to any ask; it begins with neither yes nor no, and a "
+                            "short negation in it can attach to either claim of the version 3 "
+                            "question, so nothing is inferred from it"
+                        ),
                     }
                 )
             private_replies.append(
                 {
                     "label": label,
                     "picture": title,
-                    "kind": "reply",
-                    "rubricVersion": VERSION_2.rubric_version,
+                    "kind": reply["kind"],
+                    "rubricVersion": VERSION_3.rubric_version,
                     "givenAt": given_at,
                     "picked": reply.get("picked"),
-                    "words": kept,
+                    "words": words,
                     "typedBy": judge,
                 }
             )
-            if last:
-                item["answer"] = answer
-                item["hadWords"] = has_words
-                answers.append(answer)
-                if not has_words:
-                    without_words.append(title)
-            else:
-                uncounted += 1
-                item["whyNotCounted"] = (
-                    "a typed reply that begins with neither yes nor no is not an answer, and "
-                    "nothing is inferred from it"
-                )
-            carried.append(item)
         entries.append(
             {"label": label, "picture": title, "captureSha256": bound[label], "replies": carried}
         )
-    if answers != ["yes", "yes", "yes"]:
-        raise GateEvidenceError("FINDING: the calibration answers are not three yes answers")
     evidence = {
-        "underRubricVersion": VERSION_2.rubric_version,
-        "rubricSha256": VERSION_2.rubric_sha256,
-        "wordsKept": _storage_note(VERSION_2.rubric_version),
+        "underRubricVersion": VERSION_3.rubric_version,
+        "rubricSha256": VERSION_3.rubric_sha256,
+        "wordsKept": _storage_note(VERSION_3.rubric_version),
         "judge": judge,
         "askedIn": calibration.get("askedIn"),
         "pictures": entries,
-        "summary": {
-            "yesAnswers": answers.count("yes"),
-            "noAnswers": answers.count("no"),
-            "uncountedReplies": uncounted,
-            "answersWithoutWords": without_words,
-        },
+        "notAsked": [PICTURE_TITLES[label] for label in not_asked],
+        "summary": {"answersScored": 0, "picksNotRecorded": picks, "messagesNotCounted": messages},
+        "claimsJoined": list(_V3_CLAIMS),
         "finding": (
-            "Under rubric version 2 the named judge answered yes for all three pictures of the "
-            "shipped Flatiron district, while their own words, kept in this record's private "
-            "companion, found fault with how its surfaces looked. Version 2 therefore did not "
-            "separate this district from a flat block-out."
+            "Version 3's question joined two claims, "
+            f"{_V3_CLAIMS[0]!r} and {_V3_CLAIMS[1]!r}, so a yes, a no or a short negation in the "
+            "judge's words could attach to either. The judge picked Yes and then sent a message "
+            "whose words, kept in this record's private companion, hold such a negation, and the "
+            "rubric could not read the pair without inferring. Version 4 asks one thing, and each "
+            "option says what it means."
         ),
         "status": (
-            "Calibration evidence, not a key value. No record was written under version 2, and no "
-            "readsAsInhabitedStreet value is taken from these answers."
+            "Calibration evidence, not a key value. No answer was scored and no record was "
+            "written under version 3."
         ),
     }
-    return evidence, private_replies, private_lines
+    return evidence, private_replies, []
 
 
 def calibration_words_file(
@@ -1545,7 +1694,8 @@ def calibration_words_file(
     """The private companion of a reconciliation record: where it lives, and its bytes."""
     _, replies, lines = _calibration(calibration, captures, judge)
     document = judge_words_record(record_path=record_path, judge=judge, replies=replies)
-    document["shownLines"] = [{**line, **words_fingerprint(line["words"])} for line in lines]
+    if lines:
+        document["shownLines"] = [{**line, **words_fingerprint(line["words"])} for line in lines]
     return judge_words_path(record_path), _companion_bytes(document)
 
 
@@ -1569,10 +1719,10 @@ def reconciliation_record(
     """The key reconciliation record, measured from the retained records, briefs and rubric.
 
     ``retained`` maps each retained label to its parsed document and ``briefs`` maps it to the
-    bytes of its brief. ``superseded`` is the version 2 reconciliation record this one replaces,
+    bytes of its brief. ``superseded`` is the version 3 reconciliation record this one replaces,
     ``rubric`` the bytes of the rubric it fixes, retained at ``rubric_copy_path``, and
-    ``calibration`` the answers given under version 2 about ``calibration_captures``, whose
-    words go only to the private companion named by ``record_path``.
+    ``calibration`` the pick and message given under version 3 about ``calibration_captures``,
+    whose words go only to the private companion named by ``record_path``.
     ``scored_corridors`` are the retained records that score a corridor and
     ``scored_against_superseded`` those scored against an earlier key set; both must be empty,
     because a rubric may change only before anything is read against it. Every fact is re-derived
@@ -1597,8 +1747,8 @@ def reconciliation_record(
 
     supersedes = _superseded_binding(superseded, superseded_path)
     rubric_entry = _rubric_binding(rubric, rubric_copy_path)
-    if rubric_entry["sha256"] == VERSION_2.rubric_sha256:
-        raise GateEvidenceError("FINDING: the rubric is version 2's; nothing is revised")
+    if rubric_entry["sha256"] in {version.rubric_sha256 for version in SUPERSEDED_VERSIONS}:
+        raise GateEvidenceError("FINDING: the rubric is a superseded version's; nothing is revised")
     evidence, private_replies, private_lines = _calibration(
         calibration, calibration_captures, rubric_entry["judge"]
     )
@@ -1728,7 +1878,7 @@ def reconciliation_record(
                 }
             )
     if mapping != superseded["record"]["mapping"]:
-        raise GateEvidenceError("FINDING: the spelling table moved, and version 3 does not move it")
+        raise GateEvidenceError("FINDING: the spelling table moved, and version 4 does not move it")
     used = set(spelling_uses)
     listed = {entry["spelling"] for entry in mapping}
     if not used <= listed:
@@ -1746,7 +1896,7 @@ def reconciliation_record(
             raise GateEvidenceError(f"{spelling} names a source or a city")
 
     record: dict[str, Any] = {
-        "profile": "exulanica.visual-gate-key-reconciliation/v3",
+        "profile": "exulanica.visual-gate-key-reconciliation/v4",
         "date": date,
         "status": "reconciled",
         "base": base,
@@ -1774,7 +1924,9 @@ def reconciliation_record(
             "guidance": RUBRIC_GUIDANCE,
             "requirement": ANSWER_REQUIREMENT,
             "reasonFollowUp": REASON_FOLLOW_UP,
+            "carriedWordsNotice": CARRIED_WORDS_NOTICE,
             "options": list(ANSWER_OPTIONS),
+            "optionAnswers": dict(OPTION_ANSWERS),
             "wordsStorage": WORDS_STORAGE,
             "judgeWordsDirectory": JUDGE_WORDS_DIRECTORY,
             "notAsked": NOT_ASKED,
@@ -1796,6 +1948,11 @@ def reconciliation_record(
                 "a reply that begins with neither yes nor no",
                 "a follow-up for an answer that already gave its reason, or one not in the "
                 "rubric's words",
+                "a pick that is not one of the options",
+                "carried words without the line that says they are kept, or from a rubric "
+                "version that was never fixed",
+                "a yes whose only words are carried words, and a follow-up for a picture whose "
+                "earlier words are carried",
                 "any answer or follow-up reply not typed by the judge",
                 "a public record that would carry any of the judge's words, or a quoted part of "
                 "them",
@@ -1821,8 +1978,8 @@ def reconciliation_record(
             "againstEarlierKeySets": list(scored_against_superseded),
             "measuredAs": (
                 "retained records under docs/evaluation whose file name or record profile names "
-                "a corridor, and those whose gate block names key set version 1 or 2, read when "
-                "this record was written"
+                "a corridor, and those whose gate block names key set version 1, 2 or 3, read "
+                "when this record was written"
             ),
         },
         "authenticatedShellUnderMelbourne": melbourne_preview,
@@ -1834,19 +1991,16 @@ def reconciliation_record(
             "No generated geometry is scored here, and none existed in this repository when the "
             "rubric was revised.",
             "The canonical definitions do not make any retained rejection pass or fail anew.",
-            "The version 2 record is superseded, not edited. No corridor was scored, and no record "
-            "was written, under version 1 or version 2.",
-            "The version 2 answers are calibration evidence. No key value is taken from them, "
-            "and their words are not in this record: it carries their SHA-256 and byte count, and "
-            "its private companion holds them.",
-            "Nothing here is an answer under version 3. The rubric fixes how the judge is asked; "
+            "The version 3 record is superseded, not edited. No corridor was scored, and no "
+            "record was written, under versions 1, 2 or 3; no answer was scored under version 3.",
+            "The version 3 pick and message are calibration evidence. No key value is taken from "
+            "them, and the pick is not an answer. The message's words are not in this record: it "
+            "carries their SHA-256 and byte count, and its private companion holds them.",
+            "Nothing here is an answer under version 4. The rubric fixes how the judge is asked; "
             "only the named judge answers.",
         ],
     }
-    shown = [
-        *_shown_texts(),
-        *(VERSION_2.prompt(label) for label in CAPTURE_LABELS),
-    ]
+    shown = [*_shown_texts(), *(VERSION_3.prompt(label) for label in CAPTURE_LABELS)]
     refuse_private_words(
         record,
         [item["words"] for item in private_replies if item["words"] is not None],

@@ -63,7 +63,7 @@ How the system works now. Edited as the system changes.
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [texture-package](texture-package.md) : IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
-- [visual-gate-rubric](visual-gate-rubric.md) : version 3, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
+- [visual-gate-rubric](visual-gate-rubric.md) : version 4, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
 - [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0

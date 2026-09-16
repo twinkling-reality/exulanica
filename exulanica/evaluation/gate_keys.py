@@ -24,11 +24,15 @@ each picture and stopped at the first no, where version 1 asked three questions 
 
 **Version 3 changed the question and one definition's wording, and nothing that is measured.**
 Version 2's question was answered yes for all three pictures of a district drawn in flat colour, so
-it did not separate a finished street from a block mock-up; version 3 asks that directly and puts
-real-looking materials first in the guidance. The product-shell key named only keyboard listeners
-while the product enters its world with a click on the world canvas; version 3 names keyboard and
-pointer listeners and says what carrying a click means. No measurement, threshold or mechanical
-decision moved. :data:`VERSION_2` keeps version 2's wording for its retained record.
+it did not separate a finished street from a block mock-up; version 3 asked that directly. The
+product-shell key named only keyboard listeners while the product enters its world with a click on
+the world canvas; version 3 names keyboard and pointer listeners and says what carrying a click
+means. No measurement, threshold or mechanical decision moved.
+
+**Version 4 gave the question one meaning.** Version 3's question joined two claims, so a yes, a no
+or a short negation in the judge's own words could attach to either. Version 4 asks one thing and
+each option says what it means. :data:`VERSION_2` and :data:`VERSION_3` keep the earlier wording for
+their records.
 
 Pure: this module imports nothing from the product, performs no I/O and holds no clock.
 """
@@ -47,12 +51,14 @@ __all__ = [
     "CANONICAL_KEYS",
     "CANONICAL_SPELLINGS",
     "CAPTURE_LABELS",
+    "CARRIED_WORDS_NOTICE",
     "CLASSIFICATION",
     "EVIDENCE_KINDS",
     "GATE_KEY_SET_VERSION",
     "JUDGED_KEY",
     "MELBOURNE_ENVELOPE",
     "NOT_ASKED",
+    "OPTION_ANSWERS",
     "PICTURE_TITLES",
     "REASON_FOLLOW_UP",
     "RETAINED_RECORDS",
@@ -61,8 +67,10 @@ __all__ = [
     "RUBRIC_QUESTION",
     "RUBRIC_V1",
     "RUBRIC_VERSION",
+    "SUPERSEDED_VERSIONS",
     "THRESHOLDS",
     "VERSION_2",
+    "VERSION_3",
     "WORDS_STORAGE",
     "GateKey",
     "RetainedRecord",
@@ -78,7 +86,7 @@ __all__ = [
 EvidenceKind = Literal["mechanical", "judged"]
 
 #: Bumped only by a new reconciliation record. The corridor is scored against this version.
-GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v3"
+GATE_KEY_SET_VERSION: Final = "exulanica.visual-gate-keys/v4"
 
 EVIDENCE_KINDS: Final[tuple[EvidenceKind, ...]] = ("mechanical", "judged")
 
@@ -87,8 +95,8 @@ CAPTURE_LABELS: Final[tuple[str, ...]] = ("start", "midpoint", "endpoint")
 
 RUBRIC_PATH: Final = "docs/visual-gate-rubric.md"
 
-#: The rubric's own version line reads ``Rubric version: 3``.
-RUBRIC_VERSION: Final = 3
+#: The rubric's own version line reads ``Rubric version: 4``.
+RUBRIC_VERSION: Final = 4
 
 #: How each capture is labelled when it is shown to the judge, alone, in route order.
 PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
@@ -100,16 +108,16 @@ PICTURE_TITLES: Final[Mapping[str, str]] = MappingProxyType(
 
 #: The one question, asked of each picture in these words and never paraphrased.
 RUBRIC_QUESTION: Final = (
-    "Does this look like a finished, lived-in street, not a plain block mock-up? "
-    "Yes or no, and say why in your own words."
+    "Is this a finished, lived-in street? Yes or no, and say why in your own words."
 )
 
-#: Shown directly under the question. Guidance for what a yes means, not four more questions.
+#: Shown directly under the question. Guidance for what each answer means, not more questions.
 RUBRIC_GUIDANCE: Final = (
     "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat "
     "colour; you could name what at least three ground-floor shops or entrances are; the "
     "buildings form an unbroken street edge with no cut or hole; you can see things near (about "
-    "30 m), middle (about 100 m) and far (about 300 m)."
+    "30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block "
+    "mock-up."
 )
 
 #: The last line of every ask, so that an answer arrives with its reason.
@@ -118,8 +126,17 @@ ANSWER_REQUIREMENT: Final = (
     "without them."
 )
 
-#: The only options the judge is offered, in this order, neither marked or preselected.
-ANSWER_OPTIONS: Final[tuple[str, ...]] = ("Yes", "No")
+#: The only options the judge is offered, in this order, neither marked or preselected. Each says
+#: what it means, so a pick cannot be read two ways.
+ANSWER_OPTIONS: Final[tuple[str, ...]] = (
+    "Yes, a finished, lived-in street",
+    "No, a plain block mock-up",
+)
+
+#: The answer each option gives.
+OPTION_ANSWERS: Final[Mapping[str, str]] = MappingProxyType(
+    {ANSWER_OPTIONS[0]: "yes", ANSWER_OPTIONS[1]: "no"}
+)
 
 #: What a record says of each picture after the first no. Those pictures are never asked.
 NOT_ASKED: Final = "not asked after a decisive no"
@@ -137,6 +154,13 @@ WORDS_STORAGE: Final = (
     "their place."
 )
 
+#: Shown above a picture's question when words the judge wrote about that picture under an earlier
+#: rubric version are carried into its ask. It explains the ask and nothing about the picture.
+CARRIED_WORDS_NOTICE: Final = (
+    "The question now has one meaning. Pick the answer you mean. The words you already wrote "
+    "about this picture are kept; add more if you like."
+)
+
 
 def judge_prompt(label: str) -> str:
     """Exactly what the judge reads for one capture: label, question, guidance, requirement."""
@@ -148,10 +172,10 @@ def judge_prompt(label: str) -> str:
 
 
 def reason_follow_up(answer: str) -> str:
-    """Exactly what the judge reads when an answer arrived without words."""
-    if answer not in ANSWER_OPTIONS:
-        raise ValueError(f"{answer!r} is not an option the judge is offered")
-    return REASON_FOLLOW_UP.format(answer=answer)
+    """Exactly what the judge reads when an answer, ``yes`` or ``no``, arrived without words."""
+    if answer not in OPTION_ANSWERS.values():
+        raise ValueError(f"{answer!r} is not an answer the options give")
+    return REASON_FOLLOW_UP.format(answer=answer.capitalize())
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,14 +227,29 @@ class SupersededVersion:
     rubric_sha256: str
     question: str
     guidance: str
+    #: The last line of each ask, or None when the version had none.
+    requirement: str | None
+    options: tuple[str, ...]
     composition: str
     #: Canonical definitions that differ from the current ones, keyed by spelling.
     definitions: Mapping[str, str]
 
     def prompt(self, label: str) -> str:
         """What the judge read for one capture under this version."""
-        return f"{PICTURE_TITLES[label]}\n\n{self.question}\n\n{self.guidance}"
+        parts = [PICTURE_TITLES[label], self.question, self.guidance]
+        if self.requirement is not None:
+            parts.append(self.requirement)
+        return "\n\n".join(parts)
 
+
+_SHELL_DEFINITION_V2: Final = (
+    "True only when every capture was taken in the product's own shell document with a mounted "
+    "world and no credential gate, empty-world or error surface, every listener on the window, "
+    "the document and the world canvas comes from the product's own modules, the product's "
+    "keyboard listeners carried every interaction the harness made, and no page or handler was "
+    "substituted; as the retained Melbourne record used it, the key does not by itself assert a "
+    "bearer credential, so every record states its authentication condition in a separate field."
+)
 
 #: Version 2, superseded before any corridor or any record was scored against it. Its record is
 #: retained, and the answers given under it are version 3's calibration evidence.
@@ -227,26 +266,51 @@ VERSION_2: Final = SupersededVersion(
         "buildings form an unbroken street edge with no cut or hole; you can see things near "
         "(about 30 m), middle (about 100 m) and far (about 300 m)."
     ),
+    requirement=None,
+    options=("Yes", "No"),
     composition=(
         "Each capture is shown alone, in route order, and the judge answers the one question yes "
         "or no with their own words. The first no makes the key false and the pictures after it "
         "are not asked. The key is true only when all three pictures got yes. There is no score."
     ),
     definitions=MappingProxyType(
-        {
-            "authenticatedShellAndAuthoredHandlersPreserved": (
-                "True only when every capture was taken in the product's own shell document with "
-                "a mounted world and no credential gate, empty-world or error surface, every "
-                "listener on the window, the document and the world canvas comes from the "
-                "product's own modules, the product's keyboard listeners carried every "
-                "interaction the harness made, and no page or handler was substituted; as the "
-                "retained Melbourne record used it, the key does not by itself assert a bearer "
-                "credential, so every record states its authentication condition in a separate "
-                "field."
-            )
-        }
+        {"authenticatedShellAndAuthoredHandlersPreserved": _SHELL_DEFINITION_V2}
     ),
 )
+
+#: Version 3, superseded before any answer was scored under it. Its record is retained, and the
+#: pick and message given under it are version 4's calibration evidence.
+VERSION_3: Final = SupersededVersion(
+    key_set="exulanica.visual-gate-keys/v3",
+    rubric_version=3,
+    rubric_sha256="2a1c9c62451dc8ad18b3f870d74a021e6ed419cb6059fa6da0bd11927f9fc560",
+    question=(
+        "Does this look like a finished, lived-in street, not a plain block mock-up? "
+        "Yes or no, and say why in your own words."
+    ),
+    guidance=(
+        "A yes means: the surfaces look like real materials (brick, stone, glass, paving), not "
+        "flat colour; you could name what at least three ground-floor shops or entrances are; the "
+        "buildings form an unbroken street edge with no cut or hole; you can see things near "
+        "(about 30 m), middle (about 100 m) and far (about 300 m)."
+    ),
+    requirement=(
+        "Pick Yes or No and type a few words why in the notes; the answer cannot be recorded "
+        "without them."
+    ),
+    options=("Yes", "No"),
+    composition=(
+        "Each capture is shown alone, in route order, and the judge answers the one question yes "
+        "or no with their own words. An answer that arrives without words may be followed once, "
+        "with the picture shown alone again, by a request for the reason, and that reply never "
+        "changes the answer. The first no makes the key false and the pictures after it are not "
+        "asked. The key is true only when all three pictures got yes. There is no score."
+    ),
+    definitions=MappingProxyType({}),
+)
+
+#: Every one-question version this one supersedes, oldest first.
+SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_3)
 
 #: The two conditions the product-shell key has actually been scored under. Melbourne's record
 #: set the key true while its preview API answered three 404s, so the key alone never says which.

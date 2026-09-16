@@ -1,31 +1,33 @@
 # Visual gate rubric: readsAsInhabitedStreet
 
-Status: version 3, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record, never an edit made after a corridor has been scored.
+Status: version 4, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record, never an edit made after a corridor has been scored.
 
-Rubric version: 3
+Rubric version: 4
 
-Version 3 was written on 2026-09-16, on branch `lane/gate` at main `63d97d2`. At that commit
+Version 4 was written on 2026-09-16, on branch `lane/gate` at main `63d97d2`. At that commit
 `exulanica.grammar` emits only the box proof's three integer extents, which are admitted to no
 projection, and every city stage (terrain, streets, parcels, massing, facade, material,
 streetlife, vitrine, premises, tile) is a record shape with a validator and no generator. No
 tessellator, no tile and no drawable generated geometry exists anywhere in the repository, and no
 corridor has been scored.
 
-Key set: `exulanica.visual-gate-keys/v3`, reconciled in
-`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json`, which supersedes
-`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v2.json` and, through it,
-`docs/evaluation/2026-09-15-visual-gate-key-reconciliation.json`.
+Key set: `exulanica.visual-gate-keys/v4`, reconciled in
+`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json`, which supersedes
+`docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json` and, through it, versions 2
+and 1.
 
 Why the question changed. Version 1 asked three questions of each picture, nine in all, and a
 judgement that long could not be completed. Version 2 asked one question of each picture, whether
 it looked like a real street where people live, shop and work. Asked of the shipped Flatiron
 district, whose surfaces are flat colour, it got yes for all three pictures, so it did not separate
-a finished street from a block mock-up, and a corridor that is textured and uncut but still reads as
-a block-out would have cleared it. Version 3 asks that directly and lists real-looking materials
-first in its guidance. The version 2 answers are the calibration evidence for this change: the
-version 3 reconciliation record carries each pick, its reading and the SHA-256 of the judge's
-words, and its private companion keeps the words. No record was scored under version 1 or
-version 2.
+a finished street from a block mock-up. Version 3 asked about that, but joined two claims in one
+question, a finished, lived-in street and not a plain block mock-up, so a yes, a no or a short
+negation in the judge's own words could attach to either, and the first answer given under it
+could not be read without guessing. Version 4 asks one thing, and each option says what it means.
+The answers given under versions 2 and 3 are the calibration evidence for these changes: the
+reconciliation records carry each pick, its reading and the SHA-256 of the judge's words, and
+their private companions keep the words. No answer was scored, and no record was written, under
+versions 1, 2 or 3.
 
 ## Judge
 
@@ -62,21 +64,26 @@ captures below are not shown between questions.
 
 The same question is asked of each picture, in these plain words, and is not paraphrased:
 
-> Does this look like a finished, lived-in street, not a plain block mock-up? Yes or no, and say why in your own words.
+> Is this a finished, lived-in street? Yes or no, and say why in your own words.
 
-Directly under the question the judge is shown what a yes means. It is guidance, not four more
+Directly under the question the judge is shown what each answer means. It is guidance, not more
 questions, and nothing else is offered as explanation:
 
-> A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m).
+> A yes means: the surfaces look like real materials (brick, stone, glass, paving), not flat colour; you could name what at least three ground-floor shops or entrances are; the buildings form an unbroken street edge with no cut or hole; you can see things near (about 30 m), middle (about 100 m) and far (about 300 m). A no means it looks like a plain block mock-up.
 
 Every ask ends with this line, so that an answer arrives with its reason:
 
 > Pick Yes or No and type a few words why in the notes; the answer cannot be recorded without them.
 
+The two options say what they mean, in this order, and neither is marked, recommended or
+preselected:
+
+*   **Yes, a finished, lived-in street**
+*   **No, a plain block mock-up**
+
 ## How it is asked
 
-*   One picture and one question per ask. The answer options are **Yes** and **No**, in that
-    order, and neither is marked, recommended or preselected.
+*   One picture and one question per ask.
 *   The judge's own words are taken from their reply or from the notes they add to their choice,
     exactly as typed, and kept like this:
 
@@ -92,6 +99,11 @@ Every ask ends with this line, so that an answer arrives with its reason:
     > You answered No. In a few words, why?
 
     That reply is the answer's reason. It never changes the answer.
+*   When the judge has already written about a picture under an earlier version of this rubric,
+    its next ask carries one line above the question, and those words are kept:
+
+    > The question now has one meaning. Pick the answer you mean. The words you already wrote about this picture are kept; add more if you like.
+
 *   No other follow-up is asked, and none about what a word means. The guidance above is all the
     explanation there is.
 *   If the judge declines to answer, the judgement stops there. Nothing is recorded as an answer,
@@ -99,13 +111,18 @@ Every ask ends with this line, so that an answer arrives with its reason:
 
 ## What counts as an answer
 
-*   The answer is the option the judge picks: **Yes** is yes and **No** is no.
+*   The answer is the option the judge picks: **Yes, a finished, lived-in street** is yes and
+    **No, a plain block mock-up** is no.
 *   A reply the judge types in place of picking an option counts only when its first word is yes
     or no. Any other reply, and a skipped question, is not an answer. Nothing is inferred from it,
     by a model or by anyone else, and the judgement stops unscored.
-*   Every answer carries a reason in the judge's own words: the words given with it, or the reply
-    to its one follow-up. Words that are only yes or no are not a reason, and a record is not
-    written from an answer without one.
+*   A pick that the judge's own words, given right after it, may contradict is not recorded. Both
+    are kept as calibration evidence: the pick in the record, the words in its private companion.
+*   Every answer carries a reason in the judge's own words: the words given with it, the reply to
+    its one follow-up, or, for a no, the words the judge had already written about that picture,
+    each labelled with when and under which rubric version it was given. A yes needs words given
+    with it. Words that are only yes or no are not a reason, and a record is not written from an
+    answer without one.
 
 ## How the answers compose
 
@@ -120,8 +137,8 @@ Every ask ends with this line, so that an answer arrives with its reason:
 
 A corridor passes only with **all three pictures answered yes by the named judge, plus every
 mechanical key**. Version 1 also required every one of its sub-answers to be yes for this key to
-hold, and version 3's question asks for more than version 2's, so the bar is at least as strict as
-it has been.
+hold, and versions 3 and 4 ask for more than version 2 did, so the bar is at least as strict as it
+has been.
 
 The Flatiron baseline is the calibration a corridor is read against. If the baseline itself ever
 held every key, the gate could not tell a corridor from the district it replaces: the rubric would
@@ -137,10 +154,10 @@ Every record that scores this key carries, and `visual_gate.py` refuses to write
 *   the SHA-256 of this rubric file as the judge answered against it, which must be the rubric
     the record is written with;
 *   for each picture in order, its label and the SHA-256 of the capture shown, and either the
-    answer with how it was given, when each reply was given, the SHA-256 and byte count of the
-    judge's own words, the follow-up when one was asked, the reason the answer is recorded with and
-    the name of the person who typed each reply, which must be the judge, or
-    `not asked after a decisive no`;
+    answer with the option picked, when each reply was given, the SHA-256 and byte count of the
+    judge's own words, the follow-up when one was asked, any earlier words carried into the ask with
+    the line shown above it, the reasons the answer is recorded with and the name of the person who
+    typed each reply, which must be the judge, or `not asked after a decisive no`;
 *   the path, byte size and SHA-256 of its private companion record, which holds the judge's
     words and is never committed;
 *   the captures, each bound by path, byte size and SHA-256.
@@ -148,10 +165,12 @@ Every record that scores this key carries, and `visual_gate.py` refuses to write
 The writer refuses a missing or placeholder judge, a missing reason in the judge's own words, a
 reply that does not say when it was given, a rubric digest mismatch, a capture not bound by
 digest, a picture answered about a capture other than the one bound, a yes key with any picture
-unasked, an answer given after a decisive no, a reply that begins with neither yes nor no, a
-follow-up for an answer that already gave its reason or one not asked in the words above, any
-answer or reply not typed by the judge, and a public record that would carry any of the judge's
-words or a quoted part of them.
+unasked, an answer given after a decisive no, a reply that begins with neither yes nor no, a pick
+that is not one of the options, a follow-up for an answer that already gave its reason or one not
+asked in the words above, carried words without the line above the question or from a rubric
+version that was never fixed, a yes whose only words are carried words, a follow-up for a picture
+whose earlier words are carried, any answer or reply not typed by the judge, and a public record
+that would carry any of the judge's words or a quoted part of them.
 
 ## Calibration set
 
