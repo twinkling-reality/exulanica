@@ -64,8 +64,9 @@ COMMON_CONTROLS: Final = MappingProxyType(
 MINIMUM_RESOLUTION: Final = 16
 MAXIMUM_RESOLUTION: Final = 1024
 MAXIMUM_EXTENT_MM: Final = 100_000
-#: Height range times texels on an axis, at most this many times that axis in mm, or the
-#: baker's normal derivation would leave the range where doubles hold integers exactly.
+#: A conservative bound: height range times texels on an axis, at most this many times that axis
+#: in mm. The baker's normal derivation stays exact up to about 90 on both axes at once, or 128 on
+#: one (``maps.normalMap`` and ``isqrt`` in loom-texture), so 32 is a deliberate margin.
 HEIGHT_RANGE_TEXEL_LIMIT: Final = 32
 MAXIMUM_EXPRESSION_DEPTH: Final = 8
 
@@ -481,7 +482,7 @@ def recipe_problems(candidate: object, manifest: Mapping[str, Any]) -> list[str]
     ):
         problems.append(
             f"height_range_mm times the texels on an axis is at most {HEIGHT_RANGE_TEXEL_LIMIT} "
-            "times that axis in mm, or the bake cannot derive normals exactly"
+            "times that axis in mm, a margin that keeps the bake's normals exact"
         )
     for constraint in manifest["constraints"]:
         verdict = _holds(constraint, candidate)

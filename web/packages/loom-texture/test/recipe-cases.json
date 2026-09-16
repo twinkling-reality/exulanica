@@ -279,7 +279,7 @@
       "name": "the bake must be able to derive normals exactly",
       "set": "cc0.brick-running-bond",
       "changes": [{"path": ["parameters", "height_range_mm"], "value": 57}],
-      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, or the bake cannot derive normals exactly"]
+      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, a margin that keeps the bake's normals exact"]
     },
     {
       "name": "the same height range is fine at a lower resolution",
@@ -295,7 +295,7 @@
       "name": "the height rule is checked on the short axis too",
       "set": "cc0.kerb-stone",
       "changes": [{"path": ["resolution", "width"], "value": 512}, {"path": ["parameters", "height_range_mm"], "value": 57}],
-      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, or the bake cannot derive normals exactly"]
+      "problems": ["height_range_mm times the texels on an axis is at most 32 times that axis in mm, a margin that keeps the bake's normals exact"]
     },
     {
       "name": "mineral shares cannot exceed every crystal",

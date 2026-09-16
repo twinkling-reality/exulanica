@@ -90,8 +90,8 @@ A set is a MAKER applied to a RECIPE, and everything but the maker's code is a d
   left to a default, so a recipe means the same thing even if a maker's default changes. A recipe
   is refused if a control is missing, undeclared, of the wrong kind or out of range, if a rule
   fails, if a rule's arithmetic leaves the range doubles hold exactly, or if its height range times
-  its texels on an axis exceeds 32 times that axis in millimetres, past which the normal derivation
-  would stop being exact.
+  its texels on an axis exceeds 32 times that axis in millimetres. That last bound is a deliberate
+  margin: the normal derivation stays exact up to about 90 on both axes at once, or 128 on one.
 - **A library entry** (`exulanica.texture-library-entry/v1`) publishes a recipe as a named,
   versioned set with a title, a summary and a licence. The source of each is one file in
   `web/packages/loom-texture/library/`, the recipe written out in full and kept in one layout that
@@ -115,8 +115,10 @@ byte: no set's version changed.
 `exulanica/materials/recipes.py` both run every case in
 `web/packages/loom-texture/test/recipe-cases.json` (50 recipe cases and 39 manifest cases, each
 starting from a published object and listing the exact problems expected, in order), so the baker
-and the backend refuse the same objects with the same explanation. A person's variant, a recipe the
-Companion proposes, and a recipe a model fits later are all this kind of object, and all of them
+and the backend refuse the same objects with the same explanation. Changing any message is
+therefore one commit that changes `src/recipe.ts`, `exulanica/materials/recipes.py` and
+`recipe-cases.json` together. A person's variant, a recipe the Companion proposes, and a recipe a
+model fits later are all this kind of object, and all of them
 pass this check before anything stores or bakes them. `MaterialCatalog.recipe_problems` in
 `exulanica/materials/catalog.py` is that check against whichever published maker a recipe names.
 
@@ -344,7 +346,8 @@ layers contract permits.
   seed, resolution, extent, family, surface, height range and occlusion. What the backend cannot
   check is that the maker, run on the recipe, produces these bytes, because the maker is
   TypeScript; `test/published.test.ts` rebakes every set and compares byte for byte, which is what
-  catches a recipe edited in a way no header shows, such as a colour.
+  catches a recipe edited in a way no header shows, such as a colour. The Node bake worker planned
+  for workspace recipes is the step that brings that proof to the server.
 - `PinnedTextureSet` carries the manifest fields, `extent_u_mm` and `extent_v_mm`, the header's
   title, summary, seed and height range, the maker id and version, the recipe and receipt digests,
   and `pin()`, which returns the three replay fields. `read_bytes()` re-verifies the digest on every
@@ -427,5 +430,5 @@ manifest and the pinned rows disagree.
 - The transfer figure in section 7 is gzip over the files, not a measured browser load.
 - That a recipe, run through its maker, produces a set's bytes is checked by the package's suite,
   which runs the TypeScript maker. The backend verifies every binding it can see without the maker,
-  and no more.
+  and no more, until the planned Node bake worker runs the maker server-side.
 - The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it yet.

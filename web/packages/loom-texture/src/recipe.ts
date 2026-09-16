@@ -178,9 +178,12 @@ export const MINIMUM_RESOLUTION = 16;
 /** The largest physical extent a tile may state, per axis, in mm. */
 export const MAXIMUM_EXTENT_MM = 100_000;
 /**
- * The steepest height field the bake can derive normals from exactly: the height range, times the
- * texels along an axis, at most this many times that axis's extent in mm. Past it, an intermediate
- * product in `maps.normalMap` would leave the range where doubles hold integers exactly.
+ * A conservative bound on how steep a height field may be: the height range, times the texels
+ * along an axis, at most this many times that axis's extent in mm. With x that ratio on u and y on
+ * v, `maps.normalMap` sums the squares of slopes up to x * 2^19 and y * 2^19 with 2^40, and
+ * `isqrt` is exact below 2^52. At 32 on both axes the sum is about 2^49. The true edge is near 90
+ * on both axes at once, or near 128 on one, so 32 is a deliberate margin, not the point where
+ * exactness fails.
  */
 export const HEIGHT_RANGE_TEXEL_LIMIT = 32;
 /** How deep an expression may nest. */
@@ -552,7 +555,7 @@ export function recipeProblems(candidate: unknown, manifest: MakerManifest): str
     || range * recipe.resolution.height > HEIGHT_RANGE_TEXEL_LIMIT * recipe.extent_mm.v) {
     problems.push(
       `height_range_mm times the texels on an axis is at most ${HEIGHT_RANGE_TEXEL_LIMIT} times `
-        + 'that axis in mm, or the bake cannot derive normals exactly',
+        + 'that axis in mm, a margin that keeps the bake\'s normals exact',
     );
   }
   for (const constraint of manifest.constraints) {
