@@ -1,5 +1,5 @@
-import type { AtlasVec3, LocalVec3 } from './coords.js';
-import { atlasVec3, localToAtlas, localVec3 } from './coords.js';
+import type { AtlasVec3 } from './coords.js';
+import { atlasVec3 } from './coords.js';
 import type { IslandId } from './ids.js';
 import type { MovementModel } from './rung.js';
 import { rungProperties } from './rung.js';
@@ -152,12 +152,6 @@ export function isNavigationPositionClear(
   );
 }
 
-/** Stable local placement shared by the renderer and its coarse blocker. */
-export function sourceFirstCardLocalPosition(island: Island): LocalVec3 {
-  const forward = Math.min(7, Math.max(4.8, island.footprintRadiusLocal * 0.6));
-  return localVec3(0, 0.48, -forward);
-}
-
 /**
  * Build the local resident field from stable scene placements.
  *
@@ -183,20 +177,19 @@ export function buildNavigationWorld(
   for (let index = 0; index < scene.islands.length; index += 1) {
     const island = scene.islands[index]!;
     const region = navigationRegionForIsland(island);
-    const radius = region.footprintRadius;
-    const movement = region.movement;
     regions.push(region);
-    contentRadius = Math.max(contentRadius, groundDistance(centre, island.placement.position) + radius);
-
-    // The present no-geometry slice has one honest archive body per source-first region. It is a
-    // citation surface and a coarse blocker, never a reconstruction or a terrain sample.
-    if (movement === 'cards') {
-      obstacles.push(Object.freeze({
-        id: `source-card:${island.islandId}`,
-        centre: localToAtlas(island.placement, sourceFirstCardLocalPosition(island)),
-        radius: 1.75 * island.placement.scale,
-      }));
-    }
+    contentRadius = Math.max(
+      contentRadius,
+      groundDistance(centre, island.placement.position) + region.footprintRadius,
+    );
+    /*
+     * No blocker per region any more.
+     *
+     * There used to be one: a 1.75 unit circle standing in for the source photograph that hung
+     * over every no-geometry region. The photograph is gone from the 3D world, and a collider with
+     * nothing drawn at it is worse than either, because it stops a walk with no visible cause.
+     * Regions that do have a body get their collision from that body.
+     */
   }
 
   const traces: SemanticTrace[] = [];

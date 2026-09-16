@@ -76,7 +76,6 @@ import {
   planResidency,
   residencyDemandsForView,
   sampleDirectNavigationTransition,
-  sourceFirstCardLocalPosition,
   completeResidencyRequest,
   composeAtlasWorld,
   WorldCustomizationController,
@@ -115,11 +114,6 @@ import {
   createGoogleTilesEnvironment,
   type GoogleTilesEnvironment,
 } from './google-tiles-environment.js';
-import {
-  SOURCE_VEIL_HEIGHT,
-  createSourceFirstGrove,
-  type SourceFirstGrove,
-} from './source-first-grove.js';
 import type { SourceMediaCatalog } from './source-media.js';
 import { sourceMediaForIsland } from './source-media.js';
 import { createWorldField, type WorldField } from './world-field.js';
@@ -352,7 +346,6 @@ export interface AtlasBindingOptions {
   /** Caller-authorized media presentation keyed by the scene's evidence handles. */
   readonly sourceMedia?: SourceMediaCatalog;
   /** Keep original photographs in the authorized inspector instead of placing optical sheets in the world. */
-  readonly sourcePresentation?: 'world' | 'inspection';
   /**
    * Which arrangement of the composed world to build.
    *
@@ -440,7 +433,6 @@ export class AtlasBinding {
   readonly scene: AtlasScene;
   readonly navigationWorld: NavigationWorld;
   readonly field: WorldField;
-  readonly sourceFirst: SourceFirstGrove;
   readonly topology: WorldTopologySnapshot;
   readonly composedWorld: ComposedWorld;
   readonly regionMass: RegionMass;
@@ -495,6 +487,7 @@ export class AtlasBinding {
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
   private centred: CentredPhotograph | null = null;
+  private occupied: IslandId | null = null;
   private readonly centredInverse = new pc.Mat4();
   private readonly centredCapture = new pc.Vec3();
   private readonly centredDirection = new pc.Vec3();
@@ -525,7 +518,6 @@ export class AtlasBinding {
   private navigationElapsedMs = 0;
   private navigationTargetIsland: IslandId | null = null;
   private readonly recoveredCameras: readonly RecoveredSceneCamera[];
-  private readonly sourcePresentation: 'world' | 'inspection';
   private inspection: {
     readonly returnPose: NavigationPose;
     readonly returnFov: number;
@@ -569,7 +561,6 @@ export class AtlasBinding {
   }
 
   private applyResidencyPresentation(): void {
-    this.sourceFirst.setResidency(this.residencyAllocated, this.mapState !== null);
     this.objects.setResidency(this.residencyAllocated, this.mapState !== null);
     for (const visual of this.islands) {
       const inspecting = visual.island.islandId === this.inspection?.view.islandId;
@@ -601,7 +592,6 @@ export class AtlasBinding {
     recoveredCameras: readonly RecoveredSceneCamera[],
     navigationWorld: NavigationWorld,
     field: WorldField,
-    sourceFirst: SourceFirstGrove,
     topology: WorldTopologySnapshot,
     composedWorld: ComposedWorld,
     regionMass: RegionMass,
@@ -613,7 +603,6 @@ export class AtlasBinding {
     initialProfile: WorldArtProfile,
     residencyCatalog: readonly ResidencyAsset[],
     residencyBudget: number,
-    sourcePresentation: 'world' | 'inspection',
     objectRoots: ReadonlyMap<IslandId, pc.Entity>,
     ownedDistrict: OwnedDistrictRuntime | null,
   ) {
@@ -633,10 +622,8 @@ export class AtlasBinding {
     this.trainedScenes = trainedScenes;
     this.trainedSceneFailures = trainedSceneFailures;
     this.recoveredCameras = recoveredCameras;
-    this.sourcePresentation = sourcePresentation;
     this.navigationWorld = navigationWorld;
     this.field = field;
-    this.sourceFirst = sourceFirst;
     this.objects = new SceneObjectRuntime(app, objectRoots);
     this.segmentOverlay = new SegmentOverlayRuntime(islands, trainedScenes, () => playcanvasSegmentEngine(app), {
       lensPrepared: (entity) => this.proofLensSplatsPrepared.has(entity),
@@ -878,15 +865,6 @@ export class AtlasBinding {
     );
     if (options.ownedDistrict !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);
-    const sourceFirst = createSourceFirstGrove(
-      app,
-      sourceGroveScene(options.scene, availableReconstruction, options.sourcePresentation),
-      options.sourceMedia ?? new Map(),
-      initialArtProfile,
-      theme,
-      options.reducedMotion ?? false,
-    );
-    renderRoot.addChild(sourceFirst.entity);
     const topology = composeAtlasWorld(options.scene, {
       availableReconstruction,
       ...(options.worldSeed === undefined ? {} : { seed: options.worldSeed }),
@@ -1013,7 +991,7 @@ export class AtlasBinding {
       ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
       : cityActive
         ? cityCameraState('overview')
-        : initialAtlasCameraState(options.scene, navigationWorld, options.sourcePresentation);
+        : initialAtlasCameraState(options.scene, navigationWorld);
 
     // The Google-tiles entry is an aerial overview, not a stance. Everything else starts on foot.
     const aerialStart = options.ownedDistrict === undefined && cityActive;
@@ -1067,7 +1045,6 @@ export class AtlasBinding {
       options.recoveredCameras ?? [],
       navigationWorld,
       field,
-      sourceFirst,
       topology,
       composedWorld,
       regionMass,
@@ -1079,7 +1056,6 @@ export class AtlasBinding {
       initialArtProfile,
       Object.freeze(residencyCatalog),
       residencyBudget,
-      options.sourcePresentation ?? 'world',
       objectRoots,
       ownedDistrict,
     );
@@ -1386,7 +1362,6 @@ export class AtlasBinding {
     this.invalidate();
     this.motes.setTheme(theme);
     this.field.setTheme(theme);
-    this.sourceFirst.setTheme(theme);
     this.composedWorld.setTheme(theme);
     for (const visual of this.islands) visual.cloud.setTheme(theme);
     const report = this.representation.refresh();
@@ -1396,7 +1371,6 @@ export class AtlasBinding {
   setReducedMotion(reduced: boolean): void {
     this.reducedMotion = reduced;
     this.field.setReducedMotion(reduced);
-    this.sourceFirst.setReducedMotion(reduced);
     this.invalidate();
   }
 
@@ -1457,7 +1431,6 @@ export class AtlasBinding {
     this.regionMass.applyProfile(profile);
     this.regionRelief.applyProfile(profile);
     this.field.setProfile(profile);
-    this.sourceFirst.setProfile(profile);
     this.setClearColours(profile);
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
       this.camera.camera.clearColor.copy(
@@ -1758,7 +1731,6 @@ export class AtlasBinding {
       this.field.setMapGroundPose(this.mapState.ground);
       if (this.overlay !== null) this.overlay.root.hidden = true;
       this.mapOverlay?.setActive(true);
-      this.sourceFirst.setResidency(this.residencyAllocated, true);
       this.refreshPresentIslands(true);
       this.refreshControlsEnabled();
       return;
@@ -1777,7 +1749,6 @@ export class AtlasBinding {
     this.field.setMapGroundPose(null);
     if (this.overlay !== null) this.overlay.root.hidden = false;
     this.mapOverlay?.setActive(false);
-    this.sourceFirst.setResidency(this.residencyAllocated, false);
       this.refreshPresentIslands(false);
     this.refreshControlsEnabled();
   }
@@ -1803,22 +1774,10 @@ export class AtlasBinding {
     if (!this.memoryLayerVisible) this.setMemoryLayerVisible(true);
     if (this.mapState !== null) this.setMapMode(false);
     const planned = planDirectNavigationTransition(resolution, state, reducedMotion);
-    if (target.kind === 'island') {
-      const island = this.scene.islands.find((candidate) => candidate.islandId === target.islandId);
-      if (island?.rung === 4) {
-        // Keep atlas-core's validated destination POSITION exactly. Only turn the arrival camera
-        // toward the canonical source body, so Map travel cannot deposit someone facing empty
-        // layout space while the memory sits behind them.
-        this.navigationTransition = Object.freeze({
-          ...planned,
-          to: sourceFirstArrivalPose(island, planned.to, this.sourcePresentation),
-        });
-      } else {
-        this.navigationTransition = planned;
-      }
-    } else {
-      this.navigationTransition = planned;
-    }
+    // atlas-core already aims the arrival at the region itself. The previous override tilted the
+    // camera up at the source veil hanging above it; with no body in the air there is nothing to
+    // look up at, and the region's own landmark is what the arrival should face.
+    this.navigationTransition = planned;
     this.navigationElapsedMs = 0;
     this.navigationTargetIsland = resolution.islandId;
     this.refreshControlsEnabled();
@@ -1960,6 +1919,18 @@ export class AtlasBinding {
       }
     }
     return best;
+  }
+
+  /**
+   * The region the visitor is standing in or approaching, or null between them.
+   *
+   * The landmark is what marks a memory in the world now that nothing else does, and a landmark is
+   * geometry with no identity of its own: it carries no anchor, so the reticle cannot settle on it
+   * the way it settles on an occurrence. Spatial phase already knows which region holds the camera,
+   * and that is the same answer without inventing a picking surface for a beacon.
+   */
+  get occupiedRegion(): IslandId | null {
+    return this.occupied;
   }
 
   /** Engage exactly the one settled reticle target. The application decides which panel opens. */
@@ -2118,6 +2089,7 @@ export class AtlasBinding {
         : mapTierState(this.scene);
 
     const spatial = classifySpatialPhase(this.navigationWorld, cameraAtlas);
+    this.occupied = spatial.islandId;
     this.activeNeighborhood =
       spatial.islandId === null
         ? (this.activeNeighborhood ?? this.neighborhoodIndex.neighborhoods[0]?.neighborhoodId ?? null)
@@ -2244,10 +2216,6 @@ export class AtlasBinding {
       this.focusState,
     );
     this.focusState = this.memoryLayerVisible ? resolution.state : INITIAL_FOCUS_STATE;
-    const focusedIslandId = this.controls.mode !== 'traverse' || this.focusState.focusedIndex === null
-      ? null
-      : (this.table.anchors[this.focusState.focusedIndex]?.islandId ?? null);
-    this.sourceFirst.update(nowMs, cameraAtlas, focusedIslandId);
     this.field.update(nowMs);
 
     this.centred = this.memoryLayerVisible && this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
@@ -2335,7 +2303,6 @@ export class AtlasBinding {
     this.mapOverlay?.destroy();
     this.motes.destroy();
     this.field.destroy();
-    this.sourceFirst.destroy();
     this.composedWorld.destroy();
     this.regionMass.destroy();
     this.regionRelief.destroy();
@@ -2351,21 +2318,17 @@ export class AtlasBinding {
   }
 }
 
-/** Only this renderer input changes; the authoritative scene, source catalog, and topology stay intact. */
-export function sourceGroveScene(
-  scene: AtlasScene,
-  availableReconstruction: ReadonlySet<IslandId>,
-  sourcePresentation: 'world' | 'inspection' = 'world',
-): AtlasScene {
-  return { ...scene, islands: sourcePresentation === 'inspection' ? [] : scene.islands.map((island) =>
-    availableReconstruction.has(island.islandId) ? island : { ...island, rung: 4 as const }) };
-}
-
-/** Preserve safe startup positions; only a visible in-world source may own the upward framing. */
+/**
+ * Where a session opens.
+ *
+ * The upward framing is gone with the body it framed. This used to pitch the opening camera up at
+ * the source veil hanging 3.45 metres over the region, which is the one thing that made an opening
+ * shot point at empty air once the veil was removed. A region now opens level, looking at its own
+ * ground, where its landmark stands.
+ */
 export function initialAtlasCameraState(
   scene: AtlasScene,
   navigationWorld: NavigationWorld,
-  sourcePresentation: 'world' | 'inspection' = 'world',
 ): CameraState {
   const first = scene.islands[0];
   if (first !== undefined && first.rung !== 4 && first.viewpointForwardLocal !== undefined) {
@@ -2390,21 +2353,7 @@ export function initialAtlasCameraState(
         const x = first.placement.position.x + Math.sin(first.placement.yaw) * distance;
         const z = first.placement.position.z + Math.cos(first.placement.yaw) * distance;
         const height = navigationWorld.surface.sample(x, z)?.height ?? 0;
-        if (sourcePresentation === 'inspection') {
-          return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
-        }
-        const sourceLocal = sourceFirstCardLocalPosition(first);
-        const source = localToAtlas(first.placement, sourceLocal);
-        const sourceHeight = atlasLandscapeHeight(source.x, source.z) +
-          SOURCE_VEIL_HEIGHT * first.placement.scale;
-        const horizontal = Math.max(1, Math.hypot(source.x - x, source.z - z));
-        return {
-          x,
-          y: height + navigationWorld.eyeHeight,
-          z,
-          yaw: first.placement.yaw,
-          pitch: Math.atan2(sourceHeight - (height + navigationWorld.eyeHeight), horizontal),
-        };
+        return { x, y: height + navigationWorld.eyeHeight, z, yaw: first.placement.yaw, pitch: -0.085 };
       })();
 }
 
@@ -2581,29 +2530,6 @@ export function recoveredCameraState(island: Island, viewpointLocal: LocalVec3, 
   };
 }
 
-/** Preserve the validated destination position while facing a rung-4 arrival toward its source. */
-export function sourceFirstArrivalPose(
-  island: Island,
-  pose: NavigationPose,
-  sourcePresentation: 'world' | 'inspection' = 'world',
-): NavigationPose {
-  if (sourcePresentation === 'inspection' || island.rung !== 4) return pose;
-  const card = localToAtlas(island.placement, sourceFirstCardLocalPosition(island));
-  const source = atlasVec3(
-    card.x,
-    atlasLandscapeHeight(card.x, card.z) + SOURCE_VEIL_HEIGHT * island.placement.scale,
-    card.z,
-  );
-  const dx = source.x - pose.position.x;
-  const dy = source.y - pose.position.y;
-  const dz = source.z - pose.position.z;
-  const horizontal = Math.max(1e-9, Math.hypot(dx, dz));
-  return Object.freeze({
-    position: pose.position,
-    yaw: Math.atan2(-dx, -dz),
-    pitch: Math.atan2(dy, horizontal),
-  });
-}
 
 /** A deterministic overview pose derived only from persisted presentation layout. */
 export function mapCameraState(scene: AtlasScene): CameraState {

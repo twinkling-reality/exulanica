@@ -19,7 +19,6 @@ import { worldArtProfile } from '@exulanica/presentation';
 import { mountAtlas } from '../atlas.js';
 import {
   ownedDistrict,
-  sourcePresentation,
 } from '../config.js';
 import { themeForPreferences } from '../theme.js';
 import { el } from '../ui/dom.js';
@@ -143,7 +142,6 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       ...(state.pointMaps === undefined ? {} : { pointMaps: state.pointMaps }),
       ...(state.placedPointMaps === undefined ? {} : { placedPointMaps: state.placedPointMaps }),
       trainedGeometry: state.trainedGeometry,
-      sourcePresentation: sourcePresentation(),
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
       ownedDistrict: district,

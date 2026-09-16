@@ -240,7 +240,6 @@ export {
   isNavigationPositionClear,
   navigationRegionForIsland,
   resolveGroundMovement,
-  sourceFirstCardLocalPosition,
 } from './navigation.js';
 
 export type {

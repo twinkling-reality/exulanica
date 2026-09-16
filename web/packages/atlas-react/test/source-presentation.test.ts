@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  atlasLandscapeSurface, atlasVec3, buildNavigationWorld, composeAtlasWorld,
+  atlasLandscapeSurface, atlasVec3, buildNavigationWorld,
   islandId, localVec3, makeIsland, makeScene, placement, planResidency,
 } from '@exulanica/atlas-core';
 import {
-  initialAtlasCameraState, pointMapResidencyCost, recoveredCameraState, sourceFirstArrivalPose, sourceGroveScene,
+  initialAtlasCameraState, pointMapResidencyCost, recoveredCameraState,
 } from '../src/playcanvas/atlas-binding.js';
 
 const island = makeIsland({
@@ -14,45 +14,26 @@ const island = makeIsland({
   viewpointLocal: localVec3(0, 1.6, 0), anchors: [], layoutEntities: new Set(),
 });
 const scene = makeScene([island], 1, 1);
-const available = new Set<typeof island.islandId>();
 
-describe('source presentation boundary', () => {
-  it('omits every source grove island in inspection while preserving authoritative scene and topology', () => {
-    const topologyBefore = composeAtlasWorld(scene, { availableReconstruction: available });
-    const groveInput = sourceGroveScene(scene, available, 'inspection');
-    expect(groveInput.islands).toEqual([]);
-    expect(groveInput).not.toBe(scene);
-    expect(scene.islands).toEqual([island]);
-    expect(scene.islands[0]!.rung).toBe(4);
-    expect(composeAtlasWorld(scene, { availableReconstruction: available })).toEqual(topologyBefore);
-  });
-
-  it('keeps ordinary world presentation as the default, including unavailable reconstruction fallback', () => {
-    expect(sourceGroveScene(scene, available).islands).toEqual([island]);
-    expect(sourceGroveScene(scene, available)).toEqual(sourceGroveScene(scene, available, 'world'));
-    const reconstructed = { ...island, rung: 3 as const };
-    const other = makeScene([reconstructed], 1, 1);
-    expect(sourceGroveScene(other, available).islands[0]!.rung).toBe(4);
-    expect(sourceGroveScene(other, new Set([island.islandId])).islands[0]).toBe(reconstructed);
-    expect(other.islands[0]!.rung).toBe(3);
-  });
-
-  it('keeps the same grounded startup position but stops aiming upward at an absent source', () => {
+/*
+ * The source photograph no longer stands in the 3D world.
+ *
+ * What used to be here tested a switch: `sourceGroveScene` emptied the island list so no veil was
+ * built, and `sourceFirstArrivalPose` tilted the arrival camera up at the veil unless the switch
+ * said the inspector owned the source. Both sides of that switch are gone, because only things
+ * with real geometry belong in the 3D world and a photograph has none. What remains worth holding
+ * is the consequence: nothing aims the camera upward at a body that is not there.
+ */
+describe('a session opens looking at the ground, not above it', () => {
+  it('never pitches the opening camera up', () => {
     const world = buildNavigationWorld(scene, atlasLandscapeSurface());
-    const ordinary = initialAtlasCameraState(scene, world);
-    expect(initialAtlasCameraState(scene, world, 'world')).toEqual(ordinary);
-    const inspection = initialAtlasCameraState(scene, world, 'inspection');
-    expect([inspection.x, inspection.y, inspection.z, inspection.yaw])
-      .toEqual([ordinary.x, ordinary.y, ordinary.z, ordinary.yaw]);
-    expect(ordinary.pitch).toBeGreaterThan(0);
-    expect(inspection.pitch).toBe(-0.085);
-  });
-
-  it('preserves the entire validated arrival pose when the source is inspector-only', () => {
-    const arrival = { position: atlasVec3(10, 1.62, 1), yaw: 0.4, pitch: -0.12 };
-    expect(sourceFirstArrivalPose(island, arrival, 'inspection')).toBe(arrival);
-    expect(sourceFirstArrivalPose(island, arrival).position).toBe(arrival.position);
-    expect(sourceFirstArrivalPose(island, arrival).pitch).not.toBe(arrival.pitch);
+    const start = initialAtlasCameraState(scene, world);
+    expect(start.pitch).toBe(-0.085);
+    // Standing off the region rather than inside it, which is what makes a landmark visible.
+    expect(Math.hypot(
+      start.x - island.placement.position.x,
+      start.z - island.placement.position.z,
+    )).toBeGreaterThan(3);
   });
 });
 
@@ -68,10 +49,9 @@ describe('arrival at a reconstructed region', () => {
   it('starts where the first photograph was taken and looks where that camera looked', () => {
     const scene = makeScene([reconstructed], 1, 1);
     const world = buildNavigationWorld(scene, atlasLandscapeSurface());
-    const start = initialAtlasCameraState(scene, world, 'inspection');
+    const start = initialAtlasCameraState(scene, world);
     const expected = recoveredCameraState(reconstructed, reconstructed.viewpointLocal, reconstructed.viewpointForwardLocal!);
     expect(start).toEqual(expected);
-    expect(initialAtlasCameraState(scene, world, 'world')).toEqual(expected);
     // Position is the viewpoint under the island placement: yaw pi/2 turns local +X into atlas -Z... scaled by 1.5.
     expect([start.x, start.y, start.z].map((v) => Math.round(v * 1000) / 1000)).toEqual([20, 2.4, -9]);
     // The forward points from the camera toward the region centre and slightly down.
@@ -86,7 +66,7 @@ describe('arrival at a reconstructed region', () => {
     const { viewpointForwardLocal: _omitted, ...withoutForward } = reconstructed;
     const scene = makeScene([makeIsland({ ...withoutForward, anchors: [] })], 1, 1);
     const world = buildNavigationWorld(scene, atlasLandscapeSurface());
-    const start = initialAtlasCameraState(scene, world, 'inspection');
+    const start = initialAtlasCameraState(scene, world);
     expect(start.pitch).toBe(-0.085);
     expect(Math.hypot(start.x - reconstructed.placement.position.x, start.z - reconstructed.placement.position.z)).toBeGreaterThan(3);
   });

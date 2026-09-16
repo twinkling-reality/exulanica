@@ -23,7 +23,6 @@ import {
 } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 
-import { sourcePresentation } from '../config.js';
 import {
   ObservationsClient,
   ObservationsUnavailable,
@@ -534,15 +533,16 @@ export function mountStatusAndInspector(
         applyProofLens();
       },
     } } : {}),
-    ...(sourcePresentation() === 'inspection' ? {
-      reconstructionFocus: {
-        collections: current.islands.map((island) => {
-          const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
-            ?? island.islandId;
-          return { sceneId, sourceCount: sourcesForScene(sceneId).length };
-        }),
-      },
-    } : {}),
+    // Unconditional now. This was gated on a flag that chose between hanging source photographs
+    // in the world and keeping them in the inspector; the world side has been deleted, so the
+    // inspector is not an alternative to anything, it is where a source is.
+    reconstructionFocus: {
+      collections: current.islands.map((island) => {
+        const sceneId = current.reconstructionScenes?.find((scene) => scene.islandId === island.islandId)?.sceneId
+          ?? island.islandId;
+        return { sceneId, sourceCount: sourcesForScene(sceneId).length };
+      }),
+    },
   });
 
   let statusElement = renderReconstructionStatus();

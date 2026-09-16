@@ -14,8 +14,9 @@
  * registered beside it would outlive its owner.
  */
 
+import type { IslandId } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
-import { decodeFacets } from '@exulanica/world-index';
+import { ALL_FACETS, decodeFacets } from '@exulanica/world-index';
 
 import type { MountedAtlas } from '../atlas.js';
 import type { AtlasCommand } from '../ui/atlas-commands.js';
@@ -92,11 +93,26 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
     deps.dispatchShell({ type: 'show-world' });
     deps.showTravelStatus(deps.travelUsesReducedMotion() ? 'Located the region.' : 'Moving to the region…');
   };
+  /*
+   * A memory opens in the interface, never in the scene.
+   *
+   * The landmark standing on the ground says a memory is here; it is not the memory, and a
+   * photograph hung in the air to be the memory is exactly the confusion of observation with
+   * spatial state that this world is not allowed to make. So the beacon marks, and the index
+   * filtered to that one region shows what the memory actually holds.
+   */
+  const openRegionMemory = (islandId: IslandId): void => {
+    state.indexFacets = Object.freeze({ ...ALL_FACETS, islands: Object.freeze([islandId]) });
+    deps.worldIndex.render(current, state.indexFacets, state.selected);
+    if (deps.shellState().primary !== 'index') deps.dispatchShell({ type: 'toggle-index' });
+  };
+
   mounted.binding.onNavigationArrive = (target) => {
     if (target.kind === 'anchor') {
       const index = mounted.binding.table.indexOf.get(target.anchorId);
       if (index !== undefined) mounted.binding.focusAnchor(index);
     }
+    if (target.kind === 'island') openRegionMemory(target.islandId);
     deps.showTravelStatus(target.kind === 'anchor' ? 'Located the source.' : 'The memory is in focus.');
   };
 
@@ -126,9 +142,16 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       // opens that photograph: the original, who is in it, and its evidence. The mouse is freed
       // because the inspector is read and clicked, not walked.
       const photograph = mounted.binding.centredPhotograph;
-      if (photograph === null) return;
-      if (document.pointerLockElement !== null) document.exitPointerLock();
-      status.inspectSceneSources(photograph.sceneId, photograph.captureId);
+      if (photograph !== null) {
+        if (document.pointerLockElement !== null) document.exitPointerLock();
+        status.inspectSceneSources(photograph.sceneId, photograph.captureId);
+        return;
+      }
+      // Nothing under the reticle, but standing at a memory is itself a selection of it: the
+      // landmark in front of the visitor is that memory's only mark in the world.
+      const region = mounted.binding.occupiedRegion;
+      if (region === null) return;
+      openRegionMemory(region);
       return;
     }
     const anchor = mounted.binding.table.anchors[index];
