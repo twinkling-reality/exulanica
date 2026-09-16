@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "grammar_id": "box",
+  "grammar_version": 1,
+  "subject_kind": "box",
+  "admissible_uses": [],
+  "cascade_levels": ["collection", "item"],
+  "parameters": [
+    {"name": "width_mm", "kind": "integer", "minimum": 1, "maximum": 10000, "when_unset": "draw"},
+    {"name": "depth_mm", "kind": "integer", "minimum": 1, "maximum": 10000, "when_unset": "draw"},
+    {"name": "height_mm", "kind": "integer", "minimum": 1, "maximum": 10000, "when_unset": "draw"}
+  ]
+}
