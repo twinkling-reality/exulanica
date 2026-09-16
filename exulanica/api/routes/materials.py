@@ -37,6 +37,7 @@ from exulanica.world.material_recipes import (
     BakeQuotaExceeded,
     BakeRecord,
     InvalidRecipe,
+    MaterialBusy,
     MaterialError,
     MaterialRepository,
     MaterialRuntime,
@@ -129,6 +130,10 @@ def _refused(error: Exception) -> JSONResponse:
         )
     if isinstance(error, BakeQuotaExceeded):
         return _problem(429, "bake_quota_exceeded", str(error))
+    if isinstance(error, MaterialBusy):
+        response = _problem(503, "retry", "a delivery was in progress; ask again")
+        response.headers["Retry-After"] = "1"
+        return response
     raise error
 
 

@@ -31,11 +31,12 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import re
+import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, TypeVar
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -59,6 +60,8 @@ from exulanica.materials.workspace import WORKSPACE_LICENCE_ID, workspace_set_id
 from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.texture_assets import PUBLISHED_MAKER_MANIFESTS, TEXTURE_SET_MEDIA_TYPE
 
+_T = TypeVar("_T")
+
 __all__ = [
     "AUTHORABLE_ORIGINS",
     "AuthorizedBake",
@@ -67,6 +70,7 @@ __all__ = [
     "BakeQuotaExceeded",
     "BakeRecord",
     "InvalidRecipe",
+    "MaterialBusy",
     "MaterialError",
     "MaterialRepository",
     "MaterialRuntime",
@@ -81,6 +85,8 @@ AUTHORABLE_ORIGINS: Final = ("authored", "proposed")
 _LABEL_LIMIT: Final = 200
 _CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _TOMBSTONED: Final = "tombstoned: write refused"
+#: How often a write that met a delivery in progress is tried, in all.
+_ATTEMPTS: Final = 5
 
 
 class MaterialError(ExulanicaError):
@@ -117,6 +123,10 @@ class BakeBytesMissing(MaterialError):
 
 class BakeQuotaExceeded(MaterialError):
     """The workspace has used its bake requests for the day, or has too many waiting."""
+
+
+class MaterialBusy(MaterialError):
+    """A delivery held the 0041 read lock through every retry. Asking again shortly succeeds."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,8 +260,30 @@ def _refusals() -> Iterator[None]:
         raise
 
 
+def _retrying(operation: Callable[[], _T]) -> _T:
+    """Run a write again when a delivery held the 0041 read lock, which fails it fast.
+
+    ``aaa_asset_read_mutation`` refuses a write while any delivery holds the read lock rather than
+    letting it wait, so the write is safe to repeat as a whole, and it is.
+    """
+    for attempt in range(_ATTEMPTS):
+        try:
+            return operation()
+        except psycopg.errors.SerializationFailure as error:
+            if attempt == _ATTEMPTS - 1:
+                raise MaterialBusy("a delivery was in progress; ask again") from error
+            time.sleep(0.05 * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
 class MaterialRepository:
-    """Recipes and bakes in one workspace, through a connection scoped to that workspace."""
+    """Recipes and bakes in one workspace, through a connection scoped to that workspace.
+
+    **Lock order.** Every write that can touch a bake row takes the workspace's lifecycle lock
+    (``material_bake_lifecycle_lock``) first, before any row lock, because a tombstone takes that
+    lock and then updates bake rows. Taking a row lock first and the lifecycle lock second, which
+    is what the bake guard alone would do, can deadlock against a deletion.
+    """
 
     def __init__(
         self,
@@ -316,29 +348,43 @@ class MaterialRepository:
         if problems:
             raise InvalidRecipe(problems)
         with _refusals():
-            row = self.connection.execute(
-                "insert into material_recipe (workspace_id, origin, maker_id, maker_version, "
-                "  maker_sha256, recipe_canonical, recipe_document, recipe_sha256, "
-                "  based_on_set_id, based_on_version, label, created_by) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-                "returning recipe_id",
-                (
-                    self.workspace_id,
-                    origin,
-                    published.maker_id,
-                    published.version,
-                    bytes.fromhex(published.sha256),
-                    raw,
-                    Jsonb(thaw(recipe)),
-                    hashlib.sha256(raw).digest(),
-                    None if based_on is None else based_on[0],
-                    None if based_on is None else based_on[1],
-                    label,
-                    self.actor,
-                ),
-            ).fetchone()
-        assert row is not None
+            row = _retrying(
+                lambda: self._insert_recipe(origin, published, raw, recipe, based_on, label)
+            )
         return self.recipe(row["recipe_id"])
+
+    def _insert_recipe(
+        self,
+        origin: str,
+        published: Any,
+        raw: bytes,
+        recipe: Any,
+        based_on: tuple[str, int] | None,
+        label: str | None,
+    ) -> Mapping[str, Any]:
+        row = self.connection.execute(
+            "insert into material_recipe (workspace_id, origin, maker_id, maker_version, "
+            "  maker_sha256, recipe_canonical, recipe_document, recipe_sha256, "
+            "  based_on_set_id, based_on_version, label, created_by) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "returning recipe_id",
+            (
+                self.workspace_id,
+                origin,
+                published.maker_id,
+                published.version,
+                bytes.fromhex(published.sha256),
+                raw,
+                Jsonb(thaw(recipe)),
+                hashlib.sha256(raw).digest(),
+                None if based_on is None else based_on[0],
+                None if based_on is None else based_on[1],
+                label,
+                self.actor,
+            ),
+        ).fetchone()
+        assert row is not None
+        return row
 
     def _recipe_row(self, recipe_id: uuid.UUID, *, lock: bool = False) -> Mapping[str, Any]:
         row = self.connection.execute(
@@ -370,13 +416,23 @@ class MaterialRepository:
 
     def withdraw_recipe(self, recipe_id: uuid.UUID) -> None:
         """Hide a recipe and its bake now. The row is kept; the bytes wait for the workspace."""
-        with self.connection.transaction(), _refusals():
-            self._recipe_row(recipe_id, lock=True)
-            self.connection.execute(
-                "insert into material_recipe_withdrawal (workspace_id, recipe_id, withdrawn_by) "
-                "values (%s, %s, %s) on conflict (workspace_id, recipe_id) do nothing",
-                (self.workspace_id, recipe_id, self.actor),
-            )
+
+        def withdraw() -> None:
+            with self.connection.transaction():
+                self._lifecycle_lock()
+                self._recipe_row(recipe_id, lock=True)
+                self.connection.execute(
+                    "insert into material_recipe_withdrawal (workspace_id, recipe_id, "
+                    "  withdrawn_by) values (%s, %s, %s) "
+                    "on conflict (workspace_id, recipe_id) do nothing",
+                    (self.workspace_id, recipe_id, self.actor),
+                )
+
+        with _refusals():
+            _retrying(withdraw)
+
+    def _lifecycle_lock(self) -> None:
+        self.connection.execute("select material_bake_lifecycle_lock(%s)", (self.workspace_id,))
 
     # -- bakes --------------------------------------------------------------------------
 
@@ -402,7 +458,12 @@ class MaterialRepository:
 
     def request_bake(self, recipe_id: uuid.UUID) -> BakeRecord:
         """Queue the recipe's bake, unless it is already queued, running, or baked and present."""
-        with self.connection.transaction(), _refusals():
+        with _refusals():
+            return _retrying(lambda: self._request_bake(recipe_id))
+
+    def _request_bake(self, recipe_id: uuid.UUID) -> BakeRecord:
+        with self.connection.transaction():
+            self._lifecycle_lock()
             self._recipe_row(recipe_id, lock=True)
             row = self._bake_row(recipe_id, lock=True)
             if row is None:

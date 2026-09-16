@@ -47,7 +47,7 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypeVar
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -108,6 +108,7 @@ _MIB: Final = 1 << 20
 _HEADER_ALLOWANCE: Final = 1 * _MIB
 #: The baker's exit status for a request it refused rather than failed on.
 _REFUSED: Final = 2
+_T = TypeVar("_T")
 
 
 class BakeRuntimeUnavailable(RuntimeError):
@@ -393,6 +394,18 @@ class _Claim:
 _SERIALIZATION_RETRIES: Final = 5
 
 
+def _retrying(operation: Callable[[], _T]) -> _T:
+    """Run a write again when a delivery held the 0041 read lock; the last failure propagates."""
+    for attempt in range(_SERIALIZATION_RETRIES):
+        try:
+            return operation()
+        except psycopg.errors.SerializationFailure:
+            if attempt == _SERIALIZATION_RETRIES - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
+    raise AssertionError("unreachable")
+
+
 @contextlib.contextmanager
 def _session_lock(connection: psycopg.Connection, ref: str) -> Iterator[None]:
     """The session form of ``purge_lock_object``: held across the row commit and the write."""
@@ -504,7 +517,12 @@ class MaterialBakeWorker:
     # -- the queue ----------------------------------------------------------------------
 
     def _claim(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> _Claim | None:
+        return _retrying(lambda: self._claim_once(connection, workspace_id))
+
+    def _claim_once(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> _Claim | None:
         with connection.transaction():
+            # The lifecycle lock before any row lock, the order a tombstone takes them in.
+            connection.execute("select material_bake_lifecycle_lock(%s)", (workspace_id,))
             row = connection.execute(
                 "update material_bake set state = 'running', attempts = attempts + 1, "
                 "  claim_token = gen_random_uuid(), claimed_by = %s, "
@@ -534,6 +552,11 @@ class MaterialBakeWorker:
 
     def _expire_exhausted(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
         """A bake whose every attempt died with its lease is failed, visibly, not retried."""
+        return _retrying(lambda: self._expire_exhausted_once(connection, workspace_id))
+
+    def _expire_exhausted_once(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID
+    ) -> int:
         with connection.transaction():
             cursor = connection.execute(
                 "update material_bake set state = 'failed', claim_token = null, "
@@ -546,6 +569,15 @@ class MaterialBakeWorker:
         return cursor.rowcount
 
     def _finish_failed(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        claim: _Claim,
+        failed: _Failed,
+    ) -> bool:
+        return _retrying(lambda: self._finish_failed_once(connection, workspace_id, claim, failed))
+
+    def _finish_failed_once(
         self,
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
@@ -736,6 +768,7 @@ class MaterialBakeWorker:
         for attempt in range(_SERIALIZATION_RETRIES):
             try:
                 with connection.transaction():
+                    connection.execute("select material_bake_lifecycle_lock(%s)", (workspace_id,))
                     if claim.recorded_sha256 is None:
                         cursor = connection.execute(
                             "update material_bake set state = 'baked', claim_token = null, "

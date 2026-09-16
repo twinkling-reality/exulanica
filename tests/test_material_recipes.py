@@ -997,3 +997,81 @@ def test_the_global_registries_refuse_a_private_licence(materials, table):
                 "  'invented', %s, 1, 16, 16, 1000, 1000, '[]'::jsonb, %s, %s)",
                 ("1" * 64, WORKSPACE_LICENCE_ID, WORKSPACE_LICENCE_SHA256),
             )
+
+
+# -- lock order --------------------------------------------------------------------------------
+
+
+def _holding_the_lifecycle_lock(materials, work):
+    """Run ``work`` on another thread while this connection holds the workspace's lifecycle lock.
+
+    A tombstone takes that lock and then updates bake rows. So while it is held here, the other
+    thread must be waiting on the lock itself, holding no bake row; this connection then updates
+    the bake row, which is what a tombstone does next, and has to get it at once. Taking a row
+    first and the lifecycle lock second, the order a bare guard would give, deadlocks right here.
+    """
+    import threading
+
+    outcome: dict[str, object] = {}
+
+    def run() -> None:
+        with materials.owner.session(materials.workspace_id) as connection:
+            try:
+                outcome["value"] = work(connection)
+            except Exception as error:  # the assertion below names it
+                outcome["error"] = error
+
+    with materials.owner.session(materials.workspace_id) as holder:
+        holder.execute("set lock_timeout = '3s'")
+        with holder.transaction():
+            holder.execute("select material_bake_lifecycle_lock(%s)", (materials.workspace_id,))
+            thread = threading.Thread(target=run)
+            thread.start()
+            waited = False
+            for _ in range(200):
+                waiting = holder.execute(
+                    "select count(*) as n from pg_locks l join pg_stat_activity a "
+                    "  on a.pid = l.pid "
+                    "where l.locktype = 'advisory' and not l.granted and a.pid <> pg_backend_pid()"
+                ).fetchone()["n"]
+                if waiting:
+                    waited = True
+                    break
+                holder.execute("select pg_sleep(0.01)")
+            assert waited, "the other thread never waited on the lifecycle lock"
+            holder.execute(
+                "update material_bake set state = 'cancelled', claim_token = null, "
+                "  claimed_by = null, lease_expires_at = null, failure_class = 'withdrawn' "
+                "where workspace_id = %s and state in ('requested', 'running', 'failed')",
+                (materials.workspace_id,),
+            )
+        thread.join(timeout=10)
+    assert not thread.is_alive()
+    return outcome
+
+
+def test_a_bake_request_waits_for_a_deletion_before_it_locks_a_bake(materials):
+    record = materials.repository().create_recipe(_small())
+    materials.repository().request_bake(record.recipe_id)
+    worker = materials.worker()
+    claim = worker._claim(materials.connection, materials.workspace_id)
+    assert worker._finish_failed(
+        materials.connection, materials.workspace_id, claim, _Failed("bake_failed", "test")
+    )
+    outcome = _holding_the_lifecycle_lock(
+        materials,
+        lambda connection: materials.repository(connection).request_bake(record.recipe_id),
+    )
+    assert isinstance(outcome.get("error"), MaterialWithdrawn), outcome
+    assert materials.rows("select state from material_bake")[0]["state"] == "cancelled"
+
+
+def test_a_claim_waits_for_a_deletion_before_it_locks_a_bake(materials):
+    record = materials.repository().create_recipe(_small())
+    materials.repository().request_bake(record.recipe_id)
+    worker = materials.worker()
+    outcome = _holding_the_lifecycle_lock(
+        materials, lambda connection: worker._claim(connection, materials.workspace_id)
+    )
+    assert outcome == {"value": None}, outcome
+    assert materials.rows("select state from material_bake")[0]["state"] == "cancelled"
