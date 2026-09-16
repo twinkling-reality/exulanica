@@ -25,6 +25,7 @@ from exulanica.db.roles import (
     RUNTIME_ROLE,
     provision_runtime_role,
 )
+from exulanica.env import env_get
 from exulanica.migrations import migration_directory, migrations
 from exulanica.world.texture_assets import TEXTURE_SET_ID_PATTERN, load_texture_catalog
 from psycopg import sql
@@ -222,9 +223,15 @@ def test_the_catalog_is_global_and_carries_no_isolation(connection):
 def test_the_runtime_roles_read_the_catalog_and_cannot_write_it(connection, role):
     present = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
     if present is None:
+        # 0065's grant loop, like 0042's, grants only to a role that exists when it runs. The one
+        # server without the runtime roles is one nobody provisioned: every private test server
+        # creates them before migrating, so there their absence is a defect, not a reason to skip.
+        if env_get("TEST_POSTGRES") == "private":
+            pytest.fail(f"{role} is missing on a private test server, which creates it first")
         pytest.skip(
-            f"{role} does not exist on this server, so 0065's grant loop skipped it, as 0042's "
-            "does; the provisioning test below covers enforcement without it"
+            f"{role} was never created on this hand-started server, so 0065's grant loop had "
+            "nothing to revoke from; a provisioned or private test server has it, and the "
+            "provisioning test below covers enforcement either way"
         )
     privileges = connection.execute(
         "select has_table_privilege(%(role)s, %(table)s, 'SELECT') as can_read, "
