@@ -118,13 +118,25 @@ defaulting to something:
 
 ```bash
 export EXULANICA_DATABASE_URL=postgresql://exulanica_app:<password>@localhost:5433/exulanica
-export EXULANICA_API_TOKENS='{"<a long random token>":{"workspace_id":"<uuid>","actor":"<uuid>"}}'
+export EXULANICA_API_TOKENS='{"<a long random token>":{"workspace_id":"<uuid>","actor":"<uuid>","permissions":["library.read","library.write","world.read","world.write"]}}'
 export EXULANICA_DATA_DIR=.exulanica/local          # where the content-addressed store lives
 uv run uvicorn --factory exulanica.api.app:create_app --port 8000
 ```
 
 If `EXULANICA_DATA_DIR` is unset, the store defaults to `.exulanica/local`. It does not look at
 `.orimera/`. ADR-0011 records that the pre-release Orimera names were withdrawn before release.
+
+The token above may read and edit the library and the world and nothing else. Each grant lists
+its `permissions` from the closed vocabulary in [security-floor.md](security-floor.md), and a
+grant that lists none stops startup. Add `intake.write` to upload, `model.invoke` to ask a
+question, and so on.
+
+With `NEBIUS_API_KEY` set, the model client also needs the origins it may reach, and startup
+stops without them:
+
+```bash
+export EXULANICA_EGRESS_ALLOWLIST='["https://api.tokenfactory.nebius.com"]'
+```
 
 Three more are optional and all three are reported by `/readyz`, because a defence that is off and
 silent is worse than one that is absent:

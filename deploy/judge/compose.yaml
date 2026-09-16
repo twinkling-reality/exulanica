@@ -104,6 +104,10 @@ services:
       # both edit surfaces work unchanged. An unset key is a degraded demonstration, not a
       # broken one, and it is better than a key sitting in a judge's environment.
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      # No default. Read only when a model client is built, which is when NEBIUS_API_KEY is set:
+      # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
+      # See docs/security-floor.md.
+      EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
     volumes:
       - media:/var/lib/exulanica
     expose:

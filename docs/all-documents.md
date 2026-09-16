@@ -58,6 +58,7 @@ How the system works now. Edited as the system changes.
 - [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The derivative
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
+- [security-floor](security-floor.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation

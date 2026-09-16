@@ -50,7 +50,8 @@ services:
       EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_READONLY_DATABASE_URL: postgresql://exulanica_ro:${EXULANICA_EXECUTOR_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       # No default. `load_token_directory` raises when it is unset, and an API that started with
-      # an empty token directory would accept nobody while looking healthy.
+      # an empty token directory would accept nobody while looking healthy. Every grant names its
+      # `permissions`; one that does not also stops startup.
       EXULANICA_API_TOKENS: ${EXULANICA_API_TOKENS:?set EXULANICA_API_TOKENS; there is no default}
       EXULANICA_GOOGLE_CLIENT_ID: ${EXULANICA_GOOGLE_CLIENT_ID:-}
       EXULANICA_GOOGLE_CLIENT_SECRET: ${EXULANICA_GOOGLE_CLIENT_SECRET:-}
@@ -65,6 +66,10 @@ services:
       # remains available for a one-process development run, but this composition does not use it.
       EXULANICA_DERIVATIVE_WORKER: "off"
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      # No default. Read only when a model client is built, which is when NEBIUS_API_KEY is set:
+      # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
+      # See docs/security-floor.md.
+      EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
     volumes:
       - media:/var/lib/exulanica
     ports:
@@ -98,6 +103,10 @@ services:
       EXULANICA_DEPTH_DEVICE: ${EXULANICA_DEPTH_DEVICE:-}
       HF_HOME: /var/lib/exulanica/model-cache
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      # No default. Read only when a model client is built, which is when NEBIUS_API_KEY is set:
+      # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
+      # See docs/security-floor.md.
+      EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
     volumes:
       - media:/var/lib/exulanica
     depends_on:
