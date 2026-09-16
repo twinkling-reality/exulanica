@@ -497,6 +497,14 @@ npx tsx packages/loom-texture/src/dataset/cli.ts \
   --record packages/loom-texture/dataset/manifests/texture-inverse-v1.json
 ```
 
+**Evidence.** `web/packages/loom-texture/evidence/2026-09-16-dataset-determinism.log.txt` is the
+output of the script printed at its top: the committed plan exported on Node 24.15.0 and 26.7.0
+(arm64) and on Node 20.10.0 running as x86_64 under Rosetta 2, at the commit it names and with no
+uncommitted change in the package. All 10 files (the eight shards, the records and the manifest)
+were the same bytes on all three runs, compared with `cmp`, and the manifest is byte for byte the
+committed one. The exported copies were then removed; the plan rebuilds them.
+`test/dataset.test.ts` holds the record to the committed manifest.
+
 What the dataset does not settle: whether a model trained on these pictures proposes good recipes
 from real photographs. The pictures are clean, flat and synthetic, and closing that gap needs
 photographs a model may lawfully learn from, which this repository does not have and this lane does

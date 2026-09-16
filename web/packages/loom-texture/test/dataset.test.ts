@@ -35,6 +35,7 @@ import { parseStrictJsonBytes } from '../src/strict-json.js';
  */
 const PLAN_PATH = join(packageRoot(), 'dataset', 'plans', 'texture-inverse-v1.json');
 const MANIFEST_PATH = join(packageRoot(), 'dataset', 'manifests', 'texture-inverse-v1.json');
+const EVIDENCE = join(packageRoot(), 'evidence', '2026-09-16-dataset-determinism.log.txt');
 const PLAN_TEXT = readFileSync(PLAN_PATH, 'utf8');
 const COMMITTED = checkPlan(parseStrictJsonBytes(new TextEncoder().encode(PLAN_TEXT)));
 
@@ -326,5 +327,34 @@ describe('the committed manifest', () => {
       COMMITTED.sets.map((setId) => [setId, COMMITTED.records_per_set * pixels]),
     );
     expect(manifest.records.count).toBe(COMMITTED.sets.length * COMMITTED.records_per_set);
+  });
+});
+
+describe('the dataset determinism record', () => {
+  it('is of the committed manifest, on three runtimes across two architectures', () => {
+    const record = readFileSync(EVIDENCE, 'utf8');
+    const manifestBytes = new Uint8Array(readFileSync(MANIFEST_PATH));
+    const manifest = parseStrictJsonBytes(manifestBytes) as Record<string, any>;
+    const expected = new Map<string, string>([
+      ...manifest.shards.map((shard: any): [string, string] => [`./${shard.path}`, shard.sha256]),
+      [`./${manifest.records.path}`, manifest.records.sha256],
+      [`./${DATASET_FILE}`, sha256Hex(manifestBytes)],
+    ]);
+    expect(record).toContain(
+      'working tree changes under web/packages/loom-texture and assets/textures: 0',
+    );
+    for (const run of ['node24-arm64', 'node26-arm64', 'node20-x86_64-rosetta']) {
+      const section = record.split(`== run ${run}\n`)[1]!.split('\n== ')[0]!;
+      expect(section, run).toContain('exit: 0');
+      const listed = new Map(
+        [...section.matchAll(/^([0-9a-f]{64}) {2}(\.\/\S+)$/gm)].map((match) => [match[2]!, match[1]!]),
+      );
+      expect(listed, run).toEqual(expected);
+    }
+    for (const run of ['node26-arm64', 'node20-x86_64-rosetta']) {
+      expect(record).toContain(`${run}: 0 of ${expected.size} files differ; ${expected.size} files present`);
+    }
+    expect(record).toContain("committed manifest: identical to node24-arm64's");
+    expect(record).toContain(`committed manifest sha256 ${sha256Hex(manifestBytes)}`);
   });
 });

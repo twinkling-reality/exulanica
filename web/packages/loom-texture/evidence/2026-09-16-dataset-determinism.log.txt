@@ -1,0 +1,106 @@
+== script
+#!/bin/zsh
+# Export the committed dataset plan on three runtimes across two CPU architectures, compare every
+# file of every run with cmp against the first, and the first run's manifest against the committed
+# one. Prints this script, then everything it observed. The exported bytes are removed afterwards;
+# the plan and the committed manifest rebuild them.
+set -u
+WEB=/Users/glendonchin/dev/Technology/exulanica-texture-dataset/web
+DATA=$WEB/../.exulanica/datasets/texture
+PLAN=packages/loom-texture/dataset/plans/texture-inverse-v1.json
+COMMITTED=packages/loom-texture/dataset/manifests/texture-inverse-v1.json
+cd $WEB
+echo "== script"
+cat $0
+echo
+echo "== source"
+echo "commit $(git -C .. rev-parse HEAD)"
+echo "working tree changes under web/packages/loom-texture and assets/textures: $(git -C .. status --short -- web/packages/loom-texture assets/textures | wc -l | tr -d ' ')"
+npx tsc --build packages/loom-texture || exit 1
+run() {
+  local name=$1; shift
+  local out=$DATA/evidence-$name
+  rm -rf $out $out.stdout
+  echo
+  echo "== run $name"
+  echo "runtime: $("$@" -p 'process.version + " " + process.arch + " " + process.platform')"
+  "$@" ${RUNNER[@]} --plan $PLAN --out $out > $out.stdout 2>&1
+  echo "exit: $?"
+  (cd $out && find . -type f | LC_ALL=C sort | while read f; do shasum -a 256 "$f"; done)
+}
+RUNNER=(node_modules/tsx/dist/cli.mjs packages/loom-texture/src/dataset/cli.ts)
+run node24-arm64 /opt/homebrew/opt/node@24/bin/node
+run node26-arm64 /opt/homebrew/opt/node@26/bin/node
+# esbuild ships a native binary per architecture, so the x86_64 run executes the tsc output.
+RUNNER=(packages/loom-texture/dist/src/dataset/cli.js)
+run node20-x86_64-rosetta arch -x86_64 /usr/local/bin/node
+echo
+echo "== cmp, file by file, against node24-arm64"
+FILES=($(cd $DATA/evidence-node24-arm64 && find . -type f | LC_ALL=C sort))
+echo "files per run: ${#FILES[@]}"
+for other in node26-arm64 node20-x86_64-rosetta; do
+  differing=0
+  for f in $FILES; do cmp -s "$DATA/evidence-node24-arm64/$f" "$DATA/evidence-$other/$f" || { echo "DIFFERS $other $f"; differing=$((differing+1)); }; done
+  echo "$other: $differing of ${#FILES[@]} files differ; $(cd $DATA/evidence-$other && find . -type f | wc -l | tr -d ' ') files present"
+done
+echo
+echo "== the committed manifest"
+if cmp -s "$DATA/evidence-node24-arm64/dataset.json" "$COMMITTED"; then echo "committed manifest: identical to node24-arm64's"; else echo "committed manifest: DIFFERS"; fi
+echo "committed manifest sha256 $(shasum -a 256 < $COMMITTED | cut -d' ' -f1)"
+rm -rf $DATA/evidence-node24-arm64 $DATA/evidence-node26-arm64 $DATA/evidence-node20-x86_64-rosetta
+rm -f $DATA/evidence-*.stdout
+
+== source
+commit 81a93b04f1d8a1fb42dd52c3f57bce43d8e0a741
+working tree changes under web/packages/loom-texture and assets/textures: 0
+
+== run node24-arm64
+runtime: v24.15.0 arm64 darwin
+exit: 0
+7dd52d4034447579924111df1b053ec071b2caf03eea1aa11eb594a1190c2f90  ./dataset.json
+0ec7e49b9f4fcc5e1e3d0e53310f78d9b545a50b63e8c6a9b6752c6621903aa4  ./images/cc0.brick-running-bond.rgb
+aafb9e42d3dc569e218b726382c9f5ceab11abcfc66c2fa9e7589a87f5fa8751  ./images/cc0.carriageway-asphalt.rgb
+24e78a7c81500e785c9331f83a9aaedd87cff0766294bc698a27b1bc9442b187  ./images/cc0.cast-concrete.rgb
+af8d2588c296f6bda9cf9e45043c01f5ac5487cb2936c3597a026423a1ba5e61  ./images/cc0.footway-paving.rgb
+e1bbaf1c9300c4d045f482957ed0157785557258fdf08770be3c34df79dce4c1  ./images/cc0.kerb-stone.rgb
+763f74d968d8a49ac8b7485385cf280190f83ed70c7eeb2ae46584860c9f381d  ./images/cc0.limestone-ashlar.rgb
+945f46cf841138d85ffb3e4e2e8c373e4436480c583e66c4fe574b38d1ca8e5c  ./images/cc0.painted-render.rgb
+e41992b880651e5e6d1c73ff05e8967609414e39df3927910d1ba9f526cd740b  ./images/cc0.storefront-metal.rgb
+bc266afd839c8d945c1e2182a60298986e7edfcd0c9f3bda8fb36f888dfe7ef3  ./records.jsonl
+
+== run node26-arm64
+runtime: v26.7.0 arm64 darwin
+exit: 0
+7dd52d4034447579924111df1b053ec071b2caf03eea1aa11eb594a1190c2f90  ./dataset.json
+0ec7e49b9f4fcc5e1e3d0e53310f78d9b545a50b63e8c6a9b6752c6621903aa4  ./images/cc0.brick-running-bond.rgb
+aafb9e42d3dc569e218b726382c9f5ceab11abcfc66c2fa9e7589a87f5fa8751  ./images/cc0.carriageway-asphalt.rgb
+24e78a7c81500e785c9331f83a9aaedd87cff0766294bc698a27b1bc9442b187  ./images/cc0.cast-concrete.rgb
+af8d2588c296f6bda9cf9e45043c01f5ac5487cb2936c3597a026423a1ba5e61  ./images/cc0.footway-paving.rgb
+e1bbaf1c9300c4d045f482957ed0157785557258fdf08770be3c34df79dce4c1  ./images/cc0.kerb-stone.rgb
+763f74d968d8a49ac8b7485385cf280190f83ed70c7eeb2ae46584860c9f381d  ./images/cc0.limestone-ashlar.rgb
+945f46cf841138d85ffb3e4e2e8c373e4436480c583e66c4fe574b38d1ca8e5c  ./images/cc0.painted-render.rgb
+e41992b880651e5e6d1c73ff05e8967609414e39df3927910d1ba9f526cd740b  ./images/cc0.storefront-metal.rgb
+bc266afd839c8d945c1e2182a60298986e7edfcd0c9f3bda8fb36f888dfe7ef3  ./records.jsonl
+
+== run node20-x86_64-rosetta
+runtime: v20.10.0 x64 darwin
+exit: 0
+7dd52d4034447579924111df1b053ec071b2caf03eea1aa11eb594a1190c2f90  ./dataset.json
+0ec7e49b9f4fcc5e1e3d0e53310f78d9b545a50b63e8c6a9b6752c6621903aa4  ./images/cc0.brick-running-bond.rgb
+aafb9e42d3dc569e218b726382c9f5ceab11abcfc66c2fa9e7589a87f5fa8751  ./images/cc0.carriageway-asphalt.rgb
+24e78a7c81500e785c9331f83a9aaedd87cff0766294bc698a27b1bc9442b187  ./images/cc0.cast-concrete.rgb
+af8d2588c296f6bda9cf9e45043c01f5ac5487cb2936c3597a026423a1ba5e61  ./images/cc0.footway-paving.rgb
+e1bbaf1c9300c4d045f482957ed0157785557258fdf08770be3c34df79dce4c1  ./images/cc0.kerb-stone.rgb
+763f74d968d8a49ac8b7485385cf280190f83ed70c7eeb2ae46584860c9f381d  ./images/cc0.limestone-ashlar.rgb
+945f46cf841138d85ffb3e4e2e8c373e4436480c583e66c4fe574b38d1ca8e5c  ./images/cc0.painted-render.rgb
+e41992b880651e5e6d1c73ff05e8967609414e39df3927910d1ba9f526cd740b  ./images/cc0.storefront-metal.rgb
+bc266afd839c8d945c1e2182a60298986e7edfcd0c9f3bda8fb36f888dfe7ef3  ./records.jsonl
+
+== cmp, file by file, against node24-arm64
+files per run: 10
+node26-arm64: 0 of 10 files differ; 10 files present
+node20-x86_64-rosetta: 0 of 10 files differ; 10 files present
+
+== the committed manifest
+committed manifest: identical to node24-arm64's
+committed manifest sha256 7dd52d4034447579924111df1b053ec071b2caf03eea1aa11eb594a1190c2f90
