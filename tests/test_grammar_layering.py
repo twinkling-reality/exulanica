@@ -38,6 +38,7 @@ _PACKAGE = ROOT / "exulanica" / "grammar"
 _GRAMMARS = _PACKAGE / "grammars"
 
 GRAMMAR_CONTRACT = "Generated content cannot name a citation, because it cannot name one"
+MATERIALS_CONTRACT = "Material objects cannot name a citation, open a database, or load a model"
 PURE_CORE_CONTRACT = "The pure core does not know a database exists"
 
 #: The fixed, greppable prefix of every negative-control module this file writes.
@@ -124,10 +125,11 @@ def test_the_layers_contract_is_still_exhaustive_and_places_both_new_slots():
     assert layers["exhaustive"] is True
     order = layers["layers"]
     at = order.index("grammar")
-    assert order[at - 2 : at + 2] == [
+    assert order[at - 2 : at + 3] == [
         "reconstruction | capture",
         "evidence | migrations",
         "grammar",
+        "materials",
         "canonical",
     ], order
     [grammar] = [contract for contract in contracts if contract["name"] == GRAMMAR_CONTRACT]
@@ -136,6 +138,26 @@ def test_the_layers_contract_is_still_exhaustive_and_places_both_new_slots():
     assert sorted(grammar["forbidden_modules"]) == sorted(
         f"exulanica.{name}"
         for name in ("evidence", "store", "db", "ingest", "identity", "selection")
+    )
+    [materials] = [contract for contract in contracts if contract["name"] == MATERIALS_CONTRACT]
+    assert materials["type"] == "forbidden"
+    assert materials["source_modules"] == ["exulanica.materials"]
+    assert sorted(materials["forbidden_modules"]) == sorted(
+        ["psycopg", "torch", "numpy", "cv2", "pycolmap"]
+        + [
+            f"exulanica.{name}"
+            for name in (
+                "db",
+                "store",
+                "evidence",
+                "ingest",
+                "migrations",
+                "identity",
+                "selection",
+                "reconstruction",
+                "capture",
+            )
+        ]
     )
     assert len([contract for contract in contracts if contract["type"] == "forbidden"]) >= 4
 
