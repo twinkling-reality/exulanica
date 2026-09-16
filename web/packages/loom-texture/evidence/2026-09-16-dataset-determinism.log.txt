@@ -51,7 +51,7 @@ rm -rf $DATA/evidence-node24-arm64 $DATA/evidence-node26-arm64 $DATA/evidence-no
 rm -f $DATA/evidence-*.stdout
 
 == source
-commit 81a93b04f1d8a1fb42dd52c3f57bce43d8e0a741
+commit 452afd766e13cc94be277c79bb6c3d3ad428dfcc
 working tree changes under web/packages/loom-texture and assets/textures: 0
 
 == run node24-arm64

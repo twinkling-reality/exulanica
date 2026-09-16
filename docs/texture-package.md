@@ -502,10 +502,9 @@ output of the script printed at its top: the committed plan exported on Node 24.
 (arm64) and on Node 20.10.0 running as x86_64 under Rosetta 2, at the commit it names and with no
 uncommitted change in the package. All 10 files (the eight shards, the records and the manifest)
 were the same bytes on all three runs, compared with `cmp`, and the manifest is byte for byte the
-committed one. The exported copies were then removed; the plan rebuilds them. The record names
-commit 81a93b0, from before this branch was rebased onto the provisioning fix; the rebased commit
-9bb0309 has the same package source and the same published files. `test/dataset.test.ts` holds the
-record to the committed manifest.
+committed one. The exported copies were then removed; the plan rebuilds them. An earlier run of the
+same script, taken before this branch was rebased onto the provisioning fix, gave the same digests.
+`test/dataset.test.ts` holds the record to the committed manifest.
 
 What the dataset does not settle: whether a model trained on these pictures proposes good recipes
 from real photographs. The pictures are clean, flat and synthetic, and closing that gap needs
