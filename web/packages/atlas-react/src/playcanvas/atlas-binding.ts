@@ -1922,7 +1922,7 @@ export class AtlasBinding {
   }
 
   /**
-   * The region the visitor is standing in or approaching, or null between them.
+   * The region the visitor is standing inside, or null.
    *
    * The landmark is what marks a memory in the world now that nothing else does, and a landmark is
    * geometry with no identity of its own: it carries no anchor, so the reticle cannot settle on it
@@ -2089,7 +2089,14 @@ export class AtlasBinding {
         : mapTierState(this.scene);
 
     const spatial = classifySpatialPhase(this.navigationWorld, cameraAtlas);
-    this.occupied = spatial.islandId;
+    /*
+     * Standing IN the memory, not merely near it.
+     *
+     * `approaching` reaches 24 metres past the footprint, which over a district is most of a city
+     * block and would hand every interact key in that radius to a memory. Inside the footprint is
+     * the honest reading of "standing at it", and it is also where the landmark is.
+     */
+    this.occupied = spatial.phase === 'inside' || spatial.phase === 'dissolve' ? spatial.islandId : null;
     this.activeNeighborhood =
       spatial.islandId === null
         ? (this.activeNeighborhood ?? this.neighborhoodIndex.neighborhoods[0]?.neighborhoodId ?? null)
@@ -2232,6 +2239,7 @@ export class AtlasBinding {
     if (this.overlay !== null && cameraComponent !== undefined && cameraComponent !== null) {
       this.overlay.update({
         photographPrompt: this.centred !== null,
+        memoryPrompt: this.occupied !== null,
         table: this.table,
         emphasis: this.emphasis,
         camera: cameraComponent,

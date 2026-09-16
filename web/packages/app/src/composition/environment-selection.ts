@@ -856,6 +856,17 @@ export function mountEnvironmentSelection(
       attachedControls = atlas.controls;
       priorInteract = atlas.controls.onInteract;
       installedInteract = () => {
+        /*
+         * Standing inside a memory outranks whatever the ray finds.
+         *
+         * This picker casts from the eye and a district is wall to wall facades, so over any
+         * memory in a street canyon the building behind the landmark took the key every time and
+         * the memory could only be opened by aiming at empty sky. Inside a memory's own footprint
+         * is a few metres wide and is the one place that trade is obviously wrong: the visitor is
+         * standing in the thing they would be selecting. Everywhere else the ray still decides.
+         */
+        // Loose null check on purpose: a binding without this reading is not inside anything.
+        if (atlas.occupiedRegion != null) { priorInteract?.(); return; }
         const ray = atlas.interactionRay?.();
         const position = ray ? { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] } : atlas.controls.state;
         const forward = ray ? { x: ray.direction[0], y: ray.direction[1], z: ray.direction[2] } : atlas.controls.forward?.() ?? atlas.camera.forward;

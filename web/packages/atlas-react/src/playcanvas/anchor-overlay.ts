@@ -102,6 +102,8 @@ export interface OverlayFrame {
    * specific thing under the reticle.
    */
   readonly photographPrompt?: boolean;
+  /** The visitor is standing inside a memory whose landmark carries no anchor of its own. */
+  readonly memoryPrompt?: boolean;
 }
 
 export class AnchorOverlay {
@@ -109,6 +111,7 @@ export class AnchorOverlay {
   private readonly interactionSigil: Node;
   private readonly focusLabel: Node;
   private readonly photographLabel: Node;
+  private readonly memoryLabel: Node;
   private readonly callouts: Node[];
   private readonly chevrons: Node[];
   private readonly markers: Node[];
@@ -165,6 +168,15 @@ export class AnchorOverlay {
       Object.assign(document.createElement('span'), { className: 'ov-focus-key', textContent: 'E' }),
       // One short verb: the label stage reveals at most 5.5rem of it (style.css), sized for
       // "Interact". The visitor is already looking at the photograph; the accessible name says it.
+      Object.assign(document.createElement('span'), { className: 'ov-focus-verb', textContent: 'Open' }),
+    );
+    this.memoryLabel = makeNode('ov-focus', this.root);
+    this.memoryLabel.root.dataset['stage'] = 'label';
+    this.memoryLabel.root.setAttribute('role', 'status');
+    this.memoryLabel.root.setAttribute('aria-live', 'polite');
+    this.memoryLabel.root.setAttribute('aria-label', 'Press E to open this memory');
+    this.memoryLabel.root.replaceChildren(
+      Object.assign(document.createElement('span'), { className: 'ov-focus-key', textContent: 'E' }),
       Object.assign(document.createElement('span'), { className: 'ov-focus-verb', textContent: 'Open' }),
     );
     this.callouts = Array.from({ length: MAX_CAPTIONS }, () => makeNode('ov-callout', this.root));
@@ -319,6 +331,20 @@ export class AnchorOverlay {
       focusUsed = 1;
     } else {
       hide(this.photographLabel);
+    }
+    /*
+     * The memory the visitor is standing in.
+     *
+     * Last of the three, so an anchor or a photograph under the reticle still wins: those name a
+     * particular thing, and this one only says "the place you are standing is a memory". It needs
+     * no aim at all, which is the point. The landmark has no anchor to settle on, and over a
+     * district a ray toward it meets a facade long before it meets the interface.
+     */
+    if (focusUsed === 0 && frame.traversalActive && frame.memoryPrompt === true) {
+      show(this.memoryLabel, w / 2 + 18, h / 2 + 14, 1);
+      focusUsed = 1;
+    } else {
+      hide(this.memoryLabel);
     }
     if (sigilUsed === 0) hide(this.interactionSigil);
     for (let i = calloutUsed; i < this.callouts.length; i += 1) hide(this.callouts[i]!);
