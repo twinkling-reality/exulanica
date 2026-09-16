@@ -192,7 +192,13 @@ class ContentEvidencePacket:
 
 
 def build_content_packet(result: SelectionResult) -> ContentEvidencePacket:
-    """Bound source, memory, authored, and simulated records without merging truth classes."""
+    """Bound records of every origin without merging truth classes.
+
+    Source, memory, authored, invented and simulated records each keep their own class.
+    ``invented`` is generated content: a pure function of a seed, a grammar version and a
+    catalog. It has its own truth class so that a generated subject never reaches a model as
+    ``"other"``, and ``"other"`` keeps meaning only that the origin is not one this map knows.
+    """
     taken: set[str] = set()
     items = tuple(
         ContentEvidenceItem(
@@ -201,6 +207,7 @@ def build_content_packet(result: SelectionResult) -> ContentEvidencePacket:
                 "personal": "authorized_memory",
                 "imported": "admitted_source",
                 "authored": "authored_version",
+                "invented": "invented_world",
                 "simulated": "simulation",
             }.get(item.origin_kind, "other"),
             result_kind=item.result_kind,
@@ -247,8 +254,9 @@ def build_packet(
     spans: list[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID, str | None]] = []
     for capture in result.captures:
         for support in capture.support:
-            spans.append((support.span_id, support.assertion_id, capture.capture_id,
-                          capture.captured_at))
+            spans.append(
+                (support.span_id, support.assertion_id, capture.capture_id, capture.captured_at)
+            )
             if len(spans) >= MAX_PACKET_ITEMS:
                 break
         if len(spans) >= MAX_PACKET_ITEMS:
