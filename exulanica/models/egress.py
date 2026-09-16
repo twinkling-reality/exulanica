@@ -219,6 +219,24 @@ class EgressAllowlist:
     def __str__(self) -> str:
         return ", ".join(str(origin) for origin in sorted(self.origins))
 
+    def narrowed_to(self, origins: Iterable[str], *, purpose: str) -> EgressAllowlist:
+        """Only ``origins``, every one of which this list must include.
+
+        The shared list may declare other origins as well, and usually does: the model endpoint
+        sits beside the sign-in provider. A component that needs some of them is handed exactly
+        those, so it cannot reach the others through this check. A required origin the list does
+        not include is a configuration error naming it.
+        """
+        wanted = parse_egress_allowlist(origins).origins
+        missing = sorted(str(origin) for origin in wanted - self.origins)
+        if missing:
+            raise EgressConfigurationError(
+                f"{EGRESS_ALLOWLIST_ENV} must include {', '.join(sorted(map(str, wanted)))} for "
+                f"{purpose}, alongside any other origins it declares. It does not include "
+                f"{', '.join(missing)}."
+            )
+        return EgressAllowlist(frozenset(wanted))
+
     def require_parts(
         self, *, scheme: str, host: str, port: int | None, userinfo: str | bytes = ""
     ) -> Origin:

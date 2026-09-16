@@ -4,16 +4,25 @@ import secrets
 import time
 import uuid
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Annotated
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx2
 import pytest
-from exulanica.api.account_runtime import AccountRuntime, GoogleAccountConfig, GoogleOIDCProvider
+from exulanica.api import permissions
+from exulanica.api.account_runtime import (
+    GOOGLE_EGRESS_ORIGINS,
+    AccountRuntime,
+    GoogleAccountConfig,
+    GoogleOIDCProvider,
+)
 from exulanica.api.authorisation import TokenDirectory, TokenNotAccepted
 from exulanica.api.dependencies import current_session
 from exulanica.api.routes import accounts, health
 from exulanica.api.services import Services
+from exulanica.models.egress import parse_egress_allowlist
+from exulanica.models.manifest import load_manifest
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from fastapi import Depends, FastAPI, Request
@@ -122,6 +131,12 @@ class FakeGoogle:
         )
 
 
+def production_shaped_allowlist():
+    """The model endpoint and the three sign-in origins, as one deployment declares them."""
+    scheme, _, host, _ = load_manifest().base_url.split("/", 3)
+    return parse_egress_allowlist([f"{scheme}//{host}", *GOOGLE_EGRESS_ORIGINS])
+
+
 @dataclass
 class AccountApi:
     client: TestClient
@@ -149,10 +164,15 @@ def account_api(repository, spine_schema, account_role, tmp_path):
         browser_origins=("https://app.test",),
     )
     fake = FakeGoogle()
+    # Every provider request passes the same allowlist a deployment declares, in front of the fake.
     runtime = AccountRuntime(
         config,
         account_role,
-        GoogleOIDCProvider(config, transport=httpx2.MockTransport(fake.handle)),
+        GoogleOIDCProvider(
+            config,
+            transport=httpx2.MockTransport(fake.handle),
+            egress=production_shaped_allowlist(),
+        ),
     )
     runtime.verify_database(database.url)
     app = FastAPI()
@@ -183,7 +203,20 @@ def account_api(repository, spine_schema, account_role, tmp_path):
             current = connection.execute("select current_workspace() workspace_id").fetchone()
             return {"actor": str(session.actor), "workspace_id": str(current["workspace_id"])}
 
-    with TestClient(app, base_url="https://app.test", follow_redirects=False) as client:
+    declared = {
+        **permissions.ROUTE_RULES,
+        ("GET", "/protected"): permissions.Requires(
+            frozenset({permissions.Permission.LIBRARY_READ})
+        ),
+        ("POST", "/protected"): permissions.Requires(
+            frozenset({permissions.Permission.LIBRARY_WRITE})
+        ),
+    }
+    with (
+        pytest.MonkeyPatch.context() as patch,
+        TestClient(app, base_url="https://app.test", follow_redirects=False) as client,
+    ):
+        patch.setattr(permissions, "ROUTE_RULES", MappingProxyType(declared))
         yield AccountApi(client, runtime, fake)
 
 

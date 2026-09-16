@@ -404,7 +404,14 @@ def test_the_catalog_fetch_is_held_to_the_allowlist_too(monkeypatch, sockets):
 
 # -- what the allowlist does not cover, kept true -----------------------------------------
 
-#: Modules that reach the network without this transport. docs/security-floor.md names them as
+#: Modules that reach the network and hold every request to the allowlist, through
+#: ``allowlisted_transport``. Each is checked for that wiring below.
+COVERED_NETWORK_MODULES = {
+    "exulanica/models/transport.py",
+    "exulanica/api/account_runtime.py",
+}
+
+#: Modules that reach the network without the allowlist. docs/security-floor.md names them as
 #: uncovered; a new one fails here so the document cannot quietly become wrong.
 UNCOVERED_NETWORK_MODULES = {
     "exulanica/environment/nyc_open_data.py",
@@ -412,22 +419,25 @@ UNCOVERED_NETWORK_MODULES = {
     "exulanica/evaluation/benchmark.py",
 }
 
+#: ``httpx2`` is named as well as ``httpx``: the sign-in path uses it, and a pattern that knew
+#: only the first spelling passed while that path reached Google unchecked.
 _NETWORK = re.compile(
-    r"\burlopen\(|\bhttpx\.(?:Client|AsyncClient|get|post|put|request|stream)\(|"
-    r"^\s*import (?:requests|aiohttp|urllib3)\b|\bsocket\.create_connection\(",
+    r"\burlopen\(|\bhttpx2?\.(?:Client|AsyncClient|get|post|put|request|stream)\(|"
+    r"^\s*import (?:requests|aiohttp|urllib3)\b|\bsocket\.create_connection\(|"
+    r"\bOAuth2Client\(",
     re.MULTILINE,
 )
 
 
-def test_the_list_of_uncovered_network_modules_is_complete():
+def test_every_network_module_is_either_held_to_the_allowlist_or_named_as_not():
     found = set()
     for path in sorted((ROOT / "exulanica").rglob("*.py")):
-        relative = path.relative_to(ROOT).as_posix()
-        if relative == "exulanica/models/transport.py":
-            continue
         if _NETWORK.search(path.read_text(encoding="utf-8")):
-            found.add(relative)
-    assert found == UNCOVERED_NETWORK_MODULES
+            found.add(path.relative_to(ROOT).as_posix())
+    assert found - COVERED_NETWORK_MODULES == UNCOVERED_NETWORK_MODULES
+    assert found >= COVERED_NETWORK_MODULES
+    for relative in COVERED_NETWORK_MODULES:
+        assert "allowlisted_transport(" in (ROOT / relative).read_text(encoding="utf-8"), relative
 
 
 def test_nothing_in_the_package_hands_the_transport_its_own_client():
@@ -489,3 +499,156 @@ def test_a_deployment_with_a_model_key_and_no_allowlist_does_not_start(tmp_path,
         services = build_services(environ)
     assert services.model_client is not None
     assert sockets == []
+
+
+# -- Google sign-in ---------------------------------------------------------------------------
+
+from exulanica.api import account_runtime as _accounts  # noqa: E402
+from exulanica.api.account_repository import AccountUnavailable  # noqa: E402
+from exulanica.api.account_runtime import (  # noqa: E402
+    GOOGLE_EGRESS_ORIGINS,
+    GoogleAccountConfig,
+    GoogleOIDCProvider,
+    load_account_runtime,
+)
+
+from account_fixtures import account_api as account_api  # noqa: E402
+from account_fixtures import account_role as account_role  # noqa: E402
+from account_fixtures import production_shaped_allowlist  # noqa: E402
+
+_CONFIG = GoogleAccountConfig(
+    client_id="test-google-client",
+    client_secret="test-only-client-secret",
+    callback_uri="https://app.test/auth/google/callback",
+    return_uris=("https://app.test/world",),
+    browser_origins=("https://app.test",),
+)
+
+
+def _model_origin() -> str:
+    scheme, _, host, _ = load_manifest().base_url.split("/", 3)
+    return f"{scheme}//{host}"
+
+
+def test_sign_in_needs_the_list_to_include_the_google_origins_among_others():
+    """Includes, not equals: the ordinary list also names the model endpoint."""
+    shared = production_shaped_allowlist()
+    assert Origin("https", load_manifest().base_url.split("/")[2], 443) in shared.origins
+    narrowed = shared.narrowed_to(GOOGLE_EGRESS_ORIGINS, purpose="Google sign-in")
+    assert {str(origin) for origin in narrowed.origins} == set(GOOGLE_EGRESS_ORIGINS)
+
+    only_model = parse_egress_allowlist([_model_origin()])
+    with pytest.raises(EgressConfigurationError) as refused:
+        only_model.narrowed_to(GOOGLE_EGRESS_ORIGINS, purpose="Google sign-in")
+    message = str(refused.value)
+    assert "must include" in message and "alongside any other origins" in message
+    assert all(origin in message.split("does not include")[1] for origin in GOOGLE_EGRESS_ORIGINS)
+
+    missing_jwks = parse_egress_allowlist([_model_origin(), *GOOGLE_EGRESS_ORIGINS[:2]])
+    with pytest.raises(EgressConfigurationError) as refused:
+        missing_jwks.narrowed_to(GOOGLE_EGRESS_ORIGINS, purpose="Google sign-in")
+    assert refused.value.args[0].split("does not include")[1].strip() == (
+        "https://www.googleapis.com."
+    )
+
+
+def _sign_in_environ(**extra: str) -> dict[str, str]:
+    return {
+        "EXULANICA_GOOGLE_CLIENT_ID": _CONFIG.client_id,
+        "EXULANICA_GOOGLE_CLIENT_SECRET": _CONFIG.client_secret,
+        "EXULANICA_GOOGLE_CALLBACK_URI": _CONFIG.callback_uri,
+        "EXULANICA_GOOGLE_RETURN_URIS": '["https://app.test/world"]',
+        "EXULANICA_ACCOUNT_BROWSER_ORIGINS": '["https://app.test"]',
+        "EXULANICA_ACCOUNT_DATABASE_URL": "postgresql://localhost:5433/never-connected-to",
+        **extra,
+    }
+
+
+def test_a_deployment_with_sign_in_and_no_google_origins_does_not_start(sockets):
+    with pytest.raises(EgressConfigurationError, match="no default"):
+        load_account_runtime(_sign_in_environ())
+    with pytest.raises(EgressConfigurationError, match="must include"):
+        load_account_runtime(
+            _sign_in_environ(EXULANICA_EGRESS_ALLOWLIST=json.dumps([_model_origin()]))
+        )
+    assert sockets == []
+
+
+def test_a_provider_with_nothing_declared_refuses_at_its_first_call_and_not_before(sockets):
+    provider = GoogleOIDCProvider(_CONFIG)
+    with pytest.raises(AccountUnavailable, match="EXULANICA_EGRESS_ALLOWLIST"):
+        provider.metadata()
+    assert sockets == []
+
+
+def _fake_google(seen: list[str]) -> httpx.MockTransport:
+    import httpx2
+
+    def handle(request):
+        seen.append(str(request.url))
+        return httpx2.Response(500)
+
+    return httpx2.MockTransport(handle)
+
+
+def test_an_undeclared_sign_in_host_is_refused_before_a_socket_and_named(
+    monkeypatch, sockets, caplog
+):
+    seen: list[str] = []
+    provider = GoogleOIDCProvider(
+        _CONFIG, transport=_fake_google(seen), egress=production_shaped_allowlist()
+    )
+    monkeypatch.setattr(
+        _accounts, "DISCOVERY_URI", "https://accounts.google.com.evil.example/openid"
+    )
+    with caplog.at_level(logging.WARNING, logger="exulanica.models.egress"):
+        with pytest.raises(AccountUnavailable):
+            provider.metadata()
+        # The model endpoint is declared in the shared list and is still not reachable from here.
+        with pytest.raises(AccountUnavailable):
+            provider._json(f"{_model_origin()}/v1/models")
+    assert seen == []
+    assert sockets == []
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "https://accounts.google.com.evil.example" in logged
+    assert _model_origin() in logged
+
+
+@pytest.mark.postgres
+def test_sign_in_still_resolves_through_the_declared_origins(account_api):
+    provider = account_api.runtime.provider
+    assert {str(origin) for origin in provider.egress.origins} == set(GOOGLE_EGRESS_ORIGINS)
+    session = account_api.login()
+    assert session["workspace_id"] and session["actor"]
+    reached = {url.split("/", 3)[2] for _method, url in account_api.fake.calls}
+    assert reached == {"accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com"}
+    assert account_api.client.get("/protected").status_code == 200
+
+
+@pytest.mark.postgres
+def test_sign_in_fails_closed_when_discovery_points_somewhere_undeclared(
+    account_api, monkeypatch, caplog
+):
+    before = list(account_api.fake.calls)
+    provider = account_api.runtime.provider
+    monkeypatch.setattr(provider, "_cache", {})
+    monkeypatch.setattr(_accounts, "DISCOVERY_URI", "https://discovery.evil.example/openid")
+    with caplog.at_level(logging.WARNING, logger="exulanica.models.egress"):
+        response = account_api.client.get("/auth/google/start")
+    assert (response.status_code, response.json()["code"]) == (503, "account_unavailable")
+    assert account_api.fake.calls == before
+    assert "https://discovery.evil.example" in " ".join(r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.postgres
+def test_the_production_shaped_list_starts_sign_in(account_api, spine_schema):
+    from tests_support_api import scratch_database
+
+    environ = _sign_in_environ(
+        EXULANICA_ACCOUNT_DATABASE_URL=account_api.runtime.database_url,
+        EXULANICA_DATABASE_URL=scratch_database(spine_schema[1]).url,
+        EXULANICA_EGRESS_ALLOWLIST=json.dumps([_model_origin(), *GOOGLE_EGRESS_ORIGINS]),
+    )
+    runtime = load_account_runtime(environ)
+    assert runtime is not None
+    assert {str(o) for o in runtime.provider.egress.origins} == set(GOOGLE_EGRESS_ORIGINS)

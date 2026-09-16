@@ -66,9 +66,9 @@ services:
       # remains available for a one-process development run, but this composition does not use it.
       EXULANICA_DERIVATIVE_WORKER: "off"
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
-      # No default. Read only when a model client is built, which is when NEBIUS_API_KEY is set:
-      # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
-      # See docs/security-floor.md.
+      # No default. Read when a model client is built (NEBIUS_API_KEY set) and when Google sign-in
+      # is configured: an unset or malformed allowlist, or one that omits the model endpoint or
+      # the three Google sign-in origins, stops startup. See docs/security-floor.md.
       EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
     volumes:
       - media:/var/lib/exulanica

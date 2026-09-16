@@ -41,7 +41,13 @@ from exulanica.models.egress import (
 )
 from exulanica.models.errors import TransportError
 
-__all__ = ["HttpResponse", "HttpxTransport", "Transport", "allowlisted_httpx_client"]
+__all__ = [
+    "HttpResponse",
+    "HttpxTransport",
+    "Transport",
+    "allowlisted_httpx_client",
+    "allowlisted_transport",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +114,39 @@ class Transport(Protocol):
     ) -> HttpResponse: ...
 
 
+def allowlisted_transport(
+    egress: EgressAllowlist, *, http: Any | None = None, inner: Any | None = None
+) -> Any:
+    """A transport that holds every request to ``egress`` immediately before it connects.
+
+    ``http`` is the HTTP client module, ``httpx`` by default. ``httpx2`` has the same transport
+    shape, and the Google sign-in path uses it, so one check serves both rather than two copies
+    that can drift. ``inner`` is what actually sends, a real ``HTTPTransport`` by default; a test
+    passes a mock, and the check still runs in front of it.
+    """
+    if http is None:
+        import httpx as http  # imported lazily so tests never need the dependency loaded
+
+    class _AllowlistedTransport(http.BaseTransport):
+        def __init__(self, wrapped: Any) -> None:
+            self._wrapped = wrapped
+
+        def handle_request(self, request: Any) -> Any:
+            url = request.url
+            egress.require_parts(
+                scheme=url.scheme,
+                host=url.raw_host.decode("ascii"),
+                port=url.port,
+                userinfo=url.userinfo,
+            )
+            return self._wrapped.handle_request(request)
+
+        def close(self) -> None:
+            self._wrapped.close()
+
+    return _AllowlistedTransport(inner if inner is not None else http.HTTPTransport())
+
+
 def allowlisted_httpx_client(
     egress: EgressAllowlist, *, inner: Any | None = None, follow_redirects: bool = False
 ) -> Any:
@@ -121,25 +160,8 @@ def allowlisted_httpx_client(
     """
     import httpx  # imported lazily so tests never need the dependency loaded
 
-    class _AllowlistedTransport(httpx.BaseTransport):
-        def __init__(self, wrapped: httpx.BaseTransport) -> None:
-            self._wrapped = wrapped
-
-        def handle_request(self, request: httpx.Request) -> httpx.Response:
-            url = request.url
-            egress.require_parts(
-                scheme=url.scheme,
-                host=url.raw_host.decode("ascii"),
-                port=url.port,
-                userinfo=url.userinfo,
-            )
-            return self._wrapped.handle_request(request)
-
-        def close(self) -> None:
-            self._wrapped.close()
-
     return httpx.Client(
-        transport=_AllowlistedTransport(inner if inner is not None else httpx.HTTPTransport()),
+        transport=allowlisted_transport(egress, http=httpx, inner=inner),
         follow_redirects=follow_redirects,
     )
 

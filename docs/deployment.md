@@ -391,7 +391,7 @@ Training, conversion and authenticated visual acceptance are separate gates.
 | `EXULANICA_TEST_DATABASE_URL` | Points the database backed tests at a live PostgreSQL 18 server | Tests only. Unset means those tests skip, which is why the suite runs without a database. |
 | `EXULANICA_DATA_DIR` | Where the content addressed store lives | The API and the ingest command must agree on it, or a citation resolves against a store the bytes are not in. Defaults to `.exulanica/local`. It does not look at `.orimera/`. |
 | `EXULANICA_API_TOKENS` | Bearer token to workspace grant, including the `permissions` the token holds | No default, because a default would be a credential in a repository. A grant that names no permissions, or one outside the closed vocabulary in [security-floor.md](security-floor.md), stops startup |
-| `EXULANICA_EGRESS_ALLOWLIST` | The origins the model transport may reach, as a JSON array | Required whenever a model client is built, which is whenever `NEBIUS_API_KEY` is set, and it must name the manifest's `base_url`. No default. A process-level control only; [security-floor.md](security-floor.md) says what it does not cover |
+| `EXULANICA_EGRESS_ALLOWLIST` | The origins the server may reach, as a JSON array | Required whenever a model client is built, which is whenever `NEBIUS_API_KEY` is set, and it must include the manifest's `base_url`. With Google sign-in configured it must also include `https://accounts.google.com`, `https://oauth2.googleapis.com` and `https://www.googleapis.com`. No default. A process-level control only; [security-floor.md](security-floor.md) says what it does not cover |
 | `EXULANICA_LENS_BUDGETS` | Per-lens token, call, wall-clock and Decimal cost ceilings | Read by `exulanica/models/lens_budget.py`. A lens with no entry may not call a model. No default |
 | `EXULANICA_READONLY_DATABASE_URL` | The Selection executor's role | Optional, and `/readyz` says so when it is absent |
 | `EXULANICA_DERIVATIVE_WORKER` | Whether this process drains what `POST /intake` queues | Defaults to **on**. Off is for an instance that leaves the queue to somebody else, and `/readyz` reports which it is: a queue nobody drains and a queue drained elsewhere look identical from outside |
@@ -427,7 +427,15 @@ Migration 0058 creates six pre-workspace account tables. An administrator explic
 `exulanica_accounts` using `exulanica.db.account_roles.provision_account_role`; application startup
 never creates roles. This non-owner, NOINHERIT role can access the account tables but not world
 records. Application/read roles cannot access account tables, including after reprovisioning.
-Google configuration checks role isolation at startup. Provider HTTP runs outside DB transactions.
+Google configuration checks role isolation at startup. Provider HTTP runs outside DB transactions,
+and every provider request is held to `EXULANICA_EGRESS_ALLOWLIST`, which must include
+`https://accounts.google.com` (discovery), `https://oauth2.googleapis.com` (token) and
+`https://www.googleapis.com` (JWKS) alongside anything else it declares, or startup stops and names
+the origins it lacks. If Google ever moves its token endpoint or JWKS to a new host, sign-in fails
+closed with `503 account_unavailable` and the log names either the changed discovery document or
+the refused origin; the fix is to update the pinned endpoint URLs in
+`exulanica/api/account_runtime.py` and add the new origin to the allowlist, because the allowlist
+entry alone does not get past the pinned-URL check.
 The callback and session cookie require HTTPS; a plain HTTP preview is not a live sign-in deployment.
 
 `GET /auth/google/start` begins sign-in, `GET /auth/google/callback` completes it,

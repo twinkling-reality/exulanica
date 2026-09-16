@@ -3,6 +3,18 @@
 The host configures a separate auth-role URL for the same deployment database/schema. Provider
 HTTP runs outside database transactions. Every downstream workspace session is resolved from a
 current account membership, never a callback or browser-supplied workspace identifier.
+
+Provider HTTP is held to the declared egress allowlist. ``EXULANICA_EGRESS_ALLOWLIST`` must include
+the three origins in :data:`GOOGLE_EGRESS_ORIGINS`, alongside whatever else it declares, or
+:func:`load_account_runtime` stops startup. The provider is handed only those three, and every
+request it makes, discovery, the token exchange and JWKS alike, passes the check immediately
+before it connects. A refusal is logged by :mod:`exulanica.models.egress` with the origin it
+refused, and sign-in fails closed as ``account_unavailable``. The authorization endpoint is a
+browser redirect rather than server egress, and it is on the discovery origin in any case.
+
+If Google moves its token endpoint or JWKS to another host, :meth:`GoogleOIDCProvider.metadata`
+refuses first, because the discovery document no longer matches the pinned URLs, so the fix is
+both halves: update the pinned URLs here and declare the new origin in the allowlist.
 """
 
 from __future__ import annotations
@@ -42,11 +54,25 @@ from exulanica.db.account_workspaces import (
     AccountWorkspaceUnavailable,
 )
 from exulanica.env import env_get
+from exulanica.models.egress import (
+    EgressAllowlist,
+    EgressRefused,
+    load_egress_allowlist,
+)
+from exulanica.models.transport import allowlisted_transport
 from exulanica.selection.validation import Session
 
 SESSION_COOKIE = "__Host-exulanica-session"
 LOGIN_COOKIE = "__Host-exulanica-login"
 DISCOVERY_URI = "https://accounts.google.com/.well-known/openid-configuration"
+
+#: Every origin the server contacts for Google sign-in: discovery, the token endpoint and JWKS, in
+#: that order. The same hosts :meth:`GoogleOIDCProvider.metadata` pins its URLs to.
+GOOGLE_EGRESS_ORIGINS = (
+    "https://accounts.google.com",
+    "https://oauth2.googleapis.com",
+    "https://www.googleapis.com",
+)
 _DATABASE_TIMEOUT_SECONDS = 5
 
 
@@ -116,24 +142,52 @@ class GoogleOIDCProvider:
 
     Injectable HTTP transport supports a signed fake provider, without a verification bypass.
     Discovery/JWKS addresses are pinned to Google's HTTPS authority, never token jku/x5u headers.
+
+    With ``egress``, every request passes the allowlist, narrowed to
+    :data:`GOOGLE_EGRESS_ORIGINS`, before the transport sends it, injected or not. With neither
+    ``egress`` nor an injected transport there is nothing permitted to reach, so the first network
+    call refuses rather than connecting unchecked.
     """
 
     def __init__(
-        self, config: GoogleAccountConfig, *, transport: httpx2.BaseTransport | None = None
+        self,
+        config: GoogleAccountConfig,
+        *,
+        transport: httpx2.BaseTransport | None = None,
+        egress: EgressAllowlist | None = None,
     ) -> None:
-        self.config, self.transport = config, transport
+        self.config = config
+        self.egress = (
+            None
+            if egress is None
+            else egress.narrowed_to(GOOGLE_EGRESS_ORIGINS, purpose="Google sign-in")
+        )
+        self.transport = (
+            transport
+            if self.egress is None
+            else allowlisted_transport(self.egress, http=httpx2, inner=transport)
+        )
         self._cache: dict[str, tuple[float, dict]] = {}
         self._lock = threading.Lock()
+
+    def _network(self) -> httpx2.BaseTransport:
+        if self.transport is None:
+            raise AccountUnavailable(
+                "Google sign-in has no declared egress allowlist; declare its origins in "
+                "EXULANICA_EGRESS_ALLOWLIST"
+            )
+        return self.transport
 
     def _json(self, url: str, *, refresh: bool = False) -> dict:
         with self._lock:
             cached = self._cache.get(url)
             if not refresh and cached and cached[0] > time.monotonic():
                 return cached[1]
+        # Resolved outside the try below, so a missing declaration says so rather than being
+        # reported as an unavailable provider.
+        transport = self._network()
         try:
-            with httpx2.Client(
-                transport=self.transport, timeout=10, follow_redirects=False
-            ) as client:
+            with httpx2.Client(transport=transport, timeout=10, follow_redirects=False) as client:
                 response = client.get(url, headers={"Accept": "application/json"})
                 response.raise_for_status()
                 if len(response.content) > 1024 * 1024:
@@ -141,7 +195,7 @@ class GoogleOIDCProvider:
                 value = response.json()
             if not isinstance(value, dict):
                 raise ValueError("invalid OIDC document")
-        except (httpx2.HTTPError, ValueError) as exc:
+        except (httpx2.HTTPError, ValueError, EgressRefused) as exc:
             raise AccountUnavailable("Google metadata is unavailable") from exc
         ttl = 0
         directives = response.headers.get("cache-control", "").lower().split(",")
@@ -179,7 +233,7 @@ class GoogleOIDCProvider:
             redirect_uri=self.config.callback_uri,
             code_challenge_method="S256",
             token_endpoint_auth_method="client_secret_post",
-            transport=self.transport,
+            transport=self._network(),
             timeout=10,
             follow_redirects=False,
         )
@@ -240,6 +294,9 @@ class GoogleOIDCProvider:
             return ISSUER, subject
         except AccountUnavailable:
             raise
+        except EgressRefused as exc:
+            # A destination this deployment did not declare, not a bad answer from the provider.
+            raise AccountUnavailable("Google sign-in egress was refused") from exc
         except (
             JoseError,
             AuthlibBaseError,
@@ -393,7 +450,11 @@ def load_account_runtime(environ: Mapping[str, str]) -> AccountRuntime | None:
         )
     except (ValueError, TypeError) as exc:
         raise AccountUnavailable("Google account configuration is invalid") from exc
-    runtime = AccountRuntime(config, environ[names[5]], GoogleOIDCProvider(config))
+    # Required only when sign-in is configured, and checked for inclusion: the shared list also
+    # names the model endpoint. load_egress_allowlist and narrowed_to both raise
+    # EgressConfigurationError naming what is absent, which stops startup.
+    egress = load_egress_allowlist(environ)
+    runtime = AccountRuntime(config, environ[names[5]], GoogleOIDCProvider(config, egress=egress))
     application_url = env_get("DATABASE_URL", environ)
     if not application_url:
         raise AccountUnavailable(

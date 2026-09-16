@@ -428,6 +428,8 @@ def test_secret_cleanup_and_deployment_validation(account_api, spine_schema):
         "EXULANICA_ACCOUNT_BROWSER_ORIGINS": '["https://app.test"]',
         "EXULANICA_ACCOUNT_DATABASE_URL": api.runtime.database_url,
         "EXULANICA_DATABASE_URL": scratch_database(spine_schema[1]).url,
+        "EXULANICA_EGRESS_ALLOWLIST": '["https://accounts.google.com",'
+        '"https://oauth2.googleapis.com","https://www.googleapis.com"]',
     }
     assert load_account_runtime(env) is not None
     with pytest.raises(AccountUnavailable):
