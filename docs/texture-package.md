@@ -84,7 +84,10 @@ A set is a MAKER applied to a RECIPE, and everything but the maker's code is a d
   and products of controls, extents and constants). Every manifest declares the four controls the
   bake reads itself: `height_range_mm` and the three occlusion controls. What a maker leaves fixed
   (its noise scales and thresholds) is fixed by its version; what a person would name (a module, a
-  joint, a colour, how much wear) is a control.
+  joint, a colour, how much wear) is a control. A published maker version names one manifest
+  forever: `PUBLISHED_MAKER_MANIFESTS` in `exulanica/world/texture_assets.py` pins each by digest,
+  rows are only ever added, and a change to a maker's controls, rules or even wording is a new
+  version.
 - **A recipe** (`exulanica.texture-recipe/v1`) names a maker and version and states every control,
   the seed, the resolution (a power of two from 16 to 1024 on each axis) and the extent. Nothing is
   left to a default, so a recipe means the same thing even if a maker's default changes. A recipe
@@ -115,7 +118,12 @@ byte: no set's version changed.
 `exulanica/materials/recipes.py` both run every case in
 `web/packages/loom-texture/test/recipe-cases.json` (50 recipe cases and 39 manifest cases, each
 starting from a published object and listing the exact problems expected, in order), so the baker
-and the backend refuse the same objects with the same explanation. Changing any message is
+and the backend refuse the same objects with the same explanation. They also read bytes the same
+way. `src/strict-json.ts` and `exulanica.materials.parse_strict` accept a number only as an integer
+literal in the safe range (JavaScript would otherwise read `1.0` and `2.4e1` as integers where
+Python reads floats), refuse a repeated key, nesting deeper than 64, a byte-order mark and bytes
+that are not UTF-8, and name each refusal with one of five fixed problems chosen by a fixed
+precedence; the file's 39 document cases, given as text or as hex, hold both readers to it. Changing any message is
 therefore one commit that changes `src/recipe.ts`, `exulanica/materials/recipes.py` and
 `recipe-cases.json` together. A person's variant, a recipe the Companion proposes, and a recipe a
 model fits later are all this kind of object, and all of them
@@ -124,9 +132,12 @@ pass this check before anything stores or bakes them. `MaterialCatalog.recipe_pr
 
 **Whatever a maker accepts, it can bake.** `test/makers.test.ts` pushes every control of every
 maker to each end of its range, and every choice to each option, one at a time on a small frame,
-repairing an extent a module rule pins. Every variant the check accepts must bake without
-throwing, encode a canonical header and tile exactly. When this was written that was 507 of the 543
-variants tried; each of the other 36 is refused by a rule, and the test lists them when it fails.
+repairing the variant as a person would: a count an `even` rule needs even is raised by one, an
+extent a module rule pins is recomputed, and an extent a proportion rule pins is divided out. Every
+variant the check accepts must bake without throwing, encode a canonical header, tile exactly, and
+state each integer control it states at all under that control's own key with the recipe's value.
+When this was written that was 515 of the 543 variants tried; each of the other 28 is refused by a
+rule, and the test lists them when it fails.
 
 **What `exulanica.materials` may not do.** It sits below the evidence spine in the layers contract,
 and a forbidden contract in `pyproject.toml` keeps it from importing the evidence address, the
@@ -340,12 +351,20 @@ layers contract permits.
   `tests/test_texture_sets.py` checks all of this, including by reading the function's syntax tree.
 - A set id is a string matching `^[a-z][a-z0-9.-]*$`, exactly `asset_key` in migration 0042, by
   convention `<licence>.<surface>`, for example `cc0.brick-running-bond`.
-- `load_texture_catalog` also requires `catalog.json` and verifies it through
-  `exulanica.materials`: every object hashes to its name and is canonical; the catalog describes
-  exactly this manifest; every maker manifest is well formed and every recipe valid for its maker;
-  every receipt agrees with the manifest about the bytes and the licence and with its entry about
-  the recipe. Each container header must then agree with its recipe and maker: title, summary,
-  seed, resolution, extent, family, surface, height range and occlusion. What the backend cannot
+- `load_texture_catalog` also requires `catalog.json`. Its digest must be `TEXTURE_CATALOG_SHA256`,
+  which pins every object the catalog reaches, so a directory that differs from the reviewed one in
+  any object does not load, however consistent it is with itself; and its makers must be exactly
+  `PUBLISHED_MAKER_MANIFESTS`. A rebake that changes any object updates the first pin in the same
+  commit, and the package's `test/published.test.ts` compares both pins with the committed catalog,
+  so the web suite says so first. Behind the pins, `exulanica.materials` verifies the graph: every
+  object hashes to its name and is read strictly and canonically; every version and size is an
+  integer, never a boolean; the catalog describes exactly this manifest; every maker manifest is
+  well formed and every recipe valid for its maker; every receipt agrees with the manifest about
+  the bytes and the licence and with its entry about the recipe. Each container header must then
+  agree with its recipe and maker: title, summary, seed, resolution, extent, family, surface,
+  height range, occlusion, and every stated parameter whose key is one of the maker's integer
+  controls. The pins are keyword arguments that default to the reviewed library, so a caller
+  verifying another directory names that directory's own. What the backend cannot
   check is that the maker, run on the recipe, produces these bytes, because the maker is
   TypeScript; `test/published.test.ts` rebakes every set and compares byte for byte, which is what
   catches a recipe edited in a way no header shows, such as a colour. The Node bake worker planned
@@ -434,5 +453,7 @@ manifest and the pinned rows disagree.
 - The transfer figure in section 7 is gzip over the files, not a measured browser load.
 - That a recipe, run through its maker, produces a set's bytes is checked by the package's suite,
   which runs the TypeScript maker. The backend verifies every binding it can see without the maker,
-  and no more, until the planned Node bake worker runs the maker server-side.
+  and no more, until the planned Node bake worker runs the maker server-side. A stated parameter
+  that is not an integer control (a bond or finish is stated as a sentence) is covered only by the
+  reviewed pin and the rebake.
 - The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it yet.

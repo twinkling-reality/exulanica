@@ -82,3 +82,10 @@ export {
   manifestProblems,
   recipeProblems,
 } from './recipe.js';
+export {
+  MAXIMUM_DEPTH,
+  STRICT_JSON_PROBLEMS,
+  StrictJsonError,
+  parseStrictJson,
+  parseStrictJsonBytes,
+} from './strict-json.js';

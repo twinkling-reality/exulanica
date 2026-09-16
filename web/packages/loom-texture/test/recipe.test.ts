@@ -20,14 +20,16 @@ import {
   manifestProblems,
   recipeProblems,
 } from '../src/recipe.js';
+import { StrictJsonError, parseStrictJsonBytes } from '../src/strict-json.js';
 
 /**
  * Recipes and maker manifests are data, and data is checked.
  *
  * The shared cases in `recipe-cases.json` are the specification both validators are held to: this
- * file runs them against `src/recipe.ts`, and `tests/test_material_objects.py` runs the same file
- * against `exulanica.materials`. A case lists the exact problems, in order, so the two languages
- * cannot drift into refusing different objects or explaining a refusal differently.
+ * file runs them against `src/recipe.ts` and `src/strict-json.ts`, and
+ * `tests/test_material_objects.py` runs the same file against `exulanica.materials`. A case lists
+ * the exact problems, in order, so the two languages cannot drift into refusing different objects,
+ * or different bytes, or explaining a refusal differently.
  */
 type Step = readonly (string | number)[];
 
@@ -52,14 +54,27 @@ interface ManifestCase {
   readonly problems: readonly string[];
 }
 
+interface DocumentCase {
+  readonly name: string;
+  readonly text?: string;
+  readonly hex?: string;
+  readonly problem: string | null;
+}
+
 const CASES_PATH = fileURLToPath(new URL('./recipe-cases.json', import.meta.url));
 const CASES_TEXT = readFileSync(CASES_PATH, 'utf8');
 const CASES = JSON.parse(CASES_TEXT) as {
   readonly recipes: readonly RecipeCase[];
   readonly manifests: readonly ManifestCase[];
+  readonly documents: readonly DocumentCase[];
 };
 
-/** Apply changes to a copy. The same rules as `_apply_changes` in the backend's test. */
+/**
+ * Apply changes to a copy. The same rules as `_apply_changes` in the backend's test, and anything
+ * the two could read differently is refused: an index is a whole number no larger than the list
+ * (equal to it only to append), a removal names something that is there, and no key is
+ * `__proto__`, which JavaScript assignment would not store as a key at all.
+ */
 function applyChanges(base: unknown, changes: readonly Change[]): unknown {
   let root: unknown = structuredClone(base);
   for (const change of changes) {
@@ -67,6 +82,7 @@ function applyChanges(base: unknown, changes: readonly Change[]): unknown {
     if (keys !== 'path,value' && !(keys === 'path,remove' && change.remove === true)) {
       throw new Error(`a change has a path and either a value or remove: true, not ${keys}`);
     }
+    if (change.path.includes('__proto__')) throw new Error('a change never names __proto__');
     if (change.path.length === 0) {
       root = structuredClone(change.value);
       continue;
@@ -77,17 +93,33 @@ function applyChanges(base: unknown, changes: readonly Change[]): unknown {
     }
     const last = change.path[change.path.length - 1]!;
     if (Array.isArray(parent)) {
-      if (typeof last !== 'number' || last > parent.length) throw new Error(`no index ${last}`);
+      const limit = change.remove === true ? parent.length - 1 : parent.length;
+      if (typeof last !== 'number' || !Number.isInteger(last) || last < 0 || last > limit) {
+        throw new Error(`no index ${String(last)} to change`);
+      }
       if (change.remove === true) parent.splice(last, 1);
       else parent[last] = structuredClone(change.value);
+    } else if (typeof last !== 'string') {
+      throw new Error(`an object is changed by key, not by ${String(last)}`);
     } else if (change.remove === true) {
-      if (!(last in parent)) throw new Error(`nothing to remove at ${String(last)}`);
+      if (!Object.prototype.hasOwnProperty.call(parent, last)) {
+        throw new Error(`nothing to remove at ${last}`);
+      }
       delete parent[last];
     } else {
       parent[last] = structuredClone(change.value);
     }
   }
   return root;
+}
+
+function documentBytes(testCase: DocumentCase): Uint8Array {
+  if ((testCase.text === undefined) === (testCase.hex === undefined)) {
+    throw new Error(`${testCase.name} gives exactly one of text and hex`);
+  }
+  return testCase.hex !== undefined
+    ? new Uint8Array(Buffer.from(testCase.hex, 'hex'))
+    : new TextEncoder().encode(testCase.text);
 }
 
 const libraryRecipe = (setId: string): { recipe: Recipe; manifest: MakerManifest } => {
@@ -118,6 +150,19 @@ describe('the shared cases', () => {
     });
   }
 
+  for (const testCase of CASES.documents) {
+    it(`document: ${testCase.name}`, () => {
+      let problem: string | null = null;
+      try {
+        parseStrictJsonBytes(documentBytes(testCase));
+      } catch (error) {
+        if (!(error instanceof StrictJsonError)) throw error;
+        problem = error.message;
+      }
+      expect(problem).toBe(testCase.problem);
+    });
+  }
+
   it('write no number the two languages would read differently', () => {
     const outsideStrings = CASES_TEXT.replace(/"(?:[^"\\]|\\.)*"/g, '""');
     expect(outsideStrings).not.toMatch(/\d\.0+(?!\d)|\d[eE][+-]?\d/);
@@ -127,7 +172,9 @@ describe('the shared cases', () => {
   it('cover every maker and every set they name', () => {
     const sets = new Set(LIBRARY.map((source) => source.entry.set_id));
     for (const testCase of CASES.recipes) expect(sets).toContain(testCase.set);
-    const names = [...CASES.recipes, ...CASES.manifests].map((testCase) => testCase.name);
+    const names = [...CASES.recipes, ...CASES.manifests, ...CASES.documents].map(
+      (testCase) => testCase.name,
+    );
     expect(new Set(names).size).toBe(names.length);
   });
 });
@@ -222,6 +269,14 @@ describe('the library', () => {
     expect(libraryEntryProblems({ ...entry, note: 'x' })).toEqual([
       'a library entry has exactly set_id, version, title, summary, licence_id, recipe',
     ]);
+  });
+
+  it('reads entries strictly, so a whole number written with a fraction is refused', () => {
+    scratch = mkdtempSync(join(tmpdir(), 'loom-library-'));
+    const text = formatLibrarySource(entry).replace('"version": 1,', '"version": 1.0,');
+    expect(text).toContain('"version": 1.0,');
+    writeFileSync(join(scratch, `${source.entry.set_id}.json`), text);
+    expect(() => readLibrary(scratch)).toThrow('a number is written with a fraction or an exponent');
   });
 
   it('reads only well-named JSON entries', () => {

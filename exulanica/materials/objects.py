@@ -2,11 +2,16 @@
 
 Every material object is canonical JSON, named by the sha256 of its bytes, and says what it is in
 its ``profile``. The package that writes them, ``web/packages/loom-texture``, accepts only safe
-integers and printable ASCII, so a document is read back here under exactly the same rules: a
-float, a non-finite constant, a repeated key, an integer JavaScript cannot hold exactly, or a
-character outside printable ASCII is refused, and so is any byte sequence that is not already the
-canonical serialisation of what it parses to. A document that passes has one byte form, and that
-form is its identity.
+integers and printable ASCII, so a document is read back here under exactly the same rules.
+
+:func:`parse_strict` is the byte-level rule both languages share with ``loom-texture``'s
+``src/strict-json.ts``: a number is an integer literal in the safe range, no object repeats a key,
+nothing nests deeper than :data:`MAXIMUM_DEPTH`, and the bytes are UTF-8 with no byte-order mark.
+Every refusal is one of the five :data:`STRICT_JSON_PROBLEMS`, chosen by the same fixed precedence
+in both languages, and the ``documents`` cases in ``web/packages/loom-texture/test/
+recipe-cases.json`` hold the two to it. :func:`read_object` adds the object rules on top: every
+string printable ASCII, and the bytes exactly the canonical serialisation of what they parse to, so
+a document that passes has one byte form and that form is its identity.
 
 Documents are handed out frozen, mappings as read-only proxies and lists as tuples, because a
 digest names content and content named by a digest must not change under anyone's hands.
@@ -30,13 +35,18 @@ __all__ = [
     "CATALOG_PROFILE",
     "LIBRARY_ENTRY_PROFILE",
     "MAKER_PROFILE",
+    "MAXIMUM_DEPTH",
     "RECIPE_PROFILE",
     "SAFE_INTEGER",
+    "STRICT_JSON_PROBLEMS",
     "MaterialObjectError",
     "canonical_bytes",
     "freeze",
     "is_sha256",
+    "nesting",
+    "parse_strict",
     "portable",
+    "read_document",
     "read_object",
     "sha256_hex",
     "thaw",
@@ -51,6 +61,19 @@ CATALOG_PROFILE: Final = "exulanica.texture-catalog/v1"
 BAKE_PIPELINE: Final = "exulanica.texture-bake/v1"
 #: The largest integer an IEEE double holds exactly, which is the largest the baker can write.
 SAFE_INTEGER: Final = 9_007_199_254_740_991
+
+_SAFE_DIGITS: Final = str(SAFE_INTEGER)
+MAXIMUM_DEPTH: Final = 64
+#: The five ways strict JSON is refused, in the order of precedence both languages apply.
+STRICT_JSON_PROBLEMS: Final = MappingProxyType(
+    {
+        "depth": f"a document nests more than {MAXIMUM_DEPTH} deep",
+        "syntax": "a document is not JSON",
+        "number": "a number is written with a fraction or an exponent",
+        "range": "an integer is outside the safe range",
+        "duplicate": "an object repeats a key",
+    }
+)
 
 _PRINTABLE: Final = re.compile(r"[\x20-\x7e]*")
 _HEX64: Final = re.compile(r"[0-9a-f]{64}")
@@ -86,21 +109,82 @@ def portable(value: object) -> bool:
     return False
 
 
-def _refuse_float(literal: str) -> Any:
-    raise MaterialObjectError(f"non-integer number {literal} in a material object")
+class _NotJson(Exception):
+    """Raised inside the parser for a constant JSON does not have, such as NaN."""
 
 
-def _refuse_constant(literal: str) -> Any:
-    raise MaterialObjectError(f"{literal} is not a value a material object may hold")
+def nesting(text: str) -> int:
+    """The deepest bracket nesting outside strings. Defined on any text, JSON or not."""
+    depth = 0
+    deepest = 0
+    in_string = False
+    index = 0
+    while index < len(text):
+        character = text[index]
+        if in_string:
+            if character == "\\":
+                index += 1
+            elif character == '"':
+                in_string = False
+        elif character == '"':
+            in_string = True
+        elif character in "[{":
+            depth += 1
+            deepest = max(deepest, depth)
+        elif character in "]}":
+            depth -= 1
+        index += 1
+    return deepest
 
 
-def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise MaterialObjectError(f"key {key!r} appears twice in one object")
-        result[key] = value
-    return result
+def parse_strict(raw: bytes) -> Any:
+    """Parse strict JSON, or raise :class:`MaterialObjectError` naming the one problem it has."""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise MaterialObjectError(STRICT_JSON_PROBLEMS["syntax"]) from error
+    if nesting(text) > MAXIMUM_DEPTH:
+        raise MaterialObjectError(STRICT_JSON_PROBLEMS["depth"])
+    found: set[str] = set()
+
+    def on_float(literal: str) -> int:
+        found.add("number")
+        return 0
+
+    def on_int(literal: str) -> int:
+        digits = literal[1:] if literal.startswith("-") else literal
+        if len(digits) > len(_SAFE_DIGITS) or (
+            len(digits) == len(_SAFE_DIGITS) and digits > _SAFE_DIGITS
+        ):
+            found.add("range")
+            return 0
+        return int(literal)
+
+    def on_constant(literal: str) -> Any:
+        raise _NotJson(literal)
+
+    def on_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                found.add("duplicate")
+            result[key] = value
+        return result
+
+    try:
+        document = json.loads(
+            text,
+            parse_float=on_float,
+            parse_int=on_int,
+            parse_constant=on_constant,
+            object_pairs_hook=on_pairs,
+        )
+    except (json.JSONDecodeError, _NotJson, ValueError, RecursionError) as error:
+        raise MaterialObjectError(STRICT_JSON_PROBLEMS["syntax"]) from error
+    for kind in ("number", "range", "duplicate"):
+        if kind in found:
+            raise MaterialObjectError(STRICT_JSON_PROBLEMS[kind])
+    return document
 
 
 def freeze(value: Any) -> Any:
@@ -126,21 +210,14 @@ def canonical_bytes(document: Any) -> bytes:
     return canonical_json(thaw(document))
 
 
-def read_object(raw: bytes, where: str) -> Any:
-    """Parse a material object's bytes strictly and return the document, frozen."""
+def read_document(raw: bytes, where: str) -> Any:
+    """A material object's document, read strictly and held to its canonical form, mutable."""
     try:
-        document = json.loads(
-            raw.decode("utf-8"),
-            parse_float=_refuse_float,
-            parse_constant=_refuse_constant,
-            object_pairs_hook=_unique_keys,
-        )
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise MaterialObjectError(f"{where} is not JSON: {error}") from error
+        document = parse_strict(raw)
     except MaterialObjectError as error:
         raise MaterialObjectError(f"{where}: {error}") from error
     if not portable(document):
-        raise MaterialObjectError(f"{where} holds an integer or a string the baker cannot write")
+        raise MaterialObjectError(f"{where} holds a string the baker cannot write")
     try:
         canonical = canonical_json(document)
     except CanonicalisationError as error:
@@ -149,4 +226,9 @@ def read_object(raw: bytes, where: str) -> Any:
         raise MaterialObjectError(
             f"{where} is not canonical JSON, so its bytes are not its content"
         )
-    return freeze(document)
+    return document
+
+
+def read_object(raw: bytes, where: str) -> Any:
+    """A material object's document, read as :func:`read_document` reads it, and frozen."""
+    return freeze(read_document(raw, where))

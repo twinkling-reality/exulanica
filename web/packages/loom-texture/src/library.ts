@@ -5,6 +5,7 @@ import { LICENCE_ID } from './licence.js';
 import type { Maker } from './maker.js';
 import { MAKERS } from './makers/index.js';
 import { type Recipe, recipeProblems } from './recipe.js';
+import { StrictJsonError, parseStrictJsonBytes } from './strict-json.js';
 
 /**
  * The published library: which recipes are published sets, and under which names.
@@ -20,7 +21,8 @@ import { type Recipe, recipeProblems } from './recipe.js';
  * a new migration row; `tests/test_texture_set_migration.py` fails until both agree.
  *
  * The files are JSON as people edit it, not canonical JSON: `formatLibrarySource` is the one
- * layout they are kept in, and the published objects are canonical whatever the layout.
+ * layout they are kept in, and the published objects are canonical whatever the layout. They are
+ * read strictly (`strict-json.ts`), so a number written `1.0` is refused rather than read as 1.
  */
 export const LIBRARY_PACKAGE = '@exulanica/loom-texture';
 export const LIBRARY_FOLDER = 'library';
@@ -116,7 +118,13 @@ export function readLibrary(directory: string = join(packageRoot(), LIBRARY_FOLD
   for (const name of readdirSync(directory).sort()) {
     const path = join(directory, name);
     if (!name.endsWith('.json')) throw new Error(`${path} is not a library entry; refusing`);
-    const candidate: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    let candidate: unknown;
+    try {
+      candidate = parseStrictJsonBytes(new Uint8Array(readFileSync(path)));
+    } catch (error) {
+      if (error instanceof StrictJsonError) throw new Error(`${path}: ${error.message}`);
+      throw error;
+    }
     const problems = libraryEntryProblems(candidate);
     if (problems.length > 0) throw new Error(`${path}: ${problems.join('; ')}`);
     const entry = deepFreeze(candidate as LibraryEntry);

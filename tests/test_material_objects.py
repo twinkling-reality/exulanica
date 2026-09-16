@@ -26,16 +26,20 @@ from types import MappingProxyType
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.materials import (
+    STRICT_JSON_PROBLEMS,
     MaterialObjectError,
     canonical_bytes,
     check_recipe,
     freeze,
     manifest_problems,
+    parse_strict,
     read_object,
     recipe_problems,
     thaw,
 )
 from exulanica.world.texture_assets import (
+    PUBLISHED_MAKER_MANIFESTS,
+    TEXTURE_CATALOG_SHA256,
     TEXTURE_DIRECTORY,
     TextureCatalogError,
     load_texture_catalog,
@@ -53,7 +57,12 @@ def catalog():
 
 
 def _apply_changes(base, changes):
-    """Apply case changes to a copy. The same rules as ``applyChanges`` in recipe.test.ts."""
+    """Apply case changes to a copy. The same rules as ``applyChanges`` in recipe.test.ts.
+
+    Anything the two harnesses could read differently is refused: an index is a whole number no
+    larger than the list (equal to it only to append), a removal names something that is there,
+    and no key is ``__proto__``.
+    """
     root = copy.deepcopy(base)
     for change in changes:
         keys = set(change)
@@ -62,6 +71,8 @@ def _apply_changes(base, changes):
         ):
             raise ValueError(f"a change has a path and either a value or remove: true, not {keys}")
         path = change["path"]
+        if "__proto__" in path:
+            raise ValueError("a change never names __proto__")
         if not path:
             root = copy.deepcopy(change["value"])
             continue
@@ -70,14 +81,17 @@ def _apply_changes(base, changes):
             parent = parent[step]
         last = path[-1]
         if isinstance(parent, list):
-            if type(last) is not int or last > len(parent):
-                raise ValueError(f"no index {last}")
+            limit = len(parent) - 1 if "remove" in change else len(parent)
+            if type(last) is not int or not 0 <= last <= limit:
+                raise ValueError(f"no index {last} to change")
             if "remove" in change:
                 del parent[last]
             elif last == len(parent):
                 parent.append(copy.deepcopy(change["value"]))
             else:
                 parent[last] = copy.deepcopy(change["value"])
+        elif type(last) is not str:
+            raise ValueError(f"an object is changed by key, not by {last!r}")
         elif "remove" in change:
             if last not in parent:
                 raise ValueError(f"nothing to remove at {last}")
@@ -85,6 +99,11 @@ def _apply_changes(base, changes):
         else:
             parent[last] = copy.deepcopy(change["value"])
     return root
+
+
+def _document_bytes(case):
+    assert ("text" in case) != ("hex" in case), case["name"]
+    return bytes.fromhex(case["hex"]) if "hex" in case else case["text"].encode("utf-8")
 
 
 def _maker(catalog, maker_id):
@@ -110,6 +129,18 @@ def test_a_manifest_case_is_refused_exactly_as_the_baker_refuses_it(catalog, cas
     assert manifest_problems(manifest) == case["problems"]
 
 
+@pytest.mark.parametrize("case", CASES["documents"], ids=[c["name"] for c in CASES["documents"]])
+def test_a_document_case_is_refused_exactly_as_the_baker_refuses_it(case):
+    try:
+        parse_strict(_document_bytes(case))
+    except MaterialObjectError as error:
+        problem = str(error)
+    else:
+        problem = None
+    assert problem == case["problem"]
+    assert problem is None or problem in STRICT_JSON_PROBLEMS.values()
+
+
 def test_the_cases_hold_nothing_the_two_languages_read_differently():
     def walk(value):
         if isinstance(value, float):
@@ -123,7 +154,7 @@ def test_the_cases_hold_nothing_the_two_languages_read_differently():
 
     walk(CASES)
     assert max(CASES_PATH.read_bytes()) <= 0x7E
-    names = [case["name"] for case in CASES["recipes"] + CASES["manifests"]]
+    names = [case["name"] for case in CASES["recipes"] + CASES["manifests"] + CASES["documents"]]
     assert len(set(names)) == len(names)
 
 
@@ -162,22 +193,25 @@ def test_a_recipe_is_checked_against_the_maker_it_names(catalog):
 @pytest.mark.parametrize(
     ("raw", "message"),
     [
-        (b'{"a":1.5}', "non-integer"),
-        (b'{"a":NaN}', "not a value"),
-        (b'{"a":1,"a":2}', "appears twice"),
-        (b'{"b":1,"a":2}', "not canonical"),
-        (b'{"a": 1}', "not canonical"),
-        (b'{"a":1}\n', "not canonical"),
-        (b'{"a":9007199254740992}', "cannot write"),
-        ('{"a":"caf\u00e9"}'.encode(), "cannot write"),
-        (b'{"a":"\\u0007"}', "cannot write"),
-        (b"\xff", "not JSON"),
-        (b"{", "not JSON"),
+        (b'{"a":1.5}', "object: a number is written with a fraction or an exponent"),
+        (b'{"a":NaN}', "object: a document is not JSON"),
+        (b'{"a":1,"a":2}', "object: an object repeats a key"),
+        (b'{"b":1,"a":2}', "object is not canonical JSON"),
+        (b'{"a": 1}', "object is not canonical JSON"),
+        (b'{"a":1}\n', "object is not canonical JSON"),
+        (b'{"a":9007199254740992}', "object: an integer is outside the safe range"),
+        (b'{"a":' + b"9" * 5000 + b"}", "object: an integer is outside the safe range"),
+        (b"[" * 600 + b"]" * 600, "object: a document nests more than 64 deep"),
+        ('{"a":"caf\u00e9"}'.encode(), "object holds a string the baker cannot write"),
+        (b'{"a":"\\u0007"}', "object holds a string the baker cannot write"),
+        (b"\xff", "object: a document is not JSON"),
+        (b"{", "object: a document is not JSON"),
     ],
 )
 def test_the_reader_refuses_anything_the_baker_would_not_write(raw, message):
-    with pytest.raises(MaterialObjectError, match=message):
+    with pytest.raises(MaterialObjectError) as caught:
         read_object(raw, "object")
+    assert str(caught.value).startswith(message)
 
 
 def test_a_document_comes_back_frozen_and_thaws_to_its_json():
@@ -237,6 +271,29 @@ def _reindex(directory, document):
     (directory / "catalog.json").write_bytes(canonical_json(document))
 
 
+def _behind_the_pin(directory, **pins):
+    """Load with the directory's own catalog digest, to reach the checks the reviewed pin guards."""
+    own = hashlib.sha256((directory / "catalog.json").read_bytes()).hexdigest()
+    return load_texture_catalog(directory, catalog_sha256=own, **pins)
+
+
+def _replace_maker(directory, maker_id, change):
+    """Swap one maker's manifest for an edited one, re-pointing the catalog and every receipt."""
+    index = _index(directory)
+    (row,) = [row for row in index["makers"] if row["maker_id"] == maker_id]
+    old = row["object_sha256"]
+    manifest = _read(directory, old)
+    change(manifest)
+    row["object_sha256"] = new = _write(directory, manifest)
+    for set_row in index["sets"]:
+        receipt = _read(directory, set_row["receipt_sha256"])
+        if receipt["maker_sha256"] == old:
+            receipt["maker_sha256"] = new
+            set_row["receipt_sha256"] = _write(directory, receipt)
+    _reindex(directory, index)
+    return new
+
+
 def _rebind(directory, set_id, change_recipe=None, change_entry=None, change_receipt=None):
     """Re-point one set at edited objects, every digest kept consistent: a plausible forgery."""
     index = _index(directory)
@@ -292,7 +349,7 @@ def test_the_catalog_refuses_a_recipe_its_bytes_did_not_come_from(tmp_path, chan
     directory = _copy(tmp_path)
     _rebind(directory, BRICK, change_recipe=change_recipe)
     with pytest.raises(TextureCatalogError, match=message):
-        load_texture_catalog(directory)
+        _behind_the_pin(directory)
 
 
 @pytest.mark.parametrize(
@@ -307,6 +364,7 @@ def test_the_catalog_refuses_a_recipe_its_bytes_did_not_come_from(tmp_path, chan
             "different recipes",
         ),
         ({"change_entry": lambda entry: entry.update(note="x")}, "fields other than"),
+        ({"change_entry": lambda entry: entry.update(version=True)}, "positive integer version"),
         (
             {"change_receipt": lambda receipt: receipt.update(pipeline="hand made")},
             "baked by",
@@ -329,7 +387,7 @@ def test_the_catalog_refuses_a_graph_that_disagrees_with_itself(tmp_path, change
     directory = _copy(tmp_path)
     _rebind(directory, BRICK, **changes)
     with pytest.raises(TextureCatalogError, match=message):
-        load_texture_catalog(directory)
+        _behind_the_pin(directory)
 
 
 def test_the_catalog_refuses_an_object_that_is_not_what_it_is_named(tmp_path):
@@ -354,7 +412,7 @@ def test_the_catalog_refuses_an_object_that_is_not_canonical(tmp_path):
     row["receipt_sha256"] = digest
     _reindex(directory, index)
     with pytest.raises(TextureCatalogError, match="not canonical"):
-        load_texture_catalog(directory)
+        _behind_the_pin(directory)
 
 
 @pytest.mark.parametrize(
@@ -369,6 +427,8 @@ def test_the_catalog_refuses_an_object_that_is_not_canonical(tmp_path):
         (lambda index: index.update(profile="exulanica.texture-catalog/v2"), "profile"),
         (lambda index: index.update(note="x"), "exactly"),
         (lambda index: index["sets"][0].update(receipt_sha256="nope"), "not a sha256"),
+        (lambda index: index["sets"][0].update(version=True), "positive integer version"),
+        (lambda index: index["makers"][0].update(version=True), "sorted by id and version"),
     ],
 )
 def test_the_catalog_refuses_an_index_that_breaks_the_contract(tmp_path, change, message):
@@ -377,7 +437,7 @@ def test_the_catalog_refuses_an_index_that_breaks_the_contract(tmp_path, change,
     change(index)
     _reindex(directory, index)
     with pytest.raises(TextureCatalogError, match=message):
-        load_texture_catalog(directory)
+        _behind_the_pin(directory)
 
 
 def test_the_catalog_refuses_a_malformed_maker(tmp_path, catalog):
@@ -389,7 +449,7 @@ def test_the_catalog_refuses_a_malformed_maker(tmp_path, catalog):
     row["object_sha256"] = _write(directory, manifest)
     _reindex(directory, index)
     with pytest.raises(TextureCatalogError, match="malformed manifest: controls"):
-        load_texture_catalog(directory)
+        _behind_the_pin(directory)
 
 
 def test_the_catalog_is_required(tmp_path):
@@ -397,6 +457,67 @@ def test_the_catalog_is_required(tmp_path):
     (directory / "catalog.json").unlink()
     with pytest.raises(TextureCatalogError, match="accounted for by a receipt"):
         load_texture_catalog(directory)
+
+
+def _forged_courses(recipe):
+    recipe["parameters"].update(courses=12, unit_height_mm=140)
+
+
+def _forged_bond(recipe):
+    recipe["parameters"].update(bond="stack")
+
+
+@pytest.mark.parametrize("forge", [_forged_courses, _forged_bond], ids=["courses", "bond"])
+def test_the_reviewed_pin_refuses_a_forgery_that_agrees_with_itself(tmp_path, forge):
+    """A valid recipe, re-bound with every digest kept consistent, is still not the reviewed one."""
+    directory = _copy(tmp_path)
+    _rebind(directory, BRICK, change_recipe=forge)
+    with pytest.raises(TextureCatalogError, match="not the reviewed pin"):
+        load_texture_catalog(directory)
+
+
+def test_a_stated_module_that_disagrees_with_its_recipe_is_refused_behind_the_pin(tmp_path):
+    directory = _copy(tmp_path)
+    _rebind(directory, BRICK, change_recipe=_forged_courses)
+    with pytest.raises(TextureCatalogError, match="header parameter courses is 24, but its recipe"):
+        _behind_the_pin(directory)
+
+
+def test_a_published_maker_version_never_names_another_manifest(tmp_path):
+    """The deleted-constraint forgery: a weaker brick manifest under the same version."""
+    directory = _copy(tmp_path)
+
+    def drop_the_even_rule(manifest):
+        manifest["constraints"] = [
+            rule for rule in manifest["constraints"] if rule["kind"] != "even"
+        ]
+
+    forged = _replace_maker(directory, "loom.brick", drop_the_even_rule)
+    with pytest.raises(TextureCatalogError, match="not the reviewed pin"):
+        load_texture_catalog(directory)
+    with pytest.raises(TextureCatalogError, match=r"loom\.brick version 1 is not the published"):
+        _behind_the_pin(directory)
+    # Named explicitly as published, the weaker manifest loads, and it is weaker: the recipe the
+    # real brick maker refuses passes its check. That is what the pinned table exists to prevent.
+    makers = {**PUBLISHED_MAKER_MANIFESTS, ("loom.brick", 1): forged}
+    weaker = _behind_the_pin(directory, makers=makers).materials
+    odd = thaw(weaker.sets[BRICK].recipe)
+    odd["parameters"]["courses"] = 25
+    odd["extent_mm"]["v"] = 1875
+    assert weaker.recipe_problems(odd) == []
+    assert load_texture_catalog().materials.recipe_problems(odd) == [
+        "running bond repeats every two courses, so the tile holds an even number"
+    ]
+
+
+def test_the_pins_are_the_committed_library():
+    assert hashlib.sha256((TEXTURE_DIRECTORY / "catalog.json").read_bytes()).hexdigest() == (
+        TEXTURE_CATALOG_SHA256
+    )
+    index = json.loads((TEXTURE_DIRECTORY / "catalog.json").read_bytes())
+    assert {
+        (row["maker_id"], row["version"]): row["object_sha256"] for row in index["makers"]
+    } == dict(PUBLISHED_MAKER_MANIFESTS)
 
 
 def test_every_pinned_set_names_its_maker_and_recipe(catalog):

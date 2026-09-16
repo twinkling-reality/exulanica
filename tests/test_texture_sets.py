@@ -391,7 +391,9 @@ def test_the_catalog_refuses_a_manifest_that_breaks_the_contract(
 @pytest.mark.parametrize(
     ("raw", "message"),
     [
-        (lambda good: good.replace(b'"version":1', b'"version":1.0', 1), "non-integer"),
+        (lambda good: good.replace(b'"version":1', b'"version":1.0', 1), "fraction"),
+        (lambda good: b"[" * 600 + good + b"]" * 600, "nests more than 64 deep"),
+        (lambda good: good.replace(b'"version":1', b'"version":' + b"1" * 5000, 1), "safe range"),
         (lambda good: good + b"\n", "canonical"),
         (lambda good: good.replace(b'{"profile"', b'{ "profile"', 1), "canonical"),
     ],

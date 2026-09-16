@@ -31,7 +31,8 @@ import {
   sha256Hex,
 } from '../src/publish.js';
 import { type MakerManifest, type Recipe, manifestProblems, recipeProblems } from '../src/recipe.js';
-import { PUBLISHED, readPublished } from './support.js';
+import { parseStrictJsonBytes } from '../src/strict-json.js';
+import { PUBLISHED, REPOSITORY, readPublished } from './support.js';
 
 /**
  * The committed `assets/textures/` is exactly what the source bakes.
@@ -51,11 +52,11 @@ beforeAll(() => {
   publication = publish(LIBRARY);
 }, 180_000);
 
-/** A committed object, read back and held to its name: canonical bytes that hash to it. */
+/** A committed object, read back strictly and held to its name: canonical bytes that hash to it. */
 function readObject<T>(digest: string): T {
   const bytes = readPublished(objectPath(digest));
   expect(sha256Hex(bytes), digest).toBe(digest);
-  const value = JSON.parse(new TextDecoder().decode(bytes)) as T;
+  const value = parseStrictJsonBytes(bytes) as T;
   expect(canonicalJson(value as object), digest).toBe(new TextDecoder().decode(bytes));
   return value;
 }
@@ -200,6 +201,21 @@ describe('the catalog accounts for every set', () => {
       expect(header.family).toBe(maker.family);
       expect(header.height_range_mm).toBe(recipe.parameters.height_range_mm);
     }
+  });
+
+  it('is the library the backend pins, so a rebake that changes an object says so here first', () => {
+    const loader = readFileSync(join(REPOSITORY, 'exulanica/world/texture_assets.py'), 'utf8');
+    const pinned = /^TEXTURE_CATALOG_SHA256: Final = "([0-9a-f]{64})"$/m.exec(loader)?.[1];
+    expect(pinned, 'TEXTURE_CATALOG_SHA256 in exulanica/world/texture_assets.py').toBe(
+      sha256Hex(readPublished(CATALOG_FILE)),
+    );
+    const rows = [...loader.matchAll(/^ {8}\("([a-z][a-z0-9.-]*)", (\d+)\): "([0-9a-f]{64})",$/gm)]
+      .map((match) => `${match[1]} ${match[2]} ${match[3]}`);
+    // PUBLISHED_MAKER_MANIFESTS only ever gains rows: a published maker version names one
+    // manifest forever, so a changed maker is a new version, never an edited row.
+    expect(rows, 'PUBLISHED_MAKER_MANIFESTS in exulanica/world/texture_assets.py').toEqual(
+      catalog.makers.map((row) => `${row.maker_id} ${row.version} ${row.object_sha256}`),
+    );
   });
 
   it('is built from library files kept in their one layout', () => {

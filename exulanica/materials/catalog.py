@@ -20,7 +20,6 @@ check a person's variant or a proposed recipe passes before anything stores it.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -33,8 +32,10 @@ from exulanica.materials.objects import (
     LIBRARY_ENTRY_PROFILE,
     MAKER_PROFILE,
     RECIPE_PROFILE,
+    SAFE_INTEGER,
     MaterialObjectError,
     is_sha256,
+    read_document,
     read_object,
     sha256_hex,
 )
@@ -125,8 +126,45 @@ class MaterialCatalog:
         return recipe_problems(candidate, record.manifest)
 
 
+def _positive_integer(value: object) -> bool:
+    """An ``int`` that is not a ``bool``, from 1 to the largest integer the baker can write."""
+    return type(value) is int and 1 <= value <= SAFE_INTEGER
+
+
 def _is_identity(identity: object) -> bool:
-    return isinstance(identity, tuple) and isinstance(identity[0], str) and type(identity[1]) is int
+    return (
+        isinstance(identity, tuple)
+        and isinstance(identity[0], str)
+        and _positive_integer(identity[1])
+    )
+
+
+def _is_text(value: object) -> bool:
+    return isinstance(value, str) and value.strip(" ") != ""
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise MaterialObjectError(message)
+
+
+def _manifest_sets(manifest_raw: bytes) -> tuple[Mapping[str, Any], ...]:
+    """The manifest's set rows, read strictly, with the fields this module compares typed."""
+    manifest = read_document(manifest_raw, "manifest")
+    sets = manifest.get("sets") if isinstance(manifest, Mapping) else None
+    _require(isinstance(sets, list), "the manifest is not a texture manifest")
+    for entry in sets:
+        _require(
+            isinstance(entry, Mapping)
+            and isinstance(entry.get("set_id"), str)
+            and _positive_integer(entry.get("version"))
+            and _positive_integer(entry.get("byte_size"))
+            and is_sha256(entry.get("content_sha256"))
+            and is_sha256(entry.get("licence_sha256"))
+            and isinstance(entry.get("licence_id"), str),
+            "the manifest's sets are not texture manifest entries",
+        )
+    return tuple(sets)
 
 
 def _object(read: ObjectReader, digest: Any, profile: str, keys: frozenset[str]) -> Any:
@@ -183,8 +221,8 @@ def verify_material_catalog(
 ) -> MaterialCatalog:
     """The catalog in ``catalog_raw``, verified against ``manifest_raw`` and every object.
 
-    ``manifest_raw`` must already have been checked as a texture manifest; its sets are read
-    here only to be compared, row by row, with the catalog's.
+    ``manifest_raw`` is read strictly here too, but only for the fields compared with the
+    catalog; checking it as a texture manifest is its reader's job.
     """
     document = read_object(catalog_raw, "catalog")
     if not isinstance(document, Mapping) or set(document) != _CATALOG_KEYS:
@@ -194,8 +232,15 @@ def verify_material_catalog(
     if document["manifest_sha256"] != sha256_hex(manifest_raw):
         raise MaterialObjectError("the catalog describes a different manifest")
     makers = _makers(read, document)
-    listed = json.loads(manifest_raw)["sets"]
+    listed = _manifest_sets(manifest_raw)
     rows = _rows(document, "sets", _SET_ROW_KEYS)
+    for row in rows:
+        _require(
+            isinstance(row["set_id"], str)
+            and _positive_integer(row["version"])
+            and is_sha256(row["content_sha256"]),
+            "catalog set rows name a set id, a positive integer version and a sha256",
+        )
     if [(row["set_id"], row["version"], row["content_sha256"]) for row in rows] != [
         (entry["set_id"], entry["version"], entry["content_sha256"]) for entry in listed
     ]:
@@ -207,6 +252,14 @@ def verify_material_catalog(
         receipt = _object(read, row["receipt_sha256"], BAKE_RECEIPT_PROFILE, _RECEIPT_KEYS)
         if receipt["pipeline"] != BAKE_PIPELINE:
             raise MaterialObjectError(f"{set_id} was baked by {receipt['pipeline']!r}")
+        _require(
+            _positive_integer(receipt["byte_size"])
+            and all(
+                is_sha256(receipt[field])
+                for field in ("maker_sha256", "entry_sha256", "recipe_sha256", "licence_sha256")
+            ),
+            f"{set_id}: the receipt's digests are sha256 and its byte_size a positive integer",
+        )
         for field in ("content_sha256", "byte_size", "licence_sha256"):
             if receipt[field] != entry[field]:
                 raise MaterialObjectError(f"{set_id}: the receipt's {field} is not the manifest's")
@@ -214,13 +267,18 @@ def verify_material_catalog(
         if maker is None:
             raise MaterialObjectError(f"{set_id}: the receipt names a maker the catalog lacks")
         library_entry = _object(read, receipt["entry_sha256"], LIBRARY_ENTRY_PROFILE, _ENTRY_KEYS)
+        _require(
+            _positive_integer(library_entry["version"])
+            and isinstance(library_entry["set_id"], str)
+            and isinstance(library_entry["licence_id"], str),
+            f"{set_id}: the entry names a set id, a positive integer version and a licence",
+        )
         if (library_entry["set_id"], library_entry["version"]) != (set_id, row["version"]):
             raise MaterialObjectError(f"{set_id}: the receipt's entry names another set")
-        if not all(
-            isinstance(library_entry[field], str) and library_entry[field].strip(" ")
-            for field in ("title", "summary")
-        ):
-            raise MaterialObjectError(f"{set_id}: the entry's title and summary are text")
+        _require(
+            _is_text(library_entry["title"]) and _is_text(library_entry["summary"]),
+            f"{set_id}: the entry's title and summary are text",
+        )
         if library_entry["licence_id"] != entry["licence_id"]:
             raise MaterialObjectError(f"{set_id}: the entry's licence is not the manifest's")
         if library_entry["recipe_sha256"] != receipt["recipe_sha256"]:

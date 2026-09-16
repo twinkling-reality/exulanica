@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { MAP_LAYOUT, type MapName } from '../src/container.js';
 import type { Fields } from '../src/maps.js';
 
-/** The published directory, at the repository root: web/packages/loom-texture/test -> root. */
+/** The repository root: web/packages/loom-texture/test -> root. */
+export const REPOSITORY = fileURLToPath(new URL('../../../../', import.meta.url));
+
+/** The published directory, at the repository root. */
 export const PUBLISHED = fileURLToPath(new URL('../../../../assets/textures/', import.meta.url));
 
 export function readPublished(path: string): Uint8Array {

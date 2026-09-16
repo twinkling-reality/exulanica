@@ -12,10 +12,15 @@ the manifest says about it.
 
 **Every set is accounted for.** Beside the manifest, ``catalog.json`` names a bake receipt for each
 set, and the receipt names the maker manifest, library entry and recipe the bytes were baked from,
-all content-addressed under ``objects/``. :mod:`exulanica.materials` verifies that graph, and the
-loader then holds each container header to its recipe: seed, resolution, extent, height range,
-occlusion, family, surface, title and summary. A set whose provenance does not check out is not
-loaded, so a pinned set always comes with the recipe a person or the Companion can vary.
+all content-addressed under ``objects/``. The catalog's own digest is pinned here as
+:data:`TEXTURE_CATALOG_SHA256`, which pins every object it reaches, so a directory that differs from
+the reviewed one in any object does not load however consistent it is with itself; and
+:data:`PUBLISHED_MAKER_MANIFESTS` pins each maker version to one manifest forever.
+:mod:`exulanica.materials` verifies the graph, and the loader then holds each container header to
+its recipe: seed, resolution, extent, height range, occlusion, family, surface, title, summary, and
+every stated parameter that is one of the maker's integer controls. A set whose provenance does not
+check out is not loaded, so a pinned set always comes with the recipe a person or the Companion can
+vary.
 
 **A material resolves to a pinned set or it does not resolve.** :func:`resolve_texture_set` has
 exactly two failure modes: a material record with no texture set id raises
@@ -36,7 +41,6 @@ content-addressed.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -44,18 +48,20 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final
 
-from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError, IntegrityError
 from exulanica.materials import (
     LibraryRecord,
     MaterialCatalog,
     MaterialObjectError,
+    read_document,
     verify_material_catalog,
 )
 from exulanica.store.base import ContentAddressedStore
 
 __all__ = [
     "CC0_LICENCE_ID",
+    "PUBLISHED_MAKER_MANIFESTS",
+    "TEXTURE_CATALOG_SHA256",
     "TEXTURE_DIRECTORY",
     "TEXTURE_MANIFEST_PROFILE",
     "TEXTURE_SET_ID_PATTERN",
@@ -85,6 +91,27 @@ TEXTURE_TRUTH: Final = "invented"
 #: character; ``tests/test_texture_set_migration.py`` compares the three.
 TEXTURE_SET_ID_PATTERN: Final = "^[a-z][a-z0-9.-]*$"
 CC0_LICENCE_ID: Final = "CC0-1.0"
+#: The reviewed published library: the sha256 of ``assets/textures/catalog.json``. The catalog
+#: names every maker manifest and every receipt by digest, and each receipt names its entry and
+#: recipe, so this one digest pins every object in the directory. A rebake that changes any object
+#: changes it, and updates it here in the same commit; the package's
+#: ``test/published.test.ts`` compares it with the committed catalog so the web suite says so first.
+TEXTURE_CATALOG_SHA256: Final = "c6343f4cd3a1794e95bdbf9f4ef9843e26cf212002d9e119980bce85c24e8c9e"
+#: Every published maker manifest, by maker id and version. Rows are appended, never edited or
+#: removed: a recipe names a maker by id and version, so a published version names one manifest
+#: forever, and a change to a maker's controls, rules or wording is a new version and a new row.
+PUBLISHED_MAKER_MANIFESTS: Final[Mapping[tuple[str, int], str]] = MappingProxyType(
+    {
+        ("loom.ashlar", 1): "f689a79667f18cccc577b007fb74e9c6c831482a4afac29222153d3cb6ad2cff",
+        ("loom.asphalt", 1): "a1b1a9435744a6cb5bd9c046109a63a0b41b41bcd8e162562a1d91109ad67a88",
+        ("loom.brick", 1): "50ae89003097a3b3a68f78490c1344278477a3351ef63b6dde59e06d1435f5c6",
+        ("loom.concrete", 1): "4215979b6d8dc40bc86605ca020070583892c2094042aebd1c02bb692d803fae",
+        ("loom.kerb", 1): "838d4404a523e2080005f75bb673baa23d4c15e333f415741f13943f80b408f7",
+        ("loom.metal", 1): "63c5080a4a150d5da0199cbf81e354512cae9ee27004209e8025826935d62635",
+        ("loom.paving", 1): "e1d8bf41461217f50d3880e75298056c22dc869cc86aa652afb3d99c565fbbb0",
+        ("loom.render", 1): "ebe23d3b8dc98ac86531788499137d7196a81c96717b80e1d80752add8118245",
+    }
+)
 
 _SET_ID: Final = re.compile(TEXTURE_SET_ID_PATTERN)
 _HEX64: Final = re.compile(r"^[0-9a-f]{64}$")
@@ -229,39 +256,16 @@ class DecodedTextureSet:
     maps: Mapping[str, memoryview]
 
 
-def _refuse_float(literal: str) -> Any:
-    raise TextureCatalogError(f"non-integer number {literal} in a digest input")
-
-
-def _refuse_constant(literal: str) -> Any:
-    raise TextureCatalogError(f"{literal} is not a JSON value a digest input may hold")
-
-
-def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise TextureCatalogError(f"key {key!r} appears twice in one object")
-        result[key] = value
-    return result
-
-
 def _canonical_document(raw: bytes, where: str) -> Any:
-    """Parse JSON that must already be in canonical form, refusing floats and repeated keys."""
+    """Read JSON that must already be canonical, as :func:`exulanica.materials.read_document` does.
+
+    Floats, repeated keys, integers outside the safe range, deep nesting, non-ASCII text and any
+    byte form other than the canonical one are refused, each as a :class:`TextureCatalogError`.
+    """
     try:
-        document = json.loads(
-            raw.decode("utf-8"),
-            parse_float=_refuse_float,
-            parse_constant=_refuse_constant,
-            object_pairs_hook=_unique_keys,
-        )
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise TextureCatalogError(f"{where} is not JSON: {error}") from error
-    if canonical_json(document) != raw:
-        raise TextureCatalogError(
-            f"{where} is not canonical JSON, so its bytes are not its content"
-        )
-    return document
+        return read_document(raw, where)
+    except MaterialObjectError as error:
+        raise TextureCatalogError(str(error)) from error
 
 
 def _positive_int(value: object) -> bool:
@@ -407,6 +411,19 @@ def _check_provenance(header: Mapping[str, Any], record: LibraryRecord, where: s
     placement = header.get("placement")
     if not isinstance(placement, Mapping) or placement.get("surface") != manifest["surface"]:
         raise TextureCatalogError(f"{where}: header placement is not its maker's surface")
+    # A maker may state a control under that control's own key only with the recipe's value, which
+    # loom-texture's makers test holds every maker to. Derived values stated under other keys are
+    # the maker's to compute, and the package's rebake is what checks those.
+    stated = header.get("parameters")
+    if not isinstance(stated, Mapping):
+        raise TextureCatalogError(f"{where}: header parameters is an object")
+    integers = {control["key"] for control in manifest["controls"] if control["kind"] == "integer"}
+    for key, value in stated.items():
+        if key in integers and (type(value) is not int or value != parameters[key]):
+            raise TextureCatalogError(
+                f"{where}: header parameter {key} is {value!r}, but its recipe says "
+                f"{parameters[key]!r}"
+            )
 
 
 def _object_reader(directory: Path) -> Callable[[str], bytes]:
@@ -419,14 +436,21 @@ def _object_reader(directory: Path) -> Callable[[str], bytes]:
     return read
 
 
-def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
+def load_texture_catalog(
+    directory: Path = TEXTURE_DIRECTORY,
+    *,
+    catalog_sha256: str = TEXTURE_CATALOG_SHA256,
+    makers: Mapping[tuple[str, int], str] = PUBLISHED_MAKER_MANIFESTS,
+) -> TextureCatalog:
     """Every published set, each verified against its pin and its own header, or a refusal.
 
     Refuses a manifest that is not canonical, holds a float, repeats or misorders a set, or names
     a blob that is absent, has the wrong length, hashes to anything but its pin, or carries a
     header that disagrees with the manifest. The licence text every set names is verified too,
-    and so is ``catalog.json``: every set's receipt, entry, recipe and maker, and the header
-    against the recipe.
+    and so is ``catalog.json``: its digest against ``catalog_sha256``, its makers against
+    ``makers``, every set's receipt, entry, recipe and maker, and the header against the recipe.
+    The two pins default to the reviewed library; a caller verifying another directory names
+    that directory's own.
     """
     raw = (directory / _MANIFEST).read_bytes()
     document = _canonical_document(raw, _MANIFEST)
@@ -481,12 +505,28 @@ def load_texture_catalog(directory: Path = TEXTURE_DIRECTORY) -> TextureCatalog:
         raise TextureCatalogError(
             f"{_CATALOG} is not in {directory}; every published set is accounted for by a receipt"
         )
-    try:
-        materials = verify_material_catalog(
-            catalog_path.read_bytes(), raw, _object_reader(directory)
+    catalog_raw = catalog_path.read_bytes()
+    catalog_digest = hashlib.sha256(catalog_raw).hexdigest()
+    if catalog_digest != catalog_sha256:
+        raise TextureCatalogError(
+            f"{_CATALOG} hashes to {catalog_digest}, not the reviewed pin {catalog_sha256}; a "
+            "rebake that changes any object updates TEXTURE_CATALOG_SHA256 in the same commit"
         )
+    try:
+        materials = verify_material_catalog(catalog_raw, raw, _object_reader(directory))
     except MaterialObjectError as error:
         raise TextureCatalogError(f"{_CATALOG}: {error}") from error
+    published = {key: record.sha256 for key, record in materials.makers.items()}
+    if published != dict(makers):
+        changed = sorted(
+            f"{maker_id} version {version}"
+            for maker_id, version in set(published) | set(makers)
+            if published.get((maker_id, version)) != makers.get((maker_id, version))
+        )
+        raise TextureCatalogError(
+            f"{_CATALOG}: {', '.join(changed)} is not the published maker manifest; a published "
+            "maker version names one manifest forever, and a changed maker is a new version"
+        )
     sets: dict[str, PinnedTextureSet] = {}
     for set_id, (entry, header, path) in checked.items():
         record = materials.sets[set_id]
