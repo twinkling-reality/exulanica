@@ -290,6 +290,19 @@ export function buildScene(
         layout.placements.get(toIslandId(record.islandId)) ?? originPlacement(),
         reconstructions.has(toIslandId(record.islandId)),
       ),
+      /*
+       * Located only when somebody supplied the placement.
+       *
+       * `persistedPlacements` is the one input to this function that carries a position anybody
+       * asserted. Everything else in `layout.placements` is the solver's own packing, and the
+       * comment eight lines down already says it: where a region sits "carries no real-world
+       * meaning". The composer refuses to give a body to a region whose position means nothing,
+       * so this flag is the whole difference between a landmark and a decoration.
+       *
+       * The app passes an empty map today, so today every region is unlocated and the world
+       * carries no memory bodies at all. That is the intended reading, not a gap to paper over.
+       */
+      placementLocated: persistedPlacements.has(toIslandId(record.islandId)),
       // What is actually loaded decides this renderer rung. The record remains available on the
       // graph snapshot as a separate historical fact. A failed fetch therefore presents rung 4
       // source photographs without rewriting the rung 3 that the durable gate recorded.

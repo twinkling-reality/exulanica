@@ -125,11 +125,18 @@ export interface WorldNavigationGraph {
   readonly edges: readonly WorldNavigationEdge[];
 }
 
-export interface WorldTopologyDiagnostic {
-  readonly code: 'reconstruction-asset-unavailable';
-  readonly instanceId: string;
-  readonly detail: string;
-}
+export type WorldTopologyDiagnostic =
+  | {
+      readonly code: 'reconstruction-asset-unavailable';
+      readonly instanceId: string;
+      readonly detail: string;
+    }
+  /** A memory the world declined to place, because nothing knows where it actually is. */
+  | {
+      readonly code: 'region-unlocated';
+      readonly islandId: IslandId;
+      readonly detail: string;
+    };
 
 export interface WorldTopologySnapshot {
   readonly schemaVersion: typeof WORLD_TOPOLOGY_SCHEMA_VERSION;
@@ -599,6 +606,25 @@ export function composeAtlasWorld(
       (a.islandId < b.islandId ? -1 : a.islandId > b.islandId ? 1 : 0),
   );
   for (const island of orderedIslands) {
+    /*
+     * A memory gets a body only where its real location is known.
+     *
+     * The gate is NOT whether the region has geometry; it is whether it has a PLACE. Rung says how
+     * much of a region was reconstructed, and a fully reconstructed region can still be sitting
+     * wherever a phyllotaxis spiral dropped it. Standing a landmark at an invented position tells
+     * a person their memory is there, and the layout solver never claimed that; it packed discs.
+     *
+     * The world is emptier for this. That is the correct result: an absent body is an honest
+     * absence, and a body at a decorative position is a false statement about a place.
+     */
+    if (island.placementLocated !== true) {
+      diagnostics.push(Object.freeze({
+        code: 'region-unlocated' as const,
+        islandId: island.islandId,
+        detail: 'No real location is known for this memory, so it has no body in the world.',
+      }));
+      continue;
+    }
     const recipe = recipes.get(`region.rung-${island.rung}`);
     const assembly = instantiateRecipe({
       owner: Object.freeze({ kind: 'region', id: island.islandId }),
@@ -639,7 +665,11 @@ export function composeAtlasWorld(
   }
 
   instances.sort((a, b) => a.instanceId.localeCompare(b.instanceId));
-  diagnostics.sort((a, b) => a.instanceId.localeCompare(b.instanceId));
+  // One stable key across both diagnostic shapes: an instance names itself, an unplaced memory
+  // names the region that has nowhere to be.
+  const diagnosticKey = (value: WorldTopologyDiagnostic): string =>
+    value.code === 'region-unlocated' ? value.islandId : value.instanceId;
+  diagnostics.sort((a, b) => diagnosticKey(a).localeCompare(diagnosticKey(b)));
   const navigation = navigationGraph(scene);
   const topologyDigest = fnv1a64(canonicalTopology(instances, navigation));
   const snapshot: WorldTopologySnapshot = Object.freeze({
