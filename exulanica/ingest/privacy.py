@@ -511,6 +511,11 @@ def record_person_detection_screening(
     anything here. An account holder has authorized a search for them so that they can be hidden,
     which is a different act with a different actor, and ``purpose`` is recorded so the receipt
     says which act it was.
+
+    **It names no model, and does not have to.** Which model may do the looking, and where the
+    bytes may go, is a personal model right, a separate object with its own receipt; see
+    :mod:`exulanica.ingest.model_rights`. This receipt keeps its meaning, and a model read needs
+    both.
     """
     authorization = repository.reconstruction_authorization(authorization_id)
     if authorization is None:

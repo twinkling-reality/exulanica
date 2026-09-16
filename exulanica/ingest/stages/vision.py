@@ -92,6 +92,11 @@ def run(
     screening does not change what is in the photograph, and keying on it would re-bill a model
     call every time a receipt was superseded. The receipt id is recorded on the artifact instead,
     so the provenance is kept without paying for it twice.
+
+    A screening says the photograph may be looked at and names no model, so a personal photograph
+    also needs a current model right for every model the role can reach at the endpoint the bytes
+    go to. That is asked last, immediately before the call, and a refusal is unavailable too. A
+    reused observation sends nothing and asks for no right.
     """
     spec = stage("vision")
     if model is None:
