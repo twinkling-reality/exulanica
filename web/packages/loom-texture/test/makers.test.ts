@@ -5,12 +5,11 @@ import type { LibrarySet } from '../src/library.js';
 import { bakeMaps, sampleFields } from '../src/maps.js';
 import {
   type Control,
-  type Expression,
   type ParameterValue,
   type Recipe,
-  evaluate,
   recipeProblems,
 } from '../src/recipe.js';
+import { repairRecipe } from '../src/repair.js';
 import { FIELD_NAMES, rollMismatches } from './support.js';
 
 /**
@@ -19,8 +18,9 @@ import { FIELD_NAMES, rollMismatches } from './support.js';
  * A published recipe is one point in each maker's space. A person, or a model proposing recipes,
  * will reach the corners, so every control is pushed to each end of its range (and every choice to
  * each option) one at a time, on a small frame. The variant is then repaired the way a person
- * making that change would repair it: a count an `even` rule needs even is raised by one, an
- * extent a module rule pins is recomputed, and an extent a proportion rule pins is divided out.
+ * making that change would repair it (`src/repair.ts`): a count an `even` rule needs even is
+ * raised by one, an extent a module rule pins is recomputed, and one a proportion rule pins is
+ * divided out.
  * Every variant the validator accepts must bake without throwing, encode a canonical header, tile
  * by construction, and state each of its integer controls, if it states one at all, under that
  * control's own key with that control's value, which is what the backend checks a header against.
@@ -53,56 +53,16 @@ function extremes(control: Control): ParameterValue[] {
   }
 }
 
-const mentionsExtent = (expression: Expression): boolean =>
-  'extent' in expression
-  || ('sum' in expression && expression.sum.some(mentionsExtent))
-  || ('product' in expression && expression.product.some(mentionsExtent));
-
-/** A variant on a small frame, repaired as the header comment says. */
+/** A variant on a small frame, repaired as `src/repair.ts` repairs one. */
 function variant(source: LibrarySet, key: string, value: ParameterValue): Recipe {
   const base = source.entry.recipe;
-  const { constraints, controls } = source.maker.manifest;
   const { width, height } = base.resolution;
   const shorter = Math.min(width, height);
-  const parameters: Record<string, ParameterValue> = { ...base.parameters, [key]: value };
-  for (const constraint of constraints) {
-    if (constraint.kind !== 'even' || !('param' in constraint.value)) continue;
-    if (constraint.when !== undefined
-      && parameters[constraint.when.param] !== constraint.when.equals) continue;
-    const count = constraint.value.param;
-    const current = parameters[count] as number;
-    const control = controls.find((candidate) => candidate.key === count);
-    if (current % 2 !== 0 && control?.kind === 'integer' && current < control.maximum) {
-      parameters[count] = current + 1;
-    }
-  }
-  let recipe: Recipe = {
+  return repairRecipe(source.maker, {
     ...base,
     resolution: { width: (width / shorter) * SIDE, height: (height / shorter) * SIDE },
-    parameters,
-  };
-  const extent = { ...recipe.extent_mm };
-  for (const constraint of constraints) {
-    if (constraint.kind !== 'equal' || !('extent' in constraint.right)) continue;
-    if (mentionsExtent(constraint.left)) continue;
-    const pinned = evaluate(constraint.left, recipe);
-    if (pinned !== null && pinned > 0) extent[constraint.right.extent] = pinned;
-  }
-  recipe = { ...recipe, extent_mm: { ...extent } };
-  for (const constraint of constraints) {
-    if (constraint.kind !== 'equal' || !('extent' in constraint.right)) continue;
-    if (!('product' in constraint.left)) continue;
-    const terms = constraint.left.product;
-    const axes = terms.filter((term): term is { readonly extent: 'u' | 'v' } => 'extent' in term);
-    const rest = terms.filter((term) => !mentionsExtent(term));
-    if (axes.length !== 1 || axes.length + rest.length !== terms.length) continue;
-    const factor = evaluate({ product: rest }, recipe);
-    const whole = extent[constraint.right.extent];
-    if (factor !== null && factor > 0 && whole % factor === 0) {
-      extent[axes[0]!.extent] = whole / factor;
-    }
-  }
-  return { ...recipe, extent_mm: extent };
+    parameters: { ...base.parameters, [key]: value },
+  });
 }
 
 /** Each stated integer control, under its own key, has the recipe's value. */

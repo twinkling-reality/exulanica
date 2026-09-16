@@ -444,11 +444,65 @@ manifest and the pinned rows disagree.
   `web/package.json` and two dependency-cruiser rules to `web/.dependency-cruiser.cjs`: nothing that
   ships to a browser imports loom-texture, and loom-texture reaches no workspace package but
   `atlas-core`.
-- **Tier B, not started.** Workspace recipes and bakes in migration 0066, the Node bake worker that
-  runs a maker server-side, an inert photograph-derived recipe object with its consent dependency,
-  and any learned recipe model behind a process boundary (section 2).
+- **Tier B.** The synthetic dataset exporter is built (section 13). Not started: workspace recipes
+  and bakes in migration 0066, the Node bake worker that runs a maker server-side, an inert
+  photograph-derived recipe object with its consent dependency, and any learned recipe model behind
+  a process boundary (section 2).
 
-## 13. What is not verified
+## 13. Synthetic dataset
+
+`web/packages/loom-texture/src/dataset/` turns the published library into training pairs for a model
+that proposes a recipe from a picture: each pair is a recipe and a picture of what its maker bakes.
+Every recipe starts from a published one and is varied inside its maker's own rules; every picture
+is that maker's bake, lit and cropped. Nothing is observed. No photograph, scan or download goes in,
+the export runs on a CPU, and its manifest says `"truth": "invented"` and `"licence_id": "CC0-1.0"`.
+
+- **The plan** (`exulanica.texture-dataset-plan/v1`) is the whole specification, as data: a seed,
+  the published sets to vary, records per set, the bake size (texels along a tile's longer side),
+  the picture size, the attempts allowed per record, how far controls vary, and how the light
+  varies. `dataset/plans/texture-inverse-v1.json` is the committed plan: all eight sets, 256
+  records each, bakes of 256 texels, pictures of 128 pixels, 2048 records in all.
+- **The sampler** (`exulanica.texture-dataset-sampler/v1`) draws everything from hashes of the
+  record's own seed, a stream of the plan's seed and the record's number. A control keeps its
+  published value some of the time and otherwise moves within a window of its range around it (a
+  fifth of the time and a quarter of the range, in the committed plan); a choice keeps its option
+  some of the time (half); a colour or a whole palette moves together and then a little per
+  channel, so a brick stays brick-coloured. The varied recipe is repaired as a person would repair
+  it (`src/repair.ts`, the same repair the maker sweep uses), framed at the bake size with texels as
+  near square as a power of two allows, and checked by the validator every recipe passes. A refused
+  attempt is counted and retried; a plan no attempt satisfies is refused rather than thinned out.
+- **The pictures** (`exulanica.texture-dataset-render/v1`) are a square window of the tiled surface,
+  starting anywhere on the tile, seen straight on and lit by one directional light and an even
+  surround, in integers: diffuse from the normal map, a highlight that tightens as roughness falls,
+  the surround reflected in each surface's own reflectance (so a metal shows its colour where the
+  highlight is not), occlusion, and a slight colour cast. The light's height is kept within the
+  plan's range, below the viewing axis, where a flat polished surface would turn into one highlight.
+  There is no perspective, no parallax and no shadowing between features.
+- **An export** writes `images/<set id>.rgb` (the set's pictures, sRGB bytes, concatenated),
+  `records.jsonl` (one canonical JSON line per record: the recipe and its digest, the window, the
+  texel size in micrometres, the light, the attempts used) and, last, `dataset.json`, the manifest:
+  the plan and its digest, the bake pipeline, sampler and renderer versions, the makers and published
+  recipes used, and the length and sha256 of every file. The bytes go under the repository's ignored
+  `.exulanica/datasets/texture/`, or outside the repository, and the CLI refuses anywhere else and
+  any directory that is not empty. Only the manifest is committed, at
+  `dataset/manifests/texture-inverse-v1.json`, and `test/dataset.test.ts` fails when a maker, a
+  published recipe, the bake, the sampler or the renderer changes without a new export.
+
+From `web/`:
+
+```
+npx tsx packages/loom-texture/src/dataset/cli.ts \
+  --plan packages/loom-texture/dataset/plans/texture-inverse-v1.json \
+  --out ../.exulanica/datasets/texture/texture-inverse-v1 \
+  --record packages/loom-texture/dataset/manifests/texture-inverse-v1.json
+```
+
+What the dataset does not settle: whether a model trained on these pictures proposes good recipes
+from real photographs. The pictures are clean, flat and synthetic, and closing that gap needs
+photographs a model may lawfully learn from, which this repository does not have and this lane does
+not use.
+
+## 14. What is not verified
 
 - **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.
   The contact sheet was inspected, and it shows the stored maps under a fixed light, which is

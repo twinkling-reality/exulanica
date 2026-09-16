@@ -29,6 +29,26 @@ export {
   decodeContainer,
   encodeContainer,
 } from './container.js';
+export {
+  DATASET_FILE,
+  type DatasetExport,
+  type DatasetRecord,
+  IMAGE_DIRECTORY,
+  RECORDS_FILE,
+  exportDataset,
+  recordSeed,
+} from './dataset/export.js';
+export {
+  DATASET_PROFILE,
+  type DatasetPlan,
+  PLAN_PROFILE,
+  RENDERER,
+  SAMPLER,
+  checkPlan,
+  planProblems,
+} from './dataset/plan.js';
+export { type Light, type View, renderView, sampleLight, sampleView } from './dataset/render.js';
+export { frameResolution, pickWide, sampleRecipe } from './dataset/sample.js';
 export type { CavitySpec, TextureSetDefinition } from './definition.js';
 export { sha256Hex } from './digest.js';
 export {
@@ -82,6 +102,7 @@ export {
   manifestProblems,
   recipeProblems,
 } from './recipe.js';
+export { repairRecipe } from './repair.js';
 export {
   MAXIMUM_DEPTH,
   STRICT_JSON_PROBLEMS,

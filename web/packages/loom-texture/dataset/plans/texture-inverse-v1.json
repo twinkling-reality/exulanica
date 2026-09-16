@@ -1,0 +1,23 @@
+{
+  "profile": "exulanica.texture-dataset-plan/v1",
+  "name": "texture-inverse-v1",
+  "seed": 2026091609,
+  "sets": ["cc0.brick-running-bond", "cc0.carriageway-asphalt", "cc0.cast-concrete", "cc0.footway-paving", "cc0.kerb-stone", "cc0.limestone-ashlar", "cc0.painted-render", "cc0.storefront-metal"],
+  "records_per_set": 256,
+  "bake_size": 256,
+  "image_size": 128,
+  "attempts": 64,
+  "variation": {
+    "keep_permille": 200,
+    "window_permille": 250,
+    "choice_keep_permille": 500,
+    "colour_shift": 40,
+    "colour_jitter": 12
+  },
+  "lighting": {
+    "elevation_permille": [300, 900],
+    "intensity_permille": [700, 1300],
+    "ambient_permille": [150, 350],
+    "gain_permille": [940, 1060]
+  }
+}
