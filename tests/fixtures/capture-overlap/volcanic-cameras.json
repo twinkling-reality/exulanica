@@ -1,0 +1,2112 @@
+{
+ "source": {
+  "collection": "Montserrat volcanic sample, Mike R. James and Stuart Robson, CC0",
+  "photographs": ".exulanica/reference-baseline/inputs/volcanic-sample/photographs",
+  "order": "file names sorted as strings; index is the position in that order",
+  "pose_receipt_sha256": "f44362e2840ef4f997082774d4b4cf665a734e810460aa48141887b7eb0363bb",
+  "pose_receipt_store": ".exulanica/reference-baseline/runtime/blobs",
+  "forward": "world direction of each camera's optical axis, the third row of camera_from_world, times 1000000 and truncated toward zero"
+ },
+ "photographs": [
+  {
+   "index": 0,
+   "name": "IMG_1928.jpg",
+   "sha256": "5b09358a5a2e94dd13a469714624fbd559aa1258bdb992b2111740b2614361eb",
+   "forward_e6": [
+    638772,
+    -744026,
+    -195944
+   ]
+  },
+  {
+   "index": 1,
+   "name": "IMG_1929.jpg",
+   "sha256": "61e550d6b940564d2305b77c66207c766316f83343d3bfa0567e10ee7189be78",
+   "forward_e6": [
+    673313,
+    -651488,
+    -349587
+   ]
+  },
+  {
+   "index": 2,
+   "name": "IMG_1930.jpg",
+   "sha256": "163278186744f61696ffc04dd1d5f4c83a15f23c0d996cb90f48a0c2a4f9e59f",
+   "forward_e6": [
+    684887,
+    -547226,
+    -481115
+   ]
+  },
+  {
+   "index": 3,
+   "name": "IMG_1931.jpg",
+   "sha256": "22843e46af9fd16907ba709ae26bbf1bc140bd3f29a1469b82366559de589099",
+   "forward_e6": [
+    674539,
+    -414101,
+    -611159
+   ]
+  },
+  {
+   "index": 4,
+   "name": "IMG_1932.jpg",
+   "sha256": "ab4ec9ef06f3403b4db628878b54528440d77a3b1408103de0d62f61bcba04a6",
+   "forward_e6": [
+    645357,
+    -284888,
+    -708767
+   ]
+  },
+  {
+   "index": 5,
+   "name": "IMG_1933.jpg",
+   "sha256": "e1455ec61b3230ffa3899c3e06426ee19cb2f22b31c803f2895fc788eaa4da4c",
+   "forward_e6": [
+    596328,
+    -143314,
+    -789843
+   ]
+  },
+  {
+   "index": 6,
+   "name": "IMG_1934.jpg",
+   "sha256": "94d3884fd69165373bf997beebed08221fee1c18226789f350789419ca9fd5d4",
+   "forward_e6": [
+    529412,
+    2005,
+    -848362
+   ]
+  },
+  {
+   "index": 7,
+   "name": "IMG_1935.jpg",
+   "sha256": "28d8fa0ee93f108ce913f97bdd3ba8f9ea8a712f141023a6625993c00409f459",
+   "forward_e6": [
+    442174,
+    153992,
+    -883610
+   ]
+  },
+  {
+   "index": 8,
+   "name": "IMG_1936.jpg",
+   "sha256": "ec468683648eb0b7cc7f5f65c9dc15bebf1e5851c40e6618f354a4b9afd09ba5",
+   "forward_e6": [
+    343228,
+    296397,
+    -891258
+   ]
+  },
+  {
+   "index": 9,
+   "name": "IMG_1937.jpg",
+   "sha256": "45a459b02170c4bf937a3c75b13ac7d0c6525636eb5c6de48861986dd2d0376b",
+   "forward_e6": [
+    231732,
+    431442,
+    -871870
+   ]
+  },
+  {
+   "index": 10,
+   "name": "IMG_1938.jpg",
+   "sha256": "ea7260f23fdcf3e4650fa9287153943d8f99db34bb7cfbb3596a856ec11f532f",
+   "forward_e6": [
+    114602,
+    550722,
+    -826783
+   ]
+  },
+  {
+   "index": 11,
+   "name": "IMG_1939.jpg",
+   "sha256": "91d48fec553ed332c077f72be8007e06c6e49592d0fc2e041df2d394350abf27",
+   "forward_e6": [
+    -9903,
+    655670,
+    -754982
+   ]
+  },
+  {
+   "index": 12,
+   "name": "IMG_1940.jpg",
+   "sha256": "8dd99ff4031aa1a9f067469a51cc825b9c5233304a9e568cacc19eb5bf4e9539",
+   "forward_e6": [
+    -131663,
+    737510,
+    -662377
+   ]
+  },
+  {
+   "index": 13,
+   "name": "IMG_1941.jpg",
+   "sha256": "8ec5fd7c34ca0fbd470e664804fb1c98196cb722411b7c47ce9a72b30b1a3478",
+   "forward_e6": [
+    -249487,
+    796663,
+    -550530
+   ]
+  },
+  {
+   "index": 14,
+   "name": "IMG_1942.jpg",
+   "sha256": "e3ff262876f857bcdb2638739a8eca22b9bbd5a1a767850ceb6c68a0cf2fb3d5",
+   "forward_e6": [
+    -360555,
+    831625,
+    -422372
+   ]
+  },
+  {
+   "index": 15,
+   "name": "IMG_1943.jpg",
+   "sha256": "e40e6013bb9650abfaa56f0d030ada9e6bb29b23d586558abbe37a35478e0d7b",
+   "forward_e6": [
+    -462173,
+    841199,
+    -280675
+   ]
+  },
+  {
+   "index": 16,
+   "name": "IMG_1944.jpg",
+   "sha256": "bfd64a08fa3c2df5377096bbf0cb3aea3385e3fb186e8241d1411d4214005b27",
+   "forward_e6": [
+    -550155,
+    824780,
+    -130635
+   ]
+  },
+  {
+   "index": 17,
+   "name": "IMG_1945.jpg",
+   "sha256": "609d913a9fded78535a5263a52ea14fac66b405360f46c7ce7fb4c7feb09a8a6",
+   "forward_e6": [
+    -621036,
+    783495,
+    21170
+   ]
+  },
+  {
+   "index": 18,
+   "name": "IMG_1946.jpg",
+   "sha256": "f640bb6e1e85dee11ee0a9a31577103c04bb3a8e8f340625b1d307f9559ff0e5",
+   "forward_e6": [
+    -675101,
+    716586,
+    175331
+   ]
+  },
+  {
+   "index": 19,
+   "name": "IMG_1947.jpg",
+   "sha256": "a8f61434f75913075f6e927654a9fdcedb618dd82c95d222eb5162aa0241e2b7",
+   "forward_e6": [
+    -708162,
+    629424,
+    319891
+   ]
+  },
+  {
+   "index": 20,
+   "name": "IMG_1948.jpg",
+   "sha256": "8691be1bcd779171caf093989e6d1ef3beeecf77734d546c3ad76f201566ecdd",
+   "forward_e6": [
+    -720603,
+    522653,
+    455591
+   ]
+  },
+  {
+   "index": 21,
+   "name": "IMG_1949.jpg",
+   "sha256": "25e194072be5bab31eb24b1a8629c6b6c91db9d8f1a749e36ff0cf6ed0f66a45",
+   "forward_e6": [
+    -711845,
+    397488,
+    579032
+   ]
+  },
+  {
+   "index": 22,
+   "name": "IMG_1950.jpg",
+   "sha256": "9e37e602926e21bb9f6ddae783c8af93a7909c2ec6b66209ac36619e9121b238",
+   "forward_e6": [
+    -681254,
+    259148,
+    684641
+   ]
+  },
+  {
+   "index": 23,
+   "name": "IMG_1951.jpg",
+   "sha256": "cfa5463009e8b1f8af096d89c0dea17468faa9b1fbf64331854c2d5ddc4b0d05",
+   "forward_e6": [
+    -632424,
+    118271,
+    765539
+   ]
+  },
+  {
+   "index": 24,
+   "name": "IMG_1952.jpg",
+   "sha256": "694f5254d525a22ee2548a6d05394b5d991f6e8dfa6df6729b5ed16768e275fd",
+   "forward_e6": [
+    -560283,
+    -37194,
+    827465
+   ]
+  },
+  {
+   "index": 25,
+   "name": "IMG_1953.jpg",
+   "sha256": "171ee2e281c4a535261f21400965d4e3d39419bf6195e9df854d70d1ca1c27f2",
+   "forward_e6": [
+    -476108,
+    -182505,
+    860239
+   ]
+  },
+  {
+   "index": 26,
+   "name": "IMG_1954.jpg",
+   "sha256": "18ebc5bf660bcab81a0c67d313ad55a6ccda5bcb07d22fa7dcec0032aa787695",
+   "forward_e6": [
+    -375296,
+    -327226,
+    867222
+   ]
+  },
+  {
+   "index": 27,
+   "name": "IMG_1955.jpg",
+   "sha256": "1bfa4fe0f6f8a609c9ed325598141d3ce984dc5e6a83a3c3fd7e92c407f59de3",
+   "forward_e6": [
+    -268419,
+    -456335,
+    848356
+   ]
+  },
+  {
+   "index": 28,
+   "name": "IMG_1956.jpg",
+   "sha256": "a115238cc38476e6b269c7ff3979fc1283ed763af9811cbd96a3dcd98b990e2a",
+   "forward_e6": [
+    -143831,
+    -582514,
+    799993
+   ]
+  },
+  {
+   "index": 29,
+   "name": "IMG_1957.jpg",
+   "sha256": "e24c69ea99487f0cb3ebbc5d58fe6d83edc6ae837508fdf1fa37f9f2dfd5d4c6",
+   "forward_e6": [
+    -23851,
+    -683113,
+    729922
+   ]
+  },
+  {
+   "index": 30,
+   "name": "IMG_1958.jpg",
+   "sha256": "48b46aeb0f39f7cc1d24ec510ac83921469d861b6860b0c30f13af51765ef689",
+   "forward_e6": [
+    95961,
+    -763612,
+    638504
+   ]
+  },
+  {
+   "index": 31,
+   "name": "IMG_1959.jpg",
+   "sha256": "d6f9c5afd6d4737ff5af15e74b83e500d8ddde588e262463ed38028482ff06b8",
+   "forward_e6": [
+    216494,
+    -823906,
+    523743
+   ]
+  },
+  {
+   "index": 32,
+   "name": "IMG_1960.jpg",
+   "sha256": "c1974397e7363a11ad036d4ee6e362ad6eff1b769eaae936b97165b43f827e29",
+   "forward_e6": [
+    330760,
+    -859027,
+    390730
+   ]
+  },
+  {
+   "index": 33,
+   "name": "IMG_1961.jpg",
+   "sha256": "8826e9c5059e775009f936e82d8efbfe67d83f99d6b3ad96f7321da705dfc70e",
+   "forward_e6": [
+    431191,
+    -867217,
+    249012
+   ]
+  },
+  {
+   "index": 34,
+   "name": "IMG_1962.jpg",
+   "sha256": "225c8552eb489643c5ece516b3c48ddca428ba7791fbef236dbf625ee8876a59",
+   "forward_e6": [
+    512567,
+    -851576,
+    109962
+   ]
+  },
+  {
+   "index": 35,
+   "name": "IMG_1963.jpg",
+   "sha256": "63a98ce54a5623acd7c3e12261cb59bd4b94f4c392e45b10fec1326ed6b0413c",
+   "forward_e6": [
+    587847,
+    -807363,
+    -50982
+   ]
+  },
+  {
+   "index": 36,
+   "name": "IMG_1964.jpg",
+   "sha256": "b5858fa6fa077cb2a24fb97607b81c5e0e50470c8d5de5ca4af795a45276347b",
+   "forward_e6": [
+    452881,
+    -828299,
+    -329875
+   ]
+  },
+  {
+   "index": 37,
+   "name": "IMG_1965.jpg",
+   "sha256": "15d39e845f7e01d54f077c70bc662b58be5d9a1693df9cd58adc47ab122065c1",
+   "forward_e6": [
+    481945,
+    -737920,
+    -472442
+   ]
+  },
+  {
+   "index": 38,
+   "name": "IMG_1966.jpg",
+   "sha256": "c770a6b17eb0c2bfbad3d00517febe4ac6d5135b28b9074eae1a541c3207bf8f",
+   "forward_e6": [
+    490037,
+    -635913,
+    -596219
+   ]
+  },
+  {
+   "index": 39,
+   "name": "IMG_1967.jpg",
+   "sha256": "14fc73b0e7cd7f39360289fb49b69f98b4ad26cbef001f3ed7c354a02ef98da4",
+   "forward_e6": [
+    477771,
+    -511285,
+    -714367
+   ]
+  },
+  {
+   "index": 40,
+   "name": "IMG_1968.jpg",
+   "sha256": "25b2c60b40b14312cbb9a749f934e59ec1e9ce9f83ee8ffcb9e0a494360d65fc",
+   "forward_e6": [
+    444269,
+    -374290,
+    -813960
+   ]
+  },
+  {
+   "index": 41,
+   "name": "IMG_1969.jpg",
+   "sha256": "9141d840a6d664939840983ce7cc0801d4a796f504e38e7da290964f50c6a57d",
+   "forward_e6": [
+    395208,
+    -240479,
+    -886554
+   ]
+  },
+  {
+   "index": 42,
+   "name": "IMG_1970.jpg",
+   "sha256": "820fafe54d590b3afe3da49f61a4972ba259edba25733c962e4c4509686c4e1a",
+   "forward_e6": [
+    325569,
+    -95288,
+    -940704
+   ]
+  },
+  {
+   "index": 43,
+   "name": "IMG_1971.jpg",
+   "sha256": "d62baa1791ea196bcd26da4e12dddc915698bdac667533bcd169ac7ec89cc414",
+   "forward_e6": [
+    242103,
+    45262,
+    -969193
+   ]
+  },
+  {
+   "index": 44,
+   "name": "IMG_1972.jpg",
+   "sha256": "d2b68503ebc1d8cb0225922b8c80b8b00fc02ca0964cffb6b95da0ea5c175b2e",
+   "forward_e6": [
+    146148,
+    180227,
+    -972706
+   ]
+  },
+  {
+   "index": 45,
+   "name": "IMG_1973.jpg",
+   "sha256": "24756dd3168172b436d27e7cb4324c99a2045a49dfd1739880f4e345a9221b89",
+   "forward_e6": [
+    34341,
+    312034,
+    -949449
+   ]
+  },
+  {
+   "index": 46,
+   "name": "IMG_1974.jpg",
+   "sha256": "9801df0f427a92d5dcb10ed3b0c6ee70fece730ea96789c48691bd592fc0c69e",
+   "forward_e6": [
+    -78849,
+    424108,
+    -902172
+   ]
+  },
+  {
+   "index": 47,
+   "name": "IMG_1975.jpg",
+   "sha256": "6904532981fc5137047c0b01911da0846d291716da75ed73d08425367f03ec77",
+   "forward_e6": [
+    -199187,
+    522187,
+    -829243
+   ]
+  },
+  {
+   "index": 48,
+   "name": "IMG_1976.jpg",
+   "sha256": "dc6239dd396e1558b6ef6cacc69a3f7f469fa0e3bf627d7b1fb2258fab35e7fd",
+   "forward_e6": [
+    -315634,
+    597564,
+    -737083
+   ]
+  },
+  {
+   "index": 49,
+   "name": "IMG_1977.jpg",
+   "sha256": "8fe85e731159e872848500154b5e8ca3834505393533c1880d6573cfdf12e5de",
+   "forward_e6": [
+    -429323,
+    651219,
+    -625775
+   ]
+  },
+  {
+   "index": 50,
+   "name": "IMG_1978.jpg",
+   "sha256": "3173ee2829d0aa377c075f82bd7a8e48f5502729331252298b773280bdfcef4f",
+   "forward_e6": [
+    -534617,
+    680913,
+    -500540
+   ]
+  },
+  {
+   "index": 51,
+   "name": "IMG_1979.jpg",
+   "sha256": "e0dbd4b0c27c57e6e84a0fcb4da316c929f0107b260946821f386ae60a98302c",
+   "forward_e6": [
+    -630944,
+    686240,
+    -361915
+   ]
+  },
+  {
+   "index": 52,
+   "name": "IMG_1980.jpg",
+   "sha256": "b869226fadaba64e39e5292cc82cbc741cb499767284823fe29eb6743434fe2a",
+   "forward_e6": [
+    -713251,
+    666527,
+    -216824
+   ]
+  },
+  {
+   "index": 53,
+   "name": "IMG_1981.jpg",
+   "sha256": "803ecfbfc6185705008ae69ab1641d421854bb658d037952086c4272aebcd715",
+   "forward_e6": [
+    -779120,
+    622915,
+    -70336
+   ]
+  },
+  {
+   "index": 54,
+   "name": "IMG_1982.jpg",
+   "sha256": "6b84755b45d7b09d028e741bdb59cb0cd958de9bfd64e9b813871eab879af5f2",
+   "forward_e6": [
+    -828459,
+    554572,
+    78123
+   ]
+  },
+  {
+   "index": 55,
+   "name": "IMG_1983.jpg",
+   "sha256": "e66ddba599b5237ad3b2ae7c90389c663894b32e2e7c10483fd2fbe53f92a7c2",
+   "forward_e6": [
+    -857190,
+    467283,
+    216495
+   ]
+  },
+  {
+   "index": 56,
+   "name": "IMG_1984.jpg",
+   "sha256": "9e8b99275e1f656a745a7efa139f686e8cfeab96871608a6990096dec6c5488a",
+   "forward_e6": [
+    -865958,
+    361814,
+    345263
+   ]
+  },
+  {
+   "index": 57,
+   "name": "IMG_1985.jpg",
+   "sha256": "cc4e3a07ec6ae7db6de0873057060c411e93a0cc11ef05d61e408def49f5f579",
+   "forward_e6": [
+    -853665,
+    236602,
+    463976
+   ]
+  },
+  {
+   "index": 58,
+   "name": "IMG_1986.jpg",
+   "sha256": "dc30855cb6526f1c8f6943a4d9730aefe5b43891c32cbe5501380686cdf10c63",
+   "forward_e6": [
+    -822314,
+    106532,
+    558971
+   ]
+  },
+  {
+   "index": 59,
+   "name": "IMG_1987.jpg",
+   "sha256": "ac2630182368851a3b9d86b678c2914718b925d3e8b7269a28343b5c3fd04e9a",
+   "forward_e6": [
+    -769278,
+    -38110,
+    637775
+   ]
+  },
+  {
+   "index": 60,
+   "name": "IMG_1988.jpg",
+   "sha256": "0f86b5a861300baa0d60f65a5981e42e6ed1a5b22226bc77f7c3ae4248411570",
+   "forward_e6": [
+    -700578,
+    -180334,
+    690412
+   ]
+  },
+  {
+   "index": 61,
+   "name": "IMG_1989.jpg",
+   "sha256": "55d52abcfc476bc173c6081b1af7c16de7fe71933b86b5d673faf34be660c351",
+   "forward_e6": [
+    -614116,
+    -325060,
+    719164
+   ]
+  },
+  {
+   "index": 62,
+   "name": "IMG_1990.jpg",
+   "sha256": "d9b92883db9ef7f8c1e15d64404925ad94a48701ddca276444cc542da8b09ae3",
+   "forward_e6": [
+    -516675,
+    -461013,
+    721465
+   ]
+  },
+  {
+   "index": 63,
+   "name": "IMG_1991.jpg",
+   "sha256": "7dea63283e3f59a602eaaf6fbaa78302bb26ad9fd4324a99f4498e018107fd35",
+   "forward_e6": [
+    -411760,
+    -584672,
+    699007
+   ]
+  },
+  {
+   "index": 64,
+   "name": "IMG_1992.jpg",
+   "sha256": "48db07a1727aaa221c49e2b7ae819a0071313786c45435535bcc3c48255f71af",
+   "forward_e6": [
+    -295614,
+    -699675,
+    650435
+   ]
+  },
+  {
+   "index": 65,
+   "name": "IMG_1993.jpg",
+   "sha256": "3633829800abda61a4f1c8987228a8f22d0b5aaba0e0caee5ccc2bcd0f21165a",
+   "forward_e6": [
+    -176380,
+    -796782,
+    577951
+   ]
+  },
+  {
+   "index": 66,
+   "name": "IMG_1994.jpg",
+   "sha256": "400c8c26567d53838c44c283afb246872678db46bd7567e8b2e10b6d194db800",
+   "forward_e6": [
+    -56539,
+    -873965,
+    482687
+   ]
+  },
+  {
+   "index": 67,
+   "name": "IMG_1995.jpg",
+   "sha256": "52fc57a24dd172031e0030b1892220fdfb5ed10574f3def4ba5c81181a7f30c2",
+   "forward_e6": [
+    55721,
+    -926533,
+    372062
+   ]
+  },
+  {
+   "index": 68,
+   "name": "IMG_1996.jpg",
+   "sha256": "1a9072fcef1b91e7333d5f06300f64cd812bfa60cd5ea333fd483a1eaa64c036",
+   "forward_e6": [
+    161777,
+    -955898,
+    245122
+   ]
+  },
+  {
+   "index": 69,
+   "name": "IMG_1997.jpg",
+   "sha256": "e3a5964f020eb88b656c64417f1b2b79f7e276c6fcfe9063d043affc5bdfa1d7",
+   "forward_e6": [
+    258278,
+    -960333,
+    105125
+   ]
+  },
+  {
+   "index": 70,
+   "name": "IMG_1998.jpg",
+   "sha256": "2e5aacbe49968096173c1c2b8ae41e6a71a483c16f4bc7261f09835a7ce378bb",
+   "forward_e6": [
+    338737,
+    -940154,
+    -36959
+   ]
+  },
+  {
+   "index": 71,
+   "name": "IMG_1999.jpg",
+   "sha256": "a2b5627c416fdc9f830e5e904cfc5c80955b2b619c27b89e797efd801fbf961d",
+   "forward_e6": [
+    403059,
+    -897179,
+    -180586
+   ]
+  },
+  {
+   "index": 72,
+   "name": "IMG_2000.jpg",
+   "sha256": "da394496f00207381f6e516089d59fe4dcdb8bfd285ad62e764fe043c17e20d0",
+   "forward_e6": [
+    185480,
+    -896311,
+    -402769
+   ]
+  },
+  {
+   "index": 73,
+   "name": "IMG_2001.jpg",
+   "sha256": "646a0f6e1d097c7a90f5f5239f1fe284bc98f4591bb7222b26d37321f3f4e5d7",
+   "forward_e6": [
+    212711,
+    -828736,
+    -517638
+   ]
+  },
+  {
+   "index": 74,
+   "name": "IMG_2002.jpg",
+   "sha256": "8b23ac176c9ee750cfca09009027ace19addf2e15ac4c9ce7e8f81efdc96b487",
+   "forward_e6": [
+    225446,
+    -736969,
+    -637220
+   ]
+  },
+  {
+   "index": 75,
+   "name": "IMG_2003.jpg",
+   "sha256": "5f5621080602decb6b8e8a3dbcd0cd2e0cfdd15c20da849b37d187d31d87465a",
+   "forward_e6": [
+    219538,
+    -630887,
+    -744166
+   ]
+  },
+  {
+   "index": 76,
+   "name": "IMG_2004.jpg",
+   "sha256": "09a847a4d55309e15e27c49862bb611c6172513d984bcb201d61367dccb044ef",
+   "forward_e6": [
+    196584,
+    -519507,
+    -831545
+   ]
+  },
+  {
+   "index": 77,
+   "name": "IMG_2005.jpg",
+   "sha256": "836f32078a570536457be6e16c2593a34980c93250f2018b55b4d552509f91e9",
+   "forward_e6": [
+    155647,
+    -396322,
+    -904821
+   ]
+  },
+  {
+   "index": 78,
+   "name": "IMG_2006.jpg",
+   "sha256": "b6f62f30b5308025a9beaadf0e8efbde84945a03fccbb1d5b84561f60f8e3a05",
+   "forward_e6": [
+    97316,
+    -266623,
+    -958875
+   ]
+  },
+  {
+   "index": 79,
+   "name": "IMG_2007.jpg",
+   "sha256": "ee735def32837632530a64e388df6c19499d18b3e4ba254a994c42021a4bb42c",
+   "forward_e6": [
+    25768,
+    -140154,
+    -989794
+   ]
+  },
+  {
+   "index": 80,
+   "name": "IMG_2008.jpg",
+   "sha256": "80c6d10dd1365a39b315e0e2428e8f46136d3cbce3edb3f7eeb3863dacb9001b",
+   "forward_e6": [
+    -57153,
+    -19221,
+    -998180
+   ]
+  },
+  {
+   "index": 81,
+   "name": "IMG_2009.jpg",
+   "sha256": "46a7df3f7fd394d73c86437c535b52326e4ae07957f06771b6ac17fa3729801a",
+   "forward_e6": [
+    -150736,
+    96267,
+    -983875
+   ]
+  },
+  {
+   "index": 82,
+   "name": "IMG_2010.jpg",
+   "sha256": "f07a52496d257e38110bd302a8be2eeeda0745ddc2041369d642ac620c0cb582",
+   "forward_e6": [
+    -249995,
+    199249,
+    -947524
+   ]
+  },
+  {
+   "index": 83,
+   "name": "IMG_2011.jpg",
+   "sha256": "fa273ee66b6a8b385b26a78db7b00fde90fc295056f9445ec351e14b17d714c3",
+   "forward_e6": [
+    -355915,
+    290549,
+    -888203
+   ]
+  },
+  {
+   "index": 84,
+   "name": "IMG_2012.jpg",
+   "sha256": "d9de01b4dce96a7fb1845ce0123c12705d5c8704c969c4568216664bc5971267",
+   "forward_e6": [
+    -459598,
+    362067,
+    -810972
+   ]
+  },
+  {
+   "index": 85,
+   "name": "IMG_2013.jpg",
+   "sha256": "4a3780b41069fbbb8ed7e2ec5114505e0d9a1d70b3dcd1f4839fc277bcca4319",
+   "forward_e6": [
+    -561205,
+    414312,
+    -716514
+   ]
+  },
+  {
+   "index": 86,
+   "name": "IMG_2014.jpg",
+   "sha256": "3eac33cfad1c75f0f14700c6ee74d712873e75ef645f2411d06181419d01e16e",
+   "forward_e6": [
+    -655966,
+    445902,
+    -608998
+   ]
+  },
+  {
+   "index": 87,
+   "name": "IMG_2015.jpg",
+   "sha256": "b0873c36f7f3eeacfd9183facc97a3380de9fd3844c75cae8977bbe223cd2757",
+   "forward_e6": [
+    -743695,
+    456058,
+    -488801
+   ]
+  },
+  {
+   "index": 88,
+   "name": "IMG_2016.jpg",
+   "sha256": "46e322a3b9ed9155cf81cd0f92d3b41f5878f6aec785a9856971fca62955f552",
+   "forward_e6": [
+    -819835,
+    443872,
+    -361726
+   ]
+  },
+  {
+   "index": 89,
+   "name": "IMG_2017.jpg",
+   "sha256": "acae8975c5880fc353c96664f0ead30752d1e2671714496b7ac3db333d0ec0ed",
+   "forward_e6": [
+    -881703,
+    410462,
+    -232637
+   ]
+  },
+  {
+   "index": 90,
+   "name": "IMG_2018.jpg",
+   "sha256": "8d753241e6a5b0e8a7f24e51df9e9d725adad3cab9a208aa59164df5f6322335",
+   "forward_e6": [
+    -929336,
+    355191,
+    -100862
+   ]
+  },
+  {
+   "index": 91,
+   "name": "IMG_2019.jpg",
+   "sha256": "4e86b9f26b87ea322389ae66fd8baae0f0340395ca09840ccbc2a42af892c6ac",
+   "forward_e6": [
+    -958993,
+    282489,
+    23047
+   ]
+  },
+  {
+   "index": 92,
+   "name": "IMG_2020.jpg",
+   "sha256": "fc471e70be6b5436d688744df9f535cd551d16ad5ef5a4b9e9553b097da202e5",
+   "forward_e6": [
+    -971229,
+    193220,
+    139210
+   ]
+  },
+  {
+   "index": 93,
+   "name": "IMG_2021.jpg",
+   "sha256": "9c17ed92ee49279eaae3c7724a5ac65e15410a4a7b7c31007e04b2bc69c857ce",
+   "forward_e6": [
+    -965140,
+    86530,
+    247013
+   ]
+  },
+  {
+   "index": 94,
+   "name": "IMG_2022.jpg",
+   "sha256": "12a1d3ac1b0e0c7b63230008026cbab7318f103cb8fb4ff9ff66122134983a43",
+   "forward_e6": [
+    -941137,
+    -28307,
+    336837
+   ]
+  },
+  {
+   "index": 95,
+   "name": "IMG_2023.jpg",
+   "sha256": "4bc54854f2187de1c8e09b34730085b5f277ea7dba8dc6ffefb775cefcd15364",
+   "forward_e6": [
+    -898301,
+    -154992,
+    411135
+   ]
+  },
+  {
+   "index": 96,
+   "name": "IMG_2024.jpg",
+   "sha256": "396b7d0c1259cebf2f963b3636deee369a2c81495e8d63105de3c4adcca1707d",
+   "forward_e6": [
+    -840139,
+    -282425,
+    463035
+   ]
+  },
+  {
+   "index": 97,
+   "name": "IMG_2025.jpg",
+   "sha256": "e948a5e982038df96741095066338fc4a5b3aa316e2bc8ee4527b0ae5f577d63",
+   "forward_e6": [
+    -768587,
+    -407898,
+    492840
+   ]
+  },
+  {
+   "index": 98,
+   "name": "IMG_2026.jpg",
+   "sha256": "27e6d0b0bd5a183e371613689dc9282df3839b10e3a66b76f5a572683555b826",
+   "forward_e6": [
+    -684920,
+    -529622,
+    500384
+   ]
+  },
+  {
+   "index": 99,
+   "name": "IMG_2027.jpg",
+   "sha256": "6558afa4b0463cb0011fe5afa0cd1e71a0276f6aba6f9989142286c3fa0a97ac",
+   "forward_e6": [
+    -595517,
+    -639525,
+    486174
+   ]
+  },
+  {
+   "index": 100,
+   "name": "IMG_2028.jpg",
+   "sha256": "ec975469b0b1426066d9ea3a2875e2e42c6605f545b95028a0ed940a112e21dd",
+   "forward_e6": [
+    -490450,
+    -748012,
+    447140
+   ]
+  },
+  {
+   "index": 101,
+   "name": "IMG_2029.jpg",
+   "sha256": "dff4d5c19fbf8c89c43da150777629e36fa717677ec34e52c49b4da9fec5be5f",
+   "forward_e6": [
+    -388016,
+    -835433,
+    389222
+   ]
+  },
+  {
+   "index": 102,
+   "name": "IMG_2030.jpg",
+   "sha256": "13f2e55c81f3d6c0af6b5d87403c55e46dcf78da26039237f169c46349d418ed",
+   "forward_e6": [
+    -283666,
+    -906988,
+    311295
+   ]
+  },
+  {
+   "index": 103,
+   "name": "IMG_2031.jpg",
+   "sha256": "c7a7d049735a3c794bcd254e94fc21ed853b625e555f999a42744c749c02e6a1",
+   "forward_e6": [
+    -186467,
+    -957247,
+    221149
+   ]
+  },
+  {
+   "index": 104,
+   "name": "IMG_2032.jpg",
+   "sha256": "33f692457a94ac188eb6e6ea67265f528f93855915bda1dd91a1d19ecf212dde",
+   "forward_e6": [
+    -85125,
+    -990732,
+    105847
+   ]
+  },
+  {
+   "index": 105,
+   "name": "IMG_2033.jpg",
+   "sha256": "1d47e91ad536f91389dd6a88e6e88b9c737decafb6069a9f2885c017a7e64ec6",
+   "forward_e6": [
+    506,
+    -999925,
+    -12228
+   ]
+  },
+  {
+   "index": 106,
+   "name": "IMG_2034.jpg",
+   "sha256": "a5edb387055d0a570dbfac99ceab4d550dc905de75feb17c5cd3a2b9557870f3",
+   "forward_e6": [
+    76721,
+    -987081,
+    -140655
+   ]
+  },
+  {
+   "index": 107,
+   "name": "IMG_2035.jpg",
+   "sha256": "5f85e5078aa1bc61891390a4d258011571997da99e6cdcfda867e5be0671a77c",
+   "forward_e6": [
+    136621,
+    -954160,
+    -266295
+   ]
+  },
+  {
+   "index": 108,
+   "name": "IMG_2036.jpg",
+   "sha256": "d3da70f1e2ac90cb95aa6a2b005fdbfe31813bac5f073c6655f359afb2f6b02b",
+   "forward_e6": [
+    29981,
+    -957470,
+    -286967
+   ]
+  },
+  {
+   "index": 109,
+   "name": "IMG_2037.jpg",
+   "sha256": "b11b63982a54bb2ff63acb1a26e704147cf3378911f47c6c099c78a3e48e4dff",
+   "forward_e6": [
+    -206535,
+    -912430,
+    -353290
+   ]
+  },
+  {
+   "index": 110,
+   "name": "IMG_2038.jpg",
+   "sha256": "53f30f340ec45cfecd0ddb31e83c311c288625bfaf026f5fe81e5e566f5ec357",
+   "forward_e6": [
+    -335814,
+    -841677,
+    -422855
+   ]
+  },
+  {
+   "index": 111,
+   "name": "IMG_2039.jpg",
+   "sha256": "973e2e42968c89a97cc9542f969cb8b18ee8cbd092284d1024e98d6ba9449ab2",
+   "forward_e6": [
+    -421400,
+    -790389,
+    -444642
+   ]
+  },
+  {
+   "index": 112,
+   "name": "IMG_2040.jpg",
+   "sha256": "98638e47caedb3e46747fad68bf27360ace813643516027397c7786cadadc194",
+   "forward_e6": [
+    -348083,
+    -747213,
+    -566136
+   ]
+  },
+  {
+   "index": 113,
+   "name": "IMG_2041.jpg",
+   "sha256": "82d4a8d461637bcb14789a1333788496fb54c3dd1c2bbe9c2a0b68b491ae1f73",
+   "forward_e6": [
+    -295940,
+    -731427,
+    -614356
+   ]
+  },
+  {
+   "index": 114,
+   "name": "IMG_2042.jpg",
+   "sha256": "88675af5b7c83cda8c3be5f83643ea17225497ae21a98680e8bd2b3a8756a0c8",
+   "forward_e6": [
+    -396075,
+    -854441,
+    -336235
+   ]
+  },
+  {
+   "index": 115,
+   "name": "IMG_2043.jpg",
+   "sha256": "bffdb06024b4e099dcb9222f7916015089ecce14894c5d0af2df3d2c9f443117",
+   "forward_e6": [
+    -461394,
+    -832215,
+    -307462
+   ]
+  },
+  {
+   "index": 116,
+   "name": "IMG_2044.jpg",
+   "sha256": "0023439bd90681233e920a015e20d8ea087c0b3f6b474439fca3c3038b09b16f",
+   "forward_e6": [
+    -910832,
+    17058,
+    -412422
+   ]
+  },
+  {
+   "index": 117,
+   "name": "IMG_2045.jpg",
+   "sha256": "9a5962ef9e2fe4be2e4863d18e8c211288a216c745972c2b9fd86031882e3925",
+   "forward_e6": [
+    -880227,
+    11698,
+    -474408
+   ]
+  },
+  {
+   "index": 118,
+   "name": "IMG_2046.jpg",
+   "sha256": "4ab884700f08142c2054e204da335d28c3d76182d955f4d863c718ff4806250f",
+   "forward_e6": [
+    -805692,
+    9317,
+    -592260
+   ]
+  },
+  {
+   "index": 119,
+   "name": "IMG_2047.jpg",
+   "sha256": "4cca7a3d1317a0f0b89bac6143f27c2181e38a1a23e39f48cc7b3b7b30e49d40",
+   "forward_e6": [
+    -738426,
+    2523,
+    -674328
+   ]
+  },
+  {
+   "index": 120,
+   "name": "IMG_2048.jpg",
+   "sha256": "ba1dc679f2d13c3b1088d69ce49678cb1e9916c50158c5376f18c99714595719",
+   "forward_e6": [
+    -693196,
+    -83664,
+    -715876
+   ]
+  },
+  {
+   "index": 121,
+   "name": "IMG_2049.jpg",
+   "sha256": "cc8ca61e69d6e1bd37ca1abd051f8afb0f10a6165b4c115235308498ae4d7243",
+   "forward_e6": [
+    -770564,
+    -128225,
+    -624331
+   ]
+  },
+  {
+   "index": 122,
+   "name": "IMG_2050.jpg",
+   "sha256": "5d3c9f1c7a273ec4d9b3a196622eea586ece7dd7c9f301748e943462c43063ee",
+   "forward_e6": [
+    -852747,
+    -160920,
+    -496916
+   ]
+  },
+  {
+   "index": 123,
+   "name": "IMG_2051.jpg",
+   "sha256": "19ed5d7937b18eb3aaf7ed9383241f212ae28ccb213b1c9d34a0df3c8a5ec247",
+   "forward_e6": [
+    -922266,
+    -170066,
+    -347134
+   ]
+  },
+  {
+   "index": 124,
+   "name": "IMG_2052.jpg",
+   "sha256": "3ce5f932402b33ad65b8004450912695bc86e29342a26d4223350ee8f96073e0",
+   "forward_e6": [
+    -133000,
+    -258993,
+    956678
+   ]
+  },
+  {
+   "index": 125,
+   "name": "IMG_2053.jpg",
+   "sha256": "f703c0bb7cae8372384b32b3ed8e8d0f3b93a1934006d0dac8084bc2b8780042",
+   "forward_e6": [
+    -253507,
+    -219263,
+    942155
+   ]
+  },
+  {
+   "index": 126,
+   "name": "IMG_2054.jpg",
+   "sha256": "15173a8a4a4fe757744efc4a9b51c85513be00c788a2a526c2a4e818b6249737",
+   "forward_e6": [
+    -371568,
+    -163499,
+    913895
+   ]
+  },
+  {
+   "index": 127,
+   "name": "IMG_2055.jpg",
+   "sha256": "df4316c62553815bca0cb4513a18e7fa57f76b1dff6a26231609dacb461326f0",
+   "forward_e6": [
+    -490232,
+    -85820,
+    867356
+   ]
+  },
+  {
+   "index": 128,
+   "name": "IMG_2056.jpg",
+   "sha256": "08743dd77cc746ba52cd58b7e146f6e1805a25157baacec37b5fa4618cf00eb7",
+   "forward_e6": [
+    -588170,
+    3136,
+    808730
+   ]
+  },
+  {
+   "index": 129,
+   "name": "IMG_2057.jpg",
+   "sha256": "91c50167001fafc099f6a5e1160f6ddfe66927896a8a95be13610c2a4ae2f446",
+   "forward_e6": [
+    -671066,
+    109293,
+    733296
+   ]
+  },
+  {
+   "index": 130,
+   "name": "IMG_2058.jpg",
+   "sha256": "827791b28cb47cb42f0889350d3dcd4224496701c687755fee3eb141dc226007",
+   "forward_e6": [
+    -723676,
+    210804,
+    657155
+   ]
+  },
+  {
+   "index": 131,
+   "name": "IMG_2059.jpg",
+   "sha256": "3e363456322f9e85e545bb74d6494267ff096a29c89d9b3faeabf1d35d041be1",
+   "forward_e6": [
+    -755624,
+    320158,
+    571428
+   ]
+  },
+  {
+   "index": 132,
+   "name": "IMG_2060.jpg",
+   "sha256": "acf571eb4c9b255b5aa92377646f0bcfdec5d84d75e51a56bb1bdef1d7d04813",
+   "forward_e6": [
+    -763223,
+    437691,
+    475306
+   ]
+  },
+  {
+   "index": 133,
+   "name": "IMG_2061.jpg",
+   "sha256": "564a0c1e29ac0a4d4294b4a30089e85ad6b15d7bdd27a7a63b180b675482bb22",
+   "forward_e6": [
+    -744783,
+    547232,
+    381881
+   ]
+  },
+  {
+   "index": 134,
+   "name": "IMG_2062.jpg",
+   "sha256": "d4fbc8983321aacede5ec0fed92c183dc680246293b5e2fc363e19178f20a7b9",
+   "forward_e6": [
+    -699341,
+    655058,
+    286042
+   ]
+  },
+  {
+   "index": 135,
+   "name": "IMG_2063.jpg",
+   "sha256": "be7c1e6f9eb788a943ef20033a6e80bbd9df1dfa95b65605eb54387537cae782",
+   "forward_e6": [
+    -636577,
+    743898,
+    203432
+   ]
+  },
+  {
+   "index": 136,
+   "name": "IMG_2064.jpg",
+   "sha256": "6e6d7180dbc3205f0117ab87452ba1cb545b1acd9827cd8645084c7fb5bab15b",
+   "forward_e6": [
+    -546427,
+    828898,
+    119768
+   ]
+  },
+  {
+   "index": 137,
+   "name": "IMG_2065.jpg",
+   "sha256": "42ee8ec7d171a3b7b97d0499ede82bcb6e3d96cc03b2ca213af0684b06c76e66",
+   "forward_e6": [
+    -439217,
+    897127,
+    47425
+   ]
+  },
+  {
+   "index": 138,
+   "name": "IMG_2066.jpg",
+   "sha256": "e1213dc17267e5e2d998c397eea8c0f99fb5a0fb4ffb811800bb4534a52bd651",
+   "forward_e6": [
+    -317221,
+    948261,
+    -13032
+   ]
+  },
+  {
+   "index": 139,
+   "name": "IMG_2067.jpg",
+   "sha256": "659ae26760aac0c749290da425b1808771ac58613c65ee3969b09628e8741995",
+   "forward_e6": [
+    -186154,
+    980718,
+    -59475
+   ]
+  },
+  {
+   "index": 140,
+   "name": "IMG_2068.jpg",
+   "sha256": "833ab313d09ee67dc81ef06e70896429c244e579c2f46a1bc0868b1d1a775622",
+   "forward_e6": [
+    -44572,
+    994739,
+    -92234
+   ]
+  },
+  {
+   "index": 141,
+   "name": "IMG_2069.jpg",
+   "sha256": "5b574096da771d0855e3710959d2606da851a677155a5a07f7281b74cb8644af",
+   "forward_e6": [
+    97800,
+    989228,
+    -108915
+   ]
+  },
+  {
+   "index": 142,
+   "name": "IMG_2070.jpg",
+   "sha256": "ffd494a4e1902ffa794a1ca2bc29037f0a9dc28dfaf61f03d14081b48e5b629a",
+   "forward_e6": [
+    242687,
+    963898,
+    -109554
+   ]
+  },
+  {
+   "index": 143,
+   "name": "IMG_2071.jpg",
+   "sha256": "4b62922bd5b15dd47e96cf7a4f3cb95ea7f1365f0d509a8e0808acab98823d9b",
+   "forward_e6": [
+    378867,
+    920653,
+    -94105
+   ]
+  },
+  {
+   "index": 144,
+   "name": "IMG_2072.jpg",
+   "sha256": "8483a58a8e6dfdb8e42d75e6e65730705a326a4e051994d0216724fa667a131e",
+   "forward_e6": [
+    505335,
+    860618,
+    -63021
+   ]
+  },
+  {
+   "index": 145,
+   "name": "IMG_2073.jpg",
+   "sha256": "9a5e7bcbeb978a1f1e004039b744defa8e936424c1eb29dedda90d00b152798c",
+   "forward_e6": [
+    621364,
+    783358,
+    -15996
+   ]
+  },
+  {
+   "index": 146,
+   "name": "IMG_2074.jpg",
+   "sha256": "4c7f16ccd5271f6c6c1ba2310a83b79b1a45532f1d404a15f5337a3e53ad695e",
+   "forward_e6": [
+    718964,
+    693670,
+    43712
+   ]
+  },
+  {
+   "index": 147,
+   "name": "IMG_2075.jpg",
+   "sha256": "ca78b16126372c4ed7c394206185945838572fa420f37753cf18d393a2d8fa4c",
+   "forward_e6": [
+    797061,
+    592665,
+    115933
+   ]
+  },
+  {
+   "index": 148,
+   "name": "IMG_2076.jpg",
+   "sha256": "26d9a222d67c757dfacc52ff14b94a8e9ecc088fe01c68f1f1ca913727433719",
+   "forward_e6": [
+    852849,
+    483000,
+    198389
+   ]
+  },
+  {
+   "index": 149,
+   "name": "IMG_2077.jpg",
+   "sha256": "2c98462f7f8fa14d0daa6c09a3ec126c2874f3117f8a99af117d28e09793f6e2",
+   "forward_e6": [
+    882844,
+    373984,
+    284114
+   ]
+  },
+  {
+   "index": 150,
+   "name": "IMG_2078.jpg",
+   "sha256": "dcb4e3f64884c386e9c51db5376e05b4efd232c7f8174e6c450e7da60ab6c3dc",
+   "forward_e6": [
+    888826,
+    261214,
+    376502
+   ]
+  },
+  {
+   "index": 151,
+   "name": "IMG_2079.jpg",
+   "sha256": "110e241a6a054ec2146fdc9f4a4db332ffe1746ff94b170c0b128525ec17efee",
+   "forward_e6": [
+    870481,
+    154047,
+    467472
+   ]
+  },
+  {
+   "index": 152,
+   "name": "IMG_2080.jpg",
+   "sha256": "bc0dedfb3dcc077d8ba9ba97b53fc223f4ec87058bad8ad6f2801353a14f7b7a",
+   "forward_e6": [
+    825241,
+    46597,
+    562854
+   ]
+  },
+  {
+   "index": 153,
+   "name": "IMG_2081.jpg",
+   "sha256": "e85bfc55f6f748297f263d589a94ebefcd70fbc1af5b8dd30a0028ad58963c71",
+   "forward_e6": [
+    758140,
+    -47505,
+    650358
+   ]
+  },
+  {
+   "index": 154,
+   "name": "IMG_2082.jpg",
+   "sha256": "324e65b2a50d4609444b7d95ef0696e7d7e804647795e7b4f3f6e7414ff18129",
+   "forward_e6": [
+    672143,
+    -127844,
+    729300
+   ]
+  },
+  {
+   "index": 155,
+   "name": "IMG_2083.jpg",
+   "sha256": "7b82ced2aa07cbc232b66a563782f339eb1778bc33a89091c5b9b2745d920d6d",
+   "forward_e6": [
+    564088,
+    -196442,
+    802006
+   ]
+  },
+  {
+   "index": 156,
+   "name": "IMG_2084.jpg",
+   "sha256": "c41c568df445ea42372d262b63c1b12b337b497bb35e42533925ce65634931b2",
+   "forward_e6": [
+    445105,
+    -246255,
+    860952
+   ]
+  },
+  {
+   "index": 157,
+   "name": "IMG_2085.jpg",
+   "sha256": "30af279ffe5f9bd545ff1410f064ff8089fd9803cb03cba20140e0d379ec3204",
+   "forward_e6": [
+    305058,
+    -280620,
+    910050
+   ]
+  },
+  {
+   "index": 158,
+   "name": "IMG_2086.jpg",
+   "sha256": "2e2748395aa436264c9f760048b6e0fef24dc78ef8d55bba959b4eafbbab69c4",
+   "forward_e6": [
+    171239,
+    -293432,
+    940518
+   ]
+  },
+  {
+   "index": 159,
+   "name": "IMG_2087.jpg",
+   "sha256": "593706326a2011271299255f8f20d2e1cc830bab7b120f29f16a9d4fdae71ea5",
+   "forward_e6": [
+    24534,
+    -287556,
+    957449
+   ]
+  },
+  {
+   "index": 160,
+   "name": "IMG_2088.jpg",
+   "sha256": "6372d5685616a04faf93eef2d805c80df99b6dd4d426bf25bea7efc224719a47",
+   "forward_e6": [
+    -173652,
+    -331194,
+    927445
+   ]
+  },
+  {
+   "index": 161,
+   "name": "IMG_2089.jpg",
+   "sha256": "5c7379da91c3c3f68608e0724699a879fae835bf40292a7197aaee89d07c4b0b",
+   "forward_e6": [
+    -315053,
+    -280486,
+    906679
+   ]
+  },
+  {
+   "index": 162,
+   "name": "IMG_2090.jpg",
+   "sha256": "dd6a65dcea6564f091455cd613f130ef4d06eeb2eab24dac0c44fe7772cfb603",
+   "forward_e6": [
+    -440955,
+    -215032,
+    871389
+   ]
+  },
+  {
+   "index": 163,
+   "name": "IMG_2091.jpg",
+   "sha256": "2dfcdadfdeb84bd60d0dc25193137f25fed23ed68e52112e0c7fd186e9d57f55",
+   "forward_e6": [
+    -554435,
+    -134190,
+    821336
+   ]
+  },
+  {
+   "index": 164,
+   "name": "IMG_2092.jpg",
+   "sha256": "8c100956284356b4922eb0cda39263b56ac7501585889a229c713620250ed014",
+   "forward_e6": [
+    -656370,
+    -33842,
+    753679
+   ]
+  },
+  {
+   "index": 165,
+   "name": "IMG_2093.jpg",
+   "sha256": "d2da853c638b9610c8ea119d908f32e4bbebcb1cb446b0890240ff54f602ae9e",
+   "forward_e6": [
+    -730954,
+    70142,
+    678812
+   ]
+  },
+  {
+   "index": 166,
+   "name": "IMG_2094.jpg",
+   "sha256": "218a4b48a7ebbfada86501cbf71f8cb4f2f127b261869e8dd458076d5ee7401a",
+   "forward_e6": [
+    -784857,
+    185797,
+    591167
+   ]
+  },
+  {
+   "index": 167,
+   "name": "IMG_2095.jpg",
+   "sha256": "d94bdcb1bb5e47971bc70e549cccd2f6e5b6eb8a0eb0e3ab9e1d1f873e2e822f",
+   "forward_e6": [
+    -812264,
+    303189,
+    498298
+   ]
+  },
+  {
+   "index": 168,
+   "name": "IMG_2096.jpg",
+   "sha256": "28a7a397dc75cc47610b4206116cfc0c42779fa917763545410919418cb7bf34",
+   "forward_e6": [
+    -812646,
+    429068,
+    394343
+   ]
+  },
+  {
+   "index": 169,
+   "name": "IMG_2097.jpg",
+   "sha256": "42d8cd4e545e6cd35f7711fccb03f8191c8165d598a86ee1137aeafa70059e00",
+   "forward_e6": [
+    -785953,
+    542492,
+    296612
+   ]
+  },
+  {
+   "index": 170,
+   "name": "IMG_2098.jpg",
+   "sha256": "48fd91851825cae79d683cb22ffcb6ed48e467cdbb041bf3c11925e13a580912",
+   "forward_e6": [
+    -734168,
+    648398,
+    201435
+   ]
+  },
+  {
+   "index": 171,
+   "name": "IMG_2099.jpg",
+   "sha256": "19233935bfcf62735dc7adce79a5e82f49d6761f64392dc6311df6ed011d7c00",
+   "forward_e6": [
+    -664272,
+    738303,
+    116831
+   ]
+  },
+  {
+   "index": 172,
+   "name": "IMG_2100.jpg",
+   "sha256": "b82e3fe7b0bf0eff4ba4a3752bb4a3b4cdeee9be913fd1779d484129a0a4b767",
+   "forward_e6": [
+    -560165,
+    827926,
+    27408
+   ]
+  },
+  {
+   "index": 173,
+   "name": "IMG_2101.jpg",
+   "sha256": "3cc6a38db467b0107530f64463cc10e22fc1db183c516c6f8506c0f12932e533",
+   "forward_e6": [
+    -445700,
+    894082,
+    -44367
+   ]
+  },
+  {
+   "index": 174,
+   "name": "IMG_2102.jpg",
+   "sha256": "a757649961dee10c0f4beba46d45ea1831fe0384a4afa9356c6d547210c7b631",
+   "forward_e6": [
+    -313550,
+    943737,
+    -105095
+   ]
+  },
+  {
+   "index": 175,
+   "name": "IMG_2103.jpg",
+   "sha256": "f1f89a88b9852b20593563104fa6d4f4db3b9c6c9a18675aeda46dd8f15eecdd",
+   "forward_e6": [
+    -173593,
+    973234,
+    -150596
+   ]
+  },
+  {
+   "index": 176,
+   "name": "IMG_2104.jpg",
+   "sha256": "950d7dc36be7893788997f095af44c121f10fb2fa71ff2c9f1fc953e0f0d3813",
+   "forward_e6": [
+    -25407,
+    983159,
+    -180975
+   ]
+  },
+  {
+   "index": 177,
+   "name": "IMG_2105.jpg",
+   "sha256": "6d40f94a029859800bd526bd2a63d38b25d7220f1edf1f2e6cf4c23bac90f5f6",
+   "forward_e6": [
+    126875,
+    972576,
+    -194930
+   ]
+  },
+  {
+   "index": 178,
+   "name": "IMG_2106.jpg",
+   "sha256": "eb10ca63067d9f362366465ef6271021d199425a06eadc5396dc969543e85241",
+   "forward_e6": [
+    278063,
+    941230,
+    -191745
+   ]
+  },
+  {
+   "index": 179,
+   "name": "IMG_2107.jpg",
+   "sha256": "e2ebdda02fe9049114928395dfe0c06295432697136fce388ec7ce2b567f61e7",
+   "forward_e6": [
+    418486,
+    891844,
+    -171706
+   ]
+  },
+  {
+   "index": 180,
+   "name": "IMG_2108.jpg",
+   "sha256": "5a9c0834e8d66e95ab76ffe6863780b51db3e4acd2056eb7f065dddeb4353764",
+   "forward_e6": [
+    549775,
+    824288,
+    -135256
+   ]
+  },
+  {
+   "index": 181,
+   "name": "IMG_2109.jpg",
+   "sha256": "a9480275d94bb45eed3a38b9cf91d2f374a960bd160049ff29961c1c4d742889",
+   "forward_e6": [
+    667261,
+    740188,
+    -82969
+   ]
+  },
+  {
+   "index": 182,
+   "name": "IMG_2110.jpg",
+   "sha256": "a15aff5592e457ed6a72742b554f84b5b59d1bf20cef5205ec3f27e5f2e433ad",
+   "forward_e6": [
+    766349,
+    642221,
+    -16121
+   ]
+  },
+  {
+   "index": 183,
+   "name": "IMG_2111.jpg",
+   "sha256": "c937fbae663601c03d62059040fe88e83d575d8b8998d9ae985d228869f89945",
+   "forward_e6": [
+    843437,
+    533621,
+    62148
+   ]
+  },
+  {
+   "index": 184,
+   "name": "IMG_2112.jpg",
+   "sha256": "c37693f182585e0b059c98f8c2890e00307ebdcdf31f9117a699ca431334a233",
+   "forward_e6": [
+    896090,
+    417632,
+    150345
+   ]
+  },
+  {
+   "index": 185,
+   "name": "IMG_2113.jpg",
+   "sha256": "b488be22326891401267929949677936dc6c2077eac2b51bda5f66937224e186",
+   "forward_e6": [
+    922009,
+    302138,
+    242097
+   ]
+  },
+  {
+   "index": 186,
+   "name": "IMG_2114.jpg",
+   "sha256": "016ee46559d640d71fb66770ae97e92f7157ad3f2feda20932dc5030ec9e0294",
+   "forward_e6": [
+    922486,
+    184497,
+    339085
+   ]
+  },
+  {
+   "index": 187,
+   "name": "IMG_2115.jpg",
+   "sha256": "1a5c00923f7b68b046c2c088eeed36cde7febd6f1aa57a20ad7e3fe2530f0d2f",
+   "forward_e6": [
+    895587,
+    67381,
+    439753
+   ]
+  },
+  {
+   "index": 188,
+   "name": "IMG_2116.jpg",
+   "sha256": "1050be48b70b5008faf4b6e1efe80585058b623739f9c467f01a3b0d44495bec",
+   "forward_e6": [
+    844308,
+    -38325,
+    534485
+   ]
+  },
+  {
+   "index": 189,
+   "name": "IMG_2117.jpg",
+   "sha256": "4428e0f040233ca6bd6963364dbb3c0c788bad72262cf12fc55dc204679e6fd1",
+   "forward_e6": [
+    763325,
+    -140286,
+    630598
+   ]
+  },
+  {
+   "index": 190,
+   "name": "IMG_2118.jpg",
+   "sha256": "73ad260b79cbb714bc68eb551211d4f8a7211960c8c7e3bc5b75f435c087007e",
+   "forward_e6": [
+    674477,
+    -215664,
+    706094
+   ]
+  },
+  {
+   "index": 191,
+   "name": "IMG_2119.jpg",
+   "sha256": "ddc8c1e99285dfccf7c21f3c200a190516f72975be5ca83c1cb12a4606e76d97",
+   "forward_e6": [
+    559789,
+    -283048,
+    778793
+   ]
+  },
+  {
+   "index": 192,
+   "name": "IMG_2120.jpg",
+   "sha256": "243be8e0ed7a0a88aea089405eadf2a0979b5f8af7c9777710e4ca38a0a17ea8",
+   "forward_e6": [
+    429344,
+    -333084,
+    839475
+   ]
+  },
+  {
+   "index": 193,
+   "name": "IMG_2121.jpg",
+   "sha256": "dc78076b48d0f48cc868af8b410b64d79f7bfa17d575468d29d9a811597c1a35",
+   "forward_e6": [
+    279784,
+    -364950,
+    887993
+   ]
+  },
+  {
+   "index": 194,
+   "name": "IMG_2122.jpg",
+   "sha256": "d80de58afc486a781b6724e35524e383e145a910a31684a245efc8e1fc20e1e9",
+   "forward_e6": [
+    137779,
+    -374406,
+    916971
+   ]
+  },
+  {
+   "index": 195,
+   "name": "IMG_2123.jpg",
+   "sha256": "1cc319cafdeacbabfb6952cf384f4d18cb929a93aa9961c83476b248b207b1e5",
+   "forward_e6": [
+    -15986,
+    -363986,
+    931267
+   ]
+  },
+  {
+   "index": 196,
+   "name": "IMG_2124.jpg",
+   "sha256": "c1dec896b8b4df1a70161dca339e2b0122838f202e511356a69b45bc15dee70d",
+   "forward_e6": [
+    35611,
+    88710,
+    995420
+   ]
+  },
+  {
+   "index": 197,
+   "name": "IMG_2125.jpg",
+   "sha256": "fd7054a228dc38f464fe49994fad0db944f4b582fe625079399145c3b2530123",
+   "forward_e6": [
+    134434,
+    85759,
+    987204
+   ]
+  },
+  {
+   "index": 198,
+   "name": "IMG_2126.jpg",
+   "sha256": "c66a7e409f46fd1f42e3df6632d2ac2394fc89befc8a107371feb483a4b13abf",
+   "forward_e6": [
+    254202,
+    68571,
+    964717
+   ]
+  },
+  {
+   "index": 199,
+   "name": "IMG_2127.jpg",
+   "sha256": "a056e4d1627fec16de249f81a9b7f2584f15fe5b1ecb7f17d9b2e8b6b3fed6c1",
+   "forward_e6": [
+    241919,
+    -22343,
+    970039
+   ]
+  },
+  {
+   "index": 200,
+   "name": "IMG_2128.jpg",
+   "sha256": "d21d1c1a1bd472611586ac6cc715cf3bfebd489d55b50e7d7284e55aeee80e73",
+   "forward_e6": [
+    117703,
+    -6219,
+    993029
+   ]
+  },
+  {
+   "index": 201,
+   "name": "IMG_2129.jpg",
+   "sha256": "2a63bc716ee68bb0e5a1c7dd2b4f78f8ecb1634bf1db093c46f01a913d7d4d38",
+   "forward_e6": [
+    -12453,
+    12324,
+    999846
+   ]
+  },
+  {
+   "index": 202,
+   "name": "IMG_2130.jpg",
+   "sha256": "72b7e887cbb27c0135e69a867a153145bae821488b3302125cd91d39f95e64e6",
+   "forward_e6": [
+    -152318,
+    50063,
+    987062
+   ]
+  },
+  {
+   "index": 203,
+   "name": "IMG_2131.jpg",
+   "sha256": "ffbffa2977b84b047f4e30a04836a00e54ce0d6f263d1301906727cc9dd8c718",
+   "forward_e6": [
+    -294943,
+    89420,
+    951321
+   ]
+  },
+  {
+   "index": 204,
+   "name": "IMG_2132.jpg",
+   "sha256": "345606612d1ae88717e425c8f1867be9c5d4e22e210445a057ccb70022253a1c",
+   "forward_e6": [
+    -319746,
+    299747,
+    898840
+   ]
+  },
+  {
+   "index": 205,
+   "name": "IMG_2133.jpg",
+   "sha256": "573a0ceedb3587498c7f5b4a49a6cede9668c7d111b9ae5dfc8bbb014e4a976d",
+   "forward_e6": [
+    -204657,
+    321719,
+    924452
+   ]
+  },
+  {
+   "index": 206,
+   "name": "IMG_2134.jpg",
+   "sha256": "afbee35518885dc19fe2561f6b73b116a622429b5110bf892cffb00184a737fe",
+   "forward_e6": [
+    -79061,
+    317933,
+    944810
+   ]
+  },
+  {
+   "index": 207,
+   "name": "IMG_2135.jpg",
+   "sha256": "75b3d094cc469b11f2210465e390e3c2e0949b67dc87341eeb4fe434f5d5f55c",
+   "forward_e6": [
+    48335,
+    282581,
+    958024
+   ]
+  },
+  {
+   "index": 208,
+   "name": "IMG_2136.jpg",
+   "sha256": "2d27e00e570327d2486a9ecfc2939e9e71ce3a4f62059faafedbf114c77c9c76",
+   "forward_e6": [
+    179138,
+    233613,
+    955685
+   ]
+  },
+  {
+   "index": 209,
+   "name": "IMG_2137.jpg",
+   "sha256": "6b458d17faeeea93f5346fe4f97068da50d102bb694351cd3477863093ac4bce",
+   "forward_e6": [
+    263688,
+    172700,
+    949022
+   ]
+  }
+ ]
+}

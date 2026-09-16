@@ -1,0 +1,118 @@
+module /Users/glendonchin/dev/Technology/exulanica-recovery-readiness/exulanica/__init__.py
+policy exulanica.capture-overlap-policy/v1 edge_min_score 8
+210 verdict: wall 47.41 s, cpu 41.26 s, peak rss 69 MiB (ru_maxrss bytes on darwin)
+210 verdict: registered_scene worth True edges 1451 largest 210 groups 1 isolated 0 structure one_chain digest fb2103668d52acbc31bc2978afd0b205be5b0cf7d75d5efce0f985e406b38fd2
+
+threshold rule: J = TPR(pairs <= 21 deg) - FPR(pairs >= 90 deg), per ten thousand
+  calibration 0-112: 6328 pairs, 446 positive, 2894 negative; maximum J at t=8 (9453)
+    t3:7109(tpr 9977 fpr 2868)  t4:7448(tpr 9977 fpr 2529)  t5:8713(tpr 9887 fpr 1174)  t6:9021(tpr 9843 fpr 822)
+    t7:9395(tpr 9775 fpr 380)  t8:9453(tpr 9663 fpr 210)  t9:9305(tpr 9394 fpr 89)  t10:9148(tpr 9192 fpr 44)
+    t11:8903(tpr 8923 fpr 20)  t12:8559(tpr 8565 fpr 6)  t13:8161(tpr 8161 fpr 0)  t14:7802(tpr 7802 fpr 0)
+    t15:7354(tpr 7354 fpr 0)  t16:6905(tpr 6905 fpr 0)
+    edge rate at the policy threshold by 10-degree band: 0:100% 10:95% 20:49% 30:11% 40:3% 50:3% 60:3% 70:3% 80:4% 90:2%
+  validation 113-209: 4656 pairs, 434 positive, 1854 negative; maximum J at t=7 (8583)
+    t3:7243(tpr 9654 fpr 2411)  t4:7521(tpr 9608 fpr 2087)  t5:8381(tpr 9308 fpr 927)  t6:8546(tpr 9193 fpr 647)
+    t7:8583(tpr 8917 fpr 334)  t8:8482(tpr 8686 fpr 204)  t9:8393(tpr 8479 fpr 86)  t10:8028(tpr 8087 fpr 59)
+    t11:7790(tpr 7811 fpr 21)  t12:7432(tpr 7442 fpr 10)  t13:7022(tpr 7027 fpr 5)  t14:6751(tpr 6751 fpr 0)
+    t15:6474(tpr 6474 fpr 0)  t16:6359(tpr 6359 fpr 0)
+    edge rate at the policy threshold by 10-degree band: 0:100% 10:77% 20:20% 30:4% 40:1% 50:1% 60:0% 70:1% 80:1% 90:2%
+
+the four measured rows
+  six: 6 photographs, receipt 8280728d5c8c registered 0 of 6 accepted False -> outcome insufficient_overlap
+    indices [0, 22, 45, 67, 90, 112]
+    neighbour optical-axis angles (deg) [139.7, 126.3, 129.8, 114.7, 83.4]; first to last 63.6
+    neighbour pair scores [4, 2, 3, 2, 2]; strongest non-neighbour scores [4, 4, 4, 2, 2]
+    policy verdict: ceiling insufficient_overlap, worth False, fault no_overlapping_neighbours, advisories [], largest 1/6, groups 0, isolated 6, structure scatter
+    consistent with outcome (outcome at or below ceiling, and refusal iff outcome below registered_scene): True
+    verdict by threshold: t>=1: registered_scene; t>=5: insufficient_overlap
+    says: Your photographs are kept here as they are. They won't build into a 3D place yet. None of these 6 photographs shares enough with any other: they were taken too far apart. Walk around it and take one every few steps, so each photograph overlaps the one before it.
+  twelve_wide: 12 photographs, receipt 0d4194430b77 registered 7 of 12 accepted False -> outcome registered_partial
+    indices [0, 4, 7, 11, 15, 18, 22, 25, 29, 33, 36, 40]
+    neighbour optical-axis angles (deg) [40.3, 29.8, 40.2, 39.8, 30.0, 40.0, 30.0, 40.2, 40.2, 33.8, 38.8]; first to last 43.8
+    neighbour pair scores [4, 13, 6, 6, 4, 2, 6, 0, 4, 2, 2]; strongest non-neighbour scores [25, 23, 13, 9, 6]
+    policy verdict: ceiling registered_partial, worth False, fault separate_groups, advisories [], largest 4/12, groups 2, isolated 6, structure islands
+    consistent with outcome (outcome at or below ceiling, and refusal iff outcome below registered_scene): True
+    verdict by threshold: t>=1: registered_scene; t>=7: registered_partial; t>=26: insufficient_overlap
+    says: Your photographs are kept here as they are. They won't build into a 3D place yet. These photographs fall into 2 separate groups, and nothing joins one group to the next. Go back to the gaps between the groups and take one every few steps, so each photograph overlaps the one before it.
+  twelve_close: 12 photographs, receipt e7a9145ad066 registered 12 of 12 accepted True -> outcome registered_scene
+    indices [0, 2, 4, 7, 9, 11, 13, 15, 17, 20, 22, 24]
+    neighbour optical-axis angles (deg) [20.1, 20.1, 29.8, 20.1, 20.1, 19.9, 20.0, 19.9, 29.9, 20.2, 20.2]; first to last 119.5
+    neighbour pair scores [15, 17, 13, 23, 10, 14, 8, 10, 11, 32, 23]; strongest non-neighbour scores [9, 7, 7, 6, 6]
+    policy verdict: ceiling registered_scene, worth True, fault None, advisories [], largest 12/12, groups 1, isolated 0, structure one_chain
+    consistent with outcome (outcome at or below ceiling, and refusal iff outcome below registered_scene): True
+    verdict by threshold: t>=1: registered_scene; t>=10: registered_partial; t>=33: insufficient_overlap
+  all_210: 210 photographs, receipt f44362e2840e registered 210 of 210 accepted True -> outcome registered_scene
+    policy verdict: ceiling registered_scene, worth True, fault None, advisories [], largest 210/210, groups 1, isolated 0, structure one_chain
+    consistent with outcome (outcome at or below ceiling, and refusal iff outcome below registered_scene): True
+    verdict by threshold: t>=1: registered_scene; t>=16: registered_partial
+
+monotonicity sweep: counts 6, 8, 12 and 16, every start, every step that fits
+  t=7: calibration 0-112: 141 of 452 sequences turn a refusal back into a run; validation 113-209: 27 of 388 sequences turn a refusal back into a run
+  run rate at t=8 by true 80% spacing, calibration 0-112: 5-10deg:100%(n218) 10-15deg:100%(n148) 15-20deg:79%(n244) 20-25deg:84%(n132) 25-30deg:16%(n278) 30-35deg:7%(n184) 35-40deg:18%(n181) 40-45deg:5%(n233) 45-50deg:6%(n102) 50-55deg:9%(n175) 55-60deg:0%(n291) 60-65deg:4%(n787)
+  run rate at t=8 by true 80% spacing, validation 113-209: 5-10deg:100%(n262) 10-15deg:100%(n38) 15-20deg:34%(n247) 20-25deg:52%(n63) 25-30deg:3%(n247) 30-35deg:0%(n128) 35-40deg:3%(n164) 40-45deg:0%(n144) 45-50deg:0%(n153) 50-55deg:0%(n87) 55-60deg:0%(n69) 60-65deg:0%(n562)
+  t=8: calibration 0-112: 89 of 452 sequences turn a refusal back into a run; validation 113-209: 11 of 388 sequences turn a refusal back into a run
+  t=9: calibration 0-112: 16 of 452 sequences turn a refusal back into a run; validation 113-209: 4 of 388 sequences turn a refusal back into a run
+  t=10: calibration 0-112: 0 of 452 sequences turn a refusal back into a run; validation 113-209: 2 of 388 sequences turn a refusal back into a run
+  t=12: calibration 0-112: 0 of 452 sequences turn a refusal back into a run; validation 113-209: 0 of 388 sequences turn a refusal back into a run
+
+closure readings against known arcs (ring one is frames 0-35, ring two 36-71)
+  closure_by_layer_spread: ring one step 1 arc 90: undetermined (truth open)
+  closure_by_layer_spread: ring one step 1 arc 150: undetermined (truth open)
+  closure_by_layer_spread: ring one step 1 arc 180: closed (truth open)
+  closure_by_layer_spread: ring one step 1 arc 240: closed (truth open)
+  closure_by_layer_spread: ring one step 1 arc 270: closed (truth open)
+  closure_by_layer_spread: ring one step 1 arc 330: closed (truth open)
+  closure_by_layer_spread: ring one step 1 arc 360: closed (truth closed)
+  closure_by_layer_spread: ring one step 2 arc 90: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 150: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 180: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 240: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 270: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 330: open (truth open)
+  closure_by_layer_spread: ring one step 2 arc 360: open (truth closed)
+  closure_by_layer_spread: ring one step 3 arc 90: undetermined (truth open)
+  closure_by_layer_spread: ring one step 3 arc 150: open (truth open)
+  closure_by_layer_spread: ring one step 3 arc 180: open (truth open)
+  closure_by_layer_spread: ring one step 3 arc 240: open (truth open)
+  closure_by_layer_spread: ring one step 3 arc 270: open (truth open)
+  closure_by_layer_spread: ring one step 3 arc 330: open (truth open)
+  closure_by_layer_spread: ring one step 3 arc 360: open (truth closed)
+  closure_by_layer_spread: ring two step 1 arc 120: undetermined (truth open)
+  closure_by_layer_spread: ring two step 1 arc 240: undetermined (truth open)
+  closure_by_layer_spread: ring two step 1 arc 360: closed (truth closed)
+  closure_by_layer_spread: ring two step 2 arc 120: undetermined (truth open)
+  closure_by_layer_spread: ring two step 2 arc 240: open (truth open)
+  closure_by_layer_spread: ring two step 2 arc 360: closed (truth closed)
+  closure_by_layer_spread: rings one and two, half a turn each: closed (truth open)
+  closure_by_layer_spread: rings one and two, whole: closed (truth closed)
+  closure_by_layer_spread: 7 wrong of 23 determined, 6 undetermined
+  closure_by_removing_a_middle: ring one step 1 arc 90: undetermined (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 150: undetermined (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 180: open (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 240: closed (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 270: closed (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 330: closed (truth open)
+  closure_by_removing_a_middle: ring one step 1 arc 360: closed (truth closed)
+  closure_by_removing_a_middle: ring one step 2 arc 90: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 150: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 180: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 240: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 270: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 330: open (truth open)
+  closure_by_removing_a_middle: ring one step 2 arc 360: open (truth closed)
+  closure_by_removing_a_middle: ring one step 3 arc 90: undetermined (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 150: open (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 180: open (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 240: open (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 270: open (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 330: open (truth open)
+  closure_by_removing_a_middle: ring one step 3 arc 360: open (truth closed)
+  closure_by_removing_a_middle: ring two step 1 arc 120: undetermined (truth open)
+  closure_by_removing_a_middle: ring two step 1 arc 240: undetermined (truth open)
+  closure_by_removing_a_middle: ring two step 1 arc 360: closed (truth closed)
+  closure_by_removing_a_middle: ring two step 2 arc 120: undetermined (truth open)
+  closure_by_removing_a_middle: ring two step 2 arc 240: open (truth open)
+  closure_by_removing_a_middle: ring two step 2 arc 360: closed (truth closed)
+  closure_by_removing_a_middle: rings one and two, half a turn each: closed (truth open)
+  closure_by_removing_a_middle: rings one and two, whole: closed (truth closed)
+  closure_by_removing_a_middle: 6 wrong of 23 determined, 6 undetermined

@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules, which is what keeps it 
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**82 documents** in the public catalog.
+**81 documents** in the public catalog.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-54 documents.
+53 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -21,7 +21,7 @@ How the system works now. Edited as the system changes.
 - [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [character-representation-contract](character-representation-contract.md) : Updated 2026-09-14. Status: FOUNDATION IMPLEMENTED; PRODUCTION CONFIGURATION, VISUAL/MOVEMENT
+- [capture-overlap-and-recovery-state](capture-overlap-and-recovery-state.md) : 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check
 - [companion-question](companion-question.md) : built, covered by tests, and measured with real models on three passes. Section 6
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28

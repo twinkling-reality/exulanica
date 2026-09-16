@@ -1,0 +1,54 @@
+"""The held-out bowl, measured once, after overlap-policy/v1 was fixed.
+
+Run from the worktree root: uv run python /tmp/held_out_bowl.py
+Reads the 51 bowl photographs through the .exulanica symlink and the two 51-camera pose
+receipts in the retained store. Runs no reconstruction and touches no database.
+"""
+
+import glob
+import hashlib
+import json
+import time
+from pathlib import Path
+
+import exulanica
+from exulanica.capture import Photograph, assess_capture_set, outcome_from_pose_receipt
+from exulanica.capture.verdict import POLICY_V1
+
+assert "recovery-readiness" in exulanica.__file__
+ROOT = Path.cwd()
+PHOTOS = ROOT / ".exulanica/reference-baseline/inputs/chili-salmon-bowl/images"
+names = sorted(path.name for path in PHOTOS.iterdir() if path.suffix.lower() == ".jpg")
+digests = {hashlib.sha256((PHOTOS / name).read_bytes()).hexdigest(): name for name in names}
+print("bowl photographs", len(names))
+# The known outcome, read from the receipts rather than assumed: the exact-set scenes' pose
+# receipts in the retained store, matched to these photographs by SHA-256.
+for prefix in ("292d697b", "d3563ac2", "2976a64d"):
+    path = Path(glob.glob(str(ROOT / f".exulanica/reference-baseline/runtime/blobs/sha-256/*/*/{prefix}*"))[0])
+    data = path.read_bytes()
+    assert hashlib.sha256(data).hexdigest() == path.name
+    receipt = json.loads(data)
+    frames = receipt["manifest"]["frames"]
+    matched = sum(1 for frame in frames if frame["sha256"] in digests)
+    outcome = outcome_from_pose_receipt(receipt)
+    print(f"receipt {path.name[:12]}: {len(frames)} frames, {matched} are bowl photographs, outcome {outcome.state}, registered {outcome.registered_count} of {outcome.member_count}, accepted {outcome.accepted}, reasons {receipt['quality']['reasons']}")
+started = time.perf_counter()
+verdict = assess_capture_set([Photograph.from_path(name, PHOTOS / name) for name in names], POLICY_V1)
+print(f"verdict in {time.perf_counter() - started:.2f} s: ceiling {verdict.predicted_ceiling}, worth {verdict.worth_attempting}, fault {verdict.fault}, advisories {list(verdict.advisories)}")
+graph = verdict.graph
+print(f"measured {graph.measured_count} of {graph.photograph_count}, edges {len(graph.edges)} of {len(graph.measurement.pair_scores)} pairs, largest {graph.largest_component}, groups {graph.groups}, isolated {graph.isolated}, structure {graph.structure}")
+print("unavailable", [(p.ref, p.reason) for p in graph.measurement.photographs if p.state != "measured"])
+print("working sizes", sorted({(p.width, p.height) for p in graph.measurement.photographs}))
+print("digest", verdict.sha256().hex())
+flips = []
+previous = None
+import dataclasses
+from exulanica.capture.verdict import verdict_for_measurement
+for t in range(1, 61):
+    ceiling = verdict_for_measurement(graph.measurement, dataclasses.replace(POLICY_V1, edge_min_score=t)).predicted_ceiling
+    if ceiling != previous:
+        flips.append(f"t>={t}: {ceiling}")
+        previous = ceiling
+print("verdict by threshold:", "; ".join(flips))
+for line in verdict.instructions():
+    print("says:", line.headline, line.detail, line.action or "")
