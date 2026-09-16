@@ -81,8 +81,12 @@ _OWNER_FILE = "owner.pid"
 
 
 def base_directory() -> Path:
-    """Every server this module makes lives under here, so ``sweep`` can find all of them."""
-    return Path(tempfile.gettempdir()) / "exulanica-test-postgres"
+    """Every server this module makes lives under here, so ``sweep`` can find all of them.
+
+    The ``.noindex`` suffix keeps Spotlight out: a full parallel run creates and rewrites tens of
+    thousands of relation files, and indexing them would compete with the tests for CPU.
+    """
+    return Path(tempfile.gettempdir()) / "exulanica-test-postgres.noindex"
 
 
 @functools.cache
