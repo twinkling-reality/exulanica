@@ -1040,6 +1040,66 @@
       "maximum": 15000
     },
     {
+      "name": "tree_trunk_clear_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how high a street tree's trunk is clear of branches, above the capsule so a person walks under it. The tree-species catalog states a census and a licence and no size, so the measures are declared here and authored rather than written into a measured catalog.",
+      "minimum": 2200,
+      "maximum": 3500
+    },
+    {
+      "name": "tree_trunk_diameter_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a street tree's trunk across, at the base. The tree-species catalog states a census and a licence and no size, so the measures are declared here and authored rather than written into a measured catalog.",
+      "minimum": 150,
+      "maximum": 450
+    },
+    {
+      "name": "tree_crown_radius_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far a street tree's crown reaches from its trunk. The tree-species catalog states a census and a licence and no size, so the measures are declared here and authored rather than written into a measured catalog.",
+      "minimum": 1500,
+      "maximum": 4500
+    },
+    {
+      "name": "tree_crown_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a street tree's crown from its lowest branches to its top. The tree-species catalog states a census and a licence and no size, so the measures are declared here and authored rather than written into a measured catalog.",
+      "minimum": 3000,
+      "maximum": 9000
+    },
+    {
+      "name": "tree_pit_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the square of open ground a street tree stands in, across the footway. The tree-species catalog states a census and a licence and no size, so the measures are declared here and authored rather than written into a measured catalog.",
+      "minimum": 900,
+      "maximum": 2000
+    },
+    {
       "name": "lamp_spacing_mm",
       "kind": "integer",
       "unit": "mm",

@@ -300,6 +300,26 @@
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
+      "target": "tree_trunk_clear_height_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "tree_trunk_diameter_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "tree_crown_radius_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "tree_crown_height_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "tree_pit_width_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
       "target": "lamp_spacing_mm",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
