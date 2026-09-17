@@ -1123,13 +1123,29 @@ def test_the_global_registries_refuse_a_private_licence(materials, table):
 # -- lock order --------------------------------------------------------------------------------
 
 
-def _holding_the_lifecycle_lock(materials, work):
+def _rows_free(connection, workspace_id: uuid.UUID) -> bool:
+    """Whether every recipe and bake row of the workspace can be locked here without waiting."""
+    try:
+        with connection.transaction():
+            for table in ("material_recipe", "material_bake"):
+                connection.execute(
+                    f"select 1 from {table} where workspace_id = %s for update nowait",
+                    (workspace_id,),
+                ).fetchall()
+    except psycopg.errors.LockNotAvailable:
+        return False
+    return True
+
+
+def _holding_the_lifecycle_lock(materials, work, write=None):
     """Run ``work`` on another thread while this connection holds the workspace's lifecycle lock.
 
     A tombstone takes that lock and then updates bake rows. So while it is held here, the other
-    thread must be waiting on the lock itself, holding no bake row; this connection then updates
-    the bake row, which is what a tombstone does next, and has to get it at once. Taking a row
-    first and the lifecycle lock second, the order a bare guard would give, deadlocks right here.
+    thread must be waiting on the lock itself, holding no row, and that is asked directly: this
+    connection locks every recipe and bake row of the workspace without waiting. Only then does it
+    write, by default what a tombstone writes next, or ``write``. Taking a row first and the
+    lifecycle lock second, the order a bare guard would give, deadlocks here, and every writer
+    retries past a deadlock, so a test that looked only at the outcome would pass the wrong order.
     The wait is observed on the other thread's own backend, so another session on a shared server
     cannot stand in for it, and it is given as long as a loaded machine needs.
     """
@@ -1166,14 +1182,21 @@ def _holding_the_lifecycle_lock(materials, work):
                 if not waiting:
                     time.sleep(0.02)
             assert waiting, "the other thread never waited on the lifecycle lock"
-            holder.execute(
-                "update material_bake set state = 'cancelled', claim_token = null, "
-                "  claimed_by = null, lease_expires_at = null, failure_class = 'withdrawn' "
-                "where workspace_id = %s and state in ('requested', 'running', 'failed')",
-                (materials.workspace_id,),
-            )
+            free = _rows_free(holder, materials.workspace_id)
+            # Writing past a row the other thread holds would deadlock; the assertion below names
+            # the order instead.
+            if free and write is not None:
+                write(holder)
+            elif free:
+                holder.execute(
+                    "update material_bake set state = 'cancelled', claim_token = null, "
+                    "  claimed_by = null, lease_expires_at = null, failure_class = 'withdrawn' "
+                    "where workspace_id = %s and state in ('requested', 'running', 'failed')",
+                    (materials.workspace_id,),
+                )
         thread.join(timeout=30)
     assert not thread.is_alive()
+    assert free, "the other thread locked a row before it waited for the lifecycle lock"
     outcome.pop("pid")
     return outcome
 
@@ -1202,6 +1225,25 @@ def test_a_claim_waits_for_a_deletion_before_it_locks_a_bake(materials):
         materials, lambda connection: worker._claim(connection, materials.workspace_id)
     )
     assert outcome == {"value": None}, outcome
+    assert materials.rows("select state from material_bake")[0]["state"] == "cancelled"
+
+
+def test_a_withdrawal_waits_for_the_lifecycle_lock_before_it_reads_the_recipe(materials):
+    """Two withdrawals at once answer as two in turn: the second finds the recipe withdrawn.
+
+    A withdrawal locks no row, so what holds it to the order is when it reads the recipe. Read
+    before the lock, the recipe is still live, and the second withdrawal's row meets the first's
+    and says nothing.
+    """
+    record = materials.repository().create_recipe(_small())
+    materials.repository().request_bake(record.recipe_id)
+    outcome = _holding_the_lifecycle_lock(
+        materials,
+        lambda connection: materials.repository(connection).withdraw_recipe(record.recipe_id),
+        write=lambda holder: materials.repository(holder).withdraw_recipe(record.recipe_id),
+    )
+    assert isinstance(outcome.get("error"), MaterialWithdrawn), outcome
+    assert materials.rows("select count(*) as n from material_recipe_withdrawal")[0]["n"] == 1
     assert materials.rows("select state from material_bake")[0]["state"] == "cancelled"
 
 
