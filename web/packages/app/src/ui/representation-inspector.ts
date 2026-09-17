@@ -153,7 +153,9 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     }, null, 2);
   }
   function showLegend(entries: readonly Entry[], colourBy: RepresentationIntent['colour']) {
-    const keys = [...new Set(entries.filter(item => item.subject.points !== null).map(item => item.resolved.colourKey))].sort();
+    // Only subjects this view can show: a subject hidden by residency or its parent adds no colour.
+    const keys = [...new Set(entries.filter(item => item.subject.points !== null && item.resolved.geometryVisible)
+      .map(item => item.resolved.colourKey))].sort();
     const key = `${colourBy}|${keys.join(',')}`;
     if (key === legendKey) return;
     legendKey = key;

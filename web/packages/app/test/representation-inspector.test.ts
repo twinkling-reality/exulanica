@@ -107,6 +107,17 @@ describe('world representation inspector', () => {
     view.dispose();
   });
 
+  it('leaves a subject hidden by residency out of the legend', () => {
+    const { binding, view } = setup([subject, scene]);
+    const legend = () => [...view.root.querySelectorAll('.representation-legend li')].map(item => item.textContent);
+    binding.representationReport = { ...binding.representationReport, subjects: binding.representationReport.subjects
+      .map(item => item.subject.subjectId === 'scene-1'
+        ? { ...item, resolved: resolveRepresentation(DEFAULT_REPRESENTATION_INTENT, item.subject, false) } : item) };
+    view.refresh();
+    expect(legend()).toEqual(['Authored']);
+    view.dispose();
+  });
+
   it('highlights the listed subject while the panel is open and lets it go when closed', () => {
     const { binding, view } = setup([subject, scene]);
     view.root.open = true;
