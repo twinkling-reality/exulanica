@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { parseTextureSetManifest, type TextureSetDigest } from '@exulanica/atlas-core';
 import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
+import { GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL, GLAZING_FRESNEL_WGSL, glazingReflectance } from '../src/playcanvas/generated-tile/glazing-fresnel.js';
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import {
   TileTextureLibrary,
@@ -66,7 +67,26 @@ describe('a glazing set as a material', () => {
     expect(material.depthTest).toBe(true);
     expect(material.cull).toBe(pc.CULLFACE_BACK);
     expect(castsShadow(resolution.set)).toBe(false);
+    // Reflectance rises with angle: the engine's Schlick term is replaced for this material only.
+    expect(material.getShaderChunks(pc.SHADERLANGUAGE_GLSL).get(GLAZING_FRESNEL_CHUNK)).toBe(GLAZING_FRESNEL_GLSL);
+    expect(material.getShaderChunks(pc.SHADERLANGUAGE_WGSL).get(GLAZING_FRESNEL_CHUNK)).toBe(GLAZING_FRESNEL_WGSL);
+    const opaque = await textures.resolve('fixture.opaque');
+    if (opaque.state !== 'available') throw new Error('the opaque fixture draws');
+    expect(opaque.material.hasShaderChunks).toBe(false);
     textures.destroy();
+  });
+
+  it('reflects ((n - 1) / (n + 1))^2 face on, rising to the gloss at grazing incidence', () => {
+    const f0 = ((1.5 - 1) / (1.5 + 1)) ** 2;
+    expect(glazingReflectance(1, 0.98, f0)).toBeCloseTo(0.04, 12);
+    expect(glazingReflectance(0, 0.98, f0)).toBeCloseTo(0.98, 12);
+    expect(glazingReflectance(Math.cos((70 * Math.PI) / 180), 0.98, f0)).toBeGreaterThan(0.15);
+    // A rough film reflects less at grazing incidence, never less than face on.
+    expect(glazingReflectance(0, 0.2, f0)).toBeCloseTo(0.2, 12);
+    expect(glazingReflectance(0, 0.01, f0)).toBeCloseTo(f0, 12);
+    // What the engine's own term gives the same glass: 0.04 at every angle.
+    const engine = (cosTheta: number, gloss: number): number => f0 + (Math.max(gloss * gloss * f0, f0) - f0) * (1 - cosTheta) ** 5;
+    expect(engine(0, 0.98)).toBeCloseTo(0.04, 12);
   });
 
   it('lays transmission in red and roughness in green', () => {

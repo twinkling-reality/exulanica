@@ -9,6 +9,7 @@ import {
   type TextureSetManifestEntry,
 } from '@exulanica/atlas-core';
 import { coveragePreservingMips } from './cutout-coverage.js';
+import { GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL, GLAZING_FRESNEL_WGSL } from './glazing-fresnel.js';
 import type { TileLook } from './look.js';
 import { createUnavailableMaterial } from './unavailable-surface.js';
 
@@ -380,6 +381,9 @@ export class TileTextureUploads {
       glass.thickness = 0;
       glass.blendType = pc.BLEND_NORMAL;
       glass.depthWrite = false;
+      // Reflectance that rises with angle, which the engine's own Schlick term does not give a dielectric.
+      glass.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set(GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL);
+      glass.getShaderChunks(pc.SHADERLANGUAGE_WGSL).set(GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_WGSL);
     }
     material.useSkybox = true;
     material.cull = glazing !== null && glazing.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;

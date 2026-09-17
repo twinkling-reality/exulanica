@@ -28,6 +28,7 @@ export {
   undrawnClassReason,
 } from './texture-materials.js';
 export { coveragePreservingMips, coverageShare } from './cutout-coverage.js';
+export { GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL, GLAZING_FRESNEL_WGSL, glazingReflectance } from './glazing-fresnel.js';
 export type { SurfaceBatch } from './surface-mesh.js';
 export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';
