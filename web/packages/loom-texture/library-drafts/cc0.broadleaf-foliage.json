@@ -1,0 +1,47 @@
+{
+  "set_id": "cc0.broadleaf-foliage",
+  "version": 1,
+  "title": "Broadleaf foliage",
+  "summary": "The outer leaves of a broadleaf street tree, in clumps with gaps between them, for a canopy seen from the street.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.foliage",
+      "version": 1
+    },
+    "seed": 2026091702,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 2000,
+      "v": 2000
+    },
+    "parameters": {
+      "leaf_colours": [
+        [62, 88, 38],
+        [78, 102, 44],
+        [94, 116, 52],
+        [70, 96, 50]
+      ],
+      "leaf_cells_across": 36,
+      "leaf_cells_down": 36,
+      "leaf_length_mm": 110,
+      "leaf_width_percent": 55,
+      "leaf_percent": 90,
+      "clump_cells": 10,
+      "clumping_percent": 60,
+      "layer_depth_mm": 30,
+      "leaf_fold_mm_1024ths": 2048,
+      "depth_shade_percent": 50,
+      "leaf_variation_q16": 9000,
+      "leaf_roughness_permille": 600,
+      "height_range_mm": 40,
+      "occlusion_radius_mm": 12,
+      "occlusion_depth_mm": 8,
+      "occlusion_strength_permille": 450
+    }
+  }
+}
