@@ -562,3 +562,27 @@ export type {
   CharacterResolutionContext,
   ResolvedCharacterRepresentation,
 } from './character.js';
+
+export type {
+  DecodedTextureSet,
+  TextureMapName,
+  TextureSetChannel,
+  TextureSetDigest,
+  TextureSetManifest,
+  TextureSetManifestEntry,
+  TextureSetRefusalReason,
+  TextureSetSurface,
+} from './texture-set.js';
+export {
+  TEXTURE_MANIFEST_PROFILE,
+  TEXTURE_SET_LICENCE_ID,
+  TEXTURE_SET_MAGIC,
+  TEXTURE_SET_MEDIA_TYPE,
+  TEXTURE_SET_NORMAL_CONVENTION,
+  TEXTURE_SET_PROFILE,
+  TEXTURE_SET_TRUTH,
+  TextureSetRefusal,
+  decodeTextureSet,
+  parseTextureSetManifest,
+  textureSetBlobPath,
+} from './texture-set.js';

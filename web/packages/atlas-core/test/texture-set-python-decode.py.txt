@@ -1,0 +1,63 @@
+"""Writes texture-set-python-decode.json: what the backend's strict reader decodes from each set.
+
+Run from the repository root:
+
+    uv run python web/packages/atlas-core/test/texture-set-python-decode.py.txt \
+      web/packages/atlas-core/test/texture-set-python-decode.json
+
+The TypeScript conformance test reads the JSON only; it never imports Python. Every set is loaded through load_texture_catalog,
+which recomputes each digest and holds each container header to its manifest entry and recipe,
+and then decoded again with decode_texture_set. The digests below are over the exact map bytes
+that reader hands out, so the browser reader agrees with the backend byte for byte or not at all.
+"""
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+from exulanica.canonical import canonical_json
+from exulanica.world.texture_assets import decode_texture_set, load_texture_catalog
+
+catalog = load_texture_catalog()
+sets = []
+for set_id in sorted(catalog.sets):
+    pinned = catalog.sets[set_id]
+    decoded = decode_texture_set(pinned.read_bytes())
+    header = dict(decoded.header)
+    maps = []
+    for entry in header["maps"]:
+        view = decoded.maps[entry["name"]]
+        data = bytes(view)
+        maps.append(
+            {
+                "name": entry["name"],
+                "byte_offset": entry["byte_offset"],
+                "byte_length": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "first_bytes": list(data[:6]),
+                "last_bytes": list(data[-6:]),
+            }
+        )
+    sets.append(
+        {
+            "set_id": set_id,
+            "version": pinned.version,
+            "content_sha256": pinned.content_sha256,
+            "byte_size": pinned.byte_size,
+            "header_sha256": hashlib.sha256(canonical_json(header)).hexdigest(),
+            "width": pinned.width,
+            "height": pinned.height,
+            "extent_u_mm": pinned.extent_u_mm,
+            "extent_v_mm": pinned.extent_v_mm,
+            "height_range_mm": pinned.height_range_mm,
+            "maps": maps,
+        }
+    )
+document = {
+    "profile": "exulanica.texture-set-python-decode/v1",
+    "reader": "exulanica.world.texture_assets.decode_texture_set via load_texture_catalog",
+    "sets": sets,
+}
+out = Path(sys.argv[1])
+out.write_bytes(canonical_json(document) + b"\n")
