@@ -49,7 +49,7 @@ How the system works now. Edited as the system changes.
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
-- [product-direction](product-direction.md) : Updated 2026-09-14. This roadmap defines delivery milestones and their acceptance criteria
+- [product-direction](product-direction.md) : Updated 2026-09-17. This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04

@@ -1,6 +1,6 @@
 # Product roadmap
 
-Updated 2026-09-14. This roadmap defines delivery milestones and their acceptance criteria.
+Updated 2026-09-17. This roadmap defines delivery milestones and their acceptance criteria.
 Implementation status is recorded below; API and package contracts remain authoritative for
 supported capabilities.
 
@@ -157,6 +157,95 @@ account/worker configuration, continuous pedestrian activity and richer social i
 vehicle traffic. Higher-level decisions may use evaluated models; navigation, timing and traffic
 rules remain deterministic runtime responsibilities.
 
+## How a world is made
+
+The generated parts of a world, and a person's changes to them, are built from kinds, rules,
+generated instances, decisions, appearance and edits. Personal memories and admitted places keep the
+contracts described above. This section states the intended structure and the direction for each
+world system; it is not a claim that each system exists. The World systems table records what is on
+main, what is in progress and what is missing.
+
+**Kinds** are the vocabulary of a world: street and building parts, materials, needs, activities,
+vehicle classes, road rules, and later jobs, goods and climate profiles. Each kind is a versioned
+data object (a catalog entry or a declared record shape) that records where it came from: a stated
+reason, a cited source, or the model and the checks that produced it. Hand authoring does not scale
+to a convincing city, which needs thousands of kinds. Kinds are therefore drafted in bulk by models
+in the exact catalog schema, and admitted only by automatic checks (schema, ranges, cross-catalog
+consistency and fit to admitted statistics) plus a sampled review. Every admitted kind can be
+withdrawn.
+
+**Statistics, not places.** A generated world copies the real world's distributions, never its
+geometry: when people sleep, work and shop (time-use surveys), how often it rains (climate
+normals), how far people travel to work (commute flows) and how often buses come (transit
+timetables). Each dataset is admitted with its licence. Imported real-city geometry was tried for
+Helsinki and Melbourne and did not read correctly at eye level; a generated world invents its places
+and borrows only their rhythms.
+
+**Rules** are versioned engines: grammar generators turn a seed into city records, the tessellator
+turns records into geometry, the society engine turns needs into actions and the traffic engine
+governs road lanes, signals and braking. A change to a rule is a new version, and old versions still
+replay. Rules model mechanisms, not scripts. Weather comes from a stochastic generator calibrated to
+a climate profile, and daylight from the sun's position; deliveries follow from shops running low;
+gatherings follow from relationships. Events are what those mechanisms produce, recorded as
+simulation events, not entries in a list.
+
+**Generated instances** are the cities, streets, buildings, inhabitants and simulated days of a
+world, each generated from a seed and the grammar and engine versions with no hand placement. The
+same inputs give the same world, byte for byte.
+
+**Decisions** come from interchangeable decision-makers that choose from the same validated actions:
+rules by default, a model when one is connected, and a person when they act. Model effort follows
+level of detail: a planning model for the few inhabitants near the viewer or central to a scenario,
+rules for everyone else, and small policies trained on recorded planner decisions to raise the whole
+population cheaply. Every decision is recorded as an input, so replay never calls a model again, and
+giving different models the same situation measures them.
+
+**Appearance** sits on exact structure. Geometry, identity and which material a surface is come from
+records. Generative models may supply how a surface looks, as versioned objects that name the model,
+its weights digest and its conditioning inputs, and every generated pixel or texel stays
+attributable to the record it dresses. Generated appearance is labeled as generated.
+
+**Edits** are a person's changes, recorded over the generated world, each inspectable and undoable:
+`World(branch, t) = fold(edits, generate(seed, grammar version))`. A world may also adapt to a
+person's own photographs and routines, only under that person's model and scene rights.
+
+Every world system keeps three invariants:
+
+- Nothing drawn or simulated is invented: a value comes from a kind, a rule, a recorded decision or
+  an edit, or it is stated unavailable.
+- A source that is not connected says so rather than guessing.
+- Generated and simulated state never becomes evidence about the source world.
+
+Models do not generate the world directly. A world produced directly by a generative model could not
+be edited at the level of one shop, replayed or measured. Models draft vocabulary, make decisions
+and supply appearance inside this structure instead, where each contribution is checked and
+recorded.
+
+### World systems
+
+In progress means built on a branch and not yet on main.
+
+| System | Made of | On main (2026-09-17) | Next |
+| --- | --- | --- | --- |
+| City vocabulary and validation | Record shapes, catalogs, validators | Version 1 record shapes and validators; the city catalogs hold one entry. Version 2 (27 record kinds, 69 parameters, 18 catalogs with 124 authored entries, tile documents with owned, halo and external references) is in final verification | Land version 2 |
+| Vocabulary at scale | Model-drafted catalog entries, automatic checks, sampled review | Not implemented | Bulk drafting in the catalog schema, admitted by schema, consistency and statistics checks |
+| Admitted statistics | Licensed time-use, climate, commute and transit datasets | Not implemented | Admit datasets with licence checks; calibrate routines, weather and trips |
+| City generators | Grammar stages | None: every city stage declares its records and states that it is not implemented | The first generated street corridor, then districts |
+| Shapes | Tessellator and container | Version 1 container, triangle digest, render and navigation projections, deterministic bake stage | The version 2 reader (in final verification) and full expanders (building faces, kerbs, corners) |
+| Walking on generated tiles | Tile runtime | A development evaluation route draws one baked tile and stands the player on its navigation envelope; reachable from no person's world | Version 2 tiles, material classes and data view selection |
+| Surfaces | Texture makers and recipes | Eight published opaque sets pinned by migration 0065; a workspace's own recipes and private bakes with deletion (0066) | Glazing, foliage, bark, timber, fabric, road paint and sign panels as declared material classes |
+| Generated appearance | Generative models on exact structure | Not implemented | Model-made texture sets and structure-conditioned appearance research, published as versioned objects |
+| People | Society engine and routine catalogs | Persisted v2 and v3 societies; v3 records bounded model decisions. The v1 engine draws roles and names from short fixed lists | A v4 routine society (needs, activities, capacities, homes and workplaces from premises) is in progress |
+| Looks | Character catalogs | A procedural stand-in in the preview | Catalog-driven people looks, deterministic per inhabitant, in progress |
+| Traffic | Traffic engine and cited catalogs | Not implemented | A deterministic simulation with independent rule checks is in progress; trips are not yet generated from inhabitants |
+| Decision-makers | Rules, models, people | v3 accepts bounded model proposals and typed user actions; no other engine does | One decision interface for every inhabitant and vehicle, with model effort by level of detail |
+| Weather and time of day | Weather generator, solar position | Not implemented. The v1 society state stores a fixed clear weather value that nothing reads | A seeded weather generator calibrated to a climate profile, and daylight from solar position, read by people, lighting and traffic |
+| Work, goods and economy | Premises, roles, supply | Not implemented beyond the v1 role list | Roles and shifts from premises (v4, in progress), then goods, supply and deliveries |
+| Events | Mechanisms | Not implemented | Events produced by supply, relationships and weather, recorded as simulation events |
+| Transit service | Stops, routes, timetables | Not implemented | Stops, routes and boarding calibrated to admitted timetables, joint with people and traffic |
+| Relationships and memory | Society memory | v3 communicated beliefs, bounded | Remembered interactions that change later choices |
+| Edits over generated worlds | Edit log | Object add, move, remove and undo; style edits | Reseed, set parameter, pin and undo over generated worlds |
+
 ## Implementation status
 
 The inventory below identifies existing code and the extensions required by each milestone.
@@ -170,7 +259,7 @@ The inventory below identifies existing code and the extensions required by each
 | Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
 | Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
-| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
+| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A v4 routine society and a deterministic traffic simulation are in progress and not on main. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
