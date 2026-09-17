@@ -50,6 +50,12 @@ API or, where a model is self-hosted, downloaded at deployment time. Redistribut
 do not attach to this repository's contents. Use-time clauses still bind the operator, which is why
 section 3 and section 7 exist.
 
+**Exception: public data a shipped file is derived from.** Where a catalog or the owned world is
+derived from a public dataset, the bytes it was derived from are retained unchanged beside it, so the
+derivation can be checked. Those files are third party data copied into this repository, and each is
+listed in [Shipped third party data](#shipped-third-party-data-2026-09-17) with its attribution,
+dataset, terms and the modifications made.
+
 ---
 
 ## 2. Exulanica's own license
@@ -447,3 +453,25 @@ through `deploy/gsplat/compressor/package-lock.json`; npm preserves the package'
 Source: <https://github.com/playcanvas/splat-transform/tree/d092ae94e6e1d5161990ce5ca960f659ea9faf5f>.
 Its generated SOG container records the converter version. Other runtime dependencies retain their
 respective distributions and licenses in the image; the runtime receipt records their versions.
+
+## Shipped third party data (2026-09-17)
+
+Every public dataset whose bytes this repository retains, and what was derived from them. A test,
+`tests/test_third_party_notices.py`, fails when a retained source with a provenance record under
+`assets/catalogs/sources/`, or a source record in an owned-world manifest under `assets/owned-world/`,
+is not named here with its dataset, attribution and terms.
+
+**Attribution, for every source below:** NYC Open Data, Office of Technology and Innovation (OTI).
+
+**Terms:** <https://cityofnewyork.github.io/opendatatsm/publicpolicies.html>. The reviewed reading
+of those terms, recorded in `docs/evaluation/2026-09-13-owned-world-source-decision.json`, is that
+NYC Open Data public datasets are available without registration requirements, license requirements
+or restrictions on use, and that a republication may be required to identify source, version and
+modifications. Each row states all three. NYC disclaims completeness, accuracy and fitness for
+purpose.
+
+| Retained file | Dataset | Version | Modifications |
+| --- | --- | --- | --- |
+| `assets/catalogs/sources/nyc-2015-street-tree-census-species.json`, 10,853 bytes, SHA-256 `68865bbbfdbcff42ce2492eadb218313e20c5f54845e7a4cac93885873b3ae15` | 2015 Street Tree Census (`uvpi-gqnh`), tree records aggregated by species | Provider revision Thu, 13 Sep 2018 14:58:58 GMT; retrieved 2026-09-17T01:41:14Z by one approved GET | Retained unchanged. `assets/catalogs/tree-species.v2.json` derives 19 entries from it: every named species with at least one percent of the 652,169 named trees, leaving out rows that name a genus alone and the row with no species. The query and response headers are in the `.provenance.json` file beside it |
+| `assets/owned-world/flatiron/source/buildings.geojson`, 286,944 bytes, SHA-256 `67942a1838465d35e85b83a973ac09aeaf2d9c08f463ed7d1684b9b8f3ba22db` | NYC BUILDING (`5zhs-2jue`), the footprints inside the Flatiron district box | Provider revision Sun, 13 Sep 2026 15:49:22 GMT | Retained unchanged. In `assets/owned-world/flatiron/flatiron-owned-district.json` coordinates are quantized and transformed to a local metric frame; building massing, facade completion, materials, roads, lighting, fantasy additions and synthetic inhabitants are generated and are not observations. The query is in `assets/owned-world/flatiron/manifest.json` |
+| `assets/owned-world/flatiron/source/sidewalks.geojson`, 258,925 bytes, SHA-256 `e833dd97a5f8360c2d205c003b66a7fddc6a88f34e3d3f21f594d06658ecd5d8` | NYC Planimetric Database SIDEWALK (`52n9-sdep`), the sidewalk polygons inside the same box | Provider revision Wed, 24 Apr 2024 20:18:07 GMT | As for the buildings above; ground is authored flat and claims no surveyed elevation |
