@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CITY_V2 } from '../src/core/city-v2.js';
-import { GRAMMAR_TABLES, PLANE, PROJECTIONS, TILE_SHAPE } from '../src/core/record-shapes.js';
+import { baseRingOf, TessellationError } from '../src/core/expand.js';
+import { GRAMMAR_TABLES, navigationRowOf, PLANE, PROJECTIONS, ShapeTableError, TILE_SHAPE } from '../src/core/record-shapes.js';
+import { fixtureObject, recordsOf } from './support.js';
 import { grammarTableFromSources } from './grammar-table-sources.js';
 
 describe('the grammar table', () => {
@@ -19,5 +21,18 @@ describe('the grammar table', () => {
     expect(PLANE).toBe('invented');
     expect(TILE_SHAPE.kind).toBe('city.tile');
     expect(TILE_SHAPE.version).toBe(2);
+  });
+
+  it('states what every record kind is to a person walking, and tess reads the base ring of every kind that covers one', () => {
+    for (const shape of CITY_V2.shapes.records) {
+      expect(navigationRowOf(CITY_V2, shape.kind!).kind).toBe(shape.kind);
+    }
+    expect(() => navigationRowOf(CITY_V2, 'city.nothing')).toThrow(ShapeTableError);
+    const covers = CITY_V2.navigation.filter((row) => row.ground === 'cover');
+    expect(covers.map((row) => [row.kind, row.cover])).toEqual([['city.massing', 'base_ring']]);
+    // A building stands on its lowest tier's ring, which the grammar reads as its footprint.
+    const building = recordsOf(fixtureObject(), 'city.massing')[0].fields;
+    expect(baseRingOf('city.massing', building)).toEqual(building.tiers[0].ring_mm);
+    expect(() => baseRingOf('city.parcel', {})).toThrow(TessellationError);
   });
 });

@@ -21,8 +21,11 @@
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
+import type { Plan } from './integer-math.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
+import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
+import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
 
 /**
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
@@ -156,6 +159,12 @@ export interface ExpandContext {
    * the eye are not read: the carve is in plan and ignores height, which only ever leaves out more.
    */
   readonly capsuleRadiusMm: number | undefined;
+  /**
+   * In plan, every triangle of every horizontal surface an owned record that covers the ground has
+   * drawn in this projection. Empty while those records themselves are expanded, and in a
+   * projection that carries no surfaces.
+   */
+  readonly coverings: readonly CoveringTriangle[];
 }
 
 export type Expansion =
@@ -163,7 +172,12 @@ export type Expansion =
   | { readonly state: 'unavailable'; readonly needs: readonly Need[] };
 
 export type Rule =
-  | { readonly rule: 'expand'; readonly expand: (fields: Fields, context: ExpandContext) => Expansion }
+  | {
+      readonly rule: 'expand';
+      readonly expand: (fields: Fields, context: ExpandContext) => Expansion;
+      /** Whether it reads `coverings`, so every record that covers the ground expands before it. */
+      readonly readsCoverings: boolean;
+    }
   | { readonly rule: 'needs'; readonly needs: readonly Need[] }
   | { readonly rule: 'not_in_projection' };
 
@@ -176,22 +190,8 @@ function safe(value: number, where: string): number {
   return value;
 }
 
-/**
- * A terrain patch, less every cell whose closed plan square meets one of `omit`.
- *
- * The grammar's terrain rule: samples row-major from the tile's south-west corner, at
- * `tile * tile_size_mm + index * cell_mm` with the sample's own height, and each cell split along
- * the diagonal from its south-west sample to its north-east one (`triangulation` "sw_ne"). With x
- * east and y north, both triangles are counter-clockwise seen from +z. A vertex is emitted only
- * when a kept cell uses it, in row-major order.
- *
- * It depends on the grammar's `terrain_grid_matches_tile`, and checks the facts it reads.
- */
-function terrainCells(
-  fields: Fields,
-  context: ExpandContext,
-  omit: readonly PlanBox[],
-): { readonly state: 'drawn'; readonly vertices: number[]; readonly triangles: number[] } | Extract<Expansion, { state: 'unavailable' }> {
+/** A terrain record's grid, checked against the facts it reads (`terrain_grid_matches_tile`). */
+function patchOf(fields: Fields, context: ExpandContext): TerrainPatch {
   const side = fields.samples_per_side as number;
   const cell = fields.cell_mm as number;
   const heights = fields.height_mm as readonly number[];
@@ -201,8 +201,31 @@ function terrainCells(
   if (heights.length !== side * side) {
     throw new TessellationError('a terrain patch without one height per sample (terrain_grid_matches_tile)');
   }
-  const originX = safe((fields.tile_x as number) * context.tileSizeMm, 'a terrain origin');
-  const originY = safe((fields.tile_y as number) * context.tileSizeMm, 'a terrain origin');
+  return {
+    originX: safe((fields.tile_x as number) * context.tileSizeMm, 'a terrain origin'),
+    originY: safe((fields.tile_y as number) * context.tileSizeMm, 'a terrain origin'),
+    cell,
+    side,
+    heights,
+  };
+}
+
+/**
+ * A terrain patch, less every cell whose closed plan square meets one of `omit` and every cell
+ * whose row-major index is in `skip`.
+ *
+ * The grammar's terrain rule: samples row-major from the tile's south-west corner, at
+ * `tile * tile_size_mm + index * cell_mm` with the sample's own height, and each cell split along
+ * the diagonal from its south-west sample to its north-east one (`triangulation` "sw_ne"). With x
+ * east and y north, both triangles are counter-clockwise seen from +z. A vertex is emitted only
+ * when a kept cell uses it, in row-major order.
+ */
+function terrainCells(
+  patch: TerrainPatch,
+  omit: readonly PlanBox[],
+  skip: ReadonlySet<number>,
+): { readonly vertices: number[]; readonly triangles: number[] } {
+  const { side, cell, heights, originX, originY } = patch;
   const kept: [number, number][] = [];
   const used = new Array<boolean>(side * side).fill(false);
   for (let row = 0; row + 1 < side; row += 1) {
@@ -211,6 +234,7 @@ function terrainCells(
     for (let column = 0; column + 1 < side; column += 1) {
       const west = safe(originX + column * cell, 'a terrain x');
       const east = west + cell;
+      if (skip.has(row * (side - 1) + column)) continue;
       const covered = omit.some((box) =>
         west <= box.max_x && box.min_x <= east && south <= box.max_y && box.min_y <= north);
       if (covered) continue;
@@ -219,7 +243,6 @@ function terrainCells(
       for (const sample of [low, low + 1, low + side, low + side + 1]) used[sample] = true;
     }
   }
-  if (kept.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
   const vertexOf = new Array<number>(side * side);
   const vertices: number[] = [];
   used.forEach((isUsed, sample) => {
@@ -237,24 +260,39 @@ function terrainCells(
     const up = vertexOf[(row + 1) * side + column]!;
     triangles.push(low, right, high, low, high, up);
   }
-  return { state: 'drawn', vertices, triangles };
+  return { vertices, triangles };
 }
 
 /**
- * Drawn terrain is the whole patch, a horizontal surface in the plan frame, `s = x` and `t = y`, in
- * the terrain role. The grammar says terrain is not a surface where a street, a block or a lot
- * covers it; how it yields to them is exact coverage, and comes with their expanders. Leaving cells
- * out here instead would draw holes in the ground that read as cuts.
+ * Drawn terrain is the patch less what drawn covering surfaces cover, by the terrain yield rule
+ * (`terrain-yield.ts`), a horizontal surface in the plan frame, `s = x` and `t = y`, in the terrain
+ * role. The grammar says terrain is not a surface where a street, a block or a lot covers it; it
+ * yields exactly where their surfaces are drawn, and nowhere their records only state an extent,
+ * which would draw holes nothing fills. A cell no covering meets is drawn as the grid draws it.
  */
 function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
-  const grid = terrainCells(fields, context, []);
-  if (grid.state === 'unavailable') return grid;
+  const patch = patchOf(fields, context);
+  const where = `city.terrain ${fields.identity as string}`;
+  const coverings = coveringsWithArea(context.coverings, where);
+  const met = metCells(patch, coverings, where);
+  const grid = terrainCells(patch, [], new Set(met.keys()));
+  const vertices = [...grid.vertices];
+  const triangles = [...grid.triangles];
+  for (const key of [...met.keys()].sort((a, b) => a - b)) {
+    const column = key % (patch.side - 1);
+    const row = (key - column) / (patch.side - 1);
+    const cell = yieldedCell(patch, row, column, met.get(key)!.map((index) => coverings[index]!), where);
+    const first = vertices.length / 3;
+    for (const vertex of cell.vertices) vertices.push(vertex[0], vertex[1], vertex[2]);
+    for (const index of cell.triangles) triangles.push(first + index);
+  }
+  if (triangles.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
   const coordinates: number[] = [];
-  for (let vertex = 0; vertex < grid.vertices.length; vertex += 3) {
-    coordinates.push(grid.vertices[vertex]!, grid.vertices[vertex + 1]!);
+  for (let vertex = 0; vertex < vertices.length; vertex += 3) {
+    coordinates.push(vertices[vertex]!, vertices[vertex + 1]!);
   }
   const surface: SurfaceExpansion = { role: 'terrain', orientation: 'horizontal', coordinates };
-  return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles, surface }] };
+  return { state: 'drawn', pieces: [{ vertices, triangles, surface }] };
 }
 
 /**
@@ -268,7 +306,7 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
  * extent contains everything its record generates, so a kept cell is a cell nothing covers, and a
  * point outside a box grown by the radius on each axis is more than the radius from the box, so a
  * capsule stood anywhere on a kept cell meets no such record in plan, at any height. Support never
- * claims ground that is not there, or room that is not there; render draws the whole patch. Both
+ * claims ground that is not there, or room that is not there. Both
  * rules are fixed by `TESSELLATOR_SOURCE_VERSION`.
  */
 function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
@@ -282,8 +320,8 @@ function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
     max_x: safe(box.max_x + radius, 'a clearance extent'),
     max_y: safe(box.max_y + radius, 'a clearance extent'),
   }));
-  const grid = terrainCells(fields, context, clear);
-  if (grid.state === 'unavailable') return grid;
+  const grid = terrainCells(patchOf(fields, context), clear, new Set());
+  if (grid.triangles.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
   return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles }] };
 }
 
@@ -294,9 +332,10 @@ interface KindRules {
   readonly render_batch: Rule;
   readonly nav_envelope: Rule;
   /**
-   * Whether the record's stated extent covers or stands on the ground in plan, so terrain under it
-   * is not a surface and a capsule keeps clear of it. Everything a street, a block or a lot holds
-   * does; a district is a region, and a terrain patch is the ground itself.
+   * INTERIM, for nav_envelope only: whether the record's stated extent covers or stands on the
+   * ground in plan, so a terrain cell under it grown by the capsule radius is not support. It goes
+   * when support is the ground partition carved by exact clearance from the navigation table's
+   * obstruction axis. Render reads the navigation table, never this.
    */
   readonly covers_ground: boolean;
 }
@@ -338,8 +377,8 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   // A material is not a surface. A drawn range cites it; it draws nothing of its own.
   ['city.surface_material', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
   ['city.terrain', {
-    render_batch: { rule: 'expand', expand: renderTerrain },
-    nav_envelope: { rule: 'expand', expand: supportTerrain },
+    render_batch: { rule: 'expand', expand: renderTerrain, readsCoverings: true },
+    nav_envelope: { rule: 'expand', expand: supportTerrain, readsCoverings: false },
     covers_ground: false,
   }],
   ['city.vitrine', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection, covers_ground: true }],
@@ -357,6 +396,22 @@ export function ruleFor(projection: ProjectionName, kind: string): Rule {
   if (projection === 'render_batch') return rules.render_batch;
   if (projection === 'nav_envelope') return rules.nav_envelope;
   throw new TessellationError(`${projection} is not materialised`);
+}
+
+/**
+ * How a kind whose navigation row covers its base ring states that ring: the ring the record stands
+ * on, as its grammar states it. A building stands on its lowest tier's ring
+ * (`exulanica.grammar.grammars.city.document` reads `tiers[0].ring_mm` as its footprint).
+ */
+const BASE_RINGS: ReadonlyMap<string, (fields: Fields) => readonly Plan[]> = new Map([
+  ['city.massing', (fields: Fields): readonly Plan[] => (fields.tiers as readonly Fields[])[0]!.ring_mm as readonly Plan[]],
+]);
+
+/** The base ring of a record whose kind covers it. A kind with no stated way to read it is refused. */
+export function baseRingOf(kind: string, fields: Fields): readonly Plan[] {
+  const reader = BASE_RINGS.get(kind);
+  if (reader === undefined) throw new TessellationError(`${kind} covers its base ring, and this tessellator reads no base ring for it`);
+  return reader(fields);
 }
 
 /** Whether a record kind's stated extent covers the ground terrain would otherwise draw. */
@@ -379,5 +434,11 @@ for (const table of GRAMMAR_TABLES) {
   }
   for (const kind of [...KIND_RULES.keys()].sort()) {
     if (!kinds.includes(kind)) throw new TessellationError(`a rule for ${kind}, which no table declares`);
+  }
+  // Every kind the navigation table says covers its base ring has a way to read that ring.
+  for (const row of table.navigation) {
+    if (row.ground !== 'cover') continue;
+    if (row.cover !== 'base_ring') throw new TessellationError(`${row.kind} covers ${row.cover}, a region this tessellator does not read`);
+    if (!BASE_RINGS.has(row.kind)) throw new TessellationError(`${row.kind} covers its base ring, and this tessellator reads no base ring for it`);
   }
 }

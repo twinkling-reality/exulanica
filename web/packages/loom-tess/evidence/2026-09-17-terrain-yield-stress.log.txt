@@ -1,0 +1,9 @@
+# terrain yield stress run, 2026-09-17, lane/tess-yield-wip over 65686cc4 with the outward hull rule
+# command: pnpm exec vitest run packages/loom-tess/test/zz-stress.test.ts (from web/)
+STRESS realistic seed 11 FAILURES 0 OF 400
+STRESS overlapping seed 7 FAILURES 0 OF 400
+STRESS realistic seed 1011 FAILURES 0 OF 400
+STRESS overlapping seed 1007 FAILURES 0 OF 400
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Duration  64.14s (transform 68ms, setup 0ms, collect 104ms, tests 63.45s, environment 0ms, prepare 51ms)

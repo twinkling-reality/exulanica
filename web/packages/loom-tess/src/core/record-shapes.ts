@@ -18,10 +18,10 @@
  */
 import { CITY_V2 } from './city-v2.js';
 import { FIELD_KINDS } from './grammar-table.js';
-import type { FieldShape, GrammarTable, RecordShape } from './grammar-table.js';
+import type { FieldShape, GrammarTable, NavigationRow, RecordShape } from './grammar-table.js';
 
 export { FIELD_KINDS } from './grammar-table.js';
-export type { FieldKind, FieldShape, GrammarFrame, GrammarTable, IdentityRule, RecordShape } from './grammar-table.js';
+export type { FieldKind, FieldShape, GrammarFrame, GrammarTable, IdentityRule, NavigationRow, RecordShape } from './grammar-table.js';
 
 /** Integers a JavaScript reader holds exactly. `exulanica.grammar.records.MAX_SAFE_INTEGER`. */
 export const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
@@ -50,6 +50,16 @@ export function tableFor(grammarId: unknown, grammarVersion: unknown): GrammarTa
 /** A top-level record kind of `table`, or undefined. */
 export function recordShapeOf(table: GrammarTable, kind: string): RecordShape | undefined {
   return table.shapes.records.find((shape) => shape.kind === kind);
+}
+
+/**
+ * What `table`'s navigation table says a record kind is to a person walking. A kind it leaves out is
+ * refused: the table is to state every kind.
+ */
+export function navigationRowOf(table: GrammarTable, kind: string): NavigationRow {
+  const row = table.navigation.find((candidate) => candidate.kind === kind);
+  if (row === undefined) throw new ShapeTableError(`the ${table.grammar_id} navigation table states nothing for ${kind}`);
+  return row;
 }
 
 /** A nested shape of `table` by name. A table that names a shape it does not hold is refused. */

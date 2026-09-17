@@ -115,13 +115,15 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 Only terrain.
 
-- In `render_batch`, the whole patch is drawn. No published texture set dresses terrain, so its
-  one surface (role `terrain`, horizontal) states `none-exists`. The grammar says terrain is not a surface where a street, a block
-  or a lot covers it; how terrain yields to them is exact coverage, and comes with their
-  expanders. Leaving cells out instead would draw holes that read as cuts.
-- In `nav_envelope`, a terrain cell is drawn when its closed plan square meets no stated extent of
-  a record that covers or stands on the ground (every kind with an extent but terrain and
-  districts), each grown by the capsule radius. An extent contains everything its record
+- In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
+  yield rule below. Nothing drawn covers the ground yet, so today that is the whole patch. No
+  published texture set dresses terrain, so its one surface (role `terrain`, horizontal) states
+  `none-exists`.
+- In `nav_envelope`, for now, a terrain cell is drawn when its closed plan square meets no stated
+  extent of a record that covers or stands on the ground (every kind with an extent but terrain and
+  districts, an interim list in `src/core/expand.ts`), each grown by the capsule radius. It goes
+  when support reads the same ground partition as render, carved by exact clearance from the
+  navigation table's obstruction axis. An extent contains everything its record
   generates, so a kept cell is one nothing covers, and a capsule stood anywhere on it meets none of
   those records in plan, at any height. That is the city descriptor's capsule clearance claim. The
   radius is the `radius_mm` measure the descriptor's nav_envelope contract states for
@@ -135,6 +137,42 @@ lanes, nodes and dressings are not surfaces of their own, and say so.
 
 Every vertex of a drawn range must lie inside the extent its record states, or the tile is
 refused.
+
+### Terrain yield
+
+The grammar says terrain is not a surface where a street, a block or a lot covers it.
+`src/core/terrain-yield.ts` makes terrain give way to the ground the city descriptor's navigation
+table says drawn records take (`navigation` in the generated table): the horizontal surfaces a
+`support` kind has drawn, and the base ring a `cover` kind stands on, once that record is drawn. A
+building stands on its lowest tier's ring, as the grammar reads its footprint. A record not drawn
+yet takes no ground, so the world shows no hole where it will stand, and no stated extent ever
+removes terrain, since that would cut holes nothing fills. Every record whose expander does not read
+coverings is expanded first; entries are still written in record order. A cell no covering meets is
+drawn exactly as the grid draws it.
+
+A met cell is cut into pieces that each lie on one plane of the terrain. Each piece, less the union
+of the coverings, is found exactly by a rational plan arrangement (`src/core/plan-arrangement.ts`)
+and cut into convex faces along the rows of the covering vertices inside it. Each face is drawn as
+the convex hull of the integer points round its vertices, cut by the ring rule, at the piece's
+floored plane heights. The rule holds four claims, and `test/terrain-yield.test.ts` holds its
+cases to each, in arithmetic of its own (`test/terrain-yield-claims.ts`):
+
+- **No gap at all.** Every point of the patch that no covering's closed outline holds lies in a
+  terrain triangle. That is stronger than any bound on a gap's size.
+- **Bounded entry.** Every terrain point inside a covering lies within a millimetre of that
+  covering's outline on each axis.
+- **Watertight between cells.** Where a covering edge crosses a line two cells share, both cells
+  take the same integer vertices there.
+- **Heights.** Every vertex's height is the grammar's terrain surface there, floored.
+
+No gap and no entry cannot both hold exactly with integer vertices. Two coverings can leave a
+channel a millimetre square fits in whose integer points all lie on one line, so no terrain with
+area fits inside it. The test keeps such a channel as a regression case. The rule chooses no gap:
+a crack shows the background as a bright line, and a sliver of terrain under a millimetre inside a
+covering is hidden where the covering is higher or lower than the terrain. **Known and not
+measured:** where a covering is coplanar with the terrain, such as a parcel at grade, the sliver may
+flicker in a band under a pixel. It is a runtime depth matter, to measure once such a covering is
+drawn.
 
 ## Building blocks not yet wired
 

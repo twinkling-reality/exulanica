@@ -23,10 +23,12 @@
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
-import { coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { ExpandContext, Need, PlanBox } from './expand.js';
+import { baseRingOf, coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
+import type { ExpandContext, Expansion, Need, PlanBox } from './expand.js';
 import type { Piece } from './pieces.js';
-import { MATERIAL_RECORD_KIND, recordShapeOf } from './record-shapes.js';
+import type { CoveringTriangle } from './terrain-yield.js';
+import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
+import { triangulateRing } from './ring-triangulation.js';
 import type { ProjectionName } from './record-shapes.js';
 import {
   COORDINATES_PER_TRIANGLE,
@@ -243,10 +245,11 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
   });
 
   const cover = groundCover(document, placed);
-  const contextFor = (record: PlacedRecord): ExpandContext => ({
+  const contextFor = (record: PlacedRecord, coverings: readonly CoveringTriangle[]): ExpandContext => ({
     tileSizeMm: document.tile.fields.tile_size_mm as number,
     groundCover: cover,
     capsuleRadiusMm: capsuleRadius(document, record),
+    coverings,
   });
   const dressed = dressings(placed);
   const materialFor = (record: PlacedRecord, role: string): MaterialRef => {
@@ -263,6 +266,40 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     const vertices: number[] = [];
     const indices: number[] = [];
     const surfaceCoordinates: number[] = [];
+    // Every record whose expander reads no coverings expands first. Terrain yields to the ground the
+    // navigation table says drawn records take: the horizontal surfaces a `support` kind has drawn,
+    // and the base ring a `cover` kind stands on once it is drawn. An undrawn record takes no ground,
+    // so the world never shows a hole where it will stand. Entries are still written in record order.
+    const expansions = new Map<number, Expansion>();
+    const coverings: CoveringTriangle[] = [];
+    placed.forEach((record, recordIndex) => {
+      if (record.membership === 'halo') return;
+      if (!document.grammars[record.grammar]!.declared_semantics.admissible_uses.includes(name)) return;
+      const rule = ruleFor(name, record.payload.kind);
+      if (rule.rule !== 'expand') return;
+      if (rule.readsCoverings) return;
+      const expansion = rule.expand(record.payload.fields, contextFor(record, []));
+      expansions.set(recordIndex, expansion);
+      if (expansion.state !== 'drawn') return;
+      if (!definition.surfaces) return;
+      const row = navigationRowOf(tableOf(document.grammars[record.grammar]!), record.payload.kind);
+      if (row.ground === 'cover') {
+        const ring = baseRingOf(record.payload.kind, record.payload.fields);
+        const cut = triangulateRing(ring, `${record.payload.kind} ${record.identity} base ring`);
+        for (let corner = 0; corner + 2 < cut.length; corner += 3) {
+          coverings.push([ring[cut[corner]!]!, ring[cut[corner + 1]!]!, ring[cut[corner + 2]!]!]);
+        }
+      }
+      if (row.ground !== 'support') return;
+      for (const piece of expansion.pieces) {
+        if (piece.surface === undefined) continue;
+        if (piece.surface.orientation !== 'horizontal') continue;
+        const plan = (index: number): readonly [number, number] => [piece.vertices[index * 3]!, piece.vertices[index * 3 + 1]!];
+        for (let corner = 0; corner + 2 < piece.triangles.length; corner += 3) {
+          coverings.push([plan(piece.triangles[corner]!), plan(piece.triangles[corner + 1]!), plan(piece.triangles[corner + 2]!)]);
+        }
+      }
+    });
     const entries = placed.map((record, recordIndex): Entry => {
       if (record.membership === 'halo') return { record: recordIndex, state: 'halo' };
       const admitted = document.grammars[record.grammar]!.declared_semantics.admissible_uses;
@@ -274,7 +311,8 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
         case 'needs':
           return { record: recordIndex, state: 'unavailable', needs: rule.needs };
         case 'expand': {
-          const expansion = rule.expand(record.payload.fields, contextFor(record));
+          const earlier = expansions.get(recordIndex);
+          const expansion = earlier === undefined ? rule.expand(record.payload.fields, contextFor(record, coverings)) : earlier;
           if (expansion.state === 'unavailable') {
             return { record: recordIndex, state: 'unavailable', needs: expansion.needs };
           }

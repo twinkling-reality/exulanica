@@ -1,0 +1,25 @@
+/**
+ * The terrain yield stress run retained as evidence: 400 seeded trials each of strips that meet but
+ * do not overlap and of overlapping strips and loose triangles, on flat and twisted terrain, on two
+ * seeds each, every trial held to the four claims in test/terrain-yield-claims.ts. Run it by copying
+ * it to test/zz-stress.test.ts; it is not part of the suite, which runs 20 trials of each.
+ */
+import { it } from 'vitest';
+import type { TerrainPatch } from '../src/core/terrain-yield.js';
+import { flat, holdsTheRule, seededCoverings, sequence } from './terrain-yield-claims.js';
+
+for (const [label, seed, overlapping] of [['realistic', 11, false], ['overlapping', 7, true], ['realistic', 1011, false], ['overlapping', 1007, true]] as const) {
+  it(`stress ${label} seed ${seed}`, () => {
+    const next = sequence(seed);
+    const within = (range: number): number => next() % range;
+    const failures: string[] = [];
+    for (let trial = 0; trial < 400; trial += 1) {
+      const heights = trial % 2 === 0 ? flat(5) : Array.from({ length: 25 }, () => within(40) - 20);
+      const patch: TerrainPatch = { originX: 0, originY: 0, cell: 8, side: 5, heights };
+      const coverings = seededCoverings(within, overlapping);
+      try { holdsTheRule(patch, coverings, 50); } catch (error) { failures.push(`${trial} ${(error as Error).message.slice(0, 700)}`); }
+    }
+    console.log(`STRESS ${label} seed ${seed} FAILURES ${failures.length} OF 400`);
+    for (const failure of failures.slice(0, 4)) console.log(`FAIL ${failure}`);
+  });
+}
