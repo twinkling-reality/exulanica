@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.catalogs import Licence
 from exulanica.grammar.documents import read_json, split_versioned_name
 from exulanica.grammar.errors import CatalogError
@@ -63,7 +63,7 @@ CATALOG_DIRECTORY: Final = (
 
 #: The movements a lane connection can make, in the city vocabulary's spelling.
 TURNS: Final = ("left", "straight", "right", "u_turn")
-#: How a junction decides who goes. Each is implemented in :mod:`exulanica.traffic.admission`.
+#: How a junction decides who goes. Each is implemented in :mod:`exulanica.traffic.simulation`.
 POLICY_RULES: Final = ("signal", "priority", "all_way_stop", "uncontrolled")
 ARRIVAL_ORDERS: Final = ("not_applicable", "first_stopped_first_served")
 APPROACH_CONTROLS: Final = ("priority", "signal", "stop", "yield")
@@ -277,6 +277,9 @@ class TrafficCatalogs:
     payloads: tuple[tuple[str, Mapping[str, Any]], ...]
     #: ``(catalog_id, sha256 of the file bytes)``, the digest a city signal record carries.
     file_sha256: tuple[tuple[str, str], ...]
+    #: :func:`catalogs_digest` of the payloads, computed once when they are loaded, because every
+    #: simulated second and every presentation record names it.
+    digest: str
 
     def vehicle_class(self, key: str) -> VehicleClass:
         for entry in self.vehicle_classes:
@@ -298,10 +301,6 @@ class TrafficCatalogs:
 
     def file_digest(self, catalog_id: str) -> str:
         return dict(self.file_sha256)[catalog_id]
-
-    @property
-    def digest(self) -> str:
-        return catalogs_digest(self)
 
 
 _VEHICLE_INTS: Final = {
@@ -600,7 +599,8 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
         envelope, file_digest = _read(directory.joinpath(name), catalog_id)
         envelopes[catalog_id] = envelope
         digests.append((catalog_id, file_digest))
-    catalogs = TrafficCatalogs(
+    payloads = tuple(sorted(envelopes.items()))
+    return TrafficCatalogs(
         vehicle_classes=_entries(
             directory.joinpath(_FILES["vehicle-class"]), envelopes["vehicle-class"], _vehicle
         ),
@@ -610,21 +610,21 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
             _policy,
         ),
         plans=_entries(directory.joinpath(_FILES["signal-plan"]), envelopes["signal-plan"], _plan),
-        payloads=tuple(sorted(envelopes.items())),
+        payloads=payloads,
         file_sha256=tuple(digests),
+        digest=_payloads_digest(payloads),
     )
-    canonical_json([payload for _, payload in catalogs.payloads])
-    return catalogs
+
+
+def _payloads_digest(payloads: tuple[tuple[str, Mapping[str, Any]], ...]) -> str:
+    return sha256_of_canonical(
+        [{"catalog_id": catalog_id, "document": payload} for catalog_id, payload in payloads]
+    ).hex()
 
 
 def catalogs_digest(catalogs: TrafficCatalogs) -> str:
     """SHA-256 over the canonical JSON of the three catalogs, ordered by id. Hex."""
-    return sha256_of_canonical(
-        [
-            {"catalog_id": catalog_id, "document": payload}
-            for catalog_id, payload in catalogs.payloads
-        ]
-    ).hex()
+    return _payloads_digest(catalogs.payloads)
 
 
 def declared_values(catalogs: TrafficCatalogs) -> tuple[tuple[str, str, str, str], ...]:
