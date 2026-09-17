@@ -47,12 +47,12 @@
  */
 import { add, bigFloorQuotient, exact, floorDivide, GeometryError, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
-import { sideOf, uncoveredRegions } from './plan-arrangement.js';
+import { carvedPiece, twiceArea, withArea } from './piece-carve.js';
+import type { ObstructionTriangle } from './piece-carve.js';
 import { triangulateRing } from './ring-triangulation.js';
-import type { RationalPoint } from './plan-arrangement.js';
 
-/** A covering triangle in plan. */
-export type CoveringTriangle = readonly [Plan, Plan, Plan];
+/** A covering triangle in plan: a piece of the ground a drawn record takes. */
+export type CoveringTriangle = ObstructionTriangle;
 
 /** A terrain grid: its south-west sample, its cell, its samples per side and their heights, row-major. */
 export interface TerrainPatch {
@@ -69,23 +69,8 @@ export interface CellTerrain {
   readonly triangles: readonly number[];
 }
 
-const twiceArea = (a: Plan, b: Plan, c: Plan, where: string): number =>
-  subtract(
-    multiply(subtract(b[0], a[0], where), subtract(c[1], a[1], where), where),
-    multiply(subtract(b[1], a[1], where), subtract(c[0], a[0], where), where),
-    where,
-  );
-
 /** The coverings with area, each turned counter-clockwise. */
-export function coveringsWithArea(coverings: readonly CoveringTriangle[], where: string): CoveringTriangle[] {
-  const out: CoveringTriangle[] = [];
-  for (const [a, b, c] of coverings) {
-    const area = twiceArea(a, b, c, where);
-    if (area > 0) out.push([a, b, c]);
-    if (area < 0) out.push([a, c, b]);
-  }
-  return out;
-}
+export const coveringsWithArea = withArea;
 
 /** Whether a closed counter-clockwise triangle and a closed axis-aligned square share a point. */
 function meetsSquare(triangle: CoveringTriangle, west: number, south: number, east: number, north: number, where: string): boolean {
@@ -146,73 +131,6 @@ function heightOn(corners: readonly Space[], point: Plan, where: string): number
   return exact(Number(bigFloorQuotient(weighted, whole)), where);
 }
 
-/** A piece's rows, step 3: the distinct heights of the covering vertices in the closed piece, ascending. */
-function rowsOf(piece: readonly Plan[], coverings: readonly CoveringTriangle[], where: string): number[] {
-  const rows = new Set<number>();
-  for (const triangle of coverings) {
-    for (const point of triangle) {
-      if (inPiece(piece, point, where)) rows.add(point[1]);
-    }
-  }
-  return [...rows].sort((a, b) => a - b);
-}
-
-/** Whether an integer point lies in a closed counter-clockwise convex piece. */
-function inPiece(piece: readonly Plan[], point: Plan, where: string): boolean {
-  return piece.every((corner, index) => twiceArea(corner, piece[(index + 1) % piece.length]!, point, where) >= 0);
-}
-
-const lessPoint = (a: Plan, b: Plan): number => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]);
-
-/**
- * The convex hull of integer points, counter-clockwise, keeping every point that lies along an edge
- * of it, so a neighbour that holds the same points on a shared line meets it vertex to vertex.
- */
-function hullKeepingEdges(points: readonly Plan[], where: string): Plan[] {
-  const sorted = [...points].sort(lessPoint).filter((point, index, all) => index === 0 ? true : lessPoint(point, all[index - 1]!) !== 0);
-  if (sorted.length < 3) return [];
-  const chain = (ordered: readonly Plan[]): Plan[] => {
-    const out: Plan[] = [];
-    for (const point of ordered) {
-      while (out.length >= 2 && twiceArea(out[out.length - 2]!, out[out.length - 1]!, point, where) < 0) out.pop();
-      out.push(point);
-    }
-    return out;
-  };
-  const lower = chain(sorted);
-  const upper = chain([...sorted].reverse());
-  // With every point collinear the two chains are the same line: no hull with area.
-  if (lower.length === sorted.length && upper.length === sorted.length) return [];
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
-}
-
-/** A face's hull corners, step 5. */
-function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], where: string): Plan[] {
-  const corners: Plan[] = [];
-  for (const vertex of face) {
-    const lowX = bigFloorQuotient(vertex.x, vertex.w);
-    const lowY = bigFloorQuotient(vertex.y, vertex.w);
-    const xs = lowX * vertex.w === vertex.x ? [lowX] : [lowX, lowX + 1n];
-    const ys = lowY * vertex.w === vertex.y ? [lowY] : [lowY, lowY + 1n];
-    for (const x of xs) {
-      for (const y of ys) {
-        const point: Plan = [exact(Number(x), where), exact(Number(y), where)];
-        if (inPiece(piece, point, where)) corners.push(point);
-      }
-    }
-  }
-  return hullKeepingEdges(corners, where);
-}
-
-/** Whether a face turns only left or straight on, as step 4 requires. */
-function convex(face: readonly RationalPoint[]): boolean {
-  return face.every((here, index) => {
-    const before = face[(index + face.length - 1) % face.length]!;
-    const after = face[(index + 1) % face.length]!;
-    return sideOf(before, here, after) >= 0n;
-  });
-}
-
 /** A met cell's terrain, by the terrain yield rule. */
 export function yieldedCell(
   patch: TerrainPatch,
@@ -236,11 +154,7 @@ export function yieldedCell(
   const triangles: number[] = [];
   for (const piece of pieces) {
     const ring: Plan[] = piece.map((corner) => [corner[0], corner[1]]);
-    for (const region of uncoveredRegions(ring, coverings, rowsOf(ring, coverings, where), where)) {
-      if (region.holes.length > 0) throw new GeometryError(`${where}: a face cut along its rows still holds a hole`);
-      if (!convex(region.outer)) throw new GeometryError(`${where}: a face cut along its rows is not convex`);
-      const hull = faceHull(region.outer, ring, where);
-      if (hull.length < 3) continue;
+    for (const hull of carvedPiece(ring, coverings, where)) {
       const first = vertices.length;
       for (const point of hull) vertices.push([point[0], point[1], heightOn(piece, point, where)]);
       for (const index of triangulateRing(hull, where)) triangles.push(first + index);

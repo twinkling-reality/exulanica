@@ -215,8 +215,16 @@ by the expander that needs it, with a new tessellator version.
   a hull round each corner that holds the corner's disk, its points bisected from the four axes as
   the fillet arc rule bisects, doubling until every chord is checked to clear the radius. It leaves
   nothing out and takes under five millimetres beyond, whatever the radius, which is what covering
-  an arc with integer points costs. It is what support clearance will carve a building's base ring
-  by, so no ring falls back to its plan box, which could close a footway that is open.
+  an arc with integer points costs. It is what support clearance carves a building's base ring by, so
+  no ring falls back to its plan box, which could close a footway that is open. Two mistakes it made
+  first, since neither shows in a picture:
+  - Bisecting raw axis direction vectors by adding them walks the Stern-Brocot mediants, which does
+    not halve angles: it left a fourteen degree gap beside each axis, and chords a millimetre and a
+    half inside the radius. Bisecting the steps from the centre halves the angle, because both are
+    the same distance out.
+  - A band stretched past its edge's ends by a step that leans sideways comes off the edge's own
+    line, and points on the edge itself fall outside every piece. There is no overhang now: a point
+    past an edge's end belongs to that corner, and the corner covers the radius plus the lean.
 - `src/core/support-clearance.ts` has the support clearance rule. It carves support triangles
   away from obstruction boxes grown by the capsule radius. Each box is removed by clipping on the
   integer lines a millimetre outside it, so the pieces kept meet without cracks. Crossings are
