@@ -132,6 +132,21 @@ uniform vec4 uDataViewThin;
 uniform float uDataViewTime;
 varying float vDataBand;
 varying float vDataGain;
+
+// The data view's thinning draw, as an integer hash of the sample's own index in its buffer. Not
+// hash1: sin() of an argument near 2e7, where a subject's two millionth sample lands, loses its
+// precision on Apple GPUs through ANGLE Metal, and the far subset stopped thinning (measured in
+// data-view/frame-budget.log.txt). The index is the sample's place in a deterministic sampling,
+// so the same budget keeps the same far subset every frame and every load.
+float dataViewHash(int index) {
+    uint x = uint(index);
+    x ^= x >> 16u;
+    x *= 0x7feb352du;
+    x ^= x >> 15u;
+    x *= 0x846ca68bu;
+    x ^= x >> 16u;
+    return float(x >> 8u) / 16777216.0;
+}
 #endif
 
 // One hash, used for the particulate dissolve. Deterministic per point, so the boundary does not
@@ -241,7 +256,7 @@ void main(void) {
     // ones left out. Every drawn point is still a real sample; far points only overlap less.
     float keep = min(1.0, uDataViewThin.x / max(viewDist, 0.001));
     keep *= keep;
-    if (hash1(float(gl_VertexID) * 0.7548776662) > keep) {
+    if (dataViewHash(gl_VertexID) >= keep) {
         gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
         gl_PointSize = 0.0;
         vDataGain = 0.0;
