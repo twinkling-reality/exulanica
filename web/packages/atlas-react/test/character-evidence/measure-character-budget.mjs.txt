@@ -1,6 +1,11 @@
 // Frame cost of catalog people at 1440x900: one crowd of 128, a different number drawn as full
 // characters each run, everyone else as distant forms. Run inside .exulanica/bin/quiet-slot with the
 // preview server already running. Prints one JSON line per configuration.
+//
+// Retained copy of the harness that produced frame-budget-2026-09-17.log.txt. One substitution: the
+// browser profile directory was an absolute path in the operator's private scratch area, written here
+// as <scratch>, because the withdrawn product name in that path may not appear in this tree
+// (docs/adr/0011-exulanica-namespace.md). Nothing else differs from what ran.
 import { setTimeout as sleep } from 'node:timers/promises';
 import { execSync } from 'node:child_process';
 import { launch, navigate } from '../audit-2026-09-16/cdp.mjs';
@@ -9,7 +14,7 @@ const [, , appOrigin, portText, budgetsText = '0,12,24,36,48,64', secondsText = 
 const budgets = budgetsText.split(',').map(Number);
 const seconds = Number(secondsText);
 const load = () => execSync('uptime').toString().replace(/.*load averages?: /, '').trim();
-const browser = await launch({ port: Number(portText ?? 9521), profile: `/private/tmp/claude-501/-Users-glendonchin-dev-Technology-orimera/408fea04-e684-42ba-8453-a423fb755bb8/scratchpad/budget-profile-${portText}` });
+const browser = await launch({ port: Number(portText ?? 9521), profile: `<scratch>/budget-profile-${portText}` });
 const out = (value) => console.log(JSON.stringify(value));
 try {
   await navigate(browser, `${appOrigin}/?preview=1`, { settleMs: 500 });
