@@ -1,145 +1,300 @@
-"""The generated city as a society place: a pure function from grammar records to the contract.
+"""The generated city as a society place: a pure function from city grammar records to the contract.
 
-Only the city grammar's record classes are read (streets, parcels, massing, premises and street
-furniture), never a generator, so the corridor's real records drop in unchanged. Everything is
-integer geometry:
+Only the city grammar's version 2 record classes are read, never a generator, so a generated
+city's tile documents drop in unchanged. :func:`place_from_city_documents` holds each tile document
+to every check the grammar defines, then derives the place from the records the tiles own;
+:func:`place_from_city_records` is the derivation itself, over records that each pass their own
+shape. Everything is integer geometry in the grammar's ``city_local`` frame:
 
-- a footway runs along each side of a street segment, offset from the centreline by half the
-  carriageway, the gutter and half the footway, with a standing station every catalogued spacing;
-- footways meeting at a junction join only within the same corner, taken from the angular order
-  of the segments, so nobody crosses a carriageway at a junction;
-- a carriageway is crossed only where a segment's ``crossing_offsets_mm`` puts a crossing;
-- a premises unit is an indoor destination whose use class maps, through the routine's use-class
-  catalog, to its visitors, staff, residents, role and shift. Its access node is the projection
-  of its parcel's centroid onto the frontage footway. That projection is a fallback until the
-  city records carry a premises entrance; and
-- street furniture whose item class has a use-class entry (a bench) is an outdoor destination
-  with one standing spot per seat.
+- **Footways.** A curb's footway runs beside its kerb line, offset into the footway by the kerb
+  top's width and half the footway's width, with a standing station every catalogued spacing. A
+  station is named by its distance along the kerb line from the line's first point, and a point on
+  a vertex takes its offset from the piece arriving there (the first point from the first piece).
+- **Corners.** Walking counter-clockwise round the face a curb bounds, its footway joins the
+  footway of the curb its record names as next, round the offset of the corner arc between them,
+  so footways meet only round one block's corner and never across a carriageway. The arc is
+  followed closely enough that no straight piece cuts more than :data:`CORNER_TOLERANCE_MM` inside
+  it; where the footway is wider than the corner is round, the two footway lines meet at a point.
+- **Crossings.** A carriageway is crossed only on a crossing record, between the footway points
+  beside the two ends of its line. The place's crossing keeps the record's identity and signal.
+- **Entrances.** A premises unit is an indoor destination reached through the first of its
+  entrances that opens onto a footway in the place: a premises-access edge runs from the footway
+  point nearest the threshold to the threshold. A door onto a lot reaches no footway; a unit with
+  no door onto a footway in the place is stated as unsupported and is never given one.
+- **Furniture.** Street furniture whose furniture class has a use-class entry (a bench) is an
+  outdoor destination with one standing spot per seat, side by side across its facing.
+- **Streets.** A footway, entrance or furniture node names its segment's street by the street's
+  identity, and a corner node names none. A street's name is presentation, never identity:
+  :func:`city_street_names` reads names from the city's own street records for a label, and no
+  name is copied into the place, so restyling a street never changes a society's input.
 
-Offsets at a bend use the direction of the piece that leaves the vertex, not a mitre, and a
-premises unit whose use class the routine does not know is listed as unsupported, never guessed.
-No record carries a street name, so none is published.
+Standing spots keep two standing radii apart: a footway station that close to a seat or to another
+spot is walked through, not stood on. A premises unit whose use class the routine does not know is
+listed as unsupported, never guessed.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from functools import cmp_to_key
+from collections.abc import Iterable, Sequence
 from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
-from exulanica.grammar.grammars.city.massing import MassingRecord, validate_massing
-from exulanica.grammar.grammars.city.parcels import ParcelRecord, validate_parcel
-from exulanica.grammar.grammars.city.premises import PremisesRecord, validate_premises
-from exulanica.grammar.grammars.city.streetlife import (
-    StreetFurnitureRecord,
-    validate_street_furniture,
-)
+from exulanica.grammar import shapes
+from exulanica.grammar.catalogs import Catalog
+from exulanica.grammar.grammars.city import CITY_SHAPES_BY_TYPE
+from exulanica.grammar.grammars.city.document import TileDocument, validate_city_document
+from exulanica.grammar.grammars.city.facade import EntranceRecord
+from exulanica.grammar.grammars.city.massing import MassingRecord
+from exulanica.grammar.grammars.city.parcels import ParcelRecord
+from exulanica.grammar.grammars.city.premises import PremisesRecord
+from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
 from exulanica.grammar.grammars.city.streets import (
-    StreetNodeRecord,
+    CrossingRecord,
+    CurbEdgeRecord,
+    StreetRecord,
     StreetSegmentRecord,
-    validate_street_node,
-    validate_street_segment,
 )
 from exulanica.grammar.records import canonical_record
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import PLACE_PROFILE, ceil_distance, seal_place
 
-__all__ = ["CITY_RECORDS_PROFILE", "place_from_city_records"]
+__all__ = [
+    "CITY_RECORDS_PROFILE",
+    "CORNER_TOLERANCE_MM",
+    "READ_KINDS",
+    "city_street_names",
+    "place_from_city_documents",
+    "place_from_city_records",
+]
 
-CITY_RECORDS_PROFILE: Final = "exulanica.city-records/v1"
-_VALIDATORS: Final = {
-    StreetNodeRecord: validate_street_node,
-    StreetSegmentRecord: validate_street_segment,
-    ParcelRecord: validate_parcel,
-    MassingRecord: validate_massing,
-    PremisesRecord: validate_premises,
-    StreetFurnitureRecord: validate_street_furniture,
-}
-_SIDES: Final = ("left", "right")
+CITY_RECORDS_PROFILE: Final = "exulanica.city-records/v2"
+#: The record kinds a place is derived from, and so the kinds its input digest covers.
+READ_KINDS: Final = (
+    StreetSegmentRecord,
+    CurbEdgeRecord,
+    CrossingRecord,
+    ParcelRecord,
+    MassingRecord,
+    PremisesRecord,
+    EntranceRecord,
+    StreetFurnitureRecord,
+)
+#: How far, in millimetres, a straight piece of a corner's footway may cut inside its arc.
+CORNER_TOLERANCE_MM: Final = 250
+_CORNER_DEPTH: Final = 8
 
 Point = tuple[int, int]
 
 
 def _round_div(numerator: int, denominator: int) -> int:
     """Integer division rounded half away from zero; the same on every platform."""
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
     quotient, remainder = divmod(abs(numerator), denominator)
     if 2 * remainder >= denominator:
         quotient += 1
     return quotient if numerator >= 0 else -quotient
 
 
-def _offset(start: Point, end: Point, distance: int, side: str) -> Point:
-    """The vector ``distance`` millimetres to one side of the direction start to end."""
-    dx, dy = end[0] - start[0], end[1] - start[1]
-    length = math.isqrt(dx * dx + dy * dy)
-    sign = 1 if side == "left" else -1
+def _scaled(vector: Point, distance: int) -> Point:
+    """``vector`` at ``distance`` millimetres long; the length is taken in millionths of a mm."""
+    length = math.isqrt((vector[0] * vector[0] + vector[1] * vector[1]) * 10**12)
     return (
-        _round_div(-dy * distance * sign, length),
-        _round_div(dx * distance * sign, length),
+        _round_div(vector[0] * distance * 10**6, length),
+        _round_div(vector[1] * distance * 10**6, length),
     )
 
 
-class _Centreline:
-    def __init__(self, points: Sequence[Point]) -> None:
-        self.points = [tuple(p) for p in points]
-        self.pieces = []
+def _left(vector: Point) -> Point:
+    return (-vector[1], vector[0])
+
+
+def _add(a: Point, b: Point) -> Point:
+    return (a[0] + b[0], a[1] + b[1])
+
+
+def _sub(a: Point, b: Point) -> Point:
+    return (a[0] - b[0], a[1] - b[1])
+
+
+class _Kerb:
+    """One curb's kerb line in plan, and the footway beside it."""
+
+    def __init__(self, curb: CurbEdgeRecord, segment: StreetSegmentRecord) -> None:
+        points: list[Point] = []
+        for x, y, _ in curb.kerb_line_mm:
+            if not points or points[-1] != (x, y):
+                points.append((x, y))
+        if len(points) < 2:
+            raise ValueError(f"curb {curb.identity} has a kerb line of no length")
+        self.curb = curb
+        self.segment = segment
+        self.points = points
+        self.key = f"{segment.segment_ordinal}:{curb.side}"
+        self.offset = curb.kerb_width_mm + curb.footway_width_mm // 2
+        self.pieces: list[tuple[int, int, Point, Point]] = []
         along = 0
-        for a, b in pairwise(self.points):
+        for a, b in pairwise(points):
             length = ceil_distance(a, b)
             self.pieces.append((along, length, a, b))
             along += length
         self.length = along
 
-    def at(self, along: int, distance: int, side: str) -> Point:
-        """The footway point ``along`` millimetres from the start, on one side."""
+    def footway(self, along: int) -> Point:
+        """The footway point beside the kerb line ``along`` millimetres from its first point."""
         along = max(0, min(self.length, along))
-        for start, length, a, b in self.pieces:
-            if along <= start + length or (start, length, a, b) == self.pieces[-1]:
-                t = along - start
-                base = (
-                    a[0] + _round_div((b[0] - a[0]) * t, length),
-                    a[1] + _round_div((b[1] - a[1]) * t, length),
-                )
-                ox, oy = _offset(a, b, distance, side)
-                return (base[0] + ox, base[1] + oy)
-        raise AssertionError("unreachable")
+        start, length, a, b = next(
+            (piece for piece in self.pieces if along <= piece[0] + piece[1]), self.pieces[-1]
+        )
+        t = along - start
+        base = (
+            a[0] + _round_div((b[0] - a[0]) * t, length),
+            a[1] + _round_div((b[1] - a[1]) * t, length),
+        )
+        normal = _left(_sub(b, a))
+        if self.curb.side == "right":
+            normal = (-normal[0], -normal[1])
+        return _add(base, _scaled(normal, self.offset))
 
-    def project(self, point: Point) -> tuple[int, str]:
-        """The along-distance and side of the centreline nearest to ``point``."""
-        best = None
+    def project(self, point: Point) -> tuple[int, int]:
+        """``(squared gap, along)`` of the kerb line point nearest ``point``, the first on a tie."""
+        best: tuple[int, int] | None = None
         for start, length, a, b in self.pieces:
             dx, dy = b[0] - a[0], b[1] - a[1]
             px, py = point[0] - a[0], point[1] - a[1]
-            dot = px * dx + py * dy
             squared = dx * dx + dy * dy
-            t = max(0, min(squared, dot))
+            t = max(0, min(squared, px * dx + py * dy))
             foot = (a[0] + _round_div(dx * t, squared), a[1] + _round_div(dy * t, squared))
-            gap = (point[0] - foot[0]) ** 2 + (point[1] - foot[1]) ** 2
-            side = "left" if dx * py - dy * px > 0 else "right"
-            candidate = (gap, start + _round_div(length * t, squared), side)
-            if best is None or candidate[:2] < best[:2]:
+            candidate = (
+                (point[0] - foot[0]) ** 2 + (point[1] - foot[1]) ** 2,
+                start + _round_div(length * t, squared),
+            )
+            if best is None or candidate < best:
                 best = candidate
         assert best is not None
-        return best[1], best[2]
+        return best
+
+    def walk_end(self) -> tuple[int, Point, Point]:
+        """Where a counter-clockwise walk round the face leaves this curb: along, point, heading."""
+        if self.curb.side == "left":
+            return self.length, self.points[-1], _sub(self.points[-1], self.points[-2])
+        return 0, self.points[0], _sub(self.points[0], self.points[1])
+
+    def walk_start(self) -> tuple[int, Point, Point]:
+        """Where a counter-clockwise walk round the face joins this curb: along, point, heading."""
+        if self.curb.side == "left":
+            return 0, self.points[0], _sub(self.points[1], self.points[0])
+        return self.length, self.points[-1], _sub(self.points[-2], self.points[-1])
 
 
-def _half_plane(vector: Point) -> int:
-    return 0 if vector[1] > 0 or (vector[1] == 0 and vector[0] > 0) else 1
+def _meet(p: Point, heading: Point, q: Point, other: Point) -> Point | None:
+    """Where the line through ``p`` along ``heading`` meets the line through ``q`` along ``other``.
+
+    ``None`` when they are parallel.
+    """
+    denominator = heading[0] * other[1] - heading[1] * other[0]
+    if denominator == 0:
+        return None
+    w = _sub(q, p)
+    t = w[0] * other[1] - w[1] * other[0]
+    return (
+        p[0] + _round_div(heading[0] * t, denominator),
+        p[1] + _round_div(heading[1] * t, denominator),
+    )
 
 
-def _angular(a: tuple, b: tuple) -> int:
-    """Counter-clockwise order of outward directions, by exact integer comparison."""
-    va, vb = a[0], b[0]
-    ha, hb = _half_plane(va), _half_plane(vb)
-    if ha != hb:
-        return ha - hb
-    cross = va[0] * vb[1] - va[1] * vb[0]
-    if cross:
-        return -1 if cross > 0 else 1
-    return (a[1] > b[1]) - (a[1] < b[1])
+def _arc(centre: Point, radius: int, first: Point, last: Point, depth: int) -> list[Point]:
+    """Points on the circle round ``centre`` strictly between two directions, finely enough."""
+    a = _add(centre, _scaled(first, radius))
+    b = _add(centre, _scaled(last, radius))
+    twice = _sub(_add(a, b), _add(centre, centre))
+    middle = _add(first, last)
+    if (
+        depth >= _CORNER_DEPTH
+        or middle == (0, 0)
+        or 2 * radius - math.isqrt(twice[0] * twice[0] + twice[1] * twice[1])
+        <= 2 * CORNER_TOLERANCE_MM
+    ):
+        return []
+    return [
+        *_arc(centre, radius, first, middle, depth + 1),
+        _add(centre, _scaled(middle, radius)),
+        *_arc(centre, radius, middle, last, depth + 1),
+    ]
+
+
+def _corner(kerb: _Kerb, follower: _Kerb) -> list[Point]:
+    """The footway points strictly between one curb's walk end and the next curb's walk start."""
+    end_along, p, incoming = kerb.walk_end()
+    start_along, q, outgoing = follower.walk_start()
+    start, finish = kerb.footway(end_along), follower.footway(start_along)
+    turn = incoming[0] * outgoing[1] - incoming[1] * outgoing[0]
+    if start == finish or turn == 0:
+        return []
+    radius = kerb.curb.corner_radius_mm
+    offset = (kerb.offset + follower.offset) // 2
+    footway_radius = radius - offset if turn > 0 else radius + offset
+    if radius == 0 or footway_radius <= 0:
+        # The footway is wider than the corner is round: its two lines meet at one point.
+        meeting = _meet(start, incoming, finish, outgoing)
+        return [] if meeting is None or meeting in (start, finish) else [meeting]
+    toward = _left(incoming) if turn > 0 else (incoming[1], -incoming[0])
+    centre = _add(p, _scaled(toward, radius))
+    return _arc(centre, footway_radius, _sub(p, centre), _sub(q, centre), 0)
+
+
+def _validated(records: Iterable[object]) -> list[Any]:
+    held = []
+    for record in records:
+        shape = CITY_SHAPES_BY_TYPE.get(type(record))
+        if shape is None:
+            raise ValueError(f"{type(record).__name__} is not a city grammar record")
+        shapes.validate_record(record, shape)
+        held.append(record)
+    return held
+
+
+def city_street_names(records: Iterable[object]) -> dict[str, dict[str, str]]:
+    """Each carried street's name key and text, by street identity: presentation for a label."""
+    return {
+        record.identity: {"name": record.name, "name_text": record.name_text}
+        for record in _validated(records)
+        if isinstance(record, StreetRecord)
+    }
+
+
+def place_from_city_documents(
+    *,
+    place_id: str,
+    documents: Sequence[TileDocument],
+    routine: RoutineModel,
+    catalogs: Sequence[Catalog],
+    input_seq: int = 1,
+) -> dict[str, Any]:
+    """Derive the place a set of one city's tile documents supports, each document checked first.
+
+    The place is what the tiles own. A halo record belongs to the tile that owns it, and a place
+    that needs it includes that tile.
+    """
+    if not documents:
+        raise ValueError("a city place needs at least one tile document")
+    owned: dict[str, Any] = {}
+    cities = set()
+    for document in documents:
+        validate_city_document(document, catalogs=catalogs)
+        for grammar in document.grammars:
+            cities.add(grammar.subject_identity)
+            for record in grammar.owned:
+                if record.identity in owned:  # type: ignore[attr-defined]
+                    raise ValueError(f"two tiles own record {record.identity}")  # type: ignore[attr-defined]
+                owned[record.identity] = record  # type: ignore[attr-defined]
+    if len(cities) != 1:
+        raise ValueError("a city place's tile documents all belong to one city")
+    return place_from_city_records(
+        place_id=place_id, records=list(owned.values()), routine=routine, input_seq=input_seq
+    )
 
 
 def place_from_city_records(
@@ -149,107 +304,152 @@ def place_from_city_records(
     routine: RoutineModel,
     input_seq: int = 1,
 ) -> dict[str, Any]:
-    """Derive the society place a generated city supports. Records are validated first."""
-    by_type: dict[type, list] = {kind: [] for kind in _VALIDATORS}
-    for record in records:
-        validator = _VALIDATORS.get(type(record))
-        if validator is None:
-            continue
-        validator(record)
-        by_type[type(record)].append(record)
-    street_nodes = {r.node_ordinal: r for r in by_type[StreetNodeRecord]}
-    segments = {r.segment_ordinal: r for r in sorted(by_type[StreetSegmentRecord], key=_ordinal)}
-    parcels = {r.parcel_ordinal: r for r in by_type[ParcelRecord]}
-    massing = {r.building_identity: r for r in by_type[MassingRecord]}
+    """Derive the place these city records support. Each record is held to its own shape first."""
+    by_type: dict[type, list[Any]] = {kind: [] for kind in READ_KINDS}
+    for record in _validated(records):
+        if type(record) in by_type:
+            by_type[type(record)].append(record)
+    segments = {r.identity: r for r in by_type[StreetSegmentRecord]}
     if not segments:
         raise ValueError("a city place needs street segments")
-    for segment in segments.values():
-        if segment.start_node not in street_nodes or segment.end_node not in street_nodes:
-            raise ValueError(f"segment {segment.segment_ordinal} names an unknown street node")
-    spacing = routine.policy["footway_station_spacing_mm"]
-    unsupported: set[str] = {
-        "premises entrances (access points project each parcel's centroid onto its frontage)",
-        "signal plans (no crossing record names one)",
-        "street names (no city record carries one)",
-    }
-    lines = {o: _Centreline(s.centreline_mm) for o, s in segments.items()}
-    offsets = {
-        o: s.carriageway_width_mm // 2 + s.gutter_width_mm + s.footway_width_mm // 2
-        for o, s in segments.items()
-    }
-    # Stations: (segment, side, along) -> named candidate point on that footway.
-    stations: dict[tuple[int, str], dict[int, str]] = {
-        (o, side): {} for o in segments for side in _SIDES
-    }
-    names: dict[str, Point] = {}
+    kerbs: dict[str, _Kerb] = {}
+    for curb in sorted(by_type[CurbEdgeRecord], key=lambda r: r.identity):
+        segment = segments.get(curb.segment_identity)
+        if segment is None:
+            raise ValueError(f"curb {curb.identity} stands on a segment outside the place")
+        kerbs[curb.identity] = _Kerb(curb, segment)
+    if not kerbs:
+        raise ValueError("a city place needs curb edges: every footway runs beside a kerb")
+    by_side = {(k.segment.identity, k.curb.side): k for k in kerbs.values()}
+    policy = routine.policy
+    spacing = policy["footway_station_spacing_mm"]
+    unsupported: set[str] = set()
 
-    def station(segment: int, side: str, along: int, name: str) -> str:
-        point = lines[segment].at(along, offsets[segment], side)
-        held = stations[(segment, side)].get(along)
-        if held is not None:
-            return held
-        stations[(segment, side)][along] = name
-        names[name] = point
+    positions: dict[str, Point] = {}
+    streets: dict[str, str | None] = {}
+    stations: dict[str, dict[int, str]] = {curb: {} for curb in kerbs}
+    joins: list[tuple[str, str, str]] = []
+
+    def station(kerb: _Kerb, along: int) -> str:
+        along = max(0, min(kerb.length, along))
+        held = stations[kerb.curb.identity].get(along)
+        if held is None:
+            held = f"footway:{kerb.key}:{along}"
+            stations[kerb.curb.identity][along] = held
+            positions[held] = kerb.footway(along)
+            streets[held] = kerb.segment.street_identity
+        return held
+
+    def node(name: str, point: Point, street: str | None) -> str:
+        positions[name] = point
+        streets[name] = street
         return name
 
-    for o, line in lines.items():
-        for side in _SIDES:
-            count = max(1, line.length // spacing)
-            for index in range(count + 1):
-                along = line.length * index // count
-                station(o, side, along, f"footway:{o}:{side}:{along}")
-    crossings = []
-    crossing_pairs = []
-    for o, segment in segments.items():
-        for offset in segment.crossing_offsets_mm:
-            if offset > lines[o].length:
-                unsupported.add(f"crossing beyond segment {o}'s centreline")
-                continue
-            left = station(o, "left", offset, f"footway:{o}:left:{offset}")
-            right = station(o, "right", offset, f"footway:{o}:right:{offset}")
-            crossing_pairs.append((f"crossing:{o}:{offset}", o, offset, left, right))
-    access: dict[int, str] = {}
-    for parcel in sorted(parcels.values(), key=lambda p: p.parcel_ordinal):
-        if parcel.frontage_segment_ordinal not in segments:
-            unsupported.add(f"parcel {parcel.parcel_ordinal} fronts an unknown segment")
+    for kerb in kerbs.values():
+        count = max(1, kerb.length // spacing)
+        for index in range(count + 1):
+            station(kerb, kerb.length * index // count)
+
+    outside = 0
+    for kerb in sorted(kerbs.values(), key=lambda k: k.key):
+        if not kerb.curb.next_curb_identity:
             continue
-        ring = parcel.boundary_mm
-        centroid = (
-            _round_div(sum(p[0] for p in ring), len(ring)),
-            _round_div(sum(p[1] for p in ring), len(ring)),
-        )
-        segment = parcel.frontage_segment_ordinal
-        along, side = lines[segment].project(centroid)
-        access[parcel.parcel_ordinal] = station(
-            segment, side, along, f"footway:{segment}:{side}:{along}"
-        )
-    furniture_nodes = []
-    for item in sorted(by_type[StreetFurnitureRecord], key=lambda r: r.item_ordinal):
-        use = routine.use_classes.get(item.item_class)
+        follower = kerbs.get(kerb.curb.next_curb_identity[0])
+        if follower is None:
+            outside += 1
+            continue
+        path = [station(kerb, kerb.walk_end()[0])]
+        for index, point in enumerate(_corner(kerb, follower), start=1):
+            path.append(node(f"corner:{kerb.key}:{index}", point, None))
+        path.append(station(follower, follower.walk_start()[0]))
+        joins.extend((a, b, "footway") for a, b in pairwise(path))
+    if outside:
+        unsupported.add(f"footway corners that continue outside the place ({outside})")
+
+    crossing_stops = []
+    outside = 0
+    for crossing in sorted(by_type[CrossingRecord], key=lambda r: r.identity):
+        ends = []
+        for x, y, _ in crossing.line_mm:
+            nearest = sorted(
+                (*kerb.project((x, y)), side)
+                for side in ("left", "right")
+                if (kerb := by_side.get((crossing.segment_identity, side))) is not None
+            )
+            ends.append(nearest[0] if nearest else None)
+        if None in ends or ends[0][2] == ends[1][2]:  # type: ignore[index]
+            outside += 1
+            continue
+        stops = [
+            station(by_side[(crossing.segment_identity, side)], along)
+            for _, along, side in ends  # type: ignore[misc]
+        ]
+        crossing_stops.append((crossing, stops[0], stops[1]))
+    if outside:
+        unsupported.add(f"crossings that do not join two footways in the place ({outside})")
+
+    entrances = {r.identity: r for r in by_type[EntranceRecord]}
+    lot_doors = sum(1 for r in entrances.values() if not r.approach_curb_identity)
+    if lot_doors:
+        unsupported.add(f"entrances onto a lot, not a footway ({lot_doors})")
+    doors: dict[str, tuple[str, int]] = {}
+    access: dict[str, tuple[str, int]] = {}
+    unknown_uses: dict[str, int] = {}
+    premises_units = sorted(by_type[PremisesRecord], key=lambda r: r.identity)
+    for premises in premises_units:
+        use = routine.use_classes.get(premises.use_class)
+        if use is None or use.kind == "furniture":
+            unknown_uses[premises.use_class] = unknown_uses.get(premises.use_class, 0) + 1
+            continue
+        for identity in premises.entrance_identities:
+            entrance = entrances.get(identity)
+            kerb = (
+                kerbs.get(entrance.approach_curb_identity[0])
+                if entrance is not None and entrance.approach_curb_identity
+                else None
+            )
+            if entrance is None or kerb is None:
+                continue
+            if identity not in doors:
+                threshold = (entrance.threshold_x_mm, entrance.threshold_y_mm)
+                name = node(f"entrance:{identity}", threshold, kerb.segment.street_identity)
+                joins.append((station(kerb, kerb.project(threshold)[1]), name, "premises_access"))
+                doors[identity] = (name, kerb.segment.segment_ordinal)
+            access[premises.identity] = doors[identity]
+            break
+        else:
+            unsupported.add(
+                f"premises {premises.identity} has no entrance onto a footway in the place"
+            )
+    for key, count in sorted(unknown_uses.items()):
+        unsupported.add(f"premises use class {key} ({count} units) has no routine mapping")
+
+    benches = []
+    for item in sorted(by_type[StreetFurnitureRecord], key=lambda r: r.identity):
+        use = routine.use_classes.get(item.furniture_class)
         if use is None or use.kind != "furniture":
             continue
-        if item.segment_ordinal not in segments:
-            unsupported.add(f"street furniture {item.item_ordinal} names an unknown segment")
+        kerb = kerbs.get(item.curb_identity)
+        if kerb is None:
+            unsupported.add(f"street furniture {item.identity} stands beside no curb in the place")
             continue
-        segment = item.segment_ordinal
-        link = station(
-            segment,
-            item.side,
-            item.along_mm,
-            f"footway:{segment}:{item.side}:{item.along_mm}",
-        )
-        furniture_nodes.append((item, use, link))
+        point = (item.x_mm, item.y_mm)
+        name = node(f"furniture:{item.identity}", point, kerb.segment.street_identity)
+        joins.append((station(kerb, kerb.project(point)[1]), name, "furniture_access"))
+        benches.append((item, use, name, kerb))
 
+    for chain in stations.values():
+        joins.extend((chain[a], chain[b], "footway") for a, b in pairwise(sorted(chain)))
     # One node per distinct position; the lexicographically first name wins.
     canonical: dict[Point, str] = {}
-    for name in sorted(names):
-        canonical.setdefault(names[name], name)
-    alias = {name: canonical[point] for name, point in names.items()}
-    nodes = {alias[name]: names[name] for name in names}
-    edges: dict[frozenset, dict] = {}
+    for name in sorted(positions):
+        canonical.setdefault(positions[name], name)
+    alias = {name: canonical[point] for name, point in positions.items()}
+    nodes = {name: point for point, name in canonical.items()}
+    edges: dict[frozenset[str], dict[str, Any]] = {}
 
     def connect(a: str, b: str, kind: str) -> str | None:
-        a, b = alias.get(a, a), alias.get(b, b)
+        a, b = alias[a], alias[b]
         if a == b:
             return None
         key = frozenset((a, b))
@@ -266,82 +466,66 @@ def place_from_city_records(
             edges[key]["kind"] = "crossing"
         return edges[key]["edge_id"]
 
-    for chain in stations.values():
-        ordered = [chain[along] for along in sorted(chain)]
-        for a, b in pairwise(ordered):
-            connect(a, b, "footway")
-    for crossing_id, o, offset, left, right in crossing_pairs:
-        edge_id = connect(left, right, "crossing")
-        if edge_id is not None:
-            crossings.append(
-                {
-                    "crossing_id": crossing_id,
-                    "edge_id": edge_id,
-                    "street_segment_ordinal": o,
-                    "offset_mm": offset,
-                    "signal_id": None,
-                }
-            )
-    for ordinal in sorted(street_nodes):
-        ends = []
-        for o, segment in segments.items():
-            line = lines[o]
-            if segment.start_node == ordinal:
-                first, second = line.points[0], line.points[1]
-                ends.append(((second[0] - first[0], second[1] - first[1]), o, 0, False))
-            if segment.end_node == ordinal:
-                last, before = line.points[-1], line.points[-2]
-                ends.append(((before[0] - last[0], before[1] - last[1]), o, line.length, True))
-        if len(ends) < 2:
+    for a, b, kind in joins:
+        connect(a, b, kind)
+    crossings = []
+    for crossing, a, b in crossing_stops:
+        edge_id = connect(a, b, "crossing")
+        if edge_id is None or any(c["edge_id"] == edge_id for c in crossings):
+            unsupported.add(f"crossing {crossing.identity} shares its footway points with another")
             continue
-        ends.sort(key=cmp_to_key(_angular))
-        for index, (_, o, along, reversed_) in enumerate(ends):
-            _, o2, along2, reversed2 = ends[(index + 1) % len(ends)]
-            outward_left = stations[(o, "right" if reversed_ else "left")][along]
-            next_right = stations[(o2, "left" if reversed2 else "right")][along2]
-            connect(outward_left, next_right, "footway")
-    spot_positions: dict[Point, str] = {}
-    spots: dict[str, dict] = {}
+        crossings.append(
+            {
+                "crossing_id": crossing.identity,
+                "edge_id": edge_id,
+                "street_segment_ordinal": segments[crossing.segment_identity].segment_ordinal,
+                "offset_mm": crossing.offset_mm,
+                "signal_id": crossing.signal_identity[0] if crossing.signal_identity else None,
+            }
+        )
+
+    radius = policy["standing_radius_mm"]
+    spots: dict[str, dict[str, Any]] = {}
+    standing: dict[Point, list[Point]] = {}
+
+    def keeps_apart(point: Point, apart: int) -> bool:
+        """No standing spot within ``apart`` millimetres (1 means only the same point)."""
+        cell = (point[0] // (2 * radius), point[1] // (2 * radius))
+        return all(
+            ceil_distance(point, held) >= apart
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for held in standing.get((cell[0] + dx, cell[1] + dy), ())
+        )
+
+    def stand(point: Point) -> None:
+        standing.setdefault((point[0] // (2 * radius), point[1] // (2 * radius)), []).append(point)
+
     destinations = []
-    for item, use, link in furniture_nodes:
-        name = f"furniture:{item.item_ordinal}"
-        if (item.x_mm, item.y_mm) in canonical or name in nodes:
-            unsupported.add(f"street furniture {item.item_ordinal} sits on a footway station")
+    for item, use, name, kerb in benches:
+        if alias[name] != name:
+            unsupported.add(f"street furniture {item.identity} stands on a footway station")
             continue
-        nodes[name] = (item.x_mm, item.y_mm)
-        canonical[(item.x_mm, item.y_mm)] = name
-        connect(link, name, "furniture_access")
-        line = lines[item.segment_ordinal]
-        a, b = line.pieces[0][2], line.pieces[0][3]
-        for start, length, pa, pb in line.pieces:
-            if item.along_mm <= start + length:
-                a, b = pa, pb
-                break
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        length = math.isqrt(dx * dx + dy * dy)
+        across = _left((item.facing_dx_mm, item.facing_dy_mm))
         seats = []
-        count = use.visitor_capacity
-        for seat in range(count):
-            shift = (2 * seat - (count - 1)) * routine.policy["standing_spacing_mm"]
-            point = (
-                item.x_mm + _round_div(dx * shift, 2 * length),
-                item.y_mm + _round_div(dy * shift, 2 * length),
-            )
-            if point in spot_positions:
+        for seat in range(use.visitor_capacity):
+            step = (2 * seat - (use.visitor_capacity - 1)) * policy["standing_spacing_mm"]
+            point = _add((item.x_mm, item.y_mm), _scaled(across, _round_div(step, 2)))
+            if not keeps_apart(point, 1):
                 continue
             spot_id = f"{name}:seat:{seat}"
-            spot_positions[point] = spot_id
             spots[spot_id] = {
                 "spot_id": spot_id,
                 "node_id": name,
                 "position_mm": list(point),
                 "destination_ids": [name],
             }
+            stand(point)
             seats.append(spot_id)
         destinations.append(
             {
                 "destination_id": name,
-                "subject_id": f"city.street_furniture:{item.item_ordinal}",
+                "subject_id": f"city.street_furniture:{item.identity}",
                 "node_id": name,
                 "origin": "furniture",
                 "object_id": None,
@@ -354,48 +538,42 @@ def place_from_city_records(
                 "use_class": use.key,
                 "label": use.label,
                 "address_number": None,
-                "street_segment_ordinal": item.segment_ordinal,
+                "street_segment_ordinal": kerb.segment.segment_ordinal,
                 "staff_capacity": 0,
                 "resident_capacity": 0,
                 "role": None,
                 "shift": None,
             }
         )
-    radius = routine.policy["standing_radius_mm"]
-    clearance = min(s.footway_width_mm // 2 for s in segments.values())
+    clearance = min(k.curb.footway_width_mm // 2 for k in kerbs.values())
     if clearance >= radius:
-        for name, point in sorted(nodes.items()):
-            if name.startswith("footway:") and point not in spot_positions:
-                spot_positions[point] = name
+        for name in sorted(nodes):
+            point = nodes[name]
+            if name.startswith("footway:") and keeps_apart(point, 2 * radius):
                 spots[name] = {
                     "spot_id": name,
                     "node_id": name,
                     "position_mm": list(point),
                     "destination_ids": [],
                 }
+                stand(point)
     else:
         unsupported.add("standing spots (footways are narrower than two standing radii)")
-    unknown_uses: dict[str, int] = {}
-    for premises in sorted(
-        by_type[PremisesRecord], key=lambda r: (r.building_identity, r.unit_ordinal)
-    ):
-        use = routine.use_classes.get(premises.use_class)
+
+    massing = {r.identity: r for r in by_type[MassingRecord]}
+    parcels = {r.identity: r for r in by_type[ParcelRecord]}
+    for premises in premises_units:
+        if premises.identity not in access:
+            continue
+        use = routine.use_classes[premises.use_class]
+        door_node, frontage = access[premises.identity]
         building = massing.get(premises.building_identity)
-        parcel = parcels.get(building.parcel_ordinal) if building else None
-        if use is None or use.kind == "furniture":
-            unknown_uses[premises.use_class] = unknown_uses.get(premises.use_class, 0) + 1
-            continue
-        if parcel is None or parcel.parcel_ordinal not in access:
-            unsupported.add(
-                f"premises of building {premises.building_identity} with no parcel frontage"
-            )
-            continue
-        destination_id = f"premises:{premises.building_identity}:{premises.unit_ordinal}"
+        parcel = parcels.get(building.parcel_identity) if building is not None else None
         destinations.append(
             {
-                "destination_id": destination_id,
-                "subject_id": f"city.premises:{premises.building_identity}:{premises.unit_ordinal}",
-                "node_id": alias[access[parcel.parcel_ordinal]],
+                "destination_id": f"premises:{premises.identity}",
+                "subject_id": f"city.premises:{premises.identity}",
+                "node_id": alias[door_node],
                 "origin": "premises",
                 "object_id": None,
                 "affordances": sorted(use.visitor_affordances),
@@ -406,8 +584,8 @@ def place_from_city_records(
                 "spot_ids": [],
                 "use_class": use.key,
                 "label": use.label,
-                "address_number": parcel.address_number,
-                "street_segment_ordinal": parcel.frontage_segment_ordinal,
+                "address_number": parcel.address_number if parcel is not None else None,
+                "street_segment_ordinal": frontage,
                 "staff_capacity": use.staff_per_unit,
                 "resident_capacity": use.resident_capacity,
                 "role": {"key": use.role_key, "label": use.role_label},
@@ -416,13 +594,11 @@ def place_from_city_records(
                 else None,
             }
         )
-    for key, count in sorted(unknown_uses.items()):
-        unsupported.add(f"premises use class {key} ({count} units) has no routine mapping")
-    # The record set's digest is independent of the order records were handed over.
+    # The input digest covers exactly the records read, whatever order they were handed over in.
     records_digest = sha256_of_canonical(
         sorted(
             [type(r).RECORD_KIND, canonical_record(r).decode("utf-8")]
-            for kind in _VALIDATORS
+            for kind in READ_KINDS
             for r in by_type[kind]
         )
     ).hex()
@@ -437,15 +613,11 @@ def place_from_city_records(
             "input_seq": input_seq,
             "document_sha256": records_digest,
         },
-        "frame": {
-            "name": "city-grammar-mm",
-            "axis_order": ["x", "y"],
-            "horizontal_unit": "millimetre",
-        },
+        "frame": {"name": "city_local", "axis_order": ["x", "y"], "horizontal_unit": "millimetre"},
         "routine_sha256": routine.sha256,
         "clearance_mm": clearance,
         "nodes": [
-            {"node_id": name, "position_mm": list(point), "street_id": _street(name)}
+            {"node_id": name, "position_mm": list(point), "street_id": streets[name]}
             for name, point in sorted(nodes.items())
         ],
         "edges": sorted(edges.values(), key=lambda e: e["edge_id"]),
@@ -458,13 +630,3 @@ def place_from_city_records(
         "unavailable_reason": None,
     }
     return seal_place(place)
-
-
-def _ordinal(record: StreetSegmentRecord) -> int:
-    return record.segment_ordinal
-
-
-def _street(name: str) -> str | None:
-    if name.startswith("footway:"):
-        return f"segment:{name.split(':')[1]}"
-    return None
