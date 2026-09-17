@@ -831,9 +831,10 @@ STAGES: Final[dict[str, StageSpec]] = {
             "container": "owd/3",
             # The tessellator's source version: its expanders, its statements of what a record
             # kind waits on, and its fixed tessellation choices, such as a terrain cell's diagonal,
-            # how terrain yields to the ground a drawn record takes, and how support is carved clear
-            # of what the grammar's navigation table says obstructs a walking capsule.
-            "tessellator": 5,
+            # how terrain yields to the ground a drawn record takes, how a building's own faces
+            # follow from its tiers and its roof, and how support is carved clear of what the
+            # grammar's navigation table says obstructs a walking capsule.
+            "tessellator": 6,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
             "triangle_digest": "exulanica.owd-triangle-digest/v3",
             # The document the bake reads, whose envelope the city grammar owns.

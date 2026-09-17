@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 5, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 6, digest profile v3. */
 const GOLDEN = {
-  render_batch: '00d9a4d792cb2a7eb414268ecc9a25e4ec935ca65910144c78b0d9f5c3642ac9',
-  nav_envelope: '302a247b9372f6e2968b4f8c981dd30ff96a39178c800ce6eec64f9838eb25e2',
+  render_batch: 'e691171e27caa0e6018e3901798afc5ec9b226d6290988f63e38463b5268d341',
+  nav_envelope: '8a9264cee81d29369e8597e7b0afb9653a861d0668419b05de432230e72c18bc',
 } as const;
 
 afterEach(() => {
@@ -151,18 +151,34 @@ describe('the triangle digest of the conformance fixture', () => {
     });
     const terrain = header.records.findIndex((record) => record.kind === 'city.terrain');
 
-    // The terrain patch is drawn less the carriageways and gutters the three segments draw, and says
-    // no material dresses it: the grammar admits none. Every other surface waits on a rule.
+    // The terrain patch is drawn less the carriageways and gutters the three segments draw and less
+    // the ground the building stands on, and says no material dresses it: the grammar admits none.
+    // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(4);
+    expect(count(render, 'drawn')).toBe(5);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      vertex_count: 483,
-      triangle_count: 572,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 572 }],
+      vertex_count: 520,
+      triangle_count: 586,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 586 }],
     });
+    // The building draws, so the ground it stands on is the building's and not the terrain's: its
+    // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
+    const building = renderBatch!.header.entries[header.records.findIndex((record) => record.kind === 'city.massing')]!;
+    expect(building).toMatchObject({ state: 'drawn', vertex_count: 125, triangle_count: 65 });
+    if (building.state !== 'drawn') throw new Error('the building is not drawn');
+    // Each of the three is dressed by the material record that names the building and that role.
+    expect(building.surfaces!.map((surface) => [surface.role, surface.orientation, surface.material.state])).toEqual([
+      ['wall', 'vertical', 'record'],
+      ['roof', 'horizontal', 'record'],
+      ['parapet', 'vertical', 'record'],
+    ]);
+    for (const surface of building.surfaces!) {
+      if (surface.material.state !== 'record') throw new Error('a building surface cites no record');
+      expect(header.records[surface.material.record]!.fields.role).toBe(surface.role);
+    }
     // Yielding to the streets cuts the met cells into more triangles than the grid's 16 by 16.
     expect(drawnTerrain.state === 'drawn' && drawnTerrain.triangle_count).toBeGreaterThan(16 * 16 * 2);
     // Each segment draws a carriageway and a gutter, each dressed by its own material record.

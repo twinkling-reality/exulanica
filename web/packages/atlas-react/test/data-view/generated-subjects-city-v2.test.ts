@@ -101,13 +101,14 @@ function expectToday(outcomes: readonly Outcome[]): void {
   const street = ['carriageway:record', 'gutter:record'];
   expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded, outcome.surfaces]))
     .toEqual([
+      ['city.massing', true, ['wall:record', 'roof:record', 'parapet:record']],
       ['city.street_segment', true, street],
       ['city.street_segment', true, street],
       ['city.street_segment', true, street],
       ['city.terrain', true, ['terrain:none-exists']],
     ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(64);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(63);
   // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
   // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
   // no points, exactly like every other spatial record this bake does not draw.

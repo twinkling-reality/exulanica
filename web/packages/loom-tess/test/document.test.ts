@@ -170,7 +170,10 @@ describe('the bake', () => {
   it('states terrain that something covers everywhere as unavailable rather than drawing under it', async () => {
     // A building standing on the whole tile: its base ring obstructs, so a capsule fits nowhere.
     const covered = broken((d) => {
-      first(d, 'city.massing').tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
+      const massing = first(d, 'city.massing');
+      massing.tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
+      massing.tiers[1].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
+      Object.assign(massing.extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
     });
     expect(await terrainEntry(covered, 1)).toMatchObject({ state: 'unavailable', needs: ['ground_coverage'] });
   });

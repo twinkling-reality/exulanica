@@ -506,12 +506,20 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     render, nav = header["projections"]
     terrain = next(i for i, r in enumerate(header["records"]) if r["kind"] == "city.terrain")
     # Terrain is undressed but exact, and says that no material record dresses it. It is drawn less
-    # the carriageways and gutters the segments draw, so it has more triangles than the grid's
-    # cells, and the drawn entries are the three segments and the terrain.
+    # the carriageways and gutters the segments draw and less the ground the building stands on, so
+    # it has more triangles than the grid's cells; the drawn entries are the building, the three
+    # segments and the terrain.
     segments = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.street_segment"]
+    massings = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.massing"]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*segments, terrain]
+        [*massings, *segments, terrain]
     )
+    for entry in (render["entries"][i] for i in massings):
+        assert [(s["role"], s["orientation"]) for s in entry["surfaces"]] == [
+            ("wall", "vertical"),
+            ("roof", "horizontal"),
+            ("parapet", "vertical"),
+        ]
     [surface] = render["entries"][terrain]["surfaces"]
     assert (surface["role"], surface["orientation"]) == ("terrain", "horizontal")
     assert surface["material"] == {"state": "none-exists"}

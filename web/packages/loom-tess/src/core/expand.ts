@@ -12,9 +12,10 @@
  * what every surface needs: footprints, tiers, elevations, facade layouts, kerb lines, crossing
  * widths, form parts with facing vectors and identities. What is missing is on this side: the
  * integer rules that expand them, each declared and versioned here as it is built. This version
- * builds the terrain grid and a street segment's carriageway and gutters (`streets.ts`), and in
- * the navigation projection carves both clear of what the grammar's navigation table says
- * obstructs a walking capsule; everything else states the rule it waits on (`NEEDS`).
+ * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`) and a
+ * building's own walls, roofs and parapets (`massing.ts`), and in the navigation projection carves
+ * the ground clear of what the grammar's navigation table says obstructs a walking capsule;
+ * everything else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -23,6 +24,8 @@
  */
 import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
 import type { Plan, Space } from './integer-math.js';
+import { massingPieces } from './massing.js';
+import type { MassingFields } from './massing.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
@@ -37,7 +40,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 5;
+export const TESSELLATOR_SOURCE_VERSION = 6;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -122,8 +125,6 @@ export const NEEDS = {
   ground_coverage: 'ground_coverage',
   /** Horizontal faces from a ring: a lot, a block, a tree pit. */
   ring_triangulation: 'ring_triangulation',
-  /** A building's own faces: roofs from tier rings with light wells as holes, parapets, well walls, gables. */
-  massing_faces: 'massing_faces',
   /** A facade's faces: its bays, panels, openings, mouldings, awnings and entrances. */
   facade_layout: 'facade_layout',
   /** A centreline or kerb line of more than one piece, or a kerb line not running with its centreline. */
@@ -439,6 +440,13 @@ function renderSegment(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces: result.pieces };
 }
 
+/** A building's own walls, roofs, terraces and parapets, by the massing rule (`massing.ts`). */
+function renderMassing(fields: Fields): Expansion {
+  const pieces = massingPieces(fields as unknown as MassingFields, `city.massing ${fields.identity as string}`);
+  if (pieces.length === 0) throw new TessellationError('a massing with no tier, which its grammar refuses');
+  return { state: 'drawn', pieces };
+}
+
 /**
  * A segment's carriageway and gutters are ground a person walks on, which is what the navigation
  * table's `support` says: the same surfaces the render path draws, the horizontal ones, carved.
@@ -484,7 +492,12 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   // A lane is a path on its segment's carriageway, and draws as that carriageway.
   ['city.lane', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.lane_connection', { render_batch: notInProjection, nav_envelope: notInProjection }],
-  ['city.massing', { render_batch: needs(NEEDS.massing_faces), nav_envelope: needs(NEEDS.massing_faces) }],
+  // A building stands nobody on itself and covers the ground it stands on, which the navigation
+  // table states as ground `cover`: it is no surface of the navigation projection at all.
+  ['city.massing', {
+    render_batch: { rule: 'expand', expand: (fields: Fields): Expansion => renderMassing(fields), readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
   ['city.parcel', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
   // A space on a carriageway or a footway draws as that surface; its bay lines are markings.
   ['city.parking_space', { render_batch: notInProjection, nav_envelope: notInProjection }],

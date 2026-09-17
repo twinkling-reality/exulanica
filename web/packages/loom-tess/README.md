@@ -113,12 +113,20 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Terrain, and a street segment's carriageway and gutters.
+Terrain, a street segment's carriageway and gutters, and a building's own walls, roofs and parapets.
 
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
-  yield rule below. Nothing drawn covers the ground yet, so today that is the whole patch. No
-  published texture set dresses terrain, so its one surface (role `terrain`, horizontal) states
-  `none-exists`.
+  yield rule below: the segments' carriageways and gutters, and the ground a drawn building stands
+  on. No published texture set dresses terrain, so its one surface (role `terrain`, horizontal)
+  states `none-exists`.
+- A building draws its own faces by the massing rule (`src/core/massing.ts`): a wall along every
+  tier ring edge between the storeys that tier covers, a roof on the top tier and a terrace on each
+  tier the one above is set back from, a wall round every light well, a parapet where a deck meets
+  the open air, and, where the roof form is a ridge, two planes up to the stated ridge with a gable
+  on each of the two edges it runs between. A facade is laid out on a tier edge and will cover part
+  of it: until a facade DRAWS, the building's own wall stands there, and when the facade rule lands
+  the wall yields to the facade surfaces that are drawn, by the same rule terrain yields by. Nothing
+  is drawn twice in one place at any point.
 - A street segment draws its carriageway and its gutters by the street rules
   (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
   horizontal surface dressed by the material record for its role. Terrain yields to both. A segment
@@ -136,10 +144,18 @@ Terrain, and a street segment's carriageway and gutters.
   ground from anybody else: a record that obstructs nothing removes no support, and none removes
   anything from what is drawn.
 
+  WHAT THE LOW PART READING COSTS, measured on the corridor lane's generated street, tile (2, 0),
+  on 2026-09-17: of that tile's 16,384 m2, buildings take 9,542 m2, the capsule radius round their
+  base rings 252 m2, trees and furniture 1,408 m2 as their stated extents and 258 m2 as the radius
+  round those, leaving 4,893 m2 of support. The 1,408 is the conservatism: a street tree's stated
+  extent is its six metre canopy while its trunk is 0.3 m across, so each tree takes about 45 m2 of
+  footway it does not occupy. Reading an object's parts gives most of that back, and none of the
+  258. It is never room claimed that is not there, which is the direction to be wrong in.
+
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `bent_street`, `street_curbs`,
-`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes` or `form_parts`.
-Relations, occupancies,
+`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes` or `form_parts`. Relations,
+occupancies,
 lanes, nodes and dressings are not surfaces of their own, and say so.
 
 Every vertex of a drawn range must lie inside the extent its record states, or the tile is
@@ -232,8 +248,17 @@ by the expander that needs it, with a new tessellator version.
   how a carved surface stays within the extent its record states. Which kinds are support and which
   obstruct is for the city descriptor to state per kind; the rule takes the pieces it is given.
 
-`test/geometry-blocks.test.ts`, `test/streets.test.ts`, `test/support-carve.test.ts` and
-`test/ring-clearance.test.ts` hold each to its stated properties and pin outputs.
+- `src/core/massing.ts` has the massing rule: a building's walls, roofs, terraces, well walls,
+  parapets and ridge, from its tiers and its stated roof. A tier's roof is its ring less the ring
+  standing on it, taken by the shared carve, so a terrace is what is exactly left of the tier and
+  not an offset read off the setback; a convex ring is carved whole, which loses nothing, and a ring
+  that turns in is cut into triangles first and rounds to the lattice by under a millimetre. A
+  parapet's length is worked out as intervals along each ring edge, so it stands where the deck
+  meets the air and nowhere the tier above stands.
+
+`test/geometry-blocks.test.ts`, `test/streets.test.ts`, `test/massing.test.ts`,
+`test/support-carve.test.ts` and `test/ring-clearance.test.ts` hold each to its stated properties
+and pin outputs.
 
 ## The triangle digest
 
