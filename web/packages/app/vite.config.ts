@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -221,6 +221,8 @@ export default defineConfig({
   build: { target: 'es2022' },
   plugins: [societyRecordingPlugin(resolve(APP_ROOT, '../../..')), previewApi],
   server: {
+    // The workspace, plus the committed character containers the development preview fetches.
+    fs: { allow: [searchForWorkspaceRoot(APP_ROOT), resolve(APP_ROOT, '../../../assets/characters')] },
     proxy: {
       '/__character': { target: process.env['EXULANICA_CHARACTER_BUILDER_URL'] ?? 'http://127.0.0.1:5196', rewrite: path => path.replace(/^\/__character/, '') },
       '/api': {

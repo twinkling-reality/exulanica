@@ -1,12 +1,31 @@
 import { createLatestCharacterPreview } from '../ui/latest-character-preview.js';
 import type { BodyFamily, BodyRecipe } from '../ui/character-body.js';
-import { CharacterPreview, FirstPersonGesture, type AtlasBinding, type NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
-import { characterByteLoader, loadPreviewCharacterCatalog, previewInhabitantSelection, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
+import { CharacterCrowdEvaluation, CharacterPreview, FirstPersonGesture, type AtlasBinding, type CharacterByteLoader, type NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
+import { characterByteLoader, parseCharacterLooks, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
 import { buildCharacterStudio } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
 const PLAYER = { kind: 'player', playerId: 'local-viewer' } as const;
+
+/**
+ * How many people the development crowd evaluation places beside the player, from `?crowd=N`.
+ * Zero unless the page is the development preview and N is a whole number from 1 to 128.
+ */
+export function previewCrowdSize(search: string, preview: boolean): number {
+  if (!preview) return 0;
+  const value = new URLSearchParams(search).get('crowd');
+  if (value === null || !/^[1-9][0-9]{0,2}$/.test(value)) return 0;
+  const count = Number(value);
+  return count <= 128 ? count : 0;
+}
+
+/** Development containers exist only in a development build; production has no such module. */
+function previewSources(): Promise<typeof import('../dev/character-sources.js')> {
+  return import.meta.env.DEV
+    ? import('../dev/character-sources.js')
+    : Promise.reject(new Error('Character examples are available only on the development preview.'));
+}
 
 export function mountCharacter(deps: { env: AppEnvironment; state: SessionState; onClose(): void }) {
   const { env, state } = deps;
@@ -20,7 +39,14 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
   }
   let failedBodyRecipe: BodyRecipe | null = null;
   let bodyFamily: BodyFamily | null = null;
-  const loadCharacterBytes: ReturnType<typeof characterByteLoader> = (reference, signal) => characterByteLoader([...catalog, ...generatedLooks.values()])(reference, signal);
+  // Committed containers by digest, filled from the development sources on the preview route.
+  const previewFiles = new Map<string, string>();
+  let previewLoader: CharacterByteLoader | null = null;
+  let crowd: CharacterCrowdEvaluation | null = null;
+  const loadCharacterBytes: CharacterByteLoader = (reference, signal) =>
+    previewLoader !== null && previewFiles.has(reference.contentSha256)
+      ? previewLoader(reference, signal)
+      : characterByteLoader([...generatedLooks.values()])(reference, signal);
   let catalogPromise: Promise<readonly CharacterLook[]> | null = null;
   let preview: CharacterPreview | null = null;
   let previewPromise: Promise<CharacterPreview> | null = null;
@@ -113,7 +139,14 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
   }
   async function ensureCatalog(): Promise<readonly CharacterLook[]> {
     if (!env.preview) throw new Error('Character customization is not connected to this workspace yet.');
-    catalogPromise ??= loadPreviewCharacterCatalog(lifetime.signal).catch(error => { catalogPromise = null; throw error; });
+    catalogPromise ??= previewSources()
+      .then(async sources => {
+        const { looks, files } = await sources.developmentStylizedLooks(lifetime.signal);
+        for (const [digest, file] of files) previewFiles.set(digest, file);
+        previewLoader ??= sources.developmentCharacterLoader(previewFiles);
+        return parseCharacterLooks(looks);
+      })
+      .catch(error => { catalogPromise = null; throw error; });
     if (!catalog.length) catalog = await catalogPromise;
     const retained = state.characterGeneratedLook;
     if (retained && state.characterSelection?.lookId === retained.lookId &&
@@ -227,25 +260,22 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     async attach(atlas: AtlasBinding): Promise<void> {
       unsubscribeResidents?.();
       unsubscribeResidents = null;
+      crowd?.destroy();
+      crowd = null;
       binding = atlas;
       if (!env.preview) return;
       try {
+        // Catalog people need only the byte loader, never the stylized look list: register it
+        // first, so a look list that cannot be read never leaves people as placeholders.
+        const sources = await previewSources();
+        if (disposed) return;
+        for (const [digest, file] of sources.catalogCharacterFiles()) previewFiles.set(digest, file);
+        previewLoader ??= sources.developmentCharacterLoader(previewFiles);
+        native = atlas.enableNativeCharacters(loadCharacterBytes);
+        const crowdSize = previewCrowdSize(window.location.search, env.preview);
+        if (crowdSize > 0) crowd = CharacterCrowdEvaluation.mount(atlas, { count: crowdSize, nearBudget: 24 });
         await ensureCatalog();
         if (disposed) return;
-        native = atlas.enableNativeCharacters(loadCharacterBytes);
-        const residentRuntime = native;
-        unsubscribeResidents = native.subscribeResidents(subjects => {
-          if (disposed || binding !== atlas) return;
-          for (const subject of subjects) {
-            if (residentRuntime.inspect(subject)?.status !== 'abstract') continue;
-            const selection = previewInhabitantSelection(catalog, subject);
-            const look = catalog.find(item => item.lookId === selection?.lookId);
-            if (!selection || !look) continue;
-            void residentRuntime.install(subject, look.descriptor, selection.appearance,
-              () => ({ presence: !disposed && binding === atlas ? 'allowed' : 'denied', source: 'available' }))
-              .catch(() => { /* The runtime retains the failure and displays its explicit fallback. */ });
-          }
-        });
         // Ensure the existing player presentation exists without changing the active camera.
         atlas.setCameraMode(atlas.cameraMode);
         for (let frame = 0; frame < 60 && !native.inspect(PLAYER); frame++) {
@@ -261,6 +291,6 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         if (!disposed) view.setFailure(error instanceof Error ? error.message : 'Character looks are unavailable.');
       }
     },
-    dispose() { disposed = true; bodyUpdates.dispose(); unsubscribeResidents?.(); lifetime.abort(); previewRevision++; gestureRevision++; preview?.destroy(); gesture?.destroy(); },
+    dispose() { disposed = true; bodyUpdates.dispose(); unsubscribeResidents?.(); crowd?.destroy(); lifetime.abort(); previewRevision++; gestureRevision++; preview?.destroy(); gesture?.destroy(); },
   };
 }

@@ -22,11 +22,8 @@ export interface CharacterSelection {
   readonly appearance: NativeCharacterAppearance;
 }
 
-/** Only the development preview supplies this catalogue; no production permission is inferred. */
-export async function loadPreviewCharacterCatalog(signal: AbortSignal): Promise<readonly CharacterLook[]> {
-  const response = await fetch('/fixtures/characters/catalog.json', { signal });
-  if (!response.ok) throw new Error('Character examples are unavailable. Reload to try again.');
-  const catalog: unknown = await response.json();
+/** Validate a stylized look list; only the development preview supplies one today. */
+export function parseCharacterLooks(catalog: unknown): readonly CharacterLook[] {
   if (!Array.isArray(catalog) || catalog.length === 0) throw new Error('No character looks are available.');
   const ids = new Set<string>();
   for (const item of catalog as CharacterLook[]) {
@@ -79,13 +76,12 @@ export function previewInhabitantSelection(
   return { lookId: look.lookId, appearance: { colors } };
 }
 
-export function characterByteLoader(catalog: readonly CharacterLook[]): CharacterByteLoader {
+/** Bodies the development character builder generated for an edited recipe. */
+export function characterByteLoader(generated: readonly CharacterLook[]): CharacterByteLoader {
   return async (reference, signal) => {
-    const look = catalog.find(item => item.descriptor.asset.contentSha256 === reference.contentSha256);
-    const gesture = catalog.find(item => item.gesture?.descriptor.character.asset.contentSha256 === reference.contentSha256)?.gesture;
-    const file = look?.file ?? gesture?.file;
-    if (!file) throw new Error('That character is outside the available catalogue.');
-    const response = await fetch(look?.generated ? `/__character/assets/${file}` : `/fixtures/characters/${file}`, { signal });
+    const look = generated.find(item => item.generated && item.descriptor.asset.contentSha256 === reference.contentSha256);
+    if (!look) throw new Error('That character is outside the available catalogue.');
+    const response = await fetch(`/__character/assets/${look.file}`, { signal });
     if (!response.ok) throw new Error('This character could not be loaded. Choose another look or try again.');
     return response.arrayBuffer(); // The shared renderer verifies exact size and SHA-256 before decoding.
   };
