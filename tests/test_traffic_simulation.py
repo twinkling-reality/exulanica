@@ -16,6 +16,7 @@ this process and in a new one under another hash seed.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import os
 import subprocess
@@ -29,8 +30,9 @@ from pathlib import Path
 
 import pytest
 from exulanica.canonical import canonical_json
-from exulanica.traffic import provisional_records as rec
+from exulanica.grammar.grammars.city.roads import LaneConnectionRecord, LaneRecord, SignalRecord
 from exulanica.traffic.checks import TransitionChecker
+from exulanica.traffic.city_roads import road_input_from_city
 from exulanica.traffic.errors import InvalidTrafficInputError, InvalidTrafficStateError
 from exulanica.traffic.inputs import (
     LOOKAHEAD_S,
@@ -52,7 +54,7 @@ from exulanica.traffic.simulation import (
     vehicle_id,
 )
 
-from traffic_network_fixture import SCOPE, build_records
+from traffic_network_fixture import CITY, build_records, identity
 from traffic_scenarios import (
     BUSY_FLEET,
     FLEET,
@@ -123,7 +125,7 @@ def _checked_busy_run(label: str) -> CheckedRun:
         over_cap.extend(_speed_caps_hold(step.state))
         metrics.observe(step.state, step.events)
         parked_seconds.update(
-            network.spaces[vehicle["space"]].classes
+            network.spaces[vehicle["space"]].kind
             for vehicle in step.state["vehicles"]
             if vehicle["mode"] == "parked"
         )
@@ -191,11 +193,15 @@ def test_the_metrics_report_accounts_for_every_entry_space_second_and_trip(label
         assert row["entries"] == entered[row["junction"]] > 0
         assert row["entries_per_hour"] == row["entries"] * 3600 // seconds
         assert row["mean_delay_ms"] == delays[row["junction"]] // row["entries"]
-    spaces = Counter(space.classes for space in network.spaces.values())
+    spaces = Counter(space.kind for space in network.spaces.values())
+    places = Counter()
+    for space in network.spaces.values():
+        places[space.kind] += space.capacity
+    assert [row["kind"] for row in report["parking"]] == sorted(spaces)
     for row in report["parking"]:
-        classes = tuple(row["classes"])
-        assert row["spaces"] == spaces[classes]
-        expected = checked.parked_seconds[classes] * 1_000_000 // (spaces[classes] * seconds)
+        kind = row["kind"]
+        assert (row["spaces"], row["places"]) == (spaces[kind], places[kind])
+        expected = checked.parked_seconds[kind] * 1_000_000 // (places[kind] * seconds)
         assert row["occupancy_ppm"] == expected
         assert 0 < row["occupancy_ppm"] <= 1_000_000
     trips = report["trips"]
@@ -360,7 +366,9 @@ def test_a_step_does_not_change_the_state_it_is_given():
 
 
 def _space(segment: int, side: str, index: int) -> str:
-    return rec.street_record_identity(SCOPE, "parking_space", segment, side, index)
+    segment_id = identity("street_segment", CITY, segment)
+    curb = identity("curb_edge", segment_id, 1 if side == "right" else 0)
+    return identity("parking_space", curb, index)
 
 
 def _feed_through(second: int, entries=()) -> tuple[CrossingFeed, ...]:
@@ -430,33 +438,42 @@ def test_a_destination_no_route_reaches_is_blocked_as_no_route():
     placed = initial_traffic(traffic_id, seed, fixture_network, catalogs, {"passenger_car": 1})
     [placed_car] = placed["vehicles"]
     # Cut every movement into the outbound lane of the next spoke round from the car's.
-    target_segment = (fixture_network.spaces[placed_car["space"]].segment_ordinal + 1) % 4
+    here = fixture_network.segment_ordinals[fixture_network.spaces[placed_car["space"]].segment]
+    target_segment = identity("street_segment", CITY, (here + 1) % 4)
     base = build_records()
     [target_lane] = [
         record
         for record in base
-        if isinstance(record, rec.CarriagewayLaneRecord)
-        and record.segment_ordinal == target_segment
-        and record.direction == "with_segment"
+        if type(record) is LaneRecord
+        and record.segment_identity == target_segment
+        and record.direction == "forward"
     ]
     cut = {
-        record.connector_ordinal
+        record.identity
         for record in base
-        if isinstance(record, rec.LaneConnectorRecord)
-        and record.to_lane_ordinal == target_lane.lane_ordinal
+        if type(record) is LaneConnectionRecord and record.to_lane_identity == target_lane.identity
     }
     assert len(cut) == 3
     records = []
     for record in base:
-        if isinstance(record, rec.LaneConnectorRecord) and record.connector_ordinal in cut:
+        if type(record) is LaneConnectionRecord and record.identity in cut:
             continue
-        if isinstance(record, rec.SignalGroupRecord) and record.connector_ordinals:
-            kept = tuple(o for o in record.connector_ordinals if o not in cut)
-            record = rec.SignalGroupRecord(
-                record.identity, record.controller_ordinal, record.group, kept, ()
+        if type(record) is SignalRecord:
+            record = dataclasses.replace(
+                record,
+                groups=tuple(
+                    dataclasses.replace(
+                        group,
+                        connection_identities=tuple(
+                            item for item in group.connection_identities if item not in cut
+                        ),
+                    )
+                    for group in record.groups
+                ),
+                heads=tuple(head for head in record.heads if head.serves_identity not in cut),
             )
         records.append(record)
-    network = compile_network(tuple(records), catalogs, scope=SCOPE)
+    network = compile_network(road_input_from_city(records, catalogs, city_identity=CITY), catalogs)
     target_path = f"lane:{target_lane.identity}"
     assert network.paths[target_path].predecessors == ()
     state = initial_traffic(traffic_id, seed, network, catalogs, {"passenger_car": 1})
@@ -483,9 +500,11 @@ def test_a_vehicle_held_at_a_crosswalk_is_blocked_with_the_reason_then_arrives()
     seed, traffic_id = seed_for("held"), traffic_id_for("held")
     state = initial_traffic(traffic_id, seed, network, catalogs, {"passenger_car": 1})
     [car] = state["vehicles"]
-    goal = _space(0, "right", 3)
+    # The accessible bay on the spoke's right side lies beyond its mid-block crossing.
+    goal = _space(0, "right", 4)
     if car["space"] == goal:
-        goal = _space(1, "right", 3)
+        goal = _space(1, "right", 4)
+    assert network.spaces[goal].kind == "accessible"
     band = next(
         band
         for band in network.bands
@@ -643,7 +662,13 @@ def test_initial_traffic_places_a_seeded_fleet_in_spaces_that_fit_it():
     assert state != initial_traffic(traffic_id, seed_for("other"), network, catalogs, BUSY_FLEET)
     vehicles = state["vehicles"]
     assert len(vehicles) == sum(BUSY_FLEET.values())
-    assert len({vehicle["space"] for vehicle in vehicles}) == len(vehicles)
+    # A space holds up to its capacity, each vehicle in its own place, taken from 0 upward.
+    places = Counter(vehicle["space"] for vehicle in vehicles)
+    assert len({(vehicle["space"], vehicle["slot"]) for vehicle in vehicles}) == len(vehicles)
+    for space, count in places.items():
+        assert count <= network.spaces[space].capacity
+        assert sorted(v["slot"] for v in vehicles if v["space"] == space) == list(range(count))
+    assert max(places.values()) > 1
     for vehicle in vehicles:
         vehicle_class = catalogs.vehicle_class(vehicle["vehicle_class"])
         assert vehicle["vehicle_class"] in network.spaces[vehicle["space"]].classes
@@ -729,10 +754,16 @@ def test_the_presentation_frame_is_canonical_and_places_axles_on_the_body():
             # On a curve the axles sit on the path, so the chord is at most the wheelbase.
             assert chord <= (vehicle_class.wheelbase_mm + 2) ** 2
             if record["mode"] == "parked":
-                stall = network.spaces[vehicle["space"]].footprint
-                xs, ys = [p[0] for p in stall], [p[1] for p in stall]
-                for axle in (front, rear):
-                    assert min(xs) <= axle[0] <= max(xs) and min(ys) <= axle[1] <= max(ys)
+                space = network.spaces[vehicle["space"]]
+                xs, ys = [p[0] for p in space.footprint], [p[1] for p in space.footprint]
+                if space.placement == "carriageway":
+                    for axle in (front, rear):
+                        assert min(xs) <= axle[0] <= max(xs) and min(ys) <= axle[1] <= max(ys)
+                else:
+                    # At a stand the vehicle stands across the footprint, centred in its place.
+                    middle = ((front[0] + rear[0]) // 2, (front[1] + rear[1]) // 2)
+                    assert min(xs) <= middle[0] <= max(xs) and min(ys) <= middle[1] <= max(ys)
+                    assert 0 <= record["slot"] < space.capacity
                 checked_parked += 1
             if record["mode"] == "driving" and previous[vehicle["id"]]["mode"] == "driving":
                 path = record["motion_path_mm"]

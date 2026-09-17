@@ -176,8 +176,8 @@ def _red_second(checker: TransitionChecker, junction: JunctionSpec, connector: s
 def test_entering_or_being_admitted_on_red_is_caught():
     network, _ = fixture()
     checker = _checker()
-    junction = network.junctions[0]
-    event, before, after = _entry_transition("junction_entered", junction=0)
+    [junction] = [item for item in network.junctions.values() if item.signal is not None]
+    event, before, after = _entry_transition("junction_entered", junction=junction.identity)
     vehicle_id, connector = event["vehicle_id"], event["connector"]
     assert event["facts"]["indication"] in ("green", "amber")
     assert "entered_on_red" not in _kinds(checker.entries(before, after), vehicle_id)
@@ -189,7 +189,7 @@ def test_entering_or_being_admitted_on_red_is_caught():
     grant = next(
         event
         for event in _events("reservation_granted")
-        if event["reservation_kind"] == "junction" and event["target"] == 0
+        if event["reservation_kind"] == "junction" and event["target"] == junction.identity
     )
     vehicle_id, second = grant["vehicle_id"], grant["second"]
     before, after = _states()[second], _states()[second + 1]
@@ -367,7 +367,7 @@ def _over_the_crosswalk() -> tuple[str, str, int]:
     """
     network, catalogs = fixture()
     for event in _events("crossing_entered"):
-        band = network.bands[event["band"]]
+        band = network.band(event["crossing_identity"])
         vehicle_id = event["vehicle_id"]
         length = catalogs.vehicle_class(
             _vehicle(_states()[event["second"]], vehicle_id)["vehicle_class"]

@@ -147,12 +147,21 @@ def test_traffic_imports_nothing_first_party_but_grammar_canonical_and_errors():
                     ), f"{path.name} imports {module}"
 
 
-def test_the_provisional_road_records_are_read_by_traffic_alone():
-    """A stand-in until the city vocabulary lands, which nothing else may come to rely on."""
-    for path in sorted((ROOT / "exulanica").rglob("*.py")):
-        if path.is_relative_to(_PACKAGE):
-            continue
-        assert "provisional_records" not in path.read_text(encoding="utf-8"), path
+def test_traffic_reads_the_city_in_one_module():
+    """Only the converter names the city grammar, so a new city version changes one file."""
+    readers = []
+    for path in _sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            modules = []
+            if isinstance(node, ast.ImportFrom) and node.level == 0:
+                modules.append(node.module or "")
+            elif isinstance(node, ast.Import):
+                modules.extend(alias.name for alias in node.names)
+            if any(module.startswith("exulanica.grammar.grammars") for module in modules):
+                readers.append(path.name)
+    assert sorted(set(readers)) == ["city_roads.py"]
+    assert not _PACKAGE.joinpath("provisional_records.py").exists()
 
 
 # ---------------------------------------------------------------------------------------------
