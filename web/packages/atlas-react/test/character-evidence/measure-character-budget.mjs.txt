@@ -1,0 +1,92 @@
+// Frame cost of catalog people at 1440x900: one crowd of 128, a different number drawn as full
+// characters each run, everyone else as distant forms. Run inside .exulanica/bin/quiet-slot with the
+// preview server already running. Prints one JSON line per configuration.
+import { setTimeout as sleep } from 'node:timers/promises';
+import { execSync } from 'node:child_process';
+import { launch, navigate } from '../audit-2026-09-16/cdp.mjs';
+
+const [, , appOrigin, portText, budgetsText = '0,12,24,36,48,64', secondsText = '20'] = process.argv;
+const budgets = budgetsText.split(',').map(Number);
+const seconds = Number(secondsText);
+const load = () => execSync('uptime').toString().replace(/.*load averages?: /, '').trim();
+const browser = await launch({ port: Number(portText ?? 9521), profile: `/private/tmp/claude-501/-Users-glendonchin-dev-Technology-orimera/408fea04-e684-42ba-8453-a423fb755bb8/scratchpad/budget-profile-${portText}` });
+const out = (value) => console.log(JSON.stringify(value));
+try {
+  await navigate(browser, `${appOrigin}/?preview=1`, { settleMs: 500 });
+  for (let i = 0; i < 240; i += 1) {
+    if (await browser.evaluate(`!!document.getElementById('atlas')?.dataset.societyPopulation`).catch(() => false)) break;
+    await sleep(500);
+  }
+  await browser.evaluate(`(async () => {
+    const url = performance.getEntriesByType('resource').map(e => e.name).find(n => /\\/playcanvas\\.js\\?v=/.test(n));
+    const pc = await import(url); window.__pc = pc; window.__app = pc.AppBase.getApplication('atlas');
+    window.__evaluation = await import('/@fs/Users/glendonchin/dev/Technology/exulanica-characters/web/packages/atlas-react/src/playcanvas/character/evaluation.ts');
+  })()`);
+  const fn = await browser.send('Runtime.evaluate', { expression: `window.__app._callbacks.get('update')[0].callback` });
+  const props = await browser.send('Runtime.getProperties', { objectId: fn.result.objectId, ownProperties: false });
+  const scopes = props.internalProperties.find((p) => p.name === '[[Scopes]]');
+  const scopeList = await browser.send('Runtime.getProperties', { objectId: scopes.value.objectId });
+  for (const scope of scopeList.result) {
+    if (!scope.value?.objectId) continue;
+    const vars = await browser.send('Runtime.getProperties', { objectId: scope.value.objectId });
+    const binding = vars.result.find((v) => v.name === 'binding' && v.value?.objectId);
+    if (binding) { await browser.send('Runtime.callFunctionOn', { objectId: binding.value.objectId, functionDeclaration: 'function(){ window.__binding = this; }' }); break; }
+  }
+  await browser.evaluate(`(() => { window.__binding.setCameraMode('third-person'); document.querySelectorAll('.companion-prompt, .arrival-prompt').forEach(e => e.style.visibility = 'hidden'); })()`);
+  out({ environment: await browser.evaluate(`(() => {
+    const gl = document.createElement('canvas').getContext('webgl2'); const x = gl.getExtension('WEBGL_debug_renderer_info');
+    return { userAgent: navigator.userAgent, gpu: gl.getParameter(x.UNMASKED_RENDERER_WEBGL), viewport: [innerWidth, innerHeight], canvas: [document.getElementById('atlas').width, document.getElementById('atlas').height], devicePixelRatio, logicalCpus: navigator.hardwareConcurrency };
+  })()`) });
+  for (const budget of budgets) {
+    const loadBefore = load();
+    await browser.evaluate(`(() => {
+      window.__crowd?.destroy();
+      window.__crowd = window.__evaluation.CharacterCrowdEvaluation.mount(window.__binding, { count: 128, nearBudget: ${budget}, walkers: 8 });
+    })()`);
+    let counts = null;
+    for (let i = 0; i < 480; i += 1) {
+      counts = await browser.evaluate(`window.__crowd.counts`);
+      if (counts.pending === 0) break;
+      await sleep(250);
+    }
+    await sleep(3000);
+    const result = await browser.evaluate(`new Promise((resolve) => {
+      const app = window.__app, pc = window.__pc;
+      const intervals = [], work = [], draws = [], triangles = [];
+      let last = null, startWork = 0;
+      const onUpdate = () => { startWork = performance.now(); };
+      const onEnd = () => { work.push(performance.now() - startWork); draws.push(app.stats.drawCalls.total); triangles.push(app.stats.frame.triangles); };
+      app.on('frameupdate', onUpdate); app.on('frameend', onEnd);
+      const end = performance.now() + ${seconds} * 1000;
+      const tick = (time) => {
+        if (last !== null) intervals.push(time - last);
+        last = time;
+        if (time < end) requestAnimationFrame(tick);
+        else {
+          app.off('frameupdate', onUpdate); app.off('frameend', onEnd);
+          const q = (values, f) => { const s = [...values].sort((a, b) => a - b); return Math.round(s[Math.min(s.length - 1, Math.floor(f * s.length))] * 10) / 10; };
+          // Who is on screen: roots inside the camera frustum, by the form they are drawn with.
+          const camera = app.root.findByName('atlas-camera').camera;
+          const crowd = app.root.findByName('character-evaluation-crowd');
+          let nearShown = 0, farShown = 0;
+          for (const person of crowd.children) {
+            const p = person.getPosition();
+            const head = new pc.Vec3(p.x, p.y + 1.0, p.z);
+            if (!camera.frustum.containsPoint(head)) continue;
+            if (person.children.some(k => k.name.startsWith('character:') && k.enabled)) nearShown++;
+            else farShown++;
+          }
+          resolve({ frames: intervals.length, frameP50Ms: q(intervals, 0.5), frameP95Ms: q(intervals, 0.95), frameP99Ms: q(intervals, 0.99), frameMaxMs: q(intervals, 1),
+            framesOver16_7Ms: intervals.filter(v => v > 17.5).length, framesOver33Ms: intervals.filter(v => v > 34).length,
+            workP50Ms: q(work, 0.5), workP95Ms: q(work, 0.95), drawCallsP50: q(draws, 0.5), trianglesP50: q(triangles, 0.5),
+            visible: { near: nearShown, far: farShown }, jsHeapMb: Math.round(performance.memory.usedJSHeapSize / 1048576) });
+        }
+      };
+      requestAnimationFrame(tick);
+    })`, { timeout: (seconds + 30) * 1000 });
+    const host = await browser.evaluate(`(async () => { const { CharacterHost } = await import('/@fs/Users/glendonchin/dev/Technology/exulanica-characters/web/packages/atlas-react/src/playcanvas/character/host.ts'); const { CHARACTER_CATALOG } = await import('/@fs/Users/glendonchin/dev/Technology/exulanica-characters/web/packages/atlas-react/src/playcanvas/character/catalog-data.ts'); const h = CharacterHost.forApp(window.__app, CHARACTER_CATALOG); return { containers: h.residentContainers, encodedBytes: h.residentEncodedBytes, geometryBytes: h.residentGeometryBytes, textureBytes: h.residentTextureBytes }; })()`);
+    out({ nearBudget: budget, crowd: 128, counts, loadBefore, loadAfter: load(), ...result, host });
+  }
+} finally {
+  await browser.close();
+}

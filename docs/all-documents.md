@@ -22,7 +22,7 @@ How the system works now. Edited as the system changes.
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
 - [capture-overlap-and-recovery-state](capture-overlap-and-recovery-state.md) : 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check
-- [character-representation-contract](character-representation-contract.md) : Updated 2026-09-14. Status: FOUNDATION IMPLEMENTED; PRODUCTION CONFIGURATION, VISUAL/MOVEMENT
+- [character-representation-contract](character-representation-contract.md) : Updated 2026-09-17. Status: CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
 - [companion-question](companion-question.md) : built, covered by tests, and measured with real models on three passes. Section 6
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28

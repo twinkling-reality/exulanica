@@ -1,0 +1,42 @@
+FRAME BUDGET, catalog people, 2026-09-17, the measured run.
+
+What ran: the development preview (?preview=1) in headless Chrome 152 on an Apple M3 Pro, canvas
+1440x900, one crowd of 128 catalog inhabitants placed by CharacterCrowdEvaluation with 8 of them
+walking lanes, every figure from inhabitantRenderable. Each configuration draws a different number of
+them as full characters and the rest as far figures, then records 20 s of frames. All 128 were inside
+the camera frustum in every configuration (the "visible" field), and none was still loading
+("pending" 0). Both machine-wide slots were held for the whole run (quiet-slot, then gpu-slot) and the
+one-minute load average stayed between 5.62 and 6.87, under the 8 above which a timing run here is
+not trustworthy.
+
+Fields: workP50Ms and workP95Ms are the main thread's own time from the app's frameupdate to its
+frameend, which is what saturates first; frameP95Ms and framesOver16_7Ms are the presented frame
+intervals, which stay at 60 Hz even where the work does not fit. drawCallsP50 and trianglesP50 are
+the engine's own counters for the whole scene, preview city included. host is the character host's
+resident cost: containers held, encoded bytes, geometry bytes and texture bytes.
+
+The rule, fixed before this run: the budget is the largest measured count whose work p95 stays within
+half a 60 Hz frame, 8.3 ms, with presented frames still at 60 Hz. Half is left for the city, the
+society simulation, the interface and machines slower than this one. By that rule the budget is 24
+full characters (work p95 7.5 ms); 36 is the first count that breaks it, at 9.0 ms. A full character
+costs 0.18 ms of frame work at the 95th percentile, a far figure about 0.01 ms.
+character-budget.test.ts reads this file and fails if the constant, the rule or the load disagree.
+
+Command, from the worktree with the preview server on 127.0.0.1:5241 (the harness is retained beside
+this file as measure-character-budget.mjs.txt and cdp.mjs.txt):
+  .exulanica/bin/quiet-slot .exulanica/bin/gpu-slot \
+    node measure-character-budget.mjs http://127.0.0.1:5241 9541 0,12,24,36,48,64 20
+
+quiet-slot: waiting for the machine-wide slot at 14:16:49 from /Users/glendonchin/dev/Technology/exulanica-characters
+quiet-slot: slot taken at 14:16:49; load 6.87 33.30 51.45
+gpu-slot: waiting for the machine-wide GPU slot at 14:16:49 from /Users/glendonchin/dev/Technology/exulanica-characters
+gpu-slot: slot taken at 14:16:49; load 6.87 33.30 51.45
+{"environment":{"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36","gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)","viewport":[1440,900],"canvas":[1440,900],"devicePixelRatio":1,"logicalCpus":12}}
+{"nearBudget":0,"crowd":128,"counts":{"near":0,"far":128,"pending":0,"unavailable":0},"loadBefore":"6.80 32.85 51.19","loadAfter":"6.76 31.14 50.15","frames":1200,"frameP50Ms":16.7,"frameP95Ms":16.8,"frameP99Ms":16.8,"frameMaxMs":16.8,"framesOver16_7Ms":0,"framesOver33Ms":0,"workP50Ms":2.6,"workP95Ms":3.3,"drawCallsP50":164,"trianglesP50":1171844,"visible":{"near":0,"far":128},"jsHeapMb":111,"host":{"containers":11,"encodedBytes":2768676,"geometryBytes":1138560,"textureBytes":17825781}}
+{"nearBudget":12,"crowd":128,"counts":{"near":12,"far":116,"pending":0,"unavailable":0},"loadBefore":"6.76 31.14 50.15","loadAfter":"6.41 29.10 48.86","frames":1200,"frameP50Ms":16.7,"frameP95Ms":16.7,"frameP99Ms":16.8,"frameMaxMs":16.8,"framesOver16_7Ms":0,"framesOver33Ms":0,"workP50Ms":4.7,"workP95Ms":5.9,"drawCallsP50":318,"trianglesP50":1814136,"visible":{"near":12,"far":116},"jsHeapMb":123,"host":{"containers":60,"encodedBytes":12255284,"geometryBytes":5660552,"textureBytes":110100423}}
+{"nearBudget":24,"crowd":128,"counts":{"near":24,"far":104,"pending":0,"unavailable":0},"loadBefore":"6.41 29.10 48.86","loadAfter":"5.93 27.17 47.59","frames":1200,"frameP50Ms":16.7,"frameP95Ms":16.7,"frameP99Ms":16.8,"frameMaxMs":16.8,"framesOver16_7Ms":0,"framesOver33Ms":0,"workP50Ms":6.1,"workP95Ms":7.5,"drawCallsP50":474,"trianglesP50":2448500,"visible":{"near":24,"far":104},"jsHeapMb":234,"host":{"containers":74,"encodedBytes":15809452,"geometryBytes":7931816,"textureBytes":145402469}}
+{"nearBudget":36,"crowd":128,"counts":{"near":36,"far":92,"pending":0,"unavailable":0},"loadBefore":"5.93 27.17 47.59","loadAfter":"5.99 25.81 46.63","frames":1197,"frameP50Ms":16.7,"frameP95Ms":16.7,"frameP99Ms":16.8,"frameMaxMs":50,"framesOver16_7Ms":2,"framesOver33Ms":1,"workP50Ms":7.7,"workP95Ms":9,"drawCallsP50":630,"trianglesP50":3104600,"visible":{"near":36,"far":92},"jsHeapMb":164,"host":{"containers":86,"encodedBytes":17989512,"geometryBytes":9524552,"textureBytes":173714009}}
+{"nearBudget":48,"crowd":128,"counts":{"near":48,"far":80,"pending":0,"unavailable":0},"loadBefore":"5.99 25.81 46.63","loadAfter":"5.62 24.14 45.42","frames":1200,"frameP50Ms":16.7,"frameP95Ms":16.8,"frameP99Ms":16.8,"frameMaxMs":16.8,"framesOver16_7Ms":0,"framesOver33Ms":0,"workP50Ms":9.8,"workP95Ms":11.5,"drawCallsP50":784,"trianglesP50":3746004,"visible":{"near":48,"far":80},"jsHeapMb":340,"host":{"containers":90,"encodedBytes":18570468,"geometryBytes":10372916,"textureBytes":183500714}}
+{"nearBudget":64,"crowd":128,"counts":{"near":64,"far":64,"pending":0,"unavailable":0},"loadBefore":"5.62 24.14 45.42","loadAfter":"5.82 22.70 44.28","frames":1200,"frameP50Ms":16.7,"frameP95Ms":16.8,"frameP99Ms":16.8,"frameMaxMs":16.8,"framesOver16_7Ms":0,"framesOver33Ms":0,"workP50Ms":13.3,"workP95Ms":14.6,"drawCallsP50":990,"trianglesP50":4603848,"visible":{"near":64,"far":64},"jsHeapMb":406,"host":{"containers":93,"encodedBytes":19012696,"geometryBytes":11457056,"textureBytes":190491218}}
+gpu-slot: finished at 14:19:13 with exit 0; load 5.82 22.70 44.28
+quiet-slot: finished at 14:19:13 with exit 0; load 5.82 22.70 44.28

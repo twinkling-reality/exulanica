@@ -1,0 +1,110 @@
+// Minimal headless Chrome driver over the DevTools protocol, on the pattern of
+// scripts/capture_visual_gate.mjs: Node's own WebSocket, no packages.
+import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
+export async function launch({ port, width = 1440, height = 900, profile, gpu = true }) {
+  rmSync(profile, { recursive: true, force: true });
+  mkdirSync(profile, { recursive: true });
+  const args = [
+    '--headless=new',
+    `--remote-debugging-port=${port}`,
+    `--window-size=${width},${height}`,
+    '--hide-scrollbars',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-features=Translate,MediaRouter',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    `--user-data-dir=${profile}`,
+  ];
+  if (gpu) args.push('--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-gpu-rasterization');
+  args.push('about:blank');
+  const chrome = spawn(CHROME, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let log = '';
+  chrome.stdout.on('data', (b) => { log += b; });
+  chrome.stderr.on('data', (b) => { log += b; });
+  let page = null;
+  for (let i = 0; i < 80 && !page; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      page = list.find((t) => t.type === 'page') ?? null;
+    } catch { /* starting */ }
+    if (!page) await sleep(250);
+  }
+  if (!page) { chrome.kill(); throw new Error(`no page target\n${log}`); }
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => {
+    ws.addEventListener('open', resolve, { once: true });
+    ws.addEventListener('error', reject, { once: true });
+  });
+  let nextId = 0;
+  const pending = new Map();
+  const listeners = [];
+  ws.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (message.id !== undefined) {
+      const slot = pending.get(message.id);
+      if (slot) {
+        pending.delete(message.id);
+        if (message.error) slot.reject(new Error(`${slot.method}: ${message.error.message}`));
+        else slot.resolve(message.result);
+      }
+    } else for (const listener of listeners) listener(message);
+  });
+  const send = (method, params = {}) => new Promise((resolve, reject) => {
+    const id = ++nextId;
+    pending.set(id, { resolve, reject, method });
+    ws.send(JSON.stringify({ id, method, params }));
+  });
+  const consoleLines = [];
+  listeners.push((m) => {
+    if (m.method === 'Runtime.consoleAPICalled') consoleLines.push(`${m.params.type}: ${m.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
+    if (m.method === 'Runtime.exceptionThrown') consoleLines.push(`exception: ${m.params.exceptionDetails?.exception?.description ?? m.params.exceptionDetails?.text}`);
+  });
+  await send('Runtime.enable');
+  await send('Page.enable');
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'performance.setResourceTimingBufferSize(20000);' });
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  const evaluate = async (expression, { awaitPromise = true, timeout = 60000 } = {}) => {
+    const result = await send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true, timeout });
+    if (result.exceptionDetails) throw new Error(`evaluate: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`);
+    return result.result.value;
+  };
+  const screenshot = async (path, { format = 'png', quality } = {}) => {
+    const shot = await send('Page.captureScreenshot', { format, ...(quality ? { quality } : {}), captureBeyondViewport: false });
+    const bytes = Buffer.from(shot.data, 'base64');
+    writeFileSync(path, bytes);
+    return bytes.length;
+  };
+  const key = async (code, key, type = 'both') => {
+    const base = { code, key, windowsVirtualKeyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0 };
+    if (type !== 'up') await send('Input.dispatchKeyEvent', { type: 'keyDown', ...base });
+    if (type !== 'down') await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+  };
+  const click = async (x, y) => {
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+  };
+  const close = async () => {
+    try { await send('Browser.close'); } catch { /* already closing */ }
+    ws.close();
+    await sleep(300);
+    chrome.kill();
+  };
+  return { send, evaluate, screenshot, key, click, close, consoleLines, log: () => log };
+}
+
+export async function navigate(browser, url, { settleMs = 1000 } = {}) {
+  await browser.send('Page.navigate', { url });
+  for (let i = 0; i < 240; i += 1) {
+    const state = await browser.evaluate('document.readyState').catch(() => 'loading');
+    if (state === 'complete') break;
+    await sleep(250);
+  }
+  await sleep(settleMs);
+}
