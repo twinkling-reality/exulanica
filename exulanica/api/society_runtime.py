@@ -485,6 +485,7 @@ class SocietyRuntime:
             if row is None or row["engine_version"] not in (
                 "exulanica-society/v2",
                 "exulanica-society/v3",
+                "exulanica-society/v4",
             ):
                 return
             binding = self._binding(session, version_id)

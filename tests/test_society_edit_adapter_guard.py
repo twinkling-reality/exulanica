@@ -49,7 +49,9 @@ def recorded_rows(w):
     }
 
 
-@pytest.mark.parametrize("profile", ["exulanica-society/v2", "exulanica-society/v3"])
+@pytest.mark.parametrize(
+    "profile", ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"]
+)
 @pytest.mark.parametrize("operation", ["move", "remove", "undo"])
 def test_direct_edit_without_adapter_rolls_back_object_and_all_history(
     runtime_world, profile, operation

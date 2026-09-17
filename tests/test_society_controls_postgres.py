@@ -74,7 +74,9 @@ def expire(w):
     w["connection"].commit()
 
 
-@pytest.mark.parametrize("engine", ["exulanica-society/v2", "exulanica-society/v3"])
+@pytest.mark.parametrize(
+    "engine", ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"]
+)
 def test_saved_controls_bounded_worker_local_failure_and_replay(
     runtime_world, spine_schema, engine
 ):
@@ -105,7 +107,10 @@ def test_saved_controls_bounded_worker_local_failure_and_replay(
     assert observed["receipt_sha256"] == receipt["document_sha256"]
     assert result["control"]["mode"] == "playing"
     assert helpers.society(w).replay(vid)["replay_verified"]
-    assert len(helpers.society(w).snapshot(vid)["state"]["inhabitants"]) == 128
+    held = helpers.society(w).snapshot(vid)
+    assert len(held["state"]["inhabitants"]) == held["population_size"]
+    # V4 sizes its population to the published walkable patch; earlier profiles keep 128.
+    assert held["population_size"] == (46 if engine.endswith("/v4") else 128)
     with worker.database.session(w["workspace"]) as connection:
         assert controls(w, connection).read(vid) == result["control"]
     with pytest.raises(StaleSocietyState):

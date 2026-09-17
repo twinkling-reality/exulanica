@@ -31,6 +31,9 @@ from exulanica.world.society_controls import (
 )
 from exulanica.world.society_repository import SocietyRepository
 
+#: Profiles an explicitly enabled playback worker may advance.
+PLAYABLE_PROFILES = ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4")
+
 
 class SocietyControlRepository:
     def __init__(
@@ -77,7 +80,7 @@ class SocietyControlRepository:
         ).fetchone()
 
     def _ready(self, society: dict, actor: uuid.UUID) -> None:
-        if society["engine_version"] not in ("exulanica-society/v2", "exulanica-society/v3"):
+        if society["engine_version"] not in PLAYABLE_PROFILES:
             raise ValueError("legacy_society_not_playable")
         repo = self._society(actor)
         repo.snapshot(society["version_id"])
@@ -175,8 +178,7 @@ class SocietyControlRepository:
                 if society["engine_version"] == "exulanica-society/v1"
                 else None
             ),
-            "play_eligible": society["engine_version"]
-            in ("exulanica-society/v2", "exulanica-society/v3"),
+            "play_eligible": society["engine_version"] in PLAYABLE_PROFILES,
         }
 
     def read(self, version_id: uuid.UUID) -> dict:

@@ -24,9 +24,12 @@ class CreateSocietyBody(BaseModel):
     place_id: uuid.UUID
     region_id: Annotated[str, Field(min_length=1, max_length=500)]
     seed: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-    profile: Literal["exulanica-society/v1", "exulanica-society/v2", "exulanica-society/v3"] = (
-        "exulanica-society/v1"
-    )
+    profile: Literal[
+        "exulanica-society/v1",
+        "exulanica-society/v2",
+        "exulanica-society/v3",
+        "exulanica-society/v4",
+    ] = "exulanica-society/v1"
 
 
 class AdvanceSocietyBody(BaseModel):
@@ -78,7 +81,7 @@ def create_society(
     def create() -> dict:
         repo = _repository(connection, session, request)
         document = None
-        if body.profile in ("exulanica-society/v2", "exulanica-society/v3"):
+        if body.profile in ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"):
             provider = getattr(request.app.state, "society_initial_input", None)
             if provider is None:
                 raise UnavailableSocietyInput("purposeful society input adapter is not configured")

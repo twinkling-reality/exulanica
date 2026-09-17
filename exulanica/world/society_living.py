@@ -28,7 +28,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from functools import cache
 from itertools import pairwise
 from typing import Any, Final
 
@@ -39,10 +40,17 @@ from exulanica.world.society import (
     _number,
     society_state_sha256,
 )
-from exulanica.world.society_catalogs import MINUTES_PER_DAY, Activity, RoutineModel
+from exulanica.world.society_catalogs import (
+    MINUTES_PER_DAY,
+    ROUTINE_VERSIONS,
+    Activity,
+    RoutineModel,
+    load_routine_model,
+)
 from exulanica.world.society_place import (
     ceil_distance,
     place_capacity,
+    place_from_society_input,
     validate_place,
 )
 from exulanica.world.society_planner import _paths
@@ -51,8 +59,11 @@ __all__ = [
     "LIVING_PROFILE",
     "LivingPlace",
     "advance_living_society",
+    "current_routine",
     "initial_living_society",
+    "living_places",
     "living_places_follow",
+    "routine_for",
 ]
 
 LIVING_PROFILE: Final = "exulanica-society/v4"
@@ -137,6 +148,38 @@ class LivingPlace:
             "capacity": place_capacity(self.document),
             "unsupported": list(self.document["unsupported"]),
         }
+
+
+@cache
+def _routine(versions: tuple[tuple[str, int], ...]) -> RoutineModel:
+    return load_routine_model(versions=dict(versions))
+
+
+def current_routine() -> RoutineModel:
+    """The routine new societies are created under."""
+    return _routine(tuple(sorted(ROUTINE_VERSIONS.items())))
+
+
+def routine_for(state: dict[str, Any]) -> RoutineModel:
+    """The routine a stored society recorded; a changed catalog file fails the digest check."""
+    versions = state["routine"]["catalog_versions"]
+    return _routine(tuple(sorted((str(k), int(v)) for k, v in versions.items())))
+
+
+def living_places(
+    documents: Iterable[dict[str, Any]],
+    routine: RoutineModel,
+    held: dict[str, LivingPlace] | None = None,
+) -> list[LivingPlace]:
+    """Project persisted society inputs to places, reusing any already prepared by digest."""
+    held = {} if held is None else held
+    places = []
+    for document in documents:
+        key = document["document_sha256"]
+        if key not in held:
+            held[key] = LivingPlace(place_from_society_input(document, routine), routine)
+        places.append(held[key])
+    return places
 
 
 def _supported_needs(place: LivingPlace, routine: RoutineModel) -> set[str]:

@@ -803,7 +803,7 @@ class WorldObjectRepository:
             self.connection.execute(
                 "select 1 from world_society where workspace_id=%s and world_id=%s "
                 "and version_id=%s and engine_version in "
-                "('exulanica-society/v2','exulanica-society/v3')",
+                "('exulanica-society/v2','exulanica-society/v3','exulanica-society/v4')",
                 (self.workspace_id, self.world_id, version_id),
             ).fetchone()
             is not None

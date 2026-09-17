@@ -386,7 +386,9 @@ select 'synthetic_inhabitant','simulated','inhabitant',null::text,
          'inhabitant:'||(inhabitant->>'id'),
          'world-version:'||s.world_id||':'||s.version_id::text
        ]::text[],
-       (inhabitant->>'display_name')||' · synthetic '||(inhabitant->>'role'),
+       coalesce(inhabitant->>'display_name',
+                'a '||coalesce(inhabitant->'role'->>'label','person'))||' · synthetic '||
+         coalesce(inhabitant->'role'->>'label',inhabitant->>'role','inhabitant'),
        false,4,s.created_at,
        'inhabitant:'||(inhabitant->>'id'),
        null::bytea,null::bytea,null::bytea
@@ -437,7 +439,8 @@ def _authorized_societies(
         "join confirmed_place_entity_bridge b "
         "on b.workspace_id=s.workspace_id and b.place_id=s.place_id "
         "where s.workspace_id=%s and b.entity_id=any(%s::uuid[]) "
-        "and s.engine_version in ('exulanica-society/v2','exulanica-society/v3')",
+        "and s.engine_version in "
+        "('exulanica-society/v2','exulanica-society/v3','exulanica-society/v4')",
         (validated.workspace_id, list(validated.place_ids)),
     ).fetchall()
     allowed = []
