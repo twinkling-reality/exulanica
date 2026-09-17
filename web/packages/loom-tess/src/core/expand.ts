@@ -180,14 +180,13 @@ function terrainGrid(fields: Fields): Expansion {
   return { state: 'drawn', vertices, triangles };
 }
 
-/** Drawn terrain is a horizontal surface in plan coordinates: `s = x`, `t = -y`. */
+/** Drawn terrain is a horizontal surface in the plan frame: `s = x` and `t = y`, left of `s`. */
 function renderTerrain(fields: Fields): Expansion {
   const grid = terrainGrid(fields);
   if (grid.state === 'unavailable') return grid;
   const coordinates: number[] = [];
   for (let vertex = 0; vertex < grid.vertices.length; vertex += 3) {
-    // `0 - y` rather than `-y`, so a y of zero gives zero and never negative zero.
-    coordinates.push(grid.vertices[vertex]!, 0 - grid.vertices[vertex + 1]!);
+    coordinates.push(grid.vertices[vertex]!, grid.vertices[vertex + 1]!);
   }
   return { ...grid, surface: { material: 'not-carried', orientation: 'horizontal', coordinates } };
 }

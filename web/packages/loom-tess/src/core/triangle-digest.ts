@@ -35,12 +35,21 @@
  *           signed 64-bit big-endian integers per triangle, vertex a, b, c, each s, t, in
  *           millimetres. Empty otherwise.
  *
- * SURFACE COORDINATES are absolute millimetres on the surface, so a texture's physical extent
- * scales them with no guessed constant, and two tiles tile seamlessly. A horizontal surface uses
- * the plan: `s = x`, `t = -y` (an image laid on the ground reads north up). A vertical surface uses
- * `s` = the distance along its base edge from the edge's first vertex and `t = -z`, so `t` runs
- * downward, as `loom-texture`'s vertical placement states, and courses line up around a corner.
- * No drawn record is vertical yet; the orientation is defined now so a reader can rely on it.
+ * SURFACE COORDINATES are millimetres on the surface, in the frames the city vocabulary lane
+ * fixed on 2026-09-16 (`.orimera/briefs/lanes/requirements/city-v2-uv-frames-and-keys.md`), so a
+ * texture's physical extent scales them with no guessed constant:
+ *
+ *   horizontal  t is always to the left of s. Terrain, lot and roof: s = x, t = y, in plan, a
+ *               pitched plane included. Carriageway, gutter, kerb top, footway and crossing: s
+ *               along the owning segment's centreline from its start node; a junction uses +x.
+ *               An awning: s along its facade run. A part top: s is the part's local +x.
+ *   vertical    s along the run from its start (a facade's edge run from its start vertex, the
+ *               kerb face's along-centreline coordinate, a part's local +x); t = base - z,
+ *               pointing down, from the building's base elevation, the gutter level, or the
+ *               part's base.
+ *
+ * Only terrain draws today, so only the plan frame is exercised; the others are stated here so a
+ * reader can rely on them before a record draws in them.
  *
  * WHAT DOES NOT ENTER: the float32 payload, the index buffer (triangles are digested
  * de-indexed, so how vertices are shared cannot move the digest), texture bytes, the container

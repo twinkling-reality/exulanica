@@ -113,8 +113,9 @@ export const COORDINATES = {
   up: 'z is the height the records state, increasing upward',
   winding: 'counter-clockwise seen from +z, with x to the right and y up',
   payload: 'position is float32 metres from origin_mm: fround((mm - origin_mm) / 1000)',
-  surface: 'surface_mm plus surface_origin_mm is s, t in millimetres; horizontal s = x, t = -y; '
-    + 'vertical s = distance along the base edge from its first vertex, t = -z',
+  surface: 'surface_mm plus surface_origin_mm is s, t in millimetres in the frame of the '
+    + 'surface orientation; horizontal: t left of s, terrain s = x and t = y; '
+    + 'vertical: s along the run from its start, t = base - z',
 } as const;
 
 export type SectionName = 'position_mm' | 'position' | 'surface_mm' | 'index';

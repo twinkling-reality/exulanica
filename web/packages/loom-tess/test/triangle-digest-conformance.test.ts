@@ -18,7 +18,7 @@ import { documentBytes, FIXTURE_PATH, fixtureBytes, fixtureObject, recordsOf, sc
 
 /** Over `test/fixtures/tile-conformance.json`, tessellator 1, digest profile v1. */
 const GOLDEN = {
-  render_batch: 'a56f3b0e54cf6e65f6ceb99f83015fa42017bdcb4cd300d7e102e33e05fd437f',
+  render_batch: '9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4',
   nav_envelope: '4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e',
 } as const;
 const GOLDEN_RENDER_BATCH = GOLDEN.render_batch;
@@ -62,14 +62,14 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(renderBatch!.surfaceMm).toHaveLength(32);
   });
 
-  it('gives drawn terrain plan surface coordinates, s = x and t = -y, in millimetres', async () => {
+  it('gives drawn terrain plan surface coordinates, s = x and t = y, in millimetres', async () => {
     const preview = await previewTile(fixtureBytes());
     const renderBatch = preview.projections[0]!;
     const vertices = absoluteVertices(renderBatch);
     const surface = absoluteSurfaceCoordinates(renderBatch)!;
     for (let vertex = 0; vertex < renderBatch.header.vertex_count; vertex += 1) {
       expect(surface[vertex * 2]).toBe(vertices[vertex * 3]);
-      expect(surface[vertex * 2 + 1]).toBe(0 - vertices[vertex * 3 + 1]!);
+      expect(surface[vertex * 2 + 1]).toBe(vertices[vertex * 3 + 1]);
     }
     const drawn = renderBatch.header.entries.find((entry) => entry.state === 'drawn');
     expect(drawn).toMatchObject({ surface: 'horizontal', material: { state: 'not-carried' } });

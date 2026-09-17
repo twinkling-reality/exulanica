@@ -107,13 +107,15 @@ Each entry has eight fields:
 
 Empty fields are still framed.
 
-**Surface coordinates** are absolute millimetres, so a texture's physical extent scales them and
-adjacent tiles meet seamlessly:
+**Surface coordinates** are millimetres in the frames the city vocabulary lane fixed on
+2026-09-16. A texture's physical extent scales them.
 
-- a horizontal surface uses `s = x`, `t = -y`;
-- a vertical surface uses `s` = the distance along its base edge from the edge's first vertex, and
-  `t = -z`, so `t` runs downward and courses line up around a corner. No record draws a vertical
-  surface yet.
+- **Horizontal faces.** `t` is always to the left of `s`.
+  - Terrain, lot and roof use the plan: `s = x`, `t = y`.
+  - Street surfaces run along their segment's centreline from its start node.
+- **Vertical faces.** `s` runs along the run from its start, and `t = base - z` points down.
+
+Only terrain draws today.
 
 **What does not enter:** the float32 payload, the index buffer (triangles are digested
 de-indexed), texture bytes, header layout and padding, and any time.
