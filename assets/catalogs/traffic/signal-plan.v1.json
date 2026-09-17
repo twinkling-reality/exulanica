@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "catalog_id": "signal-plan",
+  "catalog_version": 1,
+  "references": {
+    "mutcd_2009_4e06": "FHWA, Manual on Uniform Traffic Control Devices, 2009 edition with revisions 1 and 2, Section 4E.06: paragraph 7 (pedestrian clearance time at a walking speed of 3.5 feet per second), paragraph 11 (walk interval at least 7 seconds), paragraph 12 (walk intervals as short as 4 seconds may be used) and paragraph 14 (walk plus clearance at 3 feet per second from a point 6 feet from the curb)",
+    "mutcd_2023_4f17": "FHWA, Manual on Uniform Traffic Control Devices, 11th edition (2023), Section 4F.17 paragraph 13: a yellow change interval of 3 to 6 seconds and a red clearance interval not exceeding 6 seconds"
+  },
+  "entries": [
+    {
+      "key": "fixed_two_phase_60s",
+      "label": "Fixed-time two-phase plan, 60 second cycle, with concurrent pedestrian walks",
+      "groups": [
+        {
+          "key": "phase_a",
+          "kind": "vehicle"
+        },
+        {
+          "key": "phase_b",
+          "kind": "vehicle"
+        },
+        {
+          "key": "walk_a",
+          "kind": "pedestrian"
+        },
+        {
+          "key": "walk_b",
+          "kind": "pedestrian"
+        }
+      ],
+      "intervals": [
+        {
+          "vehicle_green": [
+            "phase_a"
+          ],
+          "vehicle_amber": [],
+          "pedestrian_walk": [
+            "walk_a"
+          ],
+          "pedestrian_clearance": [],
+          "duration_ms": 7000
+        },
+        {
+          "vehicle_green": [
+            "phase_a"
+          ],
+          "vehicle_amber": [],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [
+            "walk_a"
+          ],
+          "duration_ms": 17000
+        },
+        {
+          "vehicle_green": [],
+          "vehicle_amber": [
+            "phase_a"
+          ],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [],
+          "duration_ms": 4000
+        },
+        {
+          "vehicle_green": [],
+          "vehicle_amber": [],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [],
+          "duration_ms": 2000
+        },
+        {
+          "vehicle_green": [
+            "phase_b"
+          ],
+          "vehicle_amber": [],
+          "pedestrian_walk": [
+            "walk_b"
+          ],
+          "pedestrian_clearance": [],
+          "duration_ms": 7000
+        },
+        {
+          "vehicle_green": [
+            "phase_b"
+          ],
+          "vehicle_amber": [],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [
+            "walk_b"
+          ],
+          "duration_ms": 17000
+        },
+        {
+          "vehicle_green": [],
+          "vehicle_amber": [
+            "phase_b"
+          ],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [],
+          "duration_ms": 4000
+        },
+        {
+          "vehicle_green": [],
+          "vehicle_amber": [],
+          "pedestrian_walk": [],
+          "pedestrian_clearance": [],
+          "duration_ms": 2000
+        }
+      ],
+      "pedestrian_clearance_speed_mm_per_s": 1066,
+      "pedestrian_total_speed_mm_per_s": 914,
+      "pedestrian_total_extra_mm": 1829,
+      "sources": {
+        "intervals[0].duration_ms": "cited mutcd_2009_4e06: paragraph 11, a walk interval of at least 7 seconds",
+        "intervals[1].duration_ms": "declared: the rest of a 30 second phase in a fixed-time plan for the synthetic network, not an optimised timing; the compiler checks that it covers pedestrian clearance at 3.5 feet per second for every crossing the group governs",
+        "intervals[2].duration_ms": "cited mutcd_2023_4f17: a yellow change interval of 3 to 6 seconds; 4 seconds is chosen inside that range",
+        "intervals[3].duration_ms": "cited mutcd_2023_4f17: a red clearance interval of at most 6 seconds; 2 seconds is chosen inside that range",
+        "intervals[4].duration_ms": "cited mutcd_2009_4e06: paragraph 11, a walk interval of at least 7 seconds",
+        "intervals[5].duration_ms": "declared: the rest of a 30 second phase in a fixed-time plan for the synthetic network, not an optimised timing; the compiler checks that it covers pedestrian clearance at 3.5 feet per second for every crossing the group governs",
+        "intervals[6].duration_ms": "cited mutcd_2023_4f17: a yellow change interval of 3 to 6 seconds; 4 seconds is chosen inside that range",
+        "intervals[7].duration_ms": "cited mutcd_2023_4f17: a red clearance interval of at most 6 seconds; 2 seconds is chosen inside that range",
+        "pedestrian_clearance_speed_mm_per_s": "cited mutcd_2009_4e06: paragraph 7, 3.5 feet per second is 1066.8 mm/s, floored so the required time can only grow",
+        "pedestrian_total_extra_mm": "cited mutcd_2009_4e06: paragraph 14, 6 feet from the curb is 1828.8 mm, rounded up so the required time can only grow",
+        "pedestrian_total_speed_mm_per_s": "cited mutcd_2009_4e06: paragraph 14, 3 feet per second is 914.4 mm/s, floored so the required time can only grow"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}

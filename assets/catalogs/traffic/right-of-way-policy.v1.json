@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "catalog_id": "right-of-way-policy",
+  "catalog_version": 1,
+  "references": {
+    "hcm_2000": "Transportation Research Board, Highway Capacity Manual 2000, Exhibit 17-5, base critical headway for two-way stop-controlled intersections on a two-lane major street, read as tabulated in the Bentley CUBE documentation page Two-way stop-controlled intersections (HCM 2000/2010 model)",
+    "mutcd_2009_4d04": "FHWA, Manual on Uniform Traffic Control Devices, 2009 edition with revisions 1 and 2, Section 4D.04 paragraph 3, item A.1 (vehicles facing a circular green yield to pedestrians lawfully within an associated crosswalk and to other vehicles lawfully within the intersection) and item B.1 (a steady circular yellow warns that the green movement is being terminated)",
+    "uvc_2000": "National Committee on Uniform Traffic Laws and Ordinances, Uniform Vehicle Code, Millennium Edition (2000), section 11-401 (the driver of the vehicle on the left yields to the vehicle on the right when both enter at approximately the same time) and section 11-402 (a driver turning left yields to a vehicle approaching from the opposite direction)"
+  },
+  "entries": [
+    {
+      "key": "all_way_stop",
+      "label": "All-way stop",
+      "rule": "all_way_stop",
+      "approach_controls": [
+        "stop"
+      ],
+      "driving_sides": [
+        "right"
+      ],
+      "turn_priority": [
+        "straight",
+        "right",
+        "left"
+      ],
+      "arrival_order": "first_stopped_first_served",
+      "critical_headway_ms": {},
+      "sources": {
+        "rule": "cited uvc_2000: every approach stops; section 11-401 settles simultaneous arrivals in favour of the vehicle on the right",
+        "turn_priority": "cited uvc_2000: section 11-402, used only when two conflicting vehicles stopped in the same second and neither is on the other's right",
+        "arrival_order": "declared: vehicles proceed in the order in which they came to a full stop at the line, the practice driver handbooks teach; no statute or standard giving this order was read"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "priority_two_way_stop",
+      "label": "Major road priority, minor approaches stop or yield",
+      "rule": "priority",
+      "approach_controls": [
+        "priority",
+        "stop",
+        "yield"
+      ],
+      "driving_sides": [
+        "right"
+      ],
+      "turn_priority": [
+        "straight",
+        "right",
+        "left"
+      ],
+      "arrival_order": "not_applicable",
+      "critical_headway_ms": {
+        "major_left": 4100,
+        "minor_left": 7100,
+        "minor_right": 6200,
+        "minor_through": 6500
+      },
+      "sources": {
+        "rule": "cited uvc_2000: minor approaches yield to the major road; a stop-controlled approach stops at the line first",
+        "turn_priority": "cited uvc_2000: section 11-402, a left-turning driver yields to opposing traffic",
+        "arrival_order": "declared: priority rank decides order; arrival order is not used",
+        "critical_headway_ms.major_left": "cited hcm_2000: left turn from major, two-lane major street, 4.1 s",
+        "critical_headway_ms.minor_left": "cited hcm_2000: left turn from minor, two-lane major street, 7.1 s",
+        "critical_headway_ms.minor_right": "cited hcm_2000: right turn from minor, two-lane major street, 6.2 s",
+        "critical_headway_ms.minor_through": "cited hcm_2000: through traffic on minor, two-lane major street, 6.5 s"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "signalised",
+      "label": "Traffic signal control",
+      "rule": "signal",
+      "approach_controls": [
+        "signal"
+      ],
+      "driving_sides": [
+        "right"
+      ],
+      "turn_priority": [
+        "straight",
+        "right",
+        "left"
+      ],
+      "arrival_order": "not_applicable",
+      "critical_headway_ms": {
+        "permitted_left": 4100
+      },
+      "sources": {
+        "rule": "cited mutcd_2009_4d04: a vehicle may enter on a green or steady yellow indication and not on a steady red",
+        "turn_priority": "cited uvc_2000 and mutcd_2009_4d04: a left-turning vehicle on a concurrent green yields to opposing straight and right-turning vehicles",
+        "arrival_order": "declared: a signal decides order; arrival order is not used",
+        "critical_headway_ms.permitted_left": "cited hcm_2000: base critical headway for a left turn from the major street, 4.1 s, applied to a left turn permitted on a concurrent green because it crosses opposing traffic the same way"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "uncontrolled_continuation",
+      "label": "Uncontrolled bend or continuation with no conflicting movements",
+      "rule": "uncontrolled",
+      "approach_controls": [
+        "priority"
+      ],
+      "driving_sides": [
+        "right"
+      ],
+      "turn_priority": [
+        "straight",
+        "right",
+        "left"
+      ],
+      "arrival_order": "not_applicable",
+      "critical_headway_ms": {},
+      "sources": {
+        "rule": "declared: a node where no two movements from different approaches conflict needs no control; the compiler refuses the policy anywhere two such movements conflict",
+        "turn_priority": "declared: unused, because no movements conflict",
+        "arrival_order": "declared: unused, because no movements conflict"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}
