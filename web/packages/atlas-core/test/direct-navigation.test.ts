@@ -3,6 +3,7 @@ import {
   atlasVec3,
   buildNavigationWorld,
   islandId,
+  makeIsland,
   navigationRegionForIsland,
   planDirectNavigationTransition,
   resolveDirectNavigation,
@@ -219,5 +220,51 @@ describe('direct navigation over built ground', () => {
       target: { kind: 'island', islandId: islandId('far') },
       reason: 'occluded',
     });
+  });
+});
+
+/*
+ * A world that declares only places, like an owned district, leaves arranged regions out. Travel
+ * to one of those is refused for that reason, not as a region outside the ground, and the Atlas
+ * world, which declares its arrangement, still travels to it.
+ */
+describe('direct navigation to a region with no known place', () => {
+  const arranged = makeIsland({
+    ...island({
+      key: 'arranged',
+      createdAt: 1,
+      footprint: 12,
+      position: [8, 0, -4],
+      anchors: [{ key: 'object', local: [1, 1, -2], radius: 0.4 }],
+    }),
+    placementLocated: false,
+  });
+  const located = island({ key: 'located', createdAt: 2, footprint: 12, position: [-30, 0, 10], anchors: [] });
+  const atlas = scene([arranged, located]);
+  const placesOnly: NavigationWorld = { ...buildNavigationWorld(atlas), regions: [] };
+  const here = atlasVec3(0, 1.62, 0);
+
+  it('says the region has no known place when this world declares only places', () => {
+    for (const target of [
+      { kind: 'island', islandId: islandId('arranged') },
+      { kind: 'anchor', anchorId: arranged.anchors[0]!.anchorId },
+    ] as const) {
+      expect(resolveDirectNavigation(atlas, placesOnly, target, here))
+        .toEqual({ ok: false, target, reason: 'unlocated-placement' });
+    }
+  });
+
+  it('still calls a located region missing from this world outside it', () => {
+    const target = { kind: 'island', islandId: islandId('located') } as const;
+    expect(resolveDirectNavigation(atlas, placesOnly, target, here))
+      .toEqual({ ok: false, target, reason: 'outside-resident-field' });
+  });
+
+  it('travels to the arranged region in the Atlas world exactly as before', () => {
+    const world = buildNavigationWorld(atlas);
+    const result = resolveDirectNavigation(
+      atlas, world, { kind: 'island', islandId: islandId('arranged') }, atlasVec3(0, world.eyeHeight, 0),
+    );
+    expect(result.ok).toBe(true);
   });
 });

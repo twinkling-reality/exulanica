@@ -1221,6 +1221,7 @@ export function mountSegments(deps: SegmentsDependencies): MountedSegments {
       deps.showTravelStatus({
         'unknown-target': 'That segment is not in this Atlas.',
         'outside-resident-field': 'That region is outside the resident field.',
+        'unlocated-placement': 'That segment has no known place in this district yet, so there is nowhere here to arrive.',
         'no-safe-surface': 'No safe arrival point is available near that segment. Open Map to approach its region.',
         occluded: 'That segment is present, but no clear arrival point is available.',
       }[resolution.reason], 'failure');

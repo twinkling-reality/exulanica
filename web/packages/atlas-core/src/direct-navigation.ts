@@ -21,6 +21,8 @@ export type DirectNavigationTarget =
 export type DirectNavigationFailureReason =
   | 'unknown-target'
   | 'outside-resident-field'
+  /** The region is in the scene but only as an arrangement, and this world declares only places. */
+  | 'unlocated-placement'
   | 'no-safe-surface'
   | 'occluded';
 
@@ -175,6 +177,11 @@ function safePoseAround(
   return Object.freeze({ pose: null, sawReachableGround });
 }
 
+/** Why a region the scene holds is missing from this world's regions. */
+function undeclared(island: AtlasScene['islands'][number]): DirectNavigationFailureReason {
+  return island.placementLocated === true ? 'outside-resident-field' : 'unlocated-placement';
+}
+
 /** Resolve a deterministic safe region entry or exact anchor vantage inside the resident field. */
 export function resolveDirectNavigation(
   scene: AtlasScene,
@@ -187,7 +194,7 @@ export function resolveDirectNavigation(
     if (island === undefined) return Object.freeze({ ok: false, target, reason: 'unknown-target' });
     const region = world.regions.find((value) => value.islandId === target.islandId);
     if (region === undefined) {
-      return Object.freeze({ ok: false, target, reason: 'outside-resident-field' });
+      return Object.freeze({ ok: false, target, reason: undeclared(island) });
     }
     const sample = world.surface.sample(region.centre.x, region.centre.z);
     const targetPosition = atlasVec3(
@@ -222,7 +229,11 @@ export function resolveDirectNavigation(
   const island = scene.islands.find((value) => value.islandId === anchor.islandId);
   const region = world.regions.find((value) => value.islandId === anchor.islandId);
   if (island === undefined || region === undefined) {
-    return Object.freeze({ ok: false, target, reason: 'outside-resident-field' });
+    return Object.freeze({
+      ok: false,
+      target,
+      reason: island === undefined ? 'outside-resident-field' : undeclared(island),
+    });
   }
   const targetPosition = anchorAtlasPosition(table, index);
   const distance = Math.max(2.4, table.focusRadii[index]! + 1.8);
