@@ -13,7 +13,8 @@ memory_place = composition.memory_place
 pytestmark = pytest.mark.postgres
 
 
-def test_society_rights_gate_counts_pagination_and_historical_events(memory_place):
+@pytest.mark.parametrize("profile", ["exulanica-society/v2", "exulanica-society/v4"])
+def test_society_rights_gate_counts_pagination_and_historical_events(memory_place, profile):
     memory = memory_place
     composition._confirm_bridge(memory)
     world = memory.composed
@@ -27,7 +28,7 @@ def test_society_rights_gate_counts_pagination_and_historical_events(memory_plac
         region_id="region-a",
         seed=SEED,
         actor=memory.actor,
-        profile="exulanica-society/v2",
+        profile=profile,
         initial_input=doc,
     )
     initial = society.snapshot(version)
@@ -53,6 +54,11 @@ def test_society_rights_gate_counts_pagination_and_historical_events(memory_plac
     assert seen == [1, 2]
     assert allowed.total_matched > absent.total_matched
     assert any(item.origin_kind == "simulated" for item in allowed.content)
+    people = [item for item in allowed.content if item.content_kind == "inhabitant"]
+    assert people and all(item.label for item in people)
+    if profile.endswith("/v4"):
+        # No names: a v4 inhabitant is a role in a place, or a person where no role exists.
+        assert {item.label for item in people} == {"a person · synthetic inhabitant"}
     assert all(item.origin_kind != "simulated" for item in absent.content)
 
     def withdrawn_history(value):
