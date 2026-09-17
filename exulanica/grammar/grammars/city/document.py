@@ -204,6 +204,8 @@ OWN_ANCHOR_KINDS: Final = (
 )
 #: Record kinds with no single anchor, which no tile owns.
 ANCHORLESS_KINDS: Final = (DistrictRecord, StreetRecord)
+#: The scale at which a corner check measures a kerb piece's length: millionths of a millimetre.
+_CORNER_LENGTH_SCALE: Final = 1_000_000
 #: How close, in millimetres, a point derived with one floored integer normal must land.
 _NORMAL_ROUNDING_MM: Final = 2
 
@@ -479,6 +481,25 @@ def _extent_ring(extent: Extent) -> tuple[tuple[int, int], ...]:
     )
 
 
+def _walk_round_face(curb: CurbEdgeRecord) -> tuple[tuple[int, int], ...]:
+    """A kerb line in plan, in the order a counter-clockwise walk round the curb's face takes it."""
+    line = tuple((x, y) for x, y, _z in curb.kerb_line_mm)
+    return line if curb.side == "left" else line[::-1]
+
+
+def _corner_centre(
+    point: tuple[int, int], direction: tuple[int, int], radius: int, turn: int
+) -> tuple[int, int]:
+    """``point`` plus ``radius`` along the unit normal toward the turn, floored as stated."""
+    dx, dy = direction
+    scale = _CORNER_LENGTH_SCALE
+    length = integer_sqrt((dx * dx + dy * dy) * scale * scale)
+    return (
+        point[0] + (-turn * dy * radius * scale) // length,
+        point[1] + (turn * dx * radius * scale) // length,
+    )
+
+
 def _within_plan(inner: Extent, outer: Extent) -> bool:
     return (
         outer.min_x_mm <= inner.min_x_mm
@@ -716,6 +737,7 @@ class _Checker:
                 other = self.get(follower.segment_identity)
                 if not ends & {other.start_node_identity, other.end_node_identity}:
                     raise _fail("curb_graph", f"curb {curb.identity} is followed across no node")
+                self._check_corner(curb, follower)
             for block_identity in curb.block_identity:
                 block = self.carried(block_identity)
                 if block is not None:
@@ -723,6 +745,34 @@ class _Checker:
         branching = [identity for identity, count in followers.items() if count > 1]
         if branching:
             raise _fail("curb_graph", f"curbs followed by more than one curb: {branching}")
+
+    def _check_corner(self, curb: CurbEdgeRecord, follower: CurbEdgeRecord) -> None:
+        """The tangent points of the corner from ``curb`` to ``follower`` fit its radius."""
+        before, after = _walk_round_face(curb), _walk_round_face(follower)
+        p, q = before[-1], after[0]
+        radius = curb.corner_radius_mm
+        where = f"curb {curb.identity}'s corner to {follower.identity}"
+        if radius == 0:
+            if p != q:
+                raise _fail("corner_radius", f"{where} has no radius and {p} is not {q}")
+            return
+        leaving = (p[0] - before[-2][0], p[1] - before[-2][1])
+        joining = (after[1][0] - q[0], after[1][1] - q[1])
+        cross = leaving[0] * joining[1] - leaving[1] * joining[0]
+        if cross == 0:
+            raise _fail("corner_radius", f"{where} runs straight on and states a radius")
+        turn = 1 if cross > 0 else -1
+        from_p = _corner_centre(p, leaving, radius, turn)
+        from_q = _corner_centre(q, joining, radius, turn)
+        if (
+            abs(from_p[0] - from_q[0]) > _NORMAL_ROUNDING_MM
+            or abs(from_p[1] - from_q[1]) > _NORMAL_ROUNDING_MM
+        ):
+            raise _fail(
+                "corner_radius",
+                f"{where}: tangent points {p} and {q} find centres {from_p} and {from_q}, "
+                f"not one arc of radius {radius}",
+            )
 
     def _check_frontage_line(self, curb: CurbEdgeRecord, block: BlockRecord) -> None:
         offset = curb.kerb_width_mm + curb.footway_width_mm

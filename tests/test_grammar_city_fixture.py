@@ -445,6 +445,20 @@ def _footway_narrowed() -> TileDocument:
     return _document(replace={curb.identity: dataclasses.replace(curb, footway_width_mm=3_900)})
 
 
+def _corner_radius(curb_index: int, radius: int) -> TileDocument:
+    curb = FIXTURE.curbs[curb_index]
+    return _document(replace={curb.identity: dataclasses.replace(curb, corner_radius_mm=radius)})
+
+
+def _corner_tangent_point_moved(offset_mm: int) -> TileDocument:
+    """Mill Lane's west kerb starts ``offset_mm`` north of where the corner arc from Market Street
+    ends."""
+    curb = FIXTURE.curbs[4]
+    (x, y, z), *rest = curb.kerb_line_mm
+    moved = dataclasses.replace(curb, kerb_line_mm=((x, y + offset_mm, z), *rest))
+    return _document(replace={curb.identity: moved})
+
+
 def _camber_steepened() -> TileDocument:
     segment = FIXTURE.segments[0]
     return _document(
@@ -527,6 +541,26 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
     ("a facade stating another seed", _facade_seed_other, r"\[seed\]"),
     ("a footway that stops short of the frontage", _footway_narrowed, r"\[frontage_line\]"),
     ("a camber the kerb line does not fall by", _camber_steepened, r"\[camber\]"),
+    (
+        "a corner radius its tangent points do not fit",
+        lambda: _corner_radius(0, 5_000),
+        r"\[corner_radius\]",
+    ),
+    (
+        "no corner radius where the kerbs do not meet",
+        lambda: _corner_radius(0, 0),
+        r"\[corner_radius\]",
+    ),
+    (
+        "a corner radius where the kerb runs straight on",
+        lambda: _corner_radius(3, 3_000),
+        r"\[corner_radius\]",
+    ),
+    (
+        "a tangent point 3 mm off its arc",
+        lambda: _corner_tangent_point_moved(3),
+        r"\[corner_radius\]",
+    ),
     ("a crossing wider than its type", _crossing_too_wide, r"\[crossing_width\]"),
     ("a kerb below the 100 mm gate", _kerb_below_the_gate, "below its minimum 100"),
     ("a vitrine partly behind a stall riser", _vitrine_not_behind_glass, r"\[vitrine\]"),
@@ -764,3 +798,24 @@ def test_the_same_facade_owned_and_lacking_a_ground_bay_is_refused():
     )
     with pytest.raises(InvalidRecordError, match=r"\[ground_bays\]"):
         _validate(document)
+
+
+# -------------------------------------------------------------------------------------------
+# Corner arcs
+
+
+def test_the_fixture_corners_are_the_ones_the_check_reads():
+    """Market Street's north kerb turns into Mill Lane's west kerb, and Mill Lane's east kerb into
+    Market Street's north kerb east of the junction, each on a 6 m arc; the south kerb runs
+    straight on."""
+    curbs = FIXTURE.curbs
+    assert (curbs[0].next_curb_identity, curbs[0].corner_radius_mm) == ((curbs[4].identity,), 6_000)
+    assert (curbs[5].next_curb_identity, curbs[5].corner_radius_mm) == ((curbs[2].identity,), 6_000)
+    assert (curbs[3].next_curb_identity, curbs[3].corner_radius_mm) == ((curbs[1].identity,), 0)
+    assert curbs[3].kerb_line_mm[0] == curbs[1].kerb_line_mm[-1]
+
+
+def test_a_tangent_point_within_the_stated_rounding_of_its_arc_is_accepted():
+    _validate(_corner_tangent_point_moved(2))
+    with pytest.raises(InvalidRecordError, match=r"\[corner_radius\]"):
+        _validate(_corner_tangent_point_moved(3))

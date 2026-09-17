@@ -293,6 +293,15 @@ in blocks, footprints in parcels, facade runs, bays, entrances, vitrines behind 
 matches the tile's rules, and the pins match what was loaded. Each refusal names its check in
 brackets.
 
+**Corner arcs** (`[corner_radius]`). Walking counter-clockwise round the face a curb bounds takes a
+left curb's kerb line first point to last and a right curb's last to first. A corner runs from `P`,
+where a curb's walk ends, to `Q`, where its next curb's walk begins. With radius 0, `P` is `Q`.
+Otherwise the pieces leaving `P` and joining at `Q` must turn, and the arc centre found from each
+tangent point must agree within 2 mm on each axis. Each centre is the tangent point plus the radius
+along its piece's unit normal toward the turn, every component floored, the piece's length taken as
+`isqrt((dx * dx + dy * dy) * 10**12)` millionths of a millimetre so the floor of that length costs
+less than a millimetre at any radius; a reader without big integers uses a big-integer type for it.
+
 **Membership.** A tile owns a subject whose anchor lies in its 128 m square. A subject it does not
 own is in its halo when the subject's extent meets the square grown by 64 m on every side
 (`extent_meets_grown_square`), so a long segment or a large parcel anchored far away that still
@@ -323,8 +332,8 @@ carried and external), `[references]` (every name is carried or external), `[ref
 and a test validates the fixture city seen from each of the nine tiles around it.
 
 **Rules that need both ends run only when both are carried:** `segment_ends` (each end node),
-`street_segments` and `street_name` (a segment's street, a street's segments), `curb_graph` (the
-following curb), `frontage_line` (a curb's block), `junction_segments` (compared over carried
+`street_segments` and `street_name` (a segment's street, a street's segments), `curb_graph` and
+`corner_radius` (the following curb), `frontage_line` (a curb's block), `junction_segments` (compared over carried
 segments), `junction_order` (the node and every listed segment), `junction_signal` (the signal's
 controlled junction), `connection_lanes`, `connection_path` and `connection_turn` (each lane),
 `signal_groups` for a far crossing and `signal_heads` for a head's category (the crossing, the

@@ -262,6 +262,17 @@ class CurbEdgeRecord:
     ``next_curb_identity`` names the curb reached by going counter-clockwise round the face this
     curb bounds, and ``corner_radius_mm`` is the fillet between them, 0 where the kerb runs
     straight on; with no next curb (the edge of what was generated) the radius is 0.
+
+    **The corner's tangent points agree with its radius.** Walking counter-clockwise round the face
+    takes a left curb's kerb line from its first point to its last and a right curb's from its
+    last to its first. The corner runs from ``P``, where this curb's walk ends, to ``Q``, where the
+    next curb's begins, leaving along the walk's last piece and joining the next curb's first. With
+    radius 0, ``P`` is ``Q``. Otherwise the two pieces turn (left, or right for a concave corner),
+    and the arc's centre found from each tangent point agrees within 2 mm on each axis, each centre
+    being the tangent point plus the radius along the piece's unit normal toward the turn, every
+    component floored, with the piece's length taken as ``isqrt((dx * dx + dy * dy) * 10**12)``
+    millionths of a millimetre. The tile document check ``[corner_radius]`` holds it wherever both
+    curbs are carried.
     """
 
     RECORD_KIND: ClassVar[str] = "city.curb_edge"
