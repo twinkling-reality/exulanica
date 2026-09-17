@@ -154,8 +154,16 @@ by the expander that needs it, with a new tessellator version.
   (`document._corner_centre`), in BigInt. The segment count will come from the projection
   contract's `resolution_mm`: `filletSegmentsWithin` finds the least power of two whose chords keep
   within it. No number is chosen here.
+- `src/core/streets.ts` has the street rules, in straight pieces only. A segment's carriageway
+  and gutters lie on its camber plane between its two kerb lines. A curb's straight part is a
+  vertical kerb face, a kerb top and a footway rising by its crossfall. A junction's carriageway
+  fill is one ring over each leg's strip mouth, the kerb lines back to the node and the corner arcs
+  between legs, cut by the ring rule. Every point is placed by the grammar's corner rule measure.
+  A bent street, a curb its tile does not carry or a leg it cannot find draws nothing and names
+  the rule it waits on.
 
-`test/geometry-blocks.test.ts` holds each to its stated properties and pins one output of each.
+`test/geometry-blocks.test.ts` and `test/streets.test.ts` hold each to its stated properties and
+pin outputs.
 
 ## The triangle digest
 
