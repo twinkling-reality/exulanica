@@ -132,7 +132,7 @@
  {
   "asset_key": "makehuman.people.material.hair.afro01.v1",
   "byte_size": 439532,
-  "content_sha256": "cd531415bcd9d78ca84bddb2d4762aec0ca248ecdf929ca5c7ffff1fbf6b24f0",
+  "content_sha256": "cdaaef31f0ea8facb34af3d531941a734f943b943b90c574561d500c227175ed",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -145,7 +145,7 @@
  {
   "asset_key": "makehuman.people.material.hair.bob01.v1",
   "byte_size": 124488,
-  "content_sha256": "8b69e3d643ddc0639e0c996ab7f5e244d9aca5edd738fb9f1d2d8518d780b17c",
+  "content_sha256": "0d74b9131e868eb7523f03d5867724dce3e892f58c804448022797e0928ef203",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -158,7 +158,7 @@
  {
   "asset_key": "makehuman.people.material.hair.bob02.v1",
   "byte_size": 125544,
-  "content_sha256": "04641ab3eead270016cee46523f4df90b4028bcc23dc12feded41e737b7eec97",
+  "content_sha256": "8f263567c2a7a997e2dcfe06d6c9aae77ab693cf3ffc9136c69fa8815f712564",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -171,7 +171,7 @@
  {
   "asset_key": "makehuman.people.material.hair.braid01.v1",
   "byte_size": 41404,
-  "content_sha256": "d0f02a81c4e7a5c8af60094feadd0ea504604a93ecc3d2530e31cee0daa191fc",
+  "content_sha256": "e4c1e463d4d9529fb8e68f2d26d66feb81623a0557a239bceafd2b3b25701070",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -184,7 +184,7 @@
  {
   "asset_key": "makehuman.people.material.hair.long01.v1",
   "byte_size": 105008,
-  "content_sha256": "093665a51cbf184dae0fb0788c610bd9b936bffed2b6acf2dde5b0899a684d90",
+  "content_sha256": "8b70809aae4e324c7e9902f47bc26e0517e75b108aa7871400e04b373628be95",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -197,7 +197,7 @@
  {
   "asset_key": "makehuman.people.material.hair.ponytail01.v1",
   "byte_size": 226088,
-  "content_sha256": "ec344dd37f0e1c66d86d41d850dc98f7c4e7b082779f11c49ba3bb5c6e87bf87",
+  "content_sha256": "f9a3c8db9ce9150204170cd3b5273bd335baf1950b19fa0594e2d716d11154c3",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -210,7 +210,7 @@
  {
   "asset_key": "makehuman.people.material.hair.short01.v1",
   "byte_size": 341152,
-  "content_sha256": "66c5e805dc3c5eb7097617396e6caa9a9f3e31c4dbee93905436ce9c2784e59b",
+  "content_sha256": "b6c5c97b77378059104304d167cd5a31a7a470359f72a38359a4b5deced79db4",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -223,7 +223,7 @@
  {
   "asset_key": "makehuman.people.material.hair.short02.v1",
   "byte_size": 97416,
-  "content_sha256": "c2cfc00d6478f27ccc987b8bd13c318251601abf756657fa514ce75ee8961111",
+  "content_sha256": "5eb17ff3d339ecc8269121d4b839b394614476554234e52462841b2af87484ee",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -236,7 +236,7 @@
  {
   "asset_key": "makehuman.people.material.hair.short03.v1",
   "byte_size": 98260,
-  "content_sha256": "403477c95ad2439ae9924b74caedbdf2dc0320b78d30bb467c5cf383f63a6e41",
+  "content_sha256": "5b9ebbcfc2bc80419c933e17fa8557b0074984bcda9427d4bfdb8311060bad9b",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
@@ -249,7 +249,7 @@
  {
   "asset_key": "makehuman.people.material.hair.short04.v1",
   "byte_size": 177896,
-  "content_sha256": "61cd4dfd7a3d4ca10ddd9ca260e6d6778a4e29b1f6d6dcd17f622a22ce1ed8d4",
+  "content_sha256": "eed63e87217cd642bab148410e73047e916395915cde31802242b021dd6aeab7",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",

@@ -3,7 +3,7 @@
   "catalog": {
     "catalogId": "exulanica-characters",
     "revision": 1,
-    "canonicalSha256": "fe237c398f92f01622db560d3c8db889aba2987510406b08a0360729fcecc1c5"
+    "canonicalSha256": "ae370d7b1163a3fb7fbd5d701b012b659e7972d6b331b622ff1d1271427f98fa"
   },
   "domain": "street-population/v1",
   "vectors": [

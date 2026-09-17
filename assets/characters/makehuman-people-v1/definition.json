@@ -443,7 +443,7 @@
       "alphaSize": 1024,
       "format": "jpeg",
       "quality": 86,
-      "roughness": 520,
+      "roughness": 750,
       "alphaMode": "MASK",
       "alphaCutoff": 400,
       "doubleSided": true,
