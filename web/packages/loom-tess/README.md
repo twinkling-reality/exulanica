@@ -210,6 +210,13 @@ by the expander that needs it, with a new tessellator version.
   mouth, the kerb lines back to the node and the corner arcs between legs, cut by the ring rule.
   Every point is placed by the grammar's corner rule measure. A bent street, a curb its tile does
   not carry or a leg it cannot find draws nothing and names the rule it waits on.
+- `src/core/ring-clearance.ts` has the ring clearance rule. It covers everywhere a capsule of a
+  given radius meets a ring with convex integer pieces: the ring itself, a band along each edge, and
+  a hull round each corner that holds the corner's disk, its points bisected from the four axes as
+  the fillet arc rule bisects, doubling until every chord is checked to clear the radius. It leaves
+  nothing out and takes under five millimetres beyond, whatever the radius, which is what covering
+  an arc with integer points costs. It is what support clearance will carve a building's base ring
+  by, so no ring falls back to its plan box, which could close a footway that is open.
 - `src/core/support-clearance.ts` has the support clearance rule. It carves support triangles
   away from obstruction boxes grown by the capsule radius. Each box is removed by clipping on the
   integer lines a millimetre outside it, so the pieces kept meet without cracks. Crossings are
