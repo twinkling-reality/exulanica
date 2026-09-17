@@ -235,6 +235,18 @@ export {
   generatedRecordSubject,
   representationColourKey,
 } from './representation.js';
+export type {
+  GeneratedDressing,
+  GeneratedRecordEntry,
+  GeneratedRecordRegistrationV2,
+  GeneratedTileReferenceV2,
+} from './representation.js';
+export {
+  GENERATED_CITY_FRAME,
+  generatedDressing,
+  generatedRecordSubjectV2,
+  generatedTileFrameId,
+} from './representation.js';
 export type { DataViewHex, DataViewKindKey, DataViewOriginKey, DataViewStyle } from './data-view-style.js';
 export {
   DATA_VIEW_STYLE,
