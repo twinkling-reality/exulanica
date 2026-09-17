@@ -24,7 +24,8 @@ import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
 import { coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { ExpandContext, Need, Piece, PlanBox } from './expand.js';
+import type { ExpandContext, Need, PlanBox } from './expand.js';
+import type { Piece } from './pieces.js';
 import { MATERIAL_RECORD_KIND, recordShapeOf } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
 import {

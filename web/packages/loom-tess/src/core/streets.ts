@@ -56,7 +56,7 @@
  *
  * Not yet wired into a bake. It changes no container until an expander calls it.
  */
-import type { Piece, SurfaceExpansion } from './expand.js';
+import type { Piece, SurfaceExpansion } from './pieces.js';
 import { alongByCornerRule, filletArc, filletSegmentsWithin } from './fillet-arc.js';
 import {
   add,

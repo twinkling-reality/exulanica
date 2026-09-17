@@ -4,7 +4,7 @@
  * extent, meeting each other on shared edges, and measured in the segment's own frame.
  */
 import { describe, expect, it } from 'vitest';
-import type { Piece } from '../src/core/expand.js';
+import type { Piece } from '../src/core/pieces.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from '../src/core/streets.js';
 import type { StreetLookup } from '../src/core/streets.js';
 import { fixtureObject, recordsOf } from './support.js';

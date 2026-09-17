@@ -21,8 +21,8 @@
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
+import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
-import type { SurfaceOrientation } from './triangle-digest.js';
 
 /**
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
@@ -156,28 +156,6 @@ export interface ExpandContext {
    * the eye are not read: the carve is in plan and ignores height, which only ever leaves out more.
    */
   readonly capsuleRadiusMm: number | undefined;
-}
-
-export interface SurfaceExpansion {
-  /** The grammar's surface role the piece draws; the material record for (record, role) dresses it. */
-  readonly role: string;
-  readonly orientation: SurfaceOrientation;
-  /** Absolute surface coordinates in millimetres, two per vertex of the piece. */
-  readonly coordinates: readonly number[];
-}
-
-/**
- * One group of faces an expander draws, with vertices of its own. In a projection that carries
- * surfaces every piece is one surface, and an entry may repeat a role only on another orientation.
- * In any other projection the pieces are joined into one range and carry no surface.
- */
-export interface Piece {
-  /** Absolute integer vertices in the records' unit, three per vertex. */
-  readonly vertices: readonly number[];
-  /** Indices into this piece's `vertices`, three per triangle, counter-clockwise seen from outside. */
-  readonly triangles: readonly number[];
-  /** Present exactly when the projection carries surfaces. */
-  readonly surface?: SurfaceExpansion;
 }
 
 export type Expansion =
