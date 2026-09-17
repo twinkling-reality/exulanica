@@ -304,6 +304,9 @@ testpaths = ["tests"]
 addopts = "-q --strict-markers --strict-config"
 markers = [
   "postgres: requires a live PostgreSQL 18 server with pgvector via EXULANICA_TEST_DATABASE_URL",
+  # The endpoint is what these tests check, so they cannot run on a per-worker private server:
+  # see scripts/run_backend_suite.py, which runs them serially against the copy in its phase 2.
+  "reference_copy: requires the pinned local reference copy, port 5433 and exulanica_inspect_test",
 ]
 
 

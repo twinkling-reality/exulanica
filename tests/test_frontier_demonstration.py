@@ -227,6 +227,10 @@ def test_frontier_demonstration_requires_explicit_source_deletion_authority(repo
     assert not (tmp_path / "frontier-output").exists()
 
 
+# The frontier preflight pins its endpoint to the local reference copy and checks it twice,
+# in the connection string and by asking the server; a per-worker private server listens on
+# a random port, so this runs in phase 2 of scripts/run_backend_suite.py, against the copy.
+@pytest.mark.reference_copy
 def test_frontier_demonstration_names_the_capture_only_and_source_first_fallbacks(
     cli_database, tmp_path
 ):

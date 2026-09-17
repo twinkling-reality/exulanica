@@ -68,6 +68,10 @@ def test_preflight_reports_all_independent_failures_without_writing(tmp_path, mo
 
 
 @pytest.mark.postgres
+# The frontier preflight pins its endpoint to the local reference copy and checks it twice,
+# in the connection string and by asking the server; a per-worker private server listens on
+# a random port, so this runs in phase 2 of scripts/run_backend_suite.py, against the copy.
+@pytest.mark.reference_copy
 def test_preflight_checks_real_schema_without_ingesting_or_creating_outputs(cli_database, tmp_path):
     inputs = _inputs(tmp_path)
     before = _snapshot(tmp_path)
