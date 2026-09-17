@@ -36,6 +36,7 @@ from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.question import PROMPT_VERSION
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import tile_store
 from fastapi.testclient import TestClient
 
 from conftest import (
@@ -108,6 +109,8 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("GET", "/world-read/places/{place_id}"): {},
     ("POST", "/selection/environment"): {"json": {}},
     ("GET", "/world/versions/{version_id}/society"): {},
+    ("GET", "/tiles"): {"params": {"city_seed": "0" * 64}},
+    ("GET", "/tiles/{baked_tile_id}/bytes"): {},
     ("GET", "/materials/makers"): {},
     ("GET", "/materials/library"): {},
     ("GET", "/materials/recipes"): {},
@@ -413,6 +416,7 @@ class Deployment:
             .replace("{source_id}", str(uuid.uuid4()))
             .replace("{job_id}", str(uuid.uuid4()))
             .replace("{artifact_id}", str(self.artifact_id))
+            .replace("{baked_tile_id}", str(uuid.uuid4()))
             .replace("{scene_id}", str(uuid.uuid4()))
             # A place id nobody allocated, the same choice the scene id above it makes. The
             # sweep asks who may reach a route, and an id that resolves to nothing answers that
@@ -516,6 +520,7 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
         executor_shares_the_write_role=True,
         model_client=None,
         environment_admission_root=tmp_path,
+        tiles=tile_store(tmp_path / "tiles"),
     )
     app = create_app(services, verify=False)
     with TestClient(app) as client:
