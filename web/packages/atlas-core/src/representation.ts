@@ -27,10 +27,18 @@ export const DEFAULT_REPRESENTATION_INTENT: RepresentationIntent = Object.freeze
  * The point budget of the data view, MEASURED rather than chosen, in
  * `web/packages/atlas-react/src/playcanvas/data-view/frame-budget.log.txt`: the owned district with
  * every point on, at 1440x900 in Chrome 152 on an Apple M3 Pro (ANGLE Metal, WebGL2), at street
- * level and from above with the whole district in view. 4,110,676 points kept every frame on the
- * 60 Hz presentation in both views (p95 16.7 to 16.8 ms, no interval above 16.8 ms); 8,221,358 kept
- * it at street level and fell to a 66.7 ms p95 from above. The budget is the largest power of two
- * that held both views.
+ * level and from above with the whole district in view.
+ *
+ * Section 5, 2026-09-17, is the measurement that holds this number today, on the district main draws
+ * now (stated unavailable surfaces, three aggregate batches) and with the thinning hash fixed: three
+ * runs in each view held a p95 of 16.7 to 16.8 ms with no interval above 16.8 ms and no missed
+ * presentation in 601 frames, at the 2,187,735 points this budget draws there. The earlier sections
+ * measured a district main no longer draws; section 4 is the same views before the hash fix, at a
+ * p95 of 33.4 to 50 ms with most frames late.
+ *
+ * What binds in that scene is the per-subject cap below, not this budget: one district batch asks
+ * for more than the cap. The headroom above 2,187,735 points is UNMEASURED, because the runtime
+ * refuses a budget above this constant, so testing it means raising both first.
  */
 export const REPRESENTATION_POINT_BUDGET = 4_194_304;
 /** One subject may hold at most this many; a larger demand is scaled, never truncated by order. */

@@ -86,6 +86,26 @@ read above 16.7 ms, missed presentations, preparation time, bytes, draw calls.
    this main: section 3's decision measured a district main no longer draws. No constant was changed
    here; the budget decision is reported to the orchestrator.
 
+5. AFTER THE THINNING FIX (the integer hash in point-shader.ts), 2026-09-17, lane head
+   ad716897 on main f07cedb6, run through .exulanica/bin/quiet-slot then .exulanica/bin/gpu-slot,
+   every run started at a one-minute load under 8, at 1440x900:
+  overview 4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 201  missed 0   prepared  185 ms    83.5 MiB  draws 58  load 7.80 18.61 27.23
+  overview 4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 212  missed 0   prepared  175 ms    83.5 MiB  draws 58  load 7.02 17.23 26.38
+  overview 4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 601  >16.7 187  missed 0   prepared  225 ms    83.5 MiB  draws 58  load 7.42 16.33 25.73
+  street   4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 207  missed 0   prepared  187 ms    83.5 MiB  draws 26  load 7.31 17.98 26.85
+  street   4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 601  >16.7 197  missed 0   prepared  189 ms    83.5 MiB  draws 26  load 6.75 16.66 26.01
+  street   4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 601  >16.7 192  missed 0   prepared  175 ms    83.5 MiB  draws 26  load 7.80 14.21 23.88
+   Three overview runs and three street runs: p95 16.7 to 16.8 ms, no interval above 16.8 ms, NO
+   missed presentation in 601 frames, at the full 2,187,735 points. Section 4 measured the same
+   views on the same district at p95 33.4 to 50 ms with most frames late; the difference is the
+   thinning hash, not the budget.
+   A seventh run asked for 8,388,608 and was REFUSED by the runtime, which is correct: the
+   registry will not take a budget above REPRESENTATION_POINT_BUDGET. Measuring beyond the
+   constants needs them raised first, as section 2 did, and that measurement is not done: the
+   per-subject cap of 2,097,152 is what binds here (one district batch asks for more), so the
+   4,194,304 budget draws 2,187,735 points and its headroom is unmeasured.
+   DECISION: both constants stay as they are, now measured on the district main draws today.
+
 Not measured here: WebGPU (the look is WebGL2-only; see the header of data-view/points.ts), a weak machine,
 a ten-minute leak run, and the first slide's preparation hitch per frame (the totals above are
 synchronous; in the product the preparation is spread at 262,144 points per update).
