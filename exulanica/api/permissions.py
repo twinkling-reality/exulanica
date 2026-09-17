@@ -311,6 +311,7 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         # -- admission ---------------------------------------------------------------------
         ("GET", "/personal-admission"): _requires(_P.ADMISSION_READ),
         ("POST", "/personal-admission"): _ADMISSION_WRITE,
+        ("POST", "/personal-admission/model-rights/{right_id}/withdraw"): _ADMISSION_WRITE,
         ("POST", "/operations/reconstruction-admission"): _ADMISSION_WRITE,
         ("POST", "/environment-resources/sources"): _ADMISSION_WRITE,
         ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): (

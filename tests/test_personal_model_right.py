@@ -39,6 +39,7 @@ from exulanica.ingest.model_rights import (
     ModelRightRefused,
     egress_origin,
     grant_model_right,
+    model_right,
     model_rights_for_capture,
     require_model_right,
     withdraw_model_right,
@@ -1293,3 +1294,59 @@ def test_a_replayed_admission_reports_whether_each_right_is_still_current(upload
     status = upload.get("/personal-admission").json()
     source = next(s for s in status["sources"] if s["capture_id"] == receipt["capture_id"])
     assert sorted(right["state"] for right in source["model_rights"]) == ["current", "ended"]
+
+
+def _withdraw(upload, right_id):
+    return post(upload, f"/personal-admission/model-rights/{right_id}/withdraw", {})
+
+
+def test_an_account_holder_withdraws_a_right_over_http_and_nothing_is_sent(upload):
+    body = batch(upload, count=1)
+    body["model_rights"] = _vision_rights(body)
+    receipt = post(upload, "/personal-admission", body).json()["receipts"][0]
+    right_id = receipt["model_right_ids"][1]
+    stored = uuid.UUID(right_id)
+
+    withdrawn = _withdraw(upload, right_id)
+    assert withdrawn.status_code == 200, withdrawn.text
+    ended = withdrawn.json()
+    assert ended["right_id"] == right_id
+    assert ended["withdrawn"] is True
+    assert ended["state"] == "ended"
+    assert "purpose" not in ended
+    (first,) = upload.rows(
+        "select withdrawn_at, withdrawn_by from personal_model_right where right_id=%s", stored
+    )
+    again = _withdraw(upload, right_id)
+    assert again.status_code == 200, again.text
+    assert again.json() == ended
+    assert upload.rows(
+        "select withdrawn_at, withdrawn_by from personal_model_right where right_id=%s", stored
+    ) == [first]
+
+    # The fallback's right is gone, so the chain is not covered and the photograph stays here.
+    upload.drain(screened=False)
+    assert upload.vision.calls == 0
+    status = upload.get("/personal-admission").json()
+    source = next(s for s in status["sources"] if s["capture_id"] == receipt["capture_id"])
+    states = {right["right_id"]: right["state"] for right in source["model_rights"]}
+    assert states[right_id] == "ended"
+
+
+def test_withdrawing_an_unknown_or_foreign_right_is_the_same_404(upload, spine_schema):
+    psycopg_module, scratch = spine_schema
+    other_workspace = uuid.uuid4()
+    owner = open_scratch_connection(psycopg_module, scratch)
+    try:
+        elsewhere = admit_personal(
+            IngestRepository(owner, other_workspace), upload.store, photo_bytes(), "theirs.jpg"
+        )
+        foreign = grant(elsewhere, HOSTED.identities[0], HOSTED.destination)
+        unknown = _withdraw(upload, uuid.uuid4())
+        stolen = _withdraw(upload, foreign.right_id)
+        assert unknown.status_code == 404, unknown.text
+        assert stolen.status_code == 404, stolen.text
+        assert stolen.json() == unknown.json()
+        assert model_right(elsewhere.repository, foreign.right_id).withdrawn_at is None
+    finally:
+        owner.close()

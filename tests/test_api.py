@@ -208,6 +208,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     # Authentication must precede validation of personal authority or review receipts.
     ("POST", "/personal-admission"): {"json": {}},
     ("GET", "/personal-admission"): {},
+    ("POST", "/personal-admission/model-rights/{right_id}/withdraw"): {},
     ("GET", "/identity/events"): {},
     ("GET", "/operations/derivative-jobs"): {},
     ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
@@ -418,6 +419,7 @@ class Deployment:
             .replace("{resource_id}", str(uuid.uuid4()))
             .replace("{version_id}", str(uuid.uuid4()))
             .replace("{request_id}", str(uuid.uuid4()))
+            .replace("{right_id}", str(uuid.uuid4()))
             .replace("{subject_kind}", "avatar")
             .replace("{subject_id}", str(uuid.uuid4()))
         )

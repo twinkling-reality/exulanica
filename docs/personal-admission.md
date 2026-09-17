@@ -71,7 +71,10 @@ subclass) otherwise, with `reason` one of `undeclared`, `missing`, `expired`, `w
 `lapsed`, `other_model` (another identifier or another revision), `other_destination` and
 `changed`. It returns a `ModelRightDecision` naming the rights that permitted the hand-over.
 `grant_model_right`, `withdraw_model_right` and `model_rights_for_capture` are the writers and the
-reader.
+reader. `POST /personal-admission/model-rights/{right_id}/withdraw` (permission `admission.write`)
+withdraws one right for the caller's workspace and answers with the right's reference and
+`"state": "ended"`; a second withdrawal changes nothing, and another workspace's right gets the same
+404 as an id nobody granted.
 
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
 (local) call it immediately before their model; a refusal records `stage_unavailable` with the
@@ -87,7 +90,6 @@ fallback only when the local detector will run. The value types, `ModelIdentity`
 
 **Not covered yet.**
 
-- There is no HTTP route to withdraw a right. `withdraw_model_right` is the only withdrawal.
 - The manifest states no depth role, so depth cannot be granted by role name through the batch
   path; a depth right names its checkpoint through `grant_model_right`.
 - Scene pose (COLMAP, classic feature matching with no learned weights) runs under the scene
@@ -154,8 +156,7 @@ whole list is validated before any receipt is written. Each response receipt car
 purpose). A batch that names no role records no right, and the worker then sends its photographs to
 no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,
 and `GET /personal-admission` lists the rights the actor granted over each source. Neither answer is
-a permission. There is no HTTP route to withdraw a right yet; `withdraw_model_right` is the
-withdrawal.
+a permission. `POST /personal-admission/model-rights/{right_id}/withdraw` ends one right.
 
 For `review`, supply `reviewed_by_name`, `attestation`, and either `no-person` or `confirmed-regions`
 on every member. The attestation must exactly read:

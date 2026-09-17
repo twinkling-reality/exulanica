@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 
 from exulanica.api.dependencies import (
     CurrentSession,
@@ -15,6 +15,7 @@ from exulanica.api.dependencies import (
 )
 from exulanica.api.services import Services
 from exulanica.errors import BlobNotFoundError, PrivacyAdmissionError
+from exulanica.ingest.model_rights import withdraw_model_right
 from exulanica.ingest.personal_admission import PersonalBatch, admit_batch
 from exulanica.ingest.personal_requests import admission_status, personal_request
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -59,3 +60,24 @@ def admit_personal(
 @router.get("")
 def personal_status(connection: ReadOnlyConnection, session: CurrentSession) -> dict[str, Any]:
     return admission_status(connection, session.workspace_id, session.actor)
+
+
+@router.post("/model-rights/{right_id}/withdraw")
+def withdraw_right(
+    right_id: Annotated[uuid.UUID, Path()],
+    connection: ScopedConnection,
+    session: CurrentSession,
+) -> dict[str, Any]:
+    """End one model right now. Final, and idempotent: a second withdrawal changes nothing.
+
+    Another workspace's right is answered exactly as an id nobody granted.
+    """
+    try:
+        right = withdraw_model_right(
+            IngestRepository(connection, session.workspace_id),
+            right_id=right_id,
+            withdrawn_by=session.actor,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="no such model right") from exc
+    return {**right.as_reference(), "state": "ended"}
