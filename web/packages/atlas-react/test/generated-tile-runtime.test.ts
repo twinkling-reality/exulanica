@@ -167,12 +167,33 @@ describe('standing on the tile\'s own nav_envelope', () => {
   });
 });
 
+describe('a tile whose nav_envelope is there but empty', () => {
+  // MEASURED on the corridor lane's first baked street: its container carries a nav_envelope
+  // projection with its own digest and no triangle, because the expanders that make walkable
+  // geometry do not exist yet. The screen said "carries no nav_envelope", which was false about the
+  // container, so the two cases now say which one happened.
+  const extent = { min: [-4000, -4000, -200] as const, max: [8000, 8000, 640] as const };
+  const empty = {
+    header: { name: 'nav_envelope', triangle_count: 0, vertex_count: 0 },
+  } as unknown as Parameters<typeof tileNavigation>[0];
+  const navigation = tileNavigation(empty, extent, CITY_V2_CAPSULE);
+
+  it('says the projection is there and holds no triangle, and still stands nobody on it', () => {
+    expect(navigation.support).toEqual({
+      state: 'unavailable',
+      reason: "The tile's nav_envelope is empty, so there is nothing to stand on: the projection is there, with its own digest, and it holds no triangle.",
+    });
+    expect(navigation.viewpointOnly).toBe(true);
+    expect(navigation.world.surface.sample(navigation.start.x, navigation.start.z)).toBeNull();
+  });
+});
+
 describe('a tile with no nav_envelope', () => {
   const extent = { min: [-4000, -4000, -200] as const, max: [8000, 8000, 640] as const };
   const navigation = tileNavigation(undefined, extent, CITY_V2_CAPSULE);
 
   it('has no support anywhere, says so, and opens at a stated viewpoint outside the tile', () => {
-    expect(navigation.support).toEqual({ state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' });
+    expect(navigation.support).toEqual({ state: 'unavailable', reason: 'The tile carries no nav_envelope projection, so there is nothing to stand on.' });
     expect(navigation.viewpointOnly).toBe(true);
     for (const [x, z] of [[0, 0], [2, -2], [navigation.start.x, navigation.start.z], [-3.9, 3.9]] as const) {
       expect(navigation.world.surface.sample(x, z)).toBeNull();

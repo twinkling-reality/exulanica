@@ -20,7 +20,11 @@ import type { CameraState } from '../controls.js';
  *
  * NAVIGATION IS NEVER DERIVED FROM WHAT IS DRAWN. Melbourne passed every budget and failed capsule
  * clearance because its ground came out of the render mesh. So this module reads the
- * `nav_envelope` projection and nothing else for support. When a tile carries none, the support
+ * `nav_envelope` projection and nothing else for support. A tile with no projection at all and a tile
+ * whose projection holds no triangle both leave nothing to stand on, and the statement says WHICH: an
+ * empty projection means the bake ran and produced no walkable geometry, which is a different fact
+ * about the world from a container that never carried one, and a person reading the screen should not
+ * have to guess. When a tile carries none, the support
  * answers "no surface" everywhere, the opening pose is a stated viewpoint rather than a stance, and
  * any attempt to walk gets the app's own "no walkable surface" notice.
  *
@@ -275,7 +279,9 @@ export function tileNavigation(
     return {
       world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule),
       start: { x: vx, y: capsule.eyeHeightM, z: vz, yaw: 0, pitch },
-      support: { state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' },
+      support: { state: 'unavailable', reason: navEnvelope === undefined
+        ? 'The tile carries no nav_envelope projection, so there is nothing to stand on.'
+        : 'The tile\'s nav_envelope is empty, so there is nothing to stand on: the projection is there, with its own digest, and it holds no triangle.' },
       collisionState: COLLISION_PENDING,
       viewpointOnly: true,
       capsule,
