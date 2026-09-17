@@ -10,6 +10,7 @@ import {
 import { bakeTile, decodeOwd, type DecodedOwd } from '@exulanica/loom-tess/core';
 
 // Relative to web/, where the suite runs.
+/** Tess's owd/3 development golden. */
 const GOLDEN = 'packages/app/src/dev/tiles/tile-conformance.owd';
 const CITY_V2 = '../tests/fixtures/city-v2/tile-document.json';
 const sha256 = async (bytes: Uint8Array): Promise<string> => createHash('sha256').update(bytes).digest('hex');
@@ -21,6 +22,7 @@ interface Outcome {
   readonly hasExtent: boolean;
   readonly subjectId: string | null;
   readonly bounded: boolean;
+  readonly surfaces: readonly string[];
   readonly reason: string | null;
 }
 
@@ -44,13 +46,16 @@ function readThroughContract(owd: DecodedOwd): readonly Outcome[] {
     const raw = batch.entries[index]!;
     let entry: GeneratedRecordEntry;
     if (raw.state === 'drawn') {
-      const material = raw.material;
       entry = {
         state: 'drawn',
         extentMm: raw.extent_mm,
-        material: material === undefined || material.state !== 'record'
-          ? { state: 'none-exists' }
-          : { state: 'record', record: header.records[material.record]! },
+        surfaces: (raw.surfaces ?? []).map(surface => ({
+          role: surface.role,
+          orientation: surface.orientation,
+          material: surface.material.state === 'record'
+            ? { state: 'record' as const, record: header.records[surface.material.record]! }
+            : { state: 'none-exists' as const },
+        })),
       };
     } else if (raw.state === 'unavailable') {
       entry = { state: 'unavailable', needs: raw.needs };
@@ -66,6 +71,7 @@ function readThroughContract(owd: DecodedOwd): readonly Outcome[] {
       hasExtent: Object.hasOwn(record.fields, 'extent'),
       subjectId: result.subject?.subjectId ?? null,
       bounded: result.subject?.bounds != null,
+      surfaces: result.subject?.record?.surfaces?.map(surface => `${surface.role}:${surface.material}`) ?? [],
       reason: result.reason,
     };
   });
@@ -88,12 +94,12 @@ function expectContract(outcomes: readonly Outcome[]): void {
   expect(new Set(ids).size).toBe(ids.length);
 }
 
-/** What tess's owd/2 draws of the fixture today, pinned so a change here is a deliberate one. */
+/** What tess's owd/3 draws of the fixture today, pinned so a change here is a deliberate one. */
 function expectToday(outcomes: readonly Outcome[]): void {
   const count = (test: (outcome: Outcome) => boolean) => outcomes.filter(test).length;
   expect(outcomes).toHaveLength(174);
-  expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded]))
-    .toEqual([['city.terrain', true]]);
+  expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded, outcome.surfaces]))
+    .toEqual([['city.terrain', true, ['terrain:none-exists']]]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
   expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(61);
   expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(24);
@@ -101,7 +107,7 @@ function expectToday(outcomes: readonly Outcome[]): void {
 }
 
 describe('generated subject contract v2 over real city v2 containers', () => {
-  it('reads tess\'s owd/2 development golden: every owned drawn record a subject, every halo record none', () => {
+  it('reads tess\'s owd/3 development golden: every owned drawn record a subject, every halo record none', () => {
     const outcomes = readThroughContract(decodeOwd(new Uint8Array(readFileSync(GOLDEN))));
     expectContract(outcomes);
     expectToday(outcomes);

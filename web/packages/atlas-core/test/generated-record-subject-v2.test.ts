@@ -75,8 +75,8 @@ const tile: GeneratedTileReferenceV2 = {
 };
 
 const drawn = (min: [number, number, number], max: [number, number, number],
-  material: GeneratedMaterialStatement): GeneratedRecordEntry =>
-  ({ state: 'drawn', extentMm: { min, max }, material });
+  material: GeneratedMaterialStatement, role = 'wall', orientation = 'vertical'): GeneratedRecordEntry =>
+  ({ state: 'drawn', extentMm: { min, max }, surfaces: [{ role, orientation, material }] });
 
 const register = (record: GeneratedRecordPayload, entry: GeneratedRecordEntry,
   changes: Partial<GeneratedRecordRegistrationV2> = {}) => generatedRecordSubjectV2(tile, {
@@ -104,7 +104,8 @@ describe('generated street subject contract v2', () => {
       subjectId: `generated:city.facade:${FACADE}`, subjectKind: 'object', origin: 'generated',
       frameId: `city_local:${CITY}`, sourceRefs: [tile.inputsDigest], rendered: true,
       points: 'mesh-surface-samples', sceneId: null, label: null,
-      record: { kind: 'city.facade', version: 2, identity: FACADE, key: '', material: 'record' },
+      record: { kind: 'city.facade', version: 2, identity: FACADE, key: '',
+        surfaces: [{ role: 'wall', orientation: 'vertical', material: 'record', dressingIdentity: wall.fields['identity'] }] },
     });
     expect(subject!.bounds).toEqual({
       frameId: `city_local:${CITY}`, units: 'metres', origin: 'generated', basis: 'generated-extent',
@@ -143,12 +144,12 @@ describe('generated street subject contract v2', () => {
   });
 
   it('draws undressed exact geometry with a box and says no material dresses it', () => {
-    const { subject } = register(terrain, drawn([0, 0, -95], [128_000, 128_000, 0], { state: 'none-exists' }));
-    expect(subject!.record!.material).toBe('none-exists');
+    const { subject } = register(terrain, drawn([0, 0, -95], [128_000, 128_000, 0], { state: 'none-exists' }, 'terrain', 'horizontal'));
+    expect(subject!.record!.surfaces).toEqual([{ role: 'terrain', orientation: 'horizontal', material: 'none-exists', dressingIdentity: null }]);
     expect(subject!.bounds).not.toBeNull();
-    expect(subject!.unavailableReason).toContain('No material dresses this geometry');
+    expect(subject!.unavailableReason).toContain('No material dresses its terrain surface; drawn exact and undressed.');
     expect(() => register(terrain, { state: 'drawn', extentMm: { min: [0, 0, -95], max: [1, 1, 0] } } as unknown as GeneratedRecordEntry))
-      .toThrow('either one material or its surfaces');
+      .toThrow('states at least one surface');
   });
 
   it('lists an owd/3 range\'s surfaces with their dressings, and refuses a material for another record or role', () => {
@@ -181,9 +182,7 @@ describe('generated street subject contract v2', () => {
       { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
       { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
     ]))).toThrow('each surface role once');
-    expect(() => register(facade, withSurfaces([]))).toThrow('at least one');
-    expect(() => register(facade, { ...withSurfaces([{ role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } }]),
-      material: { state: 'none-exists' } } as GeneratedRecordEntry)).toThrow('not both or neither');
+    expect(() => register(facade, withSurfaces([]))).toThrow('at least one surface');
     expect(() => register(facade, withSurfaces([{ role: 'Wall', orientation: 'vertical', material: { state: 'none-exists' } }])))
       .toThrow('names its role and orientation');
   });

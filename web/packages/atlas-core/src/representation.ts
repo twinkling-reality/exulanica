@@ -76,14 +76,8 @@ export interface RepresentationRecordReference {
    */
   readonly key: string;
   /**
-   * Contract v2 only: what the drawn range states about its dressing. `record` when a material
-   * record dresses it, `none-exists` when exact geometry is drawn and nothing dresses it.
-   */
-  readonly material?: 'record' | 'none-exists';
-  /**
-   * Contract v2 on a container that states surfaces (owd/3): one per surface role of the drawn
-   * range, with what dresses it. These are the dressings an inspector lists under the subject.
-   * Present instead of `material`, never beside it.
+   * Contract v2, a drawn record only: one per surface role of its drawn range (owd/3), with what
+   * dresses it. These are the dressings an inspector lists under the subject.
    */
   readonly surfaces?: readonly RepresentationRecordSurface[];
 }
@@ -182,8 +176,7 @@ export function validateRepresentationSubject(subject: RepresentationSubject): v
       && !(CITY_RECORD_KIND.test(record.kind) && record.key === '')
     || !Number.isSafeInteger(record.version) || record.version < 1
     || !CANONICAL_UUID.test(record.identity) || !RECORD_KEY.test(record.key)
-    || (record.material !== undefined && !['record', 'none-exists'].includes(record.material))
-    || (record.surfaces !== undefined && (record.material !== undefined || !Array.isArray(record.surfaces)
+    || (record.surfaces !== undefined && (!Array.isArray(record.surfaces)
       || record.surfaces.length === 0 || record.surfaces.length > 64
       || record.surfaces.some(surface => !SURFACE_WORD.test(surface.role) || !SURFACE_WORD.test(surface.orientation)
         || (surface.material === 'record') !== (typeof surface.dressingIdentity === 'string' && CANONICAL_UUID.test(surface.dressingIdentity))
@@ -533,13 +526,8 @@ export type GeneratedRecordEntry =
     readonly state: 'drawn';
     /** Integer millimetres in the records' frame: the extent of this record's drawn range. */
     readonly extentMm: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] };
-    /**
-     * owd/2: the material record the whole range cites, resolved from its index, or the statement
-     * that none exists. Exactly one of `material` and `surfaces` is given.
-     */
-    readonly material?: GeneratedMaterialStatement;
     /** owd/3: one entry per surface role of the range, each with its own material statement. */
-    readonly surfaces?: readonly GeneratedSurfaceStatement[];
+    readonly surfaces: readonly GeneratedSurfaceStatement[];
   }
   | { readonly state: 'unavailable'; readonly needs: readonly string[] }
   | { readonly state: 'not_admitted' }
@@ -677,7 +665,6 @@ export function generatedRecordSubjectV2(
   }
   const declared = declaredExtent(kind, record.fields['extent']);
   let bounds: RepresentationBounds | null = null;
-  let material: RepresentationRecordReference['material'];
   let surfaces: RepresentationRecordReference['surfaces'];
   let reason: string;
   if (entry.state === 'drawn') {
@@ -692,14 +679,14 @@ export function generatedRecordSubjectV2(
       throw new TypeError(`${kind} ${identity}: the drawn extent lies outside the extent the record declares`);
     }
     const subjectId = `generated:${kind}:${identity}`;
-    // A material record must dress this very record, and under a surface, that surface's role.
-    const dressedBy = (statement: GeneratedMaterialStatement | undefined, role: string | null) => {
+    // A material record must dress this very record, under that surface's own role.
+    const dressedBy = (statement: GeneratedMaterialStatement | undefined, role: string) => {
       if (statement?.state === 'record') {
         const dressing = generatedDressing(statement.record);
         if (dressing.dressesSubjectId !== subjectId) {
           throw new TypeError(`${kind} ${identity}: its range cites a material that dresses another record`);
         }
-        if (role !== null && dressing.role !== role) {
+        if (dressing.role !== role) {
           throw new TypeError(`${kind} ${identity}: its ${role} surface cites a material for the ${dressing.role} role`);
         }
         return { material: 'record' as const, dressingIdentity: dressing.identity };
@@ -707,25 +694,18 @@ export function generatedRecordSubjectV2(
       if (statement?.state === 'none-exists') return { material: 'none-exists' as const, dressingIdentity: null };
       throw new TypeError(`${kind} ${identity}: a drawn range cites a material record or states that none exists`);
     };
-    if ((entry.material === undefined) === (entry.surfaces === undefined)) {
-      throw new TypeError(`${kind} ${identity}: a drawn range states either one material or its surfaces, not both or neither`);
+    if (!Array.isArray(entry.surfaces) || entry.surfaces.length === 0) {
+      throw new TypeError(`${kind} ${identity}: a drawn range states at least one surface`);
     }
-    if (entry.surfaces !== undefined) {
-      if (!Array.isArray(entry.surfaces) || entry.surfaces.length === 0) {
-        throw new TypeError(`${kind} ${identity}: a drawn range that states surfaces states at least one`);
+    surfaces = Object.freeze(entry.surfaces.map(surface => {
+      if (typeof surface?.role !== 'string' || !SURFACE_WORD.test(surface.role)
+        || typeof surface.orientation !== 'string' || !SURFACE_WORD.test(surface.orientation)) {
+        throw new TypeError(`${kind} ${identity}: a surface names its role and orientation`);
       }
-      surfaces = Object.freeze(entry.surfaces.map(surface => {
-        if (typeof surface?.role !== 'string' || !SURFACE_WORD.test(surface.role)
-          || typeof surface.orientation !== 'string' || !SURFACE_WORD.test(surface.orientation)) {
-          throw new TypeError(`${kind} ${identity}: a surface names its role and orientation`);
-        }
-        return Object.freeze({ role: surface.role, orientation: surface.orientation, ...dressedBy(surface.material, surface.role) });
-      }));
-      if (new Set(surfaces.map(surface => surface.role)).size !== surfaces.length) {
-        throw new TypeError(`${kind} ${identity}: a drawn range states each surface role once`);
-      }
-    } else {
-      material = dressedBy(entry.material, null).material;
+      return Object.freeze({ role: surface.role, orientation: surface.orientation, ...dressedBy(surface.material, surface.role) });
+    }));
+    if (new Set(surfaces.map(surface => surface.role)).size !== surfaces.length) {
+      throw new TypeError(`${kind} ${identity}: a drawn range states each surface role once`);
     }
     bounds = Object.freeze({
       frameId, units: 'metres' as const, origin: 'generated' as const, basis: 'generated-extent' as const,
@@ -735,7 +715,6 @@ export function generatedRecordSubjectV2(
     reason = registration.drawnSeparately
       ? 'Sampled points are generated surface samples of this record, not measurements.'
       : 'This record shares a tile batch draw, so it switches to points only at the points end.';
-    if (material === 'none-exists') reason += ' No material dresses this geometry; it is drawn exact and undressed.';
     const undressed = surfaces?.filter(surface => surface.material === 'none-exists').map(surface => surface.role) ?? [];
     if (undressed.length > 0) reason += ` No material dresses its ${undressed.join(', ')} surface${undressed.length > 1 ? 's' : ''}; drawn exact and undressed.`;
   } else if (entry.state === 'unavailable') {
@@ -767,7 +746,7 @@ export function generatedRecordSubjectV2(
     dataAvailable: available,
     unavailableReason: available ? reason : `Generated record is ${registration.availability}.`,
     record: Object.freeze({
-      kind, version: record.version, identity, key: '', ...(material === undefined ? {} : { material }),
+      kind, version: record.version, identity, key: '',
       ...(surfaces === undefined ? {} : { surfaces }),
     }),
   });
