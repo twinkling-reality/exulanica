@@ -191,7 +191,7 @@ stops from speeds, gaps from the catalog.
 
 The property runs (six seeds) drive a busy fleet of 10 bicycles, 4 buses, 18 cars and 8 vans on a
 five-junction test network built with the city's own record classes. Trips are requested for 15
-minutes, a pedestrian steps onto each crosswalk about every 45 seconds, and the run continues until
+minutes, a pedestrian steps onto each crosswalk about once a minute, and the run continues until
 every trip has ended. Each run must have no violation, no breach and no speed over a cap; every
 junction entered and every crosswalk walked; at least 50 trips; and every trip arrived, or blocked
 with its reason. Every check kind has a negative control, a planted transition that breaks its rule
