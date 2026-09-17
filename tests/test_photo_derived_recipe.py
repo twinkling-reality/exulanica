@@ -4,7 +4,8 @@ A personal model right (migration 0073) names one capture, one model and one des
 object names one right per photograph and the model and destination those rights must share. Each
 test below breaks one of its rules and expects the refusal that rule gives. Nothing here touches a
 database or a photograph: the object is plain data, and the check that the rights are current
-belongs to the world service that will write the recipe.
+belongs to the world service that will write the recipe. The last tests hold the object to the
+right's own code, so the two spellings of a model and a destination cannot drift apart.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import json
 import uuid
 
 import pytest
+from exulanica.ingest import model_rights
 from exulanica.materials import MaterialObjectError, canonical_bytes
 from exulanica.materials.photo_derived import (
     LOCAL_PROCESS,
@@ -30,6 +32,51 @@ LOCAL = ModelReference(LOCAL_PROVIDER, "texture_inverse", "exulanica/texture-inv
 HOSTED = ModelReference("nebius", "vision", "Qwen/Qwen2.5-VL-72B-Instruct", None)
 FIRST = uuid.UUID("11111111-1111-4111-8111-111111111111")
 SECOND = uuid.UUID("22222222-2222-4222-8222-222222222222")
+
+ORIGINS = (
+    "https://models.example.com",
+    "https://models.example.com:8443",
+    "https://localhost",
+    "http://localhost:8080",
+    "https://" + "a" * 63 + ".example.com",
+)
+NOT_ORIGINS = (
+    "",
+    "local",
+    "http://models.example.com",
+    "https://models.example.com:443",
+    "http://localhost:80",
+    "https://models.example.com:0",
+    "https://models.example.com:65536",
+    "https://models.example.com/v1",
+    "https://Models.example.com",
+    "https://example",
+    "https://10.0.0.1",
+    "https://models.0x1f",
+    "https://user@models.example.com",
+    "https://models.example.com\n",
+    "https://" + "a" * 64 + ".example.com",
+    "https://" + ".".join(["abcdefghij"] * 25) + ".com",
+)
+MALFORMED_MODELS = (
+    (("Local", "texture_inverse", "m", COMMIT), "provider is a provider key"),
+    (("local-ai", "texture_inverse", "m", COMMIT), "provider is a provider key"),
+    (("", "texture_inverse", "m", COMMIT), "provider is a provider key"),
+    ((None, "texture_inverse", "m", COMMIT), "provider is a provider key"),
+    (("local", "Texture", "m", COMMIT), "role is a role name"),
+    (("local", "texture inverse", "m", COMMIT), "role is a role name"),
+    (("local", "t" * 64, "m", COMMIT), "role is a role name"),
+    (("local", "texture_inverse", "", COMMIT), "named by its identifier"),
+    (("local", "texture_inverse", "-m", COMMIT), "named by its identifier"),
+    (("local", "texture_inverse", "a model", COMMIT), "named by its identifier"),
+    (("local", "texture_inverse", "m" * 201, COMMIT), "named by its identifier"),
+    (("local", "texture_inverse", "m", COMMIT[:-1]), "revision is a full lowercase commit"),
+    (("local", "texture_inverse", "m", COMMIT.upper()), "revision is a full lowercase commit"),
+    (("local", "texture_inverse", "m", True), "revision is a full lowercase commit"),
+    (("local", "texture_inverse", "m", None), "pinned to a full commit"),
+    # The content-pinned form a trained checkpoint will use arrives with that checkpoint.
+    (("local", "texture_inverse", "m", "sha256:" + "ab" * 32), "full lowercase commit"),
+)
 
 
 def _source(capture: uuid.UUID, right: uuid.UUID | None = None) -> PhotoSource:
@@ -79,16 +126,7 @@ def test_the_model_is_spelled_the_way_a_personal_model_right_spells_it():
     assert HOSTED.as_record()["revision"] is None
 
 
-@pytest.mark.parametrize(
-    "destination",
-    [
-        "https://models.example.com",
-        "https://models.example.com:8443",
-        "https://localhost",
-        "http://localhost:8080",
-        "https://" + "a" * 63 + ".example.com",
-    ],
-)
+@pytest.mark.parametrize("destination", ORIGINS)
 def test_a_hosted_model_names_an_origin(destination):
     assert _recipe(model=HOSTED, destination=destination).destination == destination
 
@@ -158,29 +196,7 @@ def test_a_hosted_model_never_reads_photographs_kept_in_this_process():
         _recipe(model=HOSTED, destination=LOCAL_PROCESS)
 
 
-@pytest.mark.parametrize(
-    "destination",
-    [
-        "",
-        "local",
-        "http://models.example.com",
-        "https://models.example.com:443",
-        "http://localhost:80",
-        "https://models.example.com:0",
-        "https://models.example.com:65536",
-        "https://models.example.com/v1",
-        "https://Models.example.com",
-        "https://example",
-        "https://10.0.0.1",
-        "https://models.0x1f",
-        "https://user@models.example.com",
-        "https://models.example.com\n",
-        "https://" + "a" * 64 + ".example.com",
-        "https://" + ".".join(["abcdefghij"] * 25) + ".com",
-        None,
-        b"local-process",
-    ],
-)
+@pytest.mark.parametrize("destination", (*NOT_ORIGINS, None, b"local-process"))
 def test_an_origin_is_written_the_one_way_a_right_accepts(destination):
     with pytest.raises(MaterialObjectError, match="names where the photographs went"):
         _recipe(model=HOSTED, destination=destination)
@@ -189,28 +205,7 @@ def test_an_origin_is_written_the_one_way_a_right_accepts(destination):
 # -- the model -----------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("fields", "message"),
-    [
-        (("Local", "texture_inverse", "m", COMMIT), "provider is a provider key"),
-        (("local-ai", "texture_inverse", "m", COMMIT), "provider is a provider key"),
-        (("", "texture_inverse", "m", COMMIT), "provider is a provider key"),
-        ((None, "texture_inverse", "m", COMMIT), "provider is a provider key"),
-        (("local", "Texture", "m", COMMIT), "role is a role name"),
-        (("local", "texture inverse", "m", COMMIT), "role is a role name"),
-        (("local", "t" * 64, "m", COMMIT), "role is a role name"),
-        (("local", "texture_inverse", "", COMMIT), "named by its identifier"),
-        (("local", "texture_inverse", "-m", COMMIT), "named by its identifier"),
-        (("local", "texture_inverse", "a model", COMMIT), "named by its identifier"),
-        (("local", "texture_inverse", "m" * 201, COMMIT), "named by its identifier"),
-        (("local", "texture_inverse", "m", COMMIT[:-1]), "revision is a full lowercase commit"),
-        (("local", "texture_inverse", "m", COMMIT.upper()), "revision is a full lowercase commit"),
-        (("local", "texture_inverse", "m", True), "revision is a full lowercase commit"),
-        (("local", "texture_inverse", "m", None), "pinned to a full commit"),
-        # The content-pinned form a trained checkpoint will use arrives with that checkpoint.
-        (("local", "texture_inverse", "m", "sha256:" + "ab" * 32), "full lowercase commit"),
-    ],
-)
+@pytest.mark.parametrize(("fields", "message"), MALFORMED_MODELS)
 def test_a_malformed_model_is_refused(fields, message):
     with pytest.raises(MaterialObjectError, match=message):
         ModelReference(*fields)
@@ -222,3 +217,45 @@ def test_the_model_is_a_model_reference_and_the_recipe_a_digest():
     for digest in ("ab" * 31, "AB" * 32, None, bytes.fromhex(RECIPE)):
         with pytest.raises(MaterialObjectError, match="names its recipe by sha256"):
             _recipe(recipe_sha256=digest)
+
+
+# -- the same spellings as the personal model right's own code -------------------------------------
+
+
+def test_the_local_names_are_the_rights_own():
+    assert (LOCAL_PROVIDER, LOCAL_PROCESS) == (
+        model_rights.LOCAL_PROVIDER,
+        model_rights.LOCAL_PROCESS,
+    )
+
+
+@pytest.mark.parametrize("reference", [LOCAL, HOSTED], ids=["local", "hosted"])
+def test_a_model_is_one_record_whichever_module_writes_it(reference):
+    identity = model_rights.ModelIdentity(
+        provider=reference.provider,
+        role=reference.role,
+        model_id=reference.model_id,
+        revision=reference.revision,
+    )
+    assert identity.as_record() == reference.as_record()
+
+
+@pytest.mark.parametrize(("fields", "message"), MALFORMED_MODELS)
+def test_a_model_this_object_refuses_the_right_refuses_too(fields, message):
+    with pytest.raises(ValueError):
+        model_rights.ModelIdentity(*fields)
+
+
+@pytest.mark.parametrize("destination", ORIGINS)
+def test_an_origin_this_object_accepts_is_the_rights_own_spelling(destination):
+    assert model_rights.egress_origin(destination) == destination
+
+
+@pytest.mark.parametrize("destination", NOT_ORIGINS)
+def test_an_origin_this_object_refuses_is_never_stored_by_a_right_as_written(destination):
+    """The right's code refuses it, or writes it another way before a right can hold it."""
+    try:
+        spelled = model_rights.egress_origin(destination)
+    except ValueError:
+        return
+    assert spelled != destination
