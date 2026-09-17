@@ -272,8 +272,16 @@ class QwenImageFunControl(_Base):
             kwargs["hidden_states"] = roll(kwargs["hidden_states"], 1)
             kwargs["control_context"] = roll(kwargs["control_context"], 1)
             output = original(*args, **kwargs)
-            prediction = output[0] if isinstance(output, tuple) else output.sample
-            return (roll(prediction, -1),)
+            # This pipeline calls the transformer with return_dict=False and then uses the answer as
+            # a tensor, but a diffusers model may hand back a tuple or an output object depending on
+            # its version. Unroll whichever came back and return the same shape, so the pipeline sees
+            # what it expects. MEASURED on the first real run, which returned a bare tensor.
+            if isinstance(output, tuple):
+                return (roll(output[0], -1), *output[1:])
+            if hasattr(output, "sample"):
+                output.sample = roll(output.sample, -1)
+                return output
+            return roll(output, -1)
 
         transformer.forward = forward
 

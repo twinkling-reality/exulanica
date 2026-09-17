@@ -52,6 +52,9 @@ rsync -a --delete \
   "${here}/" "${host}:${remote}/ml-appearance/"
 rsync -a --delete "${work}/staged-smoke" "${work}/staged-session-1" "${host}:${remote}/"
 
+echo "== what the host has (installs the NVIDIA container toolkit only if Docker has no runtime)"
+ssh "${host}" "bash ${remote}/ml-appearance/scripts/host-check.sh"
+
 echo "== building the image (bases pinned by digest, VideoX-Fun pinned by commit and tree)"
 ssh "${host}" "cd ${remote}/ml-appearance && docker build -f container/Dockerfile \
   --build-arg CODE_REVISION=${head} -t appearance:${tag} ."

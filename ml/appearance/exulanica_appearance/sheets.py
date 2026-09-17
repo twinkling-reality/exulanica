@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw
 from exulanica_appearance.capture import encode
 from exulanica_appearance.structure import LayerStore, load_layers, read_structure
 
-__all__ = ["before_sheets"]
+__all__ = ["before_sheets", "texture_pairs"]
 
 _TILE: Final = (480, 300)
 _LABEL: Final = 22
@@ -87,3 +87,82 @@ def before_sheets(structure_dir: Path, frames_dir: Path, out: Path) -> Iterator[
         path = out / "before-all-poses.png"
         sheet.save(path)
         yield path
+
+
+def texture_pairs(
+    *,
+    repository: Path,
+    results: Path,
+    out: Path,
+    tile: int = 2,
+) -> list[Path]:
+    """One sheet a target: the published set's colour, then each candidate's, and a tiled composite.
+
+    The left panel is what the procedural recipe paints today, read from the pinned container. Each
+    panel to its right is a generated base colour at the same size, labelled with its candidate,
+    seed and measured seam ratio. Below each, the same map tiled ``tile`` by ``tile``, because
+    repetition and seams are what a person sees on a wall and not in one square.
+    """
+    import numpy as np
+
+    from exulanica_appearance.canonical import parse_canonical
+    from exulanica_appearance.containers import read_container
+    from exulanica_appearance.generation import read_generation
+
+    manifest = json.loads((repository / "assets" / "textures" / "manifest.json").read_bytes())
+    pinned = {entry["content_sha256"]: entry for entry in manifest["sets"]}
+    summary = parse_canonical((results / "results.json").read_bytes(), "the results")
+    out.mkdir(parents=True, exist_ok=True)
+
+    by_target: dict[str, list[dict]] = {}
+    for item in summary["generations"]:
+        by_target.setdefault(item["target"], []).append(item)
+
+    written = []
+    for target, items in sorted(by_target.items()):
+        record = read_generation(
+            (results / "records" / f"{items[0]['record_sha256']}.json").read_bytes()
+        )
+        source = record["conditioning"][0]["sources"][0]
+        entry = pinned[source]
+        raw = (repository / "assets" / "textures" / "blobs" / f"{source}.ltex").read_bytes()
+        _, maps = read_container(raw, entry)
+        panels: list[tuple[str, np.ndarray]] = [
+            (f"{entry['set_id']} as the recipe paints it", maps["base_color"])
+        ]
+        for item in sorted(
+            items, key=lambda value: (value["candidate"], value["role"], value["index"])
+        )[:3]:
+            pixels = np.frombuffer(
+                (results / "outputs" / f"{item['output_sha256']}.rgb").read_bytes(), dtype=np.uint8
+            )
+            side = int((pixels.size // 3) ** 0.5)
+            label = (
+                f"{item['candidate']} {item['role']} seed {item['seed']} "
+                f"seams {item['seams_ppm']['u'] / 1e6:.2f}/{item['seams_ppm']['v'] / 1e6:.2f}"
+            )
+            panels.append((label, pixels.reshape(side, side, 3)))
+        width = 420
+        sheet = Image.new("RGB", (width * len(panels), width * 2 + _LABEL * 2), (18, 18, 20))
+        draw = ImageDraw.Draw(sheet)
+        for column, (label, pixels) in enumerate(panels):
+            picture = Image.fromarray(np.ascontiguousarray(pixels))
+            sheet.paste(
+                picture.resize((width, width), Image.Resampling.LANCZOS), (column * width, _LABEL)
+            )
+            draw.text((column * width + 6, 4), label[:64], fill=(230, 230, 230))
+            tiled = Image.new("RGB", (pixels.shape[1] * tile, pixels.shape[0] * tile))
+            for row in range(tile):
+                for step in range(tile):
+                    tiled.paste(picture, (step * pixels.shape[1], row * pixels.shape[0]))
+            sheet.paste(
+                tiled.resize((width, width), Image.Resampling.LANCZOS),
+                (column * width, width + _LABEL * 2),
+            )
+            draw.text(
+                (column * width + 6, width + _LABEL + 4), f"{tile} by {tile}", fill=(200, 200, 200)
+            )
+        path = out / f"pairs-{target}.png"
+        sheet.save(path)
+        written.append(path)
+    return written

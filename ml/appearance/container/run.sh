@@ -37,8 +37,12 @@ esac
 mkdir -p "${out}"
 if [ -n "$(ls -A "${out}")" ]; then echo "run.sh: ${out} is not empty" >&2; exit 2; fi
 
+# As the invoking host user, not the image's own user and never root: the output directory is a bind
+# mount the host owns, and a container user of its own cannot create anything inside it. MEASURED on
+# the first real run, which refused with "PermissionError: [Errno 13] Permission denied: /out/outputs".
 exec timeout --signal=TERM --kill-after=120 "${seconds}" \
   docker run --rm \
+    --user "$(id -u):$(id -g)" \
     --gpus all \
     --network none \
     --read-only \

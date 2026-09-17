@@ -6,6 +6,7 @@
     measure frames   --structure DIR --frames DIR --out FILE
     measure textures --repository ROOT --out FILE
     sheet before     --structure DIR --frames DIR --out DIR
+    sheet pairs      --repository . --results DIR --out DIR
     runner stage     --spec jobs/track-a-session-1.json --repository . --weights weights/ --out DIR
     runner run       --staged DIR --weights DIR --out DIR
     runner check     --out DIR
@@ -85,6 +86,16 @@ def _sheet_before(args: argparse.Namespace) -> int:
     from exulanica_appearance.sheets import before_sheets
 
     for path in before_sheets(Path(args.structure), Path(args.frames), Path(args.out)):
+        print(path)
+    return 0
+
+
+def _sheet_pairs(args: argparse.Namespace) -> int:
+    from exulanica_appearance.sheets import texture_pairs
+
+    for path in texture_pairs(
+        repository=Path(args.repository), results=Path(args.results), out=Path(args.out)
+    ):
         print(path)
     return 0
 
@@ -226,6 +237,11 @@ def main(argv: list[str] | None = None) -> int:
     before.add_argument("--frames", required=True)
     before.add_argument("--out", required=True)
     before.set_defaults(run=_sheet_before)
+    pairs = sheet.add_parser("pairs")
+    pairs.add_argument("--repository", required=True)
+    pairs.add_argument("--results", required=True)
+    pairs.add_argument("--out", required=True)
+    pairs.set_defaults(run=_sheet_pairs)
 
     runner = groups.add_parser("runner").add_subparsers(dest="command", required=True)
     stage = runner.add_parser("stage")

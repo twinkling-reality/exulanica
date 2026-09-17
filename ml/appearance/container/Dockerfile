@@ -50,6 +50,12 @@ ENV EXULANICA_BUILD_REVISION=${CODE_REVISION} \
     TRITON_CACHE_DIR=/tmp/triton \
     MPLCONFIGDIR=/tmp/matplotlib \
     NUMBA_CACHE_DIR=/tmp/numba
+# Triton compiles some of torch's own kernels at run time, so the image needs a C compiler and libc
+# headers. MEASURED on the first real run: without them the first generation failed with
+# "RuntimeError: Failed to find C compiler" inside torch's bmm_outer_product triton kernel.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /usr/local/bin/uv
 COPY --from=videox /opt/videox-fun /opt/videox-fun
 WORKDIR /opt/appearance
