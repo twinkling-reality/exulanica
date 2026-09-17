@@ -1,4 +1,21 @@
 import { canonicalBytes, canonicalJson } from './canonical-json.js';
+import {
+  MATERIAL_CLASSES,
+  MAKER_KINDS,
+  type MakerKind,
+  type MapDescriptor,
+  type MaterialClass,
+  RELIEF_CLASSES,
+  SET_PROFILE_V1,
+  SET_PROFILE_V2,
+  type SetProfile,
+  V1_LAYOUT,
+  classLayout,
+  classParameters,
+  coveragePermille,
+  isMakerKind,
+  isMaterialClass,
+} from './classes.js';
 import type { TextureSetDefinition } from './definition.js';
 import type { Maps } from './maps.js';
 
@@ -6,15 +23,21 @@ import type { Maps } from './maps.js';
  * THE CONTAINER, AND WHY IT IS THIS ONE.
  *
  * `.ltex`: four magic bytes, a little-endian uint32 header length, the header as canonical JSON,
- * space padding to a 16-byte boundary, then the four maps packed one after another with no gaps.
- * Each map is 8-bit texels, interleaved within the map (RGB for the three-channel maps), rows top
- * to bottom. It is the shape `scene-synth/src/format/opm.ts` proved out: self-describing, one
- * fetch, and a map is a `subarray` a renderer can hand to `texImage2D` as it stands.
+ * space padding to a 16-byte boundary, then the maps packed one after another with no gaps. Each
+ * map is 8-bit texels, interleaved within the map, rows top to bottom. It is the shape
+ * `scene-synth/src/format/opm.ts` proved out: self-describing, one fetch, and a map is a
+ * `subarray` a renderer can hand to `texImage2D` as it stands.
+ *
+ * TWO PROFILES, ONE FRAMING. `exulanica.texture-set/v1` holds the four-map opaque layout every set
+ * published before material classes uses. `exulanica.texture-set/v2` states its material class and
+ * its maker's kind, and holds exactly the layout `classes.ts` gives that pair. The framing did not
+ * change, so the magic did not; the profile did, so a reader written for v1 refuses v2 rather than
+ * reading it as something it is not.
  *
  * ONLY THE FIRST MAP IS ALIGNED, which is ADR-0010's correction to OPM carried over. Every texel
  * is one byte wide, so nothing after the first map needs alignment, and a gap would only be bytes
  * a loader has to know to skip. The header states every offset anyway (ADR-0010 D2), and the
- * decoder below refuses a file whose maps are not exactly contiguous.
+ * reader below refuses a file whose maps are not exactly contiguous.
  *
  * WHY NOT PNG. A PNG's bytes are whatever the deflate implementation emitted, so pinning a PNG
  * digest would make Node's bundled zlib a digest input: the same pixels baked on a machine with a
@@ -28,51 +51,21 @@ import type { Maps } from './maps.js';
  * in it is therefore an integer in a stated unit: millimetres, texels, bytes, thousandths.
  */
 export const CONTAINER_MAGIC = 'LTX1';
-export const SET_PROFILE = 'exulanica.texture-set/v1';
+/** The profile every set published before material classes declares. */
+export const SET_PROFILE = SET_PROFILE_V1;
 export const MEDIA_TYPE = 'application/vnd.exulanica.texture-set';
 export const GENERATOR = 'exulanica loom-texture';
 /** The plane these sets live on. Generated content, never observed, and saying so in the bytes. */
 export const TRUTH = 'invented';
 const ALIGNMENT = 16;
+const PREAMBLE = 8;
 
-/** The maps every set stores, in the order they are packed. The packing is stated, not implied. */
-export const MAP_LAYOUT = [
-  {
-    name: 'base_color',
-    components: 3,
-    holds: ['red', 'green', 'blue'],
-    srgb: true,
-    decode: 'sRGB transfer function to linear reflectance',
-  },
-  {
-    name: 'normal',
-    components: 3,
-    holds: ['normal_x', 'normal_y', 'normal_z'],
-    srgb: false,
-    decode: 'n = 2 * b / 255 - 1 per component, then normalise',
-    space: 'tangent',
-    convention: 'glTF: +X toward increasing u, +Y toward row 0, +Z out of the surface',
-  },
-  {
-    name: 'orm',
-    components: 3,
-    holds: ['occlusion', 'roughness', 'metalness'],
-    srgb: false,
-    decode: 'b / 255, linear; occlusion 255 is unoccluded; roughness is perceptual',
-  },
-  {
-    name: 'height',
-    components: 1,
-    holds: ['height'],
-    srgb: false,
-    decode: 'mm = b * height_range_mm / 255, above the lowest point the set can hold',
-  },
-] as const;
-
-export type MapName = (typeof MAP_LAYOUT)[number]['name'];
+/** The maps every v1 set stores, in the order they are packed. The packing is stated, not implied. */
+export const MAP_LAYOUT = V1_LAYOUT;
+export type MapName = 'base_color' | 'normal' | 'orm' | 'height';
 
 export interface MapEntry {
-  readonly name: MapName;
+  readonly name: string;
   readonly components: number;
   readonly holds: readonly string[];
   readonly srgb: boolean;
@@ -80,15 +73,41 @@ export interface MapEntry {
   readonly byte_length: number;
 }
 
+/** Whether a refusal is about the file's framing or about what its header says. */
+export type ContainerRefusalReason = 'container' | 'header';
+
+/** A container the reader will not read, and which of the two kinds of reason refused it. */
+export class ContainerRefusal extends Error {
+  constructor(
+    readonly reason: ContainerRefusalReason,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ContainerRefusal';
+  }
+}
+
+function refuse(reason: ContainerRefusalReason, message: string): never {
+  throw new ContainerRefusal(reason, message);
+}
+
 const align = (value: number): number => Math.ceil(value / ALIGNMENT) * ALIGNMENT;
 
-function placement(surface: TextureSetDefinition['surface']): Record<string, string> {
+export function placement(surface: TextureSetDefinition['surface']): Record<string, string> {
   return surface === 'vertical'
     ? { surface: 'vertical', u: 'horizontal, along the wall', v: 'downward: world up is row 0' }
     : { surface: 'horizontal', u: 'along the run of the surface', v: 'across the run' };
 }
 
-/** The header, less the map offsets, which depend on the header's own length. */
+/** How rows and texels lie, which every profile states in the same words. */
+export const TEXEL_LAYOUT = {
+  origin: 'row 0, column 0 is the top-left texel; glTF uv (0, 0) is its top-left corner',
+  rows: 'top to bottom',
+  texels: 'interleaved within each map, one byte per component',
+} as const;
+export const TILING = 'torus: both axes wrap, every field periodic by construction';
+
+/** The header of a v1 set, less the map offsets, which depend on the header's own length. */
 function headerBody(
   def: TextureSetDefinition,
   licenceSha256: string,
@@ -108,12 +127,8 @@ function headerBody(
     resolution: { width: def.width, height: def.height },
     extent_mm: { u: def.extentU, v: def.extentV },
     placement: placement(def.surface),
-    layout: {
-      origin: 'row 0, column 0 is the top-left texel; glTF uv (0, 0) is its top-left corner',
-      rows: 'top to bottom',
-      texels: 'interleaved within each map, one byte per component',
-    },
-    tiling: 'torus: both axes wrap, every field periodic by construction',
+    layout: TEXEL_LAYOUT,
+    tiling: TILING,
     height_range_mm: def.heightRangeMm,
     cavity: {
       radius_mm: def.cavity.radiusMm,
@@ -124,7 +139,7 @@ function headerBody(
   };
 }
 
-function mapBytes(maps: Maps, name: MapName): Uint8Array {
+function mapBytes(maps: Maps, name: string): Uint8Array {
   switch (name) {
     case 'base_color':
       return maps.baseColor;
@@ -134,7 +149,60 @@ function mapBytes(maps: Maps, name: MapName): Uint8Array {
       return maps.orm;
     case 'height':
       return maps.relief;
+    default:
+      throw new Error(`a v1 set has no ${name} map`);
   }
+}
+
+/** One map to frame: how the header states it, and its bytes. */
+export interface FramedMap {
+  readonly descriptor: MapDescriptor;
+  readonly bytes: Uint8Array;
+}
+
+/**
+ * Frame a header body and its maps: preamble, canonical header, space padding, contiguous maps.
+ * The body is everything but `maps`, which this writes with each map's offset and length.
+ */
+export function frameContainer(body: Record<string, unknown>, maps: readonly FramedMap[]): Uint8Array {
+  const build = (start: number): Uint8Array => {
+    let cursor = start;
+    const entries = maps.map(({ descriptor, bytes }) => {
+      const entry = { ...descriptor, byte_offset: cursor, byte_length: bytes.length };
+      cursor += bytes.length;
+      return entry;
+    });
+    return canonicalBytes({ ...body, maps: entries });
+  };
+
+  // The offsets are digits inside the header, so the header's length depends on them. Starting
+  // from the shortest possible header, larger offsets only ever add digits, so the data start
+  // only moves forward and settles within a step or two. The reader recomputes the start from
+  // the header length, so the two must agree exactly, not merely leave room.
+  let start = align(PREAMBLE + build(0).length);
+  let header = build(start);
+  for (;;) {
+    const needed = align(PREAMBLE + header.length);
+    if (needed === start) break;
+    if (needed < start) throw new Error(`${String(body.set_id)}: the header layout did not settle`);
+    start = needed;
+    header = build(start);
+  }
+
+  let total = start;
+  for (const map of maps) total += map.bytes.length;
+  const out = new Uint8Array(total);
+  out.set(new TextEncoder().encode(CONTAINER_MAGIC), 0);
+  new DataView(out.buffer).setUint32(4, header.length, true);
+  out.set(header, PREAMBLE);
+  // Spaces, so the header still reads cleanly in a hex dump.
+  out.fill(0x20, PREAMBLE + header.length, start);
+  let cursor = start;
+  for (const map of maps) {
+    out.set(map.bytes, cursor);
+    cursor += map.bytes.length;
+  }
+  return out;
 }
 
 export function encodeContainer(
@@ -148,51 +216,57 @@ export function encodeContainer(
         + 'not the set',
     );
   }
-  const body = headerBody(def, licenceSha256);
   const texels = def.width * def.height;
-  const build = (start: number): Uint8Array => {
-    let cursor = start;
-    const entries: MapEntry[] = MAP_LAYOUT.map((layout) => {
-      const length = texels * layout.components;
-      const entry = { ...layout, byte_offset: cursor, byte_length: length };
-      cursor += length;
-      return entry;
-    });
-    return canonicalBytes({ ...body, maps: entries });
-  };
-
-  // The offsets are digits inside the header, so the header's length depends on them. Starting
-  // from the shortest possible header, larger offsets only ever add digits, so the data start
-  // only moves forward and settles within a step or two. The reader recomputes the start from
-  // the header length, so the two must agree exactly, not merely leave room.
-  let start = align(8 + build(0).length);
-  let header = build(start);
-  for (;;) {
-    const needed = align(8 + header.length);
-    if (needed === start) break;
-    if (needed < start) throw new Error(`${def.setId}: the header layout did not settle`);
-    start = needed;
-    header = build(start);
-  }
-
-  let total = start;
-  for (const layout of MAP_LAYOUT) total += texels * layout.components;
-  const out = new Uint8Array(total);
-  out.set(new TextEncoder().encode(CONTAINER_MAGIC), 0);
-  new DataView(out.buffer).setUint32(4, header.length, true);
-  out.set(header, 8);
-  // Spaces, so the header still reads cleanly in a hex dump.
-  out.fill(0x20, 8 + header.length, start);
-  let cursor = start;
-  for (const layout of MAP_LAYOUT) {
+  const framed = MAP_LAYOUT.map((layout) => {
     const bytes = mapBytes(maps, layout.name);
     if (bytes.length !== texels * layout.components) {
       throw new Error(`${def.setId} ${layout.name} holds ${bytes.length} bytes, not ${texels * layout.components}`);
     }
-    out.set(bytes, cursor);
-    cursor += bytes.length;
+    return { descriptor: layout, bytes };
+  });
+  return frameContainer(headerBody(def, licenceSha256), framed);
+}
+
+/** Every key a v2 header holds whatever its class and maker. */
+export const V2_HEADER_KEYS = [
+  'class',
+  'extent_mm',
+  'family',
+  'generator',
+  'layout',
+  'licence',
+  'maker_kind',
+  'maps',
+  'material_class',
+  'media_type',
+  'parameters',
+  'placement',
+  'profile',
+  'resolution',
+  'seed',
+  'set_id',
+  'summary',
+  'tiling',
+  'title',
+  'truth',
+  'version',
+] as const;
+
+/**
+ * The keys a v2 header holds beyond {@link V2_HEADER_KEYS}. A procedural set whose class bakes a
+ * height field states the field's range and how its cavity was measured, because its normals and
+ * occlusion were derived from them; a model-made set states the range only when it ships the height
+ * map that range decodes.
+ */
+export function v2ReliefKeys(
+  materialClass: MaterialClass,
+  makerKind: MakerKind,
+  shipsHeight: boolean,
+): string[] {
+  if (makerKind === 'procedural') {
+    return RELIEF_CLASSES.includes(materialClass) ? ['cavity', 'height_range_mm'] : [];
   }
-  return out;
+  return shipsHeight ? ['height_range_mm'] : [];
 }
 
 export interface DecodedContainer {
@@ -207,53 +281,163 @@ export interface DecodedContainer {
   readonly maps: Readonly<Record<MapName, Uint8Array>>;
 }
 
+/** Any container this reader can read: its profile, class, maker kind, header and maps. */
+export interface ReadContainer {
+  readonly profile: SetProfile;
+  readonly materialClass: MaterialClass;
+  readonly makerKind: MakerKind;
+  readonly header: Readonly<Record<string, unknown>>;
+  readonly layout: readonly MapDescriptor[];
+  /** In stored order, each a view over the bytes. */
+  readonly maps: ReadonlyMap<string, Uint8Array>;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const positive = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+const nonNegative = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+
+function sameKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const present = Object.keys(value).sort();
+  const wanted = [...keys].sort();
+  return present.length === wanted.length && present.every((key, index) => key === wanted[index]);
+}
+
 /**
  * The reference reader, and a strict one: it refuses anything the writer would not have produced,
- * because a lenient reader is how a second, slightly different container format starts.
+ * because a lenient reader is how a second, slightly different container format starts. Each
+ * refusal is a {@link ContainerRefusal} saying whether the framing or the header refused it.
  */
-export function decodeContainer(bytes: Uint8Array): DecodedContainer {
-  if (bytes.length < 8) throw new Error('not a texture set: shorter than its preamble');
-  const magic = new TextDecoder().decode(bytes.subarray(0, 4));
+export function readContainer(bytes: Uint8Array): ReadContainer {
+  if (bytes.length < PREAMBLE) refuse('container', 'not a texture set: shorter than its preamble');
+  const magic = String.fromCharCode(bytes[0]!, bytes[1]!, bytes[2]!, bytes[3]!);
   if (magic !== CONTAINER_MAGIC) {
-    throw new Error(`not a texture set: magic was ${JSON.stringify(magic)}`);
+    refuse('container', `not a texture set: magic was ${JSON.stringify(magic)}`);
   }
-  const headerLength = new DataView(bytes.buffer, bytes.byteOffset, 8).getUint32(4, true);
-  if (8 + headerLength > bytes.length) throw new Error('the header runs past the end of the file');
-  const headerText = new TextDecoder('utf-8', { fatal: true }).decode(
-    bytes.subarray(8, 8 + headerLength),
-  );
-  const header = JSON.parse(headerText) as DecodedContainer['header'];
-  if (canonicalJson(header) !== headerText) {
-    throw new Error('the header is not canonical JSON, so its bytes are not the ones it describes');
+  const headerLength = new DataView(bytes.buffer, bytes.byteOffset, PREAMBLE).getUint32(4, true);
+  if (PREAMBLE + headerLength > bytes.length) {
+    refuse('container', 'the header runs past the end of the file');
   }
-  if (header.profile !== SET_PROFILE) {
-    throw new Error(`unsupported texture set profile ${JSON.stringify(header.profile)}`);
+  let headerText: string;
+  let parsed: unknown;
+  try {
+    headerText = new TextDecoder('utf-8', { fatal: true }).decode(
+      bytes.subarray(PREAMBLE, PREAMBLE + headerLength),
+    );
+    parsed = JSON.parse(headerText);
+  } catch {
+    return refuse('header', 'the header is not JSON');
   }
-  const start = align(8 + headerLength);
-  for (let at = 8 + headerLength; at < start; at += 1) {
-    if (bytes[at] !== 0x20) throw new Error(`padding byte ${at} is not a space`);
+  let canonical: string | null;
+  try {
+    canonical = canonicalJson(parsed as object);
+  } catch {
+    canonical = null;
   }
-  const { width, height } = header.resolution;
-  const texels = width * height;
-  if (header.maps.length !== MAP_LAYOUT.length) throw new Error('the map list is not the layout');
-  const maps: Partial<Record<MapName, Uint8Array>> = {};
+  if (canonical !== headerText) {
+    refuse('header', 'the header is not canonical JSON, so its bytes are not the ones it describes');
+  }
+  if (!isRecord(parsed)) refuse('header', 'the header is not an object');
+  const header = parsed;
+  const profile = header.profile;
+  if (profile !== SET_PROFILE_V1 && profile !== SET_PROFILE_V2) {
+    refuse('header', `unsupported texture set profile ${JSON.stringify(profile)}`);
+  }
+  const start = align(PREAMBLE + headerLength);
+  if (start > bytes.length) refuse('container', 'the padding runs past the end of the file');
+  for (let at = PREAMBLE + headerLength; at < start; at += 1) {
+    if (bytes[at] !== 0x20) refuse('container', `padding byte ${at} is not a space`);
+  }
+  const resolution = header.resolution;
+  if (!isRecord(resolution) || !sameKeys(resolution, ['height', 'width'])
+    || !positive(resolution.width) || !positive(resolution.height)) {
+    refuse('header', 'resolution is a positive width and height');
+  }
+  const texels = resolution.width * resolution.height;
+  const declared = header.maps;
+  if (!Array.isArray(declared)) refuse('header', 'the map list is not the layout');
+
+  let materialClass: MaterialClass = 'opaque';
+  let makerKind: MakerKind = 'procedural';
+  let layout: readonly MapDescriptor[] = V1_LAYOUT;
+  if (profile === SET_PROFILE_V2) {
+    if (!isMaterialClass(header.material_class)) {
+      refuse('header', `material_class is one of ${MATERIAL_CLASSES.join(', ')}`);
+    }
+    if (!isMakerKind(header.maker_kind)) {
+      refuse('header', `maker_kind is one of ${MAKER_KINDS.join(', ')}`);
+    }
+    materialClass = header.material_class;
+    makerKind = header.maker_kind;
+    const named = (name: string): boolean =>
+      declared.some((entry: unknown) => isRecord(entry) && entry.name === name);
+    const produced = { normal: named('normal'), height: named('height') };
+    layout = classLayout(materialClass, makerKind, produced);
+    const keys = [...V2_HEADER_KEYS, ...v2ReliefKeys(materialClass, makerKind, produced.height)];
+    if (!sameKeys(header, keys)) {
+      refuse('header', `a header of maker kind ${makerKind} and class ${materialClass} has exactly ${[...keys].sort().join(', ')}`);
+    }
+  }
+
+  if (declared.length !== layout.length) refuse('header', 'the map list is not the layout');
+  const maps = new Map<string, Uint8Array>();
   let cursor = start;
-  MAP_LAYOUT.forEach((layout, index) => {
-    const entry = header.maps[index]!;
-    const expected = { ...layout, byte_offset: cursor, byte_length: texels * layout.components };
-    if (canonicalJson(entry) !== canonicalJson(expected)) {
-      throw new Error(
-        `map ${index} is ${canonicalJson(entry)}, expected ${canonicalJson(expected)}`,
-      );
+  layout.forEach((descriptor, index) => {
+    const entry: unknown = declared[index];
+    const expected = { ...descriptor, byte_offset: cursor, byte_length: texels * descriptor.components };
+    if (!isRecord(entry) || canonicalJson(entry) !== canonicalJson(expected)) {
+      refuse('header', `map ${index} is ${JSON.stringify(entry)}, expected ${canonicalJson(expected)}`);
     }
-    if (cursor + entry.byte_length > bytes.length) {
-      throw new Error(`map ${layout.name} runs past the end of the file`);
+    if (cursor + expected.byte_length > bytes.length) {
+      refuse('container', `map ${descriptor.name} runs past the end of the file`);
     }
-    maps[layout.name] = bytes.subarray(cursor, cursor + entry.byte_length);
-    cursor += entry.byte_length;
+    maps.set(descriptor.name, bytes.subarray(cursor, cursor + expected.byte_length));
+    cursor += expected.byte_length;
   });
   if (cursor !== bytes.length) {
-    throw new Error(`the maps end at byte ${cursor} and the file at byte ${bytes.length}`);
+    refuse('container', `the maps end at byte ${cursor} and the file at byte ${bytes.length}`);
   }
-  return { header, maps: maps as Record<MapName, Uint8Array> };
+
+  if (profile === SET_PROFILE_V2) {
+    const colour = maps.get('base_color_coverage');
+    const measured = colour === undefined ? null : coveragePermille(colour);
+    const stated = classParameters(materialClass, measured);
+    if (!isRecord(header.class) || canonicalJson(header.class) !== canonicalJson(stated)) {
+      refuse('header', `class is ${JSON.stringify(header.class)}, but a set of class ${materialClass} with these maps states ${canonicalJson(stated)}`);
+    }
+    if ('height_range_mm' in header && !positive(header.height_range_mm)) {
+      refuse('header', 'height_range_mm is a positive integer');
+    }
+    if ('cavity' in header) {
+      const cavity = header.cavity;
+      if (!isRecord(cavity) || !sameKeys(cavity, ['depth_mm', 'radius_mm', 'strength_permille'])
+        || !positive(cavity.radius_mm) || !positive(cavity.depth_mm)
+        || !nonNegative(cavity.strength_permille)) {
+        refuse('header', 'cavity is a positive radius_mm and depth_mm and a strength_permille');
+      }
+    }
+  }
+  return { profile, materialClass, makerKind, header, layout, maps };
+}
+
+/**
+ * Read a v1 container, the only profile the published v1 pipeline bakes. A v2 container is refused
+ * here by profile; {@link readContainer} reads both.
+ */
+export function decodeContainer(bytes: Uint8Array): DecodedContainer {
+  const read = readContainer(bytes);
+  if (read.profile !== SET_PROFILE_V1) {
+    refuse('header', `unsupported texture set profile ${JSON.stringify(read.profile)}`);
+  }
+  return {
+    header: read.header as DecodedContainer['header'],
+    maps: {
+      base_color: read.maps.get('base_color')!,
+      normal: read.maps.get('normal')!,
+      orm: read.maps.get('orm')!,
+      height: read.maps.get('height')!,
+    },
+  };
 }

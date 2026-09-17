@@ -18,17 +18,52 @@ export {
 export { canonicalBytes, canonicalJson } from './canonical-json.js';
 export { CATALOG, LIBRARY, type SetIdentity, definitionOf, recipeDefinition } from './catalog.js';
 export {
+  ALPHA_CUTOFF,
+  type Channel,
+  GLAZING_IOR_MILLIONTHS,
+  MAKER_KINDS,
+  type MakerKind,
+  type MapDescriptor,
+  MATERIAL_CLASSES,
+  type MaterialClass,
+  type ModelMaps,
+  SET_PROFILE_V1,
+  SET_PROFILE_V2,
+  type SetProfile,
+  V1_LAYOUT,
+  allowedChannels,
+  channelsOf,
+  classLayout,
+  classParameters,
+  coveragePermille,
+} from './classes.js';
+export {
   CONTAINER_MAGIC,
+  ContainerRefusal,
+  type ContainerRefusalReason,
   type DecodedContainer,
+  type FramedMap,
   MAP_LAYOUT,
   type MapEntry,
   type MapName,
   MEDIA_TYPE,
+  type ReadContainer,
   SET_PROFILE,
   TRUTH,
   decodeContainer,
   encodeContainer,
+  frameContainer,
+  readContainer,
 } from './container.js';
+export {
+  MANIFEST_PROFILE_V1,
+  MANIFEST_PROFILE_V2,
+  type ManifestEntryRead,
+  TextureSetRefusal,
+  type TextureSetRefusalReason,
+  checkTextureSet,
+  readTextureManifest,
+} from './manifest-reader.js';
 export {
   DATASET_FILE,
   type DatasetExport,

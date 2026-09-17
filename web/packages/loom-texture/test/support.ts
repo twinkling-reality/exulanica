@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { MAP_LAYOUT, type MapName } from '../src/container.js';
+import type { MapDescriptor } from '../src/classes.js';
+import { MAP_LAYOUT } from '../src/container.js';
 import type { Fields } from '../src/maps.js';
 
 /** The repository root: web/packages/loom-texture/test -> root. */
@@ -19,7 +20,7 @@ export function readPublished(path: string): Uint8Array {
  * every interior neighbour pair along that axis.
  */
 export interface SeamReport {
-  readonly map: MapName;
+  readonly map: string;
   readonly channel: number;
   readonly axis: 'u' | 'v';
   readonly seam: number;
@@ -30,12 +31,13 @@ export interface SeamReport {
 export function seamReports(
   width: number,
   height: number,
-  maps: Readonly<Record<MapName, Uint8Array>>,
+  maps: Readonly<Record<string, Uint8Array>>,
+  layout: readonly MapDescriptor[] = MAP_LAYOUT,
 ): SeamReport[] {
   const reports: SeamReport[] = [];
-  for (const layout of MAP_LAYOUT) {
-    const data = maps[layout.name];
-    const stride = layout.components;
+  for (const descriptor of layout) {
+    const data = maps[descriptor.name]!;
+    const stride = descriptor.components;
     for (let channel = 0; channel < stride; channel += 1) {
       const columns = new Float64Array(width);
       const rows = new Float64Array(height);
@@ -54,7 +56,7 @@ export function seamReports(
         let interiorSum = 0;
         for (let k = 0; k < sums.length - 1; k += 1) interiorSum += sums[k]!;
         reports.push({
-          map: layout.name,
+          map: descriptor.name,
           channel,
           axis,
           seam: sums[sums.length - 1]!,
