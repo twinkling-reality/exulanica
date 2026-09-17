@@ -5,6 +5,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bakeTile, verifyOwd } from '../src/core/bake.js';
+import { canonicalBytes } from '../src/core/canonical-json.js';
 import { absoluteVertices, decodeOwd, encodeOwd, OwdError } from '../src/core/owd.js';
 import type { Bake } from '../src/core/bake.js';
 import { nodeSha256 } from '../src/node/sha256.js';
@@ -40,6 +41,47 @@ function oneCharacter(pattern: RegExp, source: Uint8Array = baked.container): Ui
   const value = match[1]!;
   const changed = value.replace(/^./, value[0] === '0' ? '1' : '0');
   return sameLength(match[0], match[0].replace(value, changed), source);
+}
+
+/**
+ * The container rebuilt around a changed header, with the same section bytes: the header is
+ * re-serialised canonically, padded to sixteen bytes, and every section offset moved by the change
+ * in where the data starts, until the header's own length settles. A tool for breaking headers in
+ * ways the same-length replacement cannot, never a second writer.
+ */
+function rebuilt(source: Uint8Array, change: (header: any) => void): Uint8Array {
+  const oldLength = headerLength(source);
+  const oldStart = Math.ceil((8 + oldLength) / 16) * 16;
+  const data = source.subarray(oldStart);
+  const header = JSON.parse(headerText(source));
+  change(header);
+  const offsets = header.sections.map((section: any) => section.byte_offset - oldStart);
+  let start = oldStart;
+  for (;;) {
+    header.sections.forEach((section: any, index: number) => { section.byte_offset = offsets[index] + start; });
+    const bytes = canonicalBytes(header);
+    const needed = Math.ceil((8 + bytes.length) / 16) * 16;
+    if (needed === start) {
+      const out = new Uint8Array(start + data.length);
+      out.set(new TextEncoder().encode('OWD3'), 0);
+      new DataView(out.buffer).setUint32(4, bytes.length, true);
+      out.set(bytes, 8);
+      out.fill(0x20, 8 + bytes.length, start);
+      out.set(data, start);
+      return out;
+    }
+    start = needed;
+  }
+}
+
+/** The terrain's render entry split into two surfaces at the row of cells halfway up the patch. */
+function splitTerrain(header: any, second: { role: string; orientation: string }): void {
+  const entry = header.projections[0].entries.find((candidate: any) => candidate.state === 'drawn');
+  const [whole] = entry.surfaces;
+  entry.surfaces = [
+    { ...whole, vertex_count: 17 * 9, triangle_count: 16 * 8 * 2 },
+    { ...whole, ...second, first_vertex: 17 * 9, vertex_count: 17 * 8, first_triangle: 16 * 8 * 2, triangle_count: 16 * 8 * 2 },
+  ];
 }
 
 const refused = (bytes: Uint8Array, pattern: RegExp): void => {
@@ -86,8 +128,8 @@ describe('decodeOwd', () => {
     ['a padding byte that is not a space', () => { const b = copy(); b[8 + headerLength(b)] = 0x2e; return b; }, /padding byte/],
     ['a trailing byte', () => { const b = new Uint8Array(baked.container.length + 4); b.set(baked.container); return b; }, /sections end at/],
     ['a missing byte', () => baked.container.slice(0, baked.container.length - 4), /sections end at/],
-    ['another tessellator version', () => sameLength('"tessellator_version":2', '"tessellator_version":3'), /no upgrade on read/],
-    ['another profile', () => sameLength('exulanica.owd/v2', 'exulanica.owd/v3'), /profile/],
+    ['another tessellator version', () => sameLength('"tessellator_version":3', '"tessellator_version":4'), /no upgrade on read/],
+    ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],
     ['a subject identity that is not a UUID', () => { const at = /"subject_identity":"[0-9a-f]/.exec(headerText(baked.container))![0]; return sameLength(at, `${at.slice(0, -1)}X`); }, /subject_identity is not a UUID/],
@@ -98,8 +140,40 @@ describe('decodeOwd', () => {
     ['a section somewhere else', () => { const b = copy(); const text = headerText(b); const offset = sectionOffset(b, 'nav_envelope', 'position'); const at = text.indexOf(`"byte_offset":${offset}`); b[8 + at + 14] = b[8 + at + 14] === 0x31 ? 0x32 : 0x31; return b; }, /contiguous layout/],
     ['a contract this version does not write', () => sameLength('"sampling support height"', '"sampling support heighT"'), /contract/],
     ['a material statement that is neither a record nor none', () => sameLength('"material":{"state":"none-exists"}', '"material":{"state":"none-exiSts"}'), /neither record nor none-exists/],
+    ['a surface role its grammar does not state', () => sameLength('"role":"terrain"', '"role":"terrair"'), /not a surface role its grammar states/],
+    ['a surface with no orientation', () => sameLength('"orientation":"horizontal"', '"orientation":"horizontai"'), /not an orientation/],
+    ['a surface that does not start its entry', () => sameLength('"first_vertex":0,"material":{"state":"none-exists"}', '"first_vertex":1,"material":{"state":"none-exists"}'), /leaves a gap or overlaps/],
+    ['surfaces that do not cover their entry', () => sameLength('"role":"terrain","triangle_count":512', '"role":"terrain","triangle_count":511'), /do not cover its triangles exactly/],
   ] as [string, () => Uint8Array, RegExp][])('refuses %s', (_name, make, pattern) => {
     refused(make(), pattern);
+  });
+
+  it('reads a container the rebuilding tool has not changed', () => {
+    expect(rebuilt(baked.container, () => undefined)).toEqual(baked.container);
+  });
+
+  it('refuses a role repeated on the same orientation', () => {
+    refused(rebuilt(baked.container, (header) => splitTerrain(header, { role: 'terrain', orientation: 'horizontal' })), /repeats the terrain horizontal surface/);
+  });
+
+  it('refuses two surfaces that share a vertex', () => {
+    // The halfway split leaves the second half's triangles on the first half's top row of samples.
+    refused(rebuilt(baked.container, (header) => splitTerrain(header, { role: 'terrain', orientation: 'vertical' })), /indexes outside its range/);
+  });
+
+  it('refuses a material that dresses another role or another record', () => {
+    const cited = (header: any) => header.projections[0].entries.find((entry: any) => entry.state === 'drawn').surfaces[0];
+    refused(rebuilt(dressed, (header) => { cited(header).role = 'lot'; }), /dresses another role/);
+    refused(rebuilt(dressed, (header) => {
+      const other = header.records.findIndex((record: any) => record.kind === 'city.surface_material' && record.fields.role === 'kerb');
+      cited(header).material = { record: other, state: 'record' };
+    }), /dresses another record/);
+  });
+
+  it('refuses a drawn entry with no surfaces', () => {
+    refused(rebuilt(baked.container, (header) => {
+      header.projections[0].entries.find((entry: any) => entry.state === 'drawn').surfaces = [];
+    }), /surfaces is empty/);
   });
 
   it('refuses an index outside its range', () => {

@@ -7,22 +7,24 @@
  * halo, context the document carries and the bake never draws. A drawn entry is a contiguous range
  * of vertices and triangles, so "which record does this triangle belong to" is one lookup, and the
  * range carries its own integer extent, so "what is that record's extent" is another. An entry
- * that is not drawn has no extent: an extent nobody measured is not written.
+ * that is not drawn has no extent: an extent nobody measured is not written. In a projection that
+ * carries surfaces a drawn entry is made of surfaces, contiguous sub-ranges in the expander's order
+ * that share no vertex, each with the grammar's surface role, its orientation and its material.
  *
  * TWO CLAIMS ARE CHECKED HERE RATHER THAN TRUSTED.
  *   - Every vertex of a drawn range lies inside the extent its record states, corners included.
  *     A record's extent is a promise about everything it generates, and a tessellation that
  *     breaks it is refused, not written.
- *   - A drawn range in a projection that carries surfaces is dressed by the one surface material
- *     record that names the range's record as its surface and the range's role as its role. With
- *     none, the range is still drawn and states that none exists; with two, or one that names
- *     another kind of surface, the tile is refused.
+ *   - Each surface of a drawn entry is dressed by the one surface material record that names the
+ *     entry's record as its surface and the surface's role as its role. With none, the surface is
+ *     still drawn and states that none exists; with two, or one that names another kind of
+ *     surface, the tile is refused. An entry repeats a role only on another orientation.
  */
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
 import { coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { ExpandContext, Need, PlanBox } from './expand.js';
+import type { ExpandContext, Need, Piece, PlanBox } from './expand.js';
 import { MATERIAL_RECORD_KIND, recordShapeOf } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
 import {
@@ -31,7 +33,7 @@ import {
   MATERIAL_NONE_EXISTS,
   SURFACE_COORDINATES_PER_TRIANGLE,
 } from './triangle-digest.js';
-import type { DigestEntry, SurfaceOrientation } from './triangle-digest.js';
+import type { DigestEntry, DigestSurface, SurfaceOrientation } from './triangle-digest.js';
 
 export interface PlacedRecord {
   readonly payload: RecordPayload;
@@ -55,6 +57,19 @@ export type MaterialRef =
 
 export type Triple = readonly [number, number, number];
 
+/** One surface of a drawn entry: a contiguous sub-range with its role, material and orientation. */
+export interface DrawnSurface {
+  /** The grammar's surface role. */
+  readonly role: string;
+  /** The surface material record for (entry's record identity, role), or the statement that none exists. */
+  readonly material: MaterialRef;
+  readonly orientation: SurfaceOrientation;
+  readonly first_vertex: number;
+  readonly vertex_count: number;
+  readonly first_triangle: number;
+  readonly triangle_count: number;
+}
+
 export interface DrawnEntry {
   readonly record: number;
   readonly state: 'drawn';
@@ -63,10 +78,8 @@ export interface DrawnEntry {
   readonly first_triangle: number;
   readonly triangle_count: number;
   readonly extent_mm: { readonly min: Triple; readonly max: Triple };
-  /** Present exactly in a projection that carries surfaces. */
-  readonly material?: MaterialRef;
-  /** Present exactly in a projection that carries surfaces. */
-  readonly surface?: SurfaceOrientation;
+  /** Present exactly in a projection that carries surfaces, covering the entry's range exactly. */
+  readonly surfaces?: readonly DrawnSurface[];
 }
 
 export type Entry =
@@ -166,6 +179,22 @@ function dressings(records: readonly PlacedRecord[]): ReadonlyMap<string, number
   return byRole;
 }
 
+/** A piece draws whole triangles on whole vertices of its own, and at least one triangle. */
+function requireWholePiece(piece: Piece, record: PlacedRecord): void {
+  const where = `${record.payload.kind} ${record.identity}`;
+  if (piece.vertices.length % 3 !== 0) throw new TessellationError(`${where} draws a piece of partial vertices`);
+  if (piece.triangles.length % 3 !== 0) throw new TessellationError(`${where} draws a piece of partial triangles`);
+  if (piece.triangles.length === 0) throw new TessellationError(`${where} draws a piece with no triangle`);
+  const outside = (): never => {
+    throw new TessellationError(`${where} draws a piece whose triangles index outside it`);
+  };
+  for (const index of piece.triangles) {
+    if (!Number.isSafeInteger(index)) outside();
+    if (index < 0) outside();
+    if (index >= piece.vertices.length / 3) outside();
+  }
+}
+
 function requireInside(extent: Box | undefined, vertices: readonly number[], record: PlacedRecord): void {
   if (extent === undefined) {
     throw new TessellationError(`${record.payload.kind} ${record.identity} draws and states no extent`);
@@ -219,6 +248,14 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     capsuleRadiusMm: capsuleRadius(document, record),
   });
   const dressed = dressings(placed);
+  const materialFor = (record: PlacedRecord, role: string): MaterialRef => {
+    const dressing = dressed.get(`${record.identity} ${role}`);
+    if (dressing === undefined) return { state: MATERIAL_NONE_EXISTS };
+    if (placed[dressing]!.payload.fields.surface_kind !== record.payload.kind) {
+      throw new TessellationError(`the material dressing ${record.identity} names another kind of surface`);
+    }
+    return { state: 'record', record: dressing };
+  };
 
   const projections = PROJECTION_DEFINITIONS.map((definition): ProjectionMesh => {
     const name = definition.name;
@@ -240,42 +277,55 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
           if (expansion.state === 'unavailable') {
             return { record: recordIndex, state: 'unavailable', needs: expansion.needs };
           }
-          requireInside(statedExtent(document, record), expansion.vertices, record);
-          const surface = expansion.surface;
-          let material: MaterialRef | undefined;
-          if (definition.surfaces) {
-            if (surface === undefined) throw new TessellationError(`${name} needs a surface for ${record.payload.kind}`);
-            if (surface.coordinates.length !== (expansion.vertices.length / 3) * 2) {
-              throw new TessellationError(`${record.payload.kind} gave surface coordinates for other vertices`);
-            }
-            const dressing = dressed.get(`${record.identity} ${surface.role}`);
-            if (dressing === undefined) {
-              material = { state: MATERIAL_NONE_EXISTS };
-            } else {
-              if (placed[dressing]!.payload.fields.surface_kind !== record.payload.kind) {
-                throw new TessellationError(`the material dressing ${record.identity} names another kind of surface`);
-              }
-              material = { state: 'record', record: dressing };
-            }
-          } else if (surface !== undefined) {
-            throw new TessellationError(`${name} carries no surfaces`);
-          }
+          const pieces = expansion.pieces;
+          if (pieces.length === 0) throw new TessellationError(`${record.payload.kind} drew no piece`);
+          const allVertices = pieces.flatMap((piece) => [...piece.vertices]);
+          requireInside(statedExtent(document, record), allVertices, record);
           const firstVertex = vertices.length / 3;
           const firstTriangle = indices.length / 3;
-          for (const value of expansion.vertices) vertices.push(value);
-          for (const index of expansion.triangles) indices.push(firstVertex + index);
+          const surfaces: DrawnSurface[] = [];
+          const seen = new Set<string>();
+          for (const piece of pieces) {
+            const pieceVertex = vertices.length / 3;
+            const pieceTriangle = indices.length / 3;
+            requireWholePiece(piece, record);
+            for (const value of piece.vertices) vertices.push(value);
+            for (const index of piece.triangles) indices.push(pieceVertex + index);
+            const surface = piece.surface;
+            if (!definition.surfaces) {
+              if (surface !== undefined) throw new TessellationError(`${name} carries no surfaces`);
+              continue;
+            }
+            if (surface === undefined) throw new TessellationError(`${name} needs a surface for ${record.payload.kind}`);
+            if (surface.coordinates.length !== (piece.vertices.length / 3) * 2) {
+              throw new TessellationError(`${record.payload.kind} gave surface coordinates for other vertices`);
+            }
+            const face = `${surface.role} ${surface.orientation}`;
+            if (seen.has(face)) {
+              throw new TessellationError(`${record.payload.kind} ${record.identity} draws the ${face} surface twice`);
+            }
+            seen.add(face);
+            for (const value of surface.coordinates) surfaceCoordinates.push(value);
+            surfaces.push({
+              role: surface.role,
+              material: materialFor(record, surface.role),
+              orientation: surface.orientation,
+              first_vertex: pieceVertex,
+              vertex_count: piece.vertices.length / 3,
+              first_triangle: pieceTriangle,
+              triangle_count: piece.triangles.length / 3,
+            });
+          }
           const drawn = {
             record: recordIndex,
             state: 'drawn',
             first_vertex: firstVertex,
-            vertex_count: expansion.vertices.length / 3,
+            vertex_count: vertices.length / 3 - firstVertex,
             first_triangle: firstTriangle,
-            triangle_count: expansion.triangles.length / 3,
-            extent_mm: extentOf(expansion.vertices),
+            triangle_count: indices.length / 3 - firstTriangle,
+            extent_mm: extentOf(allVertices),
           } as const;
-          if (material === undefined) return drawn;
-          for (const value of surface!.coordinates) surfaceCoordinates.push(value);
-          return { ...drawn, material, surface: surface!.orientation };
+          return definition.surfaces ? { ...drawn, surfaces } : drawn;
         }
       }
     });
@@ -303,35 +353,40 @@ export function digestEntries(
     const head = { kind: record.payload.kind, recordSha256: record.sha256, identity: record.identity };
     switch (entry.state) {
       case 'drawn': {
-        const triangles = new Array<number>(entry.triangle_count * COORDINATES_PER_TRIANGLE);
-        const coordinates = new Array<number>(entry.triangle_count * SURFACE_COORDINATES_PER_TRIANGLE);
-        const end = (entry.first_triangle + entry.triangle_count) * 3;
-        let out = 0;
-        let outSurface = 0;
-        for (let corner = entry.first_triangle * 3; corner < end; corner += 1) {
-          const vertex = mesh.indices[corner]!;
-          triangles[out] = mesh.vertices[vertex * 3]!;
-          triangles[out + 1] = mesh.vertices[vertex * 3 + 1]!;
-          triangles[out + 2] = mesh.vertices[vertex * 3 + 2]!;
-          out += 3;
-          if (mesh.surfaceCoordinates !== undefined) {
-            coordinates[outSurface] = mesh.surfaceCoordinates[vertex * 2]!;
-            coordinates[outSurface + 1] = mesh.surfaceCoordinates[vertex * 2 + 1]!;
-            outSurface += 2;
+        const deindexed = (firstTriangle: number, triangleCount: number) => {
+          const triangles = new Array<number>(triangleCount * COORDINATES_PER_TRIANGLE);
+          const coordinates = new Array<number>(triangleCount * SURFACE_COORDINATES_PER_TRIANGLE);
+          const end = (firstTriangle + triangleCount) * 3;
+          let out = 0;
+          let outSurface = 0;
+          for (let corner = firstTriangle * 3; corner < end; corner += 1) {
+            const vertex = mesh.indices[corner]!;
+            triangles[out] = mesh.vertices[vertex * 3]!;
+            triangles[out + 1] = mesh.vertices[vertex * 3 + 1]!;
+            triangles[out + 2] = mesh.vertices[vertex * 3 + 2]!;
+            out += 3;
+            if (mesh.surfaceCoordinates !== undefined) {
+              coordinates[outSurface] = mesh.surfaceCoordinates[vertex * 2]!;
+              coordinates[outSurface + 1] = mesh.surfaceCoordinates[vertex * 2 + 1]!;
+              outSurface += 2;
+            }
           }
-        }
-        if (entry.material === undefined) return { ...head, state: 'drawn', triangles };
-        if (entry.surface === undefined) throw new TessellationError('a material with no orientation');
-        return {
-          ...head,
-          state: 'drawn',
-          triangles,
-          surface: {
-            material: entry.material.state === 'record' ? records[entry.material.record]!.sha256 : MATERIAL_NONE_EXISTS,
-            orientation: entry.surface,
-            coordinates,
-          },
+          return { triangles, coordinates };
         };
+        if (entry.surfaces === undefined) {
+          return { ...head, state: 'drawn', triangles: deindexed(entry.first_triangle, entry.triangle_count).triangles };
+        }
+        const surfaces = entry.surfaces.map((surface): DigestSurface => {
+          const { triangles, coordinates } = deindexed(surface.first_triangle, surface.triangle_count);
+          return {
+            role: surface.role,
+            material: surface.material.state === 'record' ? records[surface.material.record]!.sha256 : MATERIAL_NONE_EXISTS,
+            orientation: surface.orientation,
+            triangles,
+            coordinates,
+          };
+        });
+        return { ...head, state: 'drawn', surfaces };
       }
       case 'unavailable':
         return { ...head, state: 'unavailable', needs: entry.needs };

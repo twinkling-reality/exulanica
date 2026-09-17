@@ -109,11 +109,11 @@ def fixture_terrain() -> Any:
 def test_the_bake_stage_is_registered_deterministic_with_no_model_role():
     spec = stage("baked_tile")
     assert spec.key == "baked_tile"
-    assert spec.version == 2
+    assert spec.version == 3
     assert spec.output_kind == "owd_tile"
     assert spec.deterministic is True
     assert spec.model_role is None
-    assert spec.params["container"] == "owd/2"
+    assert spec.params["container"] == "owd/3"
     assert spec.params["tile_document"] == TILE_DOCUMENT_PROFILE
     assert spec.params["tile_size_mm"] == TILE_SIZE_MM
     assert spec.params["halo_radius_mm"] == HALO_RADIUS_MM
@@ -310,7 +310,7 @@ def _bake(tmp_path: Path, name: str, document: Path = DOCUMENT) -> tuple[dict[st
 
 
 def _header(container: bytes) -> dict[str, Any]:
-    assert container[:4] == b"OWD2"
+    assert container[:4] == b"OWD3"
     (length,) = struct.unpack_from("<I", container, 4)
     header = json.loads(container[8 : 8 + length])
     assert canonical_json(header) == container[8 : 8 + length]
@@ -320,6 +320,35 @@ def _header(container: bytes) -> dict[str, Any]:
 def _ints(container: bytes, section: dict[str, int], code: str) -> tuple[int, ...]:
     count = section["byte_length"] // 4
     return struct.unpack_from(f"<{count}{code}", container, section["byte_offset"])
+
+
+def _deindexed(
+    mesh: dict[str, Any], first_triangle: int, triangle_count: int, carries_surfaces: bool
+) -> tuple[list[int], list[int]]:
+    """A range's triangles de-indexed to absolute millimetres, and its surface coordinates."""
+    values: list[int] = []
+    surface: list[int] = []
+    first = first_triangle * 3
+    for corner in mesh["corners"][first : first + triangle_count * 3]:
+        for axis in range(3):
+            values.append(mesh["offsets"][corner * 3 + axis] + mesh["origin"][axis])
+        if carries_surfaces:
+            for axis in range(2):
+                surface.append(
+                    mesh["surface_offsets"][corner * 2 + axis] + mesh["surface_origin"][axis]
+                )
+    return values, surface
+
+
+def _framed_range(
+    mesh: dict[str, Any], carries_surfaces: bool, first_triangle: int, triangle_count: int
+) -> tuple[bytes, bytes]:
+    """A range's triangles and surface coordinates, each framed as the digest frames a field."""
+    values, surface = _deindexed(mesh, first_triangle, triangle_count, carries_surfaces)
+    return (
+        struct.pack(">Q", len(values) * 8) + struct.pack(f">{len(values)}q", *values),
+        struct.pack(">Q", len(surface) * 8) + struct.pack(f">{len(surface)}q", *surface),
+    )
 
 
 def _independent_triangle_digests(container: bytes) -> dict[str, str]:
@@ -342,9 +371,16 @@ def _independent_triangle_digests(container: bytes) -> dict[str, str]:
             _ints(container, sections[(name, "surface_mm")], "i") if carries_surfaces else ()
         )
         surface_origin = projection.get("surface_origin_mm", [])
+        mesh = {
+            "corners": corners,
+            "offsets": offsets,
+            "origin": origin,
+            "surface_offsets": surface_offsets,
+            "surface_origin": surface_origin,
+        }
         stream = [
             field(b"exulanica/owd-triangle-digest"),
-            field(b"2"),
+            field(b"3"),
             field(name.encode("ascii")),
             field(struct.pack(">q", len(projection["entries"]))),
         ]
@@ -361,33 +397,32 @@ def _independent_triangle_digests(container: bytes) -> dict[str, str]:
                 field(entry["state"].encode("ascii")),
             ]
             if entry["state"] == "drawn":
-                values = []
-                surface = []
-                first = entry["first_triangle"] * 3
-                for corner in corners[first : first + entry["triangle_count"] * 3]:
-                    for axis in range(3):
-                        values.append(offsets[corner * 3 + axis] + origin[axis])
-                    if carries_surfaces:
-                        for axis in range(2):
-                            surface.append(
-                                surface_offsets[corner * 2 + axis] + surface_origin[axis]
-                            )
-                triangles = field(struct.pack(f">{len(values)}q", *values))
                 if not carries_surfaces:
+                    triangles, _ = _framed_range(
+                        mesh, carries_surfaces, entry["first_triangle"], entry["triangle_count"]
+                    )
                     stream += [field(b""), field(b""), triangles, field(b"")]
                     continue
-                if entry["material"] == {"state": "none-exists"}:
-                    reference = "none-exists"
-                else:
-                    material = records[entry["material"]["record"]]
-                    assert material["kind"] == SurfaceMaterialRecord.RECORD_KIND
-                    reference = material["sha256"]
-                stream += [
-                    field(reference.encode("ascii")),
-                    field(entry["surface"].encode("ascii")),
-                    triangles,
-                    field(struct.pack(f">{len(surface)}q", *surface)),
-                ]
+                stream.append(field(struct.pack(">q", len(entry["surfaces"]))))
+                for surface in entry["surfaces"]:
+                    if surface["material"] == {"state": "none-exists"}:
+                        reference = "none-exists"
+                    else:
+                        material = records[surface["material"]["record"]]
+                        assert material["kind"] == SurfaceMaterialRecord.RECORD_KIND
+                        assert material["fields"]["surface_identity"] == record["identity"]
+                        assert material["fields"]["role"] == surface["role"]
+                        reference = material["sha256"]
+                    triangles, coordinates = _framed_range(
+                        mesh, carries_surfaces, surface["first_triangle"], surface["triangle_count"]
+                    )
+                    stream += [
+                        field(surface["role"].encode("ascii")),
+                        field(reference.encode("ascii")),
+                        field(surface["orientation"].encode("ascii")),
+                        triangles,
+                        coordinates,
+                    ]
             elif entry["state"] == "unavailable":
                 stream += [
                     field(b""),
@@ -449,7 +484,9 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     terrain = next(i for i, r in enumerate(header["records"]) if r["kind"] == "city.terrain")
     # Undressed but exact: the whole patch is drawn and says that no material record dresses it.
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == [terrain]
-    assert render["entries"][terrain]["material"] == {"state": "none-exists"}
+    [surface] = render["entries"][terrain]["surfaces"]
+    assert (surface["role"], surface["orientation"]) == ("terrain", "horizontal")
+    assert surface["material"] == {"state": "none-exists"}
     assert (
         render["entries"][terrain]["triangle_count"]
         == 2 * (fixture_terrain().samples_per_side - 1) ** 2

@@ -2,7 +2,7 @@
  * THE .owd CONTAINER, AND WHY IT IS THIS ONE. This is the only writer of the format, and the
  * decoder below is the only reader any runtime should use.
  *
- * `.owd` (Exulanica World Data, one baked tile): the four magic bytes `OWD2`, a little-endian
+ * `.owd` (Exulanica World Data, one baked tile): the four magic bytes `OWD3`, a little-endian
  * uint32 header length, the header as canonical JSON, space padding to a 16-byte boundary, then
  * planar typed-array sections packed one after another with no gaps. It is the shape
  * `scene-synth/src/format/opm.ts` proved out and `loom-texture` repeated: one file, one fetch, and
@@ -45,10 +45,15 @@
  * "which record does this triangle belong to" and "what is that record's extent". Any other entry
  * states why nothing is drawn.
  *
- * VERSION 2 is the container for city grammar version 2: grammars carry their frame and subject
- * identity, records their membership, entries a `halo` state, and a drawn range cites the material
- * record that dresses it or states that none exists. A version 1 file is refused at its magic;
- * there is no upgrade on read.
+ * VERSION 2 was the container for city grammar version 2: grammars carry their frame and subject
+ * identity, records their membership, and entries a `halo` state. VERSION 3 makes a drawn
+ * render_batch entry a list of SURFACES: contiguous sub-ranges, in the expander's order, sharing no
+ * vertex and covering the entry exactly. Each states its ROLE, which is the grammar's surface role
+ * (a closed value of `city.surface_material.role`) and is never inferred from geometry, its
+ * orientation, and its material, the `city.surface_material` record for (the entry's record
+ * identity, role) or the statement that none exists. A record repeats a role only on another
+ * orientation, as a kerb's face and top do. Selection, picking and extent stay per entry. An
+ * earlier file is refused at its magic; there is no upgrade on read.
  *
  * REJECTED, with reasons:
  *
@@ -95,10 +100,11 @@ import {
   HEX64_PATTERN,
   IDENTITY_PATTERN,
   MATERIAL_RECORD_KIND,
+  recordShapeOf,
   tableFor,
   TILE_SHAPE,
 } from './record-shapes.js';
-import type { GrammarFrame, ProjectionName } from './record-shapes.js';
+import type { GrammarFrame, GrammarTable, ProjectionName } from './record-shapes.js';
 import type { Entry, MaterialRef, ProjectionMesh, TessellatedTile, Triple } from './tessellate.js';
 import {
   ENTRY_STATES,
@@ -108,10 +114,10 @@ import {
   TRIANGLE_DIGEST_PROFILE,
 } from './triangle-digest.js';
 
-export const OWD_MAGIC = 'OWD2';
-export const OWD_PROFILE = 'exulanica.owd/v2';
+export const OWD_MAGIC = 'OWD3';
+export const OWD_PROFILE = 'exulanica.owd/v3';
 /** The string the bake stage's parameters name the container by. */
-export const OWD_CONTAINER = 'owd/2';
+export const OWD_CONTAINER = 'owd/3';
 export const OWD_MEDIA_TYPE = 'application/vnd.exulanica.owd';
 export const OWD_GENERATOR = 'exulanica loom-tess';
 /** Generated content, never observed, and saying so in the bytes. */
@@ -486,7 +492,14 @@ function withRefusal<T>(run: () => T): T {
   }
 }
 
-function checkMaterial(value: unknown, where: string, records: readonly OwdRecord[]): MaterialRef {
+/** A surface's material: none exists, or the surface material record for (the entry's record, role). */
+function checkMaterial(
+  value: unknown,
+  where: string,
+  records: readonly OwdRecord[],
+  surfaceOf: OwdRecord,
+  role: string,
+): MaterialRef {
   const material = objectAt(value, where);
   if (material.state === MATERIAL_NONE_EXISTS) {
     keysAre(material, ['state'], where);
@@ -495,8 +508,66 @@ function checkMaterial(value: unknown, where: string, records: readonly OwdRecor
   if (material.state !== 'record') fail(`${where}.state is neither record nor ${MATERIAL_NONE_EXISTS}`);
   keysAre(material, ['record', 'state'], where);
   const record = countAt(material.record, `${where}.record`, records.length);
-  if (records[record]!.kind !== MATERIAL_RECORD_KIND) fail(`${where} cites a record that is not a material`);
+  const cited = records[record]!;
+  if (cited.kind !== MATERIAL_RECORD_KIND) fail(`${where} cites a record that is not a material`);
+  if (cited.fields.surface_identity !== surfaceOf.identity) fail(`${where} cites a material that dresses another record`);
+  if (cited.fields.role !== role) fail(`${where} cites a material that dresses another role`);
   return { state: 'record', record };
+}
+
+/** The surface roles a grammar table states: the closed values of its material record's role. */
+function surfaceRolesOf(table: GrammarTable): readonly string[] {
+  const role = recordShapeOf(table, MATERIAL_RECORD_KIND)!.fields.find((field) => field.name === 'role');
+  if (role?.values === undefined) fail(`the ${table.grammar_id} table states no surface roles`);
+  return role.values;
+}
+
+const SURFACE_KEYS = ['first_triangle', 'first_vertex', 'material', 'orientation', 'role', 'triangle_count', 'vertex_count'];
+
+/**
+ * A drawn entry's surfaces: at least one; each with a role its grammar states, an orientation and a
+ * material for (record, role); contiguous in order, sharing no vertex or triangle, covering the
+ * entry exactly; and a role repeated only on another orientation.
+ */
+function checkSurfaces(
+  entry: JsonObject,
+  at: string,
+  records: readonly OwdRecord[],
+  tables: readonly GrammarTable[],
+  vertices: number,
+  triangles: number,
+): void {
+  const record = records[entry.record as number]!;
+  const roles = surfaceRolesOf(tables[record.grammar]!);
+  const surfaces = arrayAt(entry.surfaces, `${at}.surfaces`);
+  if (surfaces.length === 0) fail(`${at}.surfaces is empty`);
+  let nextVertex = entry.first_vertex as number;
+  let nextTriangle = entry.first_triangle as number;
+  const faces = new Set<string>();
+  surfaces.forEach((value, which) => {
+    const where = `${at}.surfaces[${which}]`;
+    const surface = objectAt(value, where);
+    keysAre(surface, SURFACE_KEYS, where);
+    if (typeof surface.role !== 'string') fail(`${where}.role is not a surface role`);
+    if (!roles.includes(surface.role)) fail(`${where}.role is not a surface role its grammar states`);
+    if (!SURFACE_ORIENTATIONS.some((orientation) => orientation === surface.orientation)) {
+      fail(`${where}.orientation is not an orientation`);
+    }
+    const face = `${surface.role} ${String(surface.orientation)}`;
+    if (faces.has(face)) fail(`${where} repeats the ${face} surface`);
+    faces.add(face);
+    checkMaterial(surface.material, `${where}.material`, records, record, surface.role);
+    if (surface.first_vertex !== nextVertex) fail(`${where}.first_vertex leaves a gap or overlaps the surface before it`);
+    if (surface.first_triangle !== nextTriangle) fail(`${where}.first_triangle leaves a gap or overlaps the surface before it`);
+    const surfaceVertices = countAt(surface.vertex_count, `${where}.vertex_count`, vertices + 1);
+    const surfaceTriangles = countAt(surface.triangle_count, `${where}.triangle_count`, triangles + 1);
+    if (surfaceTriangles < 1) fail(`${where} has no triangle`);
+    if (surfaceVertices < COMPONENTS) fail(`${where} has fewer than three vertices`);
+    nextVertex += surfaceVertices;
+    nextTriangle += surfaceTriangles;
+  });
+  if (nextVertex !== (entry.first_vertex as number) + vertices) fail(`${at}.surfaces do not cover its vertices exactly`);
+  if (nextTriangle !== (entry.first_triangle as number) + triangles) fail(`${at}.surfaces do not cover its triangles exactly`);
 }
 
 /** `NEEDS` maps each need to itself, so its sorted keys are its values. */
@@ -509,6 +580,7 @@ function checkEntries(
   definition: ProjectionDefinition,
   where: string,
   records: readonly OwdRecord[],
+  tables: readonly GrammarTable[],
   vertexCount: number,
   triangleCount: number,
 ): void {
@@ -526,15 +598,7 @@ function checkEntries(
     }
     switch (entry.state) {
       case 'drawn': {
-        if (definition.surfaces) {
-          keysAre(entry, [...DRAWN_KEYS, 'material', 'surface'], at);
-          checkMaterial(entry.material, `${at}.material`, records);
-          if (!SURFACE_ORIENTATIONS.some((orientation) => orientation === entry.surface)) {
-            fail(`${at}.surface is not an orientation`);
-          }
-        } else {
-          keysAre(entry, DRAWN_KEYS, at);
-        }
+        keysAre(entry, definition.surfaces ? [...DRAWN_KEYS, 'surfaces'] : DRAWN_KEYS, at);
         if (entry.first_vertex !== nextVertex) fail(`${at}.first_vertex does not follow the range before it`);
         if (entry.first_triangle !== nextTriangle) fail(`${at}.first_triangle does not follow the range before it`);
         const vertices = countAt(entry.vertex_count, `${at}.vertex_count`, vertexCount + 1);
@@ -542,6 +606,7 @@ function checkEntries(
         // A drawn range draws something: a triangle needs three vertices.
         if (triangles < 1) fail(`${at} is drawn and has no triangle`);
         if (vertices < COMPONENTS) fail(`${at} is drawn and has fewer than three vertices`);
+        if (definition.surfaces) checkSurfaces(entry, at, records, tables, vertices, triangles);
         nextVertex += vertices;
         nextTriangle += triangles;
         const extent = objectAt(entry.extent_mm, `${at}.extent_mm`);
@@ -571,7 +636,12 @@ function checkEntries(
   if (nextTriangle !== triangleCount) fail(`${where} ranges do not cover its triangles exactly`);
 }
 
-function checkProjection(value: unknown, index: number, records: readonly OwdRecord[]): void {
+function checkProjection(
+  value: unknown,
+  index: number,
+  records: readonly OwdRecord[],
+  tables: readonly GrammarTable[],
+): void {
   const at = `projections[${index}]`;
   const projection = objectAt(value, at);
   const definition = PROJECTION_DEFINITIONS[index]!;
@@ -590,7 +660,7 @@ function checkProjection(value: unknown, index: number, records: readonly OwdRec
     const length = vertexCount === 0 ? 0 : components;
     integersAt(projection[key], `${at}.${key}`, length);
   }
-  checkEntries(projection, definition, at, records, vertexCount, triangleCount);
+  checkEntries(projection, definition, at, records, tables, vertexCount, triangleCount);
 }
 
 function checkHeader(value: unknown): OwdHeader {
@@ -687,7 +757,7 @@ function checkHeader(value: unknown): OwdHeader {
 
   const projections = arrayAt(header.projections, 'projections');
   if (projections.length !== PROJECTION_DEFINITIONS.length) fail('projections is not the materialised set');
-  projections.forEach((projection, index) => checkProjection(projection, index, records));
+  projections.forEach((projection, index) => checkProjection(projection, index, records, grammars));
   return header as unknown as OwdHeader;
 }
 
@@ -775,11 +845,18 @@ function checkRanges(projection: DecodedProjection): void {
     if (entry.state !== 'drawn') continue;
     const low = entry.first_vertex;
     const high = low + entry.vertex_count;
-    const end = (entry.first_triangle + entry.triangle_count) * COMPONENTS;
-    for (let corner = entry.first_triangle * COMPONENTS; corner < end; corner += 1) {
-      const vertex = projection.index[corner]!;
-      if (vertex < low) fail(`${projection.header.name} record ${entry.record} indexes outside its range`);
-      if (vertex >= high) fail(`${projection.header.name} record ${entry.record} indexes outside its range`);
+    // Every triangle indexes its own range, and within a record its own surface, so no two surfaces
+    // share a vertex.
+    const ranges = entry.surfaces === undefined ? [entry] : entry.surfaces;
+    for (const range of ranges) {
+      const end = (range.first_triangle + range.triangle_count) * COMPONENTS;
+      for (let corner = range.first_triangle * COMPONENTS; corner < end; corner += 1) {
+        const vertex = projection.index[corner]!;
+        if (vertex < range.first_vertex) fail(`${projection.header.name} record ${entry.record} indexes outside its range`);
+        if (vertex >= range.first_vertex + range.vertex_count) {
+          fail(`${projection.header.name} record ${entry.record} indexes outside its range`);
+        }
+      }
     }
     const min = [...entry.extent_mm.max];
     const max = [...entry.extent_mm.min];

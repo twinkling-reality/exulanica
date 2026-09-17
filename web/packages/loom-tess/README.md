@@ -95,10 +95,13 @@ version 2 admits `render_batch` and `nav_envelope`, among others.
 
 Two projections are materialised, each built from the records by its own rules:
 
-- `render_batch` is what is drawn. Every drawn range cites the surface material record that names
-  the range's record and role, or states that none exists (`none-exists`), as the grammar's
-  render_batch contract requires. It carries its orientation and surface coordinates. Exact
-  geometry nothing dresses is drawn, not withheld.
+- `render_batch` is what is drawn. A drawn entry is made of **surfaces**, one per face group the
+  record has. A surface's **role** is the grammar's surface role (a closed value of
+  `city.surface_material.role`, which the grammar also codes for material identities), stated by
+  the expander and never inferred from geometry. Its **material** is the `city.surface_material`
+  record for (the entry's record identity, role), or the statement that none exists
+  (`none-exists`), as the grammar's render_batch contract requires. Each surface carries its
+  orientation and surface coordinates. Exact geometry nothing dresses is drawn, not withheld.
 - `nav_envelope` is what a person is supported by. Its only admissible use is sampling support
   height.
 
@@ -112,7 +115,7 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 Only terrain.
 
 - In `render_batch`, the whole patch is drawn. No published texture set dresses terrain, so its
-  range states `none-exists`. The grammar says terrain is not a surface where a street, a block
+  one surface (role `terrain`, horizontal) states `none-exists`. The grammar says terrain is not a surface where a street, a block
   or a lot covers it; how terrain yields to them is exact coverage, and comes with their
   expanders. Leaving cells out instead would draw holes that read as cuts.
 - In `nav_envelope`, a terrain cell is drawn when its closed plan square meets no stated extent of
@@ -162,25 +165,29 @@ changes it only where city grammar version 2 changed what a record is.
 length-framed fields:
 
 1. the domain `exulanica/owd-triangle-digest`;
-2. the version `2`;
+2. the version `3`;
 3. the projection name;
 4. the number of entries, followed by one entry per record, owned or halo, in canonical order.
 
-Each entry has eight fields:
+Each entry starts with four fields:
 
 1. the record kind;
 2. the record digest, SHA-256 of `canonical_record`;
 3. the identity the record states, or `not-stated` for a kind that declares none;
-4. the state (`drawn`, `unavailable`, `not_admitted`, `not_in_projection` or `halo`);
-5. the record digest of the dressing material, or `none-exists` (drawn entries in
-   `render_batch` only);
-6. the surface orientation (drawn entries in `render_batch` only);
-7. for a drawn entry, the triangles, as nine signed 64-bit big-endian millimetre integers each;
-   for an unavailable entry, what it needs;
-8. the surface coordinates, as six signed 64-bit integers per triangle (drawn entries in
-   `render_batch` only).
+4. the state (`drawn`, `unavailable`, `not_admitted`, `not_in_projection` or `halo`).
 
-Empty fields are still framed.
+Its body follows. A drawn entry in `render_batch` gives the number of surfaces, as a signed 64-bit
+integer, then five fields per surface, in the entry's order:
+
+1. the role;
+2. the record digest of the dressing material, or `none-exists`;
+3. the orientation;
+4. the triangles, as nine signed 64-bit big-endian millimetre integers each;
+5. the surface coordinates, as six signed 64-bit integers per triangle.
+
+Every other entry gives four fields: empty, empty, then the triangles for a drawn `nav_envelope`
+entry, what it needs for an unavailable entry, or empty; then empty. Empty fields are still
+framed.
 
 **Surface coordinates** are millimetres in the frames the city grammar fixes
 (`exulanica/grammar/grammars/city/common.py`). A texture's physical extent scales them.
@@ -207,7 +214,7 @@ as `idempotency_key` does, because unframed concatenation is not injective.
 
 `src/core/owd.ts` is the only writer and holds the only reader. It is laid out like this:
 
-1. `OWD2`;
+1. `OWD3`;
 2. a little-endian uint32 header length;
 3. the header as canonical JSON;
 4. space padding to a 16-byte boundary;
@@ -230,9 +237,14 @@ The header carries:
   record.
 
 A drawn entry is a contiguous range with its integer extent. So one lookup answers "which record
-does this triangle belong to" and "what is that record's extent".
+does this triangle belong to" and "what is that record's extent". In `render_batch` the range is
+divided into surfaces: contiguous sub-ranges in the expander's order that cover it exactly, share
+no vertex, and each state a role, a material and an orientation. A record repeats a role only on
+another orientation (a kerb's vertical face and horizontal top). The decoder refuses surfaces that
+overlap, leave a gap, share a vertex, repeat a role on one orientation, name a role their grammar
+does not state, or cite a material for another record or role.
 
-A version 1 container is refused at its magic. There is no upgrade on read: rebake the tile.
+An earlier container is refused at its magic. There is no upgrade on read: rebake the tile.
 
 Runtimes import two functions from `@exulanica/loom-tess/core`:
 

@@ -1,8 +1,8 @@
 /**
  * THE TRIANGLE DIGEST. Version 1 was written before either build existed, so it describes a
- * definition and not whichever implementation came second; version 2 changes it for the city
- * grammar's second version, and only where that version changed what a record is. `README.md`
- * states the same thing in prose.
+ * definition and not whichever implementation came second; version 2 changed it for the city
+ * grammar's second version, and version 3 for drawn entries made of several surfaces, each with its
+ * own role, material and orientation. `README.md` states the same thing in prose.
  *
  * ONE DIGEST PER PROJECTION. A projection (`render_batch`, `nav_envelope`, and later
  * `collision_proxy` and `pick_geometry`) is a separate declared output, so each gets its own
@@ -12,11 +12,11 @@
  *
  *   1. the domain `exulanica/owd-triangle-digest`, distinct from `exulanica/idempotency-key` so
  *      this digest can never be mistaken for a key;
- *   2. the digest format version, the decimal text `2`;
+ *   2. the digest format version, the decimal text `3`;
  *   3. the projection name;
  *   4. the number of entries, as a signed 64-bit integer. There is exactly one entry per record
  *      the tile document carries, owned or halo, drawn or not;
- *   5. for each entry, in the canonical record order below, exactly eight fields:
+ *   5. for each entry, in the canonical record order below, four fields and then the entry's body:
  *        a. the record kind, for example `city.terrain`;
  *        b. the record digest: lowercase hex SHA-256 of the record's canonical JSON payload
  *           `{"fields", "kind", "version"}`, which is `exulanica.grammar.records.canonical_record`;
@@ -25,19 +25,23 @@
  *           version 2 record kind in a document states one. An identity is never minted here;
  *        d. the entry state: `drawn`, `unavailable`, `not_admitted`, `not_in_projection`, or
  *           `halo` for a record the document lists as halo, which is context and never drawn;
- *        e. for a drawn entry in a projection that carries surfaces (`render_batch`), the
- *           material reference: the record digest of the `city.surface_material` record that
- *           dresses the range, or `none-exists` when no material record dresses the range's
- *           record and role. Geometry nothing dresses is still drawn. Empty otherwise;
- *        f. for a drawn entry in a projection that carries surfaces, the surface orientation,
- *           `horizontal` or `vertical`. Empty otherwise;
- *        g. for a drawn entry, the triangles: nine signed 64-bit big-endian integers per triangle,
- *           vertex a, b, c, each x, y, z, in the declared unit, in the order the expander emitted
- *           them. For an unavailable entry, the canonical JSON array of what it needs. Empty for
- *           every other state;
- *        h. for a drawn entry in a projection that carries surfaces, the surface coordinates: six
- *           signed 64-bit big-endian integers per triangle, vertex a, b, c, each s, t, in
- *           millimetres. Empty otherwise.
+ *      and the body is exactly one of:
+ *        - for a drawn entry in a projection that carries surfaces (`render_batch`): the number of
+ *          surfaces as a signed 64-bit integer, then for each surface in the entry's order five
+ *          fields: its role, the grammar's surface role; its material reference, the record digest
+ *          of the `city.surface_material` record for (record identity, role), or `none-exists`
+ *          when there is none, geometry nothing dresses being still drawn; its orientation,
+ *          `horizontal` or `vertical`; its triangles, nine signed 64-bit big-endian integers per
+ *          triangle, vertex a, b, c, each x, y, z, in the declared unit, in the order the expander
+ *          emitted them; and its surface coordinates, six signed 64-bit big-endian integers per
+ *          triangle, vertex a, b, c, each s, t, in millimetres;
+ *        - for a drawn entry in any other projection: four fields, empty, empty, the triangles as
+ *          above, empty;
+ *        - for an unavailable entry: four fields, empty, empty, the canonical JSON array of what it
+ *          needs, empty;
+ *        - for every other state: four empty fields.
+ *      The surface count comes before the surfaces, so the framing stays injective however many
+ *      there are.
  *
  * SURFACE COORDINATES are millimetres on the surface, in the frames the city grammar fixes
  * (`exulanica.grammar.grammars.city.common`), so a texture's physical extent scales them with no
@@ -86,8 +90,8 @@ import { asciiBytes } from './ascii.js';
 import { canonicalJson } from './canonical-json.js';
 
 export const TRIANGLE_DIGEST_DOMAIN = 'exulanica/owd-triangle-digest';
-export const TRIANGLE_DIGEST_VERSION = 2;
-export const TRIANGLE_DIGEST_PROFILE = 'exulanica.owd-triangle-digest/v2';
+export const TRIANGLE_DIGEST_VERSION = 3;
+export const TRIANGLE_DIGEST_PROFILE = 'exulanica.owd-triangle-digest/v3';
 
 /** The identity text of a record whose kind's shape declares no identity. */
 export const IDENTITY_NOT_STATED = 'not-stated';
@@ -113,18 +117,28 @@ interface EntryHead {
   readonly identity: string;
 }
 
+/** One surface of a drawn entry, as the digest reads it. */
+export interface DigestSurface {
+  readonly role: string;
+  /** The dressing material record's digest, or `none-exists`. */
+  readonly material: string;
+  readonly orientation: SurfaceOrientation;
+  /** Absolute coordinates, nine per triangle, in emission order. */
+  readonly triangles: ArrayLike<number>;
+  /** Absolute surface coordinates, six per triangle, in emission order. */
+  readonly coordinates: ArrayLike<number>;
+}
+
 export type DigestEntry =
   | (EntryHead & {
       readonly state: 'drawn';
-      /** Absolute coordinates, nine per triangle, in emission order. */
+      /** Absolute coordinates, nine per triangle, in emission order, in a projection without surfaces. */
       readonly triangles: ArrayLike<number>;
-      /** Present exactly when the projection carries surfaces. */
-      readonly surface?: {
-        readonly material: string;
-        readonly orientation: SurfaceOrientation;
-        /** Absolute surface coordinates, six per triangle, in emission order. */
-        readonly coordinates: ArrayLike<number>;
-      };
+    })
+  | (EntryHead & {
+      readonly state: 'drawn';
+      /** The entry's surfaces, in a projection that carries them. */
+      readonly surfaces: readonly DigestSurface[];
     })
   | (EntryHead & { readonly state: 'unavailable'; readonly needs: readonly string[] })
   | (EntryHead & { readonly state: 'not_admitted' | 'not_in_projection' | 'halo' });
@@ -173,6 +187,13 @@ export function int64Bytes(values: ArrayLike<number>, where: string): Uint8Array
   return out;
 }
 
+/** The number of whole triangles in a stream of nine coordinates each, or a refusal. */
+function wholeTriangles(stream: ArrayLike<number>, where: string): number {
+  const triangles = stream.length / COORDINATES_PER_TRIANGLE;
+  if (!Number.isInteger(triangles)) throw new RangeError(`${where}: the triangle stream is not whole triangles`);
+  return triangles;
+}
+
 /** The exact bytes whose SHA-256 is a projection's triangle digest. */
 export function trianglePreimage(projection: string, entries: readonly DigestEntry[]): Uint8Array {
   const framer = new Framer();
@@ -188,25 +209,27 @@ export function trianglePreimage(projection: string, entries: readonly DigestEnt
     framer.text(entry.state, where);
     switch (entry.state) {
       case 'drawn': {
-        const triangles = entry.triangles.length / COORDINATES_PER_TRIANGLE;
-        if (!Number.isInteger(triangles)) {
-          throw new RangeError(`${where}: the triangle stream is not whole triangles`);
-        }
-        const surface = entry.surface;
-        if (surface === undefined) {
+        if (!('surfaces' in entry)) {
+          wholeTriangles(entry.triangles, where);
           framer.text('', where);
           framer.text('', where);
           framer.field(int64Bytes(entry.triangles, where));
           framer.text('', where);
           return;
         }
-        if (surface.coordinates.length !== triangles * SURFACE_COORDINATES_PER_TRIANGLE) {
-          throw new RangeError(`${where}: the surface coordinates do not match the triangles`);
-        }
-        framer.text(surface.material, where);
-        framer.text(surface.orientation, where);
-        framer.field(int64Bytes(entry.triangles, where));
-        framer.field(int64Bytes(surface.coordinates, where));
+        framer.integer(entry.surfaces.length, where);
+        entry.surfaces.forEach((surface, which) => {
+          const at = `${where} surface ${which}`;
+          const triangles = wholeTriangles(surface.triangles, at);
+          if (surface.coordinates.length !== triangles * SURFACE_COORDINATES_PER_TRIANGLE) {
+            throw new RangeError(`${at}: the surface coordinates do not match the triangles`);
+          }
+          framer.text(surface.role, at);
+          framer.text(surface.material, at);
+          framer.text(surface.orientation, at);
+          framer.field(int64Bytes(surface.triangles, at));
+          framer.field(int64Bytes(surface.coordinates, at));
+        });
         return;
       }
       case 'unavailable':

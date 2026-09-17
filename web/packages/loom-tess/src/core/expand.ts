@@ -28,7 +28,7 @@ import type { SurfaceOrientation } from './triangle-digest.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 2;
+export const TESSELLATOR_SOURCE_VERSION = 3;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -37,7 +37,11 @@ export const TESSELLATOR_SOURCE_VERSION = 2;
  */
 export interface ProjectionDefinition {
   readonly name: ProjectionName;
-  /** Whether drawn ranges carry a material reference, an orientation and surface coordinates. */
+  /**
+   * Whether a drawn entry is made of surfaces, each with the grammar's surface role, the material
+   * record for its record and role (or the statement that none exists), an orientation and surface
+   * coordinates.
+   */
   readonly surfaces: boolean;
   readonly contract: {
     readonly preserves: readonly string[];
@@ -53,7 +57,10 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
     contract: {
       preserves: [
         'the integer vertex positions of every drawn record',
-        'the record and stated identity of every triangle, and the material record that dresses it or the statement that none exists',
+        'the record and stated identity of every triangle',
+        'the surfaces of every drawn record, each with its role, which is a surface role its grammar states, '
+          + 'its orientation, and the surface material record for that record and role, or the statement '
+          + 'that none exists; no role is inferred from geometry',
         'surface coordinates in millimetres, in the surface frame the grammar fixes',
       ],
       admissible_uses: ['drawing'],
@@ -152,23 +159,29 @@ export interface ExpandContext {
 }
 
 export interface SurfaceExpansion {
-  /** The surface role the range draws; the material record dressing that role binds to it. */
+  /** The grammar's surface role the piece draws; the material record for (record, role) dresses it. */
   readonly role: string;
   readonly orientation: SurfaceOrientation;
-  /** Absolute surface coordinates in millimetres, two per vertex. */
+  /** Absolute surface coordinates in millimetres, two per vertex of the piece. */
   readonly coordinates: readonly number[];
 }
 
+/**
+ * One group of faces an expander draws, with vertices of its own. In a projection that carries
+ * surfaces every piece is one surface, and an entry may repeat a role only on another orientation.
+ * In any other projection the pieces are joined into one range and carry no surface.
+ */
+export interface Piece {
+  /** Absolute integer vertices in the records' unit, three per vertex. */
+  readonly vertices: readonly number[];
+  /** Indices into this piece's `vertices`, three per triangle, counter-clockwise seen from outside. */
+  readonly triangles: readonly number[];
+  /** Present exactly when the projection carries surfaces. */
+  readonly surface?: SurfaceExpansion;
+}
+
 export type Expansion =
-  | {
-      readonly state: 'drawn';
-      /** Absolute integer vertices in the records' unit, three per vertex. */
-      readonly vertices: readonly number[];
-      /** Indices into `vertices`, three per triangle, counter-clockwise seen from +z. */
-      readonly triangles: readonly number[];
-      /** Present exactly when the projection carries surfaces. */
-      readonly surface?: SurfaceExpansion;
-    }
+  | { readonly state: 'drawn'; readonly pieces: readonly Piece[] }
   | { readonly state: 'unavailable'; readonly needs: readonly Need[] };
 
 export type Rule =
@@ -196,7 +209,11 @@ function safe(value: number, where: string): number {
  *
  * It depends on the grammar's `terrain_grid_matches_tile`, and checks the facts it reads.
  */
-function terrainCells(fields: Fields, context: ExpandContext, omit: readonly PlanBox[]): Expansion {
+function terrainCells(
+  fields: Fields,
+  context: ExpandContext,
+  omit: readonly PlanBox[],
+): { readonly state: 'drawn'; readonly vertices: number[]; readonly triangles: number[] } | Extract<Expansion, { state: 'unavailable' }> {
   const side = fields.samples_per_side as number;
   const cell = fields.cell_mm as number;
   const heights = fields.height_mm as readonly number[];
@@ -258,7 +275,8 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
   for (let vertex = 0; vertex < grid.vertices.length; vertex += 3) {
     coordinates.push(grid.vertices[vertex]!, grid.vertices[vertex + 1]!);
   }
-  return { ...grid, surface: { role: 'terrain', orientation: 'horizontal', coordinates } };
+  const surface: SurfaceExpansion = { role: 'terrain', orientation: 'horizontal', coordinates };
+  return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles, surface }] };
 }
 
 /**
@@ -286,7 +304,9 @@ function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
     max_x: safe(box.max_x + radius, 'a clearance extent'),
     max_y: safe(box.max_y + radius, 'a clearance extent'),
   }));
-  return terrainCells(fields, context, clear);
+  const grid = terrainCells(fields, context, clear);
+  if (grid.state === 'unavailable') return grid;
+  return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles }] };
 }
 
 const needs = (...list: Need[]): Rule => ({ rule: 'needs', needs: list });

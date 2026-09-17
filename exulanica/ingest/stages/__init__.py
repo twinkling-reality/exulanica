@@ -808,9 +808,10 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "baked_tile": StageSpec(
         key="baked_tile",
-        # 2: the container is `owd/2`, read from city grammar version 2 tile documents, which carry
-        # membership, a frame and a subject identity that version 1 had no field for.
-        version=2,
+        # 3: the container is `owd/3`, whose drawn entries are made of surfaces, each with its own
+        # role, material and orientation; 2 read city grammar version 2 tile documents, with the
+        # membership, frame and subject identity version 1 had no field for.
+        version=3,
         output_kind="owd_tile",
         # Deterministic in the sense the flag carries: integer records in, integer geometry and a
         # correctly rounded float payload out, no model, no clock and no random source, so two runs
@@ -827,13 +828,13 @@ STAGES: Final[dict[str, StageSpec]] = {
         # mapping equal to what the tessellator itself states (`exulanica-tess params`).
         params={
             # The container format. A new version is a rebake, never an upgrade on read.
-            "container": "owd/2",
+            "container": "owd/3",
             # The tessellator's source version: its expanders, its statements of what a record
             # kind waits on, and its fixed tessellation choices, such as a terrain cell's diagonal
             # and which terrain cells a covering record's extent leaves out.
-            "tessellator": 2,
+            "tessellator": 3,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
-            "triangle_digest": "exulanica.owd-triangle-digest/v2",
+            "triangle_digest": "exulanica.owd-triangle-digest/v3",
             # The document the bake reads, whose envelope the city grammar owns.
             "tile_document": "exulanica.tile-document/v2",
             # The records' unit, and the unit of every digested coordinate.

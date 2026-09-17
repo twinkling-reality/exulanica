@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 2, digest profile v2. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 3, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'a2d56807a8bf0307c85ff99585e8e306a510977258ba8b4e2d2ab364273bab35',
-  nav_envelope: 'bae7b8def0945be9d00cf6e1264e15887842973b4606f3405826a6423cc94c35',
+  render_batch: '9f81d75aed01d07b09703d6367f59cf12862ce1ec652c9dfb362a70a539b4e05',
+  nav_envelope: '2b9f2b4b4c6895e892fc94c2ca6839a7315910fbad4bac251f75e172e1a40837',
 } as const;
 
 afterEach(() => {
@@ -80,8 +80,15 @@ describe('the triangle digest of the conformance fixture', () => {
       state: 'drawn',
       vertex_count: 17 * 17,
       triangle_count: 16 * 16 * 2,
-      surface: 'horizontal',
-      material: { state: 'none-exists' },
+      surfaces: [{
+        role: 'terrain',
+        orientation: 'horizontal',
+        material: { state: 'none-exists' },
+        first_vertex: 0,
+        vertex_count: 17 * 17,
+        first_triangle: 0,
+        triangle_count: 16 * 16 * 2,
+      }],
     });
     expect(renderBatch!.surfaceMm).toHaveLength(17 * 17 * 2);
     for (const entry of renderBatch!.header.entries) {
@@ -164,9 +171,10 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(drawn).toHaveLength(1);
     const entry = drawn[0]!;
     if (entry.state !== 'drawn') throw new Error('unreachable');
-    expect(entry.surface).toBe('horizontal');
-    if (entry.material?.state !== 'record') throw new Error('the dressed terrain cites no record');
-    const material = decoded.header.records[entry.material.record]!;
+    const [surface] = entry.surfaces!;
+    expect(surface).toMatchObject({ role: 'terrain', orientation: 'horizontal' });
+    if (surface!.material.state !== 'record') throw new Error('the dressed terrain cites no record');
+    const material = decoded.header.records[surface!.material.record]!;
     expect(material.kind).toBe('city.surface_material');
     expect(material.fields.surface_identity).toBe(decoded.header.records[entry.record]!.identity);
     expect(renderBatch.header.vertex_count).toBe(17 * 17);
