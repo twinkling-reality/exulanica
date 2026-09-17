@@ -3,7 +3,8 @@
 # Bake one workspace request per published set on three runtimes across two CPU architectures,
 # with the command the bake worker runs, and compare every container with cmp against the first
 # run, every result line apart from the Node version, and the package source digest each run
-# claimed against the one the backend computes. Prints this script, then everything it observed.
+# claimed against the one the backend computes. Prints this script and the request writer beside it,
+# then everything it observed.
 set -u
 ROOT=/Users/glendonchin/dev/Technology/exulanica-preview-handoffs
 WEB=$ROOT/web
@@ -12,6 +13,9 @@ WORK=$(mktemp -d $HERE/run.XXXXXX)
 cd $WEB
 echo "== script"
 cat $0
+echo
+echo "== requests.mts, which the script runs from its own directory"
+cat $HERE/requests.mts
 echo
 echo "== source"
 echo "commit $(git -C $ROOT rev-parse HEAD)"
@@ -70,8 +74,40 @@ PY
 echo "package source digest the backend computes: $($ROOT/.venv/bin/python -c 'from exulanica.world.material_bakes import package_source_sha256; print(package_source_sha256())')"
 rm -rf $WORK
 
+== requests.mts, which the script runs from its own directory
+// One bake request per published set, each the set's own recipe at its own resolution, under a
+// fixed made-up recipe row id per set, written canonically to the directory given.
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  BAKE_REQUEST_PROFILE,
+  LIBRARY,
+  WORKSPACE_LICENCE_ID,
+  canonicalBytes,
+  sha256Hex,
+  workspaceLicence,
+} from '/Users/glendonchin/dev/Technology/exulanica-preview-handoffs/web/packages/loom-texture/src/index.ts';
+
+const out = process.argv[2]!;
+mkdirSync(out, { recursive: true });
+const licence = workspaceLicence();
+LIBRARY.forEach((source, index) => {
+  const recipe = source.entry.recipe;
+  const request = {
+    profile: BAKE_REQUEST_PROFILE,
+    set_id: `ws.${sha256Hex(new TextEncoder().encode(source.entry.set_id)).slice(0, 32)}`,
+    version: 1,
+    title: `Workspace variant of ${recipe.maker.id} version ${recipe.maker.version}`,
+    summary: `Baked in one workspace from recipe ${sha256Hex(canonicalBytes(recipe))}.`,
+    licence: { id: WORKSPACE_LICENCE_ID, sha256: licence.sha256 },
+    maker_sha256: sha256Hex(canonicalBytes(source.maker.manifest)),
+    recipe,
+  };
+  writeFileSync(join(out, `${String(index).padStart(2, '0')}-${source.entry.set_id}.json`), canonicalBytes(request));
+});
+
 == source
-commit 222c25b71ca5f58e933f7b7966f49ad302b07813
+commit 14668cf2167d0fc78a51a7999482e169045013fd
 working tree changes under web/packages/loom-texture and exulanica: 0
 requests: 8
 d4d0766adfed08653b73020d923f9e631a34e72d9393b161c463b4dc9277f03a  00-cc0.brick-running-bond.json

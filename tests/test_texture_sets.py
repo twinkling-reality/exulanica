@@ -541,6 +541,14 @@ def test_the_object_determinism_record_is_of_every_published_file(manifest, cata
 def test_the_workspace_bake_record_is_every_published_recipe_baked_alike(manifest):
     """The bake worker's command, on three runtimes and two architectures, one bake per set."""
     record = WORKSPACE_EVIDENCE.read_text(encoding="utf-8")
+    # What ran comes first, in order: the script, the request writer it calls, then the source.
+    sections = re.findall(r"^== (.+)$", record, re.MULTILINE)
+    assert sections[:3] == [
+        "script",
+        "requests.mts, which the script runs from its own directory",
+        "source",
+    ], sections
+    assert "$HERE/requests.mts" in record.split("\n== requests.mts", 1)[0]
     assert re.search(r"^commit [0-9a-f]{40}$", record, re.MULTILINE)
     assert "working tree changes under web/packages/loom-texture and exulanica: 0" in record
     stems = [f"{index:02d}-{entry['set_id']}" for index, entry in enumerate(manifest["sets"])]

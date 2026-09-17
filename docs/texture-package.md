@@ -751,8 +751,9 @@ its own resolution. It runs the command the bake worker runs on three runtimes:
 
 All 24 bakes exited 0. The eight containers are byte-identical across the three runs, and so are
 the result lines once the Node version is set aside. Every run claimed the package source digest
-the backend computes from the same files. The record names the commit it ran at and a clean
-working tree. `tests/test_texture_sets.py` holds the record to all of that.
+the backend computes from the same files. The record prints the script and the request writer it
+ran, and names the commit it ran at and a clean working tree. `tests/test_texture_sets.py` holds
+the record to all of that.
 
 ## 15. What is not verified
 
