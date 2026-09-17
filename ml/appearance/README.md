@@ -47,7 +47,7 @@ scripts/delete-instance.sh at exulanica-appearance-a1 <epoch>   # this session's
 # the same steps one at a time
 .venv/bin/python -m exulanica_appearance runner stage --spec jobs/track-a-smoke.json --repository ../.. --weights weights/ --out STAGED
 python3 scripts/fetch-weights.py STAGED WEIGHTS          # on the rented machine's host
-container/run.sh IMAGE@sha256:... STAGED WEIGHTS OUT 5670   # no network, read-only, hard time limit
+container/run.sh sha256:<image id> appearance-local@sha256:<image id> STAGED WEIGHTS OUT 5670   # no network, read-only, hard time limit
 .venv/bin/python -m exulanica_appearance runner check --out OUT
 
 # weights manifests from Hugging Face metadata only (no weights file is fetched)

@@ -55,21 +55,18 @@ rsync -a --delete "${work}/staged-smoke" "${work}/staged-session-1" "${host}:${r
 echo "== building the image (bases pinned by digest, VideoX-Fun pinned by commit and tree)"
 ssh "${host}" "cd ${remote}/ml-appearance && docker build -f container/Dockerfile \
   --build-arg CODE_REVISION=${head} -t appearance:${tag} ."
-image=$(ssh "${host}" "docker image inspect appearance:${tag} --format '{{index .RepoDigests 0}}' 2>/dev/null || true")
-if [ -z "${image}" ]; then
-  # A locally built image has no registry digest, so pin it by its image id instead, which is the
-  # digest of its own configuration and is what `docker run` resolves.
-  id=$(ssh "${host}" "docker image inspect appearance:${tag} --format '{{.Id}}'")
-  image="appearance-local@${id}"
-fi
-echo "   image ${image}"
+# A locally built image has no registry digest, so docker runs it by its image id, which is the
+# digest of that image's own configuration, and the records pin a stated name with that same id.
+docker_ref=$(ssh "${host}" "docker image inspect appearance:${tag} --format '{{.Id}}'")
+record_pin="appearance-local@${docker_ref}"
+echo "   image ${record_pin}"
 
 echo "== fetching the weights the staged manifests name, verified as they land"
 ssh "${host}" "python3 ${remote}/ml-appearance/scripts/fetch-weights.py ${remote}/staged-smoke ${remote}/weights"
 
 echo "== the smoke job"
-ssh "${host}" "rm -rf ${remote}/out-smoke && ${remote}/ml-appearance/container/run.sh '${image}' \
-  ${remote}/staged-smoke ${remote}/weights ${remote}/out-smoke 1440"
+ssh "${host}" "rm -rf ${remote}/out-smoke && ${remote}/ml-appearance/container/run.sh \
+  '${docker_ref}' '${record_pin}' ${remote}/staged-smoke ${remote}/weights ${remote}/out-smoke 1440"
 rsync -a "${host}:${remote}/out-smoke" "${work}/"
 
 echo "== the gate"
@@ -83,8 +80,8 @@ else
 fi
 
 ssh "${host}" "python3 ${remote}/ml-appearance/scripts/fetch-weights.py ${remote}/staged-session-1 ${remote}/weights"
-ssh "${host}" "rm -rf ${remote}/out-session-1 && ${remote}/ml-appearance/container/run.sh '${image}' \
-  ${remote}/staged-session-1 ${remote}/weights ${remote}/out-session-1 5670"
+ssh "${host}" "rm -rf ${remote}/out-session-1 && ${remote}/ml-appearance/container/run.sh \
+  '${docker_ref}' '${record_pin}' ${remote}/staged-session-1 ${remote}/weights ${remote}/out-session-1 5670"
 rsync -a "${host}:${remote}/out-session-1" "${work}/"
 "${python}" -m exulanica_appearance runner check --out "${work}/out-session-1"
 echo "== done. Delete the machine before writing the report."
