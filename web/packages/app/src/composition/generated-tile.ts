@@ -35,7 +35,10 @@ function statement(tile: LoadedGeneratedTile): HTMLElement {
     class: 'generated-tile-evaluation',
     role: 'note',
     'aria-label': 'Generated tile evaluation',
-    style: 'position:fixed;left:12px;bottom:12px;max-width:min(34rem,45vw);z-index:5;padding:8px 10px;'
+    // The bottom left column the proof lens and environment selection use, so the scene segments
+    // panel, anchored just right of that column, never covers the statement.
+    style: 'position:fixed;left:var(--gap);bottom:12px;box-sizing:border-box;width:min(24rem,calc(100vw - 2 * var(--gap)));'
+      + 'z-index:5;padding:8px 10px;'
       + 'font:12px/1.4 ui-monospace,Menlo,monospace;color:#f4f1ea;background:rgba(12,14,18,.78);border-radius:6px',
   }, [
     ...lines.map((line) => el('p', { text: line, style: 'margin:0 0 2px' })),
