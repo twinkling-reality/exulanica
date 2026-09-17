@@ -21,3 +21,25 @@ main: detached worktree of 2aa796eb served on 5193. lane: lane/tile-runtime on t
   fixed-b-again: sha256 7ee0bc8f799988e4de8ff9b400a62fe21bd89d25f503e0c129c3d99e050d8fe6 lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
 
 RESULT: every pose byte-identical between main and lane: True
+
+RERUN AFTER THE REBASE ONTO MAIN, 2026-09-17 (the Atlas binding hunk moved: main's navigation world has no surface argument)
+Same method and scripts. main: detached worktree of 36e6d2dd served on 5193. lane: lane/tile-runtime at bad16481 (rebased,
+base 36e6d2dd) served on 5192. Both lit every pixel; the view is the owned district with delete-contested's hatched surfaces.
+The hashes differ from 2026-09-16 because main's own default view changed; what is compared is main against lane.
+
+[main]
+  arrival: sha256 a0c1062d876a5b13e4c18b57bbdd3a70964a09df556af4823727486c119ae1ce lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  arrival-again: sha256 a0c1062d876a5b13e4c18b57bbdd3a70964a09df556af4823727486c119ae1ce lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a: sha256 4a4b29d56d45ed42b1b5d1d5c38ab0d09c8f4650694ba3809c4a236ae5c95511 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a-again: sha256 4a4b29d56d45ed42b1b5d1d5c38ab0d09c8f4650694ba3809c4a236ae5c95511 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b: sha256 5b4043b60eff3acdeceda4a016fe33d93a619d8f20edb98c8cb44b72253a92de lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b-again: sha256 5b4043b60eff3acdeceda4a016fe33d93a619d8f20edb98c8cb44b72253a92de lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+[lane]
+  arrival: sha256 a0c1062d876a5b13e4c18b57bbdd3a70964a09df556af4823727486c119ae1ce lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  arrival-again: sha256 a0c1062d876a5b13e4c18b57bbdd3a70964a09df556af4823727486c119ae1ce lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a: sha256 4a4b29d56d45ed42b1b5d1d5c38ab0d09c8f4650694ba3809c4a236ae5c95511 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a-again: sha256 4a4b29d56d45ed42b1b5d1d5c38ab0d09c8f4650694ba3809c4a236ae5c95511 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b: sha256 5b4043b60eff3acdeceda4a016fe33d93a619d8f20edb98c8cb44b72253a92de lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b-again: sha256 5b4043b60eff3acdeceda4a016fe33d93a619d8f20edb98c8cb44b72253a92de lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+
+RESULT: every pose byte-identical between main 36e6d2dd and the rebased lane: True
