@@ -730,6 +730,19 @@ The rest of the machinery:
     bake's object lock, so a bake still being written is read a moment later instead of being
     re-requested.
 
+**What the runtime role may write.** `tests/test_runtime_update_grants.py` names every table the
+runtime role may update and why, and every material table is there:
+
+- `material_bake_request`, `material_recipe_source` and `material_recipe_withdrawal` are in
+  `INSERT_ONLY_TABLES` in `exulanica/db/roles.py`, so provisioning takes UPDATE on them away.
+  0066's append-only triggers still refuse an update from any role that holds it.
+- `material_bake` keeps UPDATE. The worker claims, records and fails bakes and retakes an expired
+  lease, a request re-queues a bake, and a withdrawal or a tombstone cancels one.
+- `material_recipe` keeps UPDATE, because a request and a withdrawal lock the recipe row and
+  `SELECT ... FOR UPDATE` needs that privilege. Its guard refuses every change.
+- `material_bake_quota` keeps the blanket grant and has no runtime writer. It is a ceiling an
+  operator declares; making it operator-only, with 0062's `tiles_limit`, is the security lane's.
+
 **Routes.** `/materials/makers`, `/materials/library`, `/materials/recipes`, one recipe, its
 withdrawal, its bake request, its bake and the bake's bytes. Reads need `world.read` and writes
 need `world.write`. The answers:

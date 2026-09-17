@@ -49,6 +49,13 @@ RUNTIME_UPDATES: dict[str, str] = {
     "identity_rejection": "a rejection is revoked and restored (identity/rejections.py)",
     "intake_batch": "a batch declares its size and closes (ingest/batch.py)",
     "job": "the derivative queue claims, renews, finishes and retries jobs",
+    "material_bake": (
+        "the bake worker claims, records and fails bakes and retakes an expired lease; a request "
+        "re-queues one under FOR UPDATE; a withdrawal or a tombstone cancels one"
+    ),
+    "material_recipe": (
+        "a bake request and a withdrawal lock the recipe FOR UPDATE; 0066's guard refuses changes"
+    ),
     "person_subject": "a consent write locks its subject FOR KEY SHARE (api person consent)",
     "personal_model_right": "withdrawal, once; migration 0073 refuses every other change",
     "pipeline_run": "the ledger attaches, locks and closes runs; an event insert locks its run",
@@ -98,6 +105,9 @@ WITHOUT_A_RUNTIME_UPDATER: frozenset[str] = frozenset(
         "evidence_span",
         "identity_event",
         "match_proposal",
+        # An operator-declared ceiling; the security lane makes it, and 0062's tiles_limit,
+        # operator-only.
+        "material_bake_quota",
         "media_track",
         "never_same",
         "occurrence",
