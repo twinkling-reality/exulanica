@@ -111,7 +111,7 @@ _OBJECTS: Final = (
 #: For every surface role, the record kinds whose subjects may own a surface of that role.
 SURFACE_ROLE_OWNERS: Final = {
     **{role: ("city.facade",) for role in _FACADE_ROLES},
-    "wall": ("city.facade", "city.massing"),
+    "wall": ("city.facade", "city.massing", "city.interior_backing"),
     "roof": ("city.massing",),
     "parapet": ("city.massing",),
     "carriageway": ("city.street_segment", "city.junction"),

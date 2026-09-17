@@ -8,9 +8,11 @@ roles. A segment's carriageway and, with a gutter, its gutter; a curb's kerb and
 junction's carriageway; a block's and a lot's ground. A role no published set dresses (glazing, a
 door, paint, terrain, a tree) gets no record and draws as unavailable.
 
-**Street furniture, trees and vitrines get none in this version:** this stage runs before the
-streetlife and vitrine stages, so the records their surfaces belong to do not exist yet. The stage
-order is the descriptor's; moving material after them is a grammar change, asked for, not made.
+**Everything a record draws, including what the late stages make.** This stage runs last but one,
+after streetlife, vitrine and premises, so a street lamp's parts, a vitrine's fitout and the plane
+behind a face's upper glazing are all dressed: they exist by the time it runs. It ran before them
+until 2026-09-17, when it was moved, because a stage cannot dress a record that does not exist and
+half the street was drawing unavailable for that reason alone.
 
 **Which material.** A building's wall material is ``wall_material``, derived per building among
 its era's wall materials. Every other role follows :data:`ROLE_MATERIALS`, an authored preference
@@ -41,7 +43,16 @@ from typing import Final
 
 from exulanica.grammar.contract import StageContext
 from exulanica.grammar.errors import InvalidRecordError
-from exulanica.grammar.grammars.city import facade, massing, material, parcels, roads, streets
+from exulanica.grammar.grammars.city import (
+    facade,
+    massing,
+    material,
+    parcels,
+    roads,
+    streetlife,
+    streets,
+    vitrine,
+)
 from exulanica.grammar.grammars.city.common import SURFACE_ROLE_CODES
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
@@ -74,14 +85,17 @@ ROLE_MATERIALS: Final = {
     "object_secondary": ("cast_concrete", "storefront_metal"),
     "object_tertiary": ("storefront_metal",),
 }
+#: An interior backing takes the ``wall`` role and this order, not the building's wall material:
+#: the finish inside a room is not what the street front is built of, and brick reads wrong.
+_BACKING_MATERIALS: Final = ("painted_render", "cast_concrete")
 _LOTS_PER_BLOCK: Final = 10_000
 #: Draw ordinals for surfaces no building owns, clear of every building's ordinal.
 _STREETS: Final = 1 << 30
 _GROUNDS: Final = 1 << 31
 
 
-def _material_for(role: str, wall: str | None) -> str:
-    for choice in ROLE_MATERIALS[role]:
+def _material_for(role: str, wall: str | None, order: tuple[str, ...] | None = None) -> str:
+    for choice in order or ROLE_MATERIALS[role]:
         key = wall if choice == "wall" else choice
         if key is not None and role in entry("material", key)["surfaces"]:
             return key
@@ -143,6 +157,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
     for item in rooftops:
         rooftops_of.setdefault(item.building_identity, []).append(item)
 
+    building_placement: dict[str, tuple[int, int, int, int, int, int]] = {}
     for building in buildings:
         lot = lots[building.parcel_identity]
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
@@ -161,6 +176,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             derived(context, "glazing_soil_band_bottom_mm", ordinal),
             derived(context, "glazing_soil_band_edge_mm", ordinal),
         )
+        building_placement[building.identity] = placement  # type: ignore[assignment]
         for face in faces_of.get(building.identity, []):
             face_bays = bays_of.get(face.identity, [])
             panel_roles = {
@@ -262,6 +278,24 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             "carriageway",
             _material_for("carriageway", None),
             placement,
+        )
+    for item in prior_records(context, streetlife.STAGE_ID, streetlife.StreetFurnitureRecord):
+        placement = street_placement[item.segment_identity]
+        for role in sorted({part.surface_role for part in item.parts}):
+            yield record(
+                item.identity, "city.street_furniture", role, _material_for(role, None), placement
+            )
+    for case in prior_records(context, vitrine.STAGE_ID, vitrine.VitrineRecord):
+        placement = building_placement[case.building_identity]
+        for role in sorted({part.surface_role for part in case.parts}):
+            yield record(case.identity, "city.vitrine", role, _material_for(role, None), placement)
+    for backing in prior_records(context, vitrine.STAGE_ID, vitrine.InteriorBackingRecord):
+        yield record(
+            backing.identity,
+            "city.interior_backing",
+            "wall",
+            _material_for("wall", None, _BACKING_MATERIALS),
+            building_placement[backing.building_identity],
         )
     for block in prior_records(context, streets.STAGE_ID, streets.BlockRecord):
         repeat = derived(context, "repeat_size_millionths", _GROUNDS + block.block_ordinal)

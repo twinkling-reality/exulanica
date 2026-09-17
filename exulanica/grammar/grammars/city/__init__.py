@@ -1,7 +1,8 @@
 """The city: the first and largest grammar, and one registered implementation among others.
 
 Version 2. Eleven stages, in the order they run: terrain, districts, streets, parcels, massing,
-facade, material, streetlife, vitrine, premises, tile. Each has a version and record shapes whose
+facade, streetlife, vitrine, premises, material, tile. Material runs last but one, so every record
+whose surfaces it dresses already exists. Each has a version and record shapes whose
 validators hold every field, and ``city.v2.json`` states all of it as data: the frame, the stages
 and the record kinds each validates, 76 declared parameters and the representation contract of
 each admitted projection. **No stage has a generator**, so a city generated today is a receipt
@@ -62,10 +63,10 @@ CITY_STAGES: Final = (
     parcels_generator.STAGE,
     massing_generator.STAGE,
     facade_generator.STAGE,
-    material_generator.STAGE,
     streetlife_generator.STAGE,
     vitrine_generator.STAGE,
     premises_generator.STAGE,
+    material_generator.STAGE,
     tile.STAGE,
 )
 

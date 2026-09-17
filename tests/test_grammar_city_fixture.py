@@ -60,10 +60,10 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "5180c50331f306dc085febe32e19df121da13aee90914180238fd8aab524591d"
+DOCUMENT_SHA256 = "22a6aa2034143ff94121b0e093fa1195209f6195508b8131319980691769194d"
 DOCUMENT_BYTES = 131_130
-SHAPES_SHA256 = "7ad96e305e41f69bdb7f7909a58c13591eda6f21059aadf12466a2a77c08b85b"
-SHAPES_BYTES = 61_808
+SHAPES_SHA256 = "dc74683ac4d76e5d621c40313b469d302250c2337702d8c5da17e4dd6462cd65"
+SHAPES_BYTES = 61_882
 
 #: Every city record kind but the tile record, which is the envelope rather than a record in it.
 _RECORD_KINDS = sorted(shape.kind for shape in CITY_SHAPES if shape.kind != "city.tile")

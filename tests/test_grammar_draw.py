@@ -597,10 +597,10 @@ _CITY_STAGE_IDS = (
     "parcels",
     "massing",
     "facade",
-    "material",
     "streetlife",
     "vitrine",
     "premises",
+    "material",
     "tile",
 )
 

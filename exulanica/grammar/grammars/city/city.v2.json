@@ -145,16 +145,6 @@
       ]
     },
     {
-      "stage_id": "material",
-      "stage_version": 2,
-      "records": [
-        {
-          "kind": "city.surface_material",
-          "version": 2
-        }
-      ]
-    },
-    {
       "stage_id": "streetlife",
       "stage_version": 2,
       "records": [
@@ -188,6 +178,16 @@
       "records": [
         {
           "kind": "city.premises",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "material",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.surface_material",
           "version": 2
         }
       ]
