@@ -4,10 +4,11 @@ A vehicle follows lanes and lane connectors, stops at stop lines, gives way by t
 rule, keeps out of crossings pedestrians are on, and parks. Every second is one pure step over
 integers and recorded inputs, so a replay of the same inputs is byte-identical.
 
-**What a run reads.** Road records (lanes, connectors, junctions and their approaches, signal
-controllers and groups, crossings, parking spaces), the three traffic catalogs under
-``assets/catalogs/traffic`` (vehicle classes, right-of-way policies, signal plans), a seed, a
-fleet, and two ordered inputs: trip requests and the pedestrian crossing feed.
+**What a run reads.** The city grammar's road records (districts, street nodes and segments,
+lanes, junctions and their approaches, lane connections, signals, crossings, parking spaces), the
+five traffic catalogs under ``assets/catalogs/traffic`` (vehicle classes, right-of-way policies,
+signal plans, and the classes each lane use and parking kind admits), a seed, a fleet, and two
+ordered inputs: trip requests and the pedestrian crossing feed.
 
 **What it writes.** A state document per second, events with uuid5 identities, and a transition
 receipt binding the previous and next state digests, the inputs consumed and the events.
@@ -15,9 +16,9 @@ receipt binding the previous and next state digests, the inputs consumed and the
 **The modules.**
 
 ``catalogs``
-    The cited, licensed vehicle, policy and signal catalogs and their digest.
-``provisional_records``
-    The approved road record shapes, until the city vocabulary lane lands them in the grammar.
+    The cited, licensed vehicle, policy, signal and access catalogs and their digest.
+``city_roads``, ``road_input``
+    The one place traffic reads the city: records in, a checked road input out, or a refusal.
 ``geometry``, ``kinematics``, ``signals``, ``routing``
     Integer geometry, the braking-envelope safety rule, signal indications as a pure function of
     the second, and deterministic routing.
