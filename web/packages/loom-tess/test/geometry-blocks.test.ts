@@ -114,8 +114,12 @@ function inside(point: Plan, ring: readonly Plan[]): boolean {
   return crossing;
 }
 
-/** Every property the ring rule states, checked on one ring. */
+/** Every property the ring rule states, checked on the ring starting at each of its vertices. */
 function holdsTheRingRule(ring: readonly Plan[]): void {
+  ring.forEach((_point, start) => holdsTheRingRuleFrom([...ring.slice(start), ...ring.slice(0, start)]));
+}
+
+function holdsTheRingRuleFrom(ring: readonly Plan[]): void {
   const triangles = triangulateRing(ring, 'case');
   expect(triangles).toHaveLength((ring.length - 2) * 3);
   expect(new Set(triangles)).toEqual(new Set(ring.map((_point, index) => index)));
@@ -164,6 +168,9 @@ describe('the ring rule', () => {
     const ring: Plan[] = [[0, 0], [4000, 0], [8000, 0], [8000, 3000], [3000, 3000], [3000, 8000], [0, 8000]];
     expect(triangulateRing(ring, 'case')).toEqual([6, 0, 1, 1, 2, 3, 1, 3, 4, 6, 1, 4, 4, 5, 6]);
     holdsTheRingRule(ring);
+    // Started on its straight run, the first vertex is collinear, so the first ear cut is another.
+    const fromTheRun: Plan[] = [...ring.slice(1), ring[0]!];
+    expect(triangulateRing(fromTheRun, 'case')[1]).not.toBe(0);
   });
 
   it('holds its rule on every ring the fixture states', () => {
@@ -235,6 +242,21 @@ describe('the fillet arc rule', () => {
       [2847, 1234, -70],
       [2961, 1609, -65],
       [3000, 2000, -60],
+    ]);
+  });
+
+  it('takes the centre halfway between the two tangent points\' own centres', () => {
+    // Tangent points a few millimetres off one circle: from P the centre is (0, 0), from Q it is
+    // (11, 8), and the rule takes the floored midpoint.
+    const offP: Space = [3000, -4000, 0];
+    const offQ: Space = [4010, 3010, 0];
+    expect(filletCentre(offP, [4, 3], offQ, [-3010, 4010], 5000, 'case')).toEqual([5, 4]);
+    expect(filletArc(offP, [4, 3], offQ, [-3010, 4010], 5000, 4, 'case')).toEqual([
+      [3000, -4000, 0],
+      [4305, -2546, 0],
+      [4954, -702, 0],
+      [4847, 1247, 0],
+      [4010, 3010, 0],
     ]);
   });
 
