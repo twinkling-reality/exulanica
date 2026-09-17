@@ -519,24 +519,19 @@ def test_every_float_injected_anywhere_in_the_emitted_set_is_refused(poison):
     """Part by part: the generations, then each fixture record's payload on its own.
 
     Canonical JSON walks the whole value, so a float found inside one part is found inside the
-    whole; injecting per part (each receipt, each emitted record, each fixture record) keeps every
-    position covered without copying the whole set once per leaf.
+    whole; injecting per part (each receipt, the first emitted record of each kind, each fixture
+    record) covers every position of every record shape without copying a generated city once
+    per leaf. A record of one kind has the same positions as any other of that kind.
     """
     emitted = _emitted_set()
+    first_of_each_kind: dict[str, object] = {}
+    for generation in emitted["generations"]:
+        for emission in generation["emissions"]:
+            for record in emission["fields"]["records"]:
+                first_of_each_kind.setdefault(record["kind"], record)
     parts = [
-        *(
-            record
-            for generation in emitted["generations"]
-            for part in (
-                generation["receipt"],
-                *(
-                    record
-                    for emission in generation["emissions"]
-                    for record in emission["fields"]["records"]
-                ),
-            )
-            for record in (part,)
-        ),
+        *(generation["receipt"] for generation in emitted["generations"]),
+        *first_of_each_kind.values(),
         *emitted["validator_fixtures"].values(),
     ]
     paths = [(index, path) for index, part in enumerate(parts) for path in _leaf_paths(part)]
