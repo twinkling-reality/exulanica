@@ -143,11 +143,13 @@ by the expander that needs it, with a new tessellator version.
   vector, scaled toward the grammar's direction bound and then floored.
 - `src/core/ring-triangulation.ts` has the ring rule. It checks a ring by the grammar's own tests,
   then cuts it by ear clipping into counter-clockwise triangles on the ring's own vertices, in a
-  stated order.
+  stated order. A ring with holes, a tier with its light wells, is first joined to each hole by an
+  exact bridge from the hole's greatest-x vertex to the nearest outer vertex it can see.
 - `src/core/fillet-arc.ts` has the fillet arc rule. It builds the corner between two kerb lines
-  by integer chord bisection round a centre found from both tangent points. The segment count is
-  an argument; `filletSegmentsWithin` finds the least power of two within a given sagitta, and no
-  sagitta is chosen here.
+  by integer chord bisection. Centres and arc points follow the grammar's own corner rule
+  (`document._corner_centre`), in BigInt. The segment count will come from the projection
+  contract's `resolution_mm`: `filletSegmentsWithin` finds the least power of two whose chords keep
+  within it. No number is chosen here.
 
 `test/geometry-blocks.test.ts` holds each to its stated properties and pins one output of each.
 
