@@ -2,7 +2,7 @@
  * THE CITY GRAMMAR, VERSION 2, AS DATA. GENERATED: do not edit by hand.
  *
  * Written by `test/write-grammar-table.ts` from `tests/fixtures/city-v2/record-shapes.json`
- * (the grammar's own `describe_shapes`) and the frame and contract measures of
+ * (the grammar's own `describe_shapes`) and the frame, contract measures and navigation table of
  * `exulanica/grammar/grammars/city/city.v2.json`. `test/grammar-table.test.ts` and
  * `tests/test_bake_determinism.py` hold it equal to both.
  *
@@ -29,6 +29,170 @@ export const CITY_V2: GrammarTable = {
       }
     }
   },
+  "navigation": [
+    {
+      "kind": "city.block",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.crossing",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.curb_edge",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.district",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.entrance",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.facade",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.ground_bay",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.junction",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.junction_approach",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.lane",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.lane_connection",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.massing",
+      "ground": "cover",
+      "cover": "base_ring",
+      "obstruction": "base_ring"
+    },
+    {
+      "kind": "city.parcel",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.parking_space",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.premises",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.road_marking",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.rooftop_object",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.signal",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.street",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.street_furniture",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "low_parts"
+    },
+    {
+      "kind": "city.street_node",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.street_segment",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.street_tree",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "low_parts"
+    },
+    {
+      "kind": "city.surface_material",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.terrain",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.tile",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
+      "kind": "city.vitrine",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    }
+  ],
   "shapes": {
     "nested": [
       {
@@ -171,7 +335,9 @@ export const CITY_V2: GrammarTable = {
             "values": [
               "object_primary",
               "object_secondary",
-              "object_tertiary"
+              "object_tertiary",
+              "trunk",
+              "canopy"
             ]
           },
           {
@@ -2437,7 +2603,9 @@ export const CITY_V2: GrammarTable = {
               "object_primary",
               "object_secondary",
               "object_tertiary",
-              "tree_pit"
+              "tree_pit",
+              "canopy",
+              "trunk"
             ]
           },
           {
@@ -2509,6 +2677,7 @@ export const CITY_V2: GrammarTable = {
           "ordinal": {
             "codes": {
               "awning": 12,
+              "canopy": 25,
               "carriageway": 13,
               "crossing": 17,
               "door": 7,
@@ -2531,6 +2700,7 @@ export const CITY_V2: GrammarTable = {
               "terrain": 20,
               "tree_pit": 24,
               "trim": 8,
+              "trunk": 26,
               "wall": 1
             },
             "field": "role"

@@ -275,7 +275,8 @@ def test_the_tessellator_states_the_registry_parameters():
 
 
 def test_the_tessellator_reads_the_grammars_own_table():
-    """The table is ``describe_shapes`` over the city's shapes and the descriptor's frame."""
+    """The table is ``describe_shapes`` over the city's shapes and the descriptor's frame, contract
+    measures and navigation table, each row without its prose reason."""
     from exulanica.grammar.records import _HEX64, _IDENTITY
 
     printed = json.loads(_tess("shapes").stdout)
@@ -297,6 +298,10 @@ def test_the_tessellator_reads_the_grammars_own_table():
             "grammar_version": descriptor["grammar_version"],
             "frame": descriptor["frame"],
             "measures": descriptor_measures(),
+            "navigation": [
+                {key: row[key] for key in ("kind", "ground", "cover", "obstruction")}
+                for row in descriptor["navigation"]
+            ],
             "shapes": described,
         }
     ]

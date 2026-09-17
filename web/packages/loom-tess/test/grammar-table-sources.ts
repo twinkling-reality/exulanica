@@ -13,6 +13,7 @@ export function grammarTableFromSources(): unknown {
     grammar_version: number;
     frame: unknown;
     projections: { projection: string; preserved: { property: string; measures?: unknown }[] }[];
+    navigation: { kind: string; ground: string; cover: string; obstruction: string; reason: string }[];
   };
   // The integer measures each projection's contract states for a preserved property, by projection
   // and property; rows with no measures, and projections with none, are left out.
@@ -28,6 +29,8 @@ export function grammarTableFromSources(): unknown {
     grammar_version: descriptor.grammar_version,
     frame: descriptor.frame,
     measures,
+    // The navigation table's data, row by row; each row's reason is prose and stays in the descriptor.
+    navigation: descriptor.navigation.map(({ kind, ground, cover, obstruction }) => ({ kind, ground, cover, obstruction })),
     shapes,
   };
 }

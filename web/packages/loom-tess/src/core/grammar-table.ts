@@ -70,11 +70,25 @@ export interface ContractMeasures {
   };
 }
 
+/**
+ * What one record kind is to a person walking, as the descriptor's `navigation` table states it:
+ * `ground` is `support`, `cover` or `none`, `cover` names the region a covering kind removes ground
+ * under, and `obstruction` what a standing capsule keeps clear of. The row's reason is prose for a
+ * reader and stays in the descriptor, whose digest the tile pins.
+ */
+export interface NavigationRow {
+  readonly kind: string;
+  readonly ground: string;
+  readonly cover: string;
+  readonly obstruction: string;
+}
+
 export interface GrammarTable {
   readonly grammar_id: string;
   readonly grammar_version: number;
   readonly frame: GrammarFrame;
   readonly measures: ContractMeasures;
+  readonly navigation: readonly NavigationRow[];
   readonly shapes: {
     readonly nested: readonly RecordShape[];
     readonly records: readonly RecordShape[];

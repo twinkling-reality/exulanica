@@ -30,8 +30,8 @@ import {
 
 /** Over `test/fixtures/tile-conformance.json`, tessellator 3, digest profile v3. */
 const GOLDEN = {
-  render_batch: '9f81d75aed01d07b09703d6367f59cf12862ce1ec652c9dfb362a70a539b4e05',
-  nav_envelope: '2b9f2b4b4c6895e892fc94c2ca6839a7315910fbad4bac251f75e172e1a40837',
+  render_batch: '6cf002aa288b934cf12518126f170906ec62da79e81490bb4d970a74d06abb09',
+  nav_envelope: '41e78c84c9f8ec73b1b548d666864d55b25f8ba1d51270ea50196b2393bf5269',
 } as const;
 
 afterEach(() => {

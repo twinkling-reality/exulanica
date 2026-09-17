@@ -80,8 +80,9 @@ resolve or identities derive, catalog keys or membership. The grammar's `validat
 checks all of them, against the descriptor and catalogs the tile pins.
 
 `src/core/city-v2.ts` is the grammar's own table: `describe_shapes` over the city's record shapes
-(`tests/fixtures/city-v2/record-shapes.json`), and the descriptor's frame and contract measures. It
-is generated, not transcribed:
+(`tests/fixtures/city-v2/record-shapes.json`), and the descriptor's frame, contract measures and
+navigation table (each kind's ground, cover and obstruction, without the row's prose reason). It is
+generated, not transcribed:
 
 ```bash
 pnpm exec tsx packages/loom-tess/test/write-grammar-table.ts
