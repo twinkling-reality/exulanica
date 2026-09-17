@@ -495,10 +495,10 @@ Each of these is known and deliberately not done here.
 
 - **No stage has a generator.** The corridor lane writes them against these record shapes,
   parameters and catalogs.
-- **The city v1 consumers have not been ported.** The tessellator's bake stage and its fixture,
-  the living society's city place adapter and the traffic lane's provisional records read city v1
-  record classes. The tessellator lane ports on a branch stacked on this one and both merge
-  together; the society and traffic lanes port before they merge.
+- **The city v1 consumers have not been ported.** The tessellator's bake stage and its fixture and
+  the traffic lane's provisional records read city v1 record classes, while the living society's
+  city place adapter now reads v2 tile documents. The tessellator lane ports on a branch stacked on
+  this one and both merge together; the society and traffic lanes port before they merge.
 - **Texture gaps.** No published texture set is glazing, a door, road paint, terrain, a tree pit,
   foliage, bark, timber, fabric or a sign panel, so those surfaces have no material record and
   draw as unavailable. They are queued with the texture lane.

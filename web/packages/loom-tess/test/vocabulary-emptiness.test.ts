@@ -118,10 +118,16 @@ function vocabulary(): Set<string> {
     join(REPOSITORY_ROOT, 'assets', 'owned-world', 'flatiron', 'flatiron-owned-district.json'),
   ) as { materials: { name: string }[] };
   for (const material of district.materials) words(material.name).forEach((w) => found.add(w));
-  const society = readFileSync(join(REPOSITORY_ROOT, 'exulanica', 'world', 'society.py'), 'utf8');
-  for (const tuple of ['ROLES', 'FIRST_NAMES', 'LAST_NAMES']) {
+  // The living society froze these tables in society_legacy.py, so v1 to v3 histories replay.
+  const society = readFileSync(
+    join(REPOSITORY_ROOT, 'exulanica', 'world', 'society_legacy.py'),
+    'utf8',
+  );
+  for (const tuple of ['LEGACY_ROLES', 'LEGACY_FIRST_NAMES', 'LEGACY_LAST_NAMES']) {
     const match = new RegExp(`^${tuple}: Final = \\(([^)]*)\\)`, 'm').exec(society);
-    if (match === null) throw new Error(`society.py no longer declares ${tuple} where this test reads it`);
+    if (match === null) {
+      throw new Error(`society_legacy.py no longer declares ${tuple} where this test reads it`);
+    }
     for (const literal of match[1]!.matchAll(/"([^"]+)"/g)) words(literal[1]!).forEach((w) => found.add(w));
   }
   // JavaScript's own name for a typed array's bytes, which the lane-use catalog also uses as a key.
