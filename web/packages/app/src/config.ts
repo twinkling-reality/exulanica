@@ -75,6 +75,29 @@ export function isAtlasPreview(search: string, development: boolean): boolean {
   return development && new URLSearchParams(search).get('preview') === '1';
 }
 
+/** A baked tile's name: lowercase words joined by single hyphens, as its committed file is named. */
+const GENERATED_TILE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const GENERATED_TILE_NAME_LIMIT = 64;
+
+/**
+ * The baked generated tile a development preview asked to evaluate, or null.
+ *
+ * DEVELOPMENT EVALUATION ONLY. A generated tile may not appear in any person's world until a
+ * superseding governance ADR is accepted in writing. So a tile can be named only on the synthetic
+ * preview route: `preview` is {@link isAtlasPreview}, which is false in every production build,
+ * and a preview session never carries a workspace credential. A workspace world has no way to ask
+ * for a tile, and a production build has no code that could load one.
+ *
+ * The name is a plain word, never a path: the development module resolves it to a committed file.
+ */
+export function generatedTileEvaluationName(search: string, preview: boolean): string | null {
+  if (!preview) return null;
+  const name = new URLSearchParams(search).get('tile');
+  return name !== null && name.length <= GENERATED_TILE_NAME_LIMIT && GENERATED_TILE_NAME.test(name)
+    ? name
+    : null;
+}
+
 /** Keep preview provenance visible in browser chrome without adding permanent world chrome. */
 export function applicationTitle(preview: boolean): string {
   return preview ? PREVIEW_TITLE : PRODUCT_TITLE;
