@@ -12,13 +12,17 @@ import type { RgbImage } from './png.js';
  * pictures are of the bytes that were pinned and not of an in-memory bake.
  *
  * Contact sheet rows follow the manifest's order. Columns, left to right:
- *   1. base colour, 2 x 2 tiles, 1/8 scale
- *   2. lit preview, 2 x 2 tiles, 1/8 scale
- *   3. normal map, one tile, 1/4 scale
- *   4. occlusion, roughness, metalness as RGB, one tile, 1/4 scale
- *   5. height as grey, one tile, 1/4 scale
+ *   1. base colour, 2 tiles across, 1/8 scale
+ *   2. lit preview, 2 tiles across, 1/8 scale
+ *   3. normal map, one tile across, 1/4 scale
+ *   4. occlusion, roughness, metalness as RGB, one tile across, 1/4 scale
+ *   5. height as grey, one tile across, 1/4 scale
  *   6. base colour at full scale, 256 x 256 around the corner where four tiles meet
  *   7. lit preview at full scale around the same corner
+ *
+ * Every cell is square. A set whose tile is not (cc0.kerb-stone is 4 to 1, the road paint too) is
+ * repeated more often down its cell than across it, at the same scale on both axes, so the cell is
+ * filled without the picture stretching a texel.
  */
 const CELL = 256;
 const GAP = 8;
@@ -85,10 +89,10 @@ function mapImage(container: Uint8Array, name: 'base_color' | 'normal' | 'orm' |
   return { width, height, rgb };
 }
 
-/** Box-average `tiles` x `tiles` copies of `image` down by `factor`. */
-function tiledDown(image: Image, tiles: number, factor: number): Image {
-  const width = Math.floor((image.width * tiles) / factor);
-  const height = Math.floor((image.height * tiles) / factor);
+/** Box-average `across` x `down` copies of `image` down by `factor`. */
+function tiledDown(image: Image, across: number, down: number, factor: number): Image {
+  const width = Math.floor((image.width * across) / factor);
+  const height = Math.floor((image.height * down) / factor);
   const rgb = new Uint8Array(width * height * 3);
   const area = factor * factor;
   for (let y = 0; y < height; y += 1) {
@@ -147,12 +151,17 @@ export function contactSheet(publication: Publication): RgbImage {
     const base = mapImage(set.container, 'base_color');
     const lit = litTile(set.container);
     const scale = base.width / CELL;
+    // A cell is square and a tile need not be: cc0.kerb-stone is 1024 by 256 texels and the road
+    // paint 256 by 64. One scale is right for both axes, or the picture lies about the shape of a
+    // texel, so a short tile is repeated more often DOWN the cell to fill it. Deriving the count of
+    // repeats from the width alone left such a set as a strip a quarter of the cell high.
+    const down = Math.max(1, Math.round(base.width / base.height));
     const cells: Image[] = [
-      tiledDown(base, 2, scale * 2),
-      tiledDown(lit, 2, scale * 2),
-      tiledDown(mapImage(set.container, 'normal'), 1, scale),
-      tiledDown(mapImage(set.container, 'orm'), 1, scale),
-      tiledDown(mapImage(set.container, 'height'), 1, scale),
+      tiledDown(base, 2, 2 * down, scale * 2),
+      tiledDown(lit, 2, 2 * down, scale * 2),
+      tiledDown(mapImage(set.container, 'normal'), 1, down, scale),
+      tiledDown(mapImage(set.container, 'orm'), 1, down, scale),
+      tiledDown(mapImage(set.container, 'height'), 1, down, scale),
       corner(base, CELL),
       corner(lit, CELL),
     ];
@@ -163,5 +172,5 @@ export function contactSheet(publication: Publication): RgbImage {
 
 /** One set, 2 x 2 tiles at half scale, lit: the closest look at a set's appearance offered here. */
 export function litPreview(container: Uint8Array): RgbImage {
-  return tiledDown(litTile(container), 2, 2);
+  return tiledDown(litTile(container), 2, 2, 2);
 }
