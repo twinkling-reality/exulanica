@@ -1,0 +1,10 @@
+{
+  "name": "@exulanica/loom-lettering",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./core": "./src/core/index.ts"
+  },
+  "scripts": { "typecheck": "tsc --build" }
+}

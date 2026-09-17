@@ -35,6 +35,9 @@
       "path": "./packages/loom-tess"
     },
     {
+      "path": "./packages/loom-lettering"
+    },
+    {
       "path": "./packages/companion-forms"
     },
     {

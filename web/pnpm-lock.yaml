@@ -130,6 +130,8 @@ importers:
 
   packages/loom-gate: {}
 
+  packages/loom-lettering: {}
+
   packages/loom-tess: {}
 
   packages/loom-texture: {}

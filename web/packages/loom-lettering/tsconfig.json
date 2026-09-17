@@ -1,0 +1,7 @@
+{
+  // Two projects, not a comment: the core compiles with no `lib.dom` and no `@types/node`, so a
+  // host global named in it is a type error rather than a review note. The tests are the only
+  // project that may see Node, because they read the committed catalogs off disk.
+  "files": [],
+  "references": [{ "path": "./tsconfig.core.json" }, { "path": "./tsconfig.test.json" }]
+}

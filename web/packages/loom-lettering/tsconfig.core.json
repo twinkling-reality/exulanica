@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // ES2022 and nothing else. `TextDecoder`, `Buffer`, `process` and every `node:` module are
+    // compile errors here: tess's bake compiles this source, and a browser build may later too.
+    "lib": ["ES2022"],
+    "types": [],
+    "outDir": "dist",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/core.tsbuildinfo"
+  },
+  "include": ["src/core/**/*.ts"]
+}

@@ -391,6 +391,41 @@ module.exports = {
       to: { path: String.raw`^packages/loom-tess/src/node/` },
     },
 
+    // ---- lettering: a catalog reader and a layout rule, and nothing else -------------------
+    {
+      name: 'loom-lettering-is-reached-through-its-core-entry-only',
+      severity: 'error',
+      comment:
+        'A package outside loom-lettering may import @exulanica/loom-lettering/core, the glyph ' +
+        'catalog reader and the layout rule, and nothing else from it. tess reads it to turn a ' +
+        'placed sign into triangles; the tests and the test catalog are not an entry point.',
+      from: { path: String.raw`^packages/(?!loom-lettering/)` },
+      to: {
+        path: String.raw`^packages/loom-lettering/(?!src/core/index\.ts$)|^(?:node_modules/)?@exulanica/loom-lettering(?:$|/(?!core$))`,
+      },
+    },
+    {
+      name: 'loom-lettering-imports-no-workspace-package',
+      severity: 'error',
+      comment:
+        'Letters are placed from a catalog and integer arithmetic. This package has no reason to ' +
+        'reach a renderer, a transport or another vocabulary, and one it could import is one it ' +
+        'could use. The Python copy is held to the same rule by an import contract.',
+      from: { path: pkg('loom-lettering') },
+      to: { path: notPkgRef('loom-lettering') },
+    },
+    {
+      name: 'loom-lettering-core-reaches-only-core',
+      severity: 'error',
+      comment:
+        'src/core is the source tess compiles, and a browser build may later too. It may import ' +
+        'other src/core modules and nothing else: no node: builtin, no test. tsconfig.core.json ' +
+        'already makes a host global a type error; this makes a host module an error too, which ' +
+        'is why the package writes out its own UTF-8 codec rather than reaching for TextDecoder.',
+      from: { path: String.raw`^packages/loom-lettering/src/core/` },
+      to: { pathNot: String.raw`^packages/loom-lettering/src/core/` },
+    },
+
     // ---- general hygiene -------------------------------------------------------------------
     { name: 'no-circular', severity: 'error', from: {}, to: { circular: true } },
     {
