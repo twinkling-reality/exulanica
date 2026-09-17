@@ -161,9 +161,15 @@ by the expander that needs it, with a new tessellator version.
   between legs, cut by the ring rule. Every point is placed by the grammar's corner rule measure.
   A bent street, a curb its tile does not carry or a leg it cannot find draws nothing and names
   the rule it waits on.
+- `src/core/support-clearance.ts` has the support clearance rule. It carves support triangles
+  away from obstruction boxes grown by the capsule radius. Each box is removed by clipping on the
+  integer lines a millimetre outside it, so the pieces kept meet without cracks. Crossings are
+  rounded inward, and heights are floored onto the support's own plane. No point kept is within
+  the radius of an obstruction or outside its support. Which kinds are support and which obstruct
+  is for the city descriptor to state per kind; the rule takes the boxes it is given.
 
-`test/geometry-blocks.test.ts` and `test/streets.test.ts` hold each to its stated properties and
-pin outputs.
+`test/geometry-blocks.test.ts`, `test/streets.test.ts` and `test/support-clearance.test.ts` hold
+each to its stated properties and pin outputs.
 
 ## The triangle digest
 
