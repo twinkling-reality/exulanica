@@ -207,13 +207,26 @@ describe('fetching a container', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('keeps an unknown key and a credential without the permission alike', async () => {
-    const answer = problem(404, 'unknown_reference', 'no such baked tile');
-    const missing = await refusalFrom(fetchBakedTile(access(recorder(() => answer.clone()).fetch), { bakedTileId: TILE_ID, digest }));
-    const unpermitted = await refusalFrom(fetchBakedTile(access(recorder(() => answer.clone()).fetch), { bakedTileId: TILE_ID, digest }));
-    expect(missing.code).toBe('unknown_reference');
-    expect(missing.status).toBe(404);
-    expect(unpermitted.message).toBe(missing.message);
+  it('treats an unknown key and a permissionless credential alike, on the pair the route keeps stable', async () => {
+    // MEASURED against the running route: the two share a status and a code and differ in detail,
+    // because the permission floor refuses an id-addressed route before the route function runs.
+    // The pair a caller may rely on is the status and the code, so that is what the loader reports,
+    // and it never turns either answer into a claim about which one it was.
+    const forbidden = await refusalFrom(fetchBakedTile(
+      access(recorder(() => problem(404, 'unknown_reference', 'nothing at this address is available to this credential')).fetch),
+      { bakedTileId: TILE_ID, digest },
+    ));
+    const unknown = await refusalFrom(fetchBakedTile(
+      access(recorder(() => problem(404, 'unknown_reference', 'no such baked tile')).fetch),
+      { bakedTileId: TILE_ID, digest },
+    ));
+    expect(forbidden.status).toBe(404);
+    expect(forbidden.code).toBe('unknown_reference');
+    expect(unknown.status).toBe(forbidden.status);
+    expect(unknown.code).toBe(forbidden.code);
+    for (const refusal of [forbidden, unknown]) {
+      expect(refusal.message).not.toMatch(/permission|forbidden|not allowed|unauthorised|unauthorized/i);
+    }
   });
 
   it('carries the route\'s own code for a fault, a missing file and a ceiling', async () => {

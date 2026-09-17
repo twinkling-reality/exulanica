@@ -19,6 +19,8 @@ const baseUrl = process.env['EXULANICA_TILE_ROUTE'];
 const token = process.env['EXULANICA_TILE_TOKEN'];
 const citySeed = process.env['EXULANICA_TILE_CITY'];
 const live = baseUrl !== undefined && token !== undefined && citySeed !== undefined;
+/** A credential that authenticates but does not hold `tiles.materialise`, where one was named. */
+const permissionless = process.env['EXULANICA_TILE_TOKEN_NO_PERMISSION'];
 
 describe.runIf(live)('against a running tile route', () => {
   const access = { baseUrl: baseUrl ?? '', token: token ?? '' };
@@ -65,6 +67,23 @@ describe.runIf(live)('against a running tile route', () => {
       .then(() => null, (error: unknown) => error as TileRouteRefusal);
     expect(refusal?.code).toBe('unknown_reference');
     expect(refusal?.status).toBe(404);
+  });
+
+  it.runIf(permissionless !== undefined)('answers a permissionless credential 404 unknown_reference, as it answers an unknown key', async () => {
+    const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' });
+    const real = tiles.find((tile) => tile.state === 'baked');
+    const short = { baseUrl: access.baseUrl, token: permissionless ?? '' };
+    const forbidden = await fetchBakedTile(short, { bakedTileId: real!.bakedTileId, digest })
+      .then(() => null, (error: unknown) => error as TileRouteRefusal);
+    const unknown = await fetchBakedTile(access, { bakedTileId: '00000000-0000-4000-8000-000000000000', digest })
+      .then(() => null, (error: unknown) => error as TileRouteRefusal);
+    // The pair a caller may rely on is the status and the code; the detail is the route's own.
+    expect(forbidden?.status).toBe(404);
+    expect(forbidden?.code).toBe('unknown_reference');
+    expect(unknown?.status).toBe(forbidden?.status);
+    expect(unknown?.code).toBe(forbidden?.code);
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify({ forbidden: forbidden?.message, unknown: unknown?.message }));
   });
 
   it('answers a credential the route does not know without saying what was wrong with it', async () => {

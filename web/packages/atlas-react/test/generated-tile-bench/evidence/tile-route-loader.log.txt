@@ -35,7 +35,21 @@ corridor lane implemented the branch with its own route tests, and the "not-modi
 that branch working. The loader sends If-None-Match either way and prefers the held digest, so it
 would have been correct with or without the fix.
 
-NOT PROVED HERE: a credential that authenticates but does not hold tiles.materialise, which the
-route answers 404 unknown_reference so that it cannot be told apart from an unknown key. This run
-had one token and it holds the permission. The unit tests assert the loader keeps the two answers
-byte for byte identical; proving it end to end needs a second token from the corridor lane.
+PROVED ON A SECOND RUN, with a second credential the corridor lane supplied: one that authenticates
+and holds world.read but not tiles.materialise. Asking it for a REAL key, beside an unknown key asked
+with the full credential:
+
+  permissionless credential, real key   404 unknown_reference
+                                        "nothing at this address is available to this credential"
+  full credential, unknown key          404 unknown_reference
+                                        "no such baked tile"
+
+THE TWO ARE NOT BYTE FOR BYTE THE SAME, and the earlier unit test in this lane assumed they were.
+The permission floor refuses an id-addressed route before the route's own function runs, so that
+refusal carries the floor's detail and none of the route's headers. The corridor lane measured this,
+pinned it in a test of its own, and decided not to make them identical: a credential without the
+permission is told the same thing about every id, existing or not, so it still cannot learn which
+ids exist, while an authorised caller keeps a detail that helps it debug. The pair that is stable,
+and the only pair this loader relies on, is the status and the code: 404 and unknown_reference. The
+unit test now asserts exactly that, and asserts as well that neither refusal's message claims which
+of the two it was.
