@@ -237,7 +237,10 @@ export {
 } from './representation.js';
 export type {
   GeneratedDressing,
+  GeneratedMaterialStatement,
   GeneratedRecordEntry,
+  GeneratedSurfaceStatement,
+  RepresentationRecordSurface,
   GeneratedRecordRegistrationV2,
   GeneratedTileReferenceV2,
 } from './representation.js';

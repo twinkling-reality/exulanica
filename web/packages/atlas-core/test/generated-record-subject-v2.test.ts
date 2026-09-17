@@ -7,6 +7,7 @@ import {
   generatedTileFrameId,
   resolveRepresentation,
   validateRepresentationSubject,
+  type GeneratedMaterialStatement,
   type GeneratedRecordEntry,
   type GeneratedRecordPayload,
   type GeneratedRecordRegistrationV2,
@@ -74,7 +75,7 @@ const tile: GeneratedTileReferenceV2 = {
 };
 
 const drawn = (min: [number, number, number], max: [number, number, number],
-  material: Extract<GeneratedRecordEntry, { state: 'drawn' }>['material']): GeneratedRecordEntry =>
+  material: GeneratedMaterialStatement): GeneratedRecordEntry =>
   ({ state: 'drawn', extentMm: { min, max }, material });
 
 const register = (record: GeneratedRecordPayload, entry: GeneratedRecordEntry,
@@ -147,7 +148,44 @@ describe('generated street subject contract v2', () => {
     expect(subject!.bounds).not.toBeNull();
     expect(subject!.unavailableReason).toContain('No material dresses this geometry');
     expect(() => register(terrain, { state: 'drawn', extentMm: { min: [0, 0, -95], max: [1, 1, 0] } } as unknown as GeneratedRecordEntry))
-      .toThrow('cites a material record or states that none exists');
+      .toThrow('either one material or its surfaces');
+  });
+
+  it('lists an owd/3 range\'s surfaces with their dressings, and refuses a material for another record or role', () => {
+    const fascia = { ...wall, fields: { ...wall.fields, identity: '7a0c1d2e-3f40-5a6b-8c7d-9e0f1a2b3c4d', role: 'fascia' } };
+    const extentMm = { min: [41_050, 48_950, 285], max: [52_250, 49_250, 13_785] } as const;
+    const withSurfaces = (surfaces: unknown): GeneratedRecordEntry =>
+      ({ state: 'drawn', extentMm, surfaces } as unknown as GeneratedRecordEntry);
+    const { subject } = register(facade, withSurfaces([
+      { role: 'wall', orientation: 'vertical', material: { state: 'record', record: wall } },
+      { role: 'fascia', orientation: 'vertical', material: { state: 'record', record: fascia } },
+      { role: 'trim', orientation: 'vertical', material: { state: 'none-exists' } },
+    ]));
+    expect(subject!.subjectId).toBe(`generated:city.facade:${FACADE}`);
+    expect(subject!.record).toEqual({
+      kind: 'city.facade', version: 2, identity: FACADE, key: '',
+      surfaces: [
+        { role: 'wall', orientation: 'vertical', material: 'record', dressingIdentity: wall.fields['identity'] },
+        { role: 'fascia', orientation: 'vertical', material: 'record', dressingIdentity: fascia.fields['identity'] },
+        { role: 'trim', orientation: 'vertical', material: 'none-exists', dressingIdentity: null },
+      ],
+    });
+    expect(subject!.unavailableReason).toContain('No material dresses its trim surface');
+    expect(() => validateRepresentationSubject(subject!)).not.toThrow();
+    const elsewhere = { ...wall, fields: { ...wall.fields, surface_identity: MASSING } };
+    expect(() => register(facade, withSurfaces([{ role: 'wall', orientation: 'vertical', material: { state: 'record', record: elsewhere } }])))
+      .toThrow('dresses another record');
+    expect(() => register(facade, withSurfaces([{ role: 'fascia', orientation: 'vertical', material: { state: 'record', record: wall } }])))
+      .toThrow('its fascia surface cites a material for the wall role');
+    expect(() => register(facade, withSurfaces([
+      { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
+      { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
+    ]))).toThrow('each surface role once');
+    expect(() => register(facade, withSurfaces([]))).toThrow('at least one');
+    expect(() => register(facade, { ...withSurfaces([{ role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } }]),
+      material: { state: 'none-exists' } } as GeneratedRecordEntry)).toThrow('not both or neither');
+    expect(() => register(facade, withSurfaces([{ role: 'Wall', orientation: 'vertical', material: { state: 'none-exists' } }])))
+      .toThrow('names its role and orientation');
   });
 
   it('gives a halo record no subject, and refuses a halo entry for an owned record or the reverse', () => {

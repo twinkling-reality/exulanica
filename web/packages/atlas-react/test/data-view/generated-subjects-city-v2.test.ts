@@ -99,6 +99,7 @@ function expectToday(outcomes: readonly Outcome[]): void {
   expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(24);
   expect(count(outcome => outcome.membership === 'owned' && !outcome.hasExtent && outcome.subjectId === null)).toBe(85);
 }
+
 describe('generated subject contract v2 over real city v2 containers', () => {
   it('reads tess\'s owd/2 development golden: every owned drawn record a subject, every halo record none', () => {
     const outcomes = readThroughContract(decodeOwd(new Uint8Array(readFileSync(GOLDEN))));
