@@ -119,7 +119,8 @@ describe('loading a baked tile through tess\'s decoder', () => {
     const truncated = baked.subarray(0, baked.byteLength - 4);
     await expect(loadGeneratedTile({ name: 'short', bytes: truncated, manifest, fetchSet: noSets, digest: subtle }))
       .rejects.toThrow(/refused/);
-  });
+    // Four loads of a container whose navigation envelope is now carved, each digesting it whole.
+  }, 30_000);
 
   it('refuses every tile on a page without crypto.subtle', async () => {
     await expect(loadGeneratedTile({ name: 'x', bytes: baked, manifest, fetchSet: noSets, digest: null }))
@@ -130,7 +131,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
 describe('standing on the tile\'s own nav_envelope', () => {
   it('samples support from the envelope and opens standing on it, eye 1.62 m above it', () => {
     const navigation = tile.navigation;
-    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 368 });
+    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 5786 });
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
@@ -149,11 +150,15 @@ describe('standing on the tile\'s own nav_envelope', () => {
     // Off the tile there is nothing.
     const [ox, , oz] = tileToRenderer(130000, 1000, 0);
     expect(world.surface.sample(ox, oz)).toBeNull();
-    // The middle of the tile is drawn, but the envelope carves capsule clearance around the records
-    // there, so it supports nothing: support is never read from what is drawn.
+    // The middle of the tile is drawn and stood on, by two meshes neither of which is read for the
+    // other: the render batch draws the ground there and the envelope supports a capsule on it.
     const [mx, , mz] = tileToRenderer(64000, 64000, 0);
     expect(tile.pick([mx, 5, mz], [0, -1, 0])?.range.kind).toBe('city.terrain');
-    expect(world.surface.sample(mx, mz)).toBeNull();
+    expect(world.surface.sample(mx, mz)?.height).toBe(0);
+    // Inside the building's base ring nothing supports anybody: the envelope keeps a capsule clear
+    // of what the navigation table says obstructs, whether or not the building itself is drawn.
+    const [bx, , bz] = tileToRenderer(47650, 55380, 0);
+    expect(world.surface.sample(bx, bz)).toBeNull();
   });
 
   it('walks across the terrain at its sampled height', () => {

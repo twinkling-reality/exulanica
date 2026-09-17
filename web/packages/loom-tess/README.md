@@ -123,24 +123,23 @@ Terrain, and a street segment's carriageway and gutters.
   (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
   horizontal surface dressed by the material record for its role. Terrain yields to both. A segment
   whose centreline or kerb lines are bent, or whose curbs the tile does not carry, waits on
-  `bent_street` or `street_curbs`. In `nav_envelope` a segment waits on `support_clearance`: what a
-  person is supported by is the ground partition carved clear of obstructions, which comes with the
-  navigation table's obstruction axis.
-- In `nav_envelope`, for now, a terrain cell is drawn when its closed plan square meets no stated
-  extent of a record that covers or stands on the ground (every kind with an extent but terrain and
-  districts, an interim list in `src/core/expand.ts`), each grown by the capsule radius. It goes
-  when support reads the same ground partition as render, carved by exact clearance from the
-  navigation table's obstruction axis. An extent contains everything its record
-  generates, so a kept cell is one nothing covers, and a capsule stood anywhere on it meets none of
-  those records in plan, at any height. That is the city descriptor's capsule clearance claim. The
-  radius is the `radius_mm` measure the descriptor's nav_envelope contract states for
-  `capsule_clearance` (340 mm for city version 2), carried into the generated table; core restates
-  no number.
+  `bent_street` or `street_curbs`.
+- In `nav_envelope`, support is what the navigation table calls `support`: the same ground partition
+  render draws, and the segments' own carriageways and gutters, each CARVED clear of every region
+  that table's obstruction axis names, by the support carve rule below. A `base_ring` obstruction is
+  the ring the record stands on, covered by the ring clearance rule; a `low_parts` obstruction is
+  the record's whole stated plan extent, which holds every part it has, until this tessellator reads
+  those parts one by one. So a capsule stood anywhere on support meets none of them in plan, at any
+  height, which is the city descriptor's capsule clearance claim. The radius is the `radius_mm`
+  measure the descriptor's nav_envelope contract states for `capsule_clearance` (340 mm for city
+  version 2), carried into the generated table; core restates no number. A stated extent takes no
+  ground from anybody else: a record that obstructs nothing removes no support, and none removes
+  anything from what is drawn.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `bent_street`, `street_curbs`,
-`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes`, `form_parts` or
-`support_clearance`. Relations, occupancies,
+`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes` or `form_parts`.
+Relations, occupancies,
 lanes, nodes and dressings are not surfaces of their own, and say so.
 
 Every vertex of a drawn range must lie inside the extent its record states, or the tile is
@@ -215,7 +214,7 @@ by the expander that needs it, with a new tessellator version.
   a hull round each corner that holds the corner's disk, its points bisected from the four axes as
   the fillet arc rule bisects, doubling until every chord is checked to clear the radius. It leaves
   nothing out and takes under five millimetres beyond, whatever the radius, which is what covering
-  an arc with integer points costs. It is what support clearance carves a building's base ring by, so
+  an arc with integer points costs. It is what the support carve takes a building's base ring by, so
   no ring falls back to its plan box, which could close a footway that is open. Two mistakes it made
   first, since neither shows in a picture:
   - Bisecting raw axis direction vectors by adding them walks the Stern-Brocot mediants, which does
@@ -225,15 +224,16 @@ by the expander that needs it, with a new tessellator version.
   - A band stretched past its edge's ends by a step that leans sideways comes off the edge's own
     line, and points on the edge itself fall outside every piece. There is no overhang now: a point
     past an edge's end belongs to that corner, and the corner covers the radius plus the lean.
-- `src/core/support-clearance.ts` has the support clearance rule. It carves support triangles
-  away from obstruction boxes grown by the capsule radius. Each box is removed by clipping on the
-  integer lines a millimetre outside it, so the pieces kept meet without cracks. Crossings are
-  rounded inward, and heights are floored onto the support's own plane. No point kept is within
-  the radius of an obstruction or outside its support. Which kinds are support and which obstruct
-  is for the city descriptor to state per kind; the rule takes the boxes it is given.
+- `src/core/support-carve.ts` has the support carve rule. It grows each clearance piece by a
+  millimetre, carves every support triangle by the shared piece carve, and floors each kept corner
+  onto its triangle's own plane. Growing first is what keeps the carve's own rounding outside the
+  clearance itself, so support never enters what obstructs; what it gives up is under two
+  millimetres beside an obstruction. A caller may name a region the answer is held inside, which is
+  how a carved surface stays within the extent its record states. Which kinds are support and which
+  obstruct is for the city descriptor to state per kind; the rule takes the pieces it is given.
 
-`test/geometry-blocks.test.ts`, `test/streets.test.ts` and `test/support-clearance.test.ts` hold
-each to its stated properties and pin outputs.
+`test/geometry-blocks.test.ts`, `test/streets.test.ts`, `test/support-carve.test.ts` and
+`test/ring-clearance.test.ts` hold each to its stated properties and pin outputs.
 
 ## The triangle digest
 

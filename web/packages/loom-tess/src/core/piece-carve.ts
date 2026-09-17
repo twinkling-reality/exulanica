@@ -19,20 +19,23 @@
  * enter its obstructions at all grows them by a millimetre before carving, and then the hulls stay
  * outside the obstructions themselves.
  *
- * HOLDING TO THE PIECE. A caller may keep only the points inside the closed piece. Terrain does,
- * because its pieces are cells whose sides cross every row at an integer point, so it loses nothing
- * by it and no cell's terrain reaches into the next. A surface with a sloping edge must not: a row
- * crosses such an edge between integer points, and holding to the piece would shave a sliver off
- * the edge itself. Where two triangles of one surface share that edge both would shave it, and the
- * crack between them is one a person would fall through.
+ * HOLDING. A caller may name a convex region the hull points must lie in, and keep only those.
+ * Terrain holds to the piece itself, because its pieces are cells whose sides cross every row at an
+ * integer point, so it loses nothing by it and no cell's terrain reaches into the next. A surface
+ * with a sloping edge must not hold to the piece: a row crosses such an edge between integer
+ * points, and holding to the piece would shave a sliver off the edge itself. Where two triangles of
+ * one surface share that edge both would shave it, and the crack between them is one a person would
+ * fall through. Such a caller holds to a region that contains the whole surface instead, the extent
+ * its record states, which trims nothing between the triangles and keeps the answer where the
+ * record said its geometry would be.
  */
-import { bigFloorQuotient, exact, GeometryError, multiply, subtract } from './integer-math.js';
+import { add, bigFloorQuotient, exact, GeometryError, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
 import { sideOf, uncoveredRegions } from './plan-arrangement.js';
 import type { RationalPoint } from './plan-arrangement.js';
 
-/** A convex obstruction in plan, counter-clockwise, as triangles. */
-export type ObstructionTriangle = readonly [Plan, Plan, Plan];
+/** A convex obstruction in plan, counter-clockwise: a triangle, or any convex walk. */
+export type ObstructionWalk = readonly Plan[];
 
 export const twiceArea = (a: Plan, b: Plan, c: Plan, where: string): number =>
   subtract(
@@ -41,13 +44,23 @@ export const twiceArea = (a: Plan, b: Plan, c: Plan, where: string): number =>
     where,
   );
 
+/** Twice the signed area a closed walk encloses, positive when it turns counter-clockwise. */
+export function twiceWalkArea(walk: readonly Plan[], where: string): number {
+  let total = 0;
+  walk.forEach((here, index) => {
+    const next = walk[(index + 1) % walk.length]!;
+    total = add(total, subtract(multiply(here[0], next[1], where), multiply(here[1], next[0], where), where), where);
+  });
+  return total;
+}
+
 /** The obstructions with area, each turned counter-clockwise. */
-export function withArea(obstructions: readonly ObstructionTriangle[], where: string): ObstructionTriangle[] {
-  const out: ObstructionTriangle[] = [];
-  for (const [a, b, c] of obstructions) {
-    const area = twiceArea(a, b, c, where);
-    if (area > 0) out.push([a, b, c]);
-    if (area < 0) out.push([a, c, b]);
+export function withArea(obstructions: readonly ObstructionWalk[], where: string): ObstructionWalk[] {
+  const out: ObstructionWalk[] = [];
+  for (const walk of obstructions) {
+    const area = twiceWalkArea(walk, where);
+    if (area > 0) out.push(walk);
+    if (area < 0) out.push([...walk].reverse());
   }
   return out;
 }
@@ -65,10 +78,10 @@ export function heightOnPlane(corners: readonly Space[], point: Plan, where: str
 }
 
 /** A piece's rows, step 1: the distinct heights of the obstruction vertices in the closed piece, ascending. */
-function rowsOf(piece: readonly Plan[], obstructions: readonly ObstructionTriangle[], where: string): number[] {
+function rowsOf(piece: readonly Plan[], obstructions: readonly ObstructionWalk[], where: string): number[] {
   const rows = new Set<number>();
-  for (const triangle of obstructions) {
-    for (const point of triangle) {
+  for (const walk of obstructions) {
+    for (const point of walk) {
       if (inPiece(piece, point, where)) rows.add(point[1]);
     }
   }
@@ -104,8 +117,8 @@ export function hullKeepingEdges(points: readonly Plan[], where: string): Plan[]
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** A face's hull corners, step 3, holding to the piece or not as the caller's rule needs. */
-function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], holdToPiece: boolean, where: string): Plan[] {
+/** A face's hull corners, step 3, held to the caller's region when it names one. */
+function faceHull(face: readonly RationalPoint[], hold: readonly Plan[] | undefined, where: string): Plan[] {
   const corners: Plan[] = [];
   for (const vertex of face) {
     const lowX = bigFloorQuotient(vertex.x, vertex.w);
@@ -115,7 +128,7 @@ function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], holdTo
     for (const x of xs) {
       for (const y of ys) {
         const point: Plan = [exact(Number(x), where), exact(Number(y), where)];
-        if (holdToPiece && !inPiece(piece, point, where)) continue;
+        if (hold !== undefined && !inPiece(hold, point, where)) continue;
         corners.push(point);
       }
     }
@@ -138,15 +151,15 @@ function convex(face: readonly RationalPoint[]): boolean {
  */
 export function carvedPiece(
   piece: readonly Plan[],
-  obstructions: readonly ObstructionTriangle[],
-  holdToPiece: boolean,
+  obstructions: readonly ObstructionWalk[],
+  hold: readonly Plan[] | undefined,
   where: string,
 ): Plan[][] {
   const walks: Plan[][] = [];
   for (const region of uncoveredRegions(piece, obstructions, rowsOf(piece, obstructions, where), where)) {
     if (region.holes.length > 0) throw new GeometryError(`${where}: a face cut along its rows still holds a hole`);
     if (!convex(region.outer)) throw new GeometryError(`${where}: a face cut along its rows is not convex`);
-    const hull = faceHull(region.outer, piece, holdToPiece, where);
+    const hull = faceHull(region.outer, hold, where);
     if (hull.length >= 3) walks.push(hull);
   }
   return walks;

@@ -23,7 +23,7 @@
 import { add } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
 import { carvedPiece, heightOnPlane, hullKeepingEdges, twiceArea, withArea } from './piece-carve.js';
-import type { ObstructionTriangle } from './piece-carve.js';
+import type { ObstructionWalk } from './piece-carve.js';
 import { triangulateRing } from './ring-triangulation.js';
 
 /** How far a clearance piece grows before the carve, so the carve's own rounding stays outside it. */
@@ -48,29 +48,37 @@ export function grownByAMillimetre(walk: ClearanceWalk, where: string): Plan[] {
   return hullKeepingEdges(corners, where);
 }
 
-/** The grown clearance pieces as counter-clockwise triangles, which is what the carve takes. */
-export function clearanceObstructions(walks: readonly ClearanceWalk[], where: string): ObstructionTriangle[] {
-  const out: ObstructionTriangle[] = [];
+/**
+ * The grown clearance pieces, counter-clockwise, as the carve takes them. Each stays one convex
+ * walk rather than a fan of triangles: the arrangement's work grows with the square of the segments
+ * a piece meets, and an arc covered by sixty-four corners is sixty-four segments as a walk and
+ * three times that as a fan.
+ */
+export function clearanceObstructions(walks: readonly ClearanceWalk[], where: string): ObstructionWalk[] {
+  const out: ObstructionWalk[] = [];
   for (const walk of walks) {
     const grown = grownByAMillimetre(walk, where);
     if (grown.length < 3) continue;
-    for (const corner of [...Array(grown.length - 2).keys()]) {
-      out.push([grown[0]!, grown[corner + 1]!, grown[corner + 2]!]);
-    }
+    out.push(grown);
   }
   return withArea(out, where);
 }
 
 /**
  * The support triangles less every clearance, by the support carve rule. Each triangle given is
- * carved on its own, so the answer keeps to the surfaces it was given.
+ * carved on its own, so the answer keeps to the surfaces it was given. `hold`, when given, is a
+ * convex region every kept corner must lie in: a caller whose surfaces must stay inside a stated
+ * extent names that extent, and the millimetre a hull may reach past its triangle is trimmed at
+ * that boundary alone, where there is no neighbouring triangle to crack away from.
  */
 export function carveSupport(
   support: readonly SupportTriangle[],
   clearances: readonly ClearanceWalk[],
+  hold: readonly Plan[] | undefined,
   where: string,
 ): SupportTriangle[] {
   const obstructions = clearanceObstructions(clearances, where);
+  const spans = obstructions.map(spanOf);
   const out: SupportTriangle[] = [];
   for (const triangle of support) {
     const turned: SupportTriangle = twiceArea(plan(triangle[0]), plan(triangle[1]), plan(triangle[2]), where) < 0
@@ -78,13 +86,27 @@ export function carveSupport(
       : triangle;
     const piece = turned.map(plan);
     if (twiceArea(piece[0]!, piece[1]!, piece[2]!, where) === 0) continue;
-    const near = obstructions.filter((obstruction) => meets(piece, obstruction, where));
+    // Two answers need no arrangement: a triangle no clearance reaches is kept whole, and one a
+    // single clearance holds entirely is gone. Spans are compared first, being the cheapest test.
+    const span = spanOf(piece);
+    const near: ObstructionWalk[] = [];
+    let held = false;
+    for (let index = 0; index < obstructions.length; index += 1) {
+      if (apartInSpan(span, spans[index]!)) continue;
+      const obstruction = obstructions[index]!;
+      if (holdsAll(obstruction, piece, where)) {
+        held = true;
+        break;
+      }
+      if (meets(piece, obstruction, where)) near.push(obstruction);
+    }
+    if (held) continue;
     if (near.length === 0) {
       out.push(turned);
       continue;
     }
     // Not held to the triangle: a sliver shaved off a sloping edge would crack one surface in two.
-    for (const walk of carvedPiece(piece, near, false, where)) {
+    for (const walk of carvedPiece(piece, near, hold, where)) {
       const corners = walk.map((point): Space => [point[0], point[1], heightOnPlane(turned, point, where)]);
       const cut = triangulateRing(walk, where);
       for (let corner = 0; corner + 2 < cut.length; corner += 3) {
@@ -96,6 +118,33 @@ export function carveSupport(
 }
 
 const plan = (point: Space): Plan => [point[0], point[1]];
+
+/** A walk's plan span, west, south, east and north. */
+function spanOf(walk: readonly Plan[]): readonly [number, number, number, number] {
+  let [west, south] = [walk[0]![0], walk[0]![1]];
+  let [east, north] = [west, south];
+  for (const point of walk) {
+    if (point[0] < west) west = point[0];
+    if (point[0] > east) east = point[0];
+    if (point[1] < south) south = point[1];
+    if (point[1] > north) north = point[1];
+  }
+  return [west, south, east, north];
+}
+
+/** Whether two spans are apart, which puts their walks apart. */
+function apartInSpan(first: readonly number[], second: readonly number[]): boolean {
+  if (first[2]! < second[0]!) return true;
+  if (second[2]! < first[0]!) return true;
+  if (first[3]! < second[1]!) return true;
+  return second[3]! < first[1]!;
+}
+
+/** Whether a closed counter-clockwise convex walk holds every point of another. */
+function holdsAll(walk: readonly Plan[], points: readonly Plan[], where: string): boolean {
+  return points.every((point) => walk.every((corner, index) =>
+    twiceArea(corner, walk[(index + 1) % walk.length]!, point, where) >= 0));
+}
 
 /** Whether two closed counter-clockwise convex walks share a point, by the separating axis rule. */
 function meets(first: readonly Plan[], second: readonly Plan[], where: string): boolean {

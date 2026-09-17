@@ -23,8 +23,8 @@
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
-import { baseRingOf, coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { CarriedRecord, ExpandContext, Expansion, Need, PlanBox } from './expand.js';
+import { baseRingOf, obstructionOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
+import type { CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
 import type { Piece } from './pieces.js';
 import type { CoveringTriangle } from './terrain-yield.js';
 import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
@@ -148,14 +148,27 @@ function statedExtent(document: TileDocument, record: PlacedRecord): Box | undef
   };
 }
 
-function groundCover(document: TileDocument, records: readonly PlacedRecord[]): PlanBox[] {
-  const cover: PlanBox[] = [];
+/** A record's stated extent in plan, or undefined when its kind states none. */
+function planBox(document: TileDocument, record: PlacedRecord): PlanBox | undefined {
+  const extent = statedExtent(document, record);
+  if (extent === undefined) return undefined;
+  return { min_x: extent.min[0]!, min_y: extent.min[1]!, max_x: extent.max[0]!, max_y: extent.max[1]! };
+}
+
+/**
+ * Every region a walking capsule must keep its radius clear of, from the navigation table's
+ * obstruction axis, over every record the tile carries. A halo record obstructs too: a building
+ * just over the tile boundary keeps a capsule off the ground on this side of it.
+ */
+function obstructions(document: TileDocument, records: readonly PlacedRecord[]): ObstructionRegion[] {
+  const regions: ObstructionRegion[] = [];
   for (const record of records) {
-    if (!coversGround(record.payload.kind)) continue;
-    const extent = statedExtent(document, record)!;
-    cover.push({ min_x: extent.min[0]!, min_y: extent.min[1]!, max_x: extent.max[0]!, max_y: extent.max[1]! });
+    const table = tableOf(document.grammars[record.grammar]!);
+    const row = navigationRowOf(table, record.payload.kind);
+    const region = obstructionOf(record.payload.kind, row.obstruction, record.payload.fields, planBox(document, record));
+    if (region !== undefined) regions.push(region);
   }
-  return cover;
+  return regions;
 }
 
 /**
@@ -244,7 +257,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     }
   });
 
-  const cover = groundCover(document, placed);
+  const obstructing = obstructions(document, placed);
   const carried = new Map<string, CarriedRecord>();
   for (const record of placed) {
     if (record.identity === IDENTITY_NOT_STATED) continue;
@@ -253,7 +266,8 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
   }
   const contextFor = (record: PlacedRecord, coverings: readonly CoveringTriangle[]): ExpandContext => ({
     tileSizeMm: document.tile.fields.tile_size_mm as number,
-    groundCover: cover,
+    obstructions: obstructing,
+    extent: planBox(document, record),
     capsuleRadiusMm: capsuleRadius(document, record),
     coverings,
     carried,
@@ -288,9 +302,11 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
       const expansion = rule.expand(record.payload.fields, contextFor(record, []));
       expansions.set(recordIndex, expansion);
       if (expansion.state !== 'drawn') return;
-      if (!definition.surfaces) return;
       const row = navigationRowOf(tableOf(document.grammars[record.grammar]!), record.payload.kind);
-      if (row.ground === 'cover') {
+      // A cover kind's base ring takes the ground it is drawn on. In a projection that carries no
+      // surfaces it is left to the obstruction axis, which keeps a capsule out of the ring itself
+      // whether or not the record is drawn; a table that covers without obstructing is refused.
+      if (row.ground === 'cover' && definition.surfaces) {
         const ring = baseRingOf(record.payload.kind, record.payload.fields);
         const cut = triangulateRing(ring, `${record.payload.kind} ${record.identity} base ring`);
         for (let corner = 0; corner + 2 < cut.length; corner += 3) {
@@ -299,8 +315,9 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
       }
       if (row.ground !== 'support') return;
       for (const piece of expansion.pieces) {
-        if (piece.surface === undefined) continue;
-        if (piece.surface.orientation !== 'horizontal') continue;
+        // A projection that carries surfaces states which of a record's surfaces are ground. One
+        // that carries none draws only what a person is supported by, so every piece of it is.
+        if (definition.surfaces && piece.surface?.orientation !== 'horizontal') continue;
         const plan = (index: number): readonly [number, number] => [piece.vertices[index * 3]!, piece.vertices[index * 3 + 1]!];
         for (let corner = 0; corner + 2 < piece.triangles.length; corner += 3) {
           coverings.push([plan(piece.triangles[corner]!), plan(piece.triangles[corner + 1]!), plan(piece.triangles[corner + 2]!)]);

@@ -88,7 +88,7 @@ function heightOn(triangle: SupportTriangle, point: Plan): number {
 
 /** Every claim, for one carve, over the half-millimetre lattice of the surfaces' box. */
 function holdsTheRule(support: readonly SupportTriangle[], clearances: readonly ClearanceWalk[]): SupportTriangle[] {
-  const kept = carveSupport(support, clearances, 'case');
+  const kept = carveSupport(support, clearances, undefined, 'case');
   for (const triangle of kept) {
     const walk = triangle.map(plan);
     expect(twice(walk[0]!, walk[1]!, walk[2]!) > 0n, `${JSON.stringify(triangle)} turns counter-clockwise with area`).toBe(true);
@@ -131,13 +131,13 @@ function flatSquare(west: number, south: number, side: number, height: number): 
 describe('the support carve rule', () => {
   it('keeps a surface no clearance meets exactly as it was given', () => {
     const support = flatSquare(0, 0, 20, 7);
-    expect(carveSupport(support, [], 'case')).toEqual(support);
-    expect(carveSupport(support, [[[100, 100], [110, 100], [110, 110], [100, 110]]], 'case')).toEqual(support);
+    expect(carveSupport(support, [], undefined, 'case')).toEqual(support);
+    expect(carveSupport(support, [[[100, 100], [110, 100], [110, 110], [100, 110]]], undefined, 'case')).toEqual(support);
   });
 
   it('keeps nothing where a clearance covers the whole surface', () => {
     const support = flatSquare(0, 0, 10, 0);
-    expect(carveSupport(support, [[[-5, -5], [15, -5], [15, 15], [-5, 15]]], 'case')).toEqual([]);
+    expect(carveSupport(support, [[[-5, -5], [15, -5], [15, 15], [-5, 15]]], undefined, 'case')).toEqual([]);
   });
 
   it('carves a square clearance out of a sloping surface, keeping heights on its plane', () => {
@@ -159,6 +159,22 @@ describe('the support carve rule', () => {
     const support = flatSquare(-4, -4, 36, 0);
     const ring: Plan[] = [[8, 6], [20, 6], [24, 10], [24, 20], [8, 20]];
     holdsTheRule(support, ringClearance(ring, 3, 'case'));
+  });
+
+  it('keeps nothing outside a region it is held to, and trims nothing inside one', () => {
+    // A hull round a carve may reach a millimetre past the triangle it came from. A caller whose
+    // surfaces must stay inside a stated extent names that extent, and only that boundary trims.
+    const support = flatSquare(0, 0, 20, 4);
+    const clearance: ClearanceWalk[] = [[[9, 9], [13, 9], [13, 13], [9, 13]]];
+    const box: Plan[] = [[0, 0], [20, 0], [20, 20], [0, 20]];
+    for (const triangle of carveSupport(support, clearance, box, 'case')) {
+      for (const point of triangle) {
+        expect([point[0], point[1]].every((value) => value >= 0 && value <= 20), `${JSON.stringify(point)} is in the region`).toBe(true);
+      }
+    }
+    // A region that contains the support trims nothing: the same answer as holding to none.
+    const wide: Plan[] = [[-100, -100], [200, -100], [200, 200], [-100, 200]];
+    expect(carveSupport(support, clearance, wide, 'case')).toEqual(carveSupport(support, clearance, undefined, 'case'));
   });
 
   it('carves several clearances that overlap each other', () => {

@@ -12,8 +12,9 @@
  * what every surface needs: footprints, tiers, elevations, facade layouts, kerb lines, crossing
  * widths, form parts with facing vectors and identities. What is missing is on this side: the
  * integer rules that expand them, each declared and versioned here as it is built. This version
- * builds the terrain grid and a street segment's carriageway and gutters (`streets.ts`);
- * everything else states the rule it waits on (`NEEDS`).
+ * builds the terrain grid and a street segment's carriageway and gutters (`streets.ts`), and in
+ * the navigation projection carves both clear of what the grammar's navigation table says
+ * obstructs a walking capsule; everything else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -21,11 +22,14 @@
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
-import type { Plan } from './integer-math.js';
+import type { Plan, Space } from './integer-math.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
+import { ringClearance } from './ring-clearance.js';
 import { segmentSurfaces } from './streets.js';
 import type { StreetFields } from './streets.js';
+import { carveSupport } from './support-carve.js';
+import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
 import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
 import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
 
@@ -33,7 +37,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 4;
+export const TESSELLATOR_SOURCE_VERSION = 5;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -79,9 +83,9 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
       preserves: [
         'the integer vertex positions of every surface this version draws that a person may be supported by',
         'support height at a plan point inside a triangle, by linear interpolation over them',
-        'capsule clearance in plan: every support triangle lies more than the capsule radius its grammar '
-          + 'measures from the stated plan extent of every other record the tile carries that covers or stands '
-          + 'on the ground, at any height, so a capsule of that radius stood anywhere on it meets none of them',
+        'capsule clearance in plan: no support triangle enters the region within the capsule radius its '
+          + 'grammar measures of what its navigation table says obstructs, at any height, so a capsule of '
+          + 'that radius stood anywhere on support meets none of them',
       ],
       admissible_uses: ['sampling support height'],
       inadmissible_uses: [
@@ -89,8 +93,9 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
         'collision: clearance is not a solid',
         'deciding walkability: no record states a slope limit, so no slope is refused and the capsule is '
           + 'not checked against rising ground',
-        'deciding that a plan point has no support: a terrain cell whose closed plan square meets such an '
-          + 'extent grown by the capsule radius is left out until that record is drawn',
+        'deciding that a plan point has no support: a record whose low parts obstruct takes the whole of '
+          + 'its stated plan extent until this tessellator reads those parts, and a record whose rule is '
+          + 'not built draws no support at all',
       ],
     },
   },
@@ -113,7 +118,7 @@ export const MATERIALISED_LOD = 0;
  * drawn, and says so.
  */
 export const NEEDS = {
-  /** Every cell of a terrain patch meets a record that covers the ground, or its capsule clearance. */
+  /** Every part of the surface is ground another record takes, or a capsule clearance, so none is left. */
   ground_coverage: 'ground_coverage',
   /** Horizontal faces from a ring: a lot, a block, a tree pit. */
   ring_triangulation: 'ring_triangulation',
@@ -125,13 +130,6 @@ export const NEEDS = {
   bent_street: 'bent_street',
   /** A segment's two curbs, carried by the tile, whose kerb lines leave its strip a length. */
   street_curbs: 'street_curbs',
-  /**
-   * Support carved clear of every record that obstructs a capsule, by the support clearance rule
-   * (`support-clearance.ts`). The grammar's navigation table states which kinds obstruct and with
-   * what region; a base ring waits on exact ring clearance, since a ring's plan box grown by the
-   * capsule radius can close ground that is open.
-   */
-  support_clearance: 'support_clearance',
   /** Kerb faces, kerb tops and footways, offset from a kerb line by the floor square root normal, with fillet arcs. */
   kerb_offset: 'kerb_offset',
   /** A junction's carriageway, filled between its legs with fillet arcs. */
@@ -161,15 +159,29 @@ export interface PlanBox {
   readonly max_y: number;
 }
 
+/** A region a standing capsule keeps its radius clear of, in plan, with what it was read from. */
+export interface ObstructionRegion {
+  /** The record kind that obstructs, for the message when a ring is refused. */
+  readonly kind: string;
+  /** The ring itself, as the navigation table's obstruction axis names it. */
+  readonly ring: readonly Plan[];
+}
+
 /** What an expander may read beyond its own record. */
 export interface ExpandContext {
   /** The tile record's `tile_size_mm`. */
   readonly tileSizeMm: number;
   /**
-   * The stated plan extent of every record in the document, owned or halo, that covers or stands on
-   * the ground.
+   * Every region the navigation table says obstructs a walking capsule, from every record in the
+   * document, owned or halo: a `base_ring` record's base ring, and a `low_parts` record's stated
+   * plan extent, which holds every part it has until this tessellator reads them one by one.
    */
-  readonly groundCover: readonly PlanBox[];
+  readonly obstructions: readonly ObstructionRegion[];
+  /**
+   * The record's own stated plan extent, which its geometry must lie inside. A carve holds its
+   * answer to this, since a hull round a carved face may otherwise reach a millimetre past it.
+   */
+  readonly extent: PlanBox | undefined;
   /**
    * The capsule radius the record's grammar measures for `nav_envelope`'s `capsule_clearance`, or
    * undefined when it measures none, which an expander claiming clearance refuses. The height and
@@ -283,15 +295,12 @@ function terrainCells(
 }
 
 /**
- * Drawn terrain is the patch less what drawn covering surfaces cover, by the terrain yield rule
- * (`terrain-yield.ts`), a horizontal surface in the plan frame, `s = x` and `t = y`, in the terrain
- * role. The grammar says terrain is not a surface where a street, a block or a lot covers it; it
- * yields exactly where their surfaces are drawn, and nowhere their records only state an extent,
- * which would draw holes nothing fills. A cell no covering meets is drawn as the grid draws it.
+ * THE GROUND PARTITION: a terrain patch less the ground drawn records take, by the terrain yield
+ * rule (`terrain-yield.ts`). One partition, read by both projections: render draws it as the
+ * terrain surface and navigation stands people on what is left of it, so the two never disagree
+ * about where the ground is. A cell no covering meets is the grid's own two triangles.
  */
-function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
-  const patch = patchOf(fields, context);
-  const where = `city.terrain ${fields.identity as string}`;
+function groundPartition(patch: TerrainPatch, context: ExpandContext, where: string): { vertices: number[]; triangles: number[] } {
   const coverings = coveringsWithArea(context.coverings, where);
   const met = metCells(patch, coverings, where);
   const grid = terrainCells(patch, [], new Set(met.keys()));
@@ -305,6 +314,18 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
     for (const vertex of cell.vertices) vertices.push(vertex[0], vertex[1], vertex[2]);
     for (const index of cell.triangles) triangles.push(first + index);
   }
+  return { vertices, triangles };
+}
+
+/**
+ * Drawn terrain is the ground partition, a horizontal surface in the plan frame, `s = x` and
+ * `t = y`, in the terrain role. The grammar says terrain is not a surface where a street, a block
+ * or a lot covers it; it yields exactly where their surfaces are drawn, and nowhere their records
+ * only state an extent, which would draw holes nothing fills.
+ */
+function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.terrain ${fields.identity as string}`;
+  const { vertices, triangles } = groundPartition(patchOf(fields, context), context, where);
   if (triangles.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
   const coordinates: number[] = [];
   for (let vertex = 0; vertex < vertices.length; vertex += 3) {
@@ -315,33 +336,88 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
 }
 
 /**
- * Terrain supports whoever stands on it where nothing covers it and a capsule fits: a heightfield
- * has one height over each plan point, which is what support sampling needs.
- *
- * This version cannot draw the surfaces that cover terrain, so it takes the exact conservative
- * reading, in integers: a cell is left out when its closed plan square meets the stated extent of
- * any record that covers or stands on the ground, grown on every side by the capsule radius the
- * terrain's grammar measures (`capsule_clearance`, `radius_mm`, in its nav_envelope contract). An
- * extent contains everything its record generates, so a kept cell is a cell nothing covers, and a
- * point outside a box grown by the radius on each axis is more than the radius from the box, so a
- * capsule stood anywhere on a kept cell meets no such record in plan, at any height. Support never
- * claims ground that is not there, or room that is not there. Both
- * rules are fixed by `TESSELLATOR_SOURCE_VERSION`.
+ * Everything a walking capsule keeps its radius clear of, as convex integer pieces: each region the
+ * navigation table's obstruction axis names, covered by the ring clearance rule
+ * (`ring-clearance.ts`) at the radius the record's grammar measures.
  */
-function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
+function clearancesOf(context: ExpandContext, where: string): ClearanceWalk[] {
   const radius = context.capsuleRadiusMm;
   if (radius === undefined) {
     throw new TessellationError('a support surface whose grammar measures no capsule radius, so no clearance can be kept');
   }
-  const clear = context.groundCover.map((box) => ({
-    min_x: safe(box.min_x - radius, 'a clearance extent'),
-    min_y: safe(box.min_y - radius, 'a clearance extent'),
-    max_x: safe(box.max_x + radius, 'a clearance extent'),
-    max_y: safe(box.max_y + radius, 'a clearance extent'),
-  }));
-  const grid = terrainCells(patchOf(fields, context), clear, new Set());
-  if (grid.triangles.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
-  return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles }] };
+  const walks: ClearanceWalk[] = [];
+  for (const obstruction of context.obstructions) {
+    for (const piece of ringClearance(obstruction.ring, radius, `${obstruction.kind} obstructing ${where}`)) {
+      walks.push(piece);
+    }
+  }
+  return walks;
+}
+
+/** The record's stated plan extent as a convex walk: the region its support is held inside. */
+function statedWalk(context: ExpandContext, where: string): Plan[] {
+  const extent = context.extent;
+  if (extent === undefined) throw new TessellationError(`${where} draws support and states no extent`);
+  return [
+    [extent.min_x, extent.min_y],
+    [extent.max_x, extent.min_y],
+    [extent.max_x, extent.max_y],
+    [extent.min_x, extent.max_y],
+  ];
+}
+
+/** A mesh's triangles as space triangles, which the carve takes one at a time. */
+function spaceTriangles(vertices: readonly number[], triangles: readonly number[]): SupportTriangle[] {
+  const corner = (index: number): Space => [vertices[index * 3]!, vertices[index * 3 + 1]!, vertices[index * 3 + 2]!];
+  const out: SupportTriangle[] = [];
+  for (let at = 0; at + 2 < triangles.length; at += 3) {
+    out.push([corner(triangles[at]!), corner(triangles[at + 1]!), corner(triangles[at + 2]!)]);
+  }
+  return out;
+}
+
+/** Space triangles as one piece, each vertex written once however many triangles hold it. */
+function pieceOf(kept: readonly SupportTriangle[]): Piece {
+  const vertices: number[] = [];
+  const triangles: number[] = [];
+  const at = new Map<string, number>();
+  for (const triangle of kept) {
+    for (const point of triangle) {
+      const key = `${String(point[0])} ${String(point[1])} ${String(point[2])}`;
+      const found = at.get(key);
+      if (found === undefined) {
+        at.set(key, vertices.length / 3);
+        triangles.push(vertices.length / 3);
+        vertices.push(point[0], point[1], point[2]);
+        continue;
+      }
+      triangles.push(found);
+    }
+  }
+  return { vertices, triangles };
+}
+
+/**
+ * Support is the surfaces a record draws that a person may stand on, carved clear of everything the
+ * navigation table says obstructs a capsule, by the support carve rule (`support-carve.ts`). The
+ * carve is in plan and ignores height, which only ever leaves out more, and it holds its answer
+ * inside the record's stated extent, which every drawn vertex must lie in.
+ */
+function carvedSupport(surfaces: readonly SupportTriangle[], context: ExpandContext, where: string): Expansion {
+  const kept = carveSupport(surfaces, clearancesOf(context, where), statedWalk(context, where), where);
+  if (kept.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
+  return { state: 'drawn', pieces: [pieceOf(kept)] };
+}
+
+/**
+ * Terrain supports whoever stands on it where nothing covers it and a capsule fits: a heightfield
+ * has one height over each plan point, which is what support sampling needs. It is the ground
+ * partition render draws, carved.
+ */
+function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.terrain ${fields.identity as string}`;
+  const { vertices, triangles } = groundPartition(patchOf(fields, context), context, where);
+  return carvedSupport(spaceTriangles(vertices, triangles), context, where);
 }
 
 /** A street segment's curb on one side: the one carried curb that names the segment and the side. */
@@ -363,19 +439,29 @@ function renderSegment(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces: result.pieces };
 }
 
+/**
+ * A segment's carriageway and gutters are ground a person walks on, which is what the navigation
+ * table's `support` says: the same surfaces the render path draws, the horizontal ones, carved.
+ */
+function supportSegment(fields: Fields, context: ExpandContext): Expansion {
+  const identity = fields.identity as string;
+  const where = `city.street_segment ${identity}`;
+  const result = segmentSurfaces(fields, curbOf(context, identity, 'left'), curbOf(context, identity, 'right'), where);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  const surfaces: SupportTriangle[] = [];
+  for (const piece of result.pieces) {
+    if (piece.surface?.orientation !== 'horizontal') continue;
+    for (const triangle of spaceTriangles(piece.vertices, piece.triangles)) surfaces.push(triangle);
+  }
+  return carvedSupport(surfaces, context, where);
+}
+
 const needs = (...list: Need[]): Rule => ({ rule: 'needs', needs: list });
 const notInProjection: Rule = { rule: 'not_in_projection' };
 
 interface KindRules {
   readonly render_batch: Rule;
   readonly nav_envelope: Rule;
-  /**
-   * INTERIM, for nav_envelope only: whether the record's stated extent covers or stands on the
-   * ground in plan, so a terrain cell under it grown by the capsule radius is not support. It goes
-   * when support is the ground partition carved by exact clearance from the navigation table's
-   * obstruction axis. Render reads the navigation table, never this.
-   */
-  readonly covers_ground: boolean;
 }
 
 /**
@@ -383,46 +469,48 @@ interface KindRules {
  * marking, a sign, an occupancy, a relation, and every object, which is collision's concern.
  */
 const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
-  ['city.block', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation), covers_ground: true }],
-  ['city.crossing', { render_batch: needs(NEEDS.crossing_band), nav_envelope: needs(NEEDS.crossing_band), covers_ground: true }],
-  ['city.curb_edge', { render_batch: needs(NEEDS.kerb_offset), nav_envelope: needs(NEEDS.kerb_offset), covers_ground: true }],
-  ['city.district', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
-  ['city.entrance', { render_batch: needs(NEEDS.facade_layout), nav_envelope: needs(NEEDS.facade_layout), covers_ground: true }],
-  ['city.facade', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
-  ['city.ground_bay', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
-  ['city.junction', { render_batch: needs(NEEDS.junction_fill), nav_envelope: needs(NEEDS.junction_fill), covers_ground: true }],
+  ['city.block', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
+  ['city.crossing', { render_batch: needs(NEEDS.crossing_band), nav_envelope: needs(NEEDS.crossing_band) }],
+  ['city.curb_edge', { render_batch: needs(NEEDS.kerb_offset), nav_envelope: needs(NEEDS.kerb_offset) }],
+  ['city.district', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.entrance', { render_batch: needs(NEEDS.facade_layout), nav_envelope: needs(NEEDS.facade_layout) }],
+  ['city.facade', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
+  ['city.ground_bay', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
+  ['city.junction', { render_batch: needs(NEEDS.junction_fill), nav_envelope: needs(NEEDS.junction_fill) }],
   // A room's near wall inside its building, behind its glazing: laid out on its facade, standing on
   // nothing, so it is no more a surface of the ground than the vitrine beside it.
-  ['city.interior_backing', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
-  ['city.junction_approach', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
+  ['city.interior_backing', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
+  ['city.junction_approach', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // A lane is a path on its segment's carriageway, and draws as that carriageway.
-  ['city.lane', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.lane_connection', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.massing', { render_batch: needs(NEEDS.massing_faces), nav_envelope: needs(NEEDS.massing_faces), covers_ground: true }],
-  ['city.parcel', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation), covers_ground: true }],
+  ['city.lane', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.lane_connection', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.massing', { render_batch: needs(NEEDS.massing_faces), nav_envelope: needs(NEEDS.massing_faces) }],
+  ['city.parcel', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
   // A space on a carriageway or a footway draws as that surface; its bay lines are markings.
-  ['city.parking_space', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
+  ['city.parking_space', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // An occupancy draws as its building's faces.
-  ['city.premises', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.road_marking', { render_batch: needs(NEEDS.marking_stripes), nav_envelope: notInProjection, covers_ground: true }],
-  ['city.rooftop_object', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection, covers_ground: true }],
-  ['city.signal', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
+  ['city.premises', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.road_marking', { render_batch: needs(NEEDS.marking_stripes), nav_envelope: notInProjection }],
+  ['city.rooftop_object', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
+  ['city.signal', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // A named street draws as its segments.
-  ['city.street', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.street_furniture', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection, covers_ground: true }],
+  ['city.street', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.street_furniture', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
   // A node draws as its junction or its segments' ends.
-  ['city.street_node', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.street_segment', { render_batch: { rule: 'expand', expand: renderSegment, readsCoverings: false }, nav_envelope: needs(NEEDS.support_clearance), covers_ground: true }],
+  ['city.street_node', { render_batch: notInProjection, nav_envelope: notInProjection }],
+  ['city.street_segment', {
+    render_batch: { rule: 'expand', expand: renderSegment, readsCoverings: false },
+    nav_envelope: { rule: 'expand', expand: supportSegment, readsCoverings: false },
+  }],
   // A tree's parts, and its pit, which is ground a person may stand on.
-  ['city.street_tree', { render_batch: needs(NEEDS.form_parts, NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation), covers_ground: true }],
+  ['city.street_tree', { render_batch: needs(NEEDS.form_parts, NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
   // A material is not a surface. A drawn range cites it; it draws nothing of its own.
-  ['city.surface_material', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
+  ['city.surface_material', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.terrain', {
     render_batch: { rule: 'expand', expand: renderTerrain, readsCoverings: true },
-    nav_envelope: { rule: 'expand', expand: supportTerrain, readsCoverings: false },
-    covers_ground: false,
+    nav_envelope: { rule: 'expand', expand: supportTerrain, readsCoverings: true },
   }],
-  ['city.vitrine', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection, covers_ground: true }],
+  ['city.vitrine', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
 ]);
 
 function rulesOf(kind: string): KindRules {
@@ -455,31 +543,62 @@ export function baseRingOf(kind: string, fields: Fields): readonly Plan[] {
   return reader(fields);
 }
 
-/** Whether a record kind's stated extent covers the ground terrain would otherwise draw. */
-export function coversGround(kind: string): boolean {
-  return rulesOf(kind).covers_ground;
+/**
+ * The region one record obstructs a walking capsule with, by the navigation table's obstruction
+ * axis, or undefined when it obstructs nothing. A base ring is the ring itself. Low parts are each
+ * part of the record below the capsule height, which this tessellator does not read one by one yet,
+ * so it takes the stated plan extent, which holds every part the record has: it keeps a capsule
+ * clear of more ground than the parts themselves would, never less.
+ */
+export function obstructionOf(
+  kind: string,
+  region: string,
+  fields: Fields,
+  extent: PlanBox | undefined,
+): ObstructionRegion | undefined {
+  if (region === 'none') return undefined;
+  if (region === 'base_ring') return { kind, ring: baseRingOf(kind, fields) };
+  if (region === 'low_parts') {
+    if (extent === undefined) throw new TessellationError(`${kind} obstructs with its low parts and states no extent that holds them`);
+    return {
+      kind,
+      ring: [
+        [extent.min_x, extent.min_y],
+        [extent.max_x, extent.min_y],
+        [extent.max_x, extent.max_y],
+        [extent.min_x, extent.max_y],
+      ],
+    };
+  }
+  throw new TessellationError(`${kind} obstructs with ${region}, a region this tessellator does not read`);
 }
 
-// Held at load, so a record kind added to a table without a rule cannot be baked at all, and a kind
-// said to cover the ground states an extent to cover it with.
+// Held at load, so a record kind added to a table without a rule cannot be baked at all, and every
+// kind the navigation table gives a region states what that region is read from.
 for (const table of GRAMMAR_TABLES) {
   const kinds = table.shapes.records
     .map((shape) => shape.kind)
     .filter((kind): kind is string => kind !== undefined && kind !== TILE_RECORD_KIND);
-  for (const kind of kinds) {
-    if (coversGround(kind)) {
-      if (recordShapeOf(table, kind)!.extent_field === undefined) {
-        throw new TessellationError(`${kind} covers the ground and states no extent`);
-      }
-    }
-  }
   for (const kind of [...KIND_RULES.keys()].sort()) {
     if (!kinds.includes(kind)) throw new TessellationError(`a rule for ${kind}, which no table declares`);
   }
-  // Every kind the navigation table says covers its base ring has a way to read that ring.
   for (const row of table.navigation) {
-    if (row.ground !== 'cover') continue;
-    if (row.cover !== 'base_ring') throw new TessellationError(`${row.kind} covers ${row.cover}, a region this tessellator does not read`);
-    if (!BASE_RINGS.has(row.kind)) throw new TessellationError(`${row.kind} covers its base ring, and this tessellator reads no base ring for it`);
+    // A kind whose ground is covered stands nobody, and nobody may stand inside it either, so it
+    // obstructs too: a table that covers the ground without obstructing it is refused, not guessed.
+    if (row.ground === 'cover') {
+      if (row.cover !== 'base_ring') throw new TessellationError(`${row.kind} covers ${row.cover}, a region this tessellator does not read`);
+      if (!BASE_RINGS.has(row.kind)) throw new TessellationError(`${row.kind} covers its base ring, and this tessellator reads no base ring for it`);
+      if (row.obstruction === 'none') throw new TessellationError(`${row.kind} covers the ground and obstructs nobody, so nothing would keep a capsule out of it`);
+    }
+    if (row.obstruction === 'none') continue;
+    if (row.obstruction === 'base_ring' && !BASE_RINGS.has(row.kind)) {
+      throw new TessellationError(`${row.kind} obstructs with its base ring, and this tessellator reads no base ring for it`);
+    }
+    if (row.obstruction === 'low_parts' && recordShapeOf(table, row.kind)!.extent_field === undefined) {
+      throw new TessellationError(`${row.kind} obstructs with its low parts and states no extent that holds them`);
+    }
+    if (row.obstruction !== 'base_ring' && row.obstruction !== 'low_parts') {
+      throw new TessellationError(`${row.kind} obstructs with ${row.obstruction}, a region this tessellator does not read`);
+    }
   }
 }

@@ -85,9 +85,27 @@ SHAPE_TABLE = ROOT.joinpath("tests", "fixtures", "city-v2", "record-shapes.json"
 CLI = PACKAGE.joinpath("src", "node", "cli.ts")
 TSX = WEB.joinpath("node_modules", ".bin", "tsx")
 
-#: The record kinds whose stated extent does not cover the ground: a terrain patch is the ground,
-#: and a district is a region. Every other kind with an extent covers or stands on the ground.
-NOT_GROUND_COVER = frozenset({"city.terrain", "city.district"})
+#: The record kinds the city's navigation table says obstruct a capsule with their low parts, which
+#: this tessellator reads as their whole stated plan extent until it reads the parts themselves.
+LOW_PART_KINDS = frozenset({"city.street_furniture", "city.street_tree"})
+
+
+def _ring_gap_squared(ring: list[tuple[int, int]], x: int, y: int) -> float:
+    """The squared distance from a plan point to a closed ring, zero inside it."""
+    inside = False
+    for (ax, ay), (bx, by) in zip(ring, ring[1:] + ring[:1], strict=True):
+        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+            inside = not inside
+    if inside:
+        return 0
+    best = None
+    for (ax, ay), (bx, by) in zip(ring, ring[1:] + ring[:1], strict=True):
+        dx, dy = bx - ax, by - ay
+        along = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)
+        along = min(max(along, 0), 1)
+        gap = (x - ax - along * dx) ** 2 + (y - ay - along * dy) ** 2
+        best = gap if best is None else min(best, gap)
+    return best
 
 
 def fixture_document() -> TileDocument:
@@ -507,10 +525,12 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             ("carriageway", "horizontal", "record"),
             ("gutter", "horizontal", "record"),
         ]
+    # Navigation draws what a person stands on: the same ground, and the segments' own surfaces,
+    # each carved clear of what the grammar's navigation table says obstructs a walking capsule.
     drawn = [
         header["records"][e["record"]]["kind"] for e in nav["entries"] if e["state"] == "drawn"
     ]
-    assert drawn == ["city.terrain"]
+    assert drawn == ["city.street_segment"] * len(segments) + ["city.terrain"]
 
 
 def descriptor_measures() -> dict[str, dict[str, dict[str, int]]]:
@@ -528,62 +548,107 @@ def capsule_radius_mm() -> int:
     return descriptor_measures()["nav_envelope"]["capsule_clearance"]["radius_mm"]
 
 
-def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
-    """A second reading of the support rule this version adds, from the records."""
+def test_the_tessellator_carves_support_clear_of_everything_that_obstructs(tmp_path):
+    """A second reading of the support rule this version carves, from the records themselves."""
     _, container = _bake(tmp_path, "fixture.owd")
     header = _header(container)
-    records = fixture_records()
     radius = capsule_radius_mm()
     assert radius > 0
-    cover = []
-    for record in records:
-        shape = CITY_SHAPES_BY_TYPE[type(record)]
-        if shape.extent_field and shape.kind not in NOT_GROUND_COVER:
-            extent = getattr(record, shape.extent_field)
-            cover.append(
-                (
-                    extent.min_x_mm - radius,
-                    extent.min_y_mm - radius,
-                    extent.max_x_mm + radius,
-                    extent.max_y_mm + radius,
-                )
-            )
+    obstructions = []
+    for record in fixture_records():
+        kind = CITY_SHAPES_BY_TYPE[type(record)].kind
+        if kind == "city.massing":
+            obstructions.append([tuple(point) for point in record.tiers[0].ring_mm])
+            continue
+        if kind not in LOW_PART_KINDS:
+            continue
+        extent = record.extent
+        obstructions.append(
+            [
+                (extent.min_x_mm, extent.min_y_mm),
+                (extent.max_x_mm, extent.min_y_mm),
+                (extent.max_x_mm, extent.max_y_mm),
+                (extent.min_x_mm, extent.max_y_mm),
+            ]
+        )
+    assert len(obstructions) == 9
+
     terrain = fixture_terrain()
     cell = terrain.cell_mm
     side = terrain.samples_per_side
     origin_x = terrain.tile_x * TILE_SIZE_MM
     origin_y = terrain.tile_y * TILE_SIZE_MM
-
-    def covered(west: int, south: int) -> bool:
-        return any(
-            west <= max_x and min_x <= west + cell and south <= max_y and min_y <= south + cell
-            for min_x, min_y, max_x, max_y in cover
-        )
-
-    expected = {
-        (origin_x + column * cell, origin_y + row * cell)
-        for row in range(side - 1)
-        for column in range(side - 1)
-        if not covered(origin_x + column * cell, origin_y + row * cell)
-    }
-    assert 0 < len(expected) < (side - 1) ** 2
-
     nav = header["projections"][1]
     sections = {(s["projection"], s["name"]): s for s in header["sections"]}
     offsets = _ints(container, sections[("nav_envelope", "position_mm")], "i")
     corners = _ints(container, sections[("nav_envelope", "index")], "I")
-    drawn = set()
-    for triangle in range(nav["triangle_count"]):
-        points = [
+    triangles = [
+        [
             [offsets[corners[triangle * 3 + c] * 3 + a] + nav["origin_mm"][a] for a in range(3)]
             for c in range(3)
         ]
-        drawn.add((min(p[0] for p in points), min(p[1] for p in points)))
-        for x, y, z in points:
-            sample = ((y - origin_y) // cell) * side + (x - origin_x) // cell
-            assert z == terrain.height_mm[sample]
-    assert drawn == expected
-    assert nav["triangle_count"] == 2 * len(expected)
+        for triangle in range(nav["triangle_count"])
+    ]
+
+    # Every corner is on the surface it was carved from: a sample where it is one, and between its
+    # cell's four samples otherwise, since the height is that cell's own plane, floored.
+    terrain_entry = next(
+        e
+        for e in nav["entries"]
+        if e["state"] == "drawn" and header["records"][e["record"]]["kind"] == "city.terrain"
+    )
+    low = terrain_entry["first_vertex"]
+    at_samples = 0
+    for vertex in range(low, low + terrain_entry["vertex_count"]):
+        x, y, z = (offsets[vertex * 3 + a] + nav["origin_mm"][a] for a in range(3))
+        column, row = (x - origin_x) // cell, (y - origin_y) // cell
+        if (x - origin_x) % cell == 0 and (y - origin_y) % cell == 0:
+            assert z == terrain.height_mm[row * side + column]
+            at_samples += 1
+            continue
+        column = min(max(column, 0), side - 2)
+        row = min(max(row, 0), side - 2)
+        heights = [
+            terrain.height_mm[(row + up) * side + column + east] for up in (0, 1) for east in (0, 1)
+        ]
+        assert min(heights) - 1 <= z <= max(heights) + 1
+    assert at_samples > 0
+
+    # Nothing within the capsule radius of an obstruction is supported, over a lattice of the tile,
+    # and what is beyond that radius mostly is: the carve takes the clearance and not the ground.
+    buckets: dict[tuple[int, int], list[int]] = {}
+    for index, points in enumerate(triangles):
+        for bx in range(min(p[0] for p in points) // cell, max(p[0] for p in points) // cell + 1):
+            for by in range(
+                min(p[1] for p in points) // cell, max(p[1] for p in points) // cell + 1
+            ):
+                buckets.setdefault((bx, by), []).append(index)
+
+    def supported(x: int, y: int) -> bool:
+        for index in buckets.get((x // cell, y // cell), ()):
+            a, b, c = triangles[index]
+            sides = [
+                (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0])
+                for p, q in ((a, b), (b, c), (c, a))
+            ]
+            if all(side >= 0 for side in sides) or all(side <= 0 for side in sides):
+                return True
+        return False
+
+    within, beyond, kept = 0, 0, 0
+    step = 1000
+    for y in range(origin_y, origin_y + TILE_SIZE_MM + 1, step):
+        for x in range(origin_x, origin_x + TILE_SIZE_MM + 1, step):
+            gaps = [_ring_gap_squared(ring, x, y) for ring in obstructions]
+            if min(gaps) < radius**2:
+                within += 1
+                assert not supported(x, y), f"({x}, {y}) is within the radius of an obstruction"
+                continue
+            if min(gaps) > (radius + 10) ** 2:
+                beyond += 1
+                kept += 1 if supported(x, y) else 0
+    assert within > 0
+    assert kept > beyond // 2
 
 
 def test_a_material_with_its_texture_set_stripped_is_refused(tmp_path):

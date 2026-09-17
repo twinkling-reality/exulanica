@@ -15,9 +15,9 @@ import { bakeDocumentFile, nodeSha256 } from '../src/node/index.js';
 import { bakeTile } from '../src/core/bake.js';
 import { CITY_V2 } from '../src/core/city-v2.js';
 import { absoluteSurfaceCoordinates, absoluteVertices, decodeOwd } from '../src/core/owd.js';
+import { ringClearance } from '../src/core/ring-clearance.js';
 import type { DecodedOwd } from '../src/core/owd.js';
 import {
-  coveringBoxes,
   documentBytes,
   dressedTerrainObject,
   FIXTURE_PATH,
@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 4, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 5, digest profile v3. */
 const GOLDEN = {
   render_batch: '00d9a4d792cb2a7eb414268ecc9a25e4ec935ca65910144c78b0d9f5c3642ac9',
-  nav_envelope: 'a8049612a744c018d2ceed86e78c80805ac7cb2c880c3fdb6af442d480b9aff6',
+  nav_envelope: '302a247b9372f6e2968b4f8c981dd30ff96a39178c800ce6eec64f9838eb25e2',
 } as const;
 
 afterEach(() => {
@@ -39,6 +39,85 @@ afterEach(() => {
 });
 
 const count = (states: string[], state: string): number => states.filter((s) => s === state).length;
+
+type PlanPoint = readonly [number, number];
+
+/**
+ * Every region the grammar's navigation table says obstructs a walking capsule, read from the
+ * fixture by this test's own reading of that table: a building's base ring, and the stated plan
+ * extent of whatever obstructs with its low parts. Sorted by kind, so the building comes first and
+ * the seven pieces of furniture before the tree.
+ */
+function obstructionRings(document: any): PlanPoint[][] {
+  const rings: { kind: string; ring: PlanPoint[] }[] = [];
+  for (const grammar of document.grammars) {
+    for (const record of [...grammar.owned, ...grammar.halo]) {
+      const row = CITY_V2.navigation.find((candidate) => candidate.kind === record.kind)!;
+      if (row.obstruction === 'none') continue;
+      if (row.obstruction === 'base_ring') {
+        rings.push({ kind: record.kind, ring: record.fields.tiers[0].ring_mm as PlanPoint[] });
+        continue;
+      }
+      const extent = record.fields.extent;
+      rings.push({
+        kind: record.kind,
+        ring: [
+          [extent.min_x_mm, extent.min_y_mm],
+          [extent.max_x_mm, extent.min_y_mm],
+          [extent.max_x_mm, extent.max_y_mm],
+          [extent.min_x_mm, extent.max_y_mm],
+        ],
+      });
+    }
+  }
+  rings.sort((a, b) => (a.kind === b.kind ? a.ring[0]![0] - b.ring[0]![0] : a.kind < b.kind ? -1 : 1));
+  return rings.map((row) => row.ring);
+}
+
+const twice = (a: PlanPoint, b: PlanPoint, c: PlanPoint): number =>
+  (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+/** Whether the interiors of two convex walks share a point, by the separating axis rule. */
+function interiorsMeet(first: readonly PlanPoint[], second: readonly PlanPoint[]): boolean {
+  const apart = (edges: readonly PlanPoint[], points: readonly PlanPoint[]): boolean => edges.some((from, index) => {
+    const to = edges[(index + 1) % edges.length]!;
+    return points.every((point) => twice(from, to, point) <= 0);
+  });
+  const turned = (walk: readonly PlanPoint[]): readonly PlanPoint[] => {
+    const area = walk.reduce((total, here, index) => {
+      const next = walk[(index + 1) % walk.length]!;
+      return total + (here[0] * next[1] - here[1] * next[0]);
+    }, 0);
+    return area >= 0 ? walk : [...walk].reverse();
+  };
+  const [a, b] = [turned(first), turned(second)];
+  if (apart(a, b)) return false;
+  return !apart(b, a);
+}
+
+/** The squared distance from a plan point to a closed box given as its four corners, exactly. */
+function boxGapSquared(box: readonly PlanPoint[], x: number, y: number): number {
+  const beyond = (low: number, high: number, value: number): number => Math.max(low - value, 0, value - high);
+  const across = beyond(box[0]![0], box[2]![0], x);
+  const along = beyond(box[0]![1], box[2]![1], y);
+  return across * across + along * along;
+}
+
+/** Whether any triangle of a projection holds a plan point, its edges included. */
+function supports(projection: DecodedOwd['projections'][number], vertices: ArrayLike<number>, x: number, y: number): boolean {
+  const point: PlanPoint = [x, y];
+  for (let triangle = 0; triangle < projection.header.triangle_count; triangle += 1) {
+    const corner = (at: number): PlanPoint => {
+      const vertex = projection.index[triangle * 3 + at]!;
+      return [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!];
+    };
+    const [a, b, c] = [corner(0), corner(1), corner(2)];
+    const sides = [twice(a, b, point), twice(b, c, point), twice(c, a, point)];
+    if (sides.every((side) => side >= 0)) return true;
+    if (sides.every((side) => side <= 0)) return true;
+  }
+  return false;
+}
 
 async function decodedFixture(bytes: Uint8Array = fixtureBytes()): Promise<DecodedOwd> {
   return decodeOwd((await bakeTile(bytes, nodeSha256)).container);
@@ -56,7 +135,8 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(browser.containerSha256).toBe(node.container_sha256);
     expect(await nodeSha256(new Uint8Array(readFileSync(out)))).toBe(node.container_sha256);
     expect(browser.tileInputsDigest).toBe(node.tile_inputs_digest);
-  });
+    // Two bakes of a tile whose navigation is carved: the default five seconds is not enough.
+  }, 30_000);
 
   it('draws the terrain patch undressed round the streets, the segments dressed, and states why nothing else draws', async () => {
     const { header, projections } = await decodedFixture();
@@ -104,10 +184,12 @@ describe('the triangle digest of the conformance fixture', () => {
       if (entry.state === 'unavailable') expect(entry.needs.length).toBeGreaterThan(0);
     }
 
+    // Navigation draws what a person may stand on: the same ground partition, and the segments'
+    // own carriageways and gutters, each carved clear of what the navigation table says obstructs.
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
-    expect(count(nav, 'drawn')).toBe(1);
+    expect(count(nav, 'drawn')).toBe(4);
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 235, triangle_count: 368 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 4152, triangle_count: 5006 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.
@@ -116,50 +198,77 @@ describe('the triangle digest of the conformance fixture', () => {
     });
   });
 
-  it('leaves out exactly the terrain cells a covering record meets, grown by the capsule radius', async () => {
+  it('supports nothing a capsule could not stand on, over what the navigation table says obstructs', async () => {
     const nav = (await decodedFixture()).projections[1]!;
     const vertices = absoluteVertices(nav);
     const radius = CITY_V2.measures.nav_envelope!.capsule_clearance!.radius_mm!;
-    const cover = coveringBoxes(fixtureObject()).map((box) => ({
-      min_x: box.min_x - radius,
-      min_y: box.min_y - radius,
-      max_x: box.max_x + radius,
-      max_y: box.max_y + radius,
-    }));
-    const terrain = recordsOf(fixtureObject(), 'city.terrain')[0].fields;
-    const cell = terrain.cell_mm as number;
-    const meets = (west: number, south: number): boolean =>
-      cover.some((box) => west <= box.max_x && box.min_x <= west + cell && south <= box.max_y && box.min_y <= south + cell);
+    const rings = obstructionRings(fixtureObject());
+    // One building by its base ring, seven pieces of furniture and one tree by their plan extents.
+    expect(rings).toHaveLength(9);
 
-    const drawn = new Set<string>();
+    // No support meets a clearance piece. Those pieces cover everywhere within the radius of the
+    // ring, which `ring-clearance.test.ts` holds them to, so no support is within the radius of it.
+    const pieces = rings.flatMap((ring) => ringClearance(ring, radius, 'the conformance tile'));
     for (let triangle = 0; triangle < nav.header.triangle_count; triangle += 1) {
-      const corners = [0, 1, 2].map((corner) => nav.index[triangle * 3 + corner]!);
-      const west = Math.min(...corners.map((vertex) => vertices[vertex * 3]!));
-      const south = Math.min(...corners.map((vertex) => vertices[vertex * 3 + 1]!));
-      expect(meets(west, south), `cell at ${west}, ${south}`).toBe(false);
-      drawn.add(`${west} ${south}`);
-    }
-    let expected = 0;
-    for (let row = 0; row + 1 < terrain.samples_per_side; row += 1) {
-      for (let column = 0; column + 1 < terrain.samples_per_side; column += 1) {
-        if (!meets(column * cell, row * cell)) expected += 1;
+      const walk = [0, 1, 2].map((corner) => {
+        const vertex = nav.index[triangle * 3 + corner]!;
+        return [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!] as [number, number];
+      });
+      for (const piece of pieces) {
+        expect(interiorsMeet(walk, piece), `triangle ${triangle} at ${JSON.stringify(walk[0])} meets a clearance`).toBe(false);
       }
     }
-    expect(expected).toBeGreaterThan(0);
-    expect(expected).toBeLessThan((terrain.samples_per_side - 1) ** 2);
-    expect(drawn.size).toBe(expected);
-    expect(nav.header.triangle_count).toBe(expected * 2);
+
+    // And measured against the radius itself, not against those pieces: over a lattice round one
+    // lamp, no point within the radius of its extent is supported, and points past it are.
+    const lamp = rings[1]!;
+    const [west, south] = [lamp[0]![0], lamp[0]![1]];
+    const [east, north] = [lamp[2]![0], lamp[2]![1]];
+    let within = 0;
+    let beyond = 0;
+    for (let y = south - radius - 200; y <= north + radius + 200; y += 20) {
+      for (let x = west - radius - 200; x <= east + radius + 200; x += 20) {
+        const gap = boxGapSquared(lamp, x, y);
+        const held = supports(nav, vertices, x, y);
+        if (gap < radius * radius) {
+          within += 1;
+          expect(held, `(${x}, ${y}) is within the radius of a lamp and supported`).toBe(false);
+        }
+        if (gap > (radius + 10) * (radius + 10) && held) beyond += 1;
+      }
+    }
+    expect(within).toBeGreaterThan(0);
+    expect(beyond).toBeGreaterThan(0);
   });
 
-  it('samples support height exactly at the terrain samples', async () => {
-    const nav = (await decodedFixture()).projections[1]!;
+  it('samples support height on the surface the support came from', async () => {
+    const decoded = await decodedFixture();
+    const nav = decoded.projections[1]!;
     const vertices = absoluteVertices(nav);
     const terrain = recordsOf(fixtureObject(), 'city.terrain')[0].fields;
-    for (let vertex = 0; vertex < nav.header.vertex_count; vertex += 1) {
+    const entry = nav.header.entries[decoded.header.records.findIndex((record) => record.kind === 'city.terrain')]!;
+    if (entry.state !== 'drawn') throw new Error('the terrain supports nobody');
+    const cell = terrain.cell_mm as number;
+    const side = terrain.samples_per_side as number;
+    const heights = terrain.height_mm as number[];
+    let atSamples = 0;
+    for (let step = 0; step < entry.vertex_count; step += 1) {
+      const vertex = entry.first_vertex + step;
       const [x, y, z] = [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
-      const sample = (y / terrain.cell_mm) * terrain.samples_per_side + x / terrain.cell_mm;
-      expect(z).toBe(terrain.height_mm[sample]);
+      if (x % cell === 0 && y % cell === 0 && x >= 0 && y >= 0) {
+        expect(z, `the sample at ${x}, ${y}`).toBe(heights[(y / cell) * side + x / cell]);
+        atSamples += 1;
+        continue;
+      }
+      // A carved corner is on its cell's own plane, floored, so it lies between that cell's
+      // samples. A corner the carve kept a millimetre past its cell extrapolates by under one.
+      const column = Math.min(Math.max(Math.floor(x / cell), 0), side - 2);
+      const row = Math.min(Math.max(Math.floor(y / cell), 0), side - 2);
+      const corners = [0, 1].flatMap((up) => [0, 1].map((east) => heights[(row + up) * side + column + east]!));
+      expect(z, `the carved corner at ${x}, ${y}`).toBeGreaterThanOrEqual(Math.min(...corners) - 1);
+      expect(z, `the carved corner at ${x}, ${y}`).toBeLessThanOrEqual(Math.max(...corners) + 1);
     }
+    expect(atSamples).toBeGreaterThan(0);
     expect(nav.header.contract.admissible_uses).toEqual(['sampling support height']);
   });
 
@@ -202,7 +311,8 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(node.triangleDigests.get('render_batch')).not.toBe(GOLDEN.render_batch);
     expect(node.triangleDigests.get('nav_envelope')).not.toBe(GOLDEN.nav_envelope);
     expect(Object.fromEntries(browser.triangleDigests)).toEqual(Object.fromEntries(node.triangleDigests));
-  });
+    // A bake carves navigation exactly, which costs about a second, and this test bakes twice.
+  }, 30_000);
 
   it('moves when a record that draws nothing changes, because its entry is digested too', async () => {
     const document = fixtureObject();

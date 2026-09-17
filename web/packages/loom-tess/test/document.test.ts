@@ -168,34 +168,39 @@ describe('the bake', () => {
   });
 
   it('states terrain that something covers everywhere as unavailable rather than drawing under it', async () => {
+    // A building standing on the whole tile: its base ring obstructs, so a capsule fits nowhere.
     const covered = broken((d) => {
-      Object.assign(first(d, 'city.block').extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
+      first(d, 'city.massing').tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
     });
     expect(await terrainEntry(covered, 1)).toMatchObject({ state: 'unavailable', needs: ['ground_coverage'] });
   });
 
-  it('keeps support a capsule radius clear of a record that stands just outside a cell', async () => {
-    // A lamp's stated extent 200 mm, then 400 mm, east of the tile's south-east cell, which it
-    // never meets. Within the grammar's 340 mm capsule radius the cell is left out; beyond it the
-    // cell is kept.
+  it('keeps support a capsule radius clear of a record that obstructs just outside the tile', async () => {
+    // A lamp's stated extent 200 mm, then 400 mm, east of the tile's edge, which it never meets.
+    // Its low parts obstruct, so within the grammar's 340 mm capsule radius the ground beside it is
+    // carved away and beyond that radius it is kept, whole cells either way now.
     const nearEast = (gap: number) => broken((d) => {
       Object.assign(first(d, 'city.street_furniture').extent, {
         min_x_mm: 128000 + gap, max_x_mm: 128000 + gap + 100, min_y_mm: 4000, max_y_mm: 4100,
       });
     });
-    const southEastCell = async (bytes: Uint8Array): Promise<boolean> => {
-      const baked = await bake(bytes);
-      const nav = baked.tessellation.projections[1]!;
+    const supportsEdge = async (bytes: Uint8Array): Promise<boolean> => {
+      const nav = (await bake(bytes)).tessellation.projections[1]!;
+      // The tile's east edge beside the lamp: inside the lamp's clearance at 200 mm, outside at 400.
+      const [x, y] = [128000, 4050];
       for (let triangle = 0; triangle < nav.indices.length / 3; triangle += 1) {
-        const xs = [0, 1, 2].map((corner) => nav.vertices[nav.indices[triangle * 3 + corner]! * 3]!);
-        const ys = [0, 1, 2].map((corner) => nav.vertices[nav.indices[triangle * 3 + corner]! * 3 + 1]!);
-        if (Math.min(...xs) === 120000 && Math.min(...ys) === 0) return true;
+        const at = (corner: number, axis: number): number => nav.vertices[nav.indices[triangle * 3 + corner]! * 3 + axis]!;
+        const side = (from: number, to: number): number =>
+          (at(to, 0) - at(from, 0)) * (y - at(from, 1)) - (at(to, 1) - at(from, 1)) * (x - at(from, 0));
+        const sides = [side(0, 1), side(1, 2), side(2, 0)];
+        if (sides.every((value) => value >= 0)) return true;
+        if (sides.every((value) => value <= 0)) return true;
       }
       return false;
     };
-    expect(await southEastCell(fixtureBytes())).toBe(true);
-    expect(await southEastCell(nearEast(200))).toBe(false);
-    expect(await southEastCell(nearEast(400))).toBe(true);
+    expect(await supportsEdge(fixtureBytes())).toBe(true);
+    expect(await supportsEdge(nearEast(200))).toBe(false);
+    expect(await supportsEdge(nearEast(400))).toBe(true);
     // Render is untouched either way: a stated extent takes no ground from it, only drawn surfaces do.
     const renderTriangles = async (bytes: Uint8Array): Promise<number> => {
       const render = (await bake(bytes)).tessellation.projections[0]!;

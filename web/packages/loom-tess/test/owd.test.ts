@@ -201,7 +201,8 @@ describe('decodeOwd', () => {
     const bytes = copy();
     const at = sectionOffset(bytes, 'nav_envelope', 'position_mm');
     const view = new DataView(bytes.buffer);
-    view.setInt32(at, view.getInt32(at, true) - 1, true);
+    // West of the whole extent its entry states: a vertex moved about inside one changes no bound.
+    view.setInt32(at, view.getInt32(at, true) - 1_000_000, true);
     refused(bytes, /extent its vertices do not have/);
   });
 

@@ -95,16 +95,3 @@ export function dressedTerrainObject(): any {
   return document;
 }
 
-/** Plan boxes of every record whose stated extent covers the ground: all but terrain and districts. */
-export function coveringBoxes(document: any): { min_x: number; min_y: number; max_x: number; max_y: number }[] {
-  const grammar = document.grammars[0];
-  return [...grammar.owned, ...grammar.halo]
-    .filter((record: any) => record.fields.extent !== undefined)
-    .filter((record: any) => record.kind !== 'city.terrain' && record.kind !== 'city.district')
-    .map((record: any) => ({
-      min_x: record.fields.extent.min_x_mm,
-      min_y: record.fields.extent.min_y_mm,
-      max_x: record.fields.extent.max_x_mm,
-      max_y: record.fields.extent.max_y_mm,
-    }));
-}

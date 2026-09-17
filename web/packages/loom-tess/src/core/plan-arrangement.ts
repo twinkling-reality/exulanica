@@ -189,12 +189,12 @@ function upperHalf(d: Pair): boolean {
 }
 
 /**
- * The regions of a counter-clockwise convex `piece` that no counter-clockwise triangle of
- * `coverings` covers, by the plan arrangement rule.
+ * The regions of a counter-clockwise convex `piece` that no counter-clockwise walk of `coverings`
+ * covers, by the plan arrangement rule.
  */
 export function uncoveredRegions(
   piece: readonly Plan[],
-  coverings: readonly (readonly [Plan, Plan, Plan])[],
+  coverings: readonly (readonly Plan[])[],
   cutRows: readonly number[],
   where: string,
 ): KeptRegion[] {
@@ -206,7 +206,7 @@ export function uncoveredRegions(
     });
   };
   ring(piece, 0);
-  coverings.forEach((triangle, index) => ring(triangle, index + 1));
+  coverings.forEach((walk, index) => ring(walk, index + 1));
   const xs = piece.map((point) => BigInt(point[0]));
   const [west, east] = [xs.reduce((a, b) => (a < b ? a : b)), xs.reduce((a, b) => (a > b ? a : b))];
   for (const row of cutRows) inputs.push({ a: [west, BigInt(row)], b: [east, BigInt(row)], owner: -1 });

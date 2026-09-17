@@ -47,12 +47,11 @@
  */
 import { add, floorDivide, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
-import { carvedPiece, heightOnPlane, twiceArea, withArea } from './piece-carve.js';
-import type { ObstructionTriangle } from './piece-carve.js';
+import { carvedPiece, heightOnPlane, twiceArea } from './piece-carve.js';
 import { triangulateRing } from './ring-triangulation.js';
 
 /** A covering triangle in plan: a piece of the ground a drawn record takes. */
-export type CoveringTriangle = ObstructionTriangle;
+export type CoveringTriangle = readonly [Plan, Plan, Plan];
 
 /** A terrain grid: its south-west sample, its cell, its samples per side and their heights, row-major. */
 export interface TerrainPatch {
@@ -70,7 +69,15 @@ export interface CellTerrain {
 }
 
 /** The coverings with area, each turned counter-clockwise. */
-export const coveringsWithArea = withArea;
+export function coveringsWithArea(coverings: readonly CoveringTriangle[], where: string): CoveringTriangle[] {
+  const out: CoveringTriangle[] = [];
+  for (const [a, b, c] of coverings) {
+    const area = twiceArea(a, b, c, where);
+    if (area > 0) out.push([a, b, c]);
+    if (area < 0) out.push([a, c, b]);
+  }
+  return out;
+}
 
 /** Whether a closed counter-clockwise triangle and a closed axis-aligned square share a point. */
 function meetsSquare(triangle: CoveringTriangle, west: number, south: number, east: number, north: number, where: string): boolean {
@@ -142,7 +149,7 @@ export function yieldedCell(
   const triangles: number[] = [];
   for (const piece of pieces) {
     const ring: Plan[] = piece.map((corner) => [corner[0], corner[1]]);
-    for (const hull of carvedPiece(ring, coverings, true, where)) {
+    for (const hull of carvedPiece(ring, coverings, ring, where)) {
       const first = vertices.length;
       for (const point of hull) vertices.push([point[0], point[1], heightOnPlane(piece, point, where)]);
       for (const index of triangulateRing(hull, where)) triangles.push(first + index);
