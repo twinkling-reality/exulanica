@@ -36,13 +36,28 @@
  *      `floor(footway_width_mm * footway_crossfall_millionths / 10^6)` above it at its back.
  *   Kerb top and footway take `s` along the centreline and `t` across it.
  *
+ * THE JUNCTION, its carriageway fill inside the kerb arcs, horizontal, `s = x` and `t = y`:
+ *   1. Legs are taken in the junction's order, counter-clockwise from +x. A leg's outward direction
+ *      runs from the node along its segment; its outward-left and outward-right curbs are the
+ *      segment's left and right curbs when the segment starts at the node, and the other way round
+ *      when it ends there.
+ *   2. The ring runs, for each leg: across its mouth, the segment rule's five points at the node's
+ *      end of its strip from outward-right to outward-left; back along the outward-left kerb line to
+ *      its end nearest the node, `Q`; then round the corner to the next leg. That corner belongs to
+ *      the next leg's outward-right curb, which must name this leg's outward-left curb as its next
+ *      curb: its walk ends at `P`, nearest the node. With radius 0, `P` is `Q`. Otherwise the ring
+ *      takes the fillet arc rule's points from `Q` back to `P`, with the least power of two
+ *      segments whose chords keep within the projection's resolution (`filletSegmentsWithin`).
+ *   3. Repeated consecutive points are dropped, and the ring is cut by the ring rule.
+ *   A leg whose segment, curbs or node the tile does not carry needs `junction_legs`.
+ *
  * Every triangle is counter-clockwise seen from its front: from above for a horizontal surface,
  * from the carriageway for a kerb face.
  *
  * Not yet wired into a bake. It changes no container until an expander calls it.
  */
 import type { Piece, SurfaceExpansion } from './expand.js';
-import { alongByCornerRule } from './fillet-arc.js';
+import { alongByCornerRule, filletArc, filletSegmentsWithin } from './fillet-arc.js';
 import {
   add,
   CORNER_LENGTH_SCALE,
@@ -55,13 +70,14 @@ import {
   subtract,
 } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
+import { triangulateRing } from './ring-triangulation.js';
 
 export type StreetFields = { readonly [name: string]: unknown };
 
 /** What a street rule gives: surfaces to draw, or the rule it waits on. */
 export type StreetResult =
   | { readonly state: 'drawn'; readonly pieces: readonly Piece[] }
-  | { readonly state: 'waiting'; readonly need: 'bent_street' | 'street_curbs' };
+  | { readonly state: 'waiting'; readonly need: 'bent_street' | 'street_curbs' | 'junction_legs' };
 
 /** A straight line of a record: exactly two points, or undefined for a bent one. */
 function straight(points: unknown): readonly [Space, Space] | undefined {
@@ -131,26 +147,49 @@ function piece(measured: Measured, triangles: readonly number[], role: string, o
 /** The two quads of a strip, `a0 a1 b1 b0`, as triangles over four vertices given in that order. */
 const QUAD = [0, 1, 2, 0, 2, 3];
 
-/** The segment's carriageway and gutter surfaces, between its two curbs' kerb lines. */
-export function segmentSurfaces(
+/** One end of a segment's strip: its five points across, from the left kerb line to the right. */
+export interface StripEnd {
+  readonly left: Space;
+  readonly leftGutter: Space;
+  readonly crown: Space;
+  readonly rightGutter: Space;
+  readonly right: Space;
+}
+
+/** A segment's straight frame and the two ends of its strip, or the rule it waits on. */
+export type SegmentEnds =
+  | {
+      readonly state: 'ends';
+      readonly origin: Plan;
+      readonly direction: Plan;
+      readonly start: StripEnd;
+      readonly end: StripEnd;
+    }
+  | Extract<StreetResult, { state: 'waiting' }>;
+
+/**
+ * Where a segment's strip starts and ends, by the segment rule's first three steps. The junction
+ * rule takes its mouths from here, so a strip and the junction it opens into share their points.
+ */
+export function segmentEnds(
   segment: StreetFields,
   left: StreetFields | undefined,
   right: StreetFields | undefined,
   where: string,
-): StreetResult {
+): SegmentEnds {
   if (left === undefined) return { state: 'waiting', need: 'street_curbs' };
   if (right === undefined) return { state: 'waiting', need: 'street_curbs' };
   const centre = straight(segment.centreline_mm);
   const leftLine = straight(left.kerb_line_mm);
   const rightLine = straight(right.kerb_line_mm);
-  const bent: StreetResult = { state: 'waiting', need: 'bent_street' };
+  const bent = { state: 'waiting', need: 'bent_street' } as const;
   if (centre === undefined) return bent;
   if (leftLine === undefined) return bent;
   if (rightLine === undefined) return bent;
   const origin = plan(centre[0]);
   const direction = between(origin, plan(centre[1]), where);
-  if (!runsWith(direction, leftLine, where)) return { state: 'waiting', need: 'bent_street' };
-  if (!runsWith(direction, rightLine, where)) return { state: 'waiting', need: 'bent_street' };
+  if (!runsWith(direction, leftLine, where)) return bent;
+  if (!runsWith(direction, rightLine, where)) return bent;
   const width = segment.carriageway_width_mm as number;
   const position = (point: Plan): number => dot(between(origin, point, where), direction, where);
 
@@ -165,45 +204,61 @@ export function segmentSurfaces(
     const across = moved(plan(rightPoint), alongByCornerRule(leftOf(direction), width, where), where);
     return [[across[0], across[1], heightOn(leftLine, direction, across, where)], rightPoint];
   };
-  const [left0, right0] = endPoints(leftLine[0], rightLine[0], true);
-  const [left1, right1] = endPoints(leftLine[1], rightLine[1], false);
-  if (position(plan(left0)) >= position(plan(left1))) return { state: 'waiting', need: 'street_curbs' };
-
   const crown = (a: Space, b: Space): Space => {
     const middle: Plan = [floorDivide(add(a[0], b[0], where), 2, where), floorDivide(add(a[1], b[1], where), 2, where)];
     return [middle[0], middle[1], heightOn(centre, direction, middle, where)];
   };
-  const crown0 = crown(left0, right0);
-  const crown1 = crown(left1, right1);
   const gutterLine = (kerb: Space, towardCrown: Plan, crownPoint: Space, gutter: number): Space => {
     const at = moved(plan(kerb), alongByCornerRule(towardCrown, gutter, where), where);
     const rise = floorDivide(multiply(subtract(crownPoint[2], kerb[2], where), multiply(gutter, 2, where), where), width, where);
     return [at[0], at[1], add(kerb[2], rise, where)];
   };
-  const leftGutter = left.gutter_width_mm as number;
-  const rightGutter = right.gutter_width_mm as number;
-  const leftInner0 = gutterLine(left0, rightOf(direction), crown0, leftGutter);
-  const leftInner1 = gutterLine(left1, rightOf(direction), crown1, leftGutter);
-  const rightInner0 = gutterLine(right0, leftOf(direction), crown0, rightGutter);
-  const rightInner1 = gutterLine(right1, leftOf(direction), crown1, rightGutter);
+  const stripEnd = (leftPoint: Space, rightPoint: Space): StripEnd => {
+    const crownPoint = crown(leftPoint, rightPoint);
+    return {
+      left: leftPoint,
+      leftGutter: gutterLine(leftPoint, rightOf(direction), crownPoint, left.gutter_width_mm as number),
+      crown: crownPoint,
+      rightGutter: gutterLine(rightPoint, leftOf(direction), crownPoint, right.gutter_width_mm as number),
+      right: rightPoint,
+    };
+  };
+  const [left0, right0] = endPoints(leftLine[0], rightLine[0], true);
+  const [left1, right1] = endPoints(leftLine[1], rightLine[1], false);
+  if (position(plan(left0)) >= position(plan(left1))) return { state: 'waiting', need: 'street_curbs' };
+  return { state: 'ends', origin, direction, start: stripEnd(left0, right0), end: stripEnd(left1, right1) };
+}
 
+/** The segment's carriageway and gutter surfaces, between its two curbs' kerb lines. */
+export function segmentSurfaces(
+  segment: StreetFields,
+  left: StreetFields | undefined,
+  right: StreetFields | undefined,
+  where: string,
+): StreetResult {
+  const ends = segmentEnds(segment, left, right, where);
+  if (ends.state !== 'ends') return ends;
+  const { origin, direction, start: s, end: e } = ends;
+  const width = segment.carriageway_width_mm as number;
+  const leftGutter = left!.gutter_width_mm as number;
+  const rightGutter = right!.gutter_width_mm as number;
   const pieces: Piece[] = [];
-  const carriageway: Space[] = [];
-  const carriagewayTriangles: number[] = [];
   const addQuad = (points: Space[], triangles: number[], quad: readonly Space[]): void => {
     const base = points.length;
     points.push(...quad);
     triangles.push(...QUAD.map((corner) => base + corner));
   };
-  if (multiply(leftGutter, 2, where) < width) addQuad(carriageway, carriagewayTriangles, [crown0, crown1, leftInner1, leftInner0]);
-  if (multiply(rightGutter, 2, where) < width) addQuad(carriageway, carriagewayTriangles, [rightInner0, rightInner1, crown1, crown0]);
+  const carriageway: Space[] = [];
+  const carriagewayTriangles: number[] = [];
+  if (multiply(leftGutter, 2, where) < width) addQuad(carriageway, carriagewayTriangles, [s.crown, e.crown, e.leftGutter, s.leftGutter]);
+  if (multiply(rightGutter, 2, where) < width) addQuad(carriageway, carriagewayTriangles, [s.rightGutter, e.rightGutter, e.crown, s.crown]);
   if (carriageway.length > 0) {
     pieces.push(piece(horizontal(carriageway, origin, direction, where), carriagewayTriangles, 'carriageway', 'horizontal'));
   }
   const gutters: Space[] = [];
   const gutterTriangles: number[] = [];
-  if (leftGutter > 0) addQuad(gutters, gutterTriangles, [leftInner0, leftInner1, left1, left0]);
-  if (rightGutter > 0) addQuad(gutters, gutterTriangles, [right0, right1, rightInner1, rightInner0]);
+  if (leftGutter > 0) addQuad(gutters, gutterTriangles, [s.leftGutter, e.leftGutter, e.left, s.left]);
+  if (rightGutter > 0) addQuad(gutters, gutterTriangles, [s.right, e.right, e.rightGutter, s.rightGutter]);
   if (gutters.length > 0) {
     pieces.push(piece(horizontal(gutters, origin, direction, where), gutterTriangles, 'gutter', 'horizontal'));
   }
@@ -265,5 +320,93 @@ export function curbSurfaces(curb: StreetFields, segment: StreetFields, where: s
       piece(horizontal(topQuad, origin, direction, where), QUAD, 'kerb', 'horizontal'),
       piece(horizontal(footwayQuad, origin, direction, where), QUAD, 'footway', 'horizontal'),
     ],
+  };
+}
+
+/** How a street rule finds the records a record names: carried records only. */
+export interface StreetLookup {
+  /** The carried record with this identity, or undefined when the tile does not carry it. */
+  readonly record: (identity: string) => StreetFields | undefined;
+  /** A segment's carried curbs by side. */
+  readonly curbs: (segment: string) => { readonly left: StreetFields | undefined; readonly right: StreetFields | undefined };
+}
+
+const samePoint = (a: Space, b: Space): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+
+/** A curb's straight kerb line in the order a counter-clockwise walk round its face takes it. */
+function walked(curb: StreetFields): readonly [Space, Space] {
+  const line = straight(curb.kerb_line_mm)!;
+  return curb.side === 'left' ? line : [line[1], line[0]];
+}
+
+/** The power of two a fillet's segments may not pass: the least one at or above its radius. */
+function segmentBound(radius: number): number {
+  let bound = 1;
+  while (bound < radius) bound *= 2;
+  return bound;
+}
+
+/** The junction's carriageway fill, by the junction rule. */
+export function junctionSurface(junction: StreetFields, lookup: StreetLookup, resolutionMm: number, where: string): StreetResult {
+  const legsNeeded = { state: 'waiting', need: 'junction_legs' } as const;
+  const node = lookup.record(junction.node_identity as string);
+  if (node === undefined) return legsNeeded;
+  const nodePlan: Plan = [node.x_mm as number, node.y_mm as number];
+  interface Leg { readonly mouth: readonly Space[]; readonly outwardLeft: StreetFields; readonly outwardRight: StreetFields }
+  const legs: Leg[] = [];
+  for (const identity of junction.segment_identities as readonly string[]) {
+    const segment = lookup.record(identity);
+    if (segment === undefined) return legsNeeded;
+    const { left, right } = lookup.curbs(identity);
+    if (left === undefined) return legsNeeded;
+    if (right === undefined) return legsNeeded;
+    const ends = segmentEnds(segment, left, right, where);
+    if (ends.state !== 'ends') return ends;
+    const centre = straight(segment.centreline_mm)!;
+    const atStart = centre[0][0] === nodePlan[0] && centre[0][1] === nodePlan[1];
+    const atEnd = centre[1][0] === nodePlan[0] && centre[1][1] === nodePlan[1];
+    if (atStart === atEnd) throw new GeometryError(`${where}: segment ${identity} does not meet the junction's node at one end`);
+    const e = atStart ? ends.start : ends.end;
+    legs.push(atStart
+      ? { mouth: [e.right, e.rightGutter, e.crown, e.leftGutter, e.left], outwardLeft: left, outwardRight: right }
+      : { mouth: [e.left, e.leftGutter, e.crown, e.rightGutter, e.right], outwardLeft: right, outwardRight: left });
+  }
+  const ring: Space[] = [];
+  const push = (point: Space): void => {
+    if (ring.length > 0 && samePoint(ring[ring.length - 1]!, point)) return;
+    ring.push(point);
+  };
+  for (const [index, leg] of legs.entries()) {
+    const next = legs[(index + 1) % legs.length]!;
+    for (const point of leg.mouth) push(point);
+    const a = leg.outwardLeft;
+    const b = next.outwardRight;
+    const [q, afterQ] = walked(a);
+    const [beforeP, p] = walked(b);
+    push(q);
+    if ((b.next_curb_identity as readonly string[])[0] !== a.identity) return legsNeeded;
+    const radius = b.corner_radius_mm as number;
+    if (radius === 0) {
+      if (!samePoint(p, q)) throw new GeometryError(`${where}: a corner of no radius whose tangent points differ`);
+      continue;
+    }
+    const into = between(plan(beforeP), plan(p), where);
+    const out = between(plan(q), plan(afterQ), where);
+    const segments = filletSegmentsWithin(p, into, q, out, radius, resolutionMm, segmentBound(radius), where);
+    const arc = filletArc(p, into, q, out, radius, segments, where);
+    for (let step = segments - 1; step > 0; step -= 1) push(arc[step]!);
+    push(p);
+  }
+  if (ring.length > 1 && samePoint(ring[0]!, ring[ring.length - 1]!)) ring.pop();
+  const triangles = triangulateRing(ring.map(plan), where);
+  const vertices: number[] = [];
+  const coordinates: number[] = [];
+  for (const point of ring) {
+    vertices.push(point[0], point[1], point[2]);
+    coordinates.push(point[0], point[1]);
+  }
+  return {
+    state: 'drawn',
+    pieces: [{ vertices, triangles, surface: { role: 'carriageway', orientation: 'horizontal', coordinates } }],
   };
 }

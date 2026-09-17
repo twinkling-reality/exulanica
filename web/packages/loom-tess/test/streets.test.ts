@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Piece } from '../src/core/expand.js';
-import { curbSurfaces, segmentSurfaces } from '../src/core/streets.js';
+import { curbSurfaces, junctionSurface, segmentSurfaces } from '../src/core/streets.js';
+import type { StreetLookup } from '../src/core/streets.js';
 import { fixtureObject, recordsOf } from './support.js';
 
 type Fields = Record<string, any>;
@@ -170,5 +171,73 @@ describe('the curb rule, straight parts', () => {
     const back = points(result.pieces[2]!).filter((point) => point[1] === block.boundary_mm[0][1]);
     expect(back).toHaveLength(2);
     for (const point of back) expect(point[2]).toBe(block.grade_elevation_mm);
+  });
+});
+
+describe('the junction rule', () => {
+  const carried = new Map<string, Fields>(
+    [...fixture.grammars[0].owned, ...fixture.grammars[0].halo].map((record: any) => [record.fields.identity, record.fields]),
+  );
+  const lookup: StreetLookup = {
+    record: (identity) => carried.get(identity),
+    curbs: (segment) => ({
+      left: curbs.find((curb) => curb.segment_identity === segment && curb.side === 'left'),
+      right: curbs.find((curb) => curb.segment_identity === segment && curb.side === 'right'),
+    }),
+  };
+  const junction = recordsOf(fixture, 'city.junction')[0].fields;
+
+  it('fills the carriageway inside the kerb arcs, upward, inside the junction extent', () => {
+    const result = junctionSurface(junction, lookup, 1, 'case');
+    if (result.state !== 'drawn') throw new Error(`waits on ${result.need}`);
+    expect(result.pieces).toHaveLength(1);
+    const [fill] = result.pieces;
+    expect([fill!.surface!.role, fill!.surface!.orientation]).toEqual(['carriageway', 'horizontal']);
+    for (const triangle of triangles(fill!)) expect(normal(...triangle)[2]).toBeGreaterThan(0);
+    for (const point of points(fill!)) expect(insideExtent(junction.extent, point), `${point}`).toBe(true);
+    // The box from mouth to mouth, 18500 by 15500, less a quarter disc of radius 6000 at each of
+    // the two corners: within the two arcs' length times the rule's two millimetres of rounding.
+    const ideal = 18500 * 15500 - 2 * (Math.PI * 6000 * 6000) / 4;
+    expect(Math.abs(planArea(fill!) - ideal)).toBeLessThan(2 * 9425 * 2);
+    // s = x and t = y.
+    points(fill!).forEach((point, index) => {
+      expect([fill!.surface!.coordinates[index * 2], fill!.surface!.coordinates[index * 2 + 1]]).toEqual([point[0], point[1]]);
+    });
+  });
+
+  it('opens onto each leg at exactly the points its strip ends on', () => {
+    const result = junctionSurface(junction, lookup, 1, 'case');
+    if (result.state !== 'drawn') throw new Error('not drawn');
+    const fill = new Set(points(result.pieces[0]!).map((point) => point.join(' ')));
+    for (const identity of junction.segment_identities) {
+      const segment = carried.get(identity)!;
+      const strip = segmentSurfaces(segment, lookup.curbs(identity).left, lookup.curbs(identity).right, 'case');
+      if (strip.state !== 'drawn') throw new Error('not drawn');
+      const node = carried.get(junction.node_identity)!;
+      const nodeEnd = strip.pieces.flatMap(points).filter((point) => {
+        const [start] = segment.centreline_mm;
+        const startsAtNode = start[0] === node.x_mm && start[1] === node.y_mm;
+        const along = (point[0] - start[0]) * (segment.centreline_mm[1][0] - start[0]) + (point[1] - start[1]) * (segment.centreline_mm[1][1] - start[1]);
+        const all = strip.pieces.flatMap(points).map((other) => (other[0] - start[0]) * (segment.centreline_mm[1][0] - start[0]) + (other[1] - start[1]) * (segment.centreline_mm[1][1] - start[1]));
+        return along === (startsAtNode ? Math.min(...all) : Math.max(...all));
+      });
+      expect(nodeEnd.length).toBeGreaterThan(0);
+      for (const point of nodeEnd) expect(fill.has(point.join(' ')), `${identity} ${point}`).toBe(true);
+    }
+  });
+
+  it('meets the kerb arcs from both tangent points, and uses more segments at a finer resolution', () => {
+    const fine = junctionSurface(junction, lookup, 1, 'case');
+    const coarse = junctionSurface(junction, lookup, 50, 'case');
+    if (fine.state !== 'drawn' || coarse.state !== 'drawn') throw new Error('not drawn');
+    expect(points(fine.pieces[0]!).length).toBeGreaterThan(points(coarse.pieces[0]!).length);
+    for (const tangent of ['50750 44750 -95', '56750 50750 -95', '63250 50750 -95', '69250 44750 -95']) {
+      expect(points(coarse.pieces[0]!).map((point) => point.join(' '))).toContain(tangent);
+    }
+  });
+
+  it('waits on a leg the tile does not carry', () => {
+    const partial: StreetLookup = { ...lookup, record: (identity) => (identity === junction.segment_identities[1] ? undefined : carried.get(identity)) };
+    expect(junctionSurface(junction, partial, 1, 'case')).toEqual({ state: 'waiting', need: 'junction_legs' });
   });
 });
