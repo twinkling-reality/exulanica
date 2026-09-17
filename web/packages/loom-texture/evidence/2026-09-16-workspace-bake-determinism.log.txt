@@ -107,7 +107,7 @@ LIBRARY.forEach((source, index) => {
 });
 
 == source
-commit 2d0ec9c57bab716a3e2adb8be9908a587219c512
+commit fda19aab9bac44748186e86615a82bfa446573ea
 working tree changes under web/packages/loom-texture and exulanica: 0
 requests: 8
 d4d0766adfed08653b73020d923f9e631a34e72d9393b161c463b4dc9277f03a  00-cc0.brick-running-bond.json
