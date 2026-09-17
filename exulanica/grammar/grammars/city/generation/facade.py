@@ -40,7 +40,8 @@ street or its typology admits no dwelling on the ground floor; otherwise it is a
   units of two, the last of a run taking three when the run is odd, and a run of one bay being a
   unit of its own. A unit's first bay is its door, with a transom over it and a fascia; the rest are
   shopfronts: a stall riser, glazing, a transom and a fascia. A corner lot's second frontage is
-  shopfront bays of the unit at that end.
+  shopfront bays of the unit at that end. A building with shops has a fascia at least as tall as a
+  readable sign needs (:mod:`~exulanica.grammar.grammars.city.generation.signs`).
 * On a dwelling's frontage, the bay at the threshold is the door and the others are wall.
 * A flank or rear face has wall bays.
 
@@ -77,6 +78,7 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_GRAMMAR_VERSION,
     CITY_SURFACE,
 )
+from exulanica.grammar.grammars.city.generation.signs import SIGN_FASCIA_MINIMUM_MM
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
     derived,
@@ -239,7 +241,13 @@ def _derive_values(
     # than its height field's maximum: the fascia and transom together fill the rest.
     tallest_door = _field(facade.ENTRANCE_SHAPE, "height_mm").maximum
     transom_spec = CITY_SURFACE.parameters.get("transom_height_mm")
-    fascia = put("fascia_height_mm", minimum=ground - tallest_door - transom_spec.maximum)
+    fascia = put(
+        "fascia_height_mm",
+        minimum=max(
+            ground - tallest_door - transom_spec.maximum,
+            SIGN_FASCIA_MINIMUM_MM if commercial else 0,
+        ),
+    )
     put("transom_height_mm", minimum=ground - tallest_door - fascia)
     put("stall_riser_height_mm")
     put("entrance_recess_mm")
