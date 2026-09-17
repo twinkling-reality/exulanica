@@ -261,9 +261,9 @@ class DerivativeWorker:
 
         ``embedding_pass`` is called as ``(connection, workspace_id, capture_id,
         before_send=...)`` and must call ``before_send`` with every model it is about to reach
-        before any caption text leaves; :class:`~exulanica.epistemics.caption_embeddings.
-        CaptionEmbeddingPass` does. A pass that states no ``model_handoff`` runs only for a
-        capture that needs no model right.
+        before any caption text leaves, as
+        :class:`~exulanica.epistemics.caption_embeddings.CaptionEmbeddingPass` does. A pass that
+        states no ``model_handoff`` runs only for a capture that needs no model right.
         """
         self._database = database
         self._store = store
