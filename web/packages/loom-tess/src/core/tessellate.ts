@@ -142,6 +142,17 @@ function groundCover(document: TileDocument, records: readonly PlacedRecord[]): 
   return cover;
 }
 
+/**
+ * The capsule radius the record's grammar measures for nav_envelope, from its descriptor's
+ * contract, or undefined when it measures none.
+ */
+function capsuleRadius(document: TileDocument, record: PlacedRecord): number | undefined {
+  const measures = tableOf(document.grammars[record.grammar]!).measures;
+  const clearance = measures.nav_envelope?.capsule_clearance;
+  if (clearance === undefined) return undefined;
+  return clearance.radius_mm;
+}
+
 /** Every surface material record, by the surface it names and the role it dresses. */
 function dressings(records: readonly PlacedRecord[]): ReadonlyMap<string, number> {
   const byRole = new Map<string, number>();
@@ -201,10 +212,12 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     }
   });
 
-  const context: ExpandContext = {
+  const cover = groundCover(document, placed);
+  const contextFor = (record: PlacedRecord): ExpandContext => ({
     tileSizeMm: document.tile.fields.tile_size_mm as number,
-    groundCover: groundCover(document, placed),
-  };
+    groundCover: cover,
+    capsuleRadiusMm: capsuleRadius(document, record),
+  });
   const dressed = dressings(placed);
 
   const projections = PROJECTION_DEFINITIONS.map((definition): ProjectionMesh => {
@@ -223,7 +236,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
         case 'needs':
           return { record: recordIndex, state: 'unavailable', needs: rule.needs };
         case 'expand': {
-          const expansion = rule.expand(record.payload.fields, context);
+          const expansion = rule.expand(record.payload.fields, contextFor(record));
           if (expansion.state === 'unavailable') {
             return { record: recordIndex, state: 'unavailable', needs: expansion.needs };
           }

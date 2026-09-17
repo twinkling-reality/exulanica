@@ -47,10 +47,9 @@ const ANYWHERE = new Set([0, 1, 2, 3]);
  * 4 bytes in an int32, float32 or uint32; 8 bytes in a preamble or an int64; 9 coordinates in a
  * triangle; 6 surface coordinates in a triangle; 16, ADR-0010's alignment; 1000 millimetres in a
  * metre; 0x20 and 0x7e, printable ASCII's bounds; 0x7fffffff and 0x100000000, int32's largest value
- * and uint32's size; 340, the capsule radius the city descriptor's nav_envelope contract states in
- * text, until it is a structured field (`test/capsule-clearance.test.ts` holds it to that text).
+ * and uint32's size.
  */
-const NAMED_ONLY = new Set([4, 6, 8, 9, 16, 340, 1000, 0x20, 0x7e, 0x7fffffff, 0x100000000]);
+const NAMED_ONLY = new Set([4, 6, 8, 9, 16, 1000, 0x20, 0x7e, 0x7fffffff, 0x100000000]);
 
 /** Typology, era, material, use and element words, beyond what the data files name. */
 const WRITTEN_WORDS = [

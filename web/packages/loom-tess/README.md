@@ -58,7 +58,9 @@ holds:
 - the `city.tile` record, whose grammar pins name each grammar's id, version and descriptor
   digest;
 - one entry per pinned grammar, with its declared semantics, the subject identity every record
-  identity derives from, and two sorted lists of records: `owned` and `halo`.
+  identity derives from, two sorted lists of records, `owned` and `halo`, and `external`: the
+  identities and kinds of subjects a carried record names that the tile does not carry. No
+  reference is required to resolve inside the document.
 
 A bake draws owned records only. Halo records are context: each gets a `halo` entry and nothing
 is drawn for it.
@@ -78,8 +80,8 @@ resolve or identities derive, catalog keys or membership. The grammar's `validat
 checks all of them, against the descriptor and catalogs the tile pins.
 
 `src/core/city-v2.ts` is the grammar's own table: `describe_shapes` over the city's record shapes
-(`tests/fixtures/city-v2/record-shapes.json`) and the descriptor's frame. It is generated, not
-transcribed:
+(`tests/fixtures/city-v2/record-shapes.json`), and the descriptor's frame and contract measures. It
+is generated, not transcribed:
 
 ```bash
 pnpm exec tsx packages/loom-tess/test/write-grammar-table.ts
@@ -115,11 +117,12 @@ Only terrain.
   expanders. Leaving cells out instead would draw holes that read as cuts.
 - In `nav_envelope`, a terrain cell is drawn when its closed plan square meets no stated extent of
   a record that covers or stands on the ground (every kind with an extent but terrain and
-  districts), each grown by the capsule radius, 340 mm. An extent contains everything its record
+  districts), each grown by the capsule radius. An extent contains everything its record
   generates, so a kept cell is one nothing covers, and a capsule stood anywhere on it meets none of
   those records in plan, at any height. That is the city descriptor's capsule clearance claim. The
-  radius is `CAPSULE_RADIUS_MM` until the descriptor states it as a structured field;
-  `test/capsule-clearance.test.ts` fails if the descriptor's text changes.
+  radius is the `radius_mm` measure the descriptor's nav_envelope contract states for
+  `capsule_clearance` (340 mm for city version 2), carried into the generated table; core restates
+  no number.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `segment_surface`, `kerb_offset`,
@@ -218,8 +221,8 @@ padding. This is ADR-0010's correction, carried over from OPM.
 The header carries:
 
 - the tile record and its inputs digest;
-- the grammars, each with its pin, declared semantics, frame (`city_local` for city version 2)
-  and subject identity;
+- the grammars, each with its pin, declared semantics, frame (`city_local` for city version 2),
+  subject identity and external references;
 - every record with its digest, stated identity, membership and grammar;
 - per projection, its contract, the triangle digest, the origins, the counts and one entry per
   record.

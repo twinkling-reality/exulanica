@@ -113,6 +113,7 @@ export function documentOf(header: OwdHeader): Uint8Array {
     grammars: header.grammars.map((grammar, index) => ({
       declared_semantics: grammar.declared_semantics,
       descriptor_sha256: grammar.descriptor_sha256,
+      external: grammar.external,
       grammar_id: grammar.grammar_id,
       grammar_version: grammar.grammar_version,
       halo: listed(index, 'halo'),

@@ -12,11 +12,22 @@ export function grammarTableFromSources(): unknown {
     grammar_id: string;
     grammar_version: number;
     frame: unknown;
+    projections: { projection: string; preserved: { property: string; measures?: unknown }[] }[];
   };
+  // The integer measures each projection's contract states for a preserved property, by projection
+  // and property; rows with no measures, and projections with none, are left out.
+  const measures: { [projection: string]: { [property: string]: unknown } } = {};
+  for (const projection of descriptor.projections) {
+    for (const row of projection.preserved) {
+      if (row.measures === undefined) continue;
+      measures[projection.projection] = { ...measures[projection.projection], [row.property]: row.measures };
+    }
+  }
   return {
     grammar_id: descriptor.grammar_id,
     grammar_version: descriptor.grammar_version,
     frame: descriptor.frame,
+    measures,
     shapes,
   };
 }

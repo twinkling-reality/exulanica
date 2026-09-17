@@ -15,7 +15,8 @@
  *           "declared_semantics": {"subject_kind", "admissible_uses", "plane"},
  *           "subject_identity": <the admitted identity every record identity derives from>,
  *           "owned": [<record payload>, ...],
- *           "halo": [<record payload>, ...]
+ *           "halo": [<record payload>, ...],
+ *           "external": [{"identity": <uuid>, "kind": <record kind>}, ...]
  *         }, ...
  *       ]
  *     }
@@ -25,7 +26,10 @@
  * states exactly the pins `tile.grammar_versions` states, in the same order, so the digest that
  * keys the bake covers every grammar and every descriptor the records came from. `owned` and `halo`
  * are each sorted by kind, then version, then identity, each identity once, and no identity is in
- * both. A bake draws owned records only and reads halo records for context.
+ * both. A bake draws owned records only and reads halo records for context. `external` lists, sorted
+ * by identity and each once, the subjects a carried record names that the tile does not carry, with
+ * their kinds; no identity is both carried and external. A reference is never required to resolve
+ * inside the document.
  *
  * THERE IS NO DEFAULT BRANCH. An unknown key is an error, a missing key is an error, an integer
  * out of its grammar bound is an error, an unknown record kind or grammar version is an error, and
@@ -38,7 +42,8 @@
  * tile's `catalog_digest` pins:
  *   - the grammar's named rules (`record-shapes.ts` says why core cannot);
  *   - that a ring is simple and counter-clockwise, beyond holding enough integer pairs;
- *   - that a reference resolves, or that an identity is its rule's derivation;
+ *   - that a reference resolves, carried or external, that every external entry is named, or that
+ *     an identity is its rule's derivation;
  *   - that a key resolves in a catalog. Core carries no catalog, by design;
  *   - that the declared semantics are the ones the descriptor states;
  *   - that membership follows the tile's ownership and halo rules. Core reads the membership the
@@ -81,6 +86,12 @@ export interface DeclaredSemantics {
   readonly plane: string;
 }
 
+/** A subject a carried record names that the tile does not carry. */
+export interface ExternalReference {
+  readonly identity: string;
+  readonly kind: string;
+}
+
 export interface GrammarEntry {
   readonly grammar_id: string;
   readonly grammar_version: number;
@@ -89,6 +100,7 @@ export interface GrammarEntry {
   readonly subject_identity: string;
   readonly owned: readonly RecordPayload[];
   readonly halo: readonly RecordPayload[];
+  readonly external: readonly ExternalReference[];
 }
 
 export interface TileDocument {
@@ -390,6 +402,37 @@ function readList(table: GrammarTable, value: unknown, where: string): RecordPay
 }
 
 /**
+ * A grammar entry's external references: sorted by identity, each once, each naming a record kind of
+ * `table` that states an identity, and none of them an identity in `carried`.
+ */
+export function validateExternal(
+  table: GrammarTable,
+  value: unknown,
+  where: string,
+  carried: ReadonlySet<string>,
+): ExternalReference[] {
+  const references = arrayAt(value, where).map((item, index): ExternalReference => {
+    const at = `${where}[${index}]`;
+    const reference = objectAt(item, at);
+    exactKeys(reference, ['identity', 'kind'], at);
+    const identity = stringMatching(reference.identity, IDENTITY_PATTERN, 'a canonical lowercase UUID', `${at}.identity`);
+    if (typeof reference.kind !== 'string') fail(`${at}.kind`, 'is not a record kind');
+    const shape = shapeOf(table, reference.kind, `${at}.kind`);
+    if (shape.identity === undefined) fail(`${at}.kind`, `is a ${reference.kind}, which states no identity`);
+    if (carried.has(identity)) fail(at, `names ${identity}, which the document carries`);
+    return { identity, kind: reference.kind };
+  });
+  references.forEach((reference, index) => {
+    if (index > 0) {
+      if (compareCodeUnits(references[index - 1]!.identity, reference.identity) >= 0) {
+        fail(`${where}[${index}]`, 'is not after the reference before it by identity, each once');
+      }
+    }
+  });
+  return references;
+}
+
+/**
  * Read and validate a tile document from its canonical bytes. Returns the document unchanged in
  * shape, or throws `TileDocumentError` or `CanonicalJsonError` naming the first problem.
  */
@@ -413,7 +456,7 @@ export function readTileDocument(bytes: Uint8Array): TileDocument {
     const entry = objectAt(value, where);
     exactKeys(
       entry,
-      ['declared_semantics', 'descriptor_sha256', 'grammar_id', 'grammar_version', 'halo', 'owned', 'subject_identity'],
+      ['declared_semantics', 'descriptor_sha256', 'external', 'grammar_id', 'grammar_version', 'halo', 'owned', 'subject_identity'],
       where,
     );
     const pin = pins[index]!;
@@ -429,11 +472,14 @@ export function readTileDocument(bytes: Uint8Array): TileDocument {
     const subject = stringMatching(entry.subject_identity, IDENTITY_PATTERN, 'a canonical lowercase UUID', `${where}.subject_identity`);
     const owned = readList(table, entry.owned, `${where}.owned`);
     const halo = readList(table, entry.halo, `${where}.halo`);
+    const carried = new Set<string>();
     for (const record of [...owned, ...halo]) {
       const identity = statedIdentity(table, record)!;
       if (identities.has(identity)) fail(where, `identity ${identity} is stated by two records`);
       identities.add(identity);
+      carried.add(identity);
     }
+    const external = validateExternal(table, entry.external, `${where}.external`, carried);
     return {
       grammar_id: table.grammar_id,
       grammar_version: table.grammar_version,
@@ -442,6 +488,7 @@ export function readTileDocument(bytes: Uint8Array): TileDocument {
       subject_identity: subject,
       owned,
       halo,
+      external,
     };
   });
   return { tile, grammars };

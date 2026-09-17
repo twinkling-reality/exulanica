@@ -83,10 +83,11 @@ import {
   statedIdentity,
   tableOf,
   TileDocumentError,
+  validateExternal,
   validateRecord,
   validateSemantics,
 } from './document.js';
-import type { DeclaredSemantics, Membership, RecordPayload } from './document.js';
+import type { DeclaredSemantics, ExternalReference, Membership, RecordPayload } from './document.js';
 import { NEEDS, PROJECTION_DEFINITIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
 import type { Need, ProjectionDefinition } from './expand.js';
 import {
@@ -186,6 +187,8 @@ export interface OwdGrammar {
   readonly subject_identity: string;
   /** The frame the grammar version states its coordinates in. */
   readonly frame: GrammarFrame;
+  /** The subjects this grammar entry's records name and the tile does not carry, sorted by identity. */
+  readonly external: readonly ExternalReference[];
 }
 
 export interface OwdProjection {
@@ -356,6 +359,7 @@ function headerFor(
       declared_semantics: grammar.declared_semantics,
       subject_identity: grammar.subject_identity,
       frame: tableOf(grammar).frame,
+      external: grammar.external,
     })),
     records: tile.records.map((record) => ({
       kind: record.payload.kind,
@@ -621,7 +625,7 @@ function checkHeader(value: unknown): OwdHeader {
     const grammar = objectAt(entry, at);
     keysAre(
       grammar,
-      ['declared_semantics', 'descriptor_sha256', 'frame', 'grammar_id', 'grammar_version', 'subject_identity'],
+      ['declared_semantics', 'descriptor_sha256', 'external', 'frame', 'grammar_id', 'grammar_version', 'subject_identity'],
       at,
     );
     const pin = pins[index];
@@ -662,6 +666,11 @@ function checkHeader(value: unknown): OwdHeader {
       if (!IDENTITY_PATTERN.test(record.identity)) fail(`${at}.identity is not a UUID`);
     }
     return { ...payload, sha256, identity: record.identity, grammar, membership };
+  });
+  grammars.forEach((table, index) => {
+    const carried = new Set(records.filter((record) => record.grammar === index).map((record) => record.identity));
+    const entry = (header.grammars as readonly JsonObject[])[index]!;
+    withRefusal(() => validateExternal(table, entry.external, `grammars[${index}].external`, carried));
   });
   records.forEach((record, index) => {
     if (index > 0) {

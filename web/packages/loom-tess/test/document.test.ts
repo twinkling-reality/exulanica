@@ -3,7 +3,8 @@
  * the conformance fixture, and every one must be refused by name.
  */
 import { describe, expect, it } from 'vitest';
-import { bakeTile } from '../src/core/bake.js';
+import { bakeTile, documentOf, verifyOwd } from '../src/core/bake.js';
+import { decodeOwd } from '../src/core/owd.js';
 import { CanonicalJsonError, readTileDocument, TessellationError, TileDocumentError } from '../src/core/index.js';
 import { AsciiError } from '../src/core/ascii.js';
 import { nodeSha256 } from '../src/node/sha256.js';
@@ -24,6 +25,8 @@ const refuses = (bytes: Uint8Array, pattern: RegExp): void => {
 };
 
 const owned = (d: any): any[] => d.grammars[0].owned;
+/** A street node no tile of the fixture carries. */
+const EXTERNAL_NODE = { identity: '00000000-0000-5000-8000-000000000001', kind: 'city.street_node' };
 const first = (d: any, kind: string): any => recordsOf(d, kind)[0].fields;
 
 describe('the tile document reader', () => {
@@ -108,6 +111,14 @@ describe('the tile document reader', () => {
       ['uses out of order', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['nav_envelope', 'render_batch']; }, /in the order/],
       ['a repeated use', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['render_batch', 'render_batch']; }, /repeats an item/],
       ['a subject identity that is not a UUID', (d: any) => { d.grammars[0].subject_identity = 'city'; }, /subject_identity: is not a canonical lowercase UUID/],
+      ['no external list', (d: any) => { delete d.grammars[0].external; }, /missing keys \["external"\]/],
+      ['an external reference with another key', (d: any) => { d.grammars[0].external = [{ ...EXTERNAL_NODE, name: 'x' }]; }, /unknown keys \["name"\]/],
+      ['an external reference that is not a UUID', (d: any) => { d.grammars[0].external = [{ ...EXTERNAL_NODE, identity: 'node-9' }]; }, /external\[0\].identity: is not a canonical/],
+      ['an external reference to no record kind', (d: any) => { d.grammars[0].external = [{ ...EXTERNAL_NODE, kind: 'city.lawn' }]; }, /record kind "city.lawn"/],
+      ['an external reference to a kind with no identity', (d: any) => { d.grammars[0].external = [{ ...EXTERNAL_NODE, kind: 'city.tile' }]; }, /states no identity/],
+      ['an external reference the document carries', (d: any) => { d.grammars[0].external = [{ identity: first(d, 'city.street_node').identity, kind: 'city.street_node' }]; }, /which the document carries/],
+      ['external references out of order', (d: any) => { d.grammars[0].external = [{ ...EXTERNAL_NODE, identity: 'ffffffff-0000-5000-8000-000000000000' }, EXTERNAL_NODE]; }, /by identity, each once/],
+      ['an external reference twice', (d: any) => { d.grammars[0].external = [EXTERNAL_NODE, EXTERNAL_NODE]; }, /by identity, each once/],
     ] as [string, (d: any) => void, RegExp][])('%s', (_name, mutate, pattern) => {
       refuses(broken(mutate), pattern);
     });
@@ -125,6 +136,16 @@ describe('the bake', () => {
     const index = baked.tessellation.records.findIndex((record) => record.payload.kind === 'city.terrain');
     return baked.tessellation.projections[projection]!.entries[index];
   };
+
+  it('reads an external reference, never requires it to resolve, and digests no triangle of it', async () => {
+    const withExternal = broken((d) => { d.grammars[0].external = [EXTERNAL_NODE]; });
+    expect(readTileDocument(withExternal).grammars[0]!.external).toEqual([EXTERNAL_NODE]);
+    const [plain, referenced] = [await bake(fixtureBytes()), await bake(withExternal)];
+    expect(Object.fromEntries(referenced.triangleDigests)).toEqual(Object.fromEntries(plain.triangleDigests));
+    expect(referenced.container).not.toEqual(plain.container);
+    expect(documentOf(decodeOwd(referenced.container).header)).toEqual(withExternal);
+    await expect(verifyOwd(referenced.container, nodeSha256)).resolves.toBeDefined();
+  });
 
   it('refuses a level of detail it does not draw', async () => {
     await expect(bake(broken((d) => { d.tile.fields.lod = 1; }))).rejects.toThrow(/level of detail 0 only/);
@@ -155,7 +176,8 @@ describe('the bake', () => {
 
   it('keeps support a capsule radius clear of a record that stands just outside a cell', async () => {
     // A lamp's stated extent 200 mm, then 400 mm, east of the tile's south-east cell, which it
-    // never meets. Within the 340 mm radius the cell is left out; beyond it the cell is kept.
+    // never meets. Within the grammar's 340 mm capsule radius the cell is left out; beyond it the
+    // cell is kept.
     const nearEast = (gap: number) => broken((d) => {
       Object.assign(first(d, 'city.street_furniture').extent, {
         min_x_mm: 128000 + gap, max_x_mm: 128000 + gap + 100, min_y_mm: 4000, max_y_mm: 4100,

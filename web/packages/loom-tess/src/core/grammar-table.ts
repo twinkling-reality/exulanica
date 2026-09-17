@@ -58,10 +58,23 @@ export interface GrammarFrame {
   readonly metric_class: string;
 }
 
+/**
+ * The integer measures a grammar version's projection contracts state for a preserved property,
+ * by projection, then property, then measure name: `capsule_clearance` for `nav_envelope` states
+ * `eye_height_mm`, `height_mm` and `radius_mm`. A consumer builds to these numbers and to no
+ * others; `exulanica.grammar.contract.PROPERTY_MEASURES` says which properties are measured.
+ */
+export interface ContractMeasures {
+  readonly [projection: string]: {
+    readonly [property: string]: { readonly [measure: string]: number };
+  };
+}
+
 export interface GrammarTable {
   readonly grammar_id: string;
   readonly grammar_version: number;
   readonly frame: GrammarFrame;
+  readonly measures: ContractMeasures;
   readonly shapes: {
     readonly nested: readonly RecordShape[];
     readonly records: readonly RecordShape[];

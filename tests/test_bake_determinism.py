@@ -88,13 +88,6 @@ TSX = WEB.joinpath("node_modules", ".bin", "tsx")
 #: The record kinds whose stated extent does not cover the ground: a terrain patch is the ground,
 #: and a district is a region. Every other kind with an extent covers or stands on the ground.
 NOT_GROUND_COVER = frozenset({"city.terrain", "city.district"})
-#: The capsule the city descriptor's nav_envelope contract keeps clear space for, as text until it
-#: is a structured field; the tessellator's CAPSULE_RADIUS_MM is held to the same text.
-CAPSULE_STATEMENT = (
-    "Clear space for a capsule of 340 mm radius and 1900 mm height, eye at 1620 mm, which is what "
-    "the visual gate measures."
-)
-CAPSULE_RADIUS_MM = 340
 
 
 def fixture_document() -> TileDocument:
@@ -303,6 +296,7 @@ def test_the_tessellator_reads_the_grammars_own_table():
             "grammar_id": descriptor["grammar_id"],
             "grammar_version": descriptor["grammar_version"],
             "frame": descriptor["frame"],
+            "measures": descriptor_measures(),
             "shapes": described,
         }
     ]
@@ -438,6 +432,9 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     assert header["tile_inputs_digest"] == tile_inputs_digest(document.tile)
     assert [g["frame"] for g in header["grammars"]] == [descriptor["frame"]]
     assert [g["subject_identity"] for g in header["grammars"]] == [grammar.subject_identity]
+    assert [g["external"] for g in header["grammars"]] == [
+        [{"identity": identity, "kind": kind} for identity, kind in grammar.external]
+    ]
 
     stated = {record.identity: "owned" for record in grammar.owned}  # type: ignore[attr-defined]
     stated |= {record.identity: "halo" for record in grammar.halo}  # type: ignore[attr-defined]
@@ -463,12 +460,19 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     assert drawn == ["city.terrain"]
 
 
-def test_the_capsule_radius_is_the_one_the_descriptor_states():
+def descriptor_measures() -> dict[str, dict[str, dict[str, int]]]:
+    """Every integer measure the city descriptor's projection contracts state, by projection."""
     descriptor = json.loads(CITY_DESCRIPTOR_PATH.read_bytes())
-    nav = next(p for p in descriptor["projections"] if p["projection"] == "nav_envelope")
-    clearance = next(row for row in nav["preserved"] if row["property"] == "capsule_clearance")
-    assert clearance["statement"] == CAPSULE_STATEMENT
-    assert f"{CAPSULE_RADIUS_MM} mm radius" in CAPSULE_STATEMENT
+    measures: dict[str, dict[str, dict[str, int]]] = {}
+    for projection in descriptor["projections"]:
+        for row in projection["preserved"]:
+            if "measures" in row:
+                measures.setdefault(projection["projection"], {})[row["property"]] = row["measures"]
+    return measures
+
+
+def capsule_radius_mm() -> int:
+    return descriptor_measures()["nav_envelope"]["capsule_clearance"]["radius_mm"]
 
 
 def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
@@ -476,6 +480,8 @@ def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
     _, container = _bake(tmp_path, "fixture.owd")
     header = _header(container)
     records = fixture_records()
+    radius = capsule_radius_mm()
+    assert radius > 0
     cover = []
     for record in records:
         shape = CITY_SHAPES_BY_TYPE[type(record)]
@@ -483,10 +489,10 @@ def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
             extent = getattr(record, shape.extent_field)
             cover.append(
                 (
-                    extent.min_x_mm - CAPSULE_RADIUS_MM,
-                    extent.min_y_mm - CAPSULE_RADIUS_MM,
-                    extent.max_x_mm + CAPSULE_RADIUS_MM,
-                    extent.max_y_mm + CAPSULE_RADIUS_MM,
+                    extent.min_x_mm - radius,
+                    extent.min_y_mm - radius,
+                    extent.max_x_mm + radius,
+                    extent.max_y_mm + radius,
                 )
             )
     terrain = fixture_terrain()

@@ -20,7 +20,7 @@ const source = [
   ' * THE CITY GRAMMAR, VERSION 2, AS DATA. GENERATED: do not edit by hand.',
   ' *',
   ' * Written by `test/write-grammar-table.ts` from `tests/fixtures/city-v2/record-shapes.json`',
-  " * (the grammar's own `describe_shapes`) and the frame of",
+  " * (the grammar's own `describe_shapes`) and the frame and contract measures of",
   ' * `exulanica/grammar/grammars/city/city.v2.json`. `test/grammar-table.test.ts` and',
   ' * `tests/test_bake_determinism.py` hold it equal to both.',
   ' *',

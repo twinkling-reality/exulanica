@@ -67,9 +67,9 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
       preserves: [
         'the integer vertex positions of every surface this version draws that a person may be supported by',
         'support height at a plan point inside a triangle, by linear interpolation over them',
-        'capsule clearance in plan: every support triangle lies more than 340 mm, the capsule radius, from '
-          + 'the stated plan extent of every other record the tile carries that covers or stands on the ground, '
-          + 'at any height, so a capsule of that radius stood anywhere on it meets none of them',
+        'capsule clearance in plan: every support triangle lies more than the capsule radius its grammar '
+          + 'measures from the stated plan extent of every other record the tile carries that covers or stands '
+          + 'on the ground, at any height, so a capsule of that radius stood anywhere on it meets none of them',
       ],
       admissible_uses: ['sampling support height'],
       inadmissible_uses: [
@@ -93,16 +93,6 @@ export const MATERIALISED_PROJECTIONS: readonly ProjectionName[] = PROJECTION_DE
  * a tile at any other level is refused rather than drawn at this one and labelled as the other.
  */
 export const MATERIALISED_LOD = 0;
-
-/**
- * The capsule a support surface keeps clear space for, by its radius in millimetres. City grammar
- * version 2 states it in its nav_envelope contract as text: "Clear space for a capsule of 340 mm
- * radius and 1900 mm height, eye at 1620 mm". Until the descriptor states it as a structured
- * integer field, it is this named constant, and `test/capsule-clearance.test.ts` and
- * `tests/test_bake_determinism.py` fail when that text changes. The height and eye need no
- * constant: the carve is in plan and ignores height, which only ever leaves out more.
- */
-export const CAPSULE_RADIUS_MM = 340;
 
 /**
  * Why an entry is unavailable, each named for what would have to exist. The first is a fact about
@@ -153,6 +143,12 @@ export interface ExpandContext {
    * the ground.
    */
   readonly groundCover: readonly PlanBox[];
+  /**
+   * The capsule radius the record's grammar measures for `nav_envelope`'s `capsule_clearance`, or
+   * undefined when it measures none, which an expander claiming clearance refuses. The height and
+   * the eye are not read: the carve is in plan and ignores height, which only ever leaves out more.
+   */
+  readonly capsuleRadiusMm: number | undefined;
 }
 
 export interface SurfaceExpansion {
@@ -271,7 +267,8 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
  *
  * This version cannot draw the surfaces that cover terrain, so it takes the exact conservative
  * reading, in integers: a cell is left out when its closed plan square meets the stated extent of
- * any record that covers or stands on the ground, grown by `CAPSULE_RADIUS_MM` on every side. An
+ * any record that covers or stands on the ground, grown on every side by the capsule radius the
+ * terrain's grammar measures (`capsule_clearance`, `radius_mm`, in its nav_envelope contract). An
  * extent contains everything its record generates, so a kept cell is a cell nothing covers, and a
  * point outside a box grown by the radius on each axis is more than the radius from the box, so a
  * capsule stood anywhere on a kept cell meets no such record in plan, at any height. Support never
@@ -279,11 +276,15 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
  * rules are fixed by `TESSELLATOR_SOURCE_VERSION`.
  */
 function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
+  const radius = context.capsuleRadiusMm;
+  if (radius === undefined) {
+    throw new TessellationError('a support surface whose grammar measures no capsule radius, so no clearance can be kept');
+  }
   const clear = context.groundCover.map((box) => ({
-    min_x: safe(box.min_x - CAPSULE_RADIUS_MM, 'a clearance extent'),
-    min_y: safe(box.min_y - CAPSULE_RADIUS_MM, 'a clearance extent'),
-    max_x: safe(box.max_x + CAPSULE_RADIUS_MM, 'a clearance extent'),
-    max_y: safe(box.max_y + CAPSULE_RADIUS_MM, 'a clearance extent'),
+    min_x: safe(box.min_x - radius, 'a clearance extent'),
+    min_y: safe(box.min_y - radius, 'a clearance extent'),
+    max_x: safe(box.max_x + radius, 'a clearance extent'),
+    max_y: safe(box.max_y + radius, 'a clearance extent'),
   }));
   return terrainCells(fields, context, clear);
 }

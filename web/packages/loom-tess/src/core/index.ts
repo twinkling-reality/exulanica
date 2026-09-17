@@ -9,9 +9,8 @@ export { BAKE_PARAMETERS, bakeTile, documentOf, verifyOwd } from './bake.js';
 export type { Bake, Sha256Hex } from './bake.js';
 export { CanonicalJsonError, canonicalBytes, canonicalJson } from './canonical-json.js';
 export { MEMBERSHIPS, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
-export type { DeclaredSemantics, GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
+export type { DeclaredSemantics, ExternalReference, GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
 export {
-  CAPSULE_RADIUS_MM,
   MATERIALISED_LOD,
   MATERIALISED_PROJECTIONS,
   NEEDS,
