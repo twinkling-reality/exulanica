@@ -25,7 +25,16 @@ import {
   type PreparedTextureSet,
   type TileMaterialReference,
 } from './texture-materials.js';
-import { rendererToTile, tileNavigation, tileToRenderer, type TileExtentMm, type TileNavigation, type Vec3 } from './tile-navigation.js';
+import {
+  rendererToTile,
+  tileCapsule,
+  tileNavigation,
+  tileToRenderer,
+  unsupportedFrame,
+  type TileExtentMm,
+  type TileNavigation,
+  type Vec3,
+} from './tile-navigation.js';
 
 /**
  * One baked `.owd` tile, drawn.
@@ -295,6 +304,10 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     if (error instanceof OwdError) throw new GeneratedTileRefusal(`Tile ${sources.name} refused: ${error.message}`);
     throw error;
   }
+  const frame = unsupportedFrame(decoded.header.grammars);
+  if (frame !== null) throw new GeneratedTileRefusal(`Tile ${sources.name} refused: ${frame}`);
+  const capsule = tileCapsule(decoded.header.grammars);
+  if (typeof capsule === 'string') throw new GeneratedTileRefusal(`Tile ${sources.name} refused: ${capsule}`);
   const render = decoded.projections.find((projection) => projection.header.name === 'render_batch');
   if (render === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no render_batch.`);
   const surface = absoluteSurfaceCoordinates(render);
@@ -303,6 +316,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
+    capsule,
   );
   const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
     .sort((a, b) => a.firstTriangle - b.firstTriangle);

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { atlasVec3, parseTextureSetManifest, resolveGroundMovement, type TextureSetDigest } from '@exulanica/atlas-core';
-import { PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection } from '@exulanica/loom-tess/core';
+import { GRAMMAR_TABLES, PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection, type GrammarTable } from '@exulanica/loom-tess/core';
 import {
   GeneratedTileRefusal,
   MATERIAL_NONE_EXISTS_REASON,
@@ -15,8 +15,11 @@ import {
   SUPPORT_SAMPLE_SPACING_M,
   navEnvelopeSupport,
   rendererToTile,
+  tileCapsule,
   tileNavigation,
   tileToRenderer,
+  unsupportedFrame,
+  type TileCapsule,
 } from '../src/playcanvas/generated-tile/tile-navigation.js';
 
 // Relative to web/, where the suite runs.
@@ -25,6 +28,8 @@ const manifest = parseTextureSetManifest(new Uint8Array(readFileSync('../assets/
 const subtle = webcrypto.subtle as unknown as TextureSetDigest;
 const sha256 = async (bytes: Uint8Array): Promise<string> => createHash('sha256').update(bytes).digest('hex');
 const noSets = async (): Promise<Uint8Array> => { throw new Error('this test fetches no texture set'); };
+/** The capsule city version 2 states, for the hand-built envelopes below. */
+const CITY_V2_CAPSULE: TileCapsule = { radiusM: 0.34, heightM: 1.9, eyeHeightM: 1.62 };
 
 let baked: Uint8Array;
 let tile: LoadedGeneratedTile;
@@ -104,6 +109,8 @@ describe('standing on the tile\'s own nav_envelope', () => {
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
+    // The capsule is the one city version 2 states for the envelope's capsule clearance.
+    expect(navigation.capsule).toEqual(CITY_V2_CAPSULE);
     expect(world.eyeHeight).toBe(1.62);
     expect(world.cameraRadius).toBe(0.34);
     expect(world.surfaceSampleSpacing).toBe(SUPPORT_SAMPLE_SPACING_M);
@@ -137,7 +144,7 @@ describe('standing on the tile\'s own nav_envelope', () => {
 
 describe('a tile with no nav_envelope', () => {
   const extent = { min: [-4000, -4000, -200] as const, max: [8000, 8000, 640] as const };
-  const navigation = tileNavigation(undefined, extent);
+  const navigation = tileNavigation(undefined, extent, CITY_V2_CAPSULE);
 
   it('has no support anywhere, says so, and opens at a stated viewpoint outside the tile', () => {
     expect(navigation.support).toEqual({ state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' });
@@ -158,6 +165,42 @@ describe('a tile with no nav_envelope', () => {
     expect(resolution.recovered).toBe(true);
     expect(resolution.recoveryReason).toBe('no-surface');
     expect([resolution.position.x, resolution.position.y, resolution.position.z]).toEqual([start.x, start.y, start.z]);
+  });
+});
+
+describe('the frame and the capsule a tile\'s grammar states', () => {
+  const city = GRAMMAR_TABLES.find((table) => table.grammar_id === 'city' && table.grammar_version === 2)!;
+  const named = { grammar_id: 'city', grammar_version: 2 };
+
+  it('builds the person to the grammar\'s own capsule clearance measures, and to no other numbers', () => {
+    expect(tileCapsule([named])).toEqual(CITY_V2_CAPSULE);
+    const wider: GrammarTable = {
+      ...city,
+      measures: { nav_envelope: { capsule_clearance: { eye_height_mm: 1500, height_mm: 1800, radius_mm: 400 } } },
+    };
+    expect(tileCapsule([named], [wider])).toEqual({ radiusM: 0.4, heightM: 1.8, eyeHeightM: 1.5 });
+    const loaded = tileNavigation(undefined, { min: [0, 0, 0], max: [1000, 1000, 0] }, { radiusM: 0.4, heightM: 1.8, eyeHeightM: 1.5 });
+    expect([loaded.world.eyeHeight, loaded.world.cameraRadius, loaded.start.y]).toEqual([1.5, 0.4, 1.5]);
+  });
+
+  it('refuses to guess a capsule the grammar does not state, or two that disagree', () => {
+    expect(tileCapsule([{ grammar_id: 'city', grammar_version: 9 }])).toMatch(/has no grammar table/);
+    expect(tileCapsule([named], [{ ...city, measures: {} }])).toMatch(/states no nav_envelope capsule_clearance/);
+    const other: GrammarTable = {
+      ...city, grammar_id: 'other',
+      measures: { nav_envelope: { capsule_clearance: { eye_height_mm: 1620, height_mm: 1900, radius_mm: 300 } } },
+    };
+    expect(tileCapsule([named, { grammar_id: 'other', grammar_version: 2 }], [city, other])).toMatch(/different capsule clearance/);
+    expect(tileCapsule([])).toMatch(/names no grammar/);
+  });
+
+  it('places only city_local millimetres with x east, y north and z up', () => {
+    const header = decodeOwd(baked).header;
+    expect(unsupportedFrame(header.grammars)).toBeNull();
+    const frame = header.grammars[0]!.frame;
+    for (const changed of [{ ...frame, name: 'wgs84' }, { ...frame, units: 'm' }, { ...frame, axes: 'x_north_y_east_z_up' }]) {
+      expect(unsupportedFrame([{ ...header.grammars[0]!, frame: changed }])).toMatch(/this runtime places only city_local/);
+    }
   });
 });
 
@@ -223,7 +266,7 @@ describe('support from a nav_envelope', () => {
   });
 
   it('stands the capsule on it and lets a 150 mm kerb be climbed but not a 200 mm step', () => {
-    const kerb = tileNavigation(envelope(150), extent);
+    const kerb = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE);
     expect(kerb.viewpointOnly).toBe(false);
     expect(kerb.support).toEqual({ state: 'nav_envelope', triangles: 6 });
     expect(kerb.start.y).toBeCloseTo(1.62, 12);
@@ -235,7 +278,7 @@ describe('support from a nav_envelope', () => {
     const climbed = walk(kerb);
     expect(climbed.recovered).toBe(false);
     expect(climbed.position.y).toBeCloseTo(0.15 + 1.62, 12);
-    const wall = walk(tileNavigation(envelope(200), extent));
+    const wall = walk(tileNavigation(envelope(200), extent, CITY_V2_CAPSULE));
     expect(wall.recovered).toBe(true);
     expect(wall.recoveryReason).toBe('unsafe-surface');
   });

@@ -35,11 +35,14 @@ export {
   MATERIAL_PLACEMENT_UNSTATED,
   loadGeneratedTile,
 } from './tile-runtime.js';
-export type { TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';
+export type { TileCapsule, TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';
 export {
   SUPPORT_SAMPLE_SPACING_M,
+  TILE_FRAME,
   navEnvelopeSupport,
   rendererToTile,
+  tileCapsule,
   tileNavigation,
   tileToRenderer,
+  unsupportedFrame,
 } from './tile-navigation.js';

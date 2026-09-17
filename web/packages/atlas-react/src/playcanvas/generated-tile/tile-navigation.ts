@@ -1,6 +1,4 @@
 import {
-  DEFAULT_CAMERA_RADIUS_AU,
-  DEFAULT_EYE_HEIGHT_AU,
   DEFAULT_MAXIMUM_SLOPE_DEGREES,
   DEFAULT_MAXIMUM_STEP_HEIGHT_AU,
   atlasVec3,
@@ -8,7 +6,13 @@ import {
   type NavigationWorld,
   type SurfaceSample,
 } from '@exulanica/atlas-core';
-import { absoluteVertices, type DecodedProjection } from '@exulanica/loom-tess/core';
+import {
+  GRAMMAR_TABLES,
+  absoluteVertices,
+  type DecodedProjection,
+  type GrammarTable,
+  type OwdGrammar,
+} from '@exulanica/loom-tess/core';
 import type { CameraState } from '../controls.js';
 
 /**
@@ -20,15 +24,72 @@ import type { CameraState } from '../controls.js';
  * answers "no surface" everywhere, the opening pose is a stated viewpoint rather than a stance, and
  * any attempt to walk gets the app's own "no walkable surface" notice.
  *
- * THE PLAYER is the harness's capsule: 0.34 m radius, eye at 1.62 m, support resampled every
- * 0.05 m along a move, steps up to 0.18 m (a kerb is 100 to 180 mm) and slopes up to 12 degrees.
- * The capsule's 1.9 m height needs overhead clearance from `collision_proxy`, which no tile carries
- * yet; until it does, the world has no blockers and says so in `collisionState`.
+ * THE PLAYER is the capsule the tile's grammar states for its envelope's `capsule_clearance`
+ * (city version 2: 340 mm radius, 1900 mm tall, eye at 1620 mm), because that is the capsule the
+ * envelope was carved for; see {@link tileCapsule}. Support is resampled every 0.05 m along a move,
+ * and the Atlas controller's own comfort limits apply (steps up to 0.18 m, slopes up to 12 degrees).
+ * The capsule's height needs overhead clearance from `collision_proxy`, which no tile carries yet;
+ * until it does, the world has no blockers and says so in `collisionState`.
  *
- * FRAMES. Tile records are `city_local`: x east, y north, z up, integer millimetres. The renderer is
- * metres with +Y up, and a tile point (x, y, z) is drawn at (x, z, -y) / 1000: a proper rotation,
- * so winding and handedness are kept and north is the camera's yaw-0 direction.
+ * FRAMES. Tile records are `city_local`: x east, y north, z up, integer millimetres, and a grammar
+ * that states any other frame is refused ({@link unsupportedFrame}). The renderer is metres with +Y
+ * up, and a tile point (x, y, z) is drawn at (x, z, -y) / 1000: a proper rotation, so winding and
+ * handedness are kept and north is the camera's yaw-0 direction.
  */
+
+/** The one frame {@link tileToRenderer} is written for. */
+export const TILE_FRAME = Object.freeze({ name: 'city_local', units: 'mm', axes: 'x_east_y_north_z_up' });
+
+/** Why a tile's grammars state a frame this runtime cannot place, or null when every one is `city_local`. */
+export function unsupportedFrame(grammars: readonly Pick<OwdGrammar, 'grammar_id' | 'grammar_version' | 'frame'>[]): string | null {
+  for (const grammar of grammars) {
+    const { name, units, axes } = grammar.frame;
+    if (name !== TILE_FRAME.name || units !== TILE_FRAME.units || axes !== TILE_FRAME.axes) {
+      return `Grammar ${grammar.grammar_id} version ${grammar.grammar_version} states frame ${name} (${units}, ${axes}); `
+        + `this runtime places only ${TILE_FRAME.name} (${TILE_FRAME.units}, ${TILE_FRAME.axes}).`;
+    }
+  }
+  return null;
+}
+
+/** The capsule a person is, in metres, as the grammar's nav_envelope contract measures it. */
+export interface TileCapsule {
+  readonly radiusM: number;
+  readonly heightM: number;
+  readonly eyeHeightM: number;
+}
+
+/**
+ * The capsule every grammar of a tile states for `nav_envelope`'s `capsule_clearance`, or the reason
+ * there is none to build to: a grammar this runtime has no table for, a grammar that states no such
+ * measure, or two grammars that state different capsules. The numbers come from the grammar table
+ * tess generates from the descriptor; nothing here restates one.
+ */
+export function tileCapsule(
+  grammars: readonly Pick<OwdGrammar, 'grammar_id' | 'grammar_version'>[],
+  tables: readonly GrammarTable[] = GRAMMAR_TABLES,
+): TileCapsule | string {
+  let capsule: TileCapsule | null = null;
+  for (const grammar of grammars) {
+    const name = `Grammar ${grammar.grammar_id} version ${grammar.grammar_version}`;
+    const table = tables.find((candidate) =>
+      candidate.grammar_id === grammar.grammar_id && candidate.grammar_version === grammar.grammar_version);
+    if (table === undefined) return `${name} has no grammar table, so its capsule clearance is unknown.`;
+    const measures = table.measures['nav_envelope']?.['capsule_clearance'];
+    const radius = measures?.['radius_mm'];
+    const height = measures?.['height_mm'];
+    const eye = measures?.['eye_height_mm'];
+    if (radius === undefined || height === undefined || eye === undefined) {
+      return `${name} states no nav_envelope capsule_clearance radius, height and eye height.`;
+    }
+    const stated = { radiusM: radius / MILLIMETRES, heightM: height / MILLIMETRES, eyeHeightM: eye / MILLIMETRES };
+    if (capsule !== null && (capsule.radiusM !== stated.radiusM || capsule.heightM !== stated.heightM || capsule.eyeHeightM !== stated.eyeHeightM)) {
+      return `${name} states a different capsule clearance from another grammar of the same tile.`;
+    }
+    capsule = stated;
+  }
+  return capsule ?? 'The tile names no grammar, so its capsule clearance is unknown.';
+}
 
 export const SUPPORT_SAMPLE_SPACING_M = 0.05;
 const MILLIMETRES = 1000;
@@ -161,13 +222,15 @@ export interface TileNavigation {
   readonly collisionState: TileCollisionState;
   /** True when `start` is a place to look from, not a place to stand. */
   readonly viewpointOnly: boolean;
+  /** The capsule the grammar states, which the world's eye height and radius are built to. */
+  readonly capsule: TileCapsule;
 }
 
-function world(surface: NavigationSurface, centre: readonly [number, number], radius: number): NavigationWorld {
+function world(surface: NavigationSurface, centre: readonly [number, number], radius: number, capsule: TileCapsule): NavigationWorld {
   return Object.freeze({
     surface,
-    eyeHeight: DEFAULT_EYE_HEIGHT_AU,
-    cameraRadius: DEFAULT_CAMERA_RADIUS_AU,
+    eyeHeight: capsule.eyeHeightM,
+    cameraRadius: capsule.radiusM,
     centre: atlasVec3(centre[0], 0, centre[1]),
     fieldRadius: radius,
     recoveryRadius: radius + FIELD_MARGIN_M,
@@ -197,9 +260,10 @@ const COLLISION_PENDING: TileCollisionState = {
 export function tileNavigation(
   navEnvelope: DecodedProjection | undefined,
   renderExtent: TileExtentMm,
+  capsule: TileCapsule,
 ): TileNavigation {
   if (navEnvelope === undefined || navEnvelope.header.triangle_count === 0) {
-    // A viewpoint south of the tile, looking north at its middle, eye 1.62 m above the city datum.
+    // A viewpoint south of the tile, looking north at its middle, at eye height above the city datum.
     // The world's centre is that same point, so the recovery a blocked move triggers returns the
     // camera exactly where it was rather than moving it somewhere that claims to be safe ground.
     const cx = (renderExtent.min[0] + renderExtent.max[0]) / 2;
@@ -207,13 +271,14 @@ export function tileNavigation(
     const cz = (renderExtent.min[2] + renderExtent.max[2]) / 2;
     const [vx, , vz] = tileToRenderer(cx, renderExtent.min[1] - VIEWPOINT_STANDOFF_MM, 0);
     const [tx, ty, tz] = tileToRenderer(cx, cy, cz);
-    const pitch = Math.atan2(ty - DEFAULT_EYE_HEIGHT_AU, Math.hypot(tx - vx, tz - vz));
+    const pitch = Math.atan2(ty - capsule.eyeHeightM, Math.hypot(tx - vx, tz - vz));
     return {
-      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES),
-      start: { x: vx, y: DEFAULT_EYE_HEIGHT_AU, z: vz, yaw: 0, pitch },
+      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule),
+      start: { x: vx, y: capsule.eyeHeightM, z: vz, yaw: 0, pitch },
       support: { state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' },
       collisionState: COLLISION_PENDING,
       viewpointOnly: true,
+      capsule,
     };
   }
   const support = navEnvelopeSupport(navEnvelope);
@@ -225,14 +290,15 @@ export function tileNavigation(
   for (let step = 0; step <= 400 && stance === null; step += 1) {
     const probeZ = sz - step * SUPPORT_SAMPLE_SPACING_M;
     const sample = support.surface.sample(sx, probeZ);
-    if (sample !== null) stance = { x: sx, y: sample.height + DEFAULT_EYE_HEIGHT_AU, z: probeZ, yaw: 0, pitch: 0 };
+    if (sample !== null) stance = { x: sx, y: sample.height + capsule.eyeHeightM, z: probeZ, yaw: 0, pitch: 0 };
   }
   if (stance === null) throw new Error('The nav_envelope has no support on its own north-south midline');
   return {
-    world: world(support.surface, [cx, cz], halfDiagonalM(extent)),
+    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule),
     start: stance,
     support: { state: 'nav_envelope', triangles: support.triangles },
     collisionState: COLLISION_PENDING,
     viewpointOnly: false,
+    capsule,
   };
 }
