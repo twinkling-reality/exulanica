@@ -21,11 +21,11 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * THE UV RULE. A surface coordinate is millimetres on the surface, measured the way the set's
  * header says its placement runs: for a vertical set, `s` along the wall and `t` downward; for a
  * horizontal set, `s` along the run and `t` across it. The texture repeats once per physical extent,
- * so a wall `w` mm wide repeats the tile `w / extent_u_mm` times at a record scale of one. The
- * record's `uv_scale_millionths` multiplies the repeat frequency, and `uv_rotation_urad` turns the
- * texture on the surface, both applied in millimetres before dividing by the extent, so a
- * non-square set (the kerb is 1800 by 450 mm) keeps its proportions under rotation. There is no
- * other scale anywhere, and no constant that guesses one.
+ * so a wall `w` mm wide repeats the tile `w / extent_u_mm` times at a record size of one. The
+ * record's size factor multiplies the repeat LENGTH (2,000,000 draws the set twice as large), and
+ * its rotation and offsets place the texture on the surface, all in millimetres before dividing by
+ * the repeat length, so a non-square set (the kerb is 1800 by 450 mm) keeps its proportions under
+ * rotation. There is no other scale anywhere, and no constant that guesses one.
  *
  * WHAT A SET BECOMES. base_color is uploaded as sRGB; normal, orm and height as linear bytes. The
  * orm map drives three material inputs from its three channels: occlusion (red), roughness (green,
@@ -36,11 +36,21 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * for whoever reports it. There is no default set, no flat colour and no retry with a looser check.
  */
 
-/** The material record fields a renderer reads. Everything else in the record is world data. */
+/**
+ * The material record fields a renderer reads. Everything else in the record is world data.
+ *
+ * Read as the city vocabulary's surface_material v2 states them (first cut, 2026-09-16), where the
+ * scale field is `uv_scale_millionths` and may be renamed so that it cannot be read as a frequency.
+ */
 export interface TileMaterialReference {
   readonly textureSetId: string;
-  readonly uvScaleMillionths: number;
-  readonly uvRotationUrad: number;
+  /** One repeat covers `extent * repeatSizeMillionths / 10^6` mm: 2,000,000 draws the set twice as large. */
+  readonly repeatSizeMillionths: number;
+  /** Positive turns the texture's u axis from +s toward +t. */
+  readonly rotationUrad: number;
+  /** Millimetres along the texture's own u and v axes, applied after the rotation. */
+  readonly offsetUMm: number;
+  readonly offsetVMm: number;
 }
 
 export type TileTextureResolution =
@@ -50,7 +60,13 @@ export type TileTextureResolution =
 const MILLIONTHS = 1_000_000;
 
 /**
- * UV for a surface point `s`, `t` millimetres from the surface's own origin.
+ * UV for a surface point `s`, `t` millimetres from the surface's own origin. THE ONE PLACE the
+ * record's texture placement is interpreted; a change to its meaning changes only this function.
+ *
+ * The texture's u axis points along `cos r * s + sin r * t` (positive `r` turns +s toward +t) and
+ * its v axis along `-sin r * s + cos r * t`, so at `r = 0` u runs along s and v along t. The point
+ * is measured along those axes in millimetres, shifted by the record's offsets, and divided by the
+ * repeat length, which is the set's physical extent times the record's size factor.
  *
  * Returns a float pair for the render payload only. Nothing digested reads it.
  */
@@ -60,13 +76,13 @@ export function surfaceUv(
   reference: TileMaterialReference,
   entry: Pick<TextureSetManifestEntry, 'extentUMm' | 'extentVMm'>,
 ): readonly [number, number] {
-  const scale = reference.uvScaleMillionths / MILLIONTHS;
-  const angle = reference.uvRotationUrad / MILLIONTHS;
+  const size = reference.repeatSizeMillionths / MILLIONTHS;
+  const angle = reference.rotationUrad / MILLIONTHS;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return [
-    (scale * (cos * sMm - sin * tMm)) / entry.extentUMm,
-    (scale * (sin * sMm + cos * tMm)) / entry.extentVMm,
+    (cos * sMm + sin * tMm + reference.offsetUMm) / (entry.extentUMm * size),
+    (-sin * sMm + cos * tMm + reference.offsetVMm) / (entry.extentVMm * size),
   ];
 }
 

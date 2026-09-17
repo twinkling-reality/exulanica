@@ -22,7 +22,9 @@ import {
 declare const __TEXTURE_ROOT__: string;
 
 const EYE_M = 1.62;
-const UNIT_SCALE: TileMaterialReference = { textureSetId: '', uvScaleMillionths: 1_000_000, uvRotationUrad: 0 };
+const UNIT_SCALE: TileMaterialReference = {
+  textureSetId: '', repeatSizeMillionths: 1_000_000, rotationUrad: 0, offsetUMm: 0, offsetVMm: 0,
+};
 
 type Pose = { readonly position: readonly [number, number, number]; readonly target: readonly [number, number, number] };
 

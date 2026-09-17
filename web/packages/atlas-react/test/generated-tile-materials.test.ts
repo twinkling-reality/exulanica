@@ -19,7 +19,7 @@ const TEXTURES = '../assets/textures/';
 const manifest = parseTextureSetManifest(new Uint8Array(readFileSync(`${TEXTURES}manifest.json`)));
 const subtle = webcrypto.subtle as unknown as TextureSetDigest;
 const KERB = manifest.byId.get('cc0.kerb-stone')!;
-const unit = { textureSetId: KERB.setId, uvScaleMillionths: 1_000_000, uvRotationUrad: 0 };
+const unit = { textureSetId: KERB.setId, repeatSizeMillionths: 1_000_000, rotationUrad: 0, offsetUMm: 0, offsetVMm: 0 };
 
 function device(): pc.GraphicsDevice {
   return new pc.NullGraphicsDevice(document.createElement('canvas'));
@@ -47,14 +47,34 @@ describe('generated tile UV rule', () => {
     expect(u).toBeCloseTo(6000 / brick.extentUMm, 12);
   });
 
-  it('applies the record scale to the repeat frequency and rotates in millimetres', () => {
-    const doubled = surfaceUv(9000, 450, { ...unit, uvScaleMillionths: 2_000_000 }, KERB);
-    expect(doubled[0]).toBeCloseTo(10, 12);
-    expect(doubled[1]).toBeCloseTo(2, 12);
-    // A quarter turn lays the 1800 mm axis across the surface: 450 mm along s is one repeat of v.
-    const turned = surfaceUv(450, 0, { ...unit, uvRotationUrad: 1_570_796 }, KERB);
-    expect(turned[0]).toBeCloseTo(0, 5);
-    expect(turned[1]).toBeCloseTo(1, 5);
+  it('applies the record size to the repeat length, so a larger size repeats less often', () => {
+    // 2,000,000: one repeat covers 3600 by 900 mm, so a 9 m run repeats two and a half times.
+    const doubled = surfaceUv(9000, 450, { ...unit, repeatSizeMillionths: 2_000_000 }, KERB);
+    expect(doubled[0]).toBeCloseTo(2.5, 12);
+    expect(doubled[1]).toBeCloseTo(0.5, 12);
+    const halved = surfaceUv(9000, 450, { ...unit, repeatSizeMillionths: 500_000 }, KERB);
+    expect(halved[0]).toBeCloseTo(10, 12);
+    expect(halved[1]).toBeCloseTo(2, 12);
+  });
+
+  it('turns +s toward +t for a positive rotation, in millimetres, keeping the set\'s proportions', () => {
+    // A quarter turn: the texture's u axis now runs along +t and its v axis along -s.
+    const quarter = { ...unit, rotationUrad: 1_570_796 };
+    const alongT = surfaceUv(0, 1800, quarter, KERB);
+    expect(alongT[0]).toBeCloseTo(1, 5);
+    expect(alongT[1]).toBeCloseTo(0, 5);
+    const alongS = surfaceUv(450, 0, quarter, KERB);
+    expect(alongS[0]).toBeCloseTo(0, 5);
+    expect(alongS[1]).toBeCloseTo(-1, 5);
+  });
+
+  it('shifts by the offsets along the texture\'s own axes, after the rotation', () => {
+    const shifted = surfaceUv(0, 0, { ...unit, offsetUMm: 900, offsetVMm: 225 }, KERB);
+    expect(shifted).toEqual([0.5, 0.5]);
+    const turnedAndShifted = surfaceUv(0, 1800, { ...unit, rotationUrad: 1_570_796, offsetUMm: 900, offsetVMm: 0 }, KERB);
+    expect(turnedAndShifted[0]).toBeCloseTo(1.5, 5);
+    const sized = surfaceUv(0, 0, { ...unit, repeatSizeMillionths: 2_000_000, offsetUMm: 900, offsetVMm: 0 }, KERB);
+    expect(sized[0]).toBeCloseTo(0.25, 12);
   });
 
   it('lays the unavailable pattern at the look\'s own physical size', () => {
