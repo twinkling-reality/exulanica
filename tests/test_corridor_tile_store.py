@@ -111,6 +111,48 @@ def test_a_rebake_into_other_bytes_keeps_the_row_and_marks_the_fault(stored):
         repository.serve(uuid.uuid4(), key)
 
 
+def test_one_tile_document_baked_by_two_tessellators_makes_two_rows(stored):
+    """The case migration 0077 exists for, and the one 0072 forbade by accident.
+
+    A tile document says nothing about the tessellator, so its `tile_inputs_digest` does not move
+    when the tessellator does. The key does, because it is uuid5 over the stage version, the stage
+    params digest and that digest, which is how a new tessellator's bake becomes a new row rather
+    than a fault under the old key. 0072 made `tile_inputs_digest` unique on its own, so the first
+    bake after a tessellator bump failed on a key that had correctly moved.
+    """
+    _admin, repository, _scratch = stored
+    older, newer = uuid.uuid4(), uuid.uuid4()
+    assert _record(repository, older, b"as the old tessellator wrote it") == "stored"
+    assert (
+        repository.record(
+            baked_tile_id=newer,
+            stage_version=3,
+            # The same tile, the same inputs; a tessellator whose stated version has moved.
+            stage_params_sha256=hashlib.sha256(b"params with tessellator 5").digest(),
+            tile=_tile(),
+            document=b"a tile document",
+            container=b"as the new tessellator writes it",
+            render_batch_sha256=hashlib.sha256(b"render").digest(),
+            nav_envelope_sha256=hashlib.sha256(b"nav that now holds triangles").digest(),
+            receipt={"tessellator": 5, "container": "owd/3"},
+        )
+        == "stored"
+    )
+    # Both are servable, neither is faulted, and the older bake is still exactly what it was.
+    assert repository.read(older).state == "baked"
+    assert repository.read(newer).state == "baked"
+    assert repository.read(older).container_bytes == len(b"as the old tessellator wrote it")
+
+
+def test_two_keys_may_not_claim_one_bake(stored):
+    """The other half of 0077: the key is a uuid5 the caller computes, so the database checks that
+    two rows cannot claim the same (stage version, params, inputs) under different uuids."""
+    _admin, repository, _scratch = stored
+    assert _record(repository, uuid.uuid4(), b"one bake") == "stored"
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        _record(repository, uuid.uuid4(), b"the same bake under another uuid")
+
+
 def test_a_tile_carrying_edits_is_refused_outright(stored):
     admin, repository, _scratch = stored
     with pytest.raises(psycopg.errors.CheckViolation):
