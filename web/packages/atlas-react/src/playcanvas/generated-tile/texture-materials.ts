@@ -3,6 +3,7 @@ import {
   TextureSetRefusal,
   decodeTextureSet,
   type DecodedTextureSet,
+  type TextureMapName,
   type TextureSetDigest,
   type TextureSetManifest,
   type TextureSetManifestEntry,
@@ -127,6 +128,13 @@ function rgbToRgba(rgb: Uint8Array): Uint8Array {
   return out;
 }
 
+/** A map the upload needs, which the set's layout must hold. */
+function requiredMap(set: DecodedTextureSet, name: TextureMapName): Uint8Array {
+  const bytes = set.maps[name];
+  if (bytes === undefined) throw new Error(`Texture set ${set.entry.setId} holds no ${name} map`);
+  return bytes;
+}
+
 /** Resident bytes of a mipmapped texture: the base level and a third again for the chain. */
 function mippedBytes(width: number, height: number, bytesPerTexel: number): number {
   let total = 0;
@@ -241,9 +249,9 @@ export class TileTextureUploads {
     });
     // sRGB8 without alpha cannot generate mipmaps on WebGL2, so every colour map carries an
     // opaque alpha channel.
-    const baseColor = texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(set.maps.base_color));
-    const normal = texture('normal', pc.PIXELFORMAT_RGBA8, rgbToRgba(set.maps.normal));
-    const orm = texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(set.maps.orm));
+    const baseColor = texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')));
+    const normal = texture('normal', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'normal')));
+    const orm = texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'orm')));
     const textures = [baseColor, normal, orm];
     let residentBytes = 3 * mippedBytes(width, height, 4);
 
@@ -266,7 +274,7 @@ export class TileTextureUploads {
     material.useSkybox = true;
     material.cull = pc.CULLFACE_BACK;
     if (this.look.surface.parallax) {
-      const heightMap = texture('height', pc.PIXELFORMAT_R8, set.maps.height);
+      const heightMap = texture('height', pc.PIXELFORMAT_R8, requiredMap(set, 'height'));
       textures.push(heightMap);
       residentBytes += mippedBytes(width, height, 1);
       material.heightMap = heightMap;

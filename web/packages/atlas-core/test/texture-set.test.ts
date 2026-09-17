@@ -113,7 +113,7 @@ describe('texture set reader, conformance with the backend reader', () => {
       expect(sha(bytes.subarray(8, 8 + headerLength(bytes)))).toBe(expected.header_sha256);
       expect(Object.keys(decoded.maps)).toEqual(expected.maps.map((map) => map.name));
       for (const map of expected.maps) {
-        const view = decoded.maps[map.name as keyof typeof decoded.maps];
+        const view = decoded.maps[map.name as keyof typeof decoded.maps]!;
         expect(view.byteOffset - bytes.byteOffset).toBe(map.byte_offset);
         expect(view.byteLength).toBe(map.byte_length);
         expect(sha(view)).toBe(map.sha256);

@@ -280,6 +280,7 @@ export class Bench {
     const bytes = new Uint8Array(await (await fetch(`${__TEXTURE_ROOT__}/${textureSetBlobPath(entry)}`)).arrayBuffer());
     const { decodeTextureSet } = await import('@exulanica/atlas-core');
     const relief = (await decodeTextureSet(bytes, entry)).maps.height;
+    if (relief === undefined) throw new Error(`${entry.setId} ships no height map to measure the normal's sign against`);
     const h = (row: number, column: number): number =>
       relief[(((row % height) + height) % height) * width + (((column % width) + width) % width)]!;
     const n = (height - 4) * (width - 4);
