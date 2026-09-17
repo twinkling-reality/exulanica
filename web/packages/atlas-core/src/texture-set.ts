@@ -206,7 +206,15 @@ export type TextureSetClassParameters =
   | { readonly materialClass: 'opaque' }
   | { readonly materialClass: 'cutout'; readonly alphaCutoff: number; readonly coveragePermille: number; readonly doubleSided: true }
   | { readonly materialClass: 'decal'; readonly coveragePermille: number }
-  | { readonly materialClass: 'glazing'; readonly iorMillionths: number; readonly doubleSided: false };
+  | {
+      readonly materialClass: 'glazing';
+      readonly iorMillionths: number;
+      readonly doubleSided: false;
+      /** The film's colour where film covers the glass completely: sRGB bytes, as the recipe declares it. */
+      readonly filmSrgb: readonly [number, number, number];
+      /** The film's perceptual roughness in thousandths, as the recipe declares it. */
+      readonly filmRoughnessPermille: number;
+    };
 
 export interface DecodedTextureSet {
   readonly entry: TextureSetManifestEntry;
@@ -455,8 +463,27 @@ function coveragePermille(colourCoverage: Uint8Array): number {
   return Math.floor((covered * 1000) / texels);
 }
 
-/** What `class` must say for this class, with a coverage the reader measured itself. */
-function statedClass(materialClass: MaterialClass, coverage: number | null): { readonly json: JsonObject; readonly parameters: TextureSetClassParameters } {
+/** A glazing film as its header declares it, or null when either value is missing or out of shape. */
+function declaredFilm(stated: Json | undefined): { readonly srgb: readonly [number, number, number]; readonly roughnessPermille: number } | null {
+  if (!isObject(stated)) return null;
+  const srgb = stated['film_srgb'];
+  const roughness = stated['film_roughness_permille'];
+  const byte = (value: Json): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255;
+  if (!Array.isArray(srgb) || srgb.length !== 3 || !srgb.every(byte)) return null;
+  if (typeof roughness !== 'number' || !Number.isInteger(roughness) || roughness < 0 || roughness > 1000) return null;
+  return { srgb: [srgb[0] as number, srgb[1] as number, srgb[2] as number], roughnessPermille: roughness };
+}
+
+/**
+ * What `class` must say for this class: the numbers the class fixes, a coverage the reader measured
+ * itself, and for glazing the film its recipe declared, whose shape and range are checked and which
+ * is never recomputed.
+ */
+function statedClass(
+  materialClass: MaterialClass,
+  coverage: number | null,
+  film: ReturnType<typeof declaredFilm>,
+): { readonly json: JsonObject; readonly parameters: TextureSetClassParameters } {
   const measured = (): number => {
     if (coverage === null) throw new Error(`a ${materialClass} layout always holds a coverage channel`);
     return coverage;
@@ -471,11 +498,24 @@ function statedClass(materialClass: MaterialClass, coverage: number | null): { r
       };
     case 'decal':
       return { json: { coverage_permille: measured() }, parameters: { materialClass, coveragePermille: measured() } };
-    case 'glazing':
+    case 'glazing': {
+      if (film === null) throw new Error('a glazing set declares its film');
       return {
-        json: { double_sided: false, ior_millionths: TEXTURE_SET_GLAZING_IOR_MILLIONTHS },
-        parameters: { materialClass, iorMillionths: TEXTURE_SET_GLAZING_IOR_MILLIONTHS, doubleSided: false },
+        json: {
+          double_sided: false,
+          film_roughness_permille: film.roughnessPermille,
+          film_srgb: [...film.srgb],
+          ior_millionths: TEXTURE_SET_GLAZING_IOR_MILLIONTHS,
+        },
+        parameters: {
+          materialClass,
+          iorMillionths: TEXTURE_SET_GLAZING_IOR_MILLIONTHS,
+          doubleSided: false,
+          filmSrgb: Object.freeze([...film.srgb]) as unknown as readonly [number, number, number],
+          filmRoughnessPermille: film.roughnessPermille,
+        },
       };
+    }
   }
 }
 
@@ -582,7 +622,14 @@ function decodeContainer(bytes: Uint8Array, entry: TextureSetManifestEntry): Dec
   let classParameters: TextureSetClassParameters = { materialClass: 'opaque' };
   if (profile === TEXTURE_SET_PROFILE_V2) {
     const colour = maps.base_color_coverage;
-    const stated = statedClass(materialClass, colour === undefined ? null : coveragePermille(colour));
+    let film: ReturnType<typeof declaredFilm> = null;
+    if (materialClass === 'glazing') {
+      film = declaredFilm(h['class']);
+      if (film === null) {
+        refuse('header', `${where} header class does not declare film_srgb as three integers from 0 to 255 and film_roughness_permille as an integer from 0 to 1000`);
+      }
+    }
+    const stated = statedClass(materialClass, colour === undefined ? null : coveragePermille(colour), film);
     if (!sameJson(h['class'], stated.json)) {
       refuse('header', `${where} header class is not what a ${materialClass} set with these texels states`);
     }

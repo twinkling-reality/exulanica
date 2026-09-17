@@ -235,7 +235,8 @@ describe('drawing a set by its material class', () => {
   it('prepares and verifies a set of any class; drawing it is the binding\'s decision', async () => {
     const glazing = await prepareTextureSet(fixtures, 'fixture.glazing', async (entry) =>
       new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
-    expect(glazing.state === 'decoded' && glazing.set.classParameters).toEqual({ materialClass: 'glazing', iorMillionths: 1_500_000, doubleSided: false });
+    expect(glazing.state === 'decoded' && glazing.set.classParameters).toMatchObject({ materialClass: 'glazing', iorMillionths: 1_500_000, doubleSided: false });
+    expect(glazing.state === 'decoded' && glazing.set.classParameters.materialClass === 'glazing' && glazing.set.classParameters.filmSrgb).toHaveLength(3);
   });
 });
 

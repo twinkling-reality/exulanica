@@ -149,7 +149,12 @@ describe('texture-set-cases.json against the browser reader', () => {
           expect(stated).toEqual({ coverage_permille: decoded.classParameters.coveragePermille });
           break;
         case 'glazing':
-          expect(stated).toEqual({ double_sided: decoded.classParameters.doubleSided, ior_millionths: decoded.classParameters.iorMillionths });
+          expect(stated).toEqual({
+            double_sided: decoded.classParameters.doubleSided,
+            film_roughness_permille: decoded.classParameters.filmRoughnessPermille,
+            film_srgb: [...decoded.classParameters.filmSrgb],
+            ior_millionths: decoded.classParameters.iorMillionths,
+          });
           break;
       }
     }

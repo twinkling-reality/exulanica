@@ -59,14 +59,16 @@ exactly that class's and maker's layout:
 | `opaque` | `base_color`, `normal` (x, y), `orm` | `base_color`, `normal` (x, y, z) if produced, `orm`, `height` if produced | `{}` |
 | `cutout` | `base_color_coverage`, `normal` (x, y), `orm` | the same pattern with `base_color_coverage` | `alpha_cutoff` 128, `coverage_permille`, `double_sided` true |
 | `decal` | `base_color_coverage`, `normal` (x, y), `orm` | as cutout | `coverage_permille` |
-| `glazing` | `base_color`, `transmission_roughness` | `base_color`, `normal` (x, y, z) if produced, `transmission_roughness`, `height` if produced | `double_sided` false, `ior_millionths` 1500000 |
+| `glazing` | `base_color`, `transmission_roughness` | `base_color`, `normal` (x, y, z) if produced, `transmission_roughness`, `height` if produced | `double_sided` false, `ior_millionths` 1500000, `film_srgb`, `film_roughness_permille` |
 
 A procedural set whose class bakes relief states `height_range_mm` and `cavity`; procedural glazing
 states neither; a model-made set states `height_range_mm` only when it ships a height map. Every
 map's description (name, components, what it holds, sRGB or linear, its decode words, and for a
 normal its space and convention) must be exactly the layout's, and `coverage_permille` must equal
 what the reader measures from the coverage channel (texels at or above the cutoff, in thousandths,
-floored). `DecodedTextureSet` carries the profile, class, maker kind, typed class parameters, the
+floored). A glazing set's film is declared by its recipe, not measured: `film_srgb` must be three
+integers from 0 to 255 and `film_roughness_permille` an integer from 0 to 1000, and the reader checks
+their shape and range and never recomputes them; any other class that states a film is refused. `DecodedTextureSet` carries the profile, class, maker kind, typed class parameters, the
 channels in stored order and the maps present.
 
 It refuses, with a `TextureSetRefusal` and one of the shared reasons, and never degrades:
