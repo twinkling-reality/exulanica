@@ -38,7 +38,13 @@ node scripts/capture-bench-frames.mjs http://127.0.0.1:5311/ OUT FRAMES
 # the whole Track A pipeline with a stub model: staging, verification, tiling, records, measurements
 .venv/bin/python -m exulanica_appearance runner dry-run --repository ../.. --out DRY
 
-# a real session: stage on this machine, fetch and run on the rented one, check what came back
+# a whole session on a machine that already exists (a deploy needs the operator's consent click):
+# stage, build, fetch, smoke, gate, and session 1 only if the gate passes
+scripts/gpu-session.sh USER@IP <head commit> WORK <billed seconds when the smoke run ends>
+scripts/delete-instance.sh now exulanica-appearance-a1      # and prove it is gone
+scripts/delete-instance.sh at exulanica-appearance-a1 <epoch>   # this session's own watchdog
+
+# the same steps one at a time
 .venv/bin/python -m exulanica_appearance runner stage --spec jobs/track-a-smoke.json --repository ../.. --weights weights/ --out STAGED
 python3 scripts/fetch-weights.py STAGED WEIGHTS          # on the rented machine's host
 container/run.sh IMAGE@sha256:... STAGED WEIGHTS OUT 5670   # no network, read-only, hard time limit
