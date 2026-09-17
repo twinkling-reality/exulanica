@@ -1,0 +1,1225 @@
+{
+  "profile": "exulanica.character-stylized-looks/v1",
+  "source": {
+    "manifest": "quaternius-modular-v2/manifest.json",
+    "manifestSha256": "4854cfc9cacc1b699095b27207d59d8e8846ff974b132871df0d9c1ae8172356"
+  },
+  "looks": [
+    {
+      "lookId": "hoodie",
+      "file": "hoodie.glb",
+      "descriptor": {
+        "asset": {
+          "assetKey": "quaternius.modular.hoodie.v2",
+          "mediaType": "model/gltf-binary",
+          "contentSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
+          "byteSize": 1088004
+        },
+        "rigId": "quaternius-modular/men/81099af88b304deba9f53be5a68d9af82c3f58107828fec28393a39fe12554eb",
+        "joints": [
+          "Root",
+          "Body",
+          "Hips",
+          "Abdomen",
+          "Torso",
+          "Chest",
+          "Neck",
+          "Head",
+          "Shoulder.L",
+          "UpperArm.L",
+          "LowerArm.L",
+          "Wrist.L",
+          "Index1.L",
+          "Index2.L",
+          "Index3.L",
+          "Index4.L",
+          "Middle1.L",
+          "Middle2.L",
+          "Middle3.L",
+          "Middle4.L",
+          "Ring1.L",
+          "Ring2.L",
+          "Ring3.L",
+          "Ring4.L",
+          "Pinky1.L",
+          "Pinky2.L",
+          "Pinky3.L",
+          "Pinky4.L",
+          "Thumb1.L",
+          "Thumb2.L",
+          "Thumb3.L",
+          "Shoulder.R",
+          "UpperArm.R",
+          "LowerArm.R",
+          "Wrist.R",
+          "Index1.R",
+          "Index2.R",
+          "Index3.R",
+          "Index4.R",
+          "Middle1.R",
+          "Middle2.R",
+          "Middle3.R",
+          "Middle4.R",
+          "Ring1.R",
+          "Ring2.R",
+          "Ring3.R",
+          "Ring4.R",
+          "Pinky1.R",
+          "Pinky2.R",
+          "Pinky3.R",
+          "Pinky4.R",
+          "Thumb1.R",
+          "Thumb2.R",
+          "Thumb3.R",
+          "UpperLeg.L",
+          "LowerLeg.L",
+          "UpperLeg.R",
+          "LowerLeg.R",
+          "Foot.L",
+          "PT.L",
+          "Foot.R",
+          "PT.R"
+        ],
+        "unitScale": 1,
+        "forwardYawDegrees": 180,
+        "groundOffset": -3.585591912269592e-08,
+        "standingHeight": 1.8193831802345812,
+        "clips": {
+          "idle": {
+            "name": "Idle",
+            "metresPerSecond": 0
+          },
+          "walk": {
+            "name": "Walk",
+            "metresPerSecond": 1.33104
+          },
+          "run": {
+            "name": "Run",
+            "metresPerSecond": 3.08325
+          }
+        },
+        "rootMotion": {
+          "mode": "in-place"
+        },
+        "materialSlots": {
+          "Skin": {
+            "materials": [
+              "Skin"
+            ]
+          },
+          "Purple": {
+            "materials": [
+              "Purple"
+            ]
+          },
+          "White": {
+            "materials": [
+              "White"
+            ]
+          },
+          "Eyebrows": {
+            "materials": [
+              "Eyebrows"
+            ]
+          },
+          "Eye": {
+            "materials": [
+              "Eye"
+            ]
+          },
+          "Hair": {
+            "materials": [
+              "Hair"
+            ]
+          },
+          "LightBlue": {
+            "materials": [
+              "LightBlue"
+            ]
+          }
+        },
+        "morphParameters": {},
+        "variantSlots": {}
+      },
+      "label": "Hoodie",
+      "defaultColors": {
+        "Skin": "#cead86",
+        "Purple": "#47375b",
+        "White": "#b4b4b4",
+        "Eyebrows": "#3e3429",
+        "Eye": "#31251c",
+        "Hair": "#492e18",
+        "LightBlue": "#333f47"
+      },
+      "variationSlots": [
+        "LightBlue",
+        "Purple",
+        "White"
+      ],
+      "creator": "Quaternius",
+      "license": "CC0",
+      "gesture": {
+        "file": "hoodie.glb",
+        "descriptor": {
+          "character": {
+            "asset": {
+              "assetKey": "quaternius.modular.hoodie.v2",
+              "mediaType": "model/gltf-binary",
+              "contentSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
+              "byteSize": 1088004
+            },
+            "rigId": "quaternius-modular/men/81099af88b304deba9f53be5a68d9af82c3f58107828fec28393a39fe12554eb",
+            "joints": [
+              "Root",
+              "Body",
+              "Hips",
+              "Abdomen",
+              "Torso",
+              "Chest",
+              "Neck",
+              "Head",
+              "Shoulder.L",
+              "UpperArm.L",
+              "LowerArm.L",
+              "Wrist.L",
+              "Index1.L",
+              "Index2.L",
+              "Index3.L",
+              "Index4.L",
+              "Middle1.L",
+              "Middle2.L",
+              "Middle3.L",
+              "Middle4.L",
+              "Ring1.L",
+              "Ring2.L",
+              "Ring3.L",
+              "Ring4.L",
+              "Pinky1.L",
+              "Pinky2.L",
+              "Pinky3.L",
+              "Pinky4.L",
+              "Thumb1.L",
+              "Thumb2.L",
+              "Thumb3.L",
+              "Shoulder.R",
+              "UpperArm.R",
+              "LowerArm.R",
+              "Wrist.R",
+              "Index1.R",
+              "Index2.R",
+              "Index3.R",
+              "Index4.R",
+              "Middle1.R",
+              "Middle2.R",
+              "Middle3.R",
+              "Middle4.R",
+              "Ring1.R",
+              "Ring2.R",
+              "Ring3.R",
+              "Ring4.R",
+              "Pinky1.R",
+              "Pinky2.R",
+              "Pinky3.R",
+              "Pinky4.R",
+              "Thumb1.R",
+              "Thumb2.R",
+              "Thumb3.R",
+              "UpperLeg.L",
+              "LowerLeg.L",
+              "UpperLeg.R",
+              "LowerLeg.R",
+              "Foot.L",
+              "PT.L",
+              "Foot.R",
+              "PT.R"
+            ],
+            "unitScale": 1,
+            "forwardYawDegrees": 180,
+            "groundOffset": -3.585591912269592e-08,
+            "standingHeight": 1.8193831802345812,
+            "clips": {
+              "idle": {
+                "name": "Idle",
+                "metresPerSecond": 0
+              },
+              "walk": {
+                "name": "Walk",
+                "metresPerSecond": 1.33104
+              },
+              "run": {
+                "name": "Run",
+                "metresPerSecond": 3.08325
+              }
+            },
+            "rootMotion": {
+              "mode": "in-place"
+            },
+            "materialSlots": {
+              "Skin": {
+                "materials": [
+                  "Skin"
+                ]
+              },
+              "Purple": {
+                "materials": [
+                  "Purple"
+                ]
+              },
+              "White": {
+                "materials": [
+                  "White"
+                ]
+              },
+              "Eyebrows": {
+                "materials": [
+                  "Eyebrows"
+                ]
+              },
+              "Eye": {
+                "materials": [
+                  "Eye"
+                ]
+              },
+              "Hair": {
+                "materials": [
+                  "Hair"
+                ]
+              },
+              "LightBlue": {
+                "materials": [
+                  "LightBlue"
+                ]
+              }
+            },
+            "morphParameters": {},
+            "variantSlots": {}
+          },
+          "clip": "Interact",
+          "durationSeconds": 1.2666666666666666,
+          "eye": [
+            0.0035347859375178814,
+            1.6535097360610962,
+            0.20265930891036987
+          ],
+          "hiddenNodes": [
+            "Casual_Head",
+            "Casual_Legs",
+            "Casual_Feet"
+          ]
+        }
+      }
+    },
+    {
+      "lookId": "casual",
+      "file": "casual.glb",
+      "descriptor": {
+        "asset": {
+          "assetKey": "quaternius.modular.casual.v2",
+          "mediaType": "model/gltf-binary",
+          "contentSha256": "01caafd01d1b32a6e7dc7a7cba7e1489029f9303f02d419ffbb44e08e9d69446",
+          "byteSize": 1054440
+        },
+        "rigId": "quaternius-modular/men/81099af88b304deba9f53be5a68d9af82c3f58107828fec28393a39fe12554eb",
+        "joints": [
+          "Root",
+          "Body",
+          "Hips",
+          "Abdomen",
+          "Torso",
+          "Chest",
+          "Neck",
+          "Head",
+          "Shoulder.L",
+          "UpperArm.L",
+          "LowerArm.L",
+          "Wrist.L",
+          "Index1.L",
+          "Index2.L",
+          "Index3.L",
+          "Index4.L",
+          "Middle1.L",
+          "Middle2.L",
+          "Middle3.L",
+          "Middle4.L",
+          "Ring1.L",
+          "Ring2.L",
+          "Ring3.L",
+          "Ring4.L",
+          "Pinky1.L",
+          "Pinky2.L",
+          "Pinky3.L",
+          "Pinky4.L",
+          "Thumb1.L",
+          "Thumb2.L",
+          "Thumb3.L",
+          "Shoulder.R",
+          "UpperArm.R",
+          "LowerArm.R",
+          "Wrist.R",
+          "Index1.R",
+          "Index2.R",
+          "Index3.R",
+          "Index4.R",
+          "Middle1.R",
+          "Middle2.R",
+          "Middle3.R",
+          "Middle4.R",
+          "Ring1.R",
+          "Ring2.R",
+          "Ring3.R",
+          "Ring4.R",
+          "Pinky1.R",
+          "Pinky2.R",
+          "Pinky3.R",
+          "Pinky4.R",
+          "Thumb1.R",
+          "Thumb2.R",
+          "Thumb3.R",
+          "UpperLeg.L",
+          "LowerLeg.L",
+          "UpperLeg.R",
+          "LowerLeg.R",
+          "Foot.L",
+          "PT.L",
+          "Foot.R",
+          "PT.R"
+        ],
+        "unitScale": 1,
+        "forwardYawDegrees": 180,
+        "groundOffset": 0.002731147687882185,
+        "standingHeight": 1.8059248295612633,
+        "clips": {
+          "idle": {
+            "name": "Idle",
+            "metresPerSecond": 0
+          },
+          "walk": {
+            "name": "Walk",
+            "metresPerSecond": 1.33104
+          },
+          "run": {
+            "name": "Run",
+            "metresPerSecond": 3.08325
+          }
+        },
+        "rootMotion": {
+          "mode": "in-place"
+        },
+        "materialSlots": {
+          "Skin": {
+            "materials": [
+              "Skin"
+            ]
+          },
+          "LightBrown": {
+            "materials": [
+              "LightBrown"
+            ]
+          },
+          "Red_Dark": {
+            "materials": [
+              "Red_Dark"
+            ]
+          },
+          "White": {
+            "materials": [
+              "White"
+            ]
+          },
+          "Skin_Darker": {
+            "materials": [
+              "Skin_Darker"
+            ]
+          },
+          "Eyebrows": {
+            "materials": [
+              "Eyebrows"
+            ]
+          },
+          "Hair": {
+            "materials": [
+              "Hair"
+            ]
+          },
+          "Eye": {
+            "materials": [
+              "Eye"
+            ]
+          },
+          "LightBlue": {
+            "materials": [
+              "LightBlue"
+            ]
+          }
+        },
+        "morphParameters": {},
+        "variantSlots": {}
+      },
+      "label": "Everyday",
+      "defaultColors": {
+        "Skin": "#cead86",
+        "LightBrown": "#969083",
+        "Red_Dark": "#7d2734",
+        "White": "#b4b4b4",
+        "Skin_Darker": "#b99c79",
+        "Eyebrows": "#3e3429",
+        "Hair": "#492e18",
+        "Eye": "#31251c",
+        "LightBlue": "#333f47"
+      },
+      "variationSlots": [
+        "LightBlue",
+        "LightBrown",
+        "Red_Dark",
+        "White"
+      ],
+      "creator": "Quaternius",
+      "license": "CC0",
+      "gesture": {
+        "file": "casual.glb",
+        "descriptor": {
+          "character": {
+            "asset": {
+              "assetKey": "quaternius.modular.casual.v2",
+              "mediaType": "model/gltf-binary",
+              "contentSha256": "01caafd01d1b32a6e7dc7a7cba7e1489029f9303f02d419ffbb44e08e9d69446",
+              "byteSize": 1054440
+            },
+            "rigId": "quaternius-modular/men/81099af88b304deba9f53be5a68d9af82c3f58107828fec28393a39fe12554eb",
+            "joints": [
+              "Root",
+              "Body",
+              "Hips",
+              "Abdomen",
+              "Torso",
+              "Chest",
+              "Neck",
+              "Head",
+              "Shoulder.L",
+              "UpperArm.L",
+              "LowerArm.L",
+              "Wrist.L",
+              "Index1.L",
+              "Index2.L",
+              "Index3.L",
+              "Index4.L",
+              "Middle1.L",
+              "Middle2.L",
+              "Middle3.L",
+              "Middle4.L",
+              "Ring1.L",
+              "Ring2.L",
+              "Ring3.L",
+              "Ring4.L",
+              "Pinky1.L",
+              "Pinky2.L",
+              "Pinky3.L",
+              "Pinky4.L",
+              "Thumb1.L",
+              "Thumb2.L",
+              "Thumb3.L",
+              "Shoulder.R",
+              "UpperArm.R",
+              "LowerArm.R",
+              "Wrist.R",
+              "Index1.R",
+              "Index2.R",
+              "Index3.R",
+              "Index4.R",
+              "Middle1.R",
+              "Middle2.R",
+              "Middle3.R",
+              "Middle4.R",
+              "Ring1.R",
+              "Ring2.R",
+              "Ring3.R",
+              "Ring4.R",
+              "Pinky1.R",
+              "Pinky2.R",
+              "Pinky3.R",
+              "Pinky4.R",
+              "Thumb1.R",
+              "Thumb2.R",
+              "Thumb3.R",
+              "UpperLeg.L",
+              "LowerLeg.L",
+              "UpperLeg.R",
+              "LowerLeg.R",
+              "Foot.L",
+              "PT.L",
+              "Foot.R",
+              "PT.R"
+            ],
+            "unitScale": 1,
+            "forwardYawDegrees": 180,
+            "groundOffset": 0.002731147687882185,
+            "standingHeight": 1.8059248295612633,
+            "clips": {
+              "idle": {
+                "name": "Idle",
+                "metresPerSecond": 0
+              },
+              "walk": {
+                "name": "Walk",
+                "metresPerSecond": 1.33104
+              },
+              "run": {
+                "name": "Run",
+                "metresPerSecond": 3.08325
+              }
+            },
+            "rootMotion": {
+              "mode": "in-place"
+            },
+            "materialSlots": {
+              "Skin": {
+                "materials": [
+                  "Skin"
+                ]
+              },
+              "LightBrown": {
+                "materials": [
+                  "LightBrown"
+                ]
+              },
+              "Red_Dark": {
+                "materials": [
+                  "Red_Dark"
+                ]
+              },
+              "White": {
+                "materials": [
+                  "White"
+                ]
+              },
+              "Skin_Darker": {
+                "materials": [
+                  "Skin_Darker"
+                ]
+              },
+              "Eyebrows": {
+                "materials": [
+                  "Eyebrows"
+                ]
+              },
+              "Hair": {
+                "materials": [
+                  "Hair"
+                ]
+              },
+              "Eye": {
+                "materials": [
+                  "Eye"
+                ]
+              },
+              "LightBlue": {
+                "materials": [
+                  "LightBlue"
+                ]
+              }
+            },
+            "morphParameters": {},
+            "variantSlots": {}
+          },
+          "clip": "Interact",
+          "durationSeconds": 1.2666666666666666,
+          "eye": [
+            0.003534787567332387,
+            1.6535093784332275,
+            0.20265932381153107
+          ],
+          "hiddenNodes": [
+            "Casual2_Head",
+            "Casual2_Legs",
+            "Casual2_Feet"
+          ]
+        }
+      }
+    },
+    {
+      "lookId": "casual-f",
+      "file": "casual-f.glb",
+      "descriptor": {
+        "asset": {
+          "assetKey": "quaternius.modular.casual-f.v2",
+          "mediaType": "model/gltf-binary",
+          "contentSha256": "1dc3b8c8299fb90c86efdfdcceaa2a2dff2da2548004899a0ef6c4287d87d838",
+          "byteSize": 1122528
+        },
+        "rigId": "quaternius-modular/women/a03174d93e5877adee0bb7bc7d2313dc8ce6f26b1e739807424257d19235fa9b",
+        "joints": [
+          "Root",
+          "Body",
+          "Hips",
+          "Abdomen",
+          "Torso",
+          "Chest",
+          "Neck",
+          "Head",
+          "Shoulder.L",
+          "UpperArm.L",
+          "LowerArm.L",
+          "Wrist.L",
+          "Index1.L",
+          "Index2.L",
+          "Index3.L",
+          "Index4.L",
+          "Middle1.L",
+          "Middle2.L",
+          "Middle3.L",
+          "Middle4.L",
+          "Ring1.L",
+          "Ring2.L",
+          "Ring3.L",
+          "Ring4.L",
+          "Pinky1.L",
+          "Pinky2.L",
+          "Pinky3.L",
+          "Pinky4.L",
+          "Thumb1.L",
+          "Thumb2.L",
+          "Thumb3.L",
+          "Shoulder.R",
+          "UpperArm.R",
+          "LowerArm.R",
+          "Wrist.R",
+          "Index1.R",
+          "Index2.R",
+          "Index3.R",
+          "Index4.R",
+          "Middle1.R",
+          "Middle2.R",
+          "Middle3.R",
+          "Middle4.R",
+          "Ring1.R",
+          "Ring2.R",
+          "Ring3.R",
+          "Ring4.R",
+          "Pinky1.R",
+          "Pinky2.R",
+          "Pinky3.R",
+          "Pinky4.R",
+          "Thumb1.R",
+          "Thumb2.R",
+          "Thumb3.R",
+          "UpperLeg.L",
+          "LowerLeg.L",
+          "UpperLeg.R",
+          "LowerLeg.R",
+          "Foot.L",
+          "PT.L",
+          "Foot.R",
+          "PT.R"
+        ],
+        "unitScale": 1,
+        "forwardYawDegrees": 180,
+        "groundOffset": 0.0,
+        "standingHeight": 1.8007030487060547,
+        "clips": {
+          "idle": {
+            "name": "Idle",
+            "metresPerSecond": 0
+          },
+          "walk": {
+            "name": "Walk",
+            "metresPerSecond": 1.33104
+          },
+          "run": {
+            "name": "Run",
+            "metresPerSecond": 3.08325
+          }
+        },
+        "rootMotion": {
+          "mode": "in-place"
+        },
+        "materialSlots": {
+          "Skin": {
+            "materials": [
+              "Skin"
+            ]
+          },
+          "White": {
+            "materials": [
+              "White"
+            ]
+          },
+          "Grey": {
+            "materials": [
+              "Grey"
+            ]
+          },
+          "Hair_Brown": {
+            "materials": [
+              "Hair_Brown"
+            ]
+          },
+          "Brown": {
+            "materials": [
+              "Brown"
+            ]
+          },
+          "Hair_Blond": {
+            "materials": [
+              "Hair_Blond"
+            ]
+          },
+          "Orange": {
+            "materials": [
+              "Orange"
+            ]
+          }
+        },
+        "morphParameters": {},
+        "variantSlots": {}
+      },
+      "label": "Relaxed",
+      "defaultColors": {
+        "Skin": "#cead86",
+        "White": "#b4b4b4",
+        "Grey": "#3f3f3f",
+        "Hair_Brown": "#3e3429",
+        "Brown": "#31251c",
+        "Hair_Blond": "#8b7547",
+        "Orange": "#9e6238"
+      },
+      "variationSlots": [
+        "Grey",
+        "Orange",
+        "White"
+      ],
+      "creator": "Quaternius",
+      "license": "CC0",
+      "gesture": {
+        "file": "casual-f.glb",
+        "descriptor": {
+          "character": {
+            "asset": {
+              "assetKey": "quaternius.modular.casual-f.v2",
+              "mediaType": "model/gltf-binary",
+              "contentSha256": "1dc3b8c8299fb90c86efdfdcceaa2a2dff2da2548004899a0ef6c4287d87d838",
+              "byteSize": 1122528
+            },
+            "rigId": "quaternius-modular/women/a03174d93e5877adee0bb7bc7d2313dc8ce6f26b1e739807424257d19235fa9b",
+            "joints": [
+              "Root",
+              "Body",
+              "Hips",
+              "Abdomen",
+              "Torso",
+              "Chest",
+              "Neck",
+              "Head",
+              "Shoulder.L",
+              "UpperArm.L",
+              "LowerArm.L",
+              "Wrist.L",
+              "Index1.L",
+              "Index2.L",
+              "Index3.L",
+              "Index4.L",
+              "Middle1.L",
+              "Middle2.L",
+              "Middle3.L",
+              "Middle4.L",
+              "Ring1.L",
+              "Ring2.L",
+              "Ring3.L",
+              "Ring4.L",
+              "Pinky1.L",
+              "Pinky2.L",
+              "Pinky3.L",
+              "Pinky4.L",
+              "Thumb1.L",
+              "Thumb2.L",
+              "Thumb3.L",
+              "Shoulder.R",
+              "UpperArm.R",
+              "LowerArm.R",
+              "Wrist.R",
+              "Index1.R",
+              "Index2.R",
+              "Index3.R",
+              "Index4.R",
+              "Middle1.R",
+              "Middle2.R",
+              "Middle3.R",
+              "Middle4.R",
+              "Ring1.R",
+              "Ring2.R",
+              "Ring3.R",
+              "Ring4.R",
+              "Pinky1.R",
+              "Pinky2.R",
+              "Pinky3.R",
+              "Pinky4.R",
+              "Thumb1.R",
+              "Thumb2.R",
+              "Thumb3.R",
+              "UpperLeg.L",
+              "LowerLeg.L",
+              "UpperLeg.R",
+              "LowerLeg.R",
+              "Foot.L",
+              "PT.L",
+              "Foot.R",
+              "PT.R"
+            ],
+            "unitScale": 1,
+            "forwardYawDegrees": 180,
+            "groundOffset": 0.0,
+            "standingHeight": 1.8007030487060547,
+            "clips": {
+              "idle": {
+                "name": "Idle",
+                "metresPerSecond": 0
+              },
+              "walk": {
+                "name": "Walk",
+                "metresPerSecond": 1.33104
+              },
+              "run": {
+                "name": "Run",
+                "metresPerSecond": 3.08325
+              }
+            },
+            "rootMotion": {
+              "mode": "in-place"
+            },
+            "materialSlots": {
+              "Skin": {
+                "materials": [
+                  "Skin"
+                ]
+              },
+              "White": {
+                "materials": [
+                  "White"
+                ]
+              },
+              "Grey": {
+                "materials": [
+                  "Grey"
+                ]
+              },
+              "Hair_Brown": {
+                "materials": [
+                  "Hair_Brown"
+                ]
+              },
+              "Brown": {
+                "materials": [
+                  "Brown"
+                ]
+              },
+              "Hair_Blond": {
+                "materials": [
+                  "Hair_Blond"
+                ]
+              },
+              "Orange": {
+                "materials": [
+                  "Orange"
+                ]
+              }
+            },
+            "morphParameters": {},
+            "variantSlots": {}
+          },
+          "clip": "Interact",
+          "durationSeconds": 1.2666666666666666,
+          "eye": [
+            0,
+            1.6386397743225098,
+            0.2
+          ],
+          "hiddenNodes": [
+            "Casual_Head",
+            "Casual_Legs",
+            "Casual_Feet"
+          ]
+        }
+      }
+    },
+    {
+      "lookId": "formal-f",
+      "file": "formal-f.glb",
+      "descriptor": {
+        "asset": {
+          "assetKey": "quaternius.modular.formal-f.v2",
+          "mediaType": "model/gltf-binary",
+          "contentSha256": "92a2eaabccf2ffec2ad2259c4d5e91b8d95431ec9f85addc94cb97b8b12c7cea",
+          "byteSize": 1092352
+        },
+        "rigId": "quaternius-modular/women/a03174d93e5877adee0bb7bc7d2313dc8ce6f26b1e739807424257d19235fa9b",
+        "joints": [
+          "Root",
+          "Body",
+          "Hips",
+          "Abdomen",
+          "Torso",
+          "Chest",
+          "Neck",
+          "Head",
+          "Shoulder.L",
+          "UpperArm.L",
+          "LowerArm.L",
+          "Wrist.L",
+          "Index1.L",
+          "Index2.L",
+          "Index3.L",
+          "Index4.L",
+          "Middle1.L",
+          "Middle2.L",
+          "Middle3.L",
+          "Middle4.L",
+          "Ring1.L",
+          "Ring2.L",
+          "Ring3.L",
+          "Ring4.L",
+          "Pinky1.L",
+          "Pinky2.L",
+          "Pinky3.L",
+          "Pinky4.L",
+          "Thumb1.L",
+          "Thumb2.L",
+          "Thumb3.L",
+          "Shoulder.R",
+          "UpperArm.R",
+          "LowerArm.R",
+          "Wrist.R",
+          "Index1.R",
+          "Index2.R",
+          "Index3.R",
+          "Index4.R",
+          "Middle1.R",
+          "Middle2.R",
+          "Middle3.R",
+          "Middle4.R",
+          "Ring1.R",
+          "Ring2.R",
+          "Ring3.R",
+          "Ring4.R",
+          "Pinky1.R",
+          "Pinky2.R",
+          "Pinky3.R",
+          "Pinky4.R",
+          "Thumb1.R",
+          "Thumb2.R",
+          "Thumb3.R",
+          "UpperLeg.L",
+          "LowerLeg.L",
+          "UpperLeg.R",
+          "LowerLeg.R",
+          "Foot.L",
+          "PT.L",
+          "Foot.R",
+          "PT.R"
+        ],
+        "unitScale": 1,
+        "forwardYawDegrees": 180,
+        "groundOffset": 0.006922408007085323,
+        "standingHeight": 1.7946213046088815,
+        "clips": {
+          "idle": {
+            "name": "Idle",
+            "metresPerSecond": 0
+          },
+          "walk": {
+            "name": "Walk",
+            "metresPerSecond": 1.33104
+          },
+          "run": {
+            "name": "Run",
+            "metresPerSecond": 3.08325
+          }
+        },
+        "rootMotion": {
+          "mode": "in-place"
+        },
+        "materialSlots": {
+          "Skin": {
+            "materials": [
+              "Skin"
+            ]
+          },
+          "Brown": {
+            "materials": [
+              "Brown"
+            ]
+          },
+          "Red": {
+            "materials": [
+              "Red"
+            ]
+          },
+          "LimeGreen": {
+            "materials": [
+              "LimeGreen"
+            ]
+          },
+          "Gold": {
+            "materials": [
+              "Gold"
+            ]
+          }
+        },
+        "morphParameters": {},
+        "variantSlots": {}
+      },
+      "label": "Tailored",
+      "defaultColors": {
+        "Skin": "#cead86",
+        "Brown": "#31251c",
+        "Red": "#68220c",
+        "LimeGreen": "#466843",
+        "Gold": "#af8749"
+      },
+      "variationSlots": [
+        "Gold",
+        "LimeGreen"
+      ],
+      "creator": "Quaternius",
+      "license": "CC0",
+      "gesture": {
+        "file": "formal-f.glb",
+        "descriptor": {
+          "character": {
+            "asset": {
+              "assetKey": "quaternius.modular.formal-f.v2",
+              "mediaType": "model/gltf-binary",
+              "contentSha256": "92a2eaabccf2ffec2ad2259c4d5e91b8d95431ec9f85addc94cb97b8b12c7cea",
+              "byteSize": 1092352
+            },
+            "rigId": "quaternius-modular/women/a03174d93e5877adee0bb7bc7d2313dc8ce6f26b1e739807424257d19235fa9b",
+            "joints": [
+              "Root",
+              "Body",
+              "Hips",
+              "Abdomen",
+              "Torso",
+              "Chest",
+              "Neck",
+              "Head",
+              "Shoulder.L",
+              "UpperArm.L",
+              "LowerArm.L",
+              "Wrist.L",
+              "Index1.L",
+              "Index2.L",
+              "Index3.L",
+              "Index4.L",
+              "Middle1.L",
+              "Middle2.L",
+              "Middle3.L",
+              "Middle4.L",
+              "Ring1.L",
+              "Ring2.L",
+              "Ring3.L",
+              "Ring4.L",
+              "Pinky1.L",
+              "Pinky2.L",
+              "Pinky3.L",
+              "Pinky4.L",
+              "Thumb1.L",
+              "Thumb2.L",
+              "Thumb3.L",
+              "Shoulder.R",
+              "UpperArm.R",
+              "LowerArm.R",
+              "Wrist.R",
+              "Index1.R",
+              "Index2.R",
+              "Index3.R",
+              "Index4.R",
+              "Middle1.R",
+              "Middle2.R",
+              "Middle3.R",
+              "Middle4.R",
+              "Ring1.R",
+              "Ring2.R",
+              "Ring3.R",
+              "Ring4.R",
+              "Pinky1.R",
+              "Pinky2.R",
+              "Pinky3.R",
+              "Pinky4.R",
+              "Thumb1.R",
+              "Thumb2.R",
+              "Thumb3.R",
+              "UpperLeg.L",
+              "LowerLeg.L",
+              "UpperLeg.R",
+              "LowerLeg.R",
+              "Foot.L",
+              "PT.L",
+              "Foot.R",
+              "PT.R"
+            ],
+            "unitScale": 1,
+            "forwardYawDegrees": 180,
+            "groundOffset": 0.006922408007085323,
+            "standingHeight": 1.7946213046088815,
+            "clips": {
+              "idle": {
+                "name": "Idle",
+                "metresPerSecond": 0
+              },
+              "walk": {
+                "name": "Walk",
+                "metresPerSecond": 1.33104
+              },
+              "run": {
+                "name": "Run",
+                "metresPerSecond": 3.08325
+              }
+            },
+            "rootMotion": {
+              "mode": "in-place"
+            },
+            "materialSlots": {
+              "Skin": {
+                "materials": [
+                  "Skin"
+                ]
+              },
+              "Brown": {
+                "materials": [
+                  "Brown"
+                ]
+              },
+              "Red": {
+                "materials": [
+                  "Red"
+                ]
+              },
+              "LimeGreen": {
+                "materials": [
+                  "LimeGreen"
+                ]
+              },
+              "Gold": {
+                "materials": [
+                  "Gold"
+                ]
+              }
+            },
+            "morphParameters": {},
+            "variantSlots": {}
+          },
+          "clip": "Interact",
+          "durationSeconds": 1.2666666666666666,
+          "eye": [
+            0,
+            1.6331053871940822,
+            0.2
+          ],
+          "hiddenNodes": [
+            "Formad_Head",
+            "Formal_Legs",
+            "Formal_Feet"
+          ]
+        }
+      }
+    }
+  ]
+}

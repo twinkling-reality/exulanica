@@ -33,11 +33,12 @@ describe('fictional catalog defaults', () => {
     expect(previewInhabitantSelection([], subject('person'))).toBeNull();
   });
   it('faces imported preview characters along the world forward axis', () => {
-    const looks = JSON.parse(readFileSync(
-      new URL('../public/fixtures/characters/catalog.json', import.meta.url),
-      'utf8',
-    )) as CharacterLook[];
-    expect(looks.length).toBeGreaterThan(0);
+    const committed = (path: string): unknown => JSON.parse(readFileSync(
+      new URL(`../../../../assets/characters/${path}`, import.meta.url), 'utf8'));
+    const stylized = committed('stylized-looks.json') as { profile: string; looks: CharacterLook[] };
+    expect(stylized.profile).toBe('exulanica.character-stylized-looks/v1');
+    const looks = [committed('makehuman-parametric-v1/default.look.json') as CharacterLook, ...stylized.looks];
+    expect(looks.map(look => look.lookId)).toEqual(['editable-human', 'hoodie', 'casual', 'casual-f', 'formal-f']);
     for (const look of looks) expect(look.descriptor.forwardYawDegrees).toBe(180);
   });
 });
