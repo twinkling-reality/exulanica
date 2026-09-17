@@ -39,14 +39,14 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
 /**
  * The material record fields a renderer reads. Everything else in the record is world data.
  *
- * Read as the city vocabulary's surface_material v2 states them (first cut, 2026-09-16), where the
- * scale field is `uv_scale_millionths` and may be renamed so that it cannot be read as a frequency.
+ * Read as the city vocabulary states them for surface_material v2 (final wording, 2026-09-16):
+ * `repeat_size_millionths`, `uv_rotation_urad`, `uv_offset_u_mm` and `uv_offset_v_mm`.
  */
 export interface TileMaterialReference {
   readonly textureSetId: string;
   /** One repeat covers `extent * repeatSizeMillionths / 10^6` mm: 2,000,000 draws the set twice as large. */
   readonly repeatSizeMillionths: number;
-  /** Positive turns the texture's u axis from +s toward +t. */
+  /** Theta in microradians; a positive theta turns +s toward +t. */
   readonly rotationUrad: number;
   /** Millimetres along the texture's own u and v axes, applied after the rotation. */
   readonly offsetUMm: number;
@@ -63,10 +63,11 @@ const MILLIONTHS = 1_000_000;
  * UV for a surface point `s`, `t` millimetres from the surface's own origin. THE ONE PLACE the
  * record's texture placement is interpreted; a change to its meaning changes only this function.
  *
- * The texture's u axis points along `cos r * s + sin r * t` (positive `r` turns +s toward +t) and
- * its v axis along `-sin r * s + cos r * t`, so at `r = 0` u runs along s and v along t. The point
- * is measured along those axes in millimetres, shifted by the record's offsets, and divided by the
- * repeat length, which is the set's physical extent times the record's size factor.
+ * Exactly the city vocabulary's formula, with theta the record's rotation (a positive theta turns
+ * +s toward +t) and repeat the set's physical extent times the record's size factor:
+ *
+ *   u = (cos(theta) * s - sin(theta) * t + offset_u) / repeat_u
+ *   v = (sin(theta) * s + cos(theta) * t + offset_v) / repeat_v
  *
  * Returns a float pair for the render payload only. Nothing digested reads it.
  */
@@ -81,8 +82,8 @@ export function surfaceUv(
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return [
-    (cos * sMm + sin * tMm + reference.offsetUMm) / (entry.extentUMm * size),
-    (-sin * sMm + cos * tMm + reference.offsetVMm) / (entry.extentVMm * size),
+    (cos * sMm - sin * tMm + reference.offsetUMm) / (entry.extentUMm * size),
+    (sin * sMm + cos * tMm + reference.offsetVMm) / (entry.extentVMm * size),
   ];
 }
 

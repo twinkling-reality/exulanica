@@ -57,22 +57,23 @@ describe('generated tile UV rule', () => {
     expect(halved[1]).toBeCloseTo(2, 12);
   });
 
-  it('turns +s toward +t for a positive rotation, in millimetres, keeping the set\'s proportions', () => {
-    // A quarter turn: the texture's u axis now runs along +t and its v axis along -s.
+  it('rotates by the city vocabulary\'s formula, in millimetres, keeping the set\'s proportions', () => {
+    // u = cos*s - sin*t, v = sin*s + cos*t: a quarter turn carries +s onto +t.
     const quarter = { ...unit, rotationUrad: 1_570_796 };
-    const alongT = surfaceUv(0, 1800, quarter, KERB);
-    expect(alongT[0]).toBeCloseTo(1, 5);
-    expect(alongT[1]).toBeCloseTo(0, 5);
-    const alongS = surfaceUv(450, 0, quarter, KERB);
-    expect(alongS[0]).toBeCloseTo(0, 5);
-    expect(alongS[1]).toBeCloseTo(-1, 5);
+    const fromT = surfaceUv(0, 1800, quarter, KERB);
+    expect(fromT[0]).toBeCloseTo(-1, 5);
+    expect(fromT[1]).toBeCloseTo(0, 5);
+    // 450 mm along s lands on v, where one repeat of the 1800 by 450 mm set is 450 mm.
+    const fromS = surfaceUv(450, 0, quarter, KERB);
+    expect(fromS[0]).toBeCloseTo(0, 5);
+    expect(fromS[1]).toBeCloseTo(1, 5);
   });
 
   it('shifts by the offsets along the texture\'s own axes, after the rotation', () => {
     const shifted = surfaceUv(0, 0, { ...unit, offsetUMm: 900, offsetVMm: 225 }, KERB);
     expect(shifted).toEqual([0.5, 0.5]);
     const turnedAndShifted = surfaceUv(0, 1800, { ...unit, rotationUrad: 1_570_796, offsetUMm: 900, offsetVMm: 0 }, KERB);
-    expect(turnedAndShifted[0]).toBeCloseTo(1.5, 5);
+    expect(turnedAndShifted[0]).toBeCloseTo(-0.5, 5);
     const sized = surfaceUv(0, 0, { ...unit, repeatSizeMillionths: 2_000_000, offsetUMm: 900, offsetVMm: 0 }, KERB);
     expect(sized[0]).toBeCloseTo(0.25, 12);
   });
