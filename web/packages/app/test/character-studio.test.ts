@@ -127,3 +127,43 @@ it('keeps controls live during fitting, blocks stale application, and preserves 
   expect(view.root.querySelector('.character-fitting')?.hasAttribute('hidden')).toBe(true);
   expect(button('Use in world').disabled).toBe(false);
 });
+
+describe('people mode', () => {
+  it('previews catalog choices, applies a person or the abstract figure, and restores saved looks', async () => {
+    const { CHARACTER_CATALOG, DESIGNED_LOOKS, designedLook } = await import('@exulanica/atlas-react/playcanvas');
+    const handlers = {
+      onClose: vi.fn(), onPreview: vi.fn(), onApply: vi.fn(), onRotate: vi.fn(), onZoom: vi.fn(), onMotion: vi.fn(),
+      onGestures: vi.fn(), onRetry: vi.fn(), onPreviewLook: vi.fn(), onApplyChoice: vi.fn(), onResetLook: vi.fn(),
+    };
+    const view = buildCharacterStudio(handlers);
+    document.body.replaceChildren(view.root);
+    view.setVisible(true);
+    view.setCatalog([look('first')], { lookId: 'first', appearance: {} });
+    const start = designedLook(DESIGNED_LOOKS, DESIGNED_LOOKS.defaults.player);
+    view.setPeople(CHARACTER_CATALOG, DESIGNED_LOOKS, { kind: 'catalog', look: start });
+    view.setPeopleStatus('Ready', true);
+    const button = (text: string) => [...view.root.querySelectorAll('button')].find(node => node.textContent === text)!;
+    expect(view.root.querySelector<HTMLElement>('.character-body')!.hidden).toBe(true);
+    expect(view.root.textContent).toContain('Jacket and jeans');
+    button('Dark suit').click();
+    expect(handlers.onPreviewLook).toHaveBeenLastCalledWith(designedLook(DESIGNED_LOOKS, 'suit-masculine'));
+    button('Style').click();
+    expect(view.root.querySelector<HTMLElement>('.character-body')!.hidden).toBe(true);
+    view.setPeopleStatus('Ready', true);
+    button('Use in world').click();
+    expect(handlers.onApplyChoice).toHaveBeenLastCalledWith({ kind: 'catalog', look: designedLook(DESIGNED_LOOKS, 'suit-masculine') });
+    button('Body').click();
+    button('Abstract figure').click();
+    button('Use in world').click();
+    expect(handlers.onApplyChoice).toHaveBeenLastCalledWith({ kind: 'abstract' });
+    view.setHistory([
+      { revision: 2, operation: 'save', restoredFromRevision: null, choice: { kind: 'abstract' }, savedAt: '2026-09-17T10:00:00Z' },
+      { revision: 1, operation: 'save', restoredFromRevision: null, choice: { kind: 'catalog', look: start }, savedAt: '2026-09-17T09:00:00Z' },
+    ]);
+    expect(view.root.querySelector('.character-history')!.textContent).toContain('Wearing now');
+    [...view.root.querySelectorAll<HTMLButtonElement>('.character-history button')].find(node => node.textContent === 'Restore')!.click();
+    expect(handlers.onResetLook).toHaveBeenLastCalledWith(1);
+    button('Reset to default').click();
+    expect(handlers.onResetLook).toHaveBeenLastCalledWith();
+  });
+});

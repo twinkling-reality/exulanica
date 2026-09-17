@@ -1,7 +1,16 @@
 import { buildCharacterBody, type BodyFamily, type BodyRecipe, type CharacterStep } from './character-body.js';
 import type { CharacterLook, CharacterSelection } from '../character-catalog.js';
+import type { SavedRevision } from '../character-looks-store.js';
+import { buildLookEditor, sameLook } from './character-look-editor.js';
 import { el, replace } from './dom.js';
 import { createModalFocus } from './modal-focus.js';
+import type { CharacterCatalog, CharacterLook as PersonLook, DesignedLooks } from '@exulanica/atlas-react/playcanvas';
+
+/** What the person is wearing in people mode: a catalog person, the abstract figure or a premade example. */
+export type PeopleChoice =
+  | { readonly kind: 'catalog'; readonly look: PersonLook }
+  | { readonly kind: 'abstract' }
+  | { readonly kind: 'stylized'; readonly selection: CharacterSelection };
 
 interface CharacterStudioHandlers {
   onSelect?(): void;
@@ -9,6 +18,12 @@ interface CharacterStudioHandlers {
   onClose(): void;
   onPreview(selection: CharacterSelection): void;
   onApply(selection: CharacterSelection): void;
+  /** People mode: show this catalog person on the stage. */
+  onPreviewLook?(look: PersonLook): void;
+  /** People mode: wear and save this choice. */
+  onApplyChoice?(choice: PeopleChoice): void;
+  /** People mode: go back to the default look, or restore a saved revision. */
+  onResetLook?(restoreRevision?: number): void;
   onRotate(yaw: number): void;
   onZoom(zoom: number): void;
   onMotion(motion: 'idle' | 'walk' | 'run'): void;
@@ -17,6 +32,7 @@ interface CharacterStudioHandlers {
 }
 
 export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
+  let people: { readonly editor: ReturnType<typeof buildLookEditor>; choice: PeopleChoice; readonly designed: DesignedLooks } | null = null;
   const root = el('section', { class: 'character-studio', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'character-title' });
   root.hidden = true;
   const close = el('button', { type: 'button', class: 'character-return', text: '← Return' });
@@ -61,6 +77,9 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
   function setStep(key: CharacterStep) {
     activeStep = key;
     body.setStep(key);
+    // The generated body builder stays out of people mode on every step.
+    if (people) body.root.hidden = true;
+    reflectPeopleStep(key);
     motion.hidden = key !== 'review';
     steps.forEach(([name, title], index) => {
       tabButtons.get(name)?.setAttribute('aria-pressed', String(name === key));
@@ -80,10 +99,66 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
   setStep('body');
   let selection: CharacterSelection | null = null;
   let catalog: readonly CharacterLook[] = [];
-  const editing = el('fieldset', { class: 'character-editor' }, [stepTitle, body.root, motion, next]);
+  // People mode: catalog looks replace the generated body builder when the catalog is offered.
+  const peopleRoot = el('div', { class: 'character-people' });
+  peopleRoot.hidden = true;
+  const figure = el('div', { class: 'character-look-group', role: 'group', 'aria-label': 'Figure', 'data-control': 'figure' });
+  const peopleSteps = { body: el('div'), face: el('div'), style: el('div') };
+  peopleRoot.append(figure, peopleSteps.body, peopleSteps.face, peopleSteps.style);
+  const history = el('div', { class: 'character-history', role: 'group', 'aria-label': 'Saved looks' });
+  history.hidden = true;
+  const saveNote = el('p', { class: 'character-session-note', text: 'For this preview session. Your changes are not saved to an account.' });
+  function reflectFigure(): void {
+    if (!people) return;
+    const current = people;
+    const button = (label: string, pressed: boolean, choose: () => void) => {
+      const node = el('button', { type: 'button', text: label, 'aria-pressed': String(pressed) });
+      node.addEventListener('click', choose);
+      return node;
+    };
+    replace(figure, [
+      el('h3', { text: 'Figure' }),
+      button('A person', current.choice.kind === 'catalog', () => {
+        current.choice = { kind: 'catalog', look: current.editor.look };
+        reflectFigure();
+        handlers.onPreviewLook?.(current.editor.look);
+      }),
+      button('Abstract figure', current.choice.kind === 'abstract', () => {
+        current.choice = { kind: 'abstract' };
+        reflectFigure();
+        status.textContent = 'The abstract figure has no detail to preview. Use it in the world to see it.';
+        apply.disabled = false;
+      }),
+    ]);
+    for (const section of Object.values(peopleSteps)) section.toggleAttribute('inert', current.choice.kind === 'abstract');
+  }
+  function reflectPeopleName(): void {
+    if (!people) return;
+    const current = people;
+    const designedEntry = current.choice.kind === 'catalog'
+      ? current.designed.looks.find((item) => sameLook(item.look, current.editor.look))
+      : undefined;
+    lookName.textContent = current.choice.kind === 'abstract' ? 'Abstract figure' : designedEntry?.label ?? 'Your person';
+  }
+  function reflectPeopleStep(key: CharacterStep): void {
+    if (!people) return;
+    peopleSteps.body.hidden = key !== 'body';
+    peopleSteps.face.hidden = key !== 'face';
+    peopleSteps.style.hidden = key !== 'style';
+    figure.hidden = key !== 'body';
+  }
+  const editing = el('fieldset', { class: 'character-editor' }, [stepTitle, body.root, peopleRoot, motion, next]);
   editing.disabled = true;
   const apply = el('button', { type: 'button', class: 'character-apply', text: 'Use in world', disabled: true });
-  apply.addEventListener('click', () => { if (selection) handlers.onApply(selection); });
+  apply.addEventListener('click', () => {
+    if (!people) {
+      if (selection) handlers.onApply(selection);
+      return;
+    }
+    const choice = people.choice;
+    handlers.onApplyChoice?.(choice.kind === 'catalog' ? { kind: 'catalog', look: people.editor.look }
+      : choice.kind === 'stylized' && selection ? { kind: 'stylized', selection } : choice);
+  });
   const reset = el('button', { type: 'button', text: 'Reset colors', disabled: true });
   reset.addEventListener('click', () => {
     if (selection) { selection = { ...selection, appearance: {} }; reflectColors(); handlers.onPreview(selection); }
@@ -149,8 +224,7 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
     el('aside', { class: 'character-sidebar' }, [tabs, editing]),
     el('aside', { class: 'character-description' }, [
       el('p', { class: 'character-eyebrow', text: 'Your preview' }), lookName,
-      status, retry, apply,
-      el('p', { class: 'character-session-note', text: 'For this preview session. Your changes are not saved to an account.' }), source,
+      status, retry, apply, saveNote, history, source,
     ]),
     el('footer', { class: 'character-preview-controls' }, [
       el('label', {}, [el('span', { text: 'Rotate' }), rotation]),
@@ -160,6 +234,10 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
   );
 
   function select(next: CharacterSelection): void {
+    if (people) {
+      people.choice = { kind: 'stylized', selection: next };
+      reflectFigure();
+    }
     handlers.onSelect?.(); liveUpdating = false; bodyFailure = null;
     setFitting(false);
     body.setUpdating(false);
@@ -214,6 +292,59 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
   }
   return {
     root, canvas,
+    /**
+     * Offer catalog people: controls for every declared choice, the abstract figure, and the
+     * person's saved revisions. The generated body builder is not shown in this mode.
+     */
+    setPeople(catalogOfPeople: CharacterCatalog, designed: DesignedLooks, current: PeopleChoice) {
+      if (!people) {
+        const editor = buildLookEditor(catalogOfPeople, designed, (look) => {
+          if (!people) return;
+          people.choice = { kind: 'catalog', look };
+          reflectFigure();
+          reflectPeopleName();
+          apply.disabled = true;
+          handlers.onPreviewLook?.(look);
+        });
+        people = { editor, choice: current, designed };
+        peopleSteps.body.append(editor.sections.body);
+        peopleSteps.face.append(editor.sections.face);
+        peopleSteps.style.append(editor.sections.style);
+      }
+      people.choice = current;
+      if (current.kind === 'catalog') people.editor.setLook(current.look);
+      body.root.hidden = true;
+      peopleRoot.hidden = false;
+      source.textContent = 'People from MakeHuman (CC0) with motion from Quaternius (CC0)';
+      reflectFigure();
+      reflectPeopleName();
+      reflectPeopleStep(activeStep);
+      editing.disabled = false;
+    },
+    setSaveNote(text: string) { saveNote.textContent = text; },
+    /** Newest first; the first entry is what the person wears now. */
+    setHistory(revisions: readonly SavedRevision[]) {
+      history.hidden = revisions.length === 0;
+      const describe = (entry: SavedRevision) => entry.choice.kind === 'abstract' ? 'Abstract figure'
+        : entry.choice.kind === 'stylized' ? 'Premade example'
+        : people?.designed.looks.find((item) => entry.choice.kind === 'catalog' && sameLook(item.look, entry.choice.look))?.label ?? 'Your person';
+      const reset = el('button', { type: 'button', text: 'Reset to default' });
+      reset.addEventListener('click', () => handlers.onResetLook?.());
+      replace(history, [
+        el('h3', { text: 'Saved looks' }),
+        el('ol', {}, revisions.slice(0, 8).map((entry, index) => {
+          const when = Number.isFinite(Date.parse(entry.savedAt)) ? new Date(entry.savedAt).toLocaleString() : '';
+          const row = el('li', {}, [el('span', { text: `${describe(entry)}${entry.restoredFromRevision ? ' (restored)' : ''}` }), el('small', { text: when })]);
+          if (index > 0) {
+            const restore = el('button', { type: 'button', text: 'Restore', 'aria-label': `Restore ${describe(entry)} from ${when}` });
+            restore.addEventListener('click', () => handlers.onResetLook?.(entry.revision));
+            row.append(restore);
+          } else row.append(el('small', { text: 'Wearing now' }));
+          return row;
+        })),
+        reset,
+      ]);
+    },
     setBodyUpdating() {
       liveUpdating = true;
       setFitting(true);
@@ -248,6 +379,12 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
       selection = current;
       reflectChoices();
       reflectSelection();
+    },
+    setPeopleStatus(text: string, ready: boolean) {
+      status.textContent = text;
+      retry.hidden = true;
+      apply.disabled = !ready;
+      editing.disabled = false;
     },
     setStatus(text: string, ready: boolean) {
       status.textContent = ready && bodyDirty ? bodyFailure ?? 'Updating your preview… You can keep adjusting.' : text;

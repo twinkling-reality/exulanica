@@ -177,3 +177,22 @@
 :root[data-contrast='high'] #shell .character-description { background: #071014e8; }
 :root[data-transparency='reduced'] #shell .character-studio,
 :root[data-transparency='reduced'] #shell .character-fitting { background: #101a20; backdrop-filter: none; }
+
+/* People mode: catalog look controls and saved looks. */
+#shell .character-look-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+#shell .character-look-group > h3, #shell .character-look-group > p { width: 100%; margin: 0 0 6px; }
+#shell .character-look-group button { flex: 0 1 auto; border-color: var(--edge, #b9c4c7); padding: 8px 10px; font-size: 12px; }
+#shell .character-look-group button[aria-pressed='true'] { color: var(--ink, #263940); background: var(--surface, #ffffff88); border-color: var(--accent, #40545d); }
+#shell .character-look-group .character-swatch { width: 34px; min-height: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 0; background: var(--swatch); border: 2px solid var(--edge, #b9c4c7); }
+#shell .character-look-group .character-swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--accent, #40545d); background: var(--swatch); }
+#shell .character-look-slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; margin-bottom: 16px; }
+#shell .character-look-slider input { grid-column: 1 / -1; width: 100%; }
+#shell .character-look-slider output { font-size: 12px; color: var(--ink-soft, #52656b); }
+#shell .character-people [inert] { opacity: .45; }
+#shell .character-history { margin-top: 18px; }
+#shell .character-history h3 { margin: 0 0 8px; font-size: 13px; }
+#shell .character-history ol { list-style: none; margin: 0 0 10px; padding: 0; }
+#shell .character-history li { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--edge, #c1cbce); }
+#shell .character-history li small { grid-column: 1; font-size: 11px; color: var(--ink-soft, #52656b); }
+#shell .character-history li button, #shell .character-history li > small:last-child { grid-column: 2; grid-row: 1 / span 2; }
+#shell .character-history > button { border-color: var(--edge, #b9c4c7); }

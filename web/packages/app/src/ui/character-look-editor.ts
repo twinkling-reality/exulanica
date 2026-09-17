@@ -29,7 +29,8 @@ function designed(looks: DesignedLooks, lookId: string): CharacterLook {
   return entry.look;
 }
 
-function sameLook(a: CharacterLook, b: CharacterLook): boolean {
+/** Two looks name the same choices, whatever order their fields were written in. */
+export function sameLook(a: CharacterLook, b: CharacterLook): boolean {
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
 
