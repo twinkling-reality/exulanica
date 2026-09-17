@@ -81,8 +81,8 @@ describe('owned runtime population representation', () => {
 
   it('clears unavailable residents and cannot repopulate from retained state', () => {
     const { runtime, app } = setup();
-    runtime.setSociety(population(0), 24, [0, 0]);
-    runtime.setSociety(population(1), 24, [0, 0]);
+    runtime.setSociety(population(0), [0, 0]);
+    runtime.setSociety(population(1), [0, 0]);
     runtime.revealInhabitant('person-0');
     runtime.clearSociety();
     runtime.clearSociety();
@@ -93,21 +93,27 @@ describe('owned runtime population representation', () => {
     expect(runtime.nativeCharacterFrames(0, false)).toEqual([]);
     expect(runtime.pickInhabitant([0, 1, -2], [0, 0, 1])).toBeNull();
     expect(runtime.societyAnimating).toBe(false);
-    expect(runtime.societyRoot.children).toHaveLength(0);
-    expect(runtime.setSociety(population(2), 24, [0, 0])).toBe(24);
+    expect(runtime.societyRoot.children.filter((child) => child.name.startsWith('synthetic:'))).toHaveLength(0);
+    expect(runtime.societyCounts).toMatchObject({ population: 0, near: 0, far: 0, drawn: 0 });
+    expect(runtime.setSociety(population(2), [0, 0])).toBe(128);
     runtime.destroy();
     app.destroy();
   });
-  it('caps display without truncating population and refreshes subjects around a new observer', () => {
+  it('draws the whole population by distance and moves full detail with the observer', () => {
     const { runtime, app } = setup();
     const state = population(0);
-    expect(runtime.setSociety(state, 100, [0, 0])).toBe(24);
+    expect(runtime.setSociety(state, [0, 0])).toBe(128);
     expect(state.inhabitants).toHaveLength(128);
-    expect(runtime.visibleInhabitantIds).toContain('person-0');
+    expect(runtime.societyCounts).toMatchObject({ population: 128, near: 24, far: 104, indoors: 0 });
+    expect(runtime.inhabitantDetail('person-0')).toBe('near');
+    expect(runtime.inhabitantDetail('person-127')).toBe('far');
+    expect(runtime.nativeCharacterFrames(1 / 60, false)).toHaveLength(24);
     runtime.refreshNearby([127, 0]);
-    expect(runtime.visibleInhabitantIds).toContain('person-127');
-    expect(runtime.visibleInhabitantIds).not.toContain('person-0');
+    expect(runtime.inhabitantDetail('person-127')).toBe('near');
+    expect(runtime.inhabitantDetail('person-0')).toBe('far');
+    expect(runtime.visibleInhabitantIds).toHaveLength(128);
     expect(runtime.pickInhabitant([127, 1, -2], [0, 0, 1])).toBe('person-127');
+    expect(runtime.pickInhabitant([0, 1, -2], [0, 0, 1])).toBe('person-0');
     runtime.destroy();
     app.destroy();
   });
@@ -166,7 +172,7 @@ describe('owned runtime population representation', () => {
     runtime.destroy();
     app.destroy();
   });
-  it('groups exact co-location and promotes the selected stable subject without moving anyone', () => {
+  it('draws co-located inhabitants where the simulation put them and keeps a selection near', () => {
     const { runtime, app } = setup();
     const state: OwnedSocietyState = {
       tick: 0,
@@ -177,7 +183,8 @@ describe('owned runtime population representation', () => {
     };
     runtime.setSociety(state);
     expect(runtime.visibleInhabitantIds).toEqual(['a', 'b']);
-    expect(runtime.drawnInhabitantCount).toBe(1);
+    expect(runtime.drawnInhabitantCount).toBe(2);
+    expect(runtime.coincidentInhabitants('a')).toEqual(['a', 'b']);
     expect(runtime.pickInhabitant([0, 1, -2], [0, 0, 1])).toBe('a');
     runtime.revealInhabitant('b');
     expect(runtime.pickInhabitant([0, 1, -2], [0, 0, 1])).toBe('b');

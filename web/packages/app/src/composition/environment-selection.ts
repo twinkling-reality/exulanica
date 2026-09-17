@@ -1,6 +1,5 @@
 import {
   type AtlasScene,
-  type OwnedDistrict,
   type DistrictSubject,
 } from '@exulanica/atlas-core';
 import {
@@ -12,7 +11,12 @@ import {
 } from '@exulanica/atlas-react/playcanvas';
 import { nycOpenDataAdmissionId } from '../config.js';
 import type { Credentials } from '../config.js';
-import { parseRecordedSocietyPreview, type RecordedSocietyPreview } from '../society-preview-presentation.js';
+import {
+  clockText,
+  parseLivingSocietyRecording,
+  recordingState,
+  type LivingSocietyRecording,
+} from '../society-preview-presentation.js';
 import { SocietyClient, type SocietySnapshot } from '../society-api.js';
 import {
   SocietyControlClient,
@@ -43,36 +47,19 @@ import {
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
-const PREVIEW_ROLES = ['baker', 'designer', 'gardener', 'student', 'steward', 'teacher'] as const;
-
-function previewSociety(district: OwnedDistrict): OwnedSocietyState {
-  const sidewalkPoints = district.sidewalks.map((sidewalk) => {
-    const ring = sidewalk.polygons[0]?.[0] ?? [];
-    const points = ring.slice(0, -1);
-    if (points.length === 0) return [0, 0] as const;
-    const sum = points.reduce(
-      (held, point) => [held[0] + point[0], held[1] + point[1]] as const,
-      [0, 0] as const,
-    );
-    return [Math.round(sum[0] * 10 / points.length), Math.round(sum[1] * 10 / points.length)] as const;
-  });
-  return Object.freeze({
-    tick: 0,
-    inhabitants: Object.freeze(Array.from({ length: 128 }, (_, index) => {
-      const point = sidewalkPoints[index % Math.max(1, sidewalkPoints.length)] ?? [0, 0];
-      const orbit = Math.floor(index / Math.max(1, sidewalkPoints.length));
-      return Object.freeze({
-        id: `preview-synthetic-inhabitant-${index}`,
-        synthetic: true as const,
-        role: PREVIEW_ROLES[index % PREVIEW_ROLES.length]!,
-        position_mm: [
-          point[0] + ((orbit % 3) - 1) * 850,
-          point[1] + ((Math.floor(orbit / 3) % 3) - 1) * 850,
-        ] as const,
-      });
-    })),
-  });
-}
+/** Where the development preview's real-engine society recording is served. */
+const SOCIETY_RECORDING_URL = '/preview-api/society/recording';
+const RECORDING_SPEEDS = [
+  [1, 'Real time'],
+  [10, '10 times faster'],
+  [60, '60 times faster'],
+] as const;
+const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
+  idle: 'waiting', move: 'walking', stroll: 'pausing on a walk', visit: 'visiting', rest: 'resting',
+  eat_at_home: 'eating at home', eat_out: 'eating out', shop: 'shopping', sleep: 'sleeping',
+  stay_home: 'at home', work: 'working',
+};
+const activityLabel = (kind: string): string => ACTIVITY_LABELS[kind] ?? kind.replaceAll('_', ' ');
 
 export interface EnvironmentSelectionDependencies {
   readonly env: AppEnvironment;
@@ -282,7 +269,17 @@ export function mountEnvironmentSelection(
   let renderedSnapshot: SocietySnapshot | null = null;
   let selectedInhabitant: string | null = null;
   let previewState: OwnedSocietyState | null = null;
-  let recordedPreview: RecordedSocietyPreview | null = null;
+  let recording: LivingSocietyRecording | null = null;
+  let recordingFrame = 0;
+  let recordingSpeed = 1;
+  let recordingPlaying = false;
+  const recordingStatus = el('p', { class: 'living-world-fixture', 'aria-live': 'polite' });
+  const crowdStatus = el('p', { role: 'status', class: 'living-society-counts' });
+  const recordingPlay = el('button', { type: 'button', text: 'Pause' });
+  const recordingNext = el('button', { type: 'button', text: 'Next minute' });
+  const recordingRestart = el('button', { type: 'button', text: 'Restart recording' });
+  const recordingSpeedSelect = el('select', { 'aria-label': 'Recorded society speed' });
+  for (const [value, label] of RECORDING_SPEEDS) recordingSpeedSelect.append(el('option', { value: String(value), text: label }));
   let attachedControls: { onInteract: (() => void) | null } | null = null;
 
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
@@ -325,6 +322,27 @@ export function mountEnvironmentSelection(
     });
   }
 
+  function inhabitantLabel(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
+    const place = deps.state.atlas?.binding.ownedDistrict?.district.name ?? 'this place';
+    return inhabitant.display_name ?? (inhabitant.role ? `A ${inhabitant.role}` : `A person in ${place}`);
+  }
+
+  function reflectCrowd(): void {
+    const runtime = deps.state.atlas?.binding.ownedDistrict;
+    const canvas = deps.env.canvas;
+    const state = society?.state ?? previewState;
+    if (!runtime || !canvas || !state) { crowdStatus.textContent = ''; return; }
+    const counts = runtime.societyCounts;
+    const walking = state.inhabitants.filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length;
+    canvas.dataset.societyNear = String(counts.near);
+    canvas.dataset.societyFar = String(counts.far);
+    canvas.dataset.societyIndoors = String(counts.indoors);
+    const clock = state.minute_of_day === undefined ? '' : `${clockText(state.minute_of_day)} · `;
+    crowdStatus.textContent = `${clock}${counts.population} inhabitants, ${counts.drawn} drawn `
+      + `(${counts.near} as characters, ${counts.far} as distant figures), ${counts.indoors} indoors, `
+      + `${walking} walked in the last minute.`;
+  }
+
   function reflectNearby(): void {
     const state = society?.state ?? previewState;
     const visible = new Set(deps.state.atlas?.binding.ownedDistrict?.visibleInhabitantIds ?? []);
@@ -332,9 +350,10 @@ export function mountEnvironmentSelection(
     workspace.setNearby(state ? visible.size : 0);
     inhabitantsList.replaceChildren(el('option', {value: '', text: 'Inspect a nearby inhabitant'}));
     for (const inhabitant of state?.inhabitants ?? []) {
-      if (visible.has(inhabitant.id)) inhabitantsList.append(el('option', {value: inhabitant.id, text: inhabitant.display_name ?? `${inhabitant.role ?? 'Inhabitant'} · ${inhabitant.id}`}));
+      if (visible.has(inhabitant.id)) inhabitantsList.append(el('option', {value: inhabitant.id, text: `${inhabitantLabel(inhabitant)} · ${inhabitant.id.slice(0, 8)}`}));
     }
     if (selectedInhabitant && visible.has(selectedInhabitant)) inhabitantsList.value = selectedInhabitant;
+    reflectCrowd();
   }
 
   function inspectInhabitant(id: string, reveal = true): void {
@@ -349,13 +368,15 @@ export function mountEnvironmentSelection(
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
+    if (state.profile === 'exulanica-society/v4') { inspectLivingInhabitant(inhabitant, state); return; }
     const v2 = state.profile === 'exulanica-society/v2';
+    const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
     const representation = deps.state.atlas?.binding.ownedDistrict?.inhabitantRepresentation(id);
     const liveInspection = liveSociety?.inspect(id);
     const eventText = liveInspection
       ? liveInspection.events.map(event => `Tick ${event.tick}: ${event.document.summary} [${event.event_id}]`).join(' ')
         + (liveInspection.missingEventIds.length ? ` Referenced events unavailable in the latest event window: ${liveInspection.missingEventIds.join(', ')}.` : '')
-      : recordedPreview?.events.filter(event => event.subject_id === id && inhabitant.explanation?.event_ids.includes(event.event_id) && event.tick <= state.tick).map(event => `Tick ${event.tick}: ${event.document.summary} [${event.event_id}]`).join(' ');
+      : '';
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
     inspector.show({
       subject: id,
@@ -366,18 +387,151 @@ export function mountEnvironmentSelection(
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', deps.state.atlas?.binding.ownedDistrict?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
-        ['Goal / destination', v2 && inhabitant.goal ? `${inhabitant.goal.kind} · ${inhabitant.goal.target_id}: ${inhabitant.goal.reason}` : 'Unavailable'],
+        ['Goal / destination', v2 && goal ? `${goal.kind} · ${goal.target_id}: ${goal.reason}` : 'Unavailable'],
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
         ['Event references', v2 ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],
         ['Branch / time', `${society?.versionId ?? 'Preview, not persisted'} · tick ${state.tick}`],
         ['Input', state.input_sha256 ?? 'Unavailable'],
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
-        ['Shared position', `${deps.state.atlas?.binding.ownedDistrict?.coincidentInhabitants(inhabitant.id).length ?? 1} nearby subjects at this position. One is shown; selecting another changes the visible representative.`],
+        ['Shared position', `${deps.state.atlas?.binding.ownedDistrict?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId),
         ['Unavailable dependencies', v2 ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
     });
+  }
+
+  function inspectLivingInhabitant(
+    inhabitant: OwnedSocietyState['inhabitants'][number],
+    state: OwnedSocietyState,
+  ): void {
+    const runtime = deps.state.atlas?.binding.ownedDistrict;
+    const representation = runtime?.inhabitantRepresentation(inhabitant.id);
+    const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
+    const goal = inhabitant.goal && 'activity' in inhabitant.goal ? inhabitant.goal : null;
+    const action = inhabitant.action;
+    const detail = runtime?.inhabitantDetail(inhabitant.id) ?? 'not-drawn';
+    const shown = { near: 'A full character near you', far: 'A simple distant figure of the same person',
+      indoors: 'Inside premises; interiors are not drawn', 'not-drawn': 'Too far away to draw; identity is retained' }[detail];
+    const where = (destination: string | null | undefined) => destination
+      ? `${destination.split('/').at(-1)}${recording?.destinations.get(destination) ? ` (holds ${recording.destinations.get(destination)!.capacity})` : ''}`
+      : 'an open spot on the sidewalk';
+    const history = (recording?.eventsBySubject.get(inhabitant.id) ?? [])
+      .filter((event) => event.tick <= state.tick).slice(-6)
+      .map((event) => `Tick ${event.tick}: ${event.summary} [${event.eventId}]`).join(' ');
+    const needs = Object.entries(inhabitant.needs ?? {}).map(([key, value]) => `${key} ${value}`).join(', ');
+    inspector.show({
+      subject: inhabitant.id,
+      title: inhabitantLabel(inhabitant),
+      description: 'A fictional inhabitant of this world, identified only by a synthetic identity. This is not a remembered person.',
+      activity: goal
+        ? `${activityLabel(goal.activity)} at ${where(goal.destination_id)}, because ${goal.because}.`
+        : inhabitant.explanation?.summary ?? 'Awaiting its first choice.',
+      details: [
+        ['Plane / origin', 'Simulation · synthetic'],
+        ['Shown as', shown],
+        ['Role', inhabitant.role ? inhabitant.role : `Unavailable (${(inhabitant.role_reason ?? 'no premises').replaceAll('_', ' ')})`],
+        ['Current activity', action ? `${activityLabel(action.kind)} · ${action.status}: ${action.reason.replaceAll('_', ' ')}` : 'Unavailable'],
+        ['Destination', goal ? where(goal.destination_id) : 'None chosen'],
+        ['Needs (of 1000)', needs || 'Unavailable'],
+        ['Recorded events', history || 'No recorded events yet.'],
+        ['Event references', inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references'],
+        ['Producer', `${state.profile} · ${deps.env.preview ? 'recorded by the real engine' : 'persisted'}`],
+        ['Branch / time', `${society?.versionId ?? 'Preview, not persisted'} · tick ${state.tick}${state.minute_of_day === undefined ? '' : ` · ${clockText(state.minute_of_day)}`}`],
+        ['Population', recording ? `${recording.population.size} of ${recording.population.capacity} places this district can hold. ${recording.population.reason}` : `${state.inhabitants.length} inhabitants`],
+        ['Permitted use', 'Inspect simulation state; not historical evidence'],
+        ['Shared position', `${runtime?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position`],
+        ...characterDisplayDetails(nativeCharacter, representation?.representationId),
+        ['Unavailable dependencies', recording
+          ? [...recording.unsupported, ...Object.entries(recording.environment).map(([key, value]) => `${key}: ${value.reason}`)].join('; ')
+          : 'Personal evidence and model explanation are not established by this view.'],
+      ],
+    });
+  }
+
+  function showRecordedFrame(index: number): void {
+    const atlas = deps.state.atlas?.binding;
+    if (!recording || phase === 'disposed' || !atlas?.ownedDistrict) return;
+    const last = recording.frames.length - 1;
+    recordingFrame = Math.max(0, Math.min(last, index));
+    const state = recordingState(recording, recordingFrame);
+    previewState = state;
+    atlas.ownedDistrict.setSociety(state, [atlas.controls.state.x, atlas.controls.state.z], { intervalMs: 60_000 / recordingSpeed });
+    const canvas = deps.env.canvas;
+    canvas.dataset.societyPopulation = String(state.inhabitants.length);
+    canvas.dataset.societyRendered = String(atlas.ownedDistrict.drawnInhabitantCount);
+    canvas.dataset.societyTick = String(state.tick);
+    canvas.dataset.societyMinute = String(state.minute_of_day ?? '');
+    recordingNext.disabled = recordingFrame >= last;
+    recordingStatus.textContent = recordingFrame >= last
+      ? `The recording ends at ${clockText(recording.frames[last]!.minuteOfDay)}. Restart it to watch again.`
+      : `Recorded minute ${recordingFrame} of ${last}, played ${recordingSpeed === 1 ? 'in real time' : `${recordingSpeed} times faster than real time`}.`;
+    reflectNearby();
+    if (selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
+    atlas.invalidate();
+  }
+
+  function scheduleRecording(delayMs = 60_000 / recordingSpeed): void {
+    if (societyTimer !== null) window.clearTimeout(societyTimer);
+    societyTimer = null;
+    const ended = !recording || recordingFrame >= recording.frames.length - 1;
+    if (ended) recordingPlaying = false;
+    recordingPlay.textContent = recordingPlaying ? 'Pause' : 'Play';
+    if (!recordingPlaying || phase === 'disposed') return;
+    societyTimer = window.setTimeout(() => {
+      societyTimer = null;
+      showRecordedFrame(recordingFrame + 1);
+      scheduleRecording();
+    }, delayMs);
+  }
+
+  recordingPlay.addEventListener('click', () => {
+    if (!recording) return;
+    if (!recordingPlaying && recordingFrame >= recording.frames.length - 1) showRecordedFrame(0);
+    recordingPlaying = !recordingPlaying;
+    scheduleRecording(recordingPlaying ? 0 : undefined);
+  });
+  recordingNext.addEventListener('click', () => { recordingPlaying = false; scheduleRecording(); showRecordedFrame(recordingFrame + 1); });
+  recordingRestart.addEventListener('click', () => { showRecordedFrame(0); recordingPlaying = true; scheduleRecording(0); });
+  recordingSpeedSelect.addEventListener('change', () => {
+    recordingSpeed = Number(recordingSpeedSelect.value);
+    if (recordingPlaying) scheduleRecording();
+  });
+
+  async function attachRecordedSociety(): Promise<void> {
+    const atlas = deps.state.atlas?.binding;
+    const runtime = atlas?.ownedDistrict;
+    if (!runtime) return;
+    const panel = el('details', { open: true }, [
+      el('summary', { text: 'Living society (recorded preview)' }),
+      crowdStatus, recordingStatus, recordingPlay, recordingNext, recordingRestart, recordingSpeedSelect,
+    ]);
+    workspace.details.prepend(panel);
+    fixture.textContent = 'Recorded preview';
+    if (!runtime.interpretation) {
+      recordingStatus.textContent = 'Living society unavailable: this district publishes no interpretation to walk on.';
+      return;
+    }
+    recordingStatus.textContent = 'Recording the living society with the simulation engine.';
+    try {
+      const response = await fetch(SOCIETY_RECORDING_URL, { signal: districtAbort.signal });
+      const body = await response.json() as unknown;
+      if (!response.ok) {
+        const detail = (body as { detail?: unknown } | null)?.detail;
+        throw new Error(typeof detail === 'string' ? detail : `the recording route answered ${response.status}`);
+      }
+      const parsed = parseLivingSocietyRecording(body, runtime.interpretation.document_sha256);
+      if ((phase as string) === 'disposed') return;
+      recording = parsed;
+      panel.append(el('p', { text: parsed.status }), el('p', { text: parsed.population.reason }));
+      showRecordedFrame(0);
+      recordingPlaying = true;
+      scheduleRecording(250);
+    } catch (error) {
+      if ((phase as string) === 'disposed') return;
+      recordingPlay.disabled = true; recordingNext.disabled = true; recordingRestart.disabled = true;
+      recordingStatus.textContent = `Living society unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    }
   }
 
   function reportSelection(feature: NYCLocalFeature, reveal = true): void {
@@ -796,7 +950,7 @@ export function mountEnvironmentSelection(
     } else {
       // Event/status updates must not restart a renderer's interpolation for the same state.
       if (renderedSnapshot?.stateSha256 !== society.stateSha256 || renderedSnapshot?.societyId !== society.societyId) {
-        atlas.ownedDistrict.setSociety(society.state, 24, [atlas.controls.state.x, atlas.controls.state.z]);
+        atlas.ownedDistrict.setSociety(society.state, [atlas.controls.state.x, atlas.controls.state.z]);
         renderedSnapshot = society;
       }
       canvas.dataset.societyPopulation = String(society.populationSize);
@@ -909,65 +1063,8 @@ export function mountEnvironmentSelection(
         await refreshPlayback();
         if ((phase as string) === 'disposed') return;
       } else if (atlas.ownedDistrict != null && deps.env.preview) {
-        if (atlas.ownedDistrict.interpretation) {
-          try {
-            const response = await fetch('/fixtures/living-world-ab-street-fixture.json', {
-              signal: districtAbort.signal,
-            });
-            if (!response.ok) throw new Error('Recorded fixture unavailable');
-            const parsed = parseRecordedSocietyPreview(await response.json(), atlas.ownedDistrict.interpretation.document_sha256);
-            if ((phase as string) === 'disposed') return;
-            recordedPreview = parsed;
-            let frameIndex = 0;
-            const replayStatus = el('p', {class:'living-world-fixture', 'aria-live':'polite'});
-            const next = el('button', {type:'button',text:'Replay next minute'});
-            const play = el('button', {type:'button',text:'Play recorded sequence'});
-            const reset = el('button', {type:'button',text:'Restart fixture'});
-            let playing = false;
-            const reflectFrame = () => {
-              const frame = parsed.frames[frameIndex]!;
-              society = frame.snapshot;
-              const visible = atlas.ownedDistrict!.setSociety(society.state,24,[atlas.controls.state.x,atlas.controls.state.z]);
-              deps.env.canvas.dataset.societyPopulation = String(society.populationSize);
-              deps.env.canvas.dataset.societyRendered = String(atlas.ownedDistrict!.drawnInhabitantCount);
-              deps.env.canvas.dataset.societyTick = String(society.currentTick);
-              const changes: Record<string,string> = {add_fixture_rest_pad:'Recorded fixture addition',disable_fixture_rest_pad:'Recorded fixture affordance disabled',restore_fixture_rest_pad:'Recorded fixture affordance restored; earlier events retained'};
-              replayStatus.textContent = `Recorded tick ${society.currentTick}. ${frame.change ? changes[frame.change] ?? frame.change : 'Engine-produced simulation state.'} `
-                + (frame.authored_objects.length ? 'Authored fixture object recorded; its asset rendering is unavailable in this view.' : '');
-              fixture.textContent = 'Recorded preview';
-              reason.textContent = `${society.populationSize} simulated inhabitants · ${visible} nearby. Coincident positions show one selectable person. Playback: one simulated minute per 2 seconds.`;
-              next.disabled = frameIndex === parsed.frames.length - 1;
-              reflectNearby();
-              if (selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
-              atlas.invalidate();
-            };
-            const advanceFrame = () => {
-              if ((phase as string) === 'disposed') return;
-              if (frameIndex < parsed.frames.length - 1) { frameIndex++; reflectFrame(); }
-              if (playing && frameIndex < parsed.frames.length - 1) societyTimer = window.setTimeout(advanceFrame,2000);
-              else { playing = false; play.textContent = 'Play recorded sequence'; societyTimer = null; }
-            };
-            next.addEventListener('click', () => { if (societyTimer !== null) window.clearTimeout(societyTimer); playing = false; advanceFrame(); });
-            play.addEventListener('click', () => { playing = !playing; play.textContent = playing ? 'Pause recording' : 'Play recorded sequence'; if (playing) advanceFrame(); else if (societyTimer !== null) { window.clearTimeout(societyTimer); societyTimer = null; } });
-            reset.addEventListener('click', () => { if (societyTimer !== null) window.clearTimeout(societyTimer); societyTimer = null; playing=false; frameIndex=0; play.textContent='Play recorded sequence'; reflectFrame(); });
-            workspace.details.append(el('details', {},[el('summary',{text:'Recorded simulation fixture'}),el('p',{text:parsed.status}),replayStatus,next,play,reset]));
-            reflectFrame();
-            return;
-          } catch (error) {
-            reason.textContent = `Recorded simulation unavailable: ${error instanceof Error ? error.message : String(error)}`;
-          }
-        }
-        previewState = previewSociety(atlas.ownedDistrict.district);
-        const rendered = atlas.ownedDistrict.setSociety(
-          previewState,
-          24,
-          [atlas.controls.state.x, atlas.controls.state.z],
-        );
-        deps.env.canvas.dataset.societyPopulation = String(previewState.inhabitants.length);
-        deps.env.canvas.dataset.societyRendered = String(rendered);
-        deps.env.canvas.dataset.societyTick = String(previewState.tick);
-        reason.textContent += ` ${previewState.inhabitants.length} synthetic inhabitants; `
-          + `${rendered} nearby.`;
+        await attachRecordedSociety();
+        if ((phase as string) === 'disposed') return;
       }
       reflectNearby();
       atlas.invalidate();
@@ -1008,7 +1105,9 @@ export function mountEnvironmentSelection(
       stopControlPoll();
       if (!deps.env.preview) clearDistrict();
       liveSociety?.dispose();
-      if (liveSociety) deps.state.atlas?.binding.ownedDistrict?.clearSociety();
+      if (liveSociety || recording) deps.state.atlas?.binding.ownedDistrict?.clearSociety();
+      recording = null;
+      recordingPlaying = false;
       liveSociety = null;
       society = null;
       renderedSnapshot = null;
@@ -1024,9 +1123,9 @@ export function mountEnvironmentSelection(
       canvas?.removeEventListener('camera-mode-change', reflectCamera);
       canvas?.removeEventListener('society-nearby-change', reflectNearby);
       if (canvas !== undefined) {
-        delete canvas.dataset.societyPopulation;
-        delete canvas.dataset.societyRendered;
-        delete canvas.dataset.societyTick;
+        for (const key of ['societyPopulation', 'societyRendered', 'societyTick', 'societyMinute', 'societyNear', 'societyFar', 'societyIndoors']) {
+          delete canvas.dataset[key];
+        }
       }
       overlay?.destroy();
       overlay = null;

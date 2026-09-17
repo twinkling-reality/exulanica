@@ -7,9 +7,10 @@ import type {
 } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
 import { buildingRayDistance, pointInRing, surfaceTriangles } from './district-surfaces.js';
-import { sampleMotionPath } from './society-presentation.js';
-import { PlayerAvatar } from './player-avatar.js';
-import { abstractCharacter, syntheticCharacterStyle } from './character-shape.js';
+import { SocietyCrowd, type CrowdCounts } from './society/crowd.js';
+import type { OwnedSocietyState } from './society/types.js';
+
+export type { OwnedSocietyState } from './society/types.js';
 
 export interface OwnedDistrictMetrics {
   readonly logicalBuildings: number;
@@ -56,27 +57,6 @@ export interface OwnedAuthoredEnvironmentInstance {
   readonly availability: string;
 }
 
-export interface OwnedSocietyState {
-  readonly profile?: 'exulanica-society/v1' | 'exulanica-society/v2';
-  readonly society_id?: string;
-  readonly branch_id?: string;
-  readonly input_seq?: number;
-  readonly input_sha256?: string;
-  readonly tick: number;
-  readonly inhabitants: readonly {
-    readonly id: string;
-    readonly synthetic: true;
-    readonly display_name?: string;
-    readonly role?: string;
-    readonly position_mm: readonly [number, number];
-    readonly goal?: null | { readonly kind: 'visit' | 'rest'; readonly target_id: string; readonly reason: string };
-    readonly action?: { readonly kind: 'idle' | 'move' | 'visit' | 'rest'; readonly status: 'active' | 'completed' | 'blocked'; readonly target_id: string | null; readonly remaining_ticks: number; readonly reason: string };
-    readonly route?: null | { readonly node_ids: readonly string[]; readonly edge_index: number; readonly edge_progress_mm: number; readonly destination_node_id: string; readonly input_sha256: string };
-    readonly motion_path_mm?: readonly (readonly [number, number])[];
-    readonly explanation?: { readonly summary: string; readonly event_ids: readonly string[] };
-  }[];
-}
-
 interface Batch {
   readonly positions: number[];
   readonly normals: number[];
@@ -90,19 +70,6 @@ interface HatchBatch extends Batch {
 interface LineBatch {
   readonly positions: number[];
   readonly indices: number[];
-}
-
-interface SocietyAnimation {
-  readonly startedAtMs: number;
-  readonly durationMs: number;
-  readonly inhabitants: readonly {
-    readonly id: string;
-    readonly role: string;
-    readonly ordinal: number;
-    readonly from: readonly [number, number];
-    readonly to: readonly [number, number];
-    readonly path: readonly (readonly [number, number])[];
-  }[];
 }
 
 const batch = (): Batch => ({ positions: [], normals: [], indices: [] });
@@ -392,19 +359,8 @@ export class OwnedDistrictRuntime {
   private readonly hatch: pc.Texture;
   private authoredMeshes: pc.Mesh[] = [];
   private authoredMaterials: pc.Material[] = [];
-  private societyMeshes: pc.Mesh[] = [];
-  private societyMaterials: pc.Material[] = [];
-  private readonly societyCharacters = new Map<string, PlayerAvatar>();
-  private lastSocietyFrameMs=0;
-  private nativeSocietyDiscontinuity=true;
-  private settleSocietyUntilMs=0;
-  private promotedInhabitant:string|null=null;
-  private readonly societyPositions = new Map<string, readonly [number, number]>();
-  private latestSociety: OwnedSocietyState | null = null;
-  private lastObserver: readonly [number, number] | null = null;
-  private societyScope = '';
-  private societyTick = -1;
-  private societyAnimation: SocietyAnimation | null = null;
+  /** The whole synthetic population, drawn by distance; see `society/crowd.ts`. */
+  private readonly crowd: SocietyCrowd;
   private destroyed = false;
 
   constructor(
@@ -420,6 +376,7 @@ export class OwnedDistrictRuntime {
     parent.addChild(this.societyRoot);
     this.hatch = hatchTexture(device);
     this.textures.push(this.hatch);
+    this.crowd = new SocietyCrowd(device, this.societyRoot);
 
     // Sidewalk footprints are recorded; what they are paved with is not. They draw like the
     // buildings, hatched and outlined, at a lower strength so they still read as ground.
@@ -584,108 +541,42 @@ export class OwnedDistrictRuntime {
 
   /** Release the unavailable population without inventing an authoritative snapshot. */
   clearSociety(): void {
-    this.latestSociety = null;
-    this.societyAnimation = null;
-    this.settleSocietyUntilMs = 0;
-    this.lastObserver = null;
-    this.promotedInhabitant = null;
-    this.societyScope = '';
-    this.societyTick = -1;
-    this.nativeSocietyDiscontinuity = true;
-    this.societyPositions.clear();
-    for (const character of this.societyCharacters.values()) character.destroy();
-    this.societyCharacters.clear();
-    for (const value of this.societyMeshes) value.destroy();
-    for (const value of this.societyMaterials) value.destroy();
-    this.societyMeshes = [];
-    this.societyMaterials = [];
+    this.crowd.clear();
   }
 
+  /**
+   * Present one canonical snapshot. The whole population is kept and drawn by distance, and the
+   * return value is how many inhabitants are drawn. `intervalMs` is the time until the next
+   * snapshot is expected, over which recorded motion is shown.
+   */
   setSociety(
     state: OwnedSocietyState,
-    visibleCap = 24,
     observer?: readonly [number, number],
+    options?: { readonly intervalMs?: number },
   ): number {
-    this.latestSociety = state;
-    this.lastObserver = observer ?? null;
-    const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
-    if(scope!==this.societyScope){for(const character of this.societyCharacters.values())character.destroy();this.societyCharacters.clear();}
-    const consecutive = scope === this.societyScope && state.tick === this.societyTick + 1;
-    this.nativeSocietyDiscontinuity ||= !consecutive;
-    this.societyScope = scope;
-    this.societyTick = state.tick;
-    // Picking follows only currently visible display positions, never a stale capped subset.
-    this.societyPositions.clear();
-    const visible = [...state.inhabitants]
-      .filter((inhabitant) => inhabitant.synthetic === true)
-      .sort((a, b) => observer === undefined ? 0 :
-        Math.hypot(a.position_mm[0] / 1000 - observer[0], a.position_mm[1] / 1000 - observer[1]) -
-        Math.hypot(b.position_mm[0] / 1000 - observer[0], b.position_mm[1] / 1000 - observer[1]))
-      .slice(0, Math.max(0, Math.min(visibleCap, 24)));
-    const visibleIds=new Set(visible.map(person=>person.id));
-    for(const [id,character] of this.societyCharacters)if(!visibleIds.has(id)){character.destroy();this.societyCharacters.delete(id);}
-    const animated = visible.map((inhabitant, ordinal) => {
-      const role=inhabitant.role??'inhabitant';
-      let character=this.societyCharacters.get(inhabitant.id);
-      if(!character){character=new PlayerAvatar(this.device,this.societyRoot,{name:`synthetic:${inhabitant.id}`,detail:'mid',representation:abstractCharacter({kind:'synthetic-inhabitant',societyId:state.society_id??'preview',branchId:state.branch_id??'preview',inhabitantId:inhabitant.id},'mid',syntheticCharacterStyle(inhabitant.id))});this.societyCharacters.set(inhabitant.id,character);}
-      const to = [
-        inhabitant.position_mm[0] / 1000,
-        inhabitant.position_mm[1] / 1000,
-      ] as const;
-      const candidatePath = inhabitant.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
-      // Legacy snapshots have no supported path. Do not fabricate travel between endpoints.
-      const path = state.profile === 'exulanica-society/v2' && consecutive && candidatePath?.length
-        ? candidatePath : [to];
-      const from = path[0]!;
-      this.societyPositions.set(inhabitant.id, from);
-      character.update({x:from[0],y:character.body.heightMm/1000*.89,z:from[1],yaw:0,pitch:0},0,0,1/60,true,true,0);
-      return { id: inhabitant.id, role, ordinal, from, to, path };
-    });
-    this.societyAnimation = animated.some(person=>person.path.length>1) ? {
-      startedAtMs: performance.now(),
-      durationMs: 1_850,
-      inhabitants: animated,
-    } : null;
-    this.applyCoincidentVisibility();
-    this.lastSocietyFrameMs=performance.now();
-    return visible.length;
+    return this.crowd.set(state, observer, options).drawn;
   }
 
-  /** Interpolate display meshes only; authoritative endpoints remain the society snapshots. */
+  /** Interpolate display only; authoritative endpoints remain the society snapshots. */
   tickSociety(nowMs: number): void {
-    const animation = this.societyAnimation;
-    if (animation === null) {
-      if(nowMs<this.settleSocietyUntilMs){
-        const dt=Math.max(.001,Math.min(.05,(nowMs-this.lastSocietyFrameMs)/1000));this.lastSocietyFrameMs=nowMs;
-        for(const [id,character] of this.societyCharacters){const p=this.societyPositions.get(id)!;character.update({x:p[0],y:character.body.heightMm/1000*.89,z:p[1],yaw:0,pitch:0},0,0,dt,true,false,0);}
-        this.applyCoincidentVisibility();
-      }else this.settleSocietyUntilMs=0;
-      return;
-    }
-    const linear = Math.max(0, Math.min(1, (nowMs - animation.startedAtMs) / animation.durationMs));
-    const progress = linear * linear * (3 - 2 * linear);
-    const dt=Math.max(.001,Math.min(.05,(nowMs-this.lastSocietyFrameMs)/1000));
-    this.lastSocietyFrameMs=nowMs;
-    for (const inhabitant of animation.inhabitants) {
-      const position = sampleMotionPath(inhabitant.path, progress);
-      const previous=this.societyPositions.get(inhabitant.id)??position;
-      this.societyPositions.set(inhabitant.id, position);
-      const character=this.societyCharacters.get(inhabitant.id);
-      character?.update({x:position[0],y:character.body.heightMm/1000*.89,z:position[1],yaw:0,pitch:0},position[0]-previous[0],position[1]-previous[1],dt,true,nowMs===Number.MAX_SAFE_INTEGER,0);
-    }
-    this.applyCoincidentVisibility();
-    if (linear >= 1) {this.societyAnimation = null;this.settleSocietyUntilMs=nowMs===Number.MAX_SAFE_INTEGER?0:nowMs+600;}
+    this.crowd.update(nowMs);
   }
 
   refreshNearby(observer: readonly [number, number]): void {
-    if (this.societyAnimation || !this.latestSociety || (this.lastObserver && Math.hypot(observer[0] - this.lastObserver[0], observer[1] - this.lastObserver[1]) < 4)) return;
-    this.setSociety(this.latestSociety, 24, observer);
+    this.crowd.refresh(observer);
+  }
+
+  /** Population, indoor, near-character and far-figure counts for inspection surfaces. */
+  get societyCounts(): CrowdCounts {
+    return this.crowd.counts;
   }
 
   /** GPU buffer residency, separate from the serialized source document byte count. */
-  get characterTextureBytes():number{return [...this.societyCharacters.values()].reduce((bytes,character)=>bytes+character.textureResidentBytes,0);}
+  get characterTextureBytes(): number {
+    return this.crowd.textureResidentBytes;
+  }
   get geometryResidentBytes(): number {
-    return [...this.societyCharacters.values()].reduce((sum,character)=>sum+character.residentBytes,0)+[...this.meshes, ...this.authoredMeshes, ...this.societyMeshes].reduce((sum, mesh) => sum + (mesh.vertexBuffer?.numBytes ?? 0) + mesh.indexBuffer.reduce((bytes, buffer) => bytes + (buffer?.numBytes ?? 0), 0), 0);
+    return this.crowd.residentBytes+[...this.meshes, ...this.authoredMeshes].reduce((sum, mesh) => sum + (mesh.vertexBuffer?.numBytes ?? 0) + mesh.indexBuffer.reduce((bytes, buffer) => bytes + (buffer?.numBytes ?? 0), 0), 0);
   }
 
   /** Resolves shared subjects, independent of renderer batch IDs. */
@@ -717,43 +608,47 @@ export class OwnedDistrictRuntime {
     return selected;
   }
 
-  get societyAnimating(): boolean { return this.societyAnimation !== null || this.settleSocietyUntilMs>0; }
-
-  private applyCoincidentVisibility():void {
-    const groups=new Map<string,string[]>();
-    for(const [id,p] of this.societyPositions){const key=p.map(n=>n.toFixed(3)).join(':');const ids=groups.get(key)??[];ids.push(id);groups.set(key,ids);}
-    for(const ids of groups.values()){
-      const shown=ids.includes(this.promotedInhabitant??'')?this.promotedInhabitant:ids.slice().sort()[0];
-      for(const id of ids){const character=this.societyCharacters.get(id);if(character)character.root.enabled=id===shown;}
-    }
-  }
-  revealInhabitant(id:string):void {if(!this.societyPositions.has(id))return;this.promotedInhabitant=id;this.applyCoincidentVisibility();}
-  get drawnInhabitantCount():number{return [...this.societyCharacters.values()].filter(character=>character.root.enabled&&!character.root.tags.has('native-character-hidden')).length;}
-  coincidentInhabitants(id:string):readonly string[]{const p=this.societyPositions.get(id);return p?[...this.societyPositions].filter(([,q])=>Math.hypot(p[0]-q[0],p[1]-q[1])<.001).map(([key])=>key):[];}
-  inhabitantRepresentation(id:string){return this.societyCharacters.get(id)?.representation??null;}
-
-  nativeCharacterFrames(deltaSeconds:number,reducedMotion:boolean):readonly NativeCharacterFrame[]{
-    const discontinuity=this.nativeSocietyDiscontinuity;this.nativeSocietyDiscontinuity=false;
-    return [...this.societyCharacters.values()].map(character=>{
-      const p=character.root.getLocalPosition();
-      return {subject:character.representation.subject,parent:this.societyRoot,fallback:character.root,visible:character.root.enabled,position:[p.x,p.y,p.z],yaw:character.facing,deltaSeconds,reducedMotion,discontinuity};
-    });
+  get societyAnimating(): boolean {
+    return this.crowd.animating;
   }
 
-  get visibleInhabitantIds(): readonly string[] { return [...this.societyPositions.keys()]; }
+  /** Selecting an inhabitant keeps it a full character; it never moves anyone. */
+  revealInhabitant(id: string): void {
+    this.crowd.select(id);
+  }
 
-  /** Stable subject selection against the displayed avatar, with building occlusion. */
+  get drawnInhabitantCount(): number {
+    return this.crowd.counts.drawn;
+  }
+
+  /** Every inhabitant presented at this inhabitant's point, itself included. */
+  coincidentInhabitants(id: string): readonly string[] {
+    return this.crowd.sharing(id);
+  }
+
+  inhabitantRepresentation(id: string) {
+    return this.crowd.representation(id);
+  }
+
+  /** How an inhabitant is currently shown: a full character, a far figure, indoors or not drawn. */
+  inhabitantDetail(id: string): 'near' | 'far' | 'indoors' | 'not-drawn' {
+    return this.crowd.detailOf(id);
+  }
+
+  nativeCharacterFrames(deltaSeconds: number, reducedMotion: boolean): readonly NativeCharacterFrame[] {
+    return this.crowd.nativeFrames(deltaSeconds, reducedMotion);
+  }
+
+  /** Every drawn inhabitant, full characters first, then far figures by distance. */
+  get visibleInhabitantIds(): readonly string[] {
+    return this.crowd.drawnIds;
+  }
+
+  /** Stable subject selection against the drawn figure, with building occlusion. */
   pickInhabitant(origin: readonly [number, number, number], direction: readonly [number, number, number]): string | null {
     let nearest = Infinity;
     for (const building of this.district.buildings) nearest = Math.min(nearest, buildingRayDistance(building, origin, direction) ?? Infinity);
-    let selected: string | null = null;
-    for (const [id, [x, z]] of this.societyPositions) {
-      if(!this.societyCharacters.get(id)?.root.enabled||this.societyCharacters.get(id)?.root.tags.has('native-character-hidden'))continue;
-      const height=(this.societyCharacters.get(id)?.body.heightMm??1820)/1000;
-      const distance = rayBox(origin, direction, [x - .34, 0, z - .34], [x + .34, height, z + .34]);
-      if (distance !== null && distance < nearest) { nearest = distance; selected = id; }
-    }
-    return selected;
+    return this.crowd.pick(nearest, (minimum, maximum) => rayBox(origin, direction, minimum, maximum));
   }
 
   /** Exact semantic hit against admitted extruded footprints, independent of mesh names. */
@@ -772,7 +667,7 @@ export class OwnedDistrictRuntime {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.clearSociety();
+    this.crowd.destroy();
     this.root.destroy();
     this.authoredRoot.destroy();
     this.societyRoot.destroy();

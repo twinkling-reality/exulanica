@@ -510,7 +510,8 @@ function liveMount(preview = false) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
   const district = {district:{name:'Test district',sidewalks:[]},setAuthoredInstances:vi.fn(),setSociety:vi.fn(()=>24),clearSociety:vi.fn(),
-    visibleInhabitantIds:['person-0'],drawnInhabitantCount:1,pickInhabitant:()=> 'person-0',revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>['person-0']};
+    visibleInhabitantIds:['person-0'],drawnInhabitantCount:1,pickInhabitant:()=> 'person-0',revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>['person-0'],
+    inhabitantDetail:()=>'near',societyCounts:{population:128,outdoors:128,indoors:0,near:1,far:0,drawn:1}};
   const binding = {controls,ownedDistrict:district,camera:{forward:{x:0,y:0,z:1}},invalidate:vi.fn(),setDistrictObjectFrame:vi.fn()};
   const client = {connect:vi.fn(async()=>liveSnapshot()),read:vi.fn(async()=>liveSnapshot(1)),advance:vi.fn(async(_snapshot:SocietySnapshot)=>liveSnapshot(1)),events:vi.fn(async()=>[
     {event_id:'event',subject_id:'person-0',tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}])};
@@ -542,10 +543,10 @@ function liveMount(preview = false) {
 }
 
 describe('persisted living world controls',()=>{
-  it('renders canonical population with the cap and advances only on explicit user action',async()=>{
+  it('renders the canonical population and advances only on explicit user action',async()=>{
     const {mount,client,district,button,canvas}=liveMount();await mount.begin();
     expect(client.advance).not.toHaveBeenCalled();expect(district.setSociety).toHaveBeenCalledTimes(1);
-    expect(district.setSociety).toHaveBeenCalledWith(liveSnapshot().state,24,[0,0]);
+    expect(district.setSociety).toHaveBeenCalledWith(liveSnapshot().state,[0,0]);
     expect(button('Advance one minute').disabled).toBe(false);button('Advance one minute').click();
     await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBe('1'));
     expect(client.advance).toHaveBeenCalledTimes(1);expect(district.setSociety).toHaveBeenCalledTimes(2);

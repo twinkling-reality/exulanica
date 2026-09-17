@@ -23,9 +23,79 @@ const integer = (value: unknown, minimum = 0): value is number => Number.isSafeI
 const digest = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 const point = (value: unknown): value is readonly [number, number] => Array.isArray(value) && value.length === 2 && value.every(Number.isSafeInteger);
 
+/**
+ * A persisted v4 state in the shape the renderer and inspector read. Roles, indoor presence,
+ * speed and the simulated clock are copied from canonical fields; nothing is derived here.
+ */
+function livingPresentation(row: Readonly<Record<string, unknown>>, state: Readonly<Record<string, unknown>>): OwnedSocietyState {
+  const population = record(state['population']);
+  const clock = record(state['clock']);
+  const inhabitants = state['inhabitants'];
+  if (!integer(row['population_size'], 1) || !Array.isArray(inhabitants) || inhabitants.length !== row['population_size'] ||
+      population['size'] !== row['population_size'] || !integer(clock['minute_of_day']) ||
+      state['society_id'] !== row['society_id'] || state['branch_id'] !== row['version_id'] ||
+      row['branch_id'] !== state['branch_id'] || !integer(state['input_seq'], 1) || row['input_seq'] !== state['input_seq'] ||
+      !digest(state['input_sha256']) || row['input_sha256'] !== state['input_sha256']) throw new Error('Invalid living society state');
+  const ids = new Set<string>();
+  const people = inhabitants.map((value) => {
+    const person = record(value);
+    const location = record(person['location']), action = record(person['action']), explanation = record(person['explanation']);
+    const path = person['motion_path_mm'];
+    if (!textValue(person['id']) || ids.has(person['id']) || person['synthetic'] !== true || !point(person['position_mm']) ||
+        'display_name' in person || typeof location['indoors'] !== 'boolean' || !integer(person['walk_speed_mm_per_tick'], 1) ||
+        !textValue(action['kind']) || !['active', 'completed', 'blocked'].includes(String(action['status'])) ||
+        !(action['destination_id'] === null || textValue(action['destination_id'])) || !textValue(action['reason']) ||
+        !textValue(explanation['summary']) || !Array.isArray(explanation['event_ids']) || !explanation['event_ids'].every(textValue) ||
+        !Array.isArray(path) || path.length < 1 || !path.every(point)) throw new Error('Invalid living society inhabitant');
+    const end = path[path.length - 1] as readonly number[];
+    if (end[0] !== person['position_mm'][0] || end[1] !== person['position_mm'][1]) throw new Error('Invalid society motion endpoint');
+    ids.add(person['id']);
+    const role = person['role'] === null ? null : record(person['role']);
+    const goal = person['goal'] === null ? null : record(person['goal']);
+    if ((role && !textValue(role['label'])) || (goal && (!textValue(goal['activity']) || !textValue(goal['because'])))) {
+      throw new Error('Invalid living society role or goal');
+    }
+    return {
+      id: person['id'],
+      synthetic: true as const,
+      role: role ? role['label'] as string : null,
+      role_reason: String(person['role_reason']),
+      position_mm: person['position_mm'],
+      motion_path_mm: path as readonly (readonly [number, number])[],
+      indoors: location['indoors'],
+      walk_speed_mm_per_tick: person['walk_speed_mm_per_tick'],
+      needs: record(person['needs']) as Readonly<Record<string, number>>,
+      action: action as unknown as NonNullable<OwnedSocietyState['inhabitants'][number]['action']>,
+      goal: goal ? { activity: goal['activity'] as string, destination_id: (goal['destination_id'] ?? null) as string | null, because: goal['because'] as string } : null,
+      explanation: explanation as unknown as { summary: string; event_ids: readonly string[] },
+    };
+  });
+  return {
+    profile: 'exulanica-society/v4',
+    society_id: state['society_id'] as string,
+    branch_id: state['branch_id'] as string,
+    input_seq: state['input_seq'] as number,
+    input_sha256: state['input_sha256'] as string,
+    tick: state['tick'] as number,
+    minute_of_day: clock['minute_of_day'] as number,
+    inhabitants: people,
+  };
+}
+
 export function parseSociety(value: unknown): SocietySnapshot {
   const row = record(value);
   const state = record(row['state']);
+  if (state['profile'] === 'exulanica-society/v4') {
+    if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
+        !integer(row['current_tick']) || state['tick'] !== row['current_tick'] || !digest(row['state_sha256'])) {
+      throw new Error('Invalid society response');
+    }
+    return Object.freeze({
+      societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
+      populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
+      state: livingPresentation(row, state),
+    });
+  }
   const inhabitants = state['inhabitants'];
   const v2 = state['profile'] === 'exulanica-society/v2';
   if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
@@ -74,7 +144,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
   });
 }
 
-export type SocietyProfile = 'exulanica-society/v1' | 'exulanica-society/v2';
+export type SocietyProfile = 'exulanica-society/v1' | 'exulanica-society/v2' | 'exulanica-society/v4';
 
 /** Authorized persisted events. The endpoint returns only its latest bounded window. */
 export interface SocietyEvent {
@@ -103,8 +173,9 @@ export function parseSocietyEvents(value: unknown, snapshot: SocietySnapshot): r
       throw new Error('Invalid society event');
     }
     ids.add(row['event_id']);
-    if (snapshot.state.profile === 'exulanica-society/v2' &&
-        (doc['profile'] !== 'exulanica-society/v2' || doc['branch_id'] !== snapshot.versionId ||
+    const pathful = snapshot.state.profile === 'exulanica-society/v2' || snapshot.state.profile === 'exulanica-society/v4';
+    if (pathful &&
+        (doc['profile'] !== snapshot.state.profile || doc['branch_id'] !== snapshot.versionId ||
          doc['subject_id'] !== row['subject_id'] || doc['tick'] !== row['tick'] ||
          !integer(doc['order']) || !integer(doc['input_seq'], 1) || !digest(doc['input_sha256']) ||
          !textValue(doc['reason']) || !textValue(doc['outcome']))) throw new Error('Invalid society event binding');
