@@ -36,8 +36,8 @@
  *           millimetres. Empty otherwise.
  *
  * SURFACE COORDINATES are millimetres on the surface, in the frames the city vocabulary lane
- * fixed on 2026-09-16 (`.orimera/briefs/lanes/requirements/city-v2-uv-frames-and-keys.md`), so a
- * texture's physical extent scales them with no guessed constant:
+ * fixed with this lane and the tile runtime on 2026-09-16, so a texture's physical extent scales
+ * them with no guessed constant:
  *
  *   horizontal  t is always to the left of s. Terrain, lot and roof: s = x, t = y, in plan, a
  *               pitched plane included. Carriageway, gutter, kerb top, footway and crossing: s
