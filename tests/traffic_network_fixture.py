@@ -33,6 +33,7 @@ from typing import Final
 
 from exulanica.canonical import round_half_down
 from exulanica.grammar.geometry import Extent, polyline_run_length
+from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
 from exulanica.grammar.grammars.city.common import SIDE_CODES
 from exulanica.grammar.grammars.city.districts import DistrictRecord
 from exulanica.grammar.grammars.city.roads import (
@@ -52,6 +53,13 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.grammar.subjects import subject_identity
 from exulanica.traffic.catalogs import load_traffic_catalogs
+
+
+@cache
+def _turning_radius_mm() -> int:
+    lane_uses = next(item for item in load_city_catalogs() if item.catalog_id == "lane-use")
+    return entry_fields(lane_uses, "general")["turning_radius_mm"]
+
 
 CITY: Final = str(uuid.uuid5(uuid.NAMESPACE_URL, "https://exulanica.invalid/fixture/traffic"))
 HIERARCHY: Final = "local_street"
@@ -490,6 +498,9 @@ class Builder:
                     ordinal,
                     approach,
                     rank,
+                    # Every lane of this fixture is general, and the city's lane-use catalog
+                    # states the widest turn a general lane must admit.
+                    _turning_radius_mm(),
                 )
             )
 

@@ -152,7 +152,7 @@ def _v2_kind(kind: type) -> list:
 def test_the_city_fixture_converts_record_by_record():
     records, city = _v2()
     road = _convert(records, city)
-    assert len(records) == 174 and road.city == city
+    assert len(records) == 180 and road.city == city
     # Eight lanes, of which two are parking lanes.
     assert len(_v2_kind(LaneRecord)) == 8 and len(road.lanes) == 6
     [junction] = road.junctions

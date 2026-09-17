@@ -141,7 +141,7 @@ def test_every_entry_carries_a_shippable_licence_and_a_source_that_exists():
             assert ROOT.joinpath(entry.licence.content_source).is_file(), where
             if entry.licence.origin == "derived":
                 assert entry.licence.content_source.startswith("assets/catalogs/sources/"), where
-    assert entries == 124
+    assert entries == 125
 
 
 _AUTHORED = (
@@ -246,7 +246,14 @@ def test_the_traffic_keys_are_the_agreed_ones():
         "all_way_stop",
         "uncontrolled_continuation",
     }
-    assert set(_catalog("lane-use").keys()) == {"general", "bus", "cycle", "parking", "buffer"}
+    assert set(_catalog("lane-use").keys()) == {
+        "general",
+        "bus",
+        "bus_layover",
+        "cycle",
+        "parking",
+        "buffer",
+    }
     assert set(_catalog("parking-kind").keys()) == {
         "general",
         "loading",

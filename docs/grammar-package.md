@@ -453,13 +453,13 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `era.v1.json` | 4 | Prewar masonry, interwar, postwar and contemporary: wall materials, roof families, storey heights and cornice. |
 | `fitout.v1.json` | 7 | Vitrine fitout units as explicit parts, with the use classes each dresses. |
 | `junction-control.v1.json` | 4 | Right-of-way classes; the keys equal the traffic lane's right-of-way policy keys. |
-| `lane-use.v1.json` | 5 | General, bus, cycle, parking and buffer, with width ranges; traffic maps them to vehicle classes. |
+| `lane-use.v2.json` | 6 | General, bus, bus layover, cycle, parking and buffer, with width ranges and the tightest turn each must admit; traffic maps them to vehicle classes. |
 | `material.v2.json` | 8 | One material per pinned texture set, with the surface roles it dresses and its baked modules. |
 | `parking-kind.v1.json` | 5 | General, loading, accessible, bus layover and cycle stand, with placement and size. |
 | `roof-family.v2.json` | 3 | Flat with parapet, flat with eaves, and gable: form, rise, parapet and rooftop objects. |
 | `rooftop-object.v1.json` | 4 | HVAC unit, water tank, lift overrun and stair bulkhead as explicit parts. |
 | `signage-lexicon.v2.json` | 18 | Generic descriptors ("Bakery", "Books") for the signed use classes; never a brand or business name. |
-| `street-furniture.v1.json` | 9 | Lamps, benches, bins, bollards, hydrants, cycle stands, signal poles and sign posts as explicit parts, with exclusion radius and kerb offsets. |
+| `street-furniture.v2.json` | 9 | Lamps, benches, bins, bollards, hydrants, cycle stands, signal poles and sign posts as explicit parts, with exclusion radius, kerb offsets, where each stands, how far apart and what it pairs with. |
 | `street-hierarchy.v2.json` | 4 | Avenue, high street, local street and narrow street, with lane, width, speed and kerb ranges. |
 | `street-name.v1.json` | 12 | Generic street names and the hierarchies each suits. Presentation, never identity. |
 | `tree-species.v2.json` | 19 | Derived from the 2015 NYC Street Tree Census: each named species of at least one percent of the named trees. |

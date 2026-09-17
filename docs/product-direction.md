@@ -227,7 +227,7 @@ In progress means built on a branch and not yet on main.
 
 | System | Made of | On main (2026-09-17) | Next |
 | --- | --- | --- | --- |
-| City vocabulary and validation | Record shapes, catalogs, validators | Version 1 record shapes and validators; the city catalogs hold one entry. Version 2 (27 record kinds, 69 parameters, 18 catalogs with 124 authored entries, tile documents with owned, halo and external references) is in final verification | Land version 2 |
+| City vocabulary and validation | Record shapes, catalogs, validators | Version 2 built and generating: 28 record kinds, 91 parameters, 18 catalogs with 125 authored entries, tile documents with owned, halo and external references, and every one of the eleven stages writing records | Bake the generated street and score it |
 | Vocabulary at scale | Model-drafted catalog entries, automatic checks, sampled review | Not implemented | Bulk drafting in the catalog schema, admitted by schema, consistency and statistics checks |
 | Admitted statistics | Licensed time-use, climate, commute and transit datasets | Not implemented | Admit datasets with licence checks; calibrate routines, weather and trips |
 | City generators | Grammar stages | None: every city stage declares its records and states that it is not implemented | The first generated street corridor, then districts |
