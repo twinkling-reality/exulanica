@@ -10,6 +10,7 @@ import { foliageMaker } from './foliage.js';
 import { glazingMaker } from './glazing.js';
 import { kerbMaker } from './kerb.js';
 import { metalMaker } from './metal.js';
+import { panelMaker } from './panel.js';
 import { pavingMaker } from './paving.js';
 import { renderMaker } from './render.js';
 import { timberMaker } from './timber.js';
@@ -42,7 +43,7 @@ export const MAKERS: readonly Maker[] = Object.freeze(
  * the drafts.
  */
 export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
-  [canvasMaker, timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+  [canvasMaker, panelMaker, timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
 for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {

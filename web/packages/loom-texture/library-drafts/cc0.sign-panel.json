@@ -1,0 +1,44 @@
+{
+  "set_id": "cc0.sign-panel",
+  "version": 1,
+  "title": "Sign panel",
+  "summary": "A sprayed sheet panel for a shopfront fascia: an even ground for lettering, with the joint between sheets and light weathering, and no lettering of its own.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.panel",
+      "version": 1
+    },
+    "seed": 2026091706,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 1000
+    },
+    "parameters": {
+      "panel_colour": [42, 46, 54],
+      "joint_colour": [28, 30, 34],
+      "weather_colour": [96, 96, 92],
+      "sheets_across": 1,
+      "sheet_width_mm": 1000,
+      "joint_width_mm": 4,
+      "joint_depth_mm_1024ths": 2048,
+      "finish_cells": 300,
+      "finish_relief_mm_1024ths": 260,
+      "finish_tone_q16": 1600,
+      "sheet_variation_q16": 1400,
+      "weather_percent": 12,
+      "weather_cells": 6,
+      "panel_roughness_permille": 300,
+      "joint_roughness_permille": 700,
+      "height_range_mm": 4,
+      "occlusion_radius_mm": 4,
+      "occlusion_depth_mm": 1,
+      "occlusion_strength_permille": 450
+    }
+  }
+}
