@@ -39,6 +39,11 @@ from exulanica.grammar.grammars.city.document import (
     select_tile,
     validate_city_document,
 )
+from exulanica.grammar.grammars.city.facade import (
+    EntranceRecord,
+    GroundBayRecord,
+    facade_output_digest,
+)
 from exulanica.grammar.grammars.city.streets import BlockRecord, StreetSegmentRecord
 from exulanica.grammar.grammars.city.tile import (
     HALO,
@@ -710,3 +715,52 @@ def test_every_anchored_record_is_owned_by_exactly_one_tile_of_the_neighbourhood
     assert set(owners) == everything - anchorless
     assert all(places == [(0, 0)] for places in owners.values())
     assert carried == everything
+
+
+def _halo_facade_missing_a_bay() -> TileDocument:
+    """Tile (-1, 0) carries the building as halo; one ground bay of its south face is left out.
+
+    Carried bays of a halo face are only those whose own extents reach the grown square, so a halo
+    face may lack a part, and the part becomes an external reference of the records that name it.
+    """
+    tile = dataclasses.replace(FIXTURE.tile, tile_x=-1)
+    [entry] = select_tile(tile, _city_records(), subject_identity=FIXTURE.CITY).grammars
+    bay = FIXTURE.south_bays[0]
+    halo = tuple(record for record in entry.halo if record.identity != bay.identity)
+    assert len(halo) == len(entry.halo) - 1
+    external = tuple(sorted((*entry.external, (bay.identity, "city.ground_bay"))))
+    return TileDocument(tile, (dataclasses.replace(entry, halo=halo, external=external),))
+
+
+def test_a_halo_facade_lacking_a_ground_bay_validates_by_the_owned_only_rules():
+    document = _halo_facade_missing_a_bay()
+    [entry] = document.grammars
+    south = FIXTURE.facades[0]
+    assert south.identity in {record.identity for record in entry.halo}
+    assert not entry.owned
+    carried_bays = tuple(
+        record
+        for record in entry.halo
+        if type(record) is GroundBayRecord and record.facade_identity == south.identity
+    )
+    carried_entrances = tuple(
+        record
+        for record in entry.halo
+        if type(record) is EntranceRecord and record.facade_identity == south.identity
+    )
+    assert len(carried_bays) == south.bays.count - 1
+    # The face's stated digest covers all four bays, so a digest over what this tile carries
+    # differs: only the rule that checks the digest on an owned face lets the document stand.
+    assert facade_output_digest(south, carried_bays, carried_entrances) != south.output_digest
+    _validate(document)
+    _validate(read_tile_document(document_bytes(document)))
+
+
+def test_the_same_facade_owned_and_lacking_a_ground_bay_is_refused():
+    bay = FIXTURE.south_bays[0]
+    document = _document(
+        remove=frozenset({bay.identity}),
+        grammar={"external": ((bay.identity, "city.ground_bay"),)},
+    )
+    with pytest.raises(InvalidRecordError, match=r"\[ground_bays\]"):
+        _validate(document)
