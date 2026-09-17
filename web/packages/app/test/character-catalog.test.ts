@@ -42,3 +42,19 @@ describe('fictional catalog defaults', () => {
     for (const look of looks) expect(look.descriptor.forwardYawDegrees).toBe(180);
   });
 });
+
+describe('signed-in character bytes', () => {
+  it('fetch each container as a reviewed asset by its key, with the session credentials', async () => {
+    const { workspaceCharacterLoader } = await import('../src/character-catalog.js');
+    const seen: { url: string; authorization: string | null }[] = [];
+    const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push({ url: String(input), authorization: new Headers(init?.headers).get('authorization') });
+      return new Response(new Uint8Array([1, 2, 3, 4]));
+    };
+    const load = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: 'session', fetch });
+    const bytes = await load({ assetKey: 'makehuman.people.feminine.base.v1', mediaType: 'model/gltf-binary', contentSha256: 'a'.repeat(64), byteSize: 4 },
+      new AbortController().signal);
+    expect(bytes.byteLength).toBe(4);
+    expect(seen).toEqual([{ url: 'https://world.example/api/world/assets/makehuman.people.feminine.base.v1/bytes', authorization: 'Bearer session' }]);
+  });
+});

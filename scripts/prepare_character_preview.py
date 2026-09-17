@@ -1,27 +1,24 @@
-"""Derive the committed stylized character looks, and copy them into the development preview.
+"""Derive the committed stylized character looks.
 
-    uv run python scripts/prepare_character_preview.py          # write both
+    uv run python scripts/prepare_character_preview.py          # write the list
     uv run python scripts/prepare_character_preview.py --check  # compare the committed list
 
 The committed list, assets/characters/stylized-looks.json, is derived from the pinned Quaternius
 manifest, its import receipts and the pinned container bytes; nothing else decides its content.
-The development fixture under web/packages/app/public/fixtures/characters is disposable and
-ignored by git: it is the same looks plus the editable human, with their containers copied beside.
+The app reads it, and the editable human's committed default look beside it, directly: nothing is
+copied into the app's public folder, so no build can carry these containers by accident.
 """
 
 import argparse
 import hashlib
 import json
-import shutil
 import struct
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets/characters/quaternius-modular-v2"
-PARAMETRIC = ROOT / "assets/characters/makehuman-parametric-v1"
 STYLIZED_LOOKS = ROOT / "assets/characters/stylized-looks.json"
-OUTPUT = ROOT / "web/packages/app/public/fixtures/characters"
 PROFILE = "exulanica.character-stylized-looks/v1"
 NAMES = {
     "hoodie": "Hoodie",
@@ -160,22 +157,6 @@ def render(document: dict) -> str:
     return json.dumps(document, indent=2) + "\n"
 
 
-def prepare_fixture(document: dict) -> None:
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    catalog = []
-    for item in document["looks"]:
-        shutil.copy2(SOURCE / item["file"], OUTPUT / item["file"])
-        catalog.append(item)
-    if (PARAMETRIC / "default.look.json").is_file():
-        editable = json.loads((PARAMETRIC / "default.look.json").read_text())
-        body = (PARAMETRIC / editable["file"]).read_bytes()
-        if hashlib.sha256(body).hexdigest() != editable["descriptor"]["asset"]["contentSha256"]:
-            raise ValueError("Editable human digest mismatch")
-        shutil.copy2(PARAMETRIC / editable["file"], OUTPUT / editable["file"])
-        catalog.insert(0, editable)
-    (OUTPUT / "catalog.json").write_text(json.dumps(catalog, indent=2) + "\n")
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="compare the committed list only")
@@ -189,8 +170,7 @@ def main(argv=None) -> int:
         print(f"{STYLIZED_LOOKS.relative_to(ROOT)} matches its pinned sources")
         return 0
     STYLIZED_LOOKS.write_text(expected)
-    prepare_fixture(json.loads(expected))
-    print(f"Wrote {STYLIZED_LOOKS.relative_to(ROOT)} and the development preview at {OUTPUT}")
+    print(f"Wrote {STYLIZED_LOOKS.relative_to(ROOT)}")
     return 0
 
 

@@ -13,7 +13,7 @@ import {
   type CharacterLook as PersonLook,
   type NativeCharacterRuntime,
 } from '@exulanica/atlas-react/playcanvas';
-import { characterByteLoader, parseCharacterLooks, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
+import { characterByteLoader, parseCharacterLooks, workspaceCharacterLoader, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
 import { PreviewLookStore, StaleLookError, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
 import { buildCharacterStudio, type PeopleChoice } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
@@ -394,7 +394,11 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       crowd?.destroy();
       crowd = null;
       binding = atlas;
-      if (!env.preview) return;
+      if (!env.preview) {
+        // A signed-in world draws the same catalog people from its reviewed assets.
+        if (state.credentials) native = atlas.enableNativeCharacters(workspaceCharacterLoader(state.credentials));
+        return;
+      }
       try {
         // Catalog people need only the byte loader, never the stylized look list: register it
         // first, so a look list that cannot be read never leaves people as placeholders.

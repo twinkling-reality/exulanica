@@ -1,6 +1,7 @@
 import type { BodyRecipe } from './ui/character-body.js';
 import type { NativeCharacterAppearance, NativeCharacterDescriptor, CharacterByteLoader, FirstPersonGestureDescriptor } from '@exulanica/atlas-react/playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
+import { Transport, type TransportOptions } from '@exulanica/graph-client';
 
 export interface CharacterLook {
   readonly generated?: boolean;
@@ -84,5 +85,18 @@ export function characterByteLoader(generated: readonly CharacterLook[]): Charac
     const response = await fetch(`/__character/assets/${look.file}`, { signal });
     if (!response.ok) throw new Error('This character could not be loaded. Choose another look or try again.');
     return response.arrayBuffer(); // The shared renderer verifies exact size and SHA-256 before decoding.
+  };
+}
+
+/**
+ * A signed-in world's loader: every character container is a reviewed asset, fetched by its key
+ * from `/world/assets/<asset key>/bytes`. The character host refuses bytes whose length or SHA-256
+ * differ from the catalog, so the key only says where to look, never what to trust.
+ */
+export function workspaceCharacterLoader(options: TransportOptions): CharacterByteLoader {
+  return async (reference, signal) => {
+    const response = await new Transport({ ...options, signal })
+      .getBytes(`/world/assets/${encodeURIComponent(reference.assetKey)}/bytes`);
+    return response.arrayBuffer();
   };
 }
