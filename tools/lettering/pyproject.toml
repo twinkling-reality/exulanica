@@ -1,0 +1,22 @@
+[project]
+name = "exulanica-lettering-tool"
+version = "0.1.0"
+description = "Makes the glyph catalogs from committed open-licence fonts, once, in its own environment."
+requires-python = ">=3.11,<3.13"
+dependencies = ["fonttools==4.65.0"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --strict-config"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

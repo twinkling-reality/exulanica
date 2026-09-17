@@ -1,0 +1,9 @@
+{
+  "about": "The version 1 glyph catalogs: a role key and the committed font it is made from. Keys name the role, never the font.",
+  "catalogs": [
+    {"catalog_id": "condensed", "font": "assets/fonts/francoisone/FrancoisOne-Regular.ttf"},
+    {"catalog_id": "grotesque", "font": "assets/fonts/barlow/Barlow-SemiBold.ttf"},
+    {"catalog_id": "modern_serif", "font": "assets/fonts/oldstandardtt/OldStandard-Bold.ttf"},
+    {"catalog_id": "slab", "font": "assets/fonts/bevan/Bevan-Regular.ttf"}
+  ]
+}
