@@ -23,6 +23,20 @@ MANIFESTS = sorted(MANIFEST_DIRECTORY.glob("*.json"))
 ENTRIES = sorted((PACKAGE / "library-drafts").glob("*.json"))
 
 
+def _cases(paths: list[Path], what: str) -> list:
+    """The paths as parameters, or one named skip when there is no draft of that kind at all.
+
+    Pytest skips a test parametrised over an empty list with no reason given, and that is how these
+    checks would leave quietly: the run after a batch publishes its last draft reports two bare
+    skips and looks like any other green run. Between batches the skip is right, so it stays, but
+    it says why, and the anchor above still holds the directories themselves.
+    """
+    if not paths:
+        reason = f"no {what} are written just now, so there is nothing here to check"
+        return [pytest.param(None, marks=pytest.mark.skip(reason=reason), id="none")]
+    return [pytest.param(path, id=path.name) for path in paths]
+
+
 def test_the_drafts_and_their_manifests_are_where_this_test_looks():
     """Between batches there may be no drafts, so the paths themselves are anchored instead.
 
@@ -39,7 +53,7 @@ def test_the_drafts_and_their_manifests_are_where_this_test_looks():
     assert named == makers
 
 
-@pytest.mark.parametrize("path", MANIFESTS, ids=lambda path: path.name)
+@pytest.mark.parametrize("path", _cases(MANIFESTS, "draft maker manifests"))
 def test_a_draft_maker_manifest_is_well_formed_here_too(path):
     raw = path.read_bytes()
     manifest = parse_strict(raw)
@@ -48,7 +62,7 @@ def test_a_draft_maker_manifest_is_well_formed_here_too(path):
     assert path.name == f"{manifest['maker_id']}.v{manifest['version']}.json"
 
 
-@pytest.mark.parametrize("path", ENTRIES, ids=lambda path: path.name)
+@pytest.mark.parametrize("path", _cases(ENTRIES, "draft sets"))
 def test_a_draft_recipe_is_valid_here_too(path):
     recipe = parse_strict(path.read_bytes())["recipe"]
     maker = recipe["maker"]
