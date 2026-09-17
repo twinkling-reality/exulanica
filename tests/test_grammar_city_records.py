@@ -104,7 +104,7 @@ _SAMPLES = _samples()
 
 
 def test_the_fixture_instantiates_every_record_shape_and_every_nested_shape():
-    assert len(CITY_SHAPES) == 27
+    assert len(CITY_SHAPES) == 28
     assert set(_SAMPLES) == set(_SHAPES), sorted(set(_SHAPES) ^ set(_SAMPLES))
     for name, sample in _SAMPLES.items():
         shapes.validate_record(sample, _SHAPES[name])
@@ -958,6 +958,12 @@ def _cases() -> list[RuleCase]:
             lambda: _replace(material, surface_kind="city.massing", role="fascia"),
         ),
         RuleCase(
+            "soil_band_role",
+            "city.surface_material",
+            "a soiled band on a wall, where there is no pane to run down",
+            lambda: _replace(material, soil_band_bottom_mm=600),
+        ),
+        RuleCase(
             "furniture_placed",
             "city.street_furniture",
             "a direction of zero length",
@@ -1144,7 +1150,7 @@ def test_every_named_rule_has_a_case():
     named = {rule.name for shape in _SHAPES.values() for rule in shape.rules}
     covered = {case.rule for case in _RULE_CASES}
     assert covered == named, sorted(named ^ covered)
-    assert len(named) == 36
+    assert len(named) == 37
 
 
 @pytest.mark.parametrize(
