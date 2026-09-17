@@ -11,12 +11,16 @@ import type { Space } from '../src/core/integer-math.js';
 import { carveSupport } from '../src/core/support-clearance.js';
 import type { ClearanceBox, SupportTriangle } from '../src/core/support-clearance.js';
 
-/** A small deterministic generator, for property cases: never a source of shipped geometry. */
+/**
+ * A small deterministic generator, for property cases: never a source of shipped geometry. The state
+ * is 64 bits in BigInt, since a double cannot hold the product exactly, and each draw is the top 31
+ * bits, since a power-of-two LCG's low bits repeat with short periods.
+ */
 function sequence(seed: number): () => number {
-  let state = seed;
+  let state = BigInt(seed);
   return () => {
-    state = (state * 1103515245 + 12345) % 2147483648;
-    return state;
+    state = (state * 6364136223846793005n + 1442695040888963407n) % 18446744073709551616n;
+    return Number(state >> 33n);
   };
 }
 

@@ -11,12 +11,16 @@ import type { Plan, Space } from '../src/core/integer-math.js';
 import { ringTwiceArea, requireSimpleRing, triangulateRing, triangulateRingWithHoles } from '../src/core/ring-triangulation.js';
 import { fixtureObject, recordsOf } from './support.js';
 
-/** A small deterministic generator, for property cases: never a source of shipped geometry. */
+/**
+ * A small deterministic generator, for property cases: never a source of shipped geometry. The state
+ * is 64 bits in BigInt, since a double cannot hold the product exactly, and each draw is the top 31
+ * bits, since a power-of-two LCG's low bits repeat with short periods.
+ */
 function sequence(seed: number): () => number {
-  let state = seed;
+  let state = BigInt(seed);
   return () => {
-    state = (state * 1103515245 + 12345) % 2147483648;
-    return state;
+    state = (state * 6364136223846793005n + 1442695040888963407n) % 18446744073709551616n;
+    return Number(state >> 33n);
   };
 }
 
@@ -153,12 +157,15 @@ function holdsTheRingRuleFrom(ring: readonly Plan[]): void {
   expect(total).toBe(ringTwiceArea(ring, 'case'));
 }
 
-/** A star-shaped ring, rounded from floating trigonometry here in the test; the rule sees only integers. */
-function starRing(next: () => number, count: number): Plan[] {
+/**
+ * A star-shaped ring, its vertices `least` to 10 m from the centre, rounded from floating
+ * trigonometry here in the test; the rule sees only integers.
+ */
+function starRing(next: () => number, count: number, least: number): Plan[] {
   const ring: Plan[] = [];
   for (let index = 0; index < count; index += 1) {
     const angle = (2 * Math.PI * index) / count;
-    const radius = 1000 + (next() % 9000);
+    const radius = least + (next() % (10000 - least));
     ring.push([Math.round(radius * Math.cos(angle)), Math.round(radius * Math.sin(angle))]);
   }
   return ring;
@@ -207,7 +214,7 @@ describe('the ring rule', () => {
   it('holds its rule on star-shaped and staircase rings', () => {
     const next = sequence(5);
     // Each ring is tried from every starting vertex, so the sizes stay near a lot's or a roof's.
-    for (let index = 0; index < 60; index += 1) holdsTheRingRule(starRing(next, 3 + (index % 18)));
+    for (let index = 0; index < 60; index += 1) holdsTheRingRule(starRing(next, 3 + (index % 18), 1000));
     for (let steps = 1; steps < 8; steps += 1) holdsTheRingRule(staircase(steps, 700, 1100));
   });
 
@@ -279,8 +286,10 @@ describe('the ring rule with holes', () => {
 
   it('holds its rule on star-shaped rings with wells round their centre', () => {
     const next = sequence(17);
+    // With six vertices or more, every edge keeps at least cos 30 degrees of the least radius from
+    // the centre, about 1732 mm, and the wells reach no further than 1064 mm.
     for (let index = 0; index < 12; index += 1) {
-      holdsTheHoleRule(starRing(next, 6 + (index % 8)), [square(-600, -600, 500), square(200, 100, 600)]);
+      holdsTheHoleRule(starRing(next, 6 + (index % 8), 2000), [square(-600, -600, 500), square(200, 100, 600)]);
     }
   });
 
