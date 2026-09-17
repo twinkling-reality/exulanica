@@ -221,6 +221,17 @@ export const COMMON_CONTROLS: Readonly<
   occlusion_strength_permille: { unit: 'permille', minimum: 0, maximum: 1000 },
 };
 
+/**
+ * Controls every procedural glazing maker declares, because its header declares the film from them
+ * (`GlazingFilm` in `classes.ts`): the film's colour, and its roughness in thousandths.
+ */
+export const GLAZING_CONTROLS: Readonly<
+  Record<string, { readonly kind: 'srgb' } | { readonly kind: 'integer'; readonly unit: Unit; readonly minimum: number; readonly maximum: number }>
+> = {
+  film_colour: { kind: 'srgb' },
+  film_roughness_permille: { kind: 'integer', unit: 'permille', minimum: 0, maximum: 1000 },
+};
+
 export const MAKER_ID = /^[a-z][a-z0-9.-]*$/;
 export const CONTROL_KEY = /^[a-z][a-z0-9_]*$/;
 const FAMILY = /^[a-z][a-z0-9-]*$/;
@@ -585,6 +596,22 @@ export function manifestProblems(candidate: unknown): string[] {
     }
     if (!relief && !model && candidate.material_class === 'glazing' && control !== undefined) {
       problems.push(`${key} is not a control of a glazing maker, whose bake reads no height field`);
+    }
+  }
+  if (v2 && !model && candidate.material_class === 'glazing') {
+    for (const [key, wanted] of Object.entries(GLAZING_CONTROLS)) {
+      const control = declared.get(key);
+      if (wanted.kind === 'srgb') {
+        if (control === undefined || control.kind !== 'srgb') {
+          problems.push(`${key} is an srgb control, because the header declares the film from it`);
+        }
+      } else if (control === undefined || control.kind !== 'integer' || control.unit !== wanted.unit
+        || control.minimum < wanted.minimum || control.maximum > wanted.maximum) {
+        problems.push(
+          `${key} is an integer control in ${wanted.unit} within ${wanted.minimum} to `
+            + `${wanted.maximum}, because the header declares the film from it`,
+        );
+      }
     }
   }
 

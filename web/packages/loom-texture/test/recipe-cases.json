@@ -397,13 +397,17 @@
         {"path": ["controls", 23], "remove": true},
         {"path": ["controls", 22], "remove": true},
         {"path": ["controls", 21], "remove": true},
-        {"path": ["controls", 20], "remove": true}
+        {"path": ["controls", 20], "remove": true},
+        {"path": ["controls", 20], "value": {"key": "film_colour", "kind": "srgb", "group": "colour", "default": [150, 144, 132], "label": "Film colour", "explanation": "The colour of the grime a street leaves on glass."}},
+        {"path": ["controls", 21], "value": {"key": "film_roughness_permille", "kind": "integer", "group": "wear", "unit": "permille", "minimum": 0, "maximum": 1000, "default": 650, "label": "Film roughness", "explanation": "How rough the glass is where film covers it, in thousandths."}}
       ],
       "changes": [
         {"path": ["parameters", "height_range_mm"], "remove": true},
         {"path": ["parameters", "occlusion_radius_mm"], "remove": true},
         {"path": ["parameters", "occlusion_depth_mm"], "remove": true},
         {"path": ["parameters", "occlusion_strength_permille"], "remove": true},
+        {"path": ["parameters", "film_colour"], "value": [150, 144, 132]},
+        {"path": ["parameters", "film_roughness_permille"], "value": 650},
         {"path": ["extent_mm", "u"], "value": 16}
       ],
       "problems": []
@@ -710,7 +714,9 @@
       "maker": "loom.metal",
       "changes": [
         {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
-        {"path": ["material_class"], "value": "glazing"}
+        {"path": ["material_class"], "value": "glazing"},
+        {"path": ["controls", 24], "value": {"key": "film_colour", "kind": "srgb", "group": "colour", "default": [150, 144, 132], "label": "Film colour", "explanation": "The colour of the grime a street leaves on glass."}},
+        {"path": ["controls", 25], "value": {"key": "film_roughness_permille", "kind": "integer", "group": "wear", "unit": "permille", "minimum": 0, "maximum": 1000, "default": 650, "label": "Film roughness", "explanation": "How rough the glass is where film covers it, in thousandths."}}
       ],
       "problems": [
         "height_range_mm is not a control of a glazing maker, whose bake reads no height field",
@@ -720,7 +726,22 @@
       ]
     },
     {
-      "name": "a glazing maker without them is well formed",
+      "name": "a glazing maker without them, declaring its film, is well formed",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "glazing"},
+        {"path": ["controls", 23], "remove": true},
+        {"path": ["controls", 22], "remove": true},
+        {"path": ["controls", 21], "remove": true},
+        {"path": ["controls", 20], "remove": true},
+        {"path": ["controls", 20], "value": {"key": "film_colour", "kind": "srgb", "group": "colour", "default": [150, 144, 132], "label": "Film colour", "explanation": "The colour of the grime a street leaves on glass."}},
+        {"path": ["controls", 21], "value": {"key": "film_roughness_permille", "kind": "integer", "group": "wear", "unit": "permille", "minimum": 0, "maximum": 1000, "default": 650, "label": "Film roughness", "explanation": "How rough the glass is where film covers it, in thousandths."}}
+      ],
+      "problems": []
+    },
+    {
+      "name": "a glazing maker declares the film its header states",
       "maker": "loom.metal",
       "changes": [
         {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
@@ -730,7 +751,27 @@
         {"path": ["controls", 21], "remove": true},
         {"path": ["controls", 20], "remove": true}
       ],
-      "problems": []
+      "problems": [
+        "film_colour is an srgb control, because the header declares the film from it",
+        "film_roughness_permille is an integer control in permille within 0 to 1000, because the header declares the film from it"
+      ]
+    },
+    {
+      "name": "a glazing maker's film roughness is in thousandths",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "glazing"},
+        {"path": ["controls", 23], "remove": true},
+        {"path": ["controls", 22], "remove": true},
+        {"path": ["controls", 21], "remove": true},
+        {"path": ["controls", 20], "remove": true},
+        {"path": ["controls", 20], "value": {"key": "film_colour", "kind": "srgb", "group": "colour", "default": [150, 144, 132], "label": "Film colour", "explanation": "The colour of the grime a street leaves on glass."}},
+        {"path": ["controls", 21], "value": {"key": "film_roughness_permille", "kind": "integer", "group": "wear", "unit": "percent", "minimum": 0, "maximum": 100, "default": 65, "label": "Film roughness", "explanation": "How rough the glass is where film covers it, in thousandths."}}
+      ],
+      "problems": [
+        "film_roughness_permille is an integer control in permille within 0 to 1000, because the header declares the film from it"
+      ]
     },
     {
       "name": "a cutout maker declares the controls its bake reads",

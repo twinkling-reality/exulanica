@@ -37,6 +37,7 @@ from exulanica.materials.objects import (
 
 __all__ = [
     "COMMON_CONTROLS",
+    "GLAZING_CONTROLS",
     "GROUPS",
     "HEIGHT_RANGE_TEXEL_LIMIT",
     "MAXIMUM_EXPRESSION_DEPTH",
@@ -63,6 +64,15 @@ COMMON_CONTROLS: Final = MappingProxyType(
         "occlusion_radius_mm": ("mm", 1, 64),
         "occlusion_depth_mm": ("mm", 1, 64),
         "occlusion_strength_permille": ("permille", 0, 1000),
+    }
+)
+#: Controls every procedural glazing maker declares, because its header declares the film from them
+#: (``GlazingFilm`` in ``classes``): the film's colour, and its roughness in thousandths. An integer
+#: control is (kind, unit, lowest minimum, highest maximum).
+GLAZING_CONTROLS: Final = MappingProxyType(
+    {
+        "film_colour": ("srgb",),
+        "film_roughness_permille": ("integer", "permille", 0, 1000),
     }
 )
 MINIMUM_RESOLUTION: Final = 16
@@ -491,6 +501,27 @@ def manifest_problems(candidate: object) -> list[str]:
             problems.append(
                 f"{key} is not a control of a glazing maker, whose bake reads no height field"
             )
+    if v2 and not model and candidate["material_class"] == "glazing":
+        for key, wanted in GLAZING_CONTROLS.items():
+            control = declared.get(key)
+            if wanted[0] == "srgb":
+                if control is None or control["kind"] != "srgb":
+                    problems.append(
+                        f"{key} is an srgb control, because the header declares the film from it"
+                    )
+                continue
+            _, unit, lowest, highest = wanted
+            if (
+                control is None
+                or control["kind"] != "integer"
+                or control["unit"] != unit
+                or control["minimum"] < lowest
+                or control["maximum"] > highest
+            ):
+                problems.append(
+                    f"{key} is an integer control in {unit} within {lowest} to {highest}, "
+                    "because the header declares the film from it"
+                )
 
     integer_keys = {key for key, control in declared.items() if control["kind"] == "integer"}
     choices = {
