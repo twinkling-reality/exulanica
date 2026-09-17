@@ -9,6 +9,8 @@ import {
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
+  type DrawnEntry,
+  type MaterialRef,
   type OwdHeader,
   type OwdRecord,
   type SurfaceOrientation,
@@ -43,13 +45,16 @@ import {
  * header's own records again, requiring every byte to match, so what is drawn is exactly what its
  * records say. There is no second reader here and nothing is repaired.
  *
- * WHAT IS DRAWN. Only `render_batch`, and only its drawn ranges, each exactly as stored. A drawn
- * range is textured when it cites a `surface_material` record that states its placement (version 2)
- * and whose texture set is pinned and verifies; its UVs come from the container's own surface
- * coordinates through `surfaceUv`. A drawn range whose material is `none-exists` (exact geometry no
- * material record dresses) is drawn, as the stated unavailable surface, and so is a range whose
- * material cannot be resolved; the reason is kept. An `unavailable` entry is geometry the
- * tessellator has not produced yet: it has no triangles and is listed with the needs tess stated.
+ * WHAT IS DRAWN. Only `render_batch`, and only its drawn entries, each exactly as stored. A drawn
+ * entry is made of surfaces (owd/3): contiguous runs of its triangles, sharing no vertex, each with
+ * one grammar role, one material and one orientation. A surface is textured when its material is a
+ * `surface_material` record that states its placement (version 2) and whose texture set is pinned and
+ * verifies; its UVs come from the container's own surface coordinates through `surfaceUv`. A surface
+ * whose material is `none-exists` (exact geometry no material record dresses) is drawn, as the stated
+ * unavailable surface, and so is a surface whose material cannot be resolved; the reason is kept.
+ * Surfaces are batched by what they are drawn with, so a set is still one draw. An `unavailable`
+ * entry is geometry the tessellator has not produced yet: it has no triangles and is listed with the
+ * needs tess stated.
  * A `halo` entry is context from a neighbouring record, never drawn and never listed. No vertex is
  * invented and no default mesh stands in for a missing one.
  *
@@ -61,10 +66,28 @@ import {
  * exists, so an attached tile is complete on its first frame.
  */
 
-/** A drawn range whose material is `none-exists`: no surface_material record dresses it. */
-export const MATERIAL_NONE_EXISTS_REASON = 'No surface_material record dresses this range: the tile states that none exists.';
+/** A surface whose material is `none-exists`: no surface_material record dresses its record's role. */
+export const MATERIAL_NONE_EXISTS_REASON = 'No surface_material record dresses this surface: the tile states that none exists.';
 export const MATERIAL_PLACEMENT_UNSTATED =
   'The cited surface_material is version 1, which does not state how its texture is placed; version 2 does.';
+
+/**
+ * One surface of a drawn record: a contiguous run of its triangles with one grammar role, one material
+ * and one orientation (a kerb's vertical face and its horizontal top are two). Drawing is per surface;
+ * identity, picking and selection stay with the record that holds it.
+ */
+export interface GeneratedTileSurface {
+  readonly role: string;
+  readonly orientation: SurfaceOrientation;
+  readonly state: 'textured' | 'unavailable';
+  readonly textureSetId: string | null;
+  /** Why the surface is drawn as unavailable, or null when it is textured. */
+  readonly reason: string | null;
+  readonly firstVertex: number;
+  readonly vertexCount: number;
+  readonly firstTriangle: number;
+  readonly triangleCount: number;
+}
 
 export type GeneratedTileRange =
   | {
@@ -73,13 +96,11 @@ export type GeneratedTileRange =
       /** The identity the record states, or null when it states none. */
       readonly identity: string | null;
       readonly state: 'drawn';
-      readonly surface: 'textured' | 'unavailable';
-      readonly orientation: SurfaceOrientation | null;
-      readonly textureSetId: string | null;
-      readonly reason: string | null;
       readonly firstTriangle: number;
       readonly triangleCount: number;
       readonly extentMm: TileExtentMm;
+      /** Its surfaces in triangle order, covering the record's triangles exactly. */
+      readonly surfaces: readonly GeneratedTileSurface[];
     }
   | {
       readonly record: number;
@@ -156,10 +177,19 @@ function materialReference(record: OwdRecord): TileMaterialReference | string {
   return { textureSetId: setId, repeatSizeMillionths: repeat, rotationUrad: rotation, offsetUMm: offsetU, offsetVMm: offsetV };
 }
 
+/** One surface of a drawn entry as tess's container states it. */
+type DrawnSurface = NonNullable<DrawnEntry['surfaces']>[number];
+
+/** Where a textured surface's texture goes: the record's placement and the set it names. */
+export interface SurfacePlacement {
+  readonly reference: TileMaterialReference;
+  readonly entry: TextureSetManifestEntry;
+}
+
 interface Plan {
   readonly ranges: GeneratedTileRange[];
-  /** The placement of every textured range, by record. */
-  readonly references: Map<number, TileMaterialReference>;
+  /** The placement of every textured surface. */
+  readonly placements: Map<GeneratedTileSurface, SurfacePlacement>;
   readonly prepared: Map<string, PreparedTextureSet>;
 }
 
@@ -170,46 +200,68 @@ async function plan(
   digest: TextureSetDigest,
 ): Promise<Plan> {
   const records = decoded.header.records;
-  const references = new Map<number, TileMaterialReference>();
-  const cited = new Map<number, string>();
+  const readMaterial = (material: MaterialRef): TileMaterialReference | string =>
+    material.state === MATERIAL_NONE_EXISTS ? MATERIAL_NONE_EXISTS_REASON : materialReference(records[material.record]!);
+  const surfacesOf = (entry: DrawnEntry): readonly DrawnSurface[] => {
+    // tess's decoder requires surfaces on every drawn entry of a projection that carries surfaces.
+    if (entry.surfaces === undefined || entry.surfaces.length === 0) {
+      throw new GeneratedTileRefusal(`The render_batch entry of record ${entry.record} states no surfaces.`);
+    }
+    return entry.surfaces;
+  };
+  const setIds = new Set<string>();
   for (const entry of render.header.entries) {
     if (entry.state !== 'drawn') continue;
-    const material = entry.material;
-    // tess's decoder requires a material on every drawn range of a projection that carries surfaces.
-    if (material === undefined) throw new GeneratedTileRefusal(`A render_batch range of record ${entry.record} states no material.`);
-    if (material.state === MATERIAL_NONE_EXISTS) { cited.set(entry.record, MATERIAL_NONE_EXISTS_REASON); continue; }
-    const reference = materialReference(records[material.record]!);
-    if (typeof reference === 'string') cited.set(entry.record, reference);
-    else references.set(entry.record, reference);
+    for (const surface of surfacesOf(entry)) {
+      const read = readMaterial(surface.material);
+      if (typeof read !== 'string') setIds.add(read.textureSetId);
+    }
   }
-  const setIds = [...new Set([...references.values()].map((reference) => reference.textureSetId))].sort();
   const prepared = new Map<string, PreparedTextureSet>();
   for (const result of await Promise.all(
-    setIds.map((setId) => prepareTextureSet(sources.manifest, setId, sources.fetchSet, digest)),
+    [...setIds].sort().map((setId) => prepareTextureSet(sources.manifest, setId, sources.fetchSet, digest)),
   )) prepared.set(result.setId, result);
 
+  const placements = new Map<GeneratedTileSurface, SurfacePlacement>();
   const ranges: GeneratedTileRange[] = [];
   for (const entry of render.header.entries) {
     const record = records[entry.record]!;
     const identity = record.identity === IDENTITY_NOT_STATED ? null : record.identity;
     switch (entry.state) {
       case 'drawn': {
-        const reference = references.get(entry.record);
-        const set = reference === undefined ? undefined : prepared.get(reference.textureSetId);
-        const refused = set?.state === 'refused' ? set.reason : null;
-        if (refused !== null) references.delete(entry.record);
+        const surfaces = surfacesOf(entry).map((surface): GeneratedTileSurface => {
+          const read = readMaterial(surface.material);
+          const set = typeof read === 'string' ? undefined : prepared.get(read.textureSetId);
+          const reason = typeof read === 'string'
+            ? read
+            : set === undefined
+              ? `Texture set ${read.textureSetId} was not prepared.`
+              : set.state === 'refused' ? set.reason : null;
+          const drawn: GeneratedTileSurface = {
+            role: surface.role,
+            orientation: surface.orientation,
+            state: reason === null ? 'textured' : 'unavailable',
+            textureSetId: typeof read === 'string' ? null : read.textureSetId,
+            reason,
+            firstVertex: surface.first_vertex,
+            vertexCount: surface.vertex_count,
+            firstTriangle: surface.first_triangle,
+            triangleCount: surface.triangle_count,
+          };
+          if (typeof read !== 'string' && set?.state === 'decoded' && reason === null) {
+            placements.set(drawn, { reference: read, entry: set.set.entry });
+          }
+          return drawn;
+        });
         ranges.push({
           record: entry.record,
           kind: record.kind,
           identity,
           state: 'drawn',
-          surface: reference !== undefined && refused === null ? 'textured' : 'unavailable',
-          orientation: entry.surface ?? null,
-          textureSetId: reference?.textureSetId ?? null,
-          reason: refused ?? cited.get(entry.record) ?? null,
           firstTriangle: entry.first_triangle,
           triangleCount: entry.triangle_count,
           extentMm: { min: entry.extent_mm.min, max: entry.extent_mm.max },
+          surfaces,
         });
         break;
       }
@@ -233,7 +285,79 @@ async function plan(
         throw new GeneratedTileRefusal(`A render_batch entry has a state this runtime was not written for: ${String((entry as { state: unknown }).state)}.`);
     }
   }
-  return { ranges, references, prepared };
+  return { ranges, placements, prepared };
+}
+
+/** One draw's geometry, ready for `buildSurfaceMesh`: renderer-frame metres, normals, final UVs. */
+export interface TileSurfaceBatch {
+  /** The texture set every surface in the batch is drawn with, or '' for the unavailable surfaces. */
+  readonly key: string;
+  readonly positions: number[];
+  readonly normals: number[];
+  readonly uvs: number[];
+  readonly indices: number[];
+  readonly triangles: number;
+}
+
+/**
+ * Every drawn surface of a tile, batched by what it is drawn with: one batch per texture set, and one
+ * for all unavailable surfaces, in key order. A textured surface is placed by its own material record
+ * through `surfaceUv`; an unavailable one by the pattern's size and its own orientation. Normals are
+ * computed per surface, over that surface's own triangles, so a kerb's vertical face never bends the
+ * normals of its horizontal top. Positions are the payload's metres from the projection origin,
+ * rotated into the renderer frame as (x, z, -y).
+ */
+export function batchTileSurfaces(
+  render: Pick<DecodedProjection, 'position' | 'index'>,
+  surfaceMm: ArrayLike<number>,
+  ranges: readonly GeneratedTileRange[],
+  placements: ReadonlyMap<GeneratedTileSurface, SurfacePlacement>,
+  look: TileLook,
+): TileSurfaceBatch[] {
+  const batches = new Map<string, { -readonly [K in keyof TileSurfaceBatch]: TileSurfaceBatch[K] }>();
+  for (const range of ranges) {
+    if (range.state !== 'drawn') continue;
+    for (const surface of range.surfaces) {
+      const placement = placements.get(surface);
+      if (surface.state === 'textured' && placement === undefined) {
+        throw new Error(`The ${surface.role} surface of record ${range.record} is textured and has no placement`);
+      }
+      const key = placement === undefined ? '' : placement.entry.setId;
+      let batch = batches.get(key);
+      if (batch === undefined) {
+        batch = { key, positions: [], normals: [], uvs: [], indices: [], triangles: 0 };
+        batches.set(key, batch);
+      }
+      const place = (s: number, t: number): readonly [number, number] =>
+        placement === undefined
+          ? unavailableUv(s, t, look, surface.orientation)
+          : surfaceUv(s, t, placement.reference, placement.entry);
+      const first = batch.positions.length / 3;
+      const remap = new Map<number, number>();
+      const local: number[] = [];
+      const surfaceIndices: number[] = [];
+      const lastVertex = surface.firstVertex + surface.vertexCount;
+      for (let corner = surface.firstTriangle * 3; corner < (surface.firstTriangle + surface.triangleCount) * 3; corner += 1) {
+        const vertex = render.index[corner]!;
+        if (vertex < surface.firstVertex || vertex >= lastVertex) {
+          throw new Error(`A triangle of the ${surface.role} surface of record ${range.record} uses a vertex outside the surface`);
+        }
+        let mapped = remap.get(vertex);
+        if (mapped === undefined) {
+          mapped = local.length / 3;
+          remap.set(vertex, mapped);
+          local.push(render.position[vertex * 3]!, render.position[vertex * 3 + 2]!, -render.position[vertex * 3 + 1]!);
+          batch.uvs.push(...place(surfaceMm[vertex * 2]!, surfaceMm[vertex * 2 + 1]!));
+        }
+        surfaceIndices.push(mapped);
+      }
+      batch.positions.push(...local);
+      batch.normals.push(...pc.calculateNormals(local, surfaceIndices));
+      for (const index of surfaceIndices) batch.indices.push(first + index);
+      batch.triangles += surface.triangleCount;
+    }
+  }
+  return [...batches.keys()].sort().map((key) => batches.get(key)!);
 }
 
 function renderExtent(ranges: readonly GeneratedTileRange[]): TileExtentMm {
@@ -312,7 +436,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   if (render === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no render_batch.`);
   const surface = absoluteSurfaceCoordinates(render);
   if (surface === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no surface coordinates.`);
-  const { ranges, references, prepared } = await plan(decoded, render, sources, digest);
+  const { ranges, placements, prepared } = await plan(decoded, render, sources, digest);
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
@@ -365,7 +489,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
       return best;
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      return attachTile(host, tile, render, surface, references, prepared);
+      return attachTile(host, tile, render, surface, placements, prepared);
     },
   };
   return tile;
@@ -375,8 +499,8 @@ function attachTile(
   host: GeneratedTileHost,
   tile: LoadedGeneratedTile,
   render: DecodedProjection,
-  surface: Float64Array,
-  references: ReadonlyMap<number, TileMaterialReference>,
+  surfaceMm: Float64Array,
+  placements: ReadonlyMap<GeneratedTileSurface, SurfacePlacement>,
   prepared: ReadonlyMap<string, PreparedTextureSet>,
 ): GeneratedTileAttachment {
   const device = host.app.graphicsDevice;
@@ -388,76 +512,37 @@ function attachTile(
   if (origin.length === 3) root.setLocalPosition(...tileToRenderer(origin[0], origin[1], origin[2]));
   host.environmentRoot.addChild(root);
 
-  // One batch per texture set, and one for every unavailable surface. Each vertex carries its final
-  // UV: a textured range is placed by the record it cites, an unavailable one by the pattern's size.
-  interface Batch { positions: number[]; normals: number[]; uvs: number[]; indices: number[]; material: pc.Material }
-  const batches = new Map<string, Batch>();
-  let triangles = 0;
-  for (const range of tile.ranges) {
-    if (range.state !== 'drawn') continue;
-    const key = range.surface === 'textured' ? range.textureSetId! : '';
-    let batch = batches.get(key);
-    if (batch === undefined) {
-      let material: pc.Material = uploads.unavailableMaterial;
-      if (key !== '') {
-        const resolution = uploads.adopt(prepared.get(key)!);
-        if (resolution.state !== 'available') throw new Error(`Texture set ${key} was prepared and then refused`);
-        material = resolution.material;
-      }
-      batch = { positions: [], normals: [], uvs: [], indices: [], material };
-      batches.set(key, batch);
-    }
-    const set = key === '' ? null : prepared.get(key)!;
-    const reference = references.get(range.record);
-    const place = (s: number, t: number): readonly [number, number] =>
-      set !== null && set.state === 'decoded' && reference !== undefined
-        ? surfaceUv(s, t, reference, set.set.entry)
-        : unavailableUv(s, t, look, range.orientation ?? 'vertical');
-    const first = batch.positions.length / 3;
-    const remap = new Map<number, number>();
-    const local: number[] = [];
-    const rangeIndices: number[] = [];
-    for (let corner = range.firstTriangle * 3; corner < (range.firstTriangle + range.triangleCount) * 3; corner += 1) {
-      const vertex = render.index[corner]!;
-      let mapped = remap.get(vertex);
-      if (mapped === undefined) {
-        mapped = local.length / 3;
-        remap.set(vertex, mapped);
-        // Payload metres from the origin, rotated into the renderer frame: (x, z, -y).
-        local.push(render.position[vertex * 3]!, render.position[vertex * 3 + 2]!, -render.position[vertex * 3 + 1]!);
-        batch.uvs.push(...place(surface[vertex * 2]!, surface[vertex * 2 + 1]!));
-      }
-      rangeIndices.push(mapped);
-    }
-    batch.positions.push(...local);
-    batch.normals.push(...pc.calculateNormals(local, rangeIndices));
-    for (const index of rangeIndices) batch.indices.push(first + index);
-    triangles += range.triangleCount;
-  }
+  // One draw per texture set, and one for every unavailable surface.
+  const batches = batchTileSurfaces(render, surfaceMm, tile.ranges, placements, look);
 
   const meshes: pc.Mesh[] = [];
-  const keys = [...batches.keys()].sort();
-  for (const key of keys) {
-    const batch = batches.get(key)!;
+  for (const batch of batches) {
+    let material: pc.Material = uploads.unavailableMaterial;
+    if (batch.key !== '') {
+      const resolution = uploads.adopt(prepared.get(batch.key)!);
+      if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
+      material = resolution.material;
+    }
     // The UV is already final, so the builder is handed it as the surface pair and passes it on.
     const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
     meshes.push(mesh);
-    const entity = new pc.Entity(key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${key}`);
+    const entity = new pc.Entity(batch.key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${batch.key}`);
     entity.addComponent('render', {
-      meshInstances: [new pc.MeshInstance(mesh, batch.material, entity)],
+      meshInstances: [new pc.MeshInstance(mesh, material, entity)],
       castShadows: true,
-      receiveShadows: key !== '',
+      receiveShadows: batch.key !== '',
     });
     root.addChild(entity);
   }
 
   const metrics: GeneratedTileMetrics = {
     tileName: tile.name,
-    triangles,
-    drawBatches: keys.length,
+    triangles: batches.reduce((total, batch) => total + batch.triangles, 0),
+    drawBatches: batches.length,
     transferredBytes: tile.transferredBytes,
     decodedTextureBytes: uploads.decodedTextureBytes,
-    unavailableSurfaces: tile.ranges.filter((range) => range.state === 'drawn' && range.surface === 'unavailable').length,
+    unavailableSurfaces: tile.ranges.reduce((count, range) =>
+      count + (range.state === 'drawn' ? range.surfaces.filter((surface) => surface.state === 'unavailable').length : 0), 0),
     lookId: look.id,
     lookVersion: look.version,
   };

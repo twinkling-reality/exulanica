@@ -10,9 +10,14 @@ import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import {
   GeneratedTileRefusal,
   MATERIAL_NONE_EXISTS_REASON,
+  batchTileSurfaces,
   loadGeneratedTile,
+  type GeneratedTileRange,
+  type GeneratedTileSurface,
   type LoadedGeneratedTile,
+  type SurfacePlacement,
 } from '../src/playcanvas/generated-tile/tile-runtime.js';
+import { surfaceUv, unavailableUv } from '../src/playcanvas/generated-tile/texture-materials.js';
 import {
   SUPPORT_SAMPLE_SPACING_M,
   navEnvelopeSupport,
@@ -46,15 +51,20 @@ describe('loading a baked tile through tess\'s decoder', () => {
     const drawn = tile.ranges.filter((range) => range.state === 'drawn');
     expect(drawn.map((range) => range.kind)).toEqual(['city.terrain']);
     const terrain = drawn[0]!;
-    // Exact terrain that no material record dresses is drawn, as the stated unavailable surface.
-    expect(terrain.state === 'drawn' && terrain.surface).toBe('unavailable');
-    expect(terrain.state === 'drawn' && terrain.reason).toBe(MATERIAL_NONE_EXISTS_REASON);
+    // Exact terrain that no material record dresses is drawn, as one stated unavailable surface.
+    expect(terrain.state === 'drawn' && terrain.surfaces).toEqual([{
+      role: 'terrain', orientation: 'horizontal', state: 'unavailable', textureSetId: null,
+      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 0, vertexCount: 289, firstTriangle: 0, triangleCount: 512,
+    }]);
     expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(512);
     expect(terrain.identity).toBe('2f14328d-39f8-5bee-a06a-f963b701ccf3');
     const decoded = decodeOwd(baked);
     const header = decoded.projections.find((projection) => projection.header.name === 'render_batch')!.header;
     const drawnEntry = header.entries.find((entry) => entry.state === 'drawn');
-    expect(drawnEntry?.state === 'drawn' && drawnEntry.material).toEqual({ state: 'none-exists' });
+    expect(drawnEntry?.state === 'drawn' && drawnEntry.surfaces).toEqual([{
+      role: 'terrain', material: { state: 'none-exists' }, orientation: 'horizontal',
+      first_vertex: 0, vertex_count: 289, first_triangle: 0, triangle_count: 512,
+    }]);
     // Halo records are context: the container lists them, and the runtime neither draws nor lists them.
     const halo = header.entries.filter((entry) => entry.state === 'halo').map((entry) => entry.record);
     expect(halo).toHaveLength(3);
@@ -167,6 +177,74 @@ describe('a tile with no nav_envelope', () => {
     expect(resolution.recovered).toBe(true);
     expect(resolution.recoveryReason).toBe('no-surface');
     expect([resolution.position.x, resolution.position.y, resolution.position.z]).toEqual([start.x, start.y, start.z]);
+  });
+});
+
+describe('drawing per surface', () => {
+  // A hand-built render_batch in the payload's metres from its origin (tile frame, z up): a kerb whose
+  // vertical face (vertices 0 to 3) and horizontal top (4 to 7) are two surfaces of one record, and a
+  // footway (8 to 11) that is another record's only surface.
+  const quad = (a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[]) => [...a, ...b, ...c, ...d];
+  const position = new Float32Array([
+    ...quad([0, 0, 0], [1, 0, 0], [1, 0, 0.15], [0, 0, 0.15]),
+    ...quad([0, 0, 0.15], [1, 0, 0.15], [1, 0.3, 0.15], [0, 0.3, 0.15]),
+    ...quad([0, 0.3, 0.15], [1, 0.3, 0.15], [1, 2, 0.15], [0, 2, 0.15]),
+  ]);
+  const index = new Uint32Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11]);
+  const surfaceMm = new Float64Array([
+    0, 150, 1000, 150, 1000, 0, 0, 0,
+    0, 0, 1000, 0, 1000, 300, 0, 300,
+    0, 300, 1000, 300, 1000, 2000, 0, 2000,
+  ]);
+  const surface = (role: string, orientation: 'vertical' | 'horizontal', first: number, textured: boolean): GeneratedTileSurface => ({
+    role, orientation, state: textured ? 'textured' : 'unavailable', textureSetId: textured ? 'cc0.kerb-stone' : null,
+    reason: textured ? null : MATERIAL_NONE_EXISTS_REASON, firstVertex: first * 2, vertexCount: 4, firstTriangle: first, triangleCount: 2,
+  });
+  const face = surface('kerb_face', 'vertical', 0, false);
+  const top = surface('kerb_top', 'horizontal', 2, true);
+  const footway = surface('footway', 'horizontal', 4, false);
+  const extentMm = { min: [0, 0, 0] as const, max: [1000, 2000, 150] as const };
+  const ranges: GeneratedTileRange[] = [
+    { record: 0, kind: 'city.curb_edge', identity: null, state: 'drawn', firstTriangle: 0, triangleCount: 4, extentMm, surfaces: [face, top] },
+    { record: 1, kind: 'city.footway', identity: null, state: 'drawn', firstTriangle: 4, triangleCount: 2, extentMm, surfaces: [footway] },
+  ];
+  const kerbStone = manifest.byId.get('cc0.kerb-stone')!;
+  const placement: SurfacePlacement = {
+    reference: { textureSetId: 'cc0.kerb-stone', repeatSizeMillionths: 2_000_000, rotationUrad: 0, offsetUMm: 100, offsetVMm: 0 },
+    entry: kerbStone,
+  };
+  const placements = new Map([[top, placement]]);
+
+  it('batches surfaces by what they are drawn with, not by record, and places each by its own material and orientation', () => {
+    const batches = batchTileSurfaces({ position, index }, surfaceMm, ranges, placements, TILE_LOOK_V1);
+    expect(batches.map((batch) => [batch.key, batch.triangles, batch.positions.length / 3, batch.indices.length])).toEqual([
+      ['', 4, 8, 12],
+      ['cc0.kerb-stone', 2, 4, 6],
+    ]);
+    const [unavailable, textured] = batches as [typeof batches[0], typeof batches[0]];
+    // The kerb's face and the footway share the unavailable draw, each with its own orientation's pattern.
+    expect(unavailable.uvs.slice(0, 2)).toEqual([...unavailableUv(0, 150, TILE_LOOK_V1, 'vertical')]);
+    expect(unavailable.uvs.slice(8, 10)).toEqual([...unavailableUv(0, 300, TILE_LOOK_V1, 'horizontal')]);
+    expect(textured.uvs.slice(2, 4)).toEqual([...surfaceUv(1000, 0, placement.reference, kerbStone)]);
+    // Positions are rotated into the renderer frame, (x, z, -y), and indices point into their own batch.
+    expect(textured.positions.slice(6, 9).map((value) => Math.fround(value) + 0)).toEqual([1, Math.fround(0.15), Math.fround(-0.3)]);
+    expect(Math.max(...unavailable.indices)).toBe(7);
+    // Normals are per surface: the face points horizontally, the top and the footway straight up.
+    for (let vertex = 0; vertex < 4; vertex += 1) {
+      const [x, y, z] = unavailable.normals.slice(vertex * 3, vertex * 3 + 3) as [number, number, number];
+      expect([Math.abs(x) + Math.abs(y), Math.abs(z)]).toEqual([0, 1]);
+      expect(textured.normals.slice(vertex * 3, vertex * 3 + 3).map((value) => value + 0)).toEqual([0, 1, 0]);
+      expect(unavailable.normals.slice((vertex + 4) * 3, (vertex + 4) * 3 + 3).map((value) => value + 0)).toEqual([0, 1, 0]);
+    }
+  });
+
+  it('refuses a surface triangle that reaches outside its surface, and a textured surface with no placement', () => {
+    const stray = new Uint32Array(index);
+    stray[2] = 4;
+    expect(() => batchTileSurfaces({ position, index: stray }, surfaceMm, ranges, placements, TILE_LOOK_V1))
+      .toThrow(/kerb_face surface of record 0 uses a vertex outside the surface/);
+    expect(() => batchTileSurfaces({ position, index }, surfaceMm, ranges, new Map(), TILE_LOOK_V1))
+      .toThrow(/kerb_top surface of record 0 is textured and has no placement/);
   });
 });
 

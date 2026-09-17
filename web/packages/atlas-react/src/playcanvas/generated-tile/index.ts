@@ -28,11 +28,21 @@ export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';
 export { applyTileEnvironment, skyRadiance } from './environment.js';
 export { createUnavailableMaterial, unavailablePatternTexels } from './unavailable-surface.js';
-export type { DrawnTileRange, GeneratedTileRange, GeneratedTileSources, LoadedGeneratedTile, TilePick } from './tile-runtime.js';
+export type {
+  DrawnTileRange,
+  GeneratedTileRange,
+  GeneratedTileSources,
+  GeneratedTileSurface,
+  LoadedGeneratedTile,
+  SurfacePlacement,
+  TilePick,
+  TileSurfaceBatch,
+} from './tile-runtime.js';
 export {
   GeneratedTileRefusal,
   MATERIAL_NONE_EXISTS_REASON,
   MATERIAL_PLACEMENT_UNSTATED,
+  batchTileSurfaces,
   loadGeneratedTile,
 } from './tile-runtime.js';
 export type { TileCapsule, TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';

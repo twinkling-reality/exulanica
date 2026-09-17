@@ -20,17 +20,22 @@ export const GENERATED_TILE_EVALUATION_ATTRIBUTE = 'data-generated-tile-evaluati
 
 function statement(tile: LoadedGeneratedTile): HTMLElement {
   const drawn = tile.ranges.filter((range) => range.state === 'drawn');
-  const unavailableSurfaces = drawn.filter((range) => range.state === 'drawn' && range.surface === 'unavailable');
-  const notDrawn = tile.ranges.filter((range) => range.state !== 'drawn');
+  const named = (range: LoadedGeneratedTile['ranges'][number]): string =>
+    `${range.kind}${range.identity === null ? '' : ` ${range.identity}`}`;
+  // Drawing is per surface, so an unavailable surface is listed with its record, role and orientation.
+  const unavailableSurfaces = drawn.flatMap((range) => range.state !== 'drawn' ? [] : range.surfaces
+    .filter((surface) => surface.state === 'unavailable')
+    .map((surface) => `${named(range)} ${surface.role} (${surface.orientation}): ${surface.reason ?? ''}`));
+  const notDrawn = tile.ranges.flatMap((range) => range.state === 'drawn' ? [] : [`${named(range)}: ${range.reason}`]);
   const lines = [
     `Development evaluation of generated tile ${tile.name}. Not part of any world.`,
     tile.navigation.viewpointOnly
       ? `Viewpoint only: ${tile.navigation.support.state === 'unavailable' ? tile.navigation.support.reason : ''}`
       : `Standing on the tile's nav_envelope. ${tile.navigation.collisionState.reason}`,
-    `${drawn.length} of ${tile.ranges.length} records drawn; ${unavailableSurfaces.length} drawn as unavailable surface.`,
+    `${drawn.length} of ${tile.ranges.length} records drawn; ${unavailableSurfaces.length} `
+      + `${unavailableSurfaces.length === 1 ? 'surface' : 'surfaces'} drawn as unavailable.`,
   ];
-  const items = [...unavailableSurfaces, ...notDrawn].map((range) =>
-    el('li', { text: `${range.kind}${range.identity === null ? '' : ` ${range.identity}`}: ${range.reason ?? ''}` }));
+  const items = [...unavailableSurfaces, ...notDrawn].map((text) => el('li', { text }));
   return el('section', {
     class: 'generated-tile-evaluation',
     role: 'note',
