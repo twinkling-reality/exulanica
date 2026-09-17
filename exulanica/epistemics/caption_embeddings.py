@@ -5,6 +5,12 @@ capture/workspace tombstone transactions and the purge worker removes them. Inde
 schemas without that lifecycle capability before any model call. Assertions remain the source
 text; a content fingerprint excludes stale vectors after a correction. Callers supply the
 configured budgeted ModelClient, and no response cache retains deleted caption text.
+
+Caption text is written about a photograph by the vision model, so it is as personal as the
+photograph. It leaves only through ``before_send``, which every caller supplies and which is
+handed every model the request can reach and where it goes; the caller decides, and a refusal
+raises before anything is sent. This layer cannot import that decision, which lives in
+``exulanica.ingest.model_rights``, so it asks for it instead.
 """
 
 from __future__ import annotations
@@ -12,13 +18,21 @@ from __future__ import annotations
 import hashlib
 import math
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import psycopg
+from psycopg.pq import TransactionStatus
 
 from exulanica.models.client import ModelClient
+from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.models.results import EmbeddingResult
+
+#: Called with every model a caption request can reach and where it goes, immediately before the
+#: text is sent. It returns to allow the hand-over and raises to refuse it.
+BeforeSend = Callable[[ModelHandoff], Any]
 
 PROMPT_VERSION = "companion-embedding-1"
 FAMILY_PREFIX = f"companion_text:{PROMPT_VERSION}:"
@@ -65,13 +79,24 @@ def embed_capture(
     workspace_id: uuid.UUID,
     capture_id: uuid.UUID,
     client: ModelClient,
+    *,
+    before_send: BeforeSend,
 ) -> EmbeddingResult | None:
     """Embed active assertions once per capture/content/model version, including concurrent jobs.
 
     Workspace provisioning must already have created its vector partition. Never create schema
-    at runtime. The transaction serializes this pass; the insert's tombstone guard refuses a
-    deletion that arrived while the model ran. No response cache retains deleted caption text.
+    at runtime. A session lock per capture serializes this pass, and no transaction is open while
+    the model runs. The text is read first; ``before_send`` is then called on the idle connection
+    with the embedding role's whole chain and its endpoint, and a refusal it raises propagates with
+    nothing sent. The write re-reads the text and stores nothing when it changed or went, and the
+    insert's tombstone guard refuses a deletion that arrived while the model ran. No response cache
+    retains deleted caption text.
+
+    Returns the model's result whenever a request was sent, so its cost is counted, and None when
+    nothing was sent.
     """
+    if not callable(before_send):
+        raise TypeError("caption text is sent only after a before_send check")
     # A later search-path schema can have newer migrations. Its lifecycle guard does not
     # protect embedding rows in the active schema.
     if (
@@ -82,43 +107,104 @@ def embed_capture(
         is None
     ):
         raise RuntimeError("Caption indexing requires lifecycle migration 0044")
-    with connection.transaction():
-        connection.execute(
-            "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-            (f"companion-embedding:{workspace_id}:{capture_id}",),
-        )
-        source = connection.execute(
-            "select * from (" + SOURCE_SQL + ") source where capture_id=%s",
-            (workspace_id, list(SEARCHABLE_PREDICATES), capture_id),
-        ).fetchone()
-        if source is None:
-            return None
-        model = client.manifest[Role.EMBEDDING].primary.model_id
-        version = client.manifest.pipeline_version
-        family = FAMILY_PREFIX + hashlib.sha256(source["body"].encode()).hexdigest()
-        key = uuid.uuid5(workspace_id, f"{capture_id}:{family}:{model}:{version}:{PROMPT_VERSION}")
-        if connection.execute(
-            "select 1 from embedding where workspace_id=%s and embedding_id=%s",
-            (workspace_id, key),
-        ).fetchone():
-            return None
+    if connection.info.transaction_status != TransactionStatus.IDLE:
+        raise ValueError("caption text is handed to a model only from an idle connection")
+    lock = f"companion-embedding:{workspace_id}:{capture_id}"
+    connection.execute("select pg_advisory_lock(hashtextextended(%s, 0))", (lock,))
+    try:
+        with connection.transaction():
+            source = _source(connection, workspace_id, capture_id)
+            if source is None:
+                return None
+            model = client.manifest[Role.EMBEDDING].primary.model_id
+            version = client.manifest.pipeline_version
+            family = _family(source["body"])
+            key = uuid.uuid5(
+                workspace_id, f"{capture_id}:{family}:{model}:{version}:{PROMPT_VERSION}"
+            )
+            if _stored(connection, workspace_id, key):
+                return None
+        before_send(ModelHandoff.hosted(client.manifest, Role.EMBEDDING))
         result = client.embed(
             [source["body"]], role=Role.EMBEDDING, prompt_version=PROMPT_VERSION, use_cache=False
         )
         if result.model_id != model or len(result.vectors) != 1:
             raise ValueError("The embedding role returned an unexpected model or vector count")
         vector = QueryEmbedding(result.vectors[0], result.model_id, version)
-        connection.execute(
-            "insert into embedding (embedding_id, workspace_id, family, ref_type, ref_id, "
-            "model_ref, pipeline_version, dims, v) values (%s,%s,%s,'span',%s,%s,%s,4096,%s)",
-            (
-                key,
-                workspace_id,
-                family,
-                source["span_id"],
-                result.model_id,
-                version,
-                vector.literal,
-            ),
-        )
+        with connection.transaction():
+            current = _source(connection, workspace_id, capture_id)
+            if (
+                current is None
+                or current["span_id"] != source["span_id"]
+                or _family(current["body"]) != family
+                or _stored(connection, workspace_id, key)
+            ):
+                return result
+            connection.execute(
+                "insert into embedding (embedding_id, workspace_id, family, ref_type, ref_id, "
+                "model_ref, pipeline_version, dims, v) values (%s,%s,%s,'span',%s,%s,%s,4096,%s)",
+                (
+                    key,
+                    workspace_id,
+                    family,
+                    source["span_id"],
+                    result.model_id,
+                    version,
+                    vector.literal,
+                ),
+            )
         return result
+    finally:
+        if not connection.closed:
+            connection.execute("select pg_advisory_unlock(hashtextextended(%s, 0))", (lock,))
+
+
+class CaptionEmbeddingPass:
+    """The derivative worker's caption vector pass over one configured client.
+
+    States the models it reaches, so the worker can ask for the right to reach them, and sends
+    nothing until the worker's ``before_send`` allows it.
+    """
+
+    def __init__(self, client: ModelClient) -> None:
+        self.client = client
+
+    @property
+    def model_handoff(self) -> ModelHandoff:
+        """The embedding role's whole chain, at the endpoint of the client's manifest."""
+        return ModelHandoff.hosted(self.client.manifest, Role.EMBEDDING)
+
+    def __call__(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        capture_id: uuid.UUID,
+        *,
+        before_send: BeforeSend,
+    ) -> EmbeddingResult | None:
+        return embed_capture(
+            connection, workspace_id, capture_id, self.client, before_send=before_send
+        )
+
+
+def _source(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, capture_id: uuid.UUID
+) -> dict[str, Any] | None:
+    return connection.execute(
+        "select * from (" + SOURCE_SQL + ") source where capture_id=%s",
+        (workspace_id, list(SEARCHABLE_PREDICATES), capture_id),
+    ).fetchone()
+
+
+def _family(body: str) -> str:
+    return FAMILY_PREFIX + hashlib.sha256(body.encode()).hexdigest()
+
+
+def _stored(connection: psycopg.Connection, workspace_id: uuid.UUID, key: uuid.UUID) -> bool:
+    return (
+        connection.execute(
+            "select 1 from embedding where workspace_id=%s and embedding_id=%s",
+            (workspace_id, key),
+        ).fetchone()
+        is not None
+    )

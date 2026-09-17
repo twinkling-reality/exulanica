@@ -322,8 +322,8 @@ def test_both_worker_constructors_share_the_client_and_cover_each_model_gap(
     monkeypatch, tmp_path, enabled, vision_budget, embedding_budget
 ):
     from exulanica.api import services
+    from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
     from exulanica.models.manifest import Role
-    from exulanica.selection.embeddings import embed_capture
 
     class Database:
         @classmethod
@@ -372,8 +372,8 @@ def test_both_worker_constructors_share_the_client_and_cover_each_model_gap(
         assert built["lease_seconds"] == (180 if enabled else 60)
         assert built["vision"] is (client if enabled else None)
         if enabled:
-            assert built["embedding_pass"].func is embed_capture
-            assert built["embedding_pass"].keywords == {"client": client}
+            assert isinstance(built["embedding_pass"], CaptionEmbeddingPass)
+            assert built["embedding_pass"].client is client
         else:
             assert built["embedding_pass"] is None
 

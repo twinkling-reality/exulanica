@@ -25,6 +25,17 @@ def vector(x=1.0, y=0.0):
     return (x, y, *([0.0] * 4094))
 
 
+def unchecked(handoff):
+    """Let caption text go. This corpus is synthetic test media, which needs no model right; the
+    check the derivative worker supplies is tested in ``test_caption_embedding_right``."""
+
+
+def embed(repository, capture, client):
+    return embed_capture(
+        repository.connection, repository.workspace_id, capture, client, before_send=unchecked
+    )
+
+
 @pytest.fixture
 def corpus(repository, tmp_path, photo_dir):
     texts = {
@@ -109,7 +120,7 @@ def test_fusion_ranks_within_scope_and_preserves_packet_order(
         ("volcano", vector()),
     ):
         script(client, monkeypatch, values)
-        embed_capture(repository.connection, repository.workspace_id, corpus[name], client)
+        embed(repository, corpus[name], client)
     query = QueryEmbedding(
         vector(), client.manifest[Role.EMBEDDING].primary.model_id, client.manifest.pipeline_version
     )
@@ -129,7 +140,7 @@ def test_fusion_ranks_within_scope_and_preserves_packet_order(
 
 def test_vector_only_hit_and_low_similarity_abstention(repository, corpus, client, monkeypatch):
     script(client, monkeypatch, vector())
-    embed_capture(repository.connection, repository.workspace_id, corpus["snow"], client)
+    embed(repository, corpus["snow"], client)
     model = client.manifest[Role.EMBEDDING].primary.model_id
     assert run(repository, "winter clothing", QueryEmbedding(vector(), model, 3)).total_matched == 1
     assert run(repository, "penguin submarine", QueryEmbedding(vector(0, 1), model, 3)).is_empty
@@ -140,17 +151,15 @@ def test_vector_only_hit_and_low_similarity_abstention(repository, corpus, clien
 def test_embed_once_and_tombstone_queues_vector_for_purge(repository, corpus, client, monkeypatch):
     calls = script(client, monkeypatch, vector())
     capture = corpus["snow"]
-    assert (
-        embed_capture(repository.connection, repository.workspace_id, capture, client) is not None
-    )
-    assert embed_capture(repository.connection, repository.workspace_id, capture, client) is None
+    assert embed(repository, capture, client) is not None
+    assert embed(repository, capture, client) is None
     assert len(calls) == 1
     assert calls[0][1]["role"] is Role.EMBEDDING
     assert calls[0][1]["use_cache"] is False
     assert calls[0][0] == ["People wear insulated coveralls on a snowy mountain slope."]
     before = run(repository, "snow")
     repository.insert_tombstone(scope="capture", capture_id=capture, requested_by=uuid.uuid4())
-    assert embed_capture(repository.connection, repository.workspace_id, capture, client) is None
+    assert embed(repository, capture, client) is None
     assert len(calls) == 1
     assert run(repository, "snow").is_empty
     assert build_packet(
@@ -169,7 +178,7 @@ def test_permission_filter_excluded_photo_cannot_be_cited(repository, corpus, cl
 
     script(client, monkeypatch, vector())
     for capture in corpus.values():
-        embed_capture(repository.connection, repository.workspace_id, capture, client)
+        embed(repository, capture, client)
     embedding = QueryEmbedding(
         vector(), client.manifest[Role.EMBEDDING].primary.model_id, client.manifest.pipeline_version
     )
@@ -222,7 +231,7 @@ def test_ask_records_query_vector_cost_before_composition(
     from model_fakes import chat_body
 
     calls = script(client, monkeypatch, vector())
-    embed_capture(repository.connection, repository.workspace_id, corpus["snow"], client)
+    embed(repository, corpus["snow"], client)
     transport.default = HttpResponse(
         status_code=200,
         text=json.dumps(
@@ -268,7 +277,7 @@ def test_inactive_assertion_cannot_match_through_its_old_vector(
 ):
     script(client, monkeypatch, vector())
     capture = corpus["snow"]
-    embed_capture(repository.connection, repository.workspace_id, capture, client)
+    embed(repository, capture, client)
     repository.connection.execute(
         "update assertion set status='retracted' where workspace_id=%s and subject_ref->>'id'=%s",
         (repository.workspace_id, str(capture)),

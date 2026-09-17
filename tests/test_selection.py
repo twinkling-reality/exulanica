@@ -584,14 +584,14 @@ def test_fused_candidates_cannot_escape_entity_filters(library, client, monkeypa
     from exulanica.selection.embeddings import QueryEmbedding, embed_capture
     from exulanica.selection.packet import build_packet
 
-    from test_companion_matching import script, vector
+    from test_companion_matching import script, unchecked, vector
 
     connection = library.repository.connection
     workspace = library.session.workspace_id
     provision_workspace(connection, workspace)
     script(client, monkeypatch, vector())
     for capture in library.captures.values():
-        embed_capture(connection, workspace, capture, client)
+        embed_capture(connection, workspace, capture, client, before_send=unchecked)
     query = QueryEmbedding(vector(), client.manifest[Role.EMBEDDING].primary.model_id,
                            client.manifest.pipeline_version)
     for mode, expected in (

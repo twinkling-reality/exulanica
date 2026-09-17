@@ -15,7 +15,6 @@ import sys
 import threading
 import uuid
 from collections.abc import Mapping
-from functools import partial
 from typing import Any, Final
 
 from exulanica.db.account_workspaces import (
@@ -26,7 +25,7 @@ from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
 from exulanica.env import env_get, env_name, resolve_data_dir
-from exulanica.epistemics.caption_embeddings import embed_capture
+from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
@@ -121,7 +120,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         parse_workspaces(args.workspace, environ, allow_empty=workspace_source is not None),
         workspace_source=workspace_source,
         vision=vision,
-        embedding_pass=partial(embed_capture, client=client) if client is not None else None,
+        embedding_pass=CaptionEmbeddingPass(client) if client is not None else None,
         depth=depth,
         detector=detector,
         segmenter=segmenter,

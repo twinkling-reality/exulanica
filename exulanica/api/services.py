@@ -28,7 +28,6 @@ import os
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -38,7 +37,7 @@ from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
-from exulanica.epistemics.caption_embeddings import embed_capture
+from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
@@ -210,9 +209,7 @@ class Services:
                 self.accounts.active_owned_workspaces if self.accounts is not None else None
             ),
             vision=NebiusVisionModel(self.model_client) if self.model_client else None,
-            embedding_pass=partial(embed_capture, client=self.model_client)
-            if self.model_client
-            else None,
+            embedding_pass=CaptionEmbeddingPass(self.model_client) if self.model_client else None,
             lease_seconds=lease_seconds_for(
                 max(
                     self.model_client.worst_case_seconds(role)

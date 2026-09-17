@@ -12,11 +12,12 @@ import pytest
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.session import set_workspace
 from exulanica.deletion import queue
+from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.evidence import EvidenceAddress
 from exulanica.evidence.blob import BlobId
 from exulanica.selection.embeddings import embed_capture
 
-from test_companion_matching import run, script, vector
+from test_companion_matching import run, script, unchecked, vector
 from test_derivative_reclaim import queued as queued
 from test_purge import _APP_PASSWORD, _APP_ROLE, _PURGE_PASSWORD, _PURGE_ROLE
 from test_purge import purged as purged
@@ -28,7 +29,7 @@ def indexed(purged, client, monkeypatch):
     provision_workspace(connection, purged.workspace_id)
     capture = purged.rows("select capture_id from capture")[0]["capture_id"]
     calls = script(client, monkeypatch, vector())
-    embed_capture(connection, purged.workspace_id, capture, client)
+    embed_capture(connection, purged.workspace_id, capture, client, before_send=unchecked)
     embedding = dict(purged.rows("select * from embedding")[0])
     return purged, capture, embedding, calls
 
@@ -60,7 +61,7 @@ def test_lifecycle_guard_refuses_a_function_from_a_later_search_path_schema(clie
                 older.row_factory = psycopg.rows.dict_row
                 calls = script(client, monkeypatch, vector())
                 with pytest.raises(RuntimeError, match="0044"):
-                    embed_capture(older, uuid.uuid4(), uuid.uuid4(), client)
+                    embed_capture(older, uuid.uuid4(), uuid.uuid4(), client, before_send=unchecked)
                 assert calls == []
 
 
@@ -101,7 +102,10 @@ def test_vectors_are_enqueued_atomically_and_physically_purged(indexed, client, 
         assert [row["target_ref"] for row in targets] == [str(embedding["embedding_id"])]
         assert not queue.is_purge_complete(connection, tombstone)
     assert run(fixture.repository, "red").is_empty
-    assert embed_capture(connection, fixture.workspace_id, capture, client) is None
+    assert (
+        embed_capture(connection, fixture.workspace_id, capture, client, before_send=unchecked)
+        is None
+    )
     assert len(calls) == 1
     with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
         _reinsert(connection, embedding, embedding_id=uuid.uuid4())
@@ -250,7 +254,9 @@ def test_upgrade_enqueues_old_orphans_and_reopens_false_completion(
             provision_workspace(connection, workspace)
             calls = script(client, monkeypatch, vector())
             with pytest.raises(RuntimeError, match="0044"):
-                embed_capture(connection, workspace, result.capture_id, client)
+                embed_capture(
+                    connection, workspace, result.capture_id, client, before_send=unchecked
+                )
             assert calls == []
             span = connection.execute("select span_id from evidence_span").fetchone()["span_id"]
             _reinsert(
@@ -406,7 +412,8 @@ def test_api_services_use_the_configured_client_or_remain_model_disabled(
     worker = services.build_derivative_worker()
     assert worker is not None
     if enabled:
-        assert worker._embedding_pass.keywords["client"] is client
+        assert isinstance(worker._embedding_pass, CaptionEmbeddingPass)
+        assert worker._embedding_pass.client is client
     else:
         assert worker._embedding_pass is None
     outcomes = worker.drain()

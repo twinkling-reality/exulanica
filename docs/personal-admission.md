@@ -88,6 +88,18 @@ role's whole chain and the endpoint of the manifest its client was built with; d
 fallback only when the local detector will run. The value types, `ModelIdentity` and
 `ModelHandoff`, live in `exulanica.models.handoff` so a model in any layer can state them.
 
+**Text derived from a personal photograph counts.** The caption the vision model writes goes to
+the hosted embedding model only under a current right naming the embedding role's whole chain and
+its endpoint. `embed_capture` takes a required `before_send`: it holds a session lock on the
+capture, reads the text in a short transaction, calls `before_send` with the hand-over on the idle
+connection, sends with no transaction open, and writes the vector in a transaction that re-reads
+the text and stores nothing if it changed or went. The derivative worker's `before_send` asks
+`require_model_right` with the capture's screening, and refuses outright when the capture has no
+screening. A pass that states no `model_handoff` runs only for a capture that needs no right. A
+refusal leaves the capture succeeded, sends nothing, and is recorded as the `message` of its
+`capture_succeeded` event, readable at `GET /operations/derivative-jobs/{job_id}/events`. Name the
+`embedding` role in `model_rights`, beside `vision`, to grant both in one admission.
+
 **Not covered yet.**
 
 - The manifest states no depth role, so depth cannot be granted by role name through the batch
@@ -99,9 +111,6 @@ fallback only when the local detector will run. The value types, `ModelIdentity`
   GPU or on a remote machine.
 - Place alignment's joint reconstruction stages original photographs for pose under a deletion
   check only. No API or worker path calls it; a verification script and tests do.
-- The caption embedding pass sends text derived from a photograph's observation, not its pixels,
-  to the hosted embedding model with no screening and no right. Whether that text needs a right is
-  an open decision.
 - Benchmark captures keep their recorded license as their model permission; no per-model right
   applies to them.
 - The observation half of the final check restates `privacy_screening_allows_observation`, whose
@@ -119,7 +128,9 @@ fallback only when the local detector will run. The value types, `ModelIdentity`
 none. Their receipts keep their meaning, but no model receives their bytes until the account
 holder grants a right. The detection pass of the ordinary batch path, which used to send every
 admitted photograph to the hosted vision model, now sends nothing unless the batch names the
-vision role. The migration path is to admit the same captures again with `model_rights`.
+vision role. Caption vectors stored before this change stay, and no new caption text about a
+personal capture is sent until its account holder grants the embedding role. The migration path is
+to admit the same captures again with `model_rights`.
 
 ## Ordinary API batch path
 
@@ -145,7 +156,7 @@ model client and spending guard; admission does not create a spending authorizat
 
 The optional `model_rights` list (at most eight entries, default empty) is how the account holder
 lets models receive the admitted photographs. Each entry is `{"role": ..., "valid_until": ...}`
-naming a role the manifest states: a hosted role such as `vision`, or a local role
+naming a role the manifest states: a hosted role such as `vision` or `embedding`, or a local role
 (`object_segmentation`, `open_vocabulary_detection`). The server records one right per member for
 every model the role can reach, under that member's new personal authority, granted by the session
 actor at `recorded_at`. Each role appears once, and each term must end in the future and no later

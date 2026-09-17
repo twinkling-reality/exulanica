@@ -55,10 +55,12 @@ import psycopg
 
 from exulanica.consent.regions import PersonDetector
 from exulanica.db.session import Database
+from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.model_rights import ModelHandoff, require_model_right
 from exulanica.ingest.person_detectors import RecordedObservationDetector
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
@@ -238,8 +240,7 @@ class DerivativeWorker:
         depth: DepthModel | None = None,
         detector: PersonDetector | None = None,
         segmenter: ObjectSegmenter | None = None,
-        embedding_pass: Callable[[psycopg.Connection, uuid.UUID, uuid.UUID], EmbeddingResult | None]
-        | None = None,
+        embedding_pass: Callable[..., EmbeddingResult | None] | None = None,
         name: str = "derivatives",
         poll_seconds: float = _POLL_SECONDS,
         lease_seconds: float = MINIMUM_LEASE_SECONDS,
@@ -257,6 +258,12 @@ class DerivativeWorker:
         too short for one with a slow model and a caller that decided nothing. Too short is
         survivable and says so: the claim token turns it into one duplicated call and a
         ``lease_lost`` outcome, rather than into two workers closing one batch.
+
+        ``embedding_pass`` is called as ``(connection, workspace_id, capture_id,
+        before_send=...)`` and must call ``before_send`` with every model it is about to reach
+        before any caption text leaves; :class:`~exulanica.epistemics.caption_embeddings.
+        CaptionEmbeddingPass` does. A pass that states no ``model_handoff`` runs only for a
+        capture that needs no model right.
         """
         self._database = database
         self._store = store
@@ -706,6 +713,7 @@ class DerivativeWorker:
             outcome.input_tokens += result.input_tokens
             outcome.output_tokens += result.output_tokens
             outcome.usd_estimate += result.usd_estimate
+            withheld: str | None = None
             if result.tombstoned:
                 outcome.cancelled += 1
                 event_type = "capture_cancelled"
@@ -727,11 +735,7 @@ class DerivativeWorker:
             else:
                 if self._embedding_pass is not None:
                     self._beat(repository, claimed, keeper)
-                    embedded = self._embedding_pass(
-                        repository.connection,
-                        repository.workspace_id,
-                        capture_id,
-                    )
+                    embedded, withheld = self._embed_captions(repository, capture_id, screening_id)
                     if embedded is not None:
                         outcome.model_calls += 1
                         outcome.input_tokens += embedded.usage.prompt_tokens
@@ -756,7 +760,7 @@ class DerivativeWorker:
                     "usd_estimate": str(result.usd_estimate),
                 },
                 failure_class=result.failure_class,
-                message=result.error,
+                message=result.error or withheld,
             ):
                 raise _LeaseLost
 
@@ -769,6 +773,46 @@ class DerivativeWorker:
         # rather than one photograph. Nothing bounds how long those take; see `lease_seconds_for`.
         self._beat(repository, claimed, keeper)
         run_continuity(repository, batch_id=claimed.batch_id)
+
+    def _embed_captions(
+        self,
+        repository: IngestRepository,
+        capture_id: uuid.UUID,
+        screening_id: uuid.UUID | None,
+    ) -> tuple[EmbeddingResult | None, str | None]:
+        """Run the caption vector pass under this capture's model right, or say why it did not.
+
+        Caption text is what the vision model wrote about the photograph, so it is personal
+        exactly when the photograph is, and it goes to the hosted embedding model only under a
+        current right naming that model and its endpoint, asked by ``before_send`` after the text
+        is read and immediately before it is sent. A refusal is not a failure of the capture: its
+        derivatives stand, no text leaves, and the reason is returned for the capture's event.
+        """
+        assert self._embedding_pass is not None
+
+        def before_send(handoff: ModelHandoff | None) -> None:
+            if screening_id is None:
+                raise PrivacyAdmissionError(
+                    "no privacy screening receipt permits sending text derived from these bytes "
+                    "to a model"
+                )
+            require_model_right(repository, capture_id, screening_id, handoff)
+
+        withheld: str | None = None
+        embedded: EmbeddingResult | None = None
+        try:
+            if not isinstance(getattr(self._embedding_pass, "model_handoff", None), ModelHandoff):
+                # It cannot say which model it reaches, so it runs only where no right is needed.
+                before_send(None)
+            embedded = self._embedding_pass(
+                repository.connection,
+                repository.workspace_id,
+                capture_id,
+                before_send=before_send,
+            )
+        except PrivacyAdmissionError as refusal:
+            withheld = f"caption text was not sent to the embedding model: {refusal}"
+        return embedded, withheld
 
     def _beat(
         self,

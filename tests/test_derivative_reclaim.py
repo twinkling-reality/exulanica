@@ -942,8 +942,11 @@ def test_worker_runs_injected_caption_embedding_after_vision(queued, client, mon
 
     provision_workspace(queued.connection, queued.workspace_id)
     calls = script(client, monkeypatch, vector())
-    worker = queued.worker(embedding_pass=lambda connection, workspace, capture:
-                           embed_capture(connection, workspace, capture, client))
+    worker = queued.worker(
+        embedding_pass=lambda connection, workspace, capture, *, before_send: embed_capture(
+            connection, workspace, capture, client, before_send=before_send
+        )
+    )
     outcome = worker.drain()[0]
     assert not outcome.errors
     assert len(calls) == len(queued.capture_ids)

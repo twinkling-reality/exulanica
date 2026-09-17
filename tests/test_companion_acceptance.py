@@ -365,6 +365,7 @@ def test_paired_executor_controls_use_same_plan_and_real_retained_caption_text(
     from scripts.measure_companion_acceptance import compare_retrieval
 
     from conftest import DEFAULT_PAYLOAD, CountingVisionModel, ingest_observed, write_photo
+    from test_companion_matching import unchecked
 
     provision_workspace(repository.connection, repository.workspace_id)
     unit_vector = (1.0, *([0.0] * 4095))
@@ -401,7 +402,13 @@ def test_paired_executor_controls_use_same_plan_and_real_retained_caption_text(
         )
         assert result.error is None
         expected.add(str(result.capture_id))
-        embed_capture(repository.connection, repository.workspace_id, result.capture_id, client)
+        embed_capture(
+            repository.connection,
+            repository.workspace_id,
+            result.capture_id,
+            client,
+            before_send=unchecked,
+        )
     session = Session(workspace_id=repository.workspace_id, actor=uuid.uuid4())
     vector = QueryEmbedding(unit_vector, spec.model_id, client.manifest.pipeline_version)
     plan = SelectionPlan(intent="captures", semantic_query="cold weather clothing")
