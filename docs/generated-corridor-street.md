@@ -41,8 +41,8 @@ Measured from the records, not remembered. The evidence is
 [docs/artifacts/corridor/corridor-tiles.log.txt](artifacts/corridor/corridor-tiles.log.txt),
 written by the script beside it.
 
-- **5 899 records** of 23 kinds, in five tiles along one row. The corridor's own tile, (2, 0),
-  owns 1 887 of them and carries 1 845 more in its halo; its document is 3 150 216 bytes.
+- **6 310 records** of 23 kinds, in five tiles along one row. The corridor's own tile, (2, 0),
+  owns 2 005 of them and carries 1 987 more in its halo; its document is 3 294 470 bytes.
 - **98 buildings**, 3 to 6 storeys, frontages 10.5 m to 25.8 m tall, median 17.4 m.
 - **228 premises**: 98 residential, and on the ground floor 52 cafes, 20 grocers, 19 restaurants,
   18 workshops and 17 offices, each with a name drawn from the signage lexicon.
@@ -74,11 +74,15 @@ answer, and these are the counts across the city:
 
 | Role | Surfaces | Waiting on |
 | --- | --- | --- |
-| `glazing` | 214 | The glazing set, published; this branch has not taken it yet. |
-| `transom` | 572 | The same set. |
-| `door` | 228 | The painted-timber set, batch 3. |
-| tree bark, foliage, pit | 118 trees | The bark and foliage sets, published; soil in batch 3. |
-| `crossing`, `marking` | 40 crossings | Road paint, batch 3. |
+| `door` | 228 | The painted-timber set, texture batch 3. |
+| `crossing` | 40 | Road paint, texture batch 3. |
+| tree pit | 118 | The soil set, texture batch 3. |
+
+Glazing, transoms, shopfront frames, bark and foliage were on that list this morning and are not
+now: `material.v3.json` dresses them from the published `cc0.float-glazing`, `cc0.tree-bark` and
+`cc0.broadleaf-foliage` sets. The count above is measured against the material records the city
+actually holds, so it falls on its own as sets are published and nothing has to remember to edit a
+list.
 
 Two strips of terrain are also bare: 1.0 m along the district's south edge and 2.3 m along its
 north edge, where the outermost footway stops and the city ends. They total 422 m², 2.6 per cent

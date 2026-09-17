@@ -152,17 +152,17 @@ change, through ``validateTileLook``.
 4. TEXTURES (``assets/textures/manifest.json``, ``docs/texture-package.md``)
 ===========================================================================
 
-Eight published sets, all class ``opaque``, each with a pinned SHA-256 (migration 0065):
-``cc0.brick-running-bond`` (1800 mm), ``cc0.carriageway-asphalt`` (2000), ``cc0.cast-concrete``
-(2400), ``cc0.footway-paving`` (1800), ``cc0.kerb-stone`` (1800 by 450), ``cc0.limestone-ashlar``
-(2400), ``cc0.painted-render`` (2000), ``cc0.storefront-metal`` (1000). The material catalog
-(``material.v2.json``) has one entry per set with the surface roles it dresses. No published set
-dresses glazing, a door, road paint, terrain, a tree pit, bark or foliage, so those surfaces carry
-no material record and draw as the stated unavailable surface. Glazing (class ``glazing``),
-foliage (``cutout``), bark, timber, fabric, road paint (``decal``) and sign panels are draft makers
-on the texture lane, unpublishable until its batch 1; the runtime draws ``cutout``, ``decal`` and
-``glazing`` as unavailable until their rendering lands. Budget: 168 MB decoded texture per
-corridor; one 1024 set is 16,777,212 bytes as the runtime uploads it.
+Eleven published sets, each with a pinned SHA-256 (migration 0065): eight of class ``opaque``
+(``cc0.brick-running-bond`` 1800 mm, ``cc0.carriageway-asphalt`` 2000, ``cc0.cast-concrete`` 2400,
+``cc0.footway-paving`` 1800, ``cc0.kerb-stone`` 1800 by 450, ``cc0.limestone-ashlar`` 2400,
+``cc0.painted-render`` 2000, ``cc0.storefront-metal`` 1000), ``cc0.tree-bark`` (opaque, 1000),
+``cc0.float-glazing`` (class ``glazing``, 2000) and ``cc0.broadleaf-foliage`` (class ``cutout``,
+2000). The material catalog (``material.v3.json``) has one entry per set with the surface roles it
+dresses and whether its texture runs one way. No published set dresses a door, an awning, road
+paint, terrain or a tree pit, so those surfaces carry no material record and draw as the stated
+unavailable surface; timber, fabric, road paint (``decal``) and sign panels are batch 3 on the
+texture lane. Budget: 168 MB decoded texture per corridor; one 1024 set is 16,777,212 bytes as the
+runtime uploads it.
 
 5. THE VISUAL GATE (``docs/visual-gate-rubric.md`` version 5, key set
 ``exulanica.visual-gate-keys/v5``)

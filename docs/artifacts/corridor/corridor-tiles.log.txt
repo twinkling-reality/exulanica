@@ -1,15 +1,15 @@
 corridor tiles and gates
-commit 8db86ff2982d51755f217fe11dfe07deb9f6e525
+commit 269d30f685d5945fa5133557bb780b0d2a5bcd7d
 city seed 75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1
 city identity 0594ec43-fbf9-5377-86d3-b1b733714b4a
-generation output digest ca6df3678b13a58783c490c14dc0b5cf4aeb2482ffc7282ac3a79d5b21bde891
-records 5899
+generation output digest f8480c0cd09f00dc72fed24bdfb29d8bd546223a5b918d6cba0cbe0cfe45420e
+records 6310
 
-tile (0, 0): valid; owned 314, halo 948, external 17; document 1067745 bytes sha256 fc599875133f0eb91a659977927ea9c52657834e75de42f46ee7fd920513cf27; tile_inputs_digest 2ef6a7e49cdb168a8789e1b78c3f21e699a7381e68a849d05c88cec02db12eb4; baked_tile_id 3e669215-b091-5347-84a9-d217bd9ec078
-tile (1, 0): valid; owned 1749, halo 1343, external 18; document 2617482 bytes sha256 9de40d3ca2e25581d70ec0462abe7def6faca8425411992d74d6f1c46e1bc93b; tile_inputs_digest a8bf7d2d11b29fc5ebd92f2312e5c2413b229cf32e7ee11c14118cf4cac1a667; baked_tile_id 8654ffa1-e7df-5f3d-8dde-4fc303ce1347
-tile (2, 0) corridor: valid; owned 1887, halo 1845, external 47; document 3150216 bytes sha256 0d370b64385d68a4347b8b3f2546d0dee75d0c278b8a92d02d6c8fcab5e49a47; tile_inputs_digest 0b69fba89bd0eead8b05651d86b99d2901655d86b8fc73189c3e154c749e3b06; baked_tile_id 9f1a5a7a-3e4e-58f9-baa4-1c9ab47787c6
-tile (3, 0): valid; owned 1641, halo 1312, external 31; document 2465598 bytes sha256 65c356218f09b2698c98084bf82c805e546f13c12eb69e07ea33b7005e3115d2; tile_inputs_digest 6a33897c474479c186629fd7435d7160b889e3de066c99e5f81ebd21d98d3f77; baked_tile_id ededf7d6-197f-5802-9911-e3c2e19f5964
-tile (4, 0): valid; owned 297, halo 893, external 25; document 970057 bytes sha256 5173e575b3b37783ebdec624098177a0cdc040abc5624e3766eddbe861aa751b; tile_inputs_digest dce1eb30fbeff67c2da6ea0c952172bd5ab2ba2b5fe401181523333cb1aadf73; baked_tile_id 106f5504-94e6-5018-ad5c-3841555b0657
+tile (0, 0): valid; owned 331, halo 1017, external 17; document 1115560 bytes sha256 a540c72b4fcd2f161c555de23d02196235717e77550c25c83da8014a72041574; tile_inputs_digest 30f23266ee5d91d4b20d88b14f2d2e62e427bbb9bb8a2eef014569965101e16a; baked_tile_id 42ce9125-d446-51d7-9fa1-179cc680617f
+tile (1, 0): valid; owned 1875, halo 1424, external 18; document 2732411 bytes sha256 1462bd95fe4d5a90d75a081ac3646c2281d3506eee8d5d65e9a7326011eea96b; tile_inputs_digest af3cb9abccc2b06f0cba78eaafdb83c49c5c9d9980fec75819b249638b52ee00; baked_tile_id 60046b1a-8f7b-5e3b-aeda-981f4a36bde8
+tile (2, 0) corridor: valid; owned 2005, halo 1987, external 47; document 3294470 bytes sha256 d9bb9277a659162f1d890138b99d50252b2174559ec1fb69a665a0911fd885ab; tile_inputs_digest b0912caff5df3a7abf25d098edc45b56395c868cd95efcb64664cf5196b8502c; baked_tile_id d603565a-066c-5967-86ec-bbe3706067d2
+tile (3, 0): valid; owned 1774, halo 1394, external 31; document 2584872 bytes sha256 9a607b37fb4787b9761d133bcf7d7b3b555ad2789989555091ba17e240625f15; tile_inputs_digest b95d89e30e2854cf2674e75b3a0e93145b1cd73b288a9df060d90e620e539afa; baked_tile_id a5bbdafd-3575-5af9-ba9d-05d698f8d99a
+tile (4, 0): valid; owned 314, halo 964, external 25; document 1018929 bytes sha256 f3c74419b99637bc1e9d74224fbfea517271c813e494304e584d12e91639fe2f; tile_inputs_digest 2a37b8f9446c09133f1cd054a4ea0ec9a7bc1c81b1a433307f842ba93f5e7cf1; baked_tile_id a55f9834-7044-5211-9e5d-5b41e4ac792f
 
 city reference closure: closed
 pieces no longer than 1 km: yes
@@ -32,8 +32,8 @@ gates, every record of the city:
     126,
     180
   ],
-  "materials": 2933,
-  "materials_with_texture_set": 2933,
+  "materials": 3344,
+  "materials_with_texture_set": 3344,
   "objects": 248,
   "objects_inside_footprints": 0,
   "passes": {
@@ -51,10 +51,9 @@ gates, every record of the city:
     3545
   ],
   "unavailable_roles": {
+    "crossing": 40,
     "door": 228,
-    "glazing": 214,
-    "transom": 572,
-    "tree": 118
+    "tree_pit": 118
   }
 }
 gates, the corridor tile's owned records:
@@ -75,8 +74,8 @@ gates, the corridor tile's owned records:
     126,
     168
   ],
-  "materials": 952,
-  "materials_with_texture_set": 952,
+  "materials": 1070,
+  "materials_with_texture_set": 1070,
   "objects": 66,
   "objects_inside_footprints": 0,
   "passes": {
@@ -94,9 +93,8 @@ gates, the corridor tile's owned records:
     3304
   ],
   "unavailable_roles": {
+    "crossing": 6,
     "door": 75,
-    "glazing": 78,
-    "transom": 196,
-    "tree": 30
+    "tree_pit": 30
   }
 }

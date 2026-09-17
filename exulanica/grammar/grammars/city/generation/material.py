@@ -5,8 +5,9 @@ band, stall riser, fascia and awning where its bays have them; its trim where it
 openings; its party wall scar where a neighbour stands lower than it. A building's roof, its
 parapet where it has one, and its wall where a ridge roof leaves gables. A rooftop object's parts'
 roles. A segment's carriageway and, with a gutter, its gutter; a curb's kerb and footway; a
-junction's carriageway; a block's and a lot's ground. A role no published set dresses (glazing, a
-door, paint, terrain, a tree) gets no record and draws as unavailable.
+junction's carriageway; a block's and a lot's ground. A street tree's trunk and canopy. A role no
+published set dresses (a door, paint, terrain, a tree's pit) gets no record and draws as
+unavailable.
 
 **Everything a record draws, including what the late stages make.** This stage runs last but one,
 after streetlife, vitrine and premises, so a street lamp's parts, a vitrine's fitout and the plane
@@ -30,8 +31,9 @@ material's own modules, so a building's brick starts at its own place in the bon
 neighbours line their courses up. A material with no module along an axis states no offset on it.
 This shifts the pattern within its module and not the set's image, whose repeat the grammar cannot
 know: only the texture manifest holds a set's physical extent. ``texture_quarter_turns`` turns a
-surface a whole number of quarter turns, and only where the material's bond is ``none``: a quarter
-turn of a running bond lays its courses vertically.
+surface a whole number of quarter turns, and only where the material states no grain: a quarter
+turn of a running bond lays its courses vertically, and a quarter turn of bark lays a trunk's
+fibres across it.
 ``soiling_gradient_millionths``, ``base_weathering_millionths`` and
 ``reveal_darkening_millionths`` are building parameters, derived per building for its surfaces; a
 street's surfaces belong to no building, so no parameter states their weathering and it is 0.
@@ -91,6 +93,10 @@ ROLE_MATERIALS: Final = {
     "object_primary": ("storefront_metal",),
     "object_secondary": ("cast_concrete", "storefront_metal"),
     "object_tertiary": ("storefront_metal",),
+    "shopfront_frame": ("storefront_metal",),
+    "glazing": ("float_glazing",),
+    "trunk": ("tree_bark",),
+    "canopy": ("broadleaf_foliage",),
 }
 #: An interior backing takes the ``wall`` role and this order, not the building's wall material:
 #: the finish inside a room is not what the street front is built of, and brick reads wrong.
@@ -153,7 +159,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             context,
             "texture_quarter_turns",
             ordinal,
-            maximum=3 if values["bond"] == "none" else 0,
+            maximum=3 if values["grain"] == "none" else 0,
         )
         return material.SurfaceMaterialRecord(
             identity=context.identity("surface_material", surface, SURFACE_ROLE_CODES[role]),
@@ -215,7 +221,11 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             roles = ["wall"]
             if face.first_storey == 0 and face.exposure != "party_wall":
                 roles.append("ground_band")
-            roles += [role for role in ("stall_riser", "fascia") if role in panel_roles]
+            roles += [
+                role
+                for role in ("stall_riser", "fascia", "shopfront_frame", "glazing")
+                if role in panel_roles
+            ]
             if face.string_courses or face.cornice or face.openings:
                 roles.append("trim")
             height = massing.tier_top_mm(building, building.tiers[face.tier_ordinal]) - (
@@ -342,6 +352,18 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 _material_for(role, None),
                 placement,
                 building_ordinals[case.building_identity],
+            )
+    for tree in prior_records(context, streetlife.STAGE_ID, streetlife.StreetTreeRecord):
+        placement = street_placement[tree.segment_identity]
+        ordinal = _STREETS + street_ordinals[segments_by_identity[tree.segment_identity]]
+        for role in sorted({part.surface_role for part in tree.parts}):
+            yield record(
+                tree.identity,
+                "city.street_tree",
+                role,
+                _material_for(role, None),
+                placement,
+                ordinal,
             )
     for backing in prior_records(context, vitrine.STAGE_ID, vitrine.InteriorBackingRecord):
         yield record(

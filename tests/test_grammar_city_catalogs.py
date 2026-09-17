@@ -141,7 +141,7 @@ def test_every_entry_carries_a_shippable_licence_and_a_source_that_exists():
             assert ROOT.joinpath(entry.licence.content_source).is_file(), where
             if entry.licence.origin == "derived":
                 assert entry.licence.content_source.startswith("assets/catalogs/sources/"), where
-    assert entries == 125
+    assert entries == 128
 
 
 _AUTHORED = (
@@ -181,7 +181,7 @@ def test_a_guide_cited_by_an_authored_value_is_marked_as_not_re_read():
                 assert "not re-read" in reason, (catalog.catalog_id, entry.key)
 
 
-def test_each_material_depicts_one_of_the_eight_pinned_texture_sets():
+def test_each_material_depicts_one_of_the_pinned_texture_sets():
     catalog = _catalog("material")
     published = read_texture_manifest()
     pinned = {
@@ -193,6 +193,9 @@ def test_each_material_depicts_one_of_the_eight_pinned_texture_sets():
         "cc0.limestone-ashlar",
         "cc0.painted-render",
         "cc0.storefront-metal",
+        "cc0.float-glazing",
+        "cc0.tree-bark",
+        "cc0.broadleaf-foliage",
     }
     sets = []
     for entry in catalog.entries:
@@ -483,6 +486,6 @@ def test_a_broken_cross_catalog_reference_is_refused(tmp_path, why, name, change
 
 def test_a_material_naming_an_unpublished_texture_set_is_refused(tmp_path):
     directory = _copy_catalogs(tmp_path)
-    _edit(directory, "material.v2.json", _set("kerb_stone", "texture_set_id", "cc0.granite-sett"))
+    _edit(directory, "material.v3.json", _set("kerb_stone", "texture_set_id", "cc0.granite-sett"))
     with pytest.raises(UnresolvedReferenceError, match=re.escape("cc0.granite-sett")):
         load_city_catalogs(directory)

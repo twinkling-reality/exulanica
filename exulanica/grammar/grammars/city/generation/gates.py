@@ -11,7 +11,9 @@ architecture's, as the corridor brief states them for city version 2:
 * **Furniture in footprints.** No furniture or tree position lies inside or on a building's base
   ring.
 * **Materials.** Every surface material names a texture set (a record without one cannot exist),
-  and the surfaces with no published set are listed by role, as the unavailable state.
+  and every surface no material record dresses is counted by role, as the unavailable state. That
+  count is measured against the material records the city holds, so it falls on its own as texture
+  sets are published and nothing has to remember to change a list.
 * **Section 5.1.** Every facade states its building identity, grammar version, parameters, seed,
   output digest and declared semantics, none empty.
 """
@@ -28,6 +30,7 @@ from exulanica.grammar.grammars.city.facade import (
     FACADE_RECORD_FIELDS,
     GROUND_BAND_TOP_MM,
     MINIMUM_BAYED_RUN_MM,
+    PANEL_SURFACE_ROLES,
     FacadeRecord,
     GroundBayRecord,
 )
@@ -38,6 +41,7 @@ from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, St
 from exulanica.grammar.grammars.city.streets import (
     KERB_HEIGHT_MAXIMUM_MM,
     KERB_HEIGHT_MINIMUM_MM,
+    CrossingRecord,
     CurbEdgeRecord,
 )
 
@@ -168,18 +172,27 @@ def measure_gates(records: Sequence[object]) -> GateReport:
             report.objects_inside_footprints += any(
                 point_in_ring((item.x_mm, item.y_mm), ring) != OUTSIDE for ring in footprints
             )
+    # What draws unavailable is measured, not listed: a surface is unavailable when no material
+    # record dresses it, whatever the catalog happens to hold today.
     unavailable: Counter[str] = Counter()
+    dressed = set()
     for item in records:
         if isinstance(item, SurfaceMaterialRecord):
             report.materials += 1
             report.materials_with_texture_set += bool(item.texture_set_id)
-        elif isinstance(item, RoadMarkingRecord):
+            dressed.add((item.surface_identity, item.role))
+    for item in records:
+        if isinstance(item, RoadMarkingRecord):
             unavailable["marking"] += 1
         elif isinstance(item, StreetTreeRecord):
-            unavailable["tree"] += 1
+            for role in (*sorted({part.surface_role for part in item.parts}), "tree_pit"):
+                if (item.identity, role) not in dressed:
+                    unavailable[role] += 1
+        elif isinstance(item, CrossingRecord) and (item.identity, "crossing") not in dressed:
+            unavailable["crossing"] += 1
     for bay in bays:
         for panel in bay.panels:
-            if panel.role in ("glazing", "transom", "door"):
+            if (bay.facade_identity, PANEL_SURFACE_ROLES[panel.role]) not in dressed:
                 unavailable[panel.role] += 1
     report.unavailable_roles = dict(unavailable)
     return report

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "catalog_id": "material",
-  "catalog_version": 2,
+  "catalog_version": 3,
   "entries": [
     {
       "key": "brick_running_bond",
@@ -19,13 +19,36 @@
       "mortar_module_mm": 10,
       "unit_length_mm": 225,
       "bond": "running",
-      "reason": "The material the cc0.brick-running-bond texture set depicts. Its modules are read from the set's recipe object: 24 courses and 8 units a course over the set's 1800 mm, with 10 mm joints.",
+      "grain": "directional",
+      "reason": "The material the cc0.brick-running-bond texture set depicts. Its modules are read from the set's recipe object: 24 courses and 8 units a course over the set's 1800 mm, with 10 mm joints. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
         "origin": "original",
         "licence_source": "LICENSE",
         "content_source": "assets/textures/objects/c9a76029897fd5264859f633ce0242abf4852c2b8010eed2db073eafc593fea1.json"
+      }
+    },
+    {
+      "key": "broadleaf_foliage",
+      "label": "Broadleaf foliage",
+      "category": "foliage",
+      "texture_set_id": "cc0.broadleaf-foliage",
+      "surfaces": [
+        "canopy"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "none",
+      "reason": "The material the cc0.broadleaf-foliage texture set depicts. Leaves the runtime draws as a cutout, so a canopy reads as leaves and sky rather than a solid shell. It states no course, joint or unit. Its texture has no direction, so a quarter turn of it reads the same.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/1578785c597870eb7ae21b1e7acfe2f96b7245cc94f65f7bd6cc55ebf103ea3e.json"
       }
     },
     {
@@ -43,7 +66,8 @@
       "mortar_module_mm": 0,
       "unit_length_mm": 0,
       "bond": "none",
-      "reason": "The material the cc0.carriageway-asphalt texture set depicts. Its modules are read from the set's recipe object: a continuous worn asphalt with no courses or joints.",
+      "grain": "none",
+      "reason": "The material the cc0.carriageway-asphalt texture set depicts. Its modules are read from the set's recipe object: a continuous worn asphalt with no courses or joints. Its texture has no direction, so a quarter turn of it reads the same.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -73,13 +97,36 @@
       "mortar_module_mm": 2,
       "unit_length_mm": 1200,
       "bond": "stack",
-      "reason": "The material the cc0.cast-concrete texture set depicts. Its modules are read from the set's recipe object: 1200 by 600 mm formwork panels in stack bond, with 2 mm seams.",
+      "grain": "directional",
+      "reason": "The material the cc0.cast-concrete texture set depicts. Its modules are read from the set's recipe object: 1200 by 600 mm formwork panels in stack bond, with 2 mm seams. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
         "origin": "original",
         "licence_source": "LICENSE",
         "content_source": "assets/textures/objects/01f704249a1fb892b9a87392cb5e9bc523bb2996173e90eeeeb6e12ea38c1a9c.json"
+      }
+    },
+    {
+      "key": "float_glazing",
+      "label": "Float glass",
+      "category": "glazing",
+      "texture_set_id": "cc0.float-glazing",
+      "surfaces": [
+        "glazing"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "none",
+      "reason": "The material the cc0.float-glazing texture set depicts. A pane of float glass, which the runtime draws with reflection by angle and the scene behind it transmitted. It states no course, joint or unit, because glass has none. Its texture has no direction, so a quarter turn of it reads the same.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/0dc29c62d5397e50c4be59045e3cd08d1141b345e59921d8b997b4f426807752.json"
       }
     },
     {
@@ -96,7 +143,8 @@
       "mortar_module_mm": 6,
       "unit_length_mm": 600,
       "bond": "stack",
-      "reason": "The material the cc0.footway-paving texture set depicts. Its modules are read from the set's recipe object: 600 mm flags in stack bond, with 6 mm joints.",
+      "grain": "directional",
+      "reason": "The material the cc0.footway-paving texture set depicts. Its modules are read from the set's recipe object: 600 mm flags in stack bond, with 6 mm joints. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -118,7 +166,8 @@
       "mortar_module_mm": 6,
       "unit_length_mm": 900,
       "bond": "stack",
-      "reason": "The material the cc0.kerb-stone texture set depicts. Its modules are read from the set's recipe object: 900 mm granite kerb units in one row, with 6 mm joints.",
+      "grain": "directional",
+      "reason": "The material the cc0.kerb-stone texture set depicts. Its modules are read from the set's recipe object: 900 mm granite kerb units in one row, with 6 mm joints. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -146,7 +195,8 @@
       "mortar_module_mm": 5,
       "unit_length_mm": 600,
       "bond": "half",
-      "reason": "The material the cc0.limestone-ashlar texture set depicts. Its modules are read from the set's recipe object: 300 mm courses of 600 mm blocks in half bond, with 5 mm joints.",
+      "grain": "directional",
+      "reason": "The material the cc0.limestone-ashlar texture set depicts. Its modules are read from the set's recipe object: 300 mm courses of 600 mm blocks in half bond, with 5 mm joints. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -172,7 +222,8 @@
       "mortar_module_mm": 0,
       "unit_length_mm": 0,
       "bond": "none",
-      "reason": "The material the cc0.painted-render texture set depicts. Its modules are read from the set's recipe object: a continuous dashed render with no courses or joints.",
+      "grain": "none",
+      "reason": "The material the cc0.painted-render texture set depicts. Its modules are read from the set's recipe object: a continuous dashed render with no courses or joints. Its texture has no direction, so a quarter turn of it reads the same.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -199,13 +250,36 @@
       "mortar_module_mm": 0,
       "unit_length_mm": 0,
       "bond": "none",
-      "reason": "The material the cc0.storefront-metal texture set depicts. Its modules are read from the set's recipe object: a brushed anodised sheet with no courses or joints.",
+      "grain": "directional",
+      "reason": "The material the cc0.storefront-metal texture set depicts. Its modules are read from the set's recipe object: a brushed anodised sheet with no courses or joints. Its texture runs one way, so it is never turned a quarter.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
         "origin": "original",
         "licence_source": "LICENSE",
         "content_source": "assets/textures/objects/26410fe9588398f5656ee1bc14a00c87ac2c8cca2fb666a462771007975ce806.json"
+      }
+    },
+    {
+      "key": "tree_bark",
+      "label": "Tree bark",
+      "category": "bark",
+      "texture_set_id": "cc0.tree-bark",
+      "surfaces": [
+        "trunk"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "directional",
+      "reason": "The material the cc0.tree-bark texture set depicts. It states no course, joint or unit: bark is not laid in units. Its texture runs one way, up the trunk, so it is never turned a quarter.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/97401e79fd48a3ca25829e279153cd405746a651cc7be2f9427f9f7bf6be90b8.json"
       }
     }
   ]

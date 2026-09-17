@@ -241,13 +241,24 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
         ),
         CatalogSchema(
             "material",
-            2,
+            3,
             (
                 ("label", text_field),
                 (
                     "category",
                     choice_field(
-                        ("masonry", "stone", "render", "concrete", "metal", "asphalt", "paving")
+                        (
+                            "masonry",
+                            "stone",
+                            "render",
+                            "concrete",
+                            "metal",
+                            "asphalt",
+                            "paving",
+                            "glazing",
+                            "bark",
+                            "foliage",
+                        )
                     ),
                 ),
                 ("texture_set_id", ReferenceField("a texture set", TEXTURE_SET_ID, texture_pins)),
@@ -256,6 +267,9 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("mortar_module_mm", _MILLIMETRES),
                 ("unit_length_mm", _MILLIMETRES),
                 ("bond", choice_field(("running", "half", "stack", "none"))),
+                # Whether the set's texture runs one way. Only a material with no grain may be
+                # turned a quarter: bond says how units are laid and bark is laid in none.
+                ("grain", choice_field(("none", "directional"))),
                 REASON,
             ),
         ),
