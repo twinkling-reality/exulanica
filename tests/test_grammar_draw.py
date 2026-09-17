@@ -12,7 +12,8 @@ What this file holds the generator system to.
     scan whose own detector is tested, not by reading the code.
 *   Canonical JSON **accepts the whole emitted record set and refuses every float** injected
     into it, at every position.
-*   Every city stage **emits nothing and says so**, and every record kind has a validator.
+*   A city stage with a generator **emits records**, every other city stage **emits nothing and
+    says so**, and every record kind has a validator.
 
 The record instances below named ``_FIXTURES`` are validator inputs: one record of every city
 record kind, taken from the hand-written city v2 fixture (``tests/fixtures/city-v2``). They are
@@ -43,6 +44,7 @@ from exulanica.grammar import (
     StageEmission,
     generate,
 )
+from exulanica.grammar.contract import UnimplementedStage
 from exulanica.grammar.draw import DomainCursor, _number, draw_integer
 from exulanica.grammar.errors import (
     CatalogError,
@@ -78,8 +80,18 @@ _FIXTURES = {
     **{kind: records[0] for kind, records in records_by_kind().items()},
     "city.tile": builder().tile,
 }
-#: A city binding for the one parameter nothing may choose silently.
-_CITY_BINDINGS = (CascadeBinding.of("city", {"driving_side": "right"}),)
+#: The one parameter nothing may choose silently, and a small city the generators can lay out:
+#: two tiles by one, level, with the gutter the streets stage reads bound.
+_CITY_VALUES = {
+    "driving_side": "right",
+    "city_extent_x_mm": 256_000,
+    "city_extent_y_mm": 128_000,
+    "terrain_relief_mm": 0,
+    "block_length_mm": 60_000,
+    "block_depth_mm": 40_000,
+    "gutter_width_mm": 300,
+}
+_CITY_BINDINGS = (CascadeBinding.of("city", _CITY_VALUES),)
 #: What generating each registered grammar needs besides a seed and a subject.
 _BINDINGS = {"box": (), "city": _CITY_BINDINGS}
 
@@ -266,7 +278,11 @@ from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.document import document_bytes
 
 seed, identity, builder_path = sys.argv[1], sys.argv[2], sys.argv[3]
-bindings = {"box": (), "city": (CascadeBinding.of("city", {"driving_side": "right"}),)}
+bindings = {"box": (), "city": (CascadeBinding.of("city", {
+    "driving_side": "right", "city_extent_x_mm": 256000, "city_extent_y_mm": 128000,
+    "terrain_relief_mm": 0, "block_length_mm": 60000, "block_depth_mm": 40000,
+    "gutter_width_mm": 300,
+}),)}
 spec = importlib.util.spec_from_file_location("city_v2_fixture_builder", builder_path)
 fixture = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = fixture
@@ -501,11 +517,26 @@ def test_every_float_injected_anywhere_in_the_emitted_set_is_refused(poison):
     """Part by part: the generations, then each fixture record's payload on its own.
 
     Canonical JSON walks the whole value, so a float found inside one part is found inside the
-    whole; injecting per part keeps every position covered without copying the whole set once
-    per leaf.
+    whole; injecting per part (each receipt, each emitted record, each fixture record) keeps every
+    position covered without copying the whole set once per leaf.
     """
     emitted = _emitted_set()
-    parts = [emitted["generations"], *emitted["validator_fixtures"].values()]
+    parts = [
+        *(
+            record
+            for generation in emitted["generations"]
+            for part in (
+                generation["receipt"],
+                *(
+                    record
+                    for emission in generation["emissions"]
+                    for record in emission["fields"]["records"]
+                ),
+            )
+            for record in (part,)
+        ),
+        *emitted["validator_fixtures"].values(),
+    ]
     paths = [(index, path) for index, part in enumerate(parts) for path in _leaf_paths(part)]
     assert len(paths) > 2_000, len(paths)
     for index, path in paths:
@@ -589,22 +620,28 @@ def test_only_city_version_2_is_registered():
     assert keys == [("box", 1), ("city", 2)]
 
 
-def test_every_city_stage_emits_nothing_and_says_so():
+def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has_none():
     city = builtin_registry().get("city", 2)
     generation = generate(city, seed=SEED, subject_identity=IDENTITY, bindings=_CITY_BINDINGS)
     assert [emission.stage_id for emission in generation.emissions] == list(_CITY_STAGE_IDS)
-    for emission in generation.emissions:
-        assert emission.status == "not_implemented"
-        assert emission.records == ()
-        assert "no generator" in emission.reason
+    for stage, emission in zip(CITY_STAGES, generation.emissions, strict=True):
+        if isinstance(stage, UnimplementedStage):
+            assert emission.status == "not_implemented"
+            assert emission.records == ()
+            assert "no generator" in emission.reason
+        else:
+            assert emission.status == "emitted"
+            assert emission.records
+            assert emission.reason == ""
     assert generation.receipt.declared_semantics == DeclaredSemantics(
         "city", ("render_batch", "collision_proxy", "nav_envelope", "pick_geometry")
     )
     parameters = generation.receipt.parameters
-    assert parameters.values == (("driving_side", "right"),)
+    assert parameters.values == tuple(sorted(_CITY_VALUES.items()))
     sources = dict(parameters.sources)
-    assert sources.pop("driving_side") == "city"
-    assert len(sources) == 71
+    for name in _CITY_VALUES:
+        assert sources.pop(name) == "city"
+    assert len(sources) == 72 - len(_CITY_VALUES)
     assert set(sources.values()) == {"derive"}
 
 

@@ -41,14 +41,17 @@ from exulanica.grammar.grammars.city import (
     vitrine,
 )
 from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATH
+from exulanica.grammar.grammars.city.generation import districts as districts_generator
+from exulanica.grammar.grammars.city.generation import streets as streets_generator
+from exulanica.grammar.grammars.city.generation import terrain as terrain_generator
 from exulanica.grammar.shapes import RecordShape
 
 __all__ = ["CITY_GRAMMAR", "CITY_SHAPES", "CITY_SHAPES_BY_TYPE", "CITY_STAGES"]
 
 CITY_STAGES: Final = (
-    terrain.STAGE,
-    districts.STAGE,
-    streets.STAGE,
+    terrain_generator.STAGE,
+    districts_generator.STAGE,
+    streets_generator.STAGE,
     parcels.STAGE,
     massing.STAGE,
     facade.STAGE,
