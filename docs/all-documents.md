@@ -36,7 +36,7 @@ How the system works now. Edited as the system changes.
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
 - [frontier-roadmap](frontier-roadmap.md) : engineering archive. product-direction.md owns product
 - [generated-tile-runtime](generated-tile-runtime.md) : IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
-- [grammar-package](grammar-package.md) : STRUCTURE BUILT; NO STAGE GENERATES ANYTHING YET. Phase 1 of the target architecture
+- [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; NO STAGE GENERATES ANYTHING YET. Phase 1 of the target
 - [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
