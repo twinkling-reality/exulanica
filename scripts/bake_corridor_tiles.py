@@ -44,6 +44,7 @@ from exulanica.grammar.grammars.city.generation.tiles import (
     generate_city,
     tile_document,
 )
+from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.records import record_payload
 from exulanica.ingest.stages import STAGES, baked_tile_id
 from exulanica.store.namespaces import tile_store
@@ -120,7 +121,12 @@ def main() -> int:
                     baked_tile_id=key,
                     stage_version=spec.version,
                     stage_params_sha256=spec.params_digest,
-                    tile=record_payload(tile)["fields"],
+                    tile={
+                        # The digest is computed from the record, not carried in it: the record
+                        # states the inputs and `tile_inputs_digest` is the one function over them.
+                        "tile_inputs_digest": tile_inputs_digest(tile),
+                        **record_payload(tile)["fields"],
+                    },
                     document=data,
                     container=container,
                     render_batch_sha256=bytes.fromhex(
