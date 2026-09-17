@@ -71,10 +71,12 @@ Version 1 contains no explicit:
 - pedestrian paths, destinations or affordance graph; or
 - photogrammetric appearance.
 
-The browser currently completes several of those visually with deterministic mesh-generation
-rules. Those meshes are a provisional representation, not source records or validated world-memory
-interpretations. In particular, the full-bounds asphalt plane is visible ground beneath other
-geometry; it is not road data.
+The browser does not complete any of those. It draws each building as its recorded footprint and
+roof height, outlined and hatched with no surface material, and draws the ground as a grid marking
+the authored flat walking datum. That drawing represents the recorded footprints and heights; it is
+not new data. No facade, roof, tree, lamp or street-furniture geometry is generated, the material
+class and material catalog above are not drawn, and the interpretation's facade grids and parapets
+are not drawn either.
 
 ## Interpretation boundary
 

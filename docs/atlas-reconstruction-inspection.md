@@ -65,9 +65,9 @@ so beside the rung.
   No gravity axis exists in that recovered frame, so the scene axes stand and the status reads
   "its recovered cameras do not agree on an up direction, so no upright is claimed." The bowl's 51
   recovered cameras agree (mean up length 0.68) and it stands upright.
-- **Grounding.** A reconstructed region's placement height is the authored landscape height at
-  its centre, so local y = 0 is the ground the visitor stands on. Source-first regions keep the
-  solver plane and compensate per veil, as before.
+- **Grounding.** Every region, reconstructed or not, sits on the solver's y = 0 plane, which is the
+  flat datum the visitor stands on, so a reconstruction's local y = 0 is that ground. The authored
+  landscape height that reconstructed regions were once lifted onto no longer exists.
 - **Arrival.** A region with recovered cameras arrives where the first photograph was taken,
   looking where that camera looked (`viewpointForwardLocal`). The first frame is the first
   photograph's view of the geometry. Regions without a recovered direction keep the offset framing.
