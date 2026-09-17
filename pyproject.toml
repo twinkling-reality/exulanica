@@ -379,6 +379,13 @@ layers = [
   # reached for the purger would break the build rather than a review.
   "deletion",
   "db | models | store",
+  # Traffic simulation reads generated road records and its own catalogs and nothing else. It
+  # sits below the database, the store and the model client so the layers refuse those, and the
+  # forbidden contract below refuses everything between it and the grammar: it may import
+  # grammar, materials, canonical, errors and env. It is placed here rather than directly above
+  # grammar only because the grammar tests pin the layers around grammar; the forbidden
+  # contract is what carries the rule. The society composition above it passes it data.
+  "traffic",
   # Reconstruction is driven by ingest and knows nothing about the evidence spine. It is a
   # layer of its own rather than a sibling of the three above because it must sit BELOW them
   # for the forbidden contract on it to mean anything: a module that may import evidence and
@@ -552,6 +559,39 @@ forbidden_modules = [
   "numpy",
   "cv2",
   "pycolmap",
+]
+
+[[tool.importlinter.contracts]]
+# Traffic is a pure, replayable simulation over generated road records. It cannot open the
+# database or the store, cannot name an evidence address, cannot reach the pipeline, a person, the
+# selector, reconstruction or the capture verdict, cannot import the society engine it is composed
+# with (that composition sits above and passes data down), cannot call a model, and cannot load
+# the numeric stack. Its decisions are integers, a seed and recorded inputs, and a module that
+# cannot import any of the above cannot quietly make them anything else.
+#
+# Note what is deliberately NOT claimed here. `exulanica.grammar` stays importable, because the
+# road records are grammar records. The external names are only checkable while something in this
+# package graph imports them; if the last importer of one goes, this contract errors on a missing
+# module and the name should be removed here rather than the check weakened.
+name = "Traffic simulation is pure: no database, store, evidence, pipeline, society engine or model"
+type = "forbidden"
+source_modules = ["exulanica.traffic"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+  "exulanica.reconstruction",
+  "exulanica.capture",
+  "exulanica.world",
+  "exulanica.models",
+  "exulanica.api",
+  "numpy",
+  "torch",
 ]
 
 [[tool.importlinter.contracts]]

@@ -832,6 +832,11 @@ def _start_leaving(step: _Step) -> None:
         vehicle.manoeuvre_until = step.second + _ceil_seconds(vehicle.vehicle_class.parking_exit_ms)
         vehicle.speed = 0
         vehicle.wait_reason = "parking_manoeuvre"
+        # The body is on the lane from now on, and a neighbour leaving later this second must
+        # see it.
+        entries = step.bodies.setdefault(lane, [])
+        entries.append((rear, front, vehicle.vehicle_id))
+        entries.sort()
         step.emit(
             "parking_exit_started",
             trip_id=trip.trip_id,
