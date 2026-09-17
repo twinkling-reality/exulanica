@@ -195,7 +195,7 @@ describe('first-person keyboard ownership', () => {
   });
 
   /*
-   * `atlasLandscapeSurface` samples everywhere and never returns null, so an unconditional snap
+   * `flatNavigationSurface` samples everywhere and never returns null, so an unconditional snap
    * also caught the deliberate aerial poses: the Google-tiles overview at y = 95 landed near the
    * ground with its downward pitch intact. Grounding is now something a caller asks for.
    */

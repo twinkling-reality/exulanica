@@ -135,7 +135,7 @@ export class FirstPersonControls {
       /*
        * Ground the start pose only when it is meant to be one.
        *
-       * `atlasLandscapeSurface` samples everywhere and never returns null, so grounding every
+       * `flatNavigationSurface` samples everywhere and never returns null, so grounding every
        * start pose silently teleports the deliberate aerial poses too: the city overview at
        * y = 95 lands at roughly 0.3 with its -0.48 pitch intact, aimed at the dirt. Recovery
        * still seeds from the grounded point either way.
