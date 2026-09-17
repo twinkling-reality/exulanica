@@ -171,6 +171,20 @@ describe('the support clearance rule', () => {
       .toEqual([[[0, 0, 0], [999, 5, 0], [0, 10, 0]]]);
   });
 
+  it('keeps a vertex on a clip line once, and still carves the piece it leaves for the next obstruction', () => {
+    // The corner (1000, 1000) is on the line x = 1000, where its edge from (2000, 0) crosses: the
+    // clip meets it twice, and the piece holds a repeated point until it is cut into triangles.
+    const triangle: SupportTriangle = [[0, 0, 0], [2000, 0, 0], [1000, 1000, 0]];
+    const first: ClearanceBox = { min_x: 1001, min_y: -100, max_x: 3000, max_y: 2000 };
+    expect(carveSupport([triangle], [first], 0, 'case')).toEqual([[[0, 0, 0], [1000, 0, 0], [1000, 1000, 0]]]);
+    // An edge of no length separates nothing, so a second obstruction inside that piece still carves it.
+    const second: ClearanceBox = { min_x: 400, min_y: 100, max_x: 500, max_y: 200 };
+    const kept = carveSupport([triangle], [first, second], 0, 'case');
+    holdsTheRule([triangle], [first, second], 0, kept, FLAT);
+    // Twice areas: the piece less the open box (399, 501) x (99, 201), which lies wholly inside it.
+    expect(areaOf(kept)).toBe(1000n * 1000n - 2n * 102n * 102n);
+  });
+
   it('keeps the pieces around an obstruction meeting along shared lines, with no crack between them', () => {
     const support = square(10000, FLAT);
     const kept = carveSupport(support, [{ min_x: 4000, min_y: 4000, max_x: 6000, max_y: 6000 }], 0, 'case');
