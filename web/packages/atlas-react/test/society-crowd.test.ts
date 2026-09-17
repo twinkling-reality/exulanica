@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd, type PoseInterval } from '../src/playcanvas/society/crowd.js';
+import { abstractInhabitantRenderable } from '../src/playcanvas/society/near-character.js';
 import type {
   CrowdPose,
   CrowdRenderable,
@@ -233,6 +234,33 @@ describe('society crowd', () => {
     for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
       expect(poses.get(id)![beforeJump.get(id) ?? 0]?.discontinuity, id).toBe(true);
     }
+    crowd.destroy();
+    app.destroy();
+  });
+
+  it('carries an abstract character to its new point without solving or skinning a new pose', () => {
+    const { crowd, app, root } = setup();
+    const identity = { societyId: 'society', branchId: 'branch', inhabitantId: 'walker' };
+    const renderable = abstractInhabitantRenderable(app.graphicsDevice, root, identity, 'near');
+    renderable.pose({ position: [1, 0, 2], deltaSeconds: 1 / 60, discontinuity: true });
+    renderable.pose({ position: [1, 0, 2.02], deltaSeconds: 1 / 60 });
+    const mesh = renderable.root.render!.meshInstances[0]!.mesh;
+    const skinned: number[] = [];
+    expect(mesh.getPositions(skinned)).toBeGreaterThan(100);
+    const facing = renderable.facing;
+    renderable.follow!([1.5, 0, 3]);
+    const carried: number[] = [];
+    mesh.getPositions(carried);
+    expect(carried).toEqual(skinned);
+    expect(renderable.facing).toBe(facing);
+    const at = renderable.root.getLocalPosition();
+    expect([at.x, at.y, at.z]).toEqual([1.5, 0, 3]);
+    // Hidden stays hidden and in place: carrying never shows anyone.
+    renderable.setVisible(false);
+    renderable.follow!([9, 0, 9]);
+    expect(renderable.root.enabled).toBe(false);
+    expect(renderable.root.getLocalPosition().x).toBe(1.5);
+    renderable.destroy();
     crowd.destroy();
     app.destroy();
   });
