@@ -192,6 +192,33 @@ export { FirstPersonGesture, type FirstPersonGestureDescriptor } from './first-p
 export type { NativeCharacterDescriptor, NativeCharacterAppearance } from './native-character.js';
 export type { CharacterByteLoader } from './native-character-pool.js';
 export type { NativeCharacterRuntime } from './native-character-runtime.js';
+export {
+  CHARACTER_CATALOG,
+  CharacterCrowdEvaluation,
+  CharacterHost,
+  DESIGNED_LOOKS,
+  INHABITANT_DRAW_DOMAIN,
+  LayeredCharacterRenderable,
+  describeLook,
+  designedLook,
+  drawLook,
+  inhabitantLook,
+  inhabitantRenderable,
+  lookSha256,
+  validateLook,
+  type CatalogAssetRef,
+  type CharacterAssetLoader,
+  type CharacterCatalog,
+  type CharacterDetail,
+  type CharacterLook,
+  type CharacterPose,
+  type CharacterRenderable,
+  type CharacterRenderableStatus,
+  type CrowdEvaluationHost,
+  type CrowdEvaluationOptions,
+  type DesignedLooks,
+  type InhabitantIdentity,
+} from './character/index.js';
 
 export type {
   AssetAvailability,
