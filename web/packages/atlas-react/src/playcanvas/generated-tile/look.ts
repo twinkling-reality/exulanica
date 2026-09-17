@@ -144,11 +144,13 @@ export const TILE_LOOK_V1: TileLook = deepFreeze({
     sourceSize: 64,
   },
   contactShadow: {
-    mode: 'lighting',
-    radiusM: 0.9,
+    // `combine` darkens direct light too. `lighting` touches only ambient, and measured in sunlight
+    // it darkened the kerb's foot by 7 per cent, which does not read as contact at all.
+    mode: 'combine',
+    radiusM: 0.6,
     intensity: 0.6,
     samples: 12,
-    power: 3,
+    power: 2,
     minAngleDeg: 10,
     blur: true,
     scale: 1,

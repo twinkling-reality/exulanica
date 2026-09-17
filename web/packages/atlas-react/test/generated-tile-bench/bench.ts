@@ -114,7 +114,7 @@ export class Bench {
     this.environment = applyTileEnvironment(this.app, this.camera, this.look);
   }
 
-  private async draw(surfaces: readonly TestSurface[], unlit?: pc.Material): Promise<void> {
+  private async draw(surfaces: readonly TestSurface[], unlit?: pc.Material, library = this.library): Promise<void> {
     this.clear();
     const drawn = new Set<string>();
     for (const surface of surfaces) {
@@ -124,7 +124,7 @@ export class Bench {
         material = unlit;
         uvOf = () => [0, 0];
       } else {
-        const resolved = await this.library.resolve(surface.setId);
+        const resolved = await library.resolve(surface.setId);
         material = resolved.material;
         if (resolved.state === 'available') {
           drawn.add(surface.setId);
@@ -174,7 +174,8 @@ export class Bench {
     const eye = KERB_HEIGHT_M + EYE_M;
     switch (name) {
       case 'wall': return { position: [-2.4, eye, 0.4], target: [0.6, 2.6, WALL_Z] };
-      case 'kerb': return { position: [-2.0, eye, 1.2], target: [0.4, 0.05, KERB_FACE_Z - 0.2] };
+      // From the carriageway: the junction at the kerb's foot is hidden from the footway above it.
+      case 'kerb': return { position: [-2.0, EYE_M, -4.0], target: [0.4, 0.07, KERB_FACE_Z] };
       case 'door': return { position: [-0.6, eye, 0.8], target: [(DOOR.x0 + DOOR.x1) / 2, 1.2, WALL_Z + DOOR.depth] };
       case 'cornice': return { position: [-2.4, eye, 0.6], target: [0.6, CORNICE.y0, WALL_Z] };
       case 'street': return { position: [-14, eye, 1.0], target: [6, 2.2, 1.6] };
@@ -336,18 +337,16 @@ export class Bench {
   }
 
   /** Contact shadowing: luminance at each junction with the occlusion on, over the same with it off. */
-  async measureContactShadow(): Promise<Record<string, { readonly on: number; readonly off: number; readonly ratio: number }>> {
-    await this.showStreet();
-    const frame = this.environment!.frame;
-    const mode = frame.ssao.type;
+  contactProbes(): readonly { readonly pose: Pose; readonly regions: readonly Region[] }[] {
     const k = KERB_HEIGHT_M;
-    const probes: { readonly pose: Pose; readonly regions: readonly Region[] }[] = [
+    return [
       { pose: this.eyeLevel('kerb'), regions: [
         { name: 'kerb: carriageway 30 mm from the kerb face', world: [0.4, 0, KERB_FACE_Z - 0.03], half: 2 },
         { name: 'kerb control: carriageway 1.5 m out', world: [0.4, 0, KERB_FACE_Z - 1.5], half: 2 },
       ] },
       { pose: this.eyeLevel('door'), regions: [
-        { name: 'doorway: door 40 mm from the reveal', world: [DOOR.x0 + 0.04, k + 1.2, WALL_Z + DOOR.depth], half: 2 },
+        // The far reveal: from this side of the opening, the near one is behind the wall's edge.
+        { name: 'doorway: door 40 mm from the reveal', world: [DOOR.x1 - 0.04, k + 1.2, WALL_Z + DOOR.depth], half: 2 },
         { name: 'doorway: threshold 40 mm from the door', world: [(DOOR.x0 + DOOR.x1) / 2, k, WALL_Z + DOOR.depth - 0.04], half: 2 },
         { name: 'doorway control: plinth 1.5 m from the reveal', world: [DOOR.x0 - 1.5, k + 0.5, WALL_Z], half: 2 },
       ] },
@@ -356,6 +355,31 @@ export class Bench {
         { name: 'cornice control: wall 2.5 m under the soffit', world: [0.6, CORNICE.y0 - 2.5, WALL_Z], half: 2 },
       ] },
     ];
+  }
+
+  /** Pose for one probe and pin a marker over each sampled point, to check by eye what is sampled. */
+  markContactProbe(index: number): readonly (readonly [number, number])[] {
+    const probe = this.contactProbes()[index]!;
+    this.pose(probe.pose);
+    this.pump(3);
+    document.querySelectorAll('.bench-mark').forEach((old) => old.remove());
+    const scale = this.canvas.clientWidth / this.gl.drawingBufferWidth;
+    return probe.regions.map((region) => {
+      const [x, y] = this.screen(region.world);
+      const mark = document.createElement("div");
+      mark.className = "bench-mark";
+      mark.title = region.name;
+      mark.style.cssText = `position:absolute;left:${x * scale - 4}px;top:${y * scale - 4}px;width:8px;height:8px;border:2px solid #0f0;pointer-events:none`;
+      document.body.append(mark);
+      return [Math.round(x), Math.round(y)] as const;
+    });
+  }
+
+  async measureContactShadow(): Promise<Record<string, { readonly on: number; readonly off: number; readonly ratio: number }>> {
+    await this.showStreet();
+    const frame = this.environment!.frame;
+    const mode = frame.ssao.type;
+    const probes = this.contactProbes();
     const out: Record<string, { on: number; off: number; ratio: number }> = {};
     for (const probe of probes) {
       this.pose(probe.pose);
@@ -380,7 +404,7 @@ export class Bench {
     const scene = this.app.scene;
     this.pose(this.eyeLevel('door'));
     const door: Region = { name: 'door', world: [(DOOR.x0 + DOOR.x1) / 2, KERB_HEIGHT_M + 1.2, WALL_Z + DOOR.depth], half: 6 };
-    const wall: Region = { name: 'wall', world: [-3, 3.5, WALL_Z], half: 6 };
+    const wall: Region = { name: 'wall', world: [DOOR.x1 + 0.6, 2.2, WALL_Z], half: 6 };
     this.pump(3);
     const withProbe = this.pixels();
     const atlas = scene.envAtlas; const skybox = scene.skybox;
@@ -403,19 +427,73 @@ export class Bench {
     };
   }
 
+  /**
+   * Whether the height map earns its place: the same eye-level frames with parallax off and on, at
+   * the physical factor (relief over extent) and at a multiple of it, compared pixel by pixel, with
+   * the frame time of each.
+   */
+  async measureParallax(multiples: readonly number[]): Promise<Record<string, unknown>> {
+    const results: Record<string, unknown> = {};
+    const poses = ['wall', 'footway', 'door'] as const;
+    const frames = async (library: TileTextureLibrary): Promise<{ readonly frames: Uint8Array[]; readonly times: unknown }> => {
+      const out: Uint8Array[] = [];
+      await this.draw(testStreet({
+        wall: 'cc0.brick-running-bond', plinth: 'cc0.limestone-ashlar', door: 'cc0.storefront-metal',
+        cornice: 'cc0.cast-concrete', footway: 'cc0.footway-paving', kerb: 'cc0.kerb-stone',
+        carriageway: 'cc0.carriageway-asphalt',
+      }), undefined, library);
+      for (const pose of poses) {
+        this.pose(this.eyeLevel(pose));
+        this.pump(3);
+        out.push(this.pixels().data);
+      }
+      this.pose(this.eyeLevel('wall'));
+      return { frames: out, times: this.frameTimes(120) };
+    };
+    const baseline = await frames(this.library);
+    results['off'] = baseline.times;
+    for (const multiple of multiples) {
+      const brick = this.manifest.byId.get('cc0.brick-running-bond')!;
+      // Brick's relief is 12 mm over an 1800 mm tile.
+      const factor = Math.min(1, (12 / brick.extentVMm) * multiple);
+      const look = validateTileLook({ ...structuredClone(this.look), surface: { ...this.look.surface, parallax: true, parallaxFactor: factor } });
+      const library = new TileTextureLibrary(this.app.graphicsDevice, look, this.manifest, async (entry) =>
+        new Uint8Array(await (await fetch(`${__TEXTURE_ROOT__}/${textureSetBlobPath(entry)}`)).arrayBuffer()));
+      const run = await frames(library);
+      const differences = poses.map((pose, index) => {
+        const a = baseline.frames[index]!; const b = run.frames[index]!;
+        let sum = 0; let changed = 0; let max = 0;
+        for (let i = 0; i < a.length; i += 4) {
+          const d = Math.abs(luminance(a[i]!, a[i + 1]!, a[i + 2]!) - luminance(b[i]!, b[i + 1]!, b[i + 2]!));
+          sum += d; max = Math.max(max, d); if (d >= 8) changed += 1;
+        }
+        const pixels = a.length / 4;
+        return { pose, meanAbsLuminance: Math.round((sum / pixels) * 100) / 100, pixelsChangedBy8OrMore: Math.round((changed / pixels) * 10000) / 10000, max: Math.round(max) };
+      });
+      results[`x${multiple} factor ${factor.toFixed(5)}`] = { differences, times: run.times, extraBytes: library.decodedTextureBytes - this.library.decodedTextureBytes };
+      this.clear();
+      library.destroy();
+    }
+    await this.showStreet();
+    return results;
+  }
+
   /** Synchronous frame times: update, render, and a one-pixel read that waits for the GPU. */
   frameTimes(frames: number): { readonly p50: number; readonly p95: number; readonly max: number; readonly drawCalls: number } {
     const gl = this.gl;
     const pixel = new Uint8Array(4);
     const times: number[] = [];
     let drawCalls = 0;
+    // The counter `app.stats.drawCalls.total` reads, which only the app's own tick copies out.
+    const device = this.app.graphicsDevice as unknown as { _drawCallsPerFrame: number };
     for (let i = 0; i < frames; i += 1) {
       const start = performance.now();
+      device._drawCallsPerFrame = 0;
       this.app.update(1 / 60);
       this.app.render();
       gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
       times.push(performance.now() - start);
-      drawCalls = Math.max(drawCalls, this.app.stats.drawCalls.total);
+      drawCalls = Math.max(drawCalls, device._drawCallsPerFrame);
     }
     times.sort((a, b) => a - b);
     const at = (q: number): number => Math.round(times[Math.min(times.length - 1, Math.floor(q * times.length))]! * 100) / 100;
