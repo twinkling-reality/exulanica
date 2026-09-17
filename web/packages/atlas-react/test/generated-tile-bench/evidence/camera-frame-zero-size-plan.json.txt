@@ -1,0 +1,37 @@
+{
+ "url": "http://127.0.0.1:5192/?preview=1&tile=tile-conformance",
+ "width": 1440,
+ "height": 900,
+ "outDir": "<a scratch directory>",
+ "preScript": "(()=>{window.__asserts=[];window.__marks=[];for(const k of ['error','warn','log']){const o=console[k].bind(console);console[k]=(...a)=>{const t=a.map(String).join(' ');if(/FRAMEBUFFER/.test(t)){const c=document.getElementById('atlas');window.__asserts.push({text:t.slice(0,160),framePasses:(()=>{try{return window.__pc?.AppBase.getApplication()?.root.findByName('atlas-camera')?.camera?.framePasses.length??null}catch{return null}})(),t:Math.round(performance.now()),canvas:c?[c.width,c.height,c.clientWidth,c.clientHeight]:null,style:!!document.getElementById('zero-canvas'),stack:(new Error().stack||'').split('\\n').slice(2,14).map(s=>s.trim().replace(/https?:\\/\\/[^/]+/,'').replace(/\\?v=[0-9a-f]+/,''))});}o(...a);};}})();(()=>{const add=()=>{const st=document.createElement('style');st.id='zero-canvas';st.textContent='canvas{width:0!important;height:0!important}';document.documentElement.appendChild(st);};if(document.documentElement)add();else document.addEventListener('DOMContentLoaded',add);})();",
+ "readyExpression": "!!document.querySelector('.generated-tile-evaluation') && document.getElementById('atlas')?.dataset.worldTopology !== undefined",
+ "readyTimeoutMs": 240000,
+ "steps": [
+  {
+   "wait": 2000,
+   "label": "atZero",
+   "eval": "(async()=>{const url=performance.getEntriesByType('resource').map(e=>e.name).find(n=>n.includes('/deps/playcanvas.js'));const pc=await import(url);const app=pc.AppBase.getApplication();const cam=app.root.findByName('atlas-camera');const c=document.getElementById('atlas')||document.querySelector('canvas');return {canvas:c?[c.width,c.height,c.clientWidth,c.clientHeight]:null,framePasses:cam.camera.framePasses.length,statement:!!document.querySelector('.generated-tile-evaluation'),sky:app.scene.skybox?.name??null}})()"
+  },
+  {
+   "wait": 0,
+   "label": "release",
+   "eval": "(()=>{document.getElementById('zero-canvas')?.remove();return true})()"
+  },
+  {
+   "wait": 0,
+   "label": "markRelease",
+   "eval": "(()=>{window.__marks.push(['release',Math.round(performance.now())]);return true})()"
+  },
+  {
+   "wait": 3000,
+   "label": "afterRelease",
+   "eval": "(async()=>{const url=performance.getEntriesByType('resource').map(e=>e.name).find(n=>n.includes('/deps/playcanvas.js'));const pc=await import(url);const app=pc.AppBase.getApplication();const cam=app.root.findByName('atlas-camera');const c=document.getElementById('atlas')||document.querySelector('canvas');return {canvas:c?[c.width,c.height,c.clientWidth,c.clientHeight]:null,framePasses:cam.camera.framePasses.length,statement:!!document.querySelector('.generated-tile-evaluation'),sky:app.scene.skybox?.name??null}})()",
+   "shot": "after-release"
+  },
+  {
+   "wait": 500,
+   "label": "asserts",
+   "eval": "({asserts:window.__asserts,marks:window.__marks})"
+  }
+ ]
+}

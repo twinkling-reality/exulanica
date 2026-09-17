@@ -5,6 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { atlasVec3, parseTextureSetManifest, resolveGroundMovement, type TextureSetDigest } from '@exulanica/atlas-core';
 import { GRAMMAR_TABLES, PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection, type GrammarTable } from '@exulanica/loom-tess/core';
+import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
+import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import {
   GeneratedTileRefusal,
   MATERIAL_NONE_EXISTS_REASON,
@@ -334,5 +336,63 @@ describe('drawing a tile into the Atlas scene', () => {
     attachment.dispose();
     expect(environmentRoot.findByName('generated-tile:tile-conformance')).toBeNull();
     expect(app.scene.fog.start).toBe(fogBefore);
+  });
+});
+
+describe('the camera frame waits for a canvas with a size', () => {
+  it('builds no render targets at 0 by 0, builds them once on the first resize, and removes them on dispose', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 0;
+    canvas.height = 0;
+    const device = new pc.NullGraphicsDevice(canvas);
+    const app = new pc.AppBase(canvas);
+    const options = new pc.AppOptions();
+    options.graphicsDevice = device;
+    options.componentSystems = [pc.RenderComponentSystem, pc.CameraComponentSystem, pc.LightComponentSystem];
+    app.init(options);
+    const camera = new pc.Entity('camera');
+    camera.addComponent('camera');
+    app.root.addChild(camera);
+    expect([device.width, device.height]).toEqual([0, 0]);
+
+    const environment = applyTileEnvironment(app, camera, TILE_LOOK_V1);
+    // A frame created now would build its targets at 0 by 0: incomplete framebuffers.
+    expect(environment.frame).toBeNull();
+    expect(camera.camera!.framePasses).toEqual([]);
+
+    device.setResolution(640, 480);
+    const frame = environment.frame;
+    expect(frame).not.toBeNull();
+    expect(camera.camera!.framePasses).toHaveLength(1);
+    expect(frame!.ssao.radius).toBe(TILE_LOOK_V1.contactShadow.radiusM);
+    device.setResolution(800, 600);
+    expect(environment.frame).toBe(frame);
+
+    environment.dispose();
+    expect(environment.frame).toBeNull();
+    expect(camera.camera!.framePasses).toEqual([]);
+    device.setResolution(320, 240);
+    expect(environment.frame).toBeNull();
+    expect(camera.camera!.framePasses).toEqual([]);
+  });
+
+  it('builds the frame at once when the canvas already has a size', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 200;
+    const device = new pc.NullGraphicsDevice(canvas);
+    const app = new pc.AppBase(canvas);
+    const options = new pc.AppOptions();
+    options.graphicsDevice = device;
+    options.componentSystems = [pc.RenderComponentSystem, pc.CameraComponentSystem, pc.LightComponentSystem];
+    app.init(options);
+    const camera = new pc.Entity('camera');
+    camera.addComponent('camera');
+    app.root.addChild(camera);
+    const environment = applyTileEnvironment(app, camera, TILE_LOOK_V1);
+    expect(environment.frame).not.toBeNull();
+    expect(camera.camera!.framePasses).toHaveLength(1);
+    environment.dispose();
+    expect(camera.camera!.framePasses).toEqual([]);
   });
 });

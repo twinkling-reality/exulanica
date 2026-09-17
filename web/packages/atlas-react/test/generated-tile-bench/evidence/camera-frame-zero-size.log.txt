@@ -1,0 +1,31 @@
+CAMERA FRAME AT A ZERO-SIZED CANVAS, 2026-09-17, lane/tile-runtime-v2 on tess e06aafcb
+Report from the merge review: the first time the Browser pane opened ?preview=1&tile=tile-conformance, the page logged
+three PlayCanvas asserts, FRAMEBUFFER_INCOMPLETE_ATTACHMENT for PrepassRT, SceneColor MSAA and WebglFramebuffer MSAA.
+
+Method: headless Chrome 152 at 1440x900 against the app dev server (tile-runtime-web, 5192). A script added before any page
+script (camera-frame-zero-size-plan.json.txt, run by cdp-capture-zero-size.mjs.txt) holds every canvas at 0 by 0 CSS pixels
+until the tile statement is on screen, then releases it. It wraps console to record each FRAMEBUFFER assert with its time,
+the canvas size and whether the zero style was still in force. `framePasses` is the atlas-camera's camera frame pass count.
+Before each run the served module was checked with curl until it contained (or lacked) `createFrame`: Vite took up to 17 s
+to serve an edit, and one earlier run measured a stale module.
+
+BEFORE (environment.ts as of f0beac5a, served and confirmed):
+  at zero: canvas [0, 0], framePasses 1 (the frame was created at 0 by 0)
+  455 ms canvas [0, 0] FRAMEBUFFER_INCOMPLETE_ATTACHMENT, render target: PrepassRT
+  473 ms canvas [0, 0] FRAMEBUFFER_INCOMPLETE_ATTACHMENT, render target: SceneColor MSAA
+  482 ms canvas [0, 0] FRAMEBUFFER_INCOMPLETE_ATTACHMENT, render target: WebglFramebuffer MSAA
+  after release: canvas [1440, 900], framePasses 1
+
+AFTER (the frame is created only once the device has a size, at once or on its first resize), two runs:
+  run A: at zero framePasses 0; 534 ms canvas [0, 0] WebglFramebuffer MSAA; after release canvas [1440, 900], framePasses 1
+  run B: at zero framePasses 0; 496 ms canvas [0, 0] WebglFramebuffer MSAA; after release canvas [1440, 900], framePasses 1
+  PrepassRT and SceneColor MSAA: none.
+
+CONTROL, no tile (?preview=1), same zero-size start:
+  502 ms canvas [0, 0] WebglFramebuffer MSAA; framePasses 0 throughout.
+  So the remaining assert is the app's own graphics device creating its antialiased backbuffer while the canvas is 0 by 0.
+  It happens without any tile, and it is not the tile runtime's to fix.
+
+Unit tests: generated-tile-runtime.test.ts, "the camera frame waits for a canvas with a size" (2 tests). Mutation: with the
+size guard removed, the test worker crashes creating the frame at 0 by 0 on the null device (vitest: Worker exited
+unexpectedly, 2 of 18 reported, run failed).

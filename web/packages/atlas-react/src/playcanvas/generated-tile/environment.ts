@@ -13,12 +13,18 @@ import { sunDirection, type Rgb, type TileLook } from './look.js';
  * Everything this module changes on the app and the camera is recorded first and put back by
  * `dispose`, so mounting a tile and unmounting it leaves the scene exactly as it was. The lights
  * already in the scene are disabled while the tile is mounted, not destroyed.
+ *
+ * The camera frame (tone mapping and the occlusion pass) builds its render targets when it is
+ * created, at the canvas's size. A page can mount a tile while its canvas is still 0 by 0, and
+ * targets built then are incomplete framebuffers, so the frame is created only once the device has a
+ * size: at once if it does, otherwise on the device's first resize.
  */
 
 export interface TileEnvironment {
   readonly look: TileLook;
   readonly sun: pc.Entity;
-  readonly frame: pc.CameraFrame;
+  /** The camera frame, or null while the canvas has had no size yet. */
+  readonly frame: pc.CameraFrame | null;
   /** GPU bytes held by the probe's cubemap and atlas. */
   readonly residentBytes: number;
   dispose(): void;
@@ -157,29 +163,40 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
   sun.setRotation(new pc.Quat().setFromDirections(new pc.Vec3(0, -1, 0), new pc.Vec3(dx, dy, dz)));
   app.root.addChild(sun);
 
-  const frame = new pc.CameraFrame(app, component);
-  frame.rendering.toneMapping = TONE_MAPPING[look.toneMapping];
-  frame.rendering.samples = 4;
-  frame.ssao.type = look.contactShadow.mode === 'combine' ? pc.SSAOTYPE_COMBINE : pc.SSAOTYPE_LIGHTING;
-  frame.ssao.radius = look.contactShadow.radiusM;
-  frame.ssao.intensity = look.contactShadow.intensity;
-  frame.ssao.samples = look.contactShadow.samples;
-  frame.ssao.power = look.contactShadow.power;
-  frame.ssao.minAngle = look.contactShadow.minAngleDeg;
-  frame.ssao.blurEnabled = look.contactShadow.blur;
-  frame.ssao.scale = look.contactShadow.scale;
-  frame.update();
-
+  let frame: pc.CameraFrame | null = null;
   let disposed = false;
+  const createFrame = (): void => {
+    if (disposed || frame !== null || device.width <= 0 || device.height <= 0) return;
+    const created = new pc.CameraFrame(app, component);
+    created.rendering.toneMapping = TONE_MAPPING[look.toneMapping];
+    created.rendering.samples = 4;
+    created.ssao.type = look.contactShadow.mode === 'combine' ? pc.SSAOTYPE_COMBINE : pc.SSAOTYPE_LIGHTING;
+    created.ssao.radius = look.contactShadow.radiusM;
+    created.ssao.intensity = look.contactShadow.intensity;
+    created.ssao.samples = look.contactShadow.samples;
+    created.ssao.power = look.contactShadow.power;
+    created.ssao.minAngle = look.contactShadow.minAngleDeg;
+    created.ssao.blurEnabled = look.contactShadow.blur;
+    created.ssao.scale = look.contactShadow.scale;
+    created.update();
+    frame = created;
+  };
+  createFrame();
+  device.on(pc.GraphicsDevice.EVENT_RESIZE, createFrame);
+
   return {
     look,
     sun,
-    frame,
+    get frame() {
+      return frame;
+    },
     residentBytes: probeBytes,
     dispose() {
       if (disposed) return;
       disposed = true;
-      frame.destroy();
+      device.off(pc.GraphicsDevice.EVENT_RESIZE, createFrame);
+      frame?.destroy();
+      frame = null;
       sun.destroy();
       scene.envAtlas = saved.envAtlas;
       scene.skybox = saved.skybox;

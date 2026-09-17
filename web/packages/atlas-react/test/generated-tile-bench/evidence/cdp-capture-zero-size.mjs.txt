@@ -1,0 +1,99 @@
+// Drive a throwaway headless Chrome over CDP: open a URL, run page expressions, save screenshots.
+// Usage: node cdp-capture.mjs <plan.json>
+// plan: { url, width, height, outDir, readyExpression, steps: [{ eval?: string, shot?: name, wait?: ms }] }
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+mkdirSync(plan.outDir, { recursive: true });
+const profile = mkdtempSync(join(tmpdir(), 'cdp-profile-'));
+const port = 9300 + Math.floor(Math.random() * 500);
+const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+  `--window-size=${plan.width},${plan.height}`, '--hide-scrollbars', '--no-first-run',
+  '--enable-unsafe-swiftshader', 'about:blank',
+], { stdio: 'ignore' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let targets;
+for (let i = 0; i < 50; i++) {
+  try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); break; } catch { await sleep(200); }
+}
+const page = targets.find((t) => t.type === 'page');
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+await new Promise((r) => ws.addEventListener('open', r, { once: true }));
+let id = 0;
+const pending = new Map();
+const logs = [];
+ws.addEventListener('message', (event) => {
+  const message = JSON.parse(event.data);
+  if (message.id !== undefined && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
+  if (message.method === 'Runtime.consoleAPICalled') logs.push(message.params.args.map((a) => a.value ?? a.description).join(' '));
+  if (message.method === 'Runtime.exceptionThrown') logs.push(`EXCEPTION ${message.params.exceptionDetails.text} ${message.params.exceptionDetails.exception?.description ?? ''}`);
+});
+const send = (method, params = {}) => new Promise((resolve) => { const n = ++id; pending.set(n, resolve); ws.send(JSON.stringify({ id: n, method, params })); });
+const evaluate = async (expression) => {
+  const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.result?.exceptionDetails) throw new Error(`${expression.slice(0, 80)}: ${r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text}`);
+  return r.result?.result?.value;
+};
+const results = {};
+try {
+  await send('Runtime.enable');
+  await send('Page.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: plan.width, height: plan.height, deviceScaleFactor: 1, mobile: false });
+  if (plan.reducedMotion) {
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  }
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'performance.setResourceTimingBufferSize(100000);' });
+  if (plan.preScript) await send('Page.addScriptToEvaluateOnNewDocument', { source: plan.preScript });
+  await send('Page.navigate', { url: plan.url });
+  const deadline = Date.now() + (plan.readyTimeoutMs ?? 120000);
+  for (;;) {
+    let ready = false;
+    try { ready = await evaluate(plan.readyExpression); } catch { ready = false; }
+    if (ready === true) break;
+    if (Date.now() > deadline) throw new Error('page never became ready');
+    await sleep(500);
+  }
+  for (const step of plan.steps) {
+    if (step.wait) await sleep(step.wait);
+    if (step.click) {
+      const [x, y] = step.click;
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+    }
+    if (step.key) {
+      const [code, key, keyCode] = step.key;
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', code, key, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
+      if (step.holdMs) await sleep(step.holdMs);
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', code, key, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
+    }
+    if (step.eval) {
+      const value = await evaluate(step.eval);
+      // A value carrying a PNG data URL has it written to a file and replaced by the file name.
+      if (value !== null && typeof value === 'object' && typeof value.png === 'string') {
+        const file = `${step.label}.canvas.png`;
+        writeFileSync(join(plan.outDir, file), Buffer.from(value.png.slice(value.png.indexOf(',') + 1), 'base64'));
+        value.png = file;
+      }
+      results[step.label ?? `step${Object.keys(results).length}`] = value;
+    }
+    if (step.shot) {
+      const shot = await send('Page.captureScreenshot', { format: 'png' });
+      writeFileSync(join(plan.outDir, `${step.shot}.png`), Buffer.from(shot.result.data, 'base64'));
+    }
+  }
+} catch (error) {
+  results.error = String(error);
+} finally {
+  results.logs = logs.filter((line) => /FRAMEBUFFER|ramebuffer|ASSERT|assert/i.test(line)).slice(0, 40); results.logCount = logs.length;
+  writeFileSync(join(plan.outDir, 'results.json'), JSON.stringify(results, null, 1));
+  ws.close();
+  chrome.kill('SIGTERM');
+  await sleep(500);
+  rmSync(profile, { recursive: true, force: true });
+}
+console.log(JSON.stringify(results).slice(0, 4000));

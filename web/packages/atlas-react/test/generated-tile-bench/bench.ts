@@ -185,6 +185,13 @@ export class Bench {
     }
   }
 
+  /** The environment's camera frame; the bench canvas always has a size, so it exists. */
+  private cameraFrame(): pc.CameraFrame {
+    const frame = this.environment?.frame ?? null;
+    if (frame === null) throw new Error('The bench has no camera frame: its canvas has no size');
+    return frame;
+  }
+
   pump(frames = 3): void {
     for (let i = 0; i < frames; i += 1) {
       this.app.update(1 / 60);
@@ -254,7 +261,7 @@ export class Bench {
     const cx = entry.extentUMm / 2000; const cy = entry.extentVMm / 2000;
     this.camera.setPosition(cx, cy, -5);
     this.camera.lookAt(cx, cy, 0);
-    const frame = this.environment!.frame;
+    const frame = this.cameraFrame();
     const ssao = frame.ssao.type;
     frame.ssao.type = pc.SSAOTYPE_NONE; frame.update();
     const sun = this.environment!.sun;
@@ -309,7 +316,7 @@ export class Bench {
     unlit.update();
     const scene = this.app.scene;
     const results: { distance: number; difference: number }[] = [];
-    const frame = this.environment!.frame;
+    const frame = this.cameraFrame();
     const ssao = frame.ssao.type;
     frame.ssao.type = pc.SSAOTYPE_NONE; frame.update();
     this.pose({ position: [0, EYE_M, 0], target: [0, EYE_M, 10] });
@@ -379,7 +386,7 @@ export class Bench {
 
   async measureContactShadow(): Promise<Record<string, { readonly on: number; readonly off: number; readonly ratio: number }>> {
     await this.showStreet();
-    const frame = this.environment!.frame;
+    const frame = this.cameraFrame();
     const mode = frame.ssao.type;
     const probes = this.contactProbes();
     const out: Record<string, { on: number; off: number; ratio: number }> = {};
