@@ -194,7 +194,7 @@ inside a building volume, so everything behind glass must be closed.
 ==========================================
 
 * No declared parameter bounded how far a generation reaches. Answered on 2026-09-17:
-  ``city_extent_x_mm`` and ``city_extent_y_mm`` (city level, read by districts, whole tiles) and
+  ``city_extent_x_mm`` and ``city_extent_y_mm`` (city level, read by terrain, whole tiles) and
   ``block_depth_mm`` (district level, read by streets) were added to the descriptor.
 * The corner a curb's radius makes (``corners.py``: ``[curb_extent]``, ``[corner_extent]``,
   ``[junction_extent]``) and what each record kind is to a person walking (the descriptor's
