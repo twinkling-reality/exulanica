@@ -53,7 +53,83 @@ def _unit_height_mm(parts: tuple[FormPart, ...]) -> int:
     return max(part.offset_z_mm + part.size_z_mm for part in parts)
 
 
-def _generate(context: StageContext) -> Iterator[vitrine.VitrineRecord]:
+def _face_frame(
+    building: massing.MassingRecord, face: facade.FacadeRecord
+) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """A face's two ends in plan and the unit direction into the building."""
+    ring = building.tiers[face.tier_ordinal].ring_mm
+    first, last = ring[face.edge_ordinal], ring[(face.edge_ordinal + 1) % len(ring)]
+    dx, dy = last[0] - first[0], last[1] - first[1]
+    return first, last, (-((dy > 0) - (dy < 0)), (dx > 0) - (dx < 0))
+
+
+def _reach_mm(building: massing.MassingRecord, face: facade.FacadeRecord) -> int:
+    """How deep the building is behind this face: its ring's furthest point inward."""
+    first, _last, inward = _face_frame(building, face)
+    ring = building.tiers[face.tier_ordinal].ring_mm
+    return max((x - first[0]) * inward[0] + (y - first[1]) * inward[1] for x, y in ring)
+
+
+def _opening_band_mm(
+    building: massing.MassingRecord, face: facade.FacadeRecord
+) -> tuple[int, int] | None:
+    """The band above the building's base this face's openings cover, or None when it has none."""
+    if not face.openings:
+        return None
+    sills, heads = [], []
+    for grid in face.openings:
+        for storey in grid.storeys:
+            floor = (
+                building.ground_storey_height_mm + (storey - 1) * building.upper_storey_height_mm
+            )
+            sill = floor + grid.sill_height_mm
+            sills.append(sill)
+            heads.append(sill + grid.height_mm + grid.head_rise_mm)
+    return min(sills), max(heads) - min(sills)
+
+
+def _backings(
+    context: StageContext,
+    building: massing.MassingRecord,
+    faces: list[facade.FacadeRecord],
+    ordinal: int,
+) -> Iterator[vitrine.InteriorBackingRecord]:
+    """One plane behind each face that has openings, at one depth for the whole building."""
+    glazed = [face for face in faces if _opening_band_mm(building, face) is not None]
+    if not glazed:
+        return
+    room = min(_reach_mm(building, face) for face in glazed)
+    reveal = max(grid.reveal_depth_mm for face in glazed for grid in face.openings)
+    low = max(vitrine.BACKING_DEPTH_MINIMUM_MM, reveal + 1)
+    high = min(vitrine.BACKING_DEPTH_MAXIMUM_MM, room - 1)
+    if high < low:
+        raise InvalidRecordError(
+            f"building {building.identity} is {room} mm deep behind its glazed faces, which "
+            f"holds no backing between {low} and {vitrine.BACKING_DEPTH_MAXIMUM_MM} mm"
+        )
+    depth = derived(context, "interior_backing_depth_mm", ordinal, minimum=low, maximum=high)
+    light = derived(context, "interior_backing_light_level_millionths", ordinal)
+    base = building.base_elevation_mm
+    for face in glazed:
+        sill, height = _opening_band_mm(building, face)  # type: ignore[misc]
+        first, last, inward = _face_frame(building, face)
+        xs = [first[0], last[0], first[0] + inward[0] * depth, last[0] + inward[0] * depth]  # type: ignore[operator]
+        ys = [first[1], last[1], first[1] + inward[1] * depth, last[1] + inward[1] * depth]  # type: ignore[operator]
+        yield vitrine.InteriorBackingRecord(
+            identity=context.identity("interior_backing", face.identity, 0),
+            facade_identity=face.identity,
+            building_identity=building.identity,
+            u_start_mm=0,
+            width_mm=face.run_length_mm,
+            sill_mm=sill,
+            height_mm=height,
+            depth_mm=depth,  # type: ignore[arg-type]
+            light_level_millionths=light,  # type: ignore[arg-type]
+            extent=Extent(min(xs), min(ys), base + sill, max(xs), max(ys), base + sill + height),
+        )
+
+
+def _generate(context: StageContext) -> Iterator[object]:
     buildings = prior_records(context, massing.STAGE_ID, massing.MassingRecord)
     lots = {
         record.identity: record
@@ -75,6 +151,8 @@ def _generate(context: StageContext) -> Iterator[vitrine.VitrineRecord]:
 
     for building in buildings:
         lot = lots[building.parcel_identity]
+        ordinal_of = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
+        yield from _backings(context, building, faces_of.get(building.identity, []), ordinal_of)
         units = building_shop_units(
             lot, faces_of.get(building.identity, []), bays_of.get(building.identity, [])
         )
@@ -154,4 +232,9 @@ def _generate(context: StageContext) -> Iterator[vitrine.VitrineRecord]:
             )
 
 
-STAGE: Final = GeneratorStage(vitrine.STAGE_ID, vitrine.STAGE_VERSION, (vitrine.SHAPE,), _generate)
+STAGE: Final = GeneratorStage(
+    vitrine.STAGE_ID,
+    vitrine.STAGE_VERSION,
+    (vitrine.SHAPE, vitrine.BACKING_SHAPE),
+    _generate,
+)

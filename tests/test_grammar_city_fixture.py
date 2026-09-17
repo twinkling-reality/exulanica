@@ -60,10 +60,10 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "9a43e7b160a6e114d55fa4ba1cea98e6b99329085c2faf00f01f8e04de857f23"
-DOCUMENT_BYTES = 128_454
-SHAPES_SHA256 = "9f287f7c8f806a3eaedcb7f8a49295229f3c4648f9e98b15a2f26c58406ee8ef"
-SHAPES_BYTES = 60_272
+DOCUMENT_SHA256 = "5180c50331f306dc085febe32e19df121da13aee90914180238fd8aab524591d"
+DOCUMENT_BYTES = 131_130
+SHAPES_SHA256 = "7ad96e305e41f69bdb7f7909a58c13591eda6f21059aadf12466a2a77c08b85b"
+SHAPES_BYTES = 61_808
 
 #: Every city record kind but the tile record, which is the envelope rather than a record in it.
 _RECORD_KINDS = sorted(shape.kind for shape in CITY_SHAPES if shape.kind != "city.tile")
@@ -115,7 +115,7 @@ def test_the_fixture_validates_completely_and_reports_the_gate_figures():
     report = _validate(read_tile_document(FIXTURE.DOCUMENT_PATH.read_bytes()))
     figures = report.as_dict()
     assert sorted(figures["record_counts"]) == _RECORD_KINDS
-    assert len(_RECORD_KINDS) == 26
+    assert len(_RECORD_KINDS) == 27
     assert figures["record_counts"]["city.surface_material"] == 81
     assert figures["record_counts"]["city.facade"] == 9
     assert {

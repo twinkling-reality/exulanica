@@ -320,6 +320,14 @@
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
+      "target": "interior_backing_depth_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "interior_backing_light_level_millionths",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
       "target": "ground_floor_use",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },

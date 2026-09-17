@@ -37,7 +37,7 @@ def _rows() -> dict[str, Any]:
 def test_every_record_kind_has_exactly_one_row_in_closed_words():
     rows = _rows()
     assert sorted(rows) == sorted(shape.kind for shape in CITY_SHAPES)
-    assert len(rows) == 27
+    assert len(rows) == 28
     for row in rows.values():
         assert row.ground in NAVIGATION_GROUND
         assert row.cover in NAVIGATION_COVER_REGIONS

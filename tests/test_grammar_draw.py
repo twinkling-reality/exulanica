@@ -638,7 +638,7 @@ def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has
     sources = dict(parameters.sources)
     for name in _CITY_VALUES:
         assert sources.pop(name) == "city"
-    assert len(sources) == 74 - len(_CITY_VALUES)
+    assert len(sources) == 76 - len(_CITY_VALUES)
     assert set(sources.values()) == {"derive"}
 
 

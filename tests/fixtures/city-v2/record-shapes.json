@@ -1122,6 +1122,76 @@
         },
         {
           "kind": "identity",
+          "name": "facade_identity",
+          "refers_to": [
+            "city.facade"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "width_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "sill_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3000,
+          "minimum": 300,
+          "name": "depth_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "light_level_millionths"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": 0,
+        "owner_field": "facade_identity",
+        "subject_kind": "interior_backing"
+      },
+      "kind": "city.interior_backing",
+      "rules": [],
+      "shape": "city.interior_backing",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
           "name": "node_identity",
           "refers_to": [
             "city.street_node"

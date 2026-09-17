@@ -196,4 +196,4 @@ def test_every_subject_record_kind_derives_its_identity_by_the_rule():
     kinds = {
         shape.identity.subject_kind for shape in CITY_SHAPES_BY_TYPE.values() if shape.identity
     }
-    assert len(kinds) == 26
+    assert len(kinds) == 27

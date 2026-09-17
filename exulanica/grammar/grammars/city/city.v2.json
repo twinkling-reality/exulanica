@@ -175,6 +175,10 @@
         {
           "kind": "city.vitrine",
           "version": 2
+        },
+        {
+          "kind": "city.interior_backing",
+          "version": 1
         }
       ]
     },
@@ -1103,6 +1107,30 @@
       "maximum": 1000000
     },
     {
+      "name": "interior_backing_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "vitrine",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far behind a face the near wall of the rooms behind it stands, deep enough to read as a room and never as far as the building's far side.",
+      "minimum": 300,
+      "maximum": 3000
+    },
+    {
+      "name": "interior_backing_light_level_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "face",
+      "stage": "vitrine",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the light a room behind glass gives off, as a vitrine's is stated.",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    {
       "name": "ground_floor_use",
       "kind": "choice",
       "unit": "key",
@@ -1533,6 +1561,13 @@
       "cover": "none",
       "obstruction": "none",
       "reason": "Its panels are set into the building within its base ring, and its awning stands at least the capsule height above the base (facade_clearance)."
+    },
+    {
+      "kind": "city.interior_backing",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A room's near wall inside its building, behind glazing."
     },
     {
       "kind": "city.junction",

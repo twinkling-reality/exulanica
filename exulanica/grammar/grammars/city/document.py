@@ -137,7 +137,7 @@ from exulanica.grammar.grammars.city.tile import (
 from exulanica.grammar.grammars.city.tile import (
     SHAPE as TILE_SHAPE,
 )
-from exulanica.grammar.grammars.city.vitrine import VitrineRecord
+from exulanica.grammar.grammars.city.vitrine import InteriorBackingRecord, VitrineRecord
 from exulanica.grammar.records import record_payload, require_identity
 
 __all__ = [
@@ -203,6 +203,7 @@ ANCHOR_OWNER_FIELDS: Final[Mapping[type, str]] = {
     GroundBayRecord: "facade_identity",
     EntranceRecord: "facade_identity",
     VitrineRecord: "building_identity",
+    InteriorBackingRecord: "building_identity",
 }
 #: Record kinds anchored by their own fields, which no absent owner can leave unanchored.
 OWN_ANCHOR_KINDS: Final = (
@@ -1677,6 +1678,59 @@ class _Checker:
                 ):
                     raise _fail("vitrine", f"{where}'s fitout leaves its box")
 
+    def check_backings(self) -> None:
+        """What lies behind a face's glass: one plane per glazed face, covering every opening.
+
+        A face with openings and no backing is glass with the far side of the building behind it,
+        which is the thing this record exists to stop. The plane stands behind the deepest reveal
+        (so it is behind the glass, never in front of it) and its band covers every opening the
+        face has, so no opening looks past its edge.
+        """
+        backings: dict[str, InteriorBackingRecord] = {}
+        for backing in self.of(InteriorBackingRecord):
+            where = f"interior backing {backing.identity}"
+            if backing.facade_identity in backings:
+                raise _fail("behind_glazing", f"{where} is a second backing for one face")
+            backings[backing.facade_identity] = backing
+            facade = self.carried(backing.facade_identity)
+            if facade is None:
+                continue
+            if facade.building_identity != backing.building_identity:
+                raise _fail("behind_glazing", f"{where} names a face and building that disagree")
+            if not facade.openings:
+                raise _fail("behind_glazing", f"{where} stands behind a face with no openings")
+            if backing.u_start_mm or backing.width_mm != facade.run_length_mm:
+                raise _fail("behind_glazing", f"{where} does not run the whole face")
+            building = self.carried(facade.building_identity)
+            if building is None:
+                continue
+            bottom, top = backing.sill_mm, backing.sill_mm + backing.height_mm
+            for grid in facade.openings:
+                if backing.depth_mm <= grid.reveal_depth_mm:
+                    raise _fail(
+                        "behind_glazing",
+                        f"{where} stands {backing.depth_mm} mm back, no deeper than the "
+                        f"{grid.reveal_depth_mm} mm reveal in front of it",
+                    )
+                for storey in grid.storeys:
+                    floor = building.ground_storey_height_mm + (
+                        (storey - 1) * building.upper_storey_height_mm
+                    )
+                    sill = floor + grid.sill_height_mm
+                    head = sill + grid.height_mm + grid.head_rise_mm
+                    if sill < bottom or head > top:
+                        raise _fail(
+                            "behind_glazing",
+                            f"{where} covers {bottom} to {top} mm and storey {storey}'s opening "
+                            f"reaches {sill} to {head} mm",
+                        )
+        for facade in self.of(FacadeRecord):
+            if facade.openings and facade.identity not in backings:
+                raise _fail(
+                    "behind_glazing",
+                    f"facade {facade.identity} has openings and nothing behind its glass",
+                )
+
     def check_premises(self) -> None:
         for premises in self.of(PremisesRecord):
             building = self.get(premises.building_identity)
@@ -1739,6 +1793,7 @@ _CHECKS: Final[tuple[Callable[[_Checker], None], ...]] = (
     _Checker.check_materials,
     _Checker.check_streetlife,
     _Checker.check_vitrines,
+    _Checker.check_backings,
     _Checker.check_premises,
     _Checker.check_terrain,
 )

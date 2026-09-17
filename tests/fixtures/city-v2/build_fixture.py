@@ -91,7 +91,7 @@ from exulanica.grammar.grammars.city.tile import (
     GrammarPin,
     TileRecord,
 )
-from exulanica.grammar.grammars.city.vitrine import VitrineRecord
+from exulanica.grammar.grammars.city.vitrine import InteriorBackingRecord, VitrineRecord
 from exulanica.grammar.parameters import ParameterBinding
 from exulanica.grammar.shapes import describe_shapes
 from exulanica.grammar.subjects import subject_identity
@@ -1373,6 +1373,44 @@ def vitrine(bay_record: GroundBayRecord, face: Face, fitout: str, units: int, li
     )
 
 
+# One plane behind each face that has openings: the near wall of the rooms behind it. Its band is
+# what the face's openings reach, by the rule in `exulanica.grammar.grammars.city.vitrine`.
+BACKING_DEPTH_MM = 800
+BACKING_LIGHT = 120_000
+
+
+def backing(face: Face) -> InteriorBackingRecord:
+    sills, heads = [], []
+    for grid in face.openings:
+        for storey in grid.storeys:
+            floor = GROUND + (storey - 1) * UPPER
+            sill = floor + grid.sill_height_mm
+            sills.append(sill)
+            heads.append(sill + grid.height_mm + grid.head_rise_mm)
+    sill, height = min(sills), max(heads) - min(sills)
+    dx, dy = face.end[0] - face.start[0], face.end[1] - face.start[1]
+    inward = (-((dy > 0) - (dy < 0)), (dx > 0) - (dx < 0))
+    xs = [face.start[0], face.end[0]]
+    ys = [face.start[1], face.end[1]]
+    xs += [x + inward[0] * BACKING_DEPTH_MM for x in xs]
+    ys += [y + inward[1] * BACKING_DEPTH_MM for y in ys]
+    return InteriorBackingRecord(
+        identity("interior_backing", face.identity, 0),
+        face.identity,
+        BUILDING,
+        0,
+        face.run,
+        sill,
+        height,
+        BACKING_DEPTH_MM,
+        BACKING_LIGHT,
+        Extent(min(xs), min(ys), BASE + sill, max(xs), max(ys), BASE + sill + height),
+    )
+
+
+backings = [backing(face) for face in FACES if face.openings]
+
+
 VITRINE_Z = (BASE + 600, BASE + 3_200)
 vitrines = [
     vitrine(
@@ -1763,6 +1801,7 @@ OWNED = [
     *furniture,
     *trees,
     *vitrines,
+    *backings,
     *premises,
     terrain,
 ]
