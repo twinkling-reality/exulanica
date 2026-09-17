@@ -236,6 +236,20 @@ export class CharacterHost {
     return CharacterHost.forApp(app, catalog);
   }
 
+  /**
+   * What a shared host already holds for this device, and nothing when no character has been drawn.
+   *
+   * Read by anyone accounting for character memory: containers, packs and materials are shared
+   * between people, so they belong to the host and are counted once, never once per person.
+   */
+  static residentFor(device: pc.GraphicsDevice): { readonly geometryBytes: number; readonly textureBytes: number } {
+    const app = applicationOf(device);
+    const host = app ? HOSTS.get(app) : undefined;
+    return host && !host.destroyed
+      ? { geometryBytes: host.residentGeometryBytes, textureBytes: host.residentTextureBytes }
+      : { geometryBytes: 0, textureBytes: 0 };
+  }
+
   get hasLoader(): boolean {
     return this.loader !== null;
   }

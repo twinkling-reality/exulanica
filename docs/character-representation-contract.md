@@ -276,6 +276,17 @@ would say nothing. A full character costs 0.18 ms of that work at the 95th perce
 about 0.01 ms. Character texture memory is 145 MB at 24 full characters and 190 MB at 64; a far figure
 adds a 5x1 palette and shares one sculpt per body.
 
+A person can also be carried instead of posed: `follow(position)` moves the body to a new ground
+contact and keeps the pose it has, the clips still playing, and the caller hands the time it skipped
+to the next `pose`, which then reads speed over the whole gap. Measured 2026-09-17 with 24 loaded
+people, alternating blocks: a solved pose costs 2.6 microseconds of the renderable's own work per
+person and a carried frame at most 0.1, so carrying saves about 2.5 microseconds a person a frame.
+That is 1.5 per cent of what a person costs: the other 98 per cent is the engine's animation and
+skinning, which runs for every drawn person whether or not anyone posed them. Carrying is therefore
+worth offering and is not a lever on the budget; the levers would be fewer instances or bones per
+person, or stopping a distant person's animation, each of which changes how a person looks and needs
+its own decision. The run is retained as `follow-saving-2026-09-17.log.txt` beside the budget run.
+
 The rule, fixed before the run: the budget is the largest measured count whose work p95 stays within
 half a 60 Hz frame, 8.3 ms, with presented frames still at 60 Hz. The other half is left for the city,
 the society simulation, the interface and machines slower than this one. That gives 24; 36 is the

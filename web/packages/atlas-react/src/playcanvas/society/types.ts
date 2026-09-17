@@ -81,22 +81,37 @@ export interface CrowdPose {
 }
 
 /**
- * The seam to the character lane's public renderable. It carries only what the crowd uses, so
- * the character lane's `inhabitantRenderable` satisfies it unchanged when it lands.
+ * What the crowd needs of anything that draws one person. Two kinds satisfy it today: the abstract
+ * character in this folder, and the character lane's `inhabitantRenderable`, whose people are
+ * composed from shared catalog containers. What the two do not share is optional here, and absence
+ * means something in every case, stated per member: a reader must never read a missing member as
+ * zero or as nothing.
  */
 export interface CrowdRenderable {
   readonly root: pc.Entity;
   readonly subject: CharacterSubject;
-  readonly representation: ResolvedCharacterRepresentation;
+  /**
+   * Optional: the resolved representation, for a renderable that draws one. A catalog person is
+   * described by its look and that look's digest instead and omits this; the crowd then reports no
+   * representation for that inhabitant rather than an empty one.
+   */
+  readonly representation?: ResolvedCharacterRepresentation;
   readonly standingHeight: number;
   readonly facing: number;
-  readonly residentBytes: number;
-  readonly textureResidentBytes: number;
+  /**
+   * Optional: bytes this renderable owns outright, for a renderable that holds its own geometry and
+   * textures. A renderable drawn from shared containers omits both, because its bytes belong to the
+   * shared host and counting them here would count one container once per person. The crowd's total
+   * is therefore what is reported here plus what the shared host holds, never one instead of the
+   * other.
+   */
+  readonly residentBytes?: number;
+  readonly textureResidentBytes?: number;
   pose(pose: CrowdPose): void;
   /**
    * Optional: carry the last pose to a new ground contact without solving a new one. A renderable
-   * that offers it may be posed on fewer frames than it is drawn; one without it is posed every
-   * frame.
+   * that offers it may be posed on fewer frames than it is drawn, and is handed the time skipped at
+   * its next pose; one without it is posed every frame.
    */
   follow?(position: readonly [number, number, number]): void;
   setVisible(visible: boolean): void;

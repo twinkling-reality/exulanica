@@ -32,6 +32,20 @@ export interface CharacterRenderable {
   readonly standingHeight: number;
   readonly facing: number;
   pose(pose: CharacterPose): void;
+  /**
+   * Carry the body to a new ground contact without solving a new pose.
+   *
+   * The clips keep playing, so the figure still moves; what is skipped is the per-frame solving:
+   * speed and heading, the gait, the foot contact lock. A caller that carries between poses must
+   * add up the time it skipped and hand it to the next `pose`, which then reads speed over the
+   * whole gap rather than over one frame.
+   *
+   * Measured 2026-09-17: a pose costs 2.6 microseconds of this work per person, a carry at most 0.1.
+   * That saving is 1.5 per cent of what a drawn person costs a frame, because the engine animates
+   * and skins every drawn person whether or not it was posed
+   * (test/character-evidence/follow-saving-2026-09-17.log.txt).
+   */
+  follow(position: readonly [number, number, number]): void;
   setDetail(detail: CharacterDetail): void;
   setVisible(visible: boolean): void;
   destroy(): void;
@@ -155,6 +169,15 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     this.shown = form;
     this.far.root.enabled = form === 'far';
     if (this.near) this.near.setVisible(form === 'near' && this.visible);
+  }
+
+  follow(position: readonly [number, number, number]): void {
+    if (this.disposed) return;
+    const [x, y, z] = position;
+    if (![x, y, z].every(Number.isFinite)) throw new TypeError('Character pose must be finite');
+    // `previous` stays where the last pose left it, so the next pose reads the travel of the whole
+    // gap against the time the caller accumulated, and the gait keeps matching the ground.
+    this.root.setLocalPosition(x, y, z);
   }
 
   setDetail(detail: CharacterDetail): void {

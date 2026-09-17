@@ -3,6 +3,8 @@ import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { sampleMotionPath } from '../society-presentation.js';
 import { FarFigures } from './far-figures.js';
 import { abstractInhabitantRenderable } from './near-character.js';
+import { NEAR_CHARACTER_BUDGET } from '../character/budget.js';
+import { CharacterHost } from '../character/host.js';
 import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from './types.js';
 
 /**
@@ -24,7 +26,7 @@ import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from 
  * carried to their recorded point in between. A selected inhabitant is posed every frame.
  */
 export interface CrowdOptions {
-  /** Full characters at most; the native character runtime admits 24 synthetic residents. */
+  /** Full characters at most; the measured character budget (NEAR_CHARACTER_BUDGET) is the ceiling. */
   readonly nearLimit?: number;
   /** Full characters only within this many metres of the observer. */
   readonly nearRadius?: number;
@@ -58,7 +60,8 @@ interface Walker {
   facing: number;
 }
 
-const NEAR_LIMIT = 24;
+/** The measured ceiling on people drawn in full at once, the player's own body included. */
+const NEAR_LIMIT = NEAR_CHARACTER_BUDGET;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
 /**
@@ -269,16 +272,23 @@ export class SocietyCrowd {
     return this.near.get(id)?.representation ?? null;
   }
 
+  /**
+   * Geometry the drawn crowd is responsible for: the far figures, whatever each full character owns
+   * outright, and what the shared character host holds for everyone composed from the catalog.
+   * A renderable that draws from shared containers reports no bytes of its own, so adding only the
+   * renderables would miss those people entirely, and asking each of them for the shared total
+   * would count one container once per person.
+   */
   get residentBytes(): number {
     let bytes = this.far.residentBytes;
-    for (const renderable of this.near.values()) bytes += renderable.residentBytes;
-    return bytes;
+    for (const renderable of this.near.values()) bytes += renderable.residentBytes ?? 0;
+    return bytes + CharacterHost.residentFor(this.device).geometryBytes;
   }
 
   get textureResidentBytes(): number {
     let bytes = 0;
-    for (const renderable of this.near.values()) bytes += renderable.textureResidentBytes;
-    return bytes;
+    for (const renderable of this.near.values()) bytes += renderable.textureResidentBytes ?? 0;
+    return bytes + CharacterHost.residentFor(this.device).textureBytes;
   }
 
   nativeFrames(deltaSeconds: number, reducedMotion: boolean): readonly NativeCharacterFrame[] {

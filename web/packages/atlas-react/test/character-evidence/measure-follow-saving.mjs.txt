@@ -1,0 +1,73 @@
+// What a carried frame saves for a catalog person: the cost of pose() against follow(), per person
+// per frame, measured on real loaded people in the running preview. Run inside quiet-slot + gpu-slot
+// with the preview server already running. Prints one JSON line per block and one summary line.
+import { setTimeout as sleep } from 'node:timers/promises';
+import { execSync } from 'node:child_process';
+import { launch, navigate } from '../audit-2026-09-16/cdp.mjs';
+
+const [, , appOrigin, portText, nearText = '24', blocksText = '6', callsText = '400'] = process.argv;
+const near = Number(nearText), blocks = Number(blocksText), calls = Number(callsText);
+const load = () => execSync('uptime').toString().replace(/.*load averages?: /, '').trim();
+const browser = await launch({ port: Number(portText ?? 9613), profile: `${process.env.SCRATCH ?? '/tmp'}/follow-profile-${portText}` });
+const out = (value) => console.log(JSON.stringify(value));
+try {
+  await navigate(browser, `${appOrigin}/?preview=1`, { settleMs: 500 });
+  for (let i = 0; i < 240; i += 1) {
+    if (await browser.evaluate(`!!document.getElementById('atlas')?.dataset.societyPopulation`).catch(() => false)) break;
+    await sleep(500);
+  }
+  await browser.evaluate(`(async () => {
+    const url = performance.getEntriesByType('resource').map(e => e.name).find(n => /\\/playcanvas\\.js\\?v=/.test(n));
+    const pc = await import(url); window.__pc = pc; window.__app = pc.AppBase.getApplication('atlas');
+    window.__evaluation = await import('/@fs/Users/glendonchin/dev/Technology/exulanica-characters/web/packages/atlas-react/src/playcanvas/character/evaluation.ts');
+  })()`);
+  const fn = await browser.send('Runtime.evaluate', { expression: `window.__app._callbacks.get('update')[0].callback` });
+  const props = await browser.send('Runtime.getProperties', { objectId: fn.result.objectId, ownProperties: false });
+  const scopes = props.internalProperties.find((p) => p.name === '[[Scopes]]');
+  const scopeList = await browser.send('Runtime.getProperties', { objectId: scopes.value.objectId });
+  for (const scope of scopeList.result) {
+    if (!scope.value?.objectId) continue;
+    const vars = await browser.send('Runtime.getProperties', { objectId: scope.value.objectId });
+    const binding = vars.result.find((v) => v.name === 'binding' && v.value?.objectId);
+    if (binding) { await browser.send('Runtime.callFunctionOn', { objectId: binding.value.objectId, functionDeclaration: 'function(){ window.__binding = this; }' }); break; }
+  }
+  await browser.evaluate(`(() => {
+    window.__crowd?.destroy();
+    window.__crowd = window.__evaluation.CharacterCrowdEvaluation.mount(window.__binding, { count: ${near}, nearBudget: ${near}, walkers: 4 });
+  })()`);
+  let counts = null;
+  for (let i = 0; i < 480; i += 1) {
+    counts = await browser.evaluate(`window.__crowd.counts`);
+    if (counts.near === near && counts.pending === 0) break;
+    await sleep(250);
+  }
+  out({ environment: await browser.evaluate(`(() => {
+    const gl = document.createElement('canvas').getContext('webgl2'); const x = gl.getExtension('WEBGL_debug_renderer_info');
+    return { gpu: gl.getParameter(x.UNMASKED_RENDERER_WEBGL), canvas: [document.getElementById('atlas').width, document.getElementById('atlas').height], people: ${near}, counts: window.__crowd.counts };
+  })()`), loadBefore: load() });
+  // Alternate blocks so a warming cache or a drifting machine cannot favour one of the two.
+  for (let block = 0; block < blocks; block += 1) {
+    const result = await browser.evaluate(`(() => {
+      const people = window.__crowd.figures.map((f) => f.renderable).filter((r) => r.detail === 'near');
+      const at = (i, k) => [Math.sin(i) * 3 + k * 0.02, 0, Math.cos(i) * 3 + k * 0.012];
+      const run = (what) => {
+        // One call per person per iteration, the way a crowd drives them frame by frame.
+        const start = performance.now();
+        for (let k = 0; k < ${calls}; k++) {
+          for (let i = 0; i < people.length; i++) {
+            if (what === 'pose') people[i].pose({ position: at(i, k), deltaSeconds: 1 / 60 });
+            else people[i].follow(at(i, k));
+          }
+        }
+        return (performance.now() - start) * 1000 / (${calls} * people.length);
+      };
+      const first = ${block} % 2 === 0 ? 'pose' : 'follow';
+      const a = run(first), b = run(first === 'pose' ? 'follow' : 'pose');
+      return { people: people.length, poseMicroseconds: first === 'pose' ? a : b, followMicroseconds: first === 'pose' ? b : a, first };
+    })()`);
+    out({ block, ...result });
+  }
+  out({ loadAfter: load() });
+} finally {
+  await browser.close();
+}

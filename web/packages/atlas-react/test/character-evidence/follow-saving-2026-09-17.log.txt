@@ -1,0 +1,46 @@
+WHAT A CARRIED FRAME SAVES FOR A CATALOG PERSON, 2026-09-17.
+
+What ran: the development preview in headless Chrome 152 on an Apple M3 Pro, canvas 1440x900, with 24
+catalog people loaded and drawn in full (none pending, none far). Six blocks; each block calls
+pose({position, deltaSeconds}) once per person for 400 iterations and follow(position) the same
+number of times, and the two arms swap order every block so a warming cache or a drifting machine
+cannot favour one. Figures are microseconds of the renderable's own work per person per call.
+
+Both machine-wide slots were held, but the one-minute load was 17.9, above the 8 under which absolute
+timings here are trustworthy. That does not touch the comparison: the two arms run milliseconds apart
+inside one block and alternate across blocks, and the six blocks agree to within 0.26 microseconds for
+pose. Read the absolute microseconds as upper bounds.
+
+RESULT: a solved pose costs about 2.6 microseconds per person (2.55 to 2.81 across blocks). A carried
+frame costs about 0.1 microseconds (0.05 to 0.15), which is the page clock's own resolution floor over
+9,600 calls, so it is an upper bound rather than a measurement. Carrying therefore saves about
+2.5 microseconds per person per carried frame: 0.06 ms a frame with 24 people posed every frame
+against 0.003 ms with all of them carried.
+
+WHAT THAT MEANS, AND IT IS NOT WHAT I EXPECTED: a catalog person costs 0.18 ms of frame work at the
+95th percentile (see frame-budget-2026-09-17.log.txt), so the pose solve is about 1.5 per cent of what
+that person costs. The rest is the engine's own work: the animation graph, the bone matrices and the
+skinning, which run for every drawn person whether or not anyone posed them. Posing on fewer frames is
+worth having and costs nothing to offer, but it is not a lever on the character budget. The levers
+would be fewer mesh instances or bones per person, or stopping a distant person's animation, and each
+of those changes what the person looks like, so each needs its own decision and its own measurement.
+
+Command, from the worktree with the preview server on 127.0.0.1:5241 (harness retained beside this
+file as measure-follow-saving.mjs.txt):
+  .exulanica/bin/quiet-slot .exulanica/bin/gpu-slot \
+    node measure-follow-saving.mjs http://127.0.0.1:5241 9613 24 6 400
+
+quiet-slot: waiting for the machine-wide slot at 18:00:24 from /Users/glendonchin/dev/Technology/exulanica-characters
+quiet-slot: slot taken at 18:01:51; load 18.38 25.52 21.57
+gpu-slot: waiting for the machine-wide GPU slot at 18:01:51 from /Users/glendonchin/dev/Technology/exulanica-characters
+gpu-slot: slot taken at 18:01:51; load 18.38 25.52 21.57
+{"environment":{"gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)","canvas":[1440,900],"people":24,"counts":{"near":24,"far":0,"pending":0,"unavailable":0}},"loadBefore":"17.95 25.31 21.52"}
+{"block":0,"people":24,"poseMicroseconds":2.7500000099341073,"followMicroseconds":0.10416666666666667,"first":"pose"}
+{"block":1,"people":24,"poseMicroseconds":2.8125,"followMicroseconds":0.14583333084980646,"first":"follow"}
+{"block":2,"people":24,"poseMicroseconds":2.583333340783914,"followMicroseconds":0.052083333333333336,"first":"pose"}
+{"block":3,"people":24,"poseMicroseconds":2.5729166716337204,"followMicroseconds":0.10416666666666667,"first":"follow"}
+{"block":4,"people":24,"poseMicroseconds":2.6041666666666665,"followMicroseconds":0.052083333333333336,"first":"pose"}
+{"block":5,"people":24,"poseMicroseconds":2.5520833333333335,"followMicroseconds":0.10416666666666667,"first":"follow"}
+{"loadAfter":"17.95 25.31 21.52"}
+gpu-slot: finished at 18:01:57 with exit 0; load 17.95 25.31 21.52
+quiet-slot: finished at 18:01:57 with exit 0; load 17.95 25.31 21.52

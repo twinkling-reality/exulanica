@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd, type PoseInterval } from '../src/playcanvas/society/crowd.js';
+import { CharacterHost } from '../src/playcanvas/character/host.js';
 import { abstractInhabitantRenderable } from '../src/playcanvas/society/near-character.js';
 import type {
   CrowdPose,
@@ -28,6 +29,23 @@ function setup(factory?: CrowdRenderableFactory, nearLimit?: number, poseInterva
   return { crowd, app, root };
 }
 
+/** People drawn from shared containers: no bytes of their own, as the seam allows. */
+function sharedContainerFactory(): CrowdRenderableFactory {
+  return (_device, parent, identity) => {
+    const root = new pc.Entity(`shared:${identity.inhabitantId}`);
+    parent.addChild(root);
+    return {
+      root,
+      subject: { kind: 'synthetic-inhabitant', ...identity },
+      standingHeight: 1.8,
+      facing: 0,
+      pose: (pose) => root.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]),
+      setVisible: (visible) => { root.enabled = visible; },
+      destroy: () => root.destroy(),
+    };
+  };
+}
+
 function fakeFactory(log: { identity: unknown; detail: string; poses: CrowdPose[] }[]): CrowdRenderableFactory {
   return (_device, parent, identity, detail) => {
     const entry = { identity, detail, poses: [] as CrowdPose[] };
@@ -37,7 +55,6 @@ function fakeFactory(log: { identity: unknown; detail: string; poses: CrowdPose[
     const renderable: CrowdRenderable = {
       root,
       subject: { kind: 'synthetic-inhabitant', ...identity },
-      representation: null as never,
       standingHeight: 1.8,
       facing: 0,
       residentBytes: 10,
@@ -74,7 +91,6 @@ function cadenceScenario(poseInterval?: PoseInterval) {
     return {
       root,
       subject: { kind: 'synthetic-inhabitant', ...identity },
-      representation: null as never,
       standingHeight: 1.8,
       facing: 0,
       residentBytes: 10,
@@ -273,6 +289,45 @@ describe('society crowd', () => {
     expect(window.poses.get('p001')!.length).toBe(20);
     crowd.destroy();
     app.destroy();
+  });
+
+  it('counts the bytes a renderable owns and the bytes the shared host holds, never one instead of the other', () => {
+    const people = Array.from({ length: 6 }, (_, i) => ({
+      id: `synthetic-${i}`,
+      synthetic: true as const,
+      position_mm: [i * 1000, 0] as const,
+    }));
+    const shared = vi.spyOn(CharacterHost, 'residentFor');
+    shared.mockReturnValue({ geometryBytes: 0, textureBytes: 0 });
+
+    // Nobody drawn in full: far figures cost geometry and no character textures at all.
+    const far = setup(fakeFactory([]), 0);
+    far.crowd.set(v4(0, people), [0, 0]);
+    expect(far.crowd.residentBytes).toBeGreaterThan(0);
+    expect(far.crowd.textureResidentBytes).toBe(0);
+
+    // Four drawn in full by renderables that own their geometry: each one's bytes are added.
+    const owning = setup(fakeFactory([]), 4);
+    expect(owning.crowd.set(v4(0, people), [0, 0])).toMatchObject({ near: 4, far: 2 });
+    expect(owning.crowd.textureResidentBytes).toBe(4 * 1);
+    // Whatever the two far figures cost, read while the shared host holds nothing.
+    const figures = owning.crowd.residentBytes - 4 * 10;
+    expect(figures).toBeGreaterThan(0);
+
+    // The same four drawn from shared containers: they report nothing of their own, so the crowd
+    // adds what the shared host holds, once for the whole crowd rather than once for each person.
+    shared.mockReturnValue({ geometryBytes: 4096, textureBytes: 2048 });
+    const fromHost = setup(sharedContainerFactory(), 4);
+    expect(fromHost.crowd.set(v4(0, people), [0, 0])).toMatchObject({ near: 4, far: 2 });
+    expect(fromHost.crowd.textureResidentBytes).toBe(2048);
+
+    // Same population and the same split, so the far figures cost the same in both: what is left
+    // over is exactly what each kind reports, and neither kind reports the other's bytes.
+    expect(fromHost.crowd.residentBytes).toBe(figures + 4096);
+    expect(owning.crowd.residentBytes).toBe(figures + 4 * 10 + 4096);
+
+    shared.mockRestore();
+    for (const { crowd, app } of [far, owning, fromHost]) { crowd.destroy(); app.destroy(); }
   });
 
   it('draws far figures with one instanced draw per palette', () => {
