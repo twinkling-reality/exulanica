@@ -1,0 +1,22 @@
+# ring clearance mutation run, 2026-09-17, against test/ring-clearance.test.ts
+# baseline 4ba162e9, survivors rerun on f4d5d61a, which samples every sixteenth of a millimetre
+# round each band's far corners.
+no corner margin                killed   3 failed | 3 passed
+chords assumed clear            killed   2 failed | 4 passed
+band steps inward               killed   4 failed | 2 passed
+ring itself left out            killed   3 failed | 3 passed
+normal turned inward            killed   4 failed | 2 passed
+no band slant in corners        survived, kept deliberately. Where a band's outward step leans along
+  its edge it leaves a lens at the far corner, no wider than the lean and about one over the radius
+  tall. A corner hull's own millimetre of margin covers that lens in every case tested, at radii 1 to
+  340, including the sixteenth-of-a-millimetre sampling written for it; the slant allowance makes the
+  cover certain by construction rather than by that margin happening to be enough.
+first step, not least           survived, equivalent within the stated bound: taking the first step
+  that reaches rather than the least leaves the claims true, with more taken beyond, still under five
+  millimetres.
+step may point inward           survived: a guard. The corner rule's floored point never points
+  inward for a normal, so the check never fires; it stays because nothing else would catch it.
+no convex walk                  survived: a guard. The steps round a corner come out convex, so
+  hulling them changes nothing here; it stays so a walk that did not would still be convex.
+one bisection fewer             survived, equivalent: the loop searches every second count instead of
+  every count and finds one that passes its own chord check.
