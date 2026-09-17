@@ -191,8 +191,10 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
     edge_ids = {e["edge_id"]: e for e in document["edges"]}
     for crossing in document["crossings"]:
         _require(
-            set(crossing) == {"crossing_id", "edge_id", "street_segment_ordinal", "offset_mm"}
+            set(crossing)
+            == {"crossing_id", "edge_id", "street_segment_ordinal", "offset_mm", "signal_id"}
             and _text(crossing["crossing_id"])
+            and (crossing["signal_id"] is None or _text(crossing["signal_id"]))
             and crossing["edge_id"] in edge_ids
             and edge_ids[crossing["edge_id"]]["kind"] == "crossing"
             and _int(crossing["street_segment_ordinal"], 0)

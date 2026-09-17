@@ -279,6 +279,7 @@ def place_from_city_records(
                     "edge_id": edge_id,
                     "street_segment_ordinal": o,
                     "offset_mm": offset,
+                    "signal_id": None,
                 }
             )
     for ordinal in sorted(street_nodes):
