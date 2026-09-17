@@ -7,6 +7,8 @@ import { parseTextureSetManifest, textureSetBlobPath, type TextureSetDigest } fr
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import {
   TileTextureLibrary,
+  normalTexels,
+  prepareTextureSet,
   setTangents,
   surfaceUv,
   unavailableUv,
@@ -176,6 +178,64 @@ describe('generated tile materials from texture sets', () => {
     expect(resolved.material.heightMap?.format).toBe(pc.PIXELFORMAT_R8);
     expect(resolved.material.heightMapFactor).toBe(0.01);
     lib.destroy();
+  });
+});
+
+describe('drawing a set by its material class', () => {
+  // The texture lane's shared v2 fixtures, one container per class, read by path.
+  const CONFORMANCE = 'packages/loom-texture/test/conformance/';
+  const fixtures = parseTextureSetManifest(new Uint8Array(readFileSync(`${CONFORMANCE}manifest.json`)));
+  const fixtureLibrary = () => new TileTextureLibrary(device(), TILE_LOOK_V1, fixtures, async (entry) =>
+    new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
+
+  it('draws opaque sets of either profile and maker, and every other class as the stated unavailable surface', async () => {
+    const textures = fixtureLibrary();
+    const drawn: Record<string, string> = {};
+    for (const entry of fixtures.sets) {
+      const resolution = await textures.resolve(entry.setId);
+      drawn[entry.setId] = resolution.state === 'available' ? 'available' : resolution.reason;
+      if (resolution.state === 'unavailable') expect(resolution.material).toBe(textures.unavailableMaterial);
+    }
+    expect(drawn).toEqual({
+      'fixture.cutout': 'material class cutout is not drawn by this runtime',
+      'fixture.decal': 'material class decal is not drawn by this runtime',
+      'fixture.glazing': 'material class glazing is not drawn by this runtime',
+      'fixture.legacy-opaque': 'available',
+      'fixture.model-opaque': 'available',
+      'fixture.opaque': 'available',
+    });
+    // Nothing of a class it does not draw is uploaded.
+    expect(textures.resolvedSetIds).toEqual(['fixture.legacy-opaque', 'fixture.model-opaque', 'fixture.opaque']);
+    textures.destroy();
+  });
+
+  it('binds a two-component normal with its z rebuilt, and a three-component normal as stored', async () => {
+    const textures = fixtureLibrary();
+    const procedural = await textures.resolve('fixture.opaque');
+    const model = await textures.resolve('fixture.model-opaque');
+    if (procedural.state !== 'available' || model.state !== 'available') throw new Error('both opaque fixtures draw');
+    expect(procedural.material.normalMap).not.toBeNull();
+    expect(procedural.material.heightMap).toBeNull();
+    const stored = procedural.set.maps.normal!;
+    const rebuilt = normalTexels(procedural.set)!;
+    expect(rebuilt.length).toBe((stored.length / 2) * 4);
+    for (let texel = 0; texel < stored.length / 2; texel += 1) {
+      const x = (2 * stored[texel * 2]!) / 255 - 1;
+      const y = (2 * stored[texel * 2 + 1]!) / 255 - 1;
+      const z = Math.sqrt(Math.max(0, 1 - x * x - y * y));
+      expect([...rebuilt.subarray(texel * 4, texel * 4 + 4)])
+        .toEqual([stored[texel * 2], stored[texel * 2 + 1], Math.round(((z + 1) / 2) * 255), 255]);
+    }
+    const three = model.set.maps.normal!;
+    const widened = normalTexels(model.set)!;
+    expect([...widened.subarray(0, 8)]).toEqual([three[0], three[1], three[2], 255, three[3], three[4], three[5], 255]);
+    textures.destroy();
+  });
+
+  it('prepares and verifies a set of any class; drawing it is the binding\'s decision', async () => {
+    const glazing = await prepareTextureSet(fixtures, 'fixture.glazing', async (entry) =>
+      new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
+    expect(glazing.state === 'decoded' && glazing.set.classParameters).toEqual({ materialClass: 'glazing', iorMillionths: 1_500_000, doubleSided: false });
   });
 });
 

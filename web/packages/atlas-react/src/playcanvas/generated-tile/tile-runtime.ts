@@ -24,6 +24,7 @@ import {
   prepareTextureSet,
   surfaceUv,
   unavailableUv,
+  undrawnClassReason,
   type PreparedTextureSet,
   type TileMaterialReference,
 } from './texture-materials.js';
@@ -51,7 +52,8 @@ import {
  * `surface_material` record that states its placement (version 2) and whose texture set is pinned and
  * verifies; its UVs come from the container's own surface coordinates through `surfaceUv`. A surface
  * whose material is `none-exists` (exact geometry no material record dresses) is drawn, as the stated
- * unavailable surface, and so is a surface whose material cannot be resolved; the reason is kept.
+ * unavailable surface, and so is a surface whose material cannot be resolved or whose set's material
+ * class this runtime does not draw; the reason is kept.
  * Surfaces are batched by what they are drawn with, so a set is still one draw. An `unavailable`
  * entry is geometry the tessellator has not produced yet: it has no triangles and is listed with the
  * needs tess stated.
@@ -236,7 +238,8 @@ async function plan(
             ? read
             : set === undefined
               ? `Texture set ${read.textureSetId} was not prepared.`
-              : set.state === 'refused' ? set.reason : null;
+              // A set that is refused, or whose material class this runtime does not draw, is unavailable.
+              : set.state === 'refused' ? set.reason : undrawnClassReason(set.set);
           const drawn: GeneratedTileSurface = {
             role: surface.role,
             orientation: surface.orientation,

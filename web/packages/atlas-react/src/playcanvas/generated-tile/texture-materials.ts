@@ -28,10 +28,16 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * the repeat length, so a non-square set (the kerb is 1800 by 450 mm) keeps its proportions under
  * rotation. There is no other scale anywhere, and no constant that guesses one.
  *
- * WHAT A SET BECOMES. base_color is uploaded as sRGB; normal, orm and height as linear bytes. The
- * orm map drives three material inputs from its three channels: occlusion (red), roughness (green,
- * inverted into PlayCanvas's gloss) and metalness (blue). The height map is uploaded only when the
- * look turns parallax on, so an unused map costs no memory.
+ * WHAT A SET BECOMES. A set is drawn by its material class and by nothing else. This runtime draws
+ * `opaque` sets, of either container profile; every other class (`cutout`, `decal`, `glazing`) is
+ * the stated unavailable surface with the reason {@link undrawnClassReason} gives, so glazing is never
+ * drawn as opaque. For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
+ * bytes. A two-component normal (a procedural v2 set) gets its z rebuilt where it is uploaded,
+ * z = sqrt(max(0, 1 - x * x - y * y)), in arithmetic that enters no digest; a model-made set that
+ * produced no normal map draws without one. The orm map drives three material inputs from its three
+ * channels: occlusion (red), roughness (green, inverted into PlayCanvas's gloss) and metalness (blue).
+ * The height map is uploaded only when the look turns parallax on and the set ships one, so an unused
+ * map costs no memory.
  *
  * A SET THAT DOES NOT RESOLVE draws the stated unavailable surface, with the refusal's reason kept
  * for whoever reports it. There is no default set, no flat colour and no retry with a looser check.
@@ -124,6 +130,37 @@ function rgbToRgba(rgb: Uint8Array): Uint8Array {
     out[to + 1] = rgb[from + 1]!;
     out[to + 2] = rgb[from + 2]!;
     out[to + 3] = 255;
+  }
+  return out;
+}
+
+/** Why a decoded set is not drawn by this runtime, or null when its class is one it draws. */
+export function undrawnClassReason(set: Pick<DecodedTextureSet, 'materialClass'>): string | null {
+  return set.materialClass === 'opaque' ? null : `material class ${set.materialClass} is not drawn by this runtime`;
+}
+
+/**
+ * The normal map as RGBA bytes: a three-component map is widened as stored; a two-component map gets
+ * its z rebuilt from x and y, since a tangent-space normal points out of its surface. The renderer
+ * normalises what it samples.
+ */
+export function normalTexels(set: DecodedTextureSet): Uint8Array | null {
+  const normal = set.maps.normal;
+  if (normal === undefined) return null;
+  const components = set.channels.find((channel) => channel.map === 'normal')!.components;
+  if (components === 3) return rgbToRgba(normal);
+  const texels = normal.length / 2;
+  const out = new Uint8Array(texels * 4);
+  for (let texel = 0; texel < texels; texel += 1) {
+    const x = normal[texel * 2]!;
+    const y = normal[texel * 2 + 1]!;
+    const nx = (2 * x) / 255 - 1;
+    const ny = (2 * y) / 255 - 1;
+    const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+    out[texel * 4] = x;
+    out[texel * 4 + 1] = y;
+    out[texel * 4 + 2] = Math.round(((nz + 1) / 2) * 255);
+    out[texel * 4 + 3] = 255;
   }
   return out;
 }
@@ -221,6 +258,10 @@ export class TileTextureUploads {
     if (prepared.state === 'refused') {
       return { state: 'unavailable', setId: prepared.setId, material: this.unavailableMaterial, reason: prepared.reason };
     }
+    const undrawn = undrawnClassReason(prepared.set);
+    if (undrawn !== null) {
+      return { state: 'unavailable', setId: prepared.setId, material: this.unavailableMaterial, reason: undrawn };
+    }
     let uploaded = this.settled.get(prepared.setId);
     if (uploaded === undefined) {
       uploaded = this.upload(prepared.set);
@@ -249,19 +290,23 @@ export class TileTextureUploads {
     });
     // sRGB8 without alpha cannot generate mipmaps on WebGL2, so every colour map carries an
     // opaque alpha channel.
+    if (undrawnClassReason(set) !== null) throw new Error(`Texture set ${entry.setId} is ${set.materialClass}, which this runtime does not draw`);
     const baseColor = texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')));
-    const normal = texture('normal', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'normal')));
+    const normalBytes = normalTexels(set);
+    const normal = normalBytes === null ? null : texture('normal', pc.PIXELFORMAT_RGBA8, normalBytes);
     const orm = texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'orm')));
-    const textures = [baseColor, normal, orm];
-    let residentBytes = 3 * mippedBytes(width, height, 4);
+    const textures = [baseColor, ...(normal === null ? [] : [normal]), orm];
+    let residentBytes = textures.length * mippedBytes(width, height, 4);
 
     const material = new pc.StandardMaterial();
     material.name = `generated-tile:${entry.setId}`;
     material.useMetalness = true;
     material.diffuse = new pc.Color(1, 1, 1);
     material.diffuseMap = baseColor;
-    material.normalMap = normal;
-    material.bumpiness = this.look.surface.normalStrength;
+    if (normal !== null) {
+      material.normalMap = normal;
+      material.bumpiness = this.look.surface.normalStrength;
+    }
     material.aoMap = orm;
     material.aoMapChannel = 'r';
     material.gloss = 1;
@@ -273,7 +318,7 @@ export class TileTextureUploads {
     material.metalnessMapChannel = 'b';
     material.useSkybox = true;
     material.cull = pc.CULLFACE_BACK;
-    if (this.look.surface.parallax) {
+    if (this.look.surface.parallax && set.maps.height !== undefined) {
       const heightMap = texture('height', pc.PIXELFORMAT_R8, requiredMap(set, 'height'));
       textures.push(heightMap);
       residentBytes += mippedBytes(width, height, 1);
