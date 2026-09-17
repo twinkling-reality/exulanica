@@ -5,6 +5,10 @@ the manifest named no depth model and a personal model right could not name dept
 now lives in ``local_roles.depth``. The move is safe only if every artifact identity it can reach
 is unchanged, so the values below were recorded on main at 42f296bf, before the move, by the same
 computation this module repeats, and are compared byte for byte.
+
+The two whole-registry digests were recorded again on main at e76503fd, still before the move, when
+the tile bake stage ``baked_tile`` joined the registry. That stage moves only those two values:
+every stage recorded at 42f296bf kept its own parameter digest, and every other value is unchanged.
 """
 
 from __future__ import annotations
@@ -33,13 +37,14 @@ from exulanica.models.handoff import ModelHandoff, ModelIdentity
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.reconstruction import moge
 
-#: Recorded on main 42f296bf with the depth pin still in worker defaults.
+#: Recorded with the depth pin still in worker defaults: on main 42f296bf, and the two
+#: whole-registry digests again on main e76503fd.
 GOLDEN = {
     "depth_model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
     "depth_key": "b61967020fae53eedf34d3ca0b9e67a5365e743b41b265de99ef1c0bc97c3e4f",
-    "pipeline_digest": "cc7e2785783544ee",
+    "pipeline_digest": "05becde891860583",
     "pipeline_version": 3,
-    "stages_digest": "2cd5ce282f07016f2d3df5f12f22b1f3927ac3aed94ccef744dbce5fc60caa13",
+    "stages_digest": "1ece64d3241453c4dee81b4b5661a16beb30e88e29a27051f1003ca3c0a51817",
     "local_roles_digest": "1ec7d3a7f36817d12a975c5b0a48461d96cf27db1ad7d37cee29a699be7837a5",
     "blob": "e4f90aa67ee4c3c76b62f706472fe2e6d8072ed92ac8151e048492d490a60fee",
     "inputs": "fd2b925e8379846ee7ea096f62a44a127d70deb6baba9e9d3339869ec0f9e0fe",
