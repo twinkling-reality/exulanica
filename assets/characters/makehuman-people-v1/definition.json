@@ -473,6 +473,14 @@
     "green",
     "grey"
   ],
+  "eyeColourAdjust": {
+    "brown": {
+      "hueDegrees": 14,
+      "saturationMilli": 620,
+      "valueMilli": 950,
+      "reason": "The source brown iris is a saturated red (hue 9 degrees, saturation 0.92) that reads as red eyes; this brings it to a natural brown."
+    }
+  },
   "textureRepairs": {
     "female_casualsuit01": [
       {

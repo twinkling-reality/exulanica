@@ -1,5 +1,5 @@
 {
- "definitionSha256": "3769551d9c02c2fb1946cfe5dc122a778a7f01cdb3d02f33de1832a592c1fc6f",
+ "definitionSha256": "51a5c103173124e3970f0cf6d68716e13b0d6357ecfa6779bbcc3e81d4cd93cf",
  "inputs": {
   "animationSha256": "7d026bd1bac1a4c2e9e4785af4a1c3ed13d0abae2c870798654f816ec8d78d2d",
   "blenderBinarySha256": "3d297c91a96ef848bdb987da48cad2b4591ffa51f4f3591b231ce075b1c8af48",
@@ -92,7 +92,7 @@
   "materials/brows.eyebrow009.glb": "7f9c79499ccedb6606ea727fb0b9380d18acbd660f55e4b2bde2e522b7b6ce62",
   "materials/brows.eyebrow010.glb": "2b84db0e7c4de1eef5e42f574874bacfc01583cc55c5882a930674ad06f474ad",
   "materials/eyecolour.blue.glb": "eba792c327fd7c534f4c2cf995f7d3edb45106d20706511faed5438eb37e7204",
-  "materials/eyecolour.brown.glb": "a87b851ce8c91d75bec983f2dbdab37daeb81dcf61acdc6953f4c64702311d8f",
+  "materials/eyecolour.brown.glb": "3e70f8832f3b1b99f847cb86b2249454257b2a8e68cd1a43445f9a9248e582eb",
   "materials/eyecolour.brownlight.glb": "51262168e8f62c0627e194c987dd0fdfac79a741590f7447c945fe6a395b9cd1",
   "materials/eyecolour.green.glb": "26a72931dcef9929c496187f51238fea2b340e5ef93ddf18bd4fae8e79de4b6e",
   "materials/eyecolour.grey.glb": "01d09b67dc6509226bac36b075a68e3229e70aa6ce8af586de2f7f39fe72af48",
@@ -182,8 +182,8 @@
  "profile": "exulanica.character-preparation-receipt/v1",
  "scripts": {
   "glb.py": "43a3f7633076c99b37a514ffb1aeb9e1336da606d95c16a7dd30d2e63369b860",
-  "packs.py": "c15cab8c9fc7df8e0677b92671332e29f8593dac2ff086e1e2630e163567721e",
-  "people.py": "2f49a6a4cc9d856c0142971bc68ea341897f6c012980fcfe09292926063d2179",
+  "packs.py": "d5173e66bdfa3e0f34cb50f35949323e5520fd2381330eb43f2a4b0b6b9d0365",
+  "people.py": "b6c5040d589072c5f28eb2ded81a0b35c5d401980df3e833346273f290023d93",
   "people_blender.py": "aa8819fdc4da27b7789142b2ebc0f8f551d7bdb9ce83f1baaaa4c4b845b01970",
   "retarget.py": "cf98c1ef5b4ccbb45547a904b713079ce345092ba83cfbc82c0219f9654fba45",
   "split.py": "47d16125c80bbf373f3093d628f55d707ae2c87c737ef69583f0b92b4a6ef6d5"

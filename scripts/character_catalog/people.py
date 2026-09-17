@@ -170,6 +170,7 @@ def material_jobs(definition, assets):
             "label": labels[colour],
             "mhmat": assets / "eyes/materials" / f"{colour}.mhmat",
             "settings": settings["eyes"],
+            "adjust": definition.get("eyeColourAdjust", {}).get(colour),
             "source": f"eyes/materials/{colour}",
         }
     return jobs
@@ -284,7 +285,13 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
     for material_id, job in sorted(material_jobs(definition, assets).items()):
         name = key_name(material_id.replace("/", "."))
         data, info, image = packs.build_pack(
-            name, job["kind"], job["mhmat"], job["settings"], job.get("repairs"), return_image=True
+            name,
+            job["kind"],
+            job["mhmat"],
+            job["settings"],
+            job.get("repairs"),
+            return_image=True,
+            adjust=job.get("adjust"),
         )
         relative = f"materials/{name}.glb"
         write(relative, data)

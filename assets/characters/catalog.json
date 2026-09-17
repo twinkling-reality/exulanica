@@ -75,8 +75,8 @@
      "parts": [
       {
        "farColours": {
-        "lower": "#9c9590",
-        "upper": "#9c9590"
+        "lower": "#9b9792",
+        "upper": "#9b9792"
        },
        "label": "Eyes",
        "material": "eyeColour/brown",
@@ -918,8 +918,8 @@
      "parts": [
       {
        "farColours": {
-        "lower": "#9c9590",
-        "upper": "#9c9590"
+        "lower": "#9b9792",
+        "upper": "#9b9792"
        },
        "label": "Eyes",
        "material": "eyeColour/brown",
@@ -1905,12 +1905,12 @@
      "alphaMode": "OPAQUE",
      "asset": {
       "assetKey": "makehuman.people.material.eyecolour.brown.v1",
-      "byteSize": 51208,
-      "contentSha256": "a87b851ce8c91d75bec983f2dbdab37daeb81dcf61acdc6953f4c64702311d8f",
+      "byteSize": 51872,
+      "contentSha256": "3e70f8832f3b1b99f847cb86b2249454257b2a8e68cd1a43445f9a9248e582eb",
       "file": "makehuman-people-v1/materials/eyecolour.brown.glb",
       "mediaType": "model/gltf-binary"
      },
-     "averageColour": "#9c9590",
+     "averageColour": "#9b9792",
      "doubleSided": false,
      "kind": "eyes",
      "label": "Brown eyes",

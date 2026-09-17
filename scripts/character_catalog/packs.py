@@ -102,6 +102,42 @@ def normalise_hair(colour, target=205, radius_fraction=1 / 64, strength=0.7, max
     return Image.merge("RGB", [flat, flat, flat])
 
 
+def adjust_iris(colour, adjust):
+    """Shift an eye texture's saturated iris towards a declared hue, saturation and value.
+
+    Only saturated texels move, weighted in over a short saturation ramp, so the sclera, the pupil
+    and the highlights keep their authored values.
+    """
+    rgb = colour.convert("RGB")
+    hue, saturation, value = rgb.convert("HSV").split()
+    weight = saturation.point(lambda s: max(0, min(255, round((s - 60) * 255 / 40))))
+    shift = round(adjust["hueDegrees"] * 255 / 360)
+
+    def blend(a):
+        w = a["w"] / 255.0
+        return a["x"] * (1 - w) + a["y"] * w
+
+    shifted = hue.point(lambda h: (h + shift) % 256)
+    new_hue = ImageMath.lambda_eval(blend, x=hue.convert("F"), y=shifted.convert("F"), w=weight.convert("F"))
+    new_saturation = ImageMath.lambda_eval(
+        blend,
+        x=saturation.convert("F"),
+        y=saturation.point(lambda s: min(255, round(s * adjust["saturationMilli"] / 1000))).convert("F"),
+        w=weight.convert("F"),
+    )
+    new_value = ImageMath.lambda_eval(
+        blend,
+        x=value.convert("F"),
+        y=value.point(lambda v: min(255, round(v * adjust["valueMilli"] / 1000))).convert("F"),
+        w=weight.convert("F"),
+    )
+    channels = [channel.convert("L") for channel in (new_hue, new_saturation, new_value)]
+    adjusted = Image.merge("HSV", channels).convert("RGB")
+    if colour.mode == "RGBA":
+        adjusted.putalpha(colour.getchannel("A"))
+    return adjusted
+
+
 def encode(image, fmt, quality=86):
     buffer = io.BytesIO()
     if fmt == "jpeg":
@@ -149,7 +185,9 @@ def pack_glb(name, images, material):
     return write_glb(doc, data)
 
 
-def build_pack(name, kind, mhmat, settings, repairs=None, image_path=None, return_image=False):
+def build_pack(
+    name, kind, mhmat, settings, repairs=None, image_path=None, return_image=False, adjust=None
+):
     """Return (glb bytes, description) for one material, plus the processed colour image.
 
     ``image_path`` overrides the mhmat's diffuse texture (eye colour variants).
@@ -160,6 +198,8 @@ def build_pack(name, kind, mhmat, settings, repairs=None, image_path=None, retur
     colour = Image.open(colour_path)
     colour.load()
     colour = repair(colour, repairs)
+    if adjust:
+        colour = adjust_iris(colour, adjust)
     if settings.get("bakeOcclusion") and "occlusion" in info:
         colour = bake_occlusion(colour, Image.open(folder / info["occlusion"]))
     roles = {"baseColor": 0}

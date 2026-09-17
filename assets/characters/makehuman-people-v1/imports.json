@@ -79,8 +79,8 @@
  },
  {
   "asset_key": "makehuman.people.material.eyecolour.brown.v1",
-  "byte_size": 51208,
-  "content_sha256": "a87b851ce8c91d75bec983f2dbdab37daeb81dcf61acdc6953f4c64702311d8f",
+  "byte_size": 51872,
+  "content_sha256": "3e70f8832f3b1b99f847cb86b2249454257b2a8e68cd1a43445f9a9248e582eb",
   "licence_id": "CC0-1.0",
   "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
   "producer": "makehuman-people-prepare/1",
