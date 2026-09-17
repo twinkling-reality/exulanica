@@ -3,7 +3,8 @@
 This is test data, not a city and not a generator. Every dimension below is a fixture value
 chosen so the network exercises the simulation: a signalised four-way centre, two two-way-stop
 and two all-way-stop T junctions on a ring road with rounded corners, a pedestrian crossing on
-every leg, and parking with bus layovers and bicycle corrals on the four spokes.
+every leg, a mid-block crossing halfway along each spoke, and parking with bus layovers and
+bicycle corrals on the four spokes.
 
 Everything is integer arithmetic. Rotations are exact quarter turns, and the ring corners use
 the rational circle parametrisation ``((1 - t^2) / (1 + t^2), 2t / (1 + t^2))`` so every point
@@ -42,21 +43,26 @@ LANE_OFFSET_MM: Final = 1_875
 PARKING_OUTER_MM: Final = 6_350
 CROSSING_AT_MM: Final = 16_500
 CROSSING_WIDTH_MM: Final = 3_000
+#: The mid-block crossing on each spoke, measured from the centre: the middle of the gap left
+#: in the parking row, so no parking access runs across the crosswalk.
+MIDBLOCK_AT_MM: Final = 52_750
 RING_STRAIGHT_MM: Final = 30_000
 RING_RADIUS_MM: Final = 70_000
 ARC_STEPS: Final = 12
 
-#: (length, classes) along each spoke side, from 26.6 m out from the centre.
+#: (length, classes) along each spoke side, from 22 m out from the centre. No classes is a gap
+#: with no stall, where the mid-block crossing is.
 PARKING_LAYOUT: Final = (
     (14_000, ("city_bus",)),
     (6_700, ("passenger_car", "van")),
     (6_700, ("passenger_car", "van")),
+    (6_700, ()),
     (6_700, ("passenger_car", "van")),
     (6_700, ("passenger_car", "van")),
     (2_000, ("bicycle",)),
     (2_000, ("bicycle",)),
 )
-PARKING_START_MM: Final = 26_600
+PARKING_START_MM: Final = 22_000
 
 NODES: Final = {"C": 0, "N": 1, "E": 2, "S": 3, "W": 4}
 POSITIONS: Final = {
@@ -196,7 +202,10 @@ class Builder:
         from exulanica.traffic.geometry import Polyline
 
         length = Polyline.of(centreline).length
-        offsets = (CROSSING_AT_MM, length - CROSSING_AT_MM)
+        if spoke:
+            offsets = (CROSSING_AT_MM, MIDBLOCK_AT_MM, length - CROSSING_AT_MM)
+        else:
+            offsets = (CROSSING_AT_MM, length - CROSSING_AT_MM)
         self.records.append(
             rec.StreetSegmentRecord(
                 ordinal,
@@ -219,8 +228,9 @@ class Builder:
             "length": length,
         }
         for index, offset in enumerate(offsets):
-            node_name = start if index == 0 else end
-            line_axis = self.leg_axis(centreline, index == 0)
+            # The first and last crossings are junction legs; one between them is mid-block.
+            node_name = start if index == 0 else end if index == len(offsets) - 1 else None
+            line_axis = self.leg_axis(centreline, index < len(offsets) - 1)
             centre = self.point_along(centreline, offset)
             across = right_of(line_axis)
             line = (
@@ -239,7 +249,8 @@ class Builder:
                     CROSSING_WIDTH_MM,
                 )
             )
-            self.crossings[node_name].append((self.crossing_ordinal, line_axis))
+            if node_name is not None:
+                self.crossings[node_name].append((self.crossing_ordinal, line_axis))
             self.crossing_ordinal += 1
 
     @staticmethod
@@ -401,8 +412,12 @@ class Builder:
         )
         for side, lane in (("right", forward), ("left", backward)):
             along = PARKING_START_MM
-            for index, (length, classes) in enumerate(PARKING_LAYOUT):
+            index = 0
+            for length, classes in PARKING_LAYOUT:
                 low, high = along, along + length
+                along = high
+                if not classes:
+                    continue
                 if side == "right":
                     corners = [
                         (LANE_WIDTH_MM, low),
@@ -436,7 +451,7 @@ class Builder:
                     )
                 )
                 self.space_ordinal += 1
-                along = high
+                index += 1
 
 
 def build_records() -> tuple[object, ...]:

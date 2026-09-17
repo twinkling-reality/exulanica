@@ -475,12 +475,19 @@ class _Step:
     # Geometry of routes ------------------------------------------------------------------------
 
     def next_gate(self, vehicle: Vehicle) -> tuple[Gate, int, int] | None:
-        """The first gate at or ahead of the front: ``(gate, route index, distance)``."""
+        """The first gate at or ahead of the front: ``(gate, route index, distance)``.
+
+        A gate on the last path at or beyond the destination is not on the trip, because the
+        front stops at the destination, so it is never returned.
+        """
         distance = 0
         start = vehicle.position
+        last = len(vehicle.route) - 1
         for index in range(vehicle.route_index, len(vehicle.route)):
             path = vehicle.route[index]
             for gate in self.network.gates.get(path, ()):
+                if index == last and gate.position >= _target_position(vehicle, self.network):
+                    return None
                 if gate.position >= start:
                     return gate, index, distance + gate.position - start
             distance += self.network.paths[path].length - start
@@ -744,6 +751,22 @@ def _finish_manoeuvres(step: _Step) -> None:
             vehicle.wait_since = -1
             step.emit("trip_departed", trip_id=trip.trip_id, vehicle_id=vehicle.vehicle_id)
         elif vehicle.mode == "arriving":
+            if vehicle.reservation is not None:
+                # Every clear point lies before the destination, so this is a simulation fault.
+                step.breaches.append(
+                    {
+                        "vehicle_id": vehicle.vehicle_id,
+                        "second": step.second,
+                        "kind": "parked_holding_reservation",
+                    }
+                )
+                step.emit(
+                    "reservation_released",
+                    vehicle_id=vehicle.vehicle_id,
+                    reservation_kind=vehicle.reservation.kind,
+                    target=vehicle.reservation.target,
+                )
+                vehicle.reservation = None
             vehicle.mode = "parked"
             vehicle.manoeuvre_until = -1
             vehicle.space = vehicle.target_space
