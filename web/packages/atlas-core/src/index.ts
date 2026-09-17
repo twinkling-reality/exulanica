@@ -251,6 +251,8 @@ export type { DataViewHex, DataViewKindKey, DataViewOriginKey, DataViewStyle } f
 export {
   DATA_VIEW_STYLE,
   DATA_VIEW_STYLE_V1,
+  DATA_VIEW_STYLE_V2,
+  dataViewKindColour,
   dataViewRgb,
   dataViewStyle,
   dataViewStyleName,

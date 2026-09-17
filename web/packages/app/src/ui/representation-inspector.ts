@@ -1,6 +1,6 @@
 import {
   DATA_VIEW_STYLE,
-  isDataViewKindKey,
+  dataViewKindColour,
   representationBinaryVisualization,
   type RepresentationIntent,
   type RepresentationResolution,
@@ -55,11 +55,15 @@ const PRESENTATION = 'Glow, dashes, the moving band, colour and the dark ground 
 function swatchColour(colourBy: RepresentationIntent['colour'], key: string): string | null {
   const palette = DATA_VIEW_STYLE.palette;
   if (colourBy === 'origin') return palette.origin[key as keyof typeof palette.origin] ?? null;
-  return isDataViewKindKey(key) ? palette.kind[key] : null;
+  return dataViewKindColour(DATA_VIEW_STYLE, key) ?? null;
 }
 
 function keyWords(colourBy: RepresentationIntent['colour'], key: string): string {
-  return (colourBy === 'origin' ? ORIGIN_WORDS[key] : KIND_WORDS[key]) ?? key;
+  if (colourBy === 'origin') return ORIGIN_WORDS[key] ?? key;
+  // A city record kind in plain words, from the kind itself: city.street_segment is "Street segment".
+  const city = /^city\.([a-z][a-z0-9_]*)$/.exec(key)?.[1];
+  const words = city?.replaceAll('_', ' ');
+  return KIND_WORDS[key] ?? (words === undefined ? key : words.charAt(0).toUpperCase() + words.slice(1));
 }
 
 function checkbox(label: string): { readonly root: HTMLLabelElement; readonly input: HTMLInputElement } {

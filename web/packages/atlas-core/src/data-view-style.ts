@@ -22,14 +22,23 @@
 
 /** The closed origin set, restated so this module has no import cycle with representation.ts. */
 const ORIGINS = ['inferred', 'authored', 'generated', 'external'] as const;
-/** Subject kinds, plus the record kinds a generated tile states an identity on. */
-const KINDS = [
-  'scene', 'object', 'geometry-group',
+/** Subject kinds every version colours. */
+const SUBJECT_KINDS = ['scene', 'object', 'geometry-group'] as const;
+/** Version 1's closed kind list: the subject kinds and the city.v1 identity record kinds. */
+const KINDS_V1 = [
+  ...SUBJECT_KINDS,
   'city.massing', 'city.facade', 'city.surface_material', 'city.vitrine', 'city.premises',
 ] as const;
+/** A city grammar record kind. `city.tile` is a tile header, never a subject. */
+const CITY_KIND = /^city\.(?!tile$)[a-z][a-z0-9_]{0,63}$/;
+const MAX_KINDS = 128;
 
 export type DataViewOriginKey = (typeof ORIGINS)[number];
-export type DataViewKindKey = (typeof KINDS)[number];
+/**
+ * A key of the kind palette. Version 1 names exactly its closed list; from version 2 the palette
+ * declares its own city record kinds as data, beside the three subject kinds.
+ */
+export type DataViewKindKey = string;
 /** Lowercase `#rrggbb`, a display colour. The data view shaders write it without tone mapping. */
 export type DataViewHex = string;
 
@@ -183,6 +192,43 @@ export const DATA_VIEW_STYLE_V1 = {
   },
 } as const;
 
+/**
+ * Version 2. Every value of version 1 unchanged, and the kind palette declares a colour for every
+ * city grammar version 2 record kind that can be a spatial subject (it states an extent). Buildings
+ * stay warm, streets and their parts cool, land green, objects on the street distinct. The relation
+ * records (junction approach, signal) are never subjects and have none; the surface material keeps
+ * its version 1 colour for version 1 subjects only.
+ */
+export const DATA_VIEW_STYLE_V2 = {
+  ...DATA_VIEW_STYLE_V1,
+  version: 2,
+  palette: {
+    origin: DATA_VIEW_STYLE_V1.palette.origin,
+    kind: {
+      ...DATA_VIEW_STYLE_V1.palette.kind,
+      'city.rooftop_object': '#ffb86b',
+      'city.ground_bay': '#ffe08a',
+      'city.entrance': '#fff3b0',
+      'city.district': '#9fd98b',
+      'city.block': '#b5e37a',
+      'city.parcel': '#d4ee8e',
+      'city.terrain': '#7fcf9a',
+      'city.street': '#6fd3ff',
+      'city.street_segment': '#5fb8ff',
+      'city.street_node': '#a9c8ff',
+      'city.junction': '#7aa8ff',
+      'city.lane': '#58e0f0',
+      'city.lane_connection': '#8ff0f5',
+      'city.crossing': '#e8f4ff',
+      'city.road_marking': '#f5f7ff',
+      'city.curb_edge': '#b0bfd8',
+      'city.parking_space': '#9fb6ff',
+      'city.street_furniture': '#ff7fbf',
+      'city.street_tree': '#5ee39a',
+    },
+  },
+} as const;
+
 const HEX = /^#[0-9a-f]{6}$/;
 
 function fail(path: string, why: string): never {
@@ -226,7 +272,7 @@ function text(value: unknown, path: string, maxLength: number, pattern: RegExp):
 export function dataViewStyle(value: unknown): DataViewStyle {
   const root = record(value, 'style', ['id', 'version', 'ground', 'points', 'dashes', 'palette', 'boxes', 'links', 'tags']);
   if (root['id'] !== 'exulanica.data-view') fail('style.id', 'is not exulanica.data-view');
-  const version = number(root['version'], 'style.version', 1, 1_000_000, true);
+  const version = number(root['version'], 'style.version', 1, 2, true);
   const ground = record(root['ground'], 'style.ground', ['colour', 'strength', 'rise']);
   const points = record(root['points'], 'style.points', [
     'sizeMetres', 'minPixels', 'maxPixels', 'densityPerSquareMetre', 'intensity', 'rise', 'pullMetres',
@@ -238,7 +284,8 @@ export function dataViewStyle(value: unknown): DataViewStyle {
   const dashes = record(root['dashes'], 'style.dashes', ['halfWidth', 'sizeScale', 'bandsPerMetre', 'bandsPerSecond', 'bandDepth']);
   const palette = record(root['palette'], 'style.palette', ['origin', 'kind']);
   const origin = record(palette['origin'], 'style.palette.origin', ORIGINS);
-  const kind = record(palette['kind'], 'style.palette.kind', KINDS);
+  const kindKeys = version === 1 ? [...KINDS_V1] : declaredKinds(palette['kind']);
+  const kind = record(palette['kind'], 'style.palette.kind', kindKeys);
   const boxes = record(root['boxes'], 'style.boxes', ['colour', 'opacity', 'selectedColour', 'selectedOpacity', 'cornerFraction']);
   const links = record(root['links'], 'style.links', ['colour', 'opacity', 'maxCount']);
   const tags = record(root['tags'], 'style.tags', [
@@ -292,7 +339,7 @@ export function dataViewStyle(value: unknown): DataViewStyle {
     },
     palette: {
       origin: Object.fromEntries(ORIGINS.map(key => [key, hex(origin[key], `style.palette.origin.${key}`)])) as Record<DataViewOriginKey, DataViewHex>,
-      kind: Object.fromEntries(KINDS.map(key => [key, hex(kind[key], `style.palette.kind.${key}`)])) as Record<DataViewKindKey, DataViewHex>,
+      kind: Object.fromEntries(kindKeys.map(key => [key, hex(kind[key], `style.palette.kind.${key}`)])) as Record<DataViewKindKey, DataViewHex>,
     },
     boxes: {
       colour: hex(boxes['colour'], 'style.boxes.colour'),
@@ -318,6 +365,16 @@ export function dataViewStyle(value: unknown): DataViewStyle {
   return deepFreeze(style);
 }
 
+/** The kind keys a version 2 palette declares: the subject kinds, then its own city record kinds. */
+function declaredKinds(value: unknown): string[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) fail('style.palette.kind', 'is not an object');
+  const keys = Object.keys(value);
+  if (keys.length > MAX_KINDS) fail('style.palette.kind', `declares more than ${MAX_KINDS} kinds`);
+  const unknown = keys.find(key => !(SUBJECT_KINDS as readonly string[]).includes(key) && !CITY_KIND.test(key));
+  if (unknown !== undefined) fail(`style.palette.kind.${unknown}`, 'is not a known key');
+  return [...SUBJECT_KINDS, ...keys.filter(key => CITY_KIND.test(key))];
+}
+
 function deepFreeze<T>(value: T): T {
   if (typeof value === 'object' && value !== null) {
     for (const child of Object.values(value)) deepFreeze(child);
@@ -327,7 +384,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 /** The descriptor every data view draw uses. Validated once, here. */
-export const DATA_VIEW_STYLE: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V1);
+export const DATA_VIEW_STYLE: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V2);
 
 /** `id@version`, the form a display record carries. */
 export function dataViewStyleName(style: DataViewStyle): string {
@@ -341,6 +398,12 @@ export function dataViewRgb(colour: DataViewHex): readonly [number, number, numb
   return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
 }
 
+/** A kind version 1's closed list names. */
 export function isDataViewKindKey(value: string): value is DataViewKindKey {
-  return (KINDS as readonly string[]).includes(value);
+  return (KINDS_V1 as readonly string[]).includes(value);
+}
+
+/** The colour a style declares for a kind, or undefined when it declares none. Never a fallback. */
+export function dataViewKindColour(style: Pick<DataViewStyle, 'palette'>, kind: string): DataViewHex | undefined {
+  return Object.hasOwn(style.palette.kind, kind) ? style.palette.kind[kind] : undefined;
 }

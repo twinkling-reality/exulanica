@@ -1308,6 +1308,7 @@ export class AtlasBinding {
     const seen = new Set<string>();
     for (const entry of entries) {
       validateRepresentationSubject(entry.subject);
+      this.representation.assertStyleAccepts(entry.subject);
       const id = entry.subject.subjectId;
       if (seen.has(id) || this.representationDefaults.has(id)) {
         throw new TypeError(`Duplicate representation subject ${id}`);

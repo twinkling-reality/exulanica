@@ -1,7 +1,7 @@
 import * as pc from 'playcanvas';
 import {
   dataViewRgb,
-  isDataViewKindKey,
+  dataViewKindColour,
   type DataViewStyle,
   type RepresentationSubject,
 } from '@exulanica/atlas-core';
@@ -282,7 +282,7 @@ export class DataViewOverlay {
       const accent = tag.selected ? selectedColour
         : report.intent.colour === 'origin'
           ? palette.origin[key as keyof typeof palette.origin] ?? selectedColour
-          : isDataViewKindKey(key) ? palette.kind[key] : selectedColour;
+          : dataViewKindColour(this.#style, key) ?? selectedColour;
       context.fillStyle = `rgba(${gr * 255}, ${gg * 255}, ${gb * 255}, ${style.backgroundOpacity})`;
       context.fillRect(left, top, w, h);
       context.fillStyle = accent;

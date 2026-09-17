@@ -3,7 +3,7 @@ import {
   DEFAULT_REPRESENTATION_INTENT,
   REPRESENTATION_POINT_BUDGET,
   REPRESENTATION_POINTS_PER_SUBJECT,
-  isDataViewKindKey,
+  dataViewKindColour,
   representationIntent,
   resolveRepresentation,
   type DataViewHex,
@@ -117,10 +117,27 @@ export class RepresentationRuntime {
   get intent(): RepresentationIntent { return this.#intent; }
   get style(): DataViewStyle { return this.#style; }
 
+  /**
+   * Refuses a subject this runtime's style cannot colour honestly: a contract v2 generated record
+   * (its reference carries no ordinal key) needs style version 2 or later, and a declared colour for
+   * its own kind. Nothing is guessed for a kind the style does not name.
+   */
+  assertStyleAccepts(subject: RepresentationSubject): void {
+    const record = subject.record;
+    if (record === undefined || record.key !== '') return;
+    if (this.#style.version < 2) {
+      throw new TypeError(`${subject.subjectId} is a contract v2 subject and needs data view style version 2 or later`);
+    }
+    if (dataViewKindColour(this.#style, record.kind) === undefined) {
+      throw new TypeError(`Data view style version ${this.#style.version} declares no colour for ${record.kind}`);
+    }
+  }
+
   register(draw: RepresentationDraw): void {
     if (this.#destroyed) throw new Error('Representation runtime is destroyed');
     const subject = draw.currentSubject();
     resolveRepresentation(this.#intent, subject);
+    this.assertStyleAccepts(subject);
     if (!this.#held.has(subject.subjectId) && this.#held.size >= 256) {
       throw new RangeError('Representation registry is limited to 256 borrowed draws');
     }
@@ -225,7 +242,7 @@ export class RepresentationRuntime {
     const palette = this.#style.palette;
     const colour = this.#intent.colour === 'origin'
       ? palette.origin[key as keyof typeof palette.origin]
-      : isDataViewKindKey(key) ? palette.kind[key] : undefined;
+      : dataViewKindColour(this.#style, key);
     if (colour === undefined) throw new TypeError(`The data view style has no colour for ${key}`);
     const gain = this.#selection === null ? 1
       : this.#selection === resolved.subjectId ? this.#style.points.selectedGain : this.#style.points.unselectedGain;

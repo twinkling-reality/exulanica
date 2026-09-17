@@ -83,7 +83,7 @@ describe('world representation inspector', () => {
       ...DEFAULT_REPRESENTATION_INTENT, boxes: true, ids: true, labels: true, binary: 'visualization', colour: 'kind',
     });
     const record = JSON.parse(view.root.querySelector('pre')!.textContent!);
-    expect(record.look).toMatchObject({ style: 'exulanica.data-view@1', colour_by: 'kind',
+    expect(record.look).toMatchObject({ style: 'exulanica.data-view@2', colour_by: 'kind',
       colour_key: 'geometry-group', treatment: 'visualization' });
     expect(record.look.presentation).toContain('encode no artifact bytes');
     expect(record.visualization).toMatchObject({ label: 'Generated binary visualization, not artifact bytes' });
@@ -98,12 +98,23 @@ describe('world representation inspector', () => {
   it('shows the style version and a legend of only the colour keys present', () => {
     const { binding, view } = setup([subject, scene]);
     expect(view.root.querySelector('.representation-style')!.textContent)
-      .toContain('Look exulanica.data-view, version 1.');
+      .toContain('Look exulanica.data-view, version 2.');
     const legend = () => [...view.root.querySelectorAll('.representation-legend li')].map(item => item.textContent);
     expect(legend()).toEqual(['Authored', 'Inferred']);
     binding.setRepresentationIntent({ ...DEFAULT_REPRESENTATION_INTENT, colour: 'kind' });
     view.refresh();
     expect(legend()).toEqual(['Grouped geometry', 'Scene']);
+    view.dispose();
+  });
+
+  it('names a city record kind in plain words in the legend', () => {
+    const street: RepresentationSubject = { ...subject, subjectId: 'generated:city.street_segment:3afeee23-e3b3-5cbb-8654-ed114473327c',
+      subjectKind: 'object', origin: 'generated',
+      record: { kind: 'city.street_segment', version: 2, identity: '3afeee23-e3b3-5cbb-8654-ed114473327c', key: '' } };
+    const { binding, view } = setup([street]);
+    binding.setRepresentationIntent({ ...DEFAULT_REPRESENTATION_INTENT, colour: 'kind' });
+    view.refresh();
+    expect([...view.root.querySelectorAll('.representation-legend li')].map(item => item.textContent)).toEqual(['Street segment']);
     view.dispose();
   });
 

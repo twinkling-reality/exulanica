@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   DATA_VIEW_STYLE,
+  DATA_VIEW_STYLE_V1,
+  dataViewStyle,
   DEFAULT_REPRESENTATION_INTENT,
   REPRESENTATION_POINT_BUDGET,
   REPRESENTATION_POINTS_PER_SUBJECT,
@@ -53,6 +55,25 @@ class Draw implements RepresentationDraw {
 }
 
 describe('bounded representation runtime', () => {
+  it('refuses a contract v2 subject under a version 1 style, or a kind the style declares no colour for', () => {
+    const v2 = (kind: `city.${string}`, key = ''): Draw => {
+      const draw = new Draw(`generated:${kind}:5488228a-3210-54a7-9517-968a75f4624b`);
+      draw.subject = { ...draw.subject, origin: 'generated', subjectKind: 'object',
+        record: { kind, version: 2, identity: '5488228a-3210-54a7-9517-968a75f4624b', key } };
+      return draw;
+    };
+    const old = new RepresentationRuntime(8, 4, { style: dataViewStyle(JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V1))) });
+    expect(() => old.register(v2('city.street'))).toThrow('needs data view style version 2 or later');
+    expect(() => old.register(v2('city.massing'))).toThrow('needs data view style version 2 or later');
+    old.register(v2('city.massing', 'parcel_ordinal.3'));
+    expect(old.report.subjects).toHaveLength(0);
+    const current = new RepresentationRuntime(8, 4);
+    current.register(v2('city.street'));
+    expect(() => current.register(v2('city.bus_shelter'))).toThrow('declares no colour for city.bus_shelter');
+    const report = current.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1, colour: 'kind' });
+    expect(report.subjects.map(entry => entry.subject.record?.kind)).toEqual(['city.street']);
+  });
+
   it('blends, reverses without reallocating, then restores and disposes exactly once', () => {
     const runtime = new RepresentationRuntime(8, 4);
     const draw = new Draw('one');
