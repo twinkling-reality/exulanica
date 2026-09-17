@@ -7,17 +7,18 @@
  * imported only behind `import.meta.env.DEV`; `test/generated-tile-evaluation.test.ts` builds the
  * app and proves no tile, texture set or tile code is emitted.
  *
- * A tile is named by its file name without `.owd`. The places searched are fixed:
- * - `assets/corridor/`, where the corridor lane commits baked streets;
- * - `./tiles/`, baked evaluation tiles this entry carries for development.
+ * A tile is named by its file name without `.owd`, and only `./tiles/` is searched: pinned golden
+ * bakes this entry carries for development (see `./tiles/README.md`). Baked corridor streets are not
+ * files in the repository; they live in the baked tile store and a permission-gated route serves
+ * them, so they are not reachable from here.
  */
 
 import textureManifestUrl from '../../../../../assets/textures/manifest.json?url';
 
-const TILES: Readonly<Record<string, () => Promise<string>>> = {
-  ...import.meta.glob<string>('../../../../../assets/corridor/**/*.owd', { query: '?url', import: 'default' }),
-  ...import.meta.glob<string>('./tiles/*.owd', { query: '?url', import: 'default' }),
-};
+const TILES: Readonly<Record<string, () => Promise<string>>> = import.meta.glob<string>(
+  './tiles/*.owd',
+  { query: '?url', import: 'default' },
+);
 
 const TEXTURE_SETS: Readonly<Record<string, () => Promise<string>>> = import.meta.glob<string>(
   '../../../../../assets/textures/blobs/*.ltex',
