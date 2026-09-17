@@ -3,8 +3,8 @@
 Every value below was chosen by hand for this fixture. The builder computes only what a written
 rule derives from those values: identities (``exulanica.grammar.subjects``), facade output
 digests, part extents, owners' extents covering what they anchor, the descriptor and catalog pins,
-and the canonical bytes. The tile carries everything it names, so its external list is empty. It is a test
-input, never stage output: no generator exists, and nothing here is one.
+and the canonical bytes. The tile carries everything it names, so its external list is empty. It
+is a test input, never stage output: no generator exists, and nothing here is one.
 
 The tile is one T-junction at (60 m, 40 m). Market Street, a high street, runs west to east
 through it on two segments; Mill Lane, a local street, runs north from it. The junction is
