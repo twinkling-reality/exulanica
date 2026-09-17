@@ -118,8 +118,10 @@ const MEASURE = (budget, view) => `(async () => {
   const prepareMs = performance.now() - prepareStart;
   const frozen = ${JSON.stringify(view)} === 'overview';
   if (frozen) {
-    const ground = report.subjects.find(e => e.subject.label === 'owned-district-visible-support');
-    const corners = b.representationBounds(ground.subject);
+    // The whole district: every aggregate batch's own box, projected into display space.
+    const corners = report.subjects.filter(e => e.subject.subjectKind === 'geometry-group')
+      .flatMap(e => b.representationBounds(e.subject) ?? []);
+    if (corners.length === 0) throw new Error('No district batch states bounds to frame the overview');
     const xs = corners.map(c => c[0]), zs = corners.map(c => c[2]);
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     b.update = function () {};
