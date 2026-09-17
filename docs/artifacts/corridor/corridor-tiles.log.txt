@@ -1,40 +1,40 @@
 corridor tiles and gates
-commit 015e662fb9f45f5b089a9f0048de6b8d3940cd71
+commit 8db86ff2982d51755f217fe11dfe07deb9f6e525
 city seed 75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1
 city identity 0594ec43-fbf9-5377-86d3-b1b733714b4a
-generation output digest 0b1db332f5aa8518b5071515dbd1cbd88444f72d59228563138f64f284224759
-records 4806
+generation output digest ca6df3678b13a58783c490c14dc0b5cf4aeb2482ffc7282ac3a79d5b21bde891
+records 5899
 
-tile (0, 0): valid; owned 292, halo 733, external 17; document 866145 bytes sha256 6a43fd1a35dff8b94036ecc1e8e3743537f36c89951a670d0df33b353a303624; tile_inputs_digest ded374f902ecb3378dfaf253239600ab7684034fb5987b0f9f2c94eb8eb11984; baked_tile_id ad424140-27ae-5d63-b740-89581c04296c
-tile (1, 0): valid; owned 1349, halo 1130, external 18; document 2107833 bytes sha256 42b6fb12d7985a8e58a989a5c25f1e36e9eb4c431a4c59991e22b46c6f98277d; tile_inputs_digest 3ef5fb8db9ccf4c017821e8787488ea4595c1575df21b117cdb392c33a1a0a51; baked_tile_id 976a729b-c2a6-5172-9ed5-00f27cb309ad
-tile (2, 0) corridor: valid; owned 1544, halo 1484, external 47; document 2564535 bytes sha256 991a0e79feaec23537d927bb7c7f2b6d54df6bc8d9f9f236aa434ad8c9efb62c; tile_inputs_digest 5f4b3df87ecdf16a505f6572eee20bca5585c5391954b8acb87a4d5bc0ad7fd4; baked_tile_id 33a71a6a-f141-5868-a0c3-5d61d79cd30f
-tile (3, 0): valid; owned 1325, halo 1134, external 31; document 2044300 bytes sha256 36e30bbdec0b02ed9e7513892018fb99a5070182b255044c65f1bc7d71f21a8e; tile_inputs_digest 9773b324e1cc6ef036d6519b11d051e3c94fff88446c6b75bbed83bc8701620d; baked_tile_id e28f5863-712c-576c-803c-c433bf9a95c0
-tile (4, 0): valid; owned 285, halo 724, external 25; document 813969 bytes sha256 c41b85410133c159931ade4784ad95370c3a7772de781859db256309e3ddd0ca; tile_inputs_digest 3731b228359259aaba16c81aac5429639b0cccd143a26bb8a1ef533cabe6e81d; baked_tile_id 88493f7c-e166-50c2-8b17-6516ea0bdefe
+tile (0, 0): valid; owned 314, halo 948, external 17; document 1067745 bytes sha256 fc599875133f0eb91a659977927ea9c52657834e75de42f46ee7fd920513cf27; tile_inputs_digest 2ef6a7e49cdb168a8789e1b78c3f21e699a7381e68a849d05c88cec02db12eb4; baked_tile_id 3e669215-b091-5347-84a9-d217bd9ec078
+tile (1, 0): valid; owned 1749, halo 1343, external 18; document 2617482 bytes sha256 9de40d3ca2e25581d70ec0462abe7def6faca8425411992d74d6f1c46e1bc93b; tile_inputs_digest a8bf7d2d11b29fc5ebd92f2312e5c2413b229cf32e7ee11c14118cf4cac1a667; baked_tile_id 8654ffa1-e7df-5f3d-8dde-4fc303ce1347
+tile (2, 0) corridor: valid; owned 1887, halo 1845, external 47; document 3150216 bytes sha256 0d370b64385d68a4347b8b3f2546d0dee75d0c278b8a92d02d6c8fcab5e49a47; tile_inputs_digest 0b69fba89bd0eead8b05651d86b99d2901655d86b8fc73189c3e154c749e3b06; baked_tile_id 9f1a5a7a-3e4e-58f9-baa4-1c9ab47787c6
+tile (3, 0): valid; owned 1641, halo 1312, external 31; document 2465598 bytes sha256 65c356218f09b2698c98084bf82c805e546f13c12eb69e07ea33b7005e3115d2; tile_inputs_digest 6a33897c474479c186629fd7435d7160b889e3de066c99e5f81ebd21d98d3f77; baked_tile_id ededf7d6-197f-5802-9911-e3c2e19f5964
+tile (4, 0): valid; owned 297, halo 893, external 25; document 970057 bytes sha256 5173e575b3b37783ebdec624098177a0cdc040abc5624e3766eddbe861aa751b; tile_inputs_digest dce1eb30fbeff67c2da6ea0c952172bd5ab2ba2b5fe401181523333cb1aadf73; baked_tile_id 106f5504-94e6-5018-ad5c-3841555b0657
 
 city reference closure: closed
 pieces no longer than 1 km: yes
 
 gates, every record of the city:
 {
-  "bayable_edges": 171,
+  "bayable_edges": 166,
   "bayable_edges_without_bays": 0,
-  "buildings": 99,
-  "buildings_with_every_facade": 99,
+  "buildings": 98,
+  "buildings_with_every_facade": 98,
   "curbs": 46,
   "facade_coverage_percent": 100,
-  "facades": 524,
-  "facades_with_section_5_1_fields": 524,
-  "frontage_faces_in_pitch_band": 166,
-  "frontage_faces_with_bays": 167,
-  "ground_faces": 396,
-  "ground_faces_in_band": 396,
+  "facades": 512,
+  "facades_with_section_5_1_fields": 512,
+  "frontage_faces_in_pitch_band": 162,
+  "frontage_faces_with_bays": 163,
+  "ground_faces": 392,
+  "ground_faces_in_band": 392,
   "kerb_height_range_mm": [
     126,
-    150
+    180
   ],
-  "materials": 2166,
-  "materials_with_texture_set": 2166,
-  "objects": 58,
+  "materials": 2933,
+  "materials_with_texture_set": 2933,
+  "objects": 248,
   "objects_inside_footprints": 0,
   "passes": {
     "bay_pitch": true,
@@ -46,37 +46,38 @@ gates, every record of the city:
     "section_5_1": true
   },
   "pitch_mm_minimum_median_maximum": [
-    2425,
-    2927,
-    3564
+    2400,
+    2923,
+    3545
   ],
   "unavailable_roles": {
-    "door": 231,
-    "glazing": 223,
-    "transom": 454
+    "door": 228,
+    "glazing": 214,
+    "transom": 572,
+    "tree": 118
   }
 }
 gates, the corridor tile's owned records:
 {
-  "bayable_edges": 60,
+  "bayable_edges": 56,
   "bayable_edges_without_bays": 0,
   "buildings": 32,
   "buildings_with_every_facade": 32,
   "curbs": 6,
   "facade_coverage_percent": 100,
-  "facades": 176,
-  "facades_with_section_5_1_fields": 176,
-  "frontage_faces_in_pitch_band": 56,
-  "frontage_faces_with_bays": 56,
+  "facades": 168,
+  "facades_with_section_5_1_fields": 168,
+  "frontage_faces_in_pitch_band": 53,
+  "frontage_faces_with_bays": 53,
   "ground_faces": 128,
   "ground_faces_in_band": 128,
   "kerb_height_range_mm": [
     126,
-    145
+    168
   ],
-  "materials": 706,
-  "materials_with_texture_set": 706,
-  "objects": 12,
+  "materials": 952,
+  "materials_with_texture_set": 952,
+  "objects": 66,
   "objects_inside_footprints": 0,
   "passes": {
     "bay_pitch": true,
@@ -88,13 +89,14 @@ gates, the corridor tile's owned records:
     "section_5_1": true
   },
   "pitch_mm_minimum_median_maximum": [
-    2455,
-    2907,
-    3343
+    2400,
+    2832,
+    3304
   ],
   "unavailable_roles": {
     "door": 75,
     "glazing": 78,
-    "transom": 153
+    "transom": 196,
+    "tree": 30
   }
 }
