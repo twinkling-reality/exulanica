@@ -49,21 +49,30 @@ beforeAll(async () => {
 describe('loading a baked tile through tess\'s decoder', () => {
   it('draws only what the container draws, and states every record it does not', () => {
     const drawn = tile.ranges.filter((range) => range.state === 'drawn');
-    expect(drawn.map((range) => range.kind)).toEqual(['city.terrain']);
-    const terrain = drawn[0]!;
-    // Exact terrain that no material record dresses is drawn, as one stated unavailable surface.
+    expect(drawn.map((range) => range.kind)).toEqual([
+      'city.street_segment', 'city.street_segment', 'city.street_segment', 'city.terrain',
+    ]);
+    const terrain = drawn[3]!;
+    // Exact terrain that no material record dresses is drawn, as one stated unavailable surface. It
+    // is the patch less the carriageways and gutters the segments draw, so it follows their ranges.
     expect(terrain.state === 'drawn' && terrain.surfaces).toEqual([{
       role: 'terrain', orientation: 'horizontal', state: 'unavailable', textureSetId: null,
-      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 0, vertexCount: 289, firstTriangle: 0, triangleCount: 512,
+      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 48, vertexCount: 483, firstTriangle: 24, triangleCount: 572,
     }]);
-    expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(512);
+    expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(572);
     expect(terrain.identity).toBe('2f14328d-39f8-5bee-a06a-f963b701ccf3');
+    // A segment draws a carriageway and a gutter, each dressed by a texture set this test serves none of.
+    const segment = drawn[0]!;
+    expect(segment.state === 'drawn' && segment.surfaces.map((surface) => [surface.role, surface.orientation, surface.state])).toEqual([
+      ['carriageway', 'horizontal', 'unavailable'],
+      ['gutter', 'horizontal', 'unavailable'],
+    ]);
     const decoded = decodeOwd(baked);
     const header = decoded.projections.find((projection) => projection.header.name === 'render_batch')!.header;
-    const drawnEntry = header.entries.find((entry) => entry.state === 'drawn');
+    const drawnEntry = header.entries.find((entry, index) => entry.state === 'drawn' && decoded.header.records[index]!.kind === 'city.terrain');
     expect(drawnEntry?.state === 'drawn' && drawnEntry.surfaces).toEqual([{
       role: 'terrain', material: { state: 'none-exists' }, orientation: 'horizontal',
-      first_vertex: 0, vertex_count: 289, first_triangle: 0, triangle_count: 512,
+      first_vertex: 48, vertex_count: 483, first_triangle: 24, triangle_count: 572,
     }]);
     // Halo records are context: the container lists them, and the runtime neither draws nor lists them.
     const halo = header.entries.filter((entry) => entry.state === 'halo').map((entry) => entry.record);
@@ -86,10 +95,14 @@ describe('loading a baked tile through tess\'s decoder', () => {
   });
 
   it('maps every drawn triangle back to its record, and nothing else', () => {
-    for (let triangle = 0; triangle < 512; triangle += 1) {
+    // The three segments' 24 triangles come first, then the terrain's 572.
+    for (let triangle = 0; triangle < 24; triangle += 1) {
+      expect(tile.rangeAtTriangle(triangle)?.kind).toBe('city.street_segment');
+    }
+    for (let triangle = 24; triangle < 596; triangle += 1) {
       expect(tile.rangeAtTriangle(triangle)?.kind).toBe('city.terrain');
     }
-    expect(tile.rangeAtTriangle(512)).toBeNull();
+    expect(tile.rangeAtTriangle(596)).toBeNull();
     expect(tile.rangeAtTriangle(-1)).toBeNull();
   });
 
@@ -386,16 +399,18 @@ describe('drawing a tile into the Atlas scene', () => {
     app.root.addChild(environmentRoot);
     const fogBefore = app.scene.fog.start;
     const attachment = tile.attach({ app, environmentRoot, camera });
-    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 512, drawBatches: 1, unavailableSurfaces: 1, decodedTextureBytes: 0 });
+    // Every surface is unavailable here: the terrain has no material, and this test serves no set
+    // for the segments' carriageways and gutters.
+    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 596, drawBatches: 1, unavailableSurfaces: 7, decodedTextureBytes: 0 });
     const root = environmentRoot.findByName('generated-tile:tile-conformance') as pc.Entity;
     const renders = root.findComponents('render') as pc.RenderComponent[];
     expect(renders).toHaveLength(1);
     const mesh = renders[0]!.meshInstances[0]!.mesh;
-    expect(mesh.vertexBuffer?.numVertices).toBe(289);
+    expect(mesh.vertexBuffer?.numVertices).toBe(531);
     const decoded = decodeOwd(baked).projections[0]!;
     const drawn: number[] = [];
     mesh.getPositions(drawn);
-    // The same 289 vertices, rotated into the renderer frame, and no other: the mesh keeps
+    // The same 531 vertices, rotated into the renderer frame, and no other: the mesh keeps
     // first-use order, so compare them as sorted triples.
     const triples = (values: ArrayLike<number>): string[] => {
       const out: string[] = [];
@@ -405,11 +420,11 @@ describe('drawing a tile into the Atlas scene', () => {
       return out.sort();
     };
     const expected: number[] = [];
-    for (let vertex = 0; vertex < 289; vertex += 1) {
+    for (let vertex = 0; vertex < 531; vertex += 1) {
       expected.push(decoded.position[vertex * 3]!, decoded.position[vertex * 3 + 2]!, -decoded.position[vertex * 3 + 1]!);
     }
     expect(triples(drawn)).toEqual(triples(expected));
-    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(512 * 3);
+    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(596 * 3);
     expect(app.scene.fog.start).toBe(tile.look.fog.startM);
     attachment.dispose();
     expect(environmentRoot.findByName('generated-tile:tile-conformance')).toBeNull();

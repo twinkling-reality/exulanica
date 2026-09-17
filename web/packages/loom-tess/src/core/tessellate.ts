@@ -24,7 +24,7 @@ import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
 import { baseRingOf, coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { ExpandContext, Expansion, Need, PlanBox } from './expand.js';
+import type { CarriedRecord, ExpandContext, Expansion, Need, PlanBox } from './expand.js';
 import type { Piece } from './pieces.js';
 import type { CoveringTriangle } from './terrain-yield.js';
 import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
@@ -245,11 +245,18 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
   });
 
   const cover = groundCover(document, placed);
+  const carried = new Map<string, CarriedRecord>();
+  for (const record of placed) {
+    if (record.identity === IDENTITY_NOT_STATED) continue;
+    if (carried.has(record.identity)) throw new TessellationError(`two records state the identity ${record.identity}`);
+    carried.set(record.identity, { kind: record.payload.kind, fields: record.payload.fields });
+  }
   const contextFor = (record: PlacedRecord, coverings: readonly CoveringTriangle[]): ExpandContext => ({
     tileSizeMm: document.tile.fields.tile_size_mm as number,
     groundCover: cover,
     capsuleRadiusMm: capsuleRadius(document, record),
     coverings,
+    carried,
   });
   const dressed = dressings(placed);
   const materialFor = (record: PlacedRecord, role: string): MaterialRef => {

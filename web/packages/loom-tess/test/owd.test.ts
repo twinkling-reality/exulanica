@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bakeTile, verifyOwd } from '../src/core/bake.js';
 import { canonicalBytes } from '../src/core/canonical-json.js';
+import { TESSELLATOR_SOURCE_VERSION } from '../src/core/expand.js';
 import { absoluteVertices, decodeOwd, encodeOwd, OwdError } from '../src/core/owd.js';
 import type { Bake } from '../src/core/bake.js';
 import { nodeSha256 } from '../src/node/sha256.js';
@@ -76,12 +77,25 @@ function rebuilt(source: Uint8Array, change: (header: any) => void): Uint8Array 
 
 /** The terrain's render entry split into two surfaces at the row of cells halfway up the patch. */
 function splitTerrain(header: any, second: { role: string; orientation: string }): void {
-  const entry = header.projections[0].entries.find((candidate: any) => candidate.state === 'drawn');
-  const [whole] = entry.surfaces;
-  entry.surfaces = [
-    { ...whole, vertex_count: 17 * 9, triangle_count: 16 * 8 * 2 },
-    { ...whole, ...second, first_vertex: 17 * 9, vertex_count: 17 * 8, first_triangle: 16 * 8 * 2, triangle_count: 16 * 8 * 2 },
+  const [whole] = terrainEntry(header).surfaces;
+  const vertices = Math.floor(whole.vertex_count / 2);
+  const triangles = Math.floor(whole.triangle_count / 2);
+  terrainEntry(header).surfaces = [
+    { ...whole, vertex_count: vertices, triangle_count: triangles },
+    {
+      ...whole,
+      ...second,
+      first_vertex: whole.first_vertex + vertices,
+      vertex_count: whole.vertex_count - vertices,
+      first_triangle: whole.first_triangle + triangles,
+      triangle_count: whole.triangle_count - triangles,
+    },
   ];
+}
+
+/** The terrain's render_batch entry in a parsed header. */
+function terrainEntry(header: any): any {
+  return header.projections[0].entries.find((entry: any) => header.records[entry.record].kind === 'city.terrain');
 }
 
 const refused = (bytes: Uint8Array, pattern: RegExp): void => {
@@ -128,7 +142,7 @@ describe('decodeOwd', () => {
     ['a padding byte that is not a space', () => { const b = copy(); b[8 + headerLength(b)] = 0x2e; return b; }, /padding byte/],
     ['a trailing byte', () => { const b = new Uint8Array(baked.container.length + 4); b.set(baked.container); return b; }, /sections end at/],
     ['a missing byte', () => baked.container.slice(0, baked.container.length - 4), /sections end at/],
-    ['another tessellator version', () => sameLength('"tessellator_version":3', '"tessellator_version":4'), /no upgrade on read/],
+    ['another tessellator version', () => rebuilt(baked.container, (header) => { header.tessellator_version = TESSELLATOR_SOURCE_VERSION + 1; }), /no upgrade on read/],
     ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],
@@ -142,8 +156,8 @@ describe('decodeOwd', () => {
     ['a material statement that is neither a record nor none', () => sameLength('"material":{"state":"none-exists"}', '"material":{"state":"none-exiSts"}'), /neither record nor none-exists/],
     ['a surface role its grammar does not state', () => sameLength('"role":"terrain"', '"role":"terrair"'), /not a surface role its grammar states/],
     ['a surface with no orientation', () => sameLength('"orientation":"horizontal"', '"orientation":"horizontai"'), /not an orientation/],
-    ['a surface that does not start its entry', () => sameLength('"first_vertex":0,"material":{"state":"none-exists"}', '"first_vertex":1,"material":{"state":"none-exists"}'), /leaves a gap or overlaps/],
-    ['surfaces that do not cover their entry', () => sameLength('"role":"terrain","triangle_count":512', '"role":"terrain","triangle_count":511'), /do not cover its triangles exactly/],
+    ['a surface that does not start its entry', () => rebuilt(baked.container, (header) => { terrainEntry(header).surfaces[0].first_vertex += 1; }), /leaves a gap or overlaps/],
+    ['surfaces that do not cover their entry', () => rebuilt(baked.container, (header) => { terrainEntry(header).surfaces[0].triangle_count -= 1; }), /do not cover its triangles exactly/],
   ] as [string, () => Uint8Array, RegExp][])('refuses %s', (_name, make, pattern) => {
     refused(make(), pattern);
   });

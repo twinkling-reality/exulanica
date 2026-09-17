@@ -74,10 +74,13 @@ import { triangulateRing } from './ring-triangulation.js';
 
 export type StreetFields = { readonly [name: string]: unknown };
 
-/** What a street rule gives: surfaces to draw, or the rule it waits on. */
-export type StreetResult =
+/** What a street rule gives: surfaces to draw, or the rule it waits on, one of `Need`. */
+export type StreetResult<Need extends string> =
   | { readonly state: 'drawn'; readonly pieces: readonly Piece[] }
-  | { readonly state: 'waiting'; readonly need: 'bent_street' | 'street_curbs' | 'junction_legs' };
+  | { readonly state: 'waiting'; readonly need: Need };
+
+/** What a segment's strip waits on. */
+export type StripNeed = 'bent_street' | 'street_curbs';
 
 /** A straight line of a record: exactly two points, or undefined for a bent one. */
 function straight(points: unknown): readonly [Space, Space] | undefined {
@@ -165,7 +168,7 @@ export type SegmentEnds =
       readonly start: StripEnd;
       readonly end: StripEnd;
     }
-  | Extract<StreetResult, { state: 'waiting' }>;
+  | Extract<StreetResult<StripNeed>, { state: 'waiting' }>;
 
 /**
  * Where a segment's strip starts and ends, by the segment rule's first three steps. The junction
@@ -235,7 +238,7 @@ export function segmentSurfaces(
   left: StreetFields | undefined,
   right: StreetFields | undefined,
   where: string,
-): StreetResult {
+): StreetResult<StripNeed> {
   const ends = segmentEnds(segment, left, right, where);
   if (ends.state !== 'ends') return ends;
   const { origin, direction, start: s, end: e } = ends;
@@ -267,7 +270,7 @@ export function segmentSurfaces(
 }
 
 /** A curb's straight part: its kerb face, its kerb top and its footway. */
-export function curbSurfaces(curb: StreetFields, segment: StreetFields, where: string): StreetResult {
+export function curbSurfaces(curb: StreetFields, segment: StreetFields, where: string): StreetResult<'bent_street'> {
   const centre = straight(segment.centreline_mm);
   const line = straight(curb.kerb_line_mm);
   if (centre === undefined) return { state: 'waiting', need: 'bent_street' };
@@ -347,7 +350,7 @@ function segmentBound(radius: number): number {
 }
 
 /** The junction's carriageway fill, by the junction rule. */
-export function junctionSurface(junction: StreetFields, lookup: StreetLookup, resolutionMm: number, where: string): StreetResult {
+export function junctionSurface(junction: StreetFields, lookup: StreetLookup, resolutionMm: number, where: string): StreetResult<StripNeed | 'junction_legs'> {
   const legsNeeded = { state: 'waiting', need: 'junction_legs' } as const;
   const node = lookup.record(junction.node_identity as string);
   if (node === undefined) return legsNeeded;

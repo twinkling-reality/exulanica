@@ -12,8 +12,8 @@
  * what every surface needs: footprints, tiers, elevations, facade layouts, kerb lines, crossing
  * widths, form parts with facing vectors and identities. What is missing is on this side: the
  * integer rules that expand them, each declared and versioned here as it is built. This version
- * builds one, the terrain grid, because it is exact with no new rule; everything else states the
- * rule it waits on (`NEEDS`).
+ * builds the terrain grid and a street segment's carriageway and gutters (`streets.ts`);
+ * everything else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -24,6 +24,8 @@ import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes
 import type { Plan } from './integer-math.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
+import { segmentSurfaces } from './streets.js';
+import type { StreetFields } from './streets.js';
 import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
 import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
 
@@ -31,7 +33,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 3;
+export const TESSELLATOR_SOURCE_VERSION = 4;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -119,8 +121,17 @@ export const NEEDS = {
   massing_faces: 'massing_faces',
   /** A facade's faces: its bays, panels, openings, mouldings, awnings and entrances. */
   facade_layout: 'facade_layout',
-  /** A segment's carriageway and gutters, between its curbs' kerb lines. */
-  segment_surface: 'segment_surface',
+  /** A centreline or kerb line of more than one piece, or a kerb line not running with its centreline. */
+  bent_street: 'bent_street',
+  /** A segment's two curbs, carried by the tile, whose kerb lines leave its strip a length. */
+  street_curbs: 'street_curbs',
+  /**
+   * Support carved clear of every record that obstructs a capsule, by the support clearance rule
+   * (`support-clearance.ts`). The grammar's navigation table states which kinds obstruct and with
+   * what region; a base ring waits on exact ring clearance, since a ring's plan box grown by the
+   * capsule radius can close ground that is open.
+   */
+  support_clearance: 'support_clearance',
   /** Kerb faces, kerb tops and footways, offset from a kerb line by the floor square root normal, with fillet arcs. */
   kerb_offset: 'kerb_offset',
   /** A junction's carriageway, filled between its legs with fillet arcs. */
@@ -135,6 +146,12 @@ export const NEEDS = {
 export type Need = (typeof NEEDS)[keyof typeof NEEDS];
 
 export type Fields = { readonly [name: string]: unknown };
+
+/** A record the document carries, owned or halo, as an expander may read it. */
+export interface CarriedRecord {
+  readonly kind: string;
+  readonly fields: Fields;
+}
 
 /** A record's stated extent in plan, which a tessellation may test against but never draws. */
 export interface PlanBox {
@@ -160,11 +177,13 @@ export interface ExpandContext {
    */
   readonly capsuleRadiusMm: number | undefined;
   /**
-   * In plan, every triangle of every horizontal surface an owned record that covers the ground has
-   * drawn in this projection. Empty while those records themselves are expanded, and in a
+   * In plan, every triangle of the ground drawn records take by the navigation table, in this
+   * projection. Empty while the records whose expanders read no coverings are expanded, and in a
    * projection that carries no surfaces.
    */
   readonly coverings: readonly CoveringTriangle[];
+  /** Every record the document carries, owned or halo, that states an identity, by that identity. */
+  readonly carried: ReadonlyMap<string, CarriedRecord>;
 }
 
 export type Expansion =
@@ -325,6 +344,25 @@ function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces: [{ vertices: grid.vertices, triangles: grid.triangles }] };
 }
 
+/** A street segment's curb on one side: the one carried curb that names the segment and the side. */
+function curbOf(context: ExpandContext, segment: string, side: string): StreetFields | undefined {
+  const found = [...context.carried.values()].filter((record) =>
+    record.kind === 'city.curb_edge' && record.fields.segment_identity === segment && record.fields.side === side);
+  if (found.length > 1) throw new TessellationError(`two curbs on the ${side} of segment ${segment}`);
+  return found.length === 1 ? found[0]!.fields : undefined;
+}
+
+/**
+ * A street segment's carriageway and gutters, by the segment rule, between the kerb lines of the
+ * two curbs the tile carries for it.
+ */
+function renderSegment(fields: Fields, context: ExpandContext): Expansion {
+  const identity = fields.identity as string;
+  const result = segmentSurfaces(fields, curbOf(context, identity, 'left'), curbOf(context, identity, 'right'), `city.street_segment ${identity}`);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  return { state: 'drawn', pieces: result.pieces };
+}
+
 const needs = (...list: Need[]): Rule => ({ rule: 'needs', needs: list });
 const notInProjection: Rule = { rule: 'not_in_projection' };
 
@@ -371,7 +409,7 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   ['city.street_furniture', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection, covers_ground: true }],
   // A node draws as its junction or its segments' ends.
   ['city.street_node', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],
-  ['city.street_segment', { render_batch: needs(NEEDS.segment_surface), nav_envelope: needs(NEEDS.segment_surface), covers_ground: true }],
+  ['city.street_segment', { render_batch: { rule: 'expand', expand: renderSegment, readsCoverings: false }, nav_envelope: needs(NEEDS.support_clearance), covers_ground: true }],
   // A tree's parts, and its pit, which is ground a person may stand on.
   ['city.street_tree', { render_batch: needs(NEEDS.form_parts, NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation), covers_ground: true }],
   // A material is not a surface. A drawn range cites it; it draws nothing of its own.

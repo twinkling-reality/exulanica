@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 3, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 4, digest profile v3. */
 const GOLDEN = {
-  render_batch: '6cf002aa288b934cf12518126f170906ec62da79e81490bb4d970a74d06abb09',
-  nav_envelope: '41e78c84c9f8ec73b1b548d666864d55b25f8ba1d51270ea50196b2393bf5269',
+  render_batch: 'a2c581db847ecab6c23c2ce258f69805f89451eab8a87171f6fd517c1c6a5a4b',
+  nav_envelope: '04481caa395be65a3a80d29e41c787221f99a12ab831232e0ebb6200c388cc39',
 } as const;
 
 afterEach(() => {
@@ -58,7 +58,7 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(browser.tileInputsDigest).toBe(node.tile_inputs_digest);
   });
 
-  it('draws the terrain patch undressed and its exposed cells as support, and states why nothing else draws', async () => {
+  it('draws the terrain patch undressed round the streets, the segments dressed, and states why nothing else draws', async () => {
     const { header, projections } = await decodedFixture();
     const [renderBatch, navEnvelope] = projections;
     expect(renderBatch!.header.name).toBe('render_batch');
@@ -71,26 +71,35 @@ describe('the triangle digest of the conformance fixture', () => {
     });
     const terrain = header.records.findIndex((record) => record.kind === 'city.terrain');
 
-    // The whole terrain patch is drawn, and says no material dresses it: the grammar admits none.
-    // Every other surface waits on a rule.
+    // The terrain patch is drawn less the carriageways and gutters the three segments draw, and says
+    // no material dresses it: the grammar admits none. Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(1);
+    expect(count(render, 'drawn')).toBe(4);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
-    expect(renderBatch!.header.entries[terrain]).toMatchObject({
+    const drawnTerrain = renderBatch!.header.entries[terrain]!;
+    expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      vertex_count: 17 * 17,
-      triangle_count: 16 * 16 * 2,
-      surfaces: [{
-        role: 'terrain',
-        orientation: 'horizontal',
-        material: { state: 'none-exists' },
-        first_vertex: 0,
-        vertex_count: 17 * 17,
-        first_triangle: 0,
-        triangle_count: 16 * 16 * 2,
-      }],
+      vertex_count: 483,
+      triangle_count: 572,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 572 }],
     });
-    expect(renderBatch!.surfaceMm).toHaveLength(17 * 17 * 2);
+    // Yielding to the streets cuts the met cells into more triangles than the grid's 16 by 16.
+    expect(drawnTerrain.state === 'drawn' && drawnTerrain.triangle_count).toBeGreaterThan(16 * 16 * 2);
+    // Each segment draws a carriageway and a gutter, each dressed by its own material record.
+    const segments = renderBatch!.header.entries.filter((_entry, index) => header.records[index]!.kind === 'city.street_segment');
+    expect(segments).toHaveLength(3);
+    for (const entry of segments) {
+      if (entry.state !== 'drawn') throw new Error('a segment is not drawn');
+      expect(entry.surfaces!.map((surface) => [surface.role, surface.orientation, surface.material.state])).toEqual([
+        ['carriageway', 'horizontal', 'record'],
+        ['gutter', 'horizontal', 'record'],
+      ]);
+      for (const surface of entry.surfaces!) {
+        if (surface.material.state !== 'record') throw new Error('a segment surface cites no record');
+        expect(header.records[surface.material.record]!.fields.role).toBe(surface.role);
+      }
+    }
+    expect(renderBatch!.surfaceMm).toHaveLength(renderBatch!.header.vertex_count * 2);
     for (const entry of renderBatch!.header.entries) {
       if (entry.state === 'unavailable') expect(entry.needs.length).toBeGreaterThan(0);
     }
@@ -155,10 +164,14 @@ describe('the triangle digest of the conformance fixture', () => {
   });
 
   it('gives undressed terrain plan surface coordinates, s = x and t = y', async () => {
-    const renderBatch = (await decodedFixture()).projections[0]!;
+    const decoded = await decodedFixture();
+    const renderBatch = decoded.projections[0]!;
     const vertices = absoluteVertices(renderBatch);
     const surface = absoluteSurfaceCoordinates(renderBatch)!;
-    for (let vertex = 0; vertex < renderBatch.header.vertex_count; vertex += 1) {
+    const terrain = renderBatch.header.entries.find((_entry, index) => decoded.header.records[index]!.kind === 'city.terrain')!;
+    if (terrain.state !== 'drawn') throw new Error('the terrain is not drawn');
+    for (let step = 0; step < terrain.vertex_count; step += 1) {
+      const vertex = terrain.first_vertex + step;
       expect(surface[vertex * 2]).toBe(vertices[vertex * 3]);
       expect(surface[vertex * 2 + 1]).toBe(vertices[vertex * 3 + 1]);
     }
@@ -167,9 +180,7 @@ describe('the triangle digest of the conformance fixture', () => {
   it('draws dressed terrain citing its material record', async () => {
     const decoded = await decodedFixture(documentBytes(dressedTerrainObject()));
     const renderBatch = decoded.projections[0]!;
-    const drawn = renderBatch.header.entries.filter((entry) => entry.state === 'drawn');
-    expect(drawn).toHaveLength(1);
-    const entry = drawn[0]!;
+    const entry = renderBatch.header.entries.find((_candidate, index) => decoded.header.records[index]!.kind === 'city.terrain')!;
     if (entry.state !== 'drawn') throw new Error('unreachable');
     const [surface] = entry.surfaces!;
     expect(surface).toMatchObject({ role: 'terrain', orientation: 'horizontal' });
@@ -177,7 +188,6 @@ describe('the triangle digest of the conformance fixture', () => {
     const material = decoded.header.records[surface!.material.record]!;
     expect(material.kind).toBe('city.surface_material');
     expect(material.fields.surface_identity).toBe(decoded.header.records[entry.record]!.identity);
-    expect(renderBatch.header.vertex_count).toBe(17 * 17);
     expect(decoded.projections[0]!.header.triangle_digest).not.toBe(GOLDEN.render_batch);
   });
 

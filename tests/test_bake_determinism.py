@@ -487,15 +487,26 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             assert (entry["state"] == "halo") == (record["membership"] == "halo")
     render, nav = header["projections"]
     terrain = next(i for i, r in enumerate(header["records"]) if r["kind"] == "city.terrain")
-    # Undressed but exact: the whole patch is drawn and says that no material record dresses it.
-    assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == [terrain]
+    # Terrain is undressed but exact, and says that no material record dresses it. It is drawn less
+    # the carriageways and gutters the segments draw, so it has more triangles than the grid's
+    # cells, and the drawn entries are the three segments and the terrain.
+    segments = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.street_segment"]
+    assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
+        [*segments, terrain]
+    )
     [surface] = render["entries"][terrain]["surfaces"]
     assert (surface["role"], surface["orientation"]) == ("terrain", "horizontal")
     assert surface["material"] == {"state": "none-exists"}
     assert (
         render["entries"][terrain]["triangle_count"]
-        == 2 * (fixture_terrain().samples_per_side - 1) ** 2
+        > 2 * (fixture_terrain().samples_per_side - 1) ** 2
     )
+    for entry in (render["entries"][i] for i in segments):
+        roles = [(s["role"], s["orientation"], s["material"]["state"]) for s in entry["surfaces"]]
+        assert roles == [
+            ("carriageway", "horizontal", "record"),
+            ("gutter", "horizontal", "record"),
+        ]
     drawn = [
         header["records"][e["record"]]["kind"] for e in nav["entries"] if e["state"] == "drawn"
     ]

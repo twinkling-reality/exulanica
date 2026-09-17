@@ -113,12 +113,19 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Only terrain.
+Terrain, and a street segment's carriageway and gutters.
 
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
   yield rule below. Nothing drawn covers the ground yet, so today that is the whole patch. No
   published texture set dresses terrain, so its one surface (role `terrain`, horizontal) states
   `none-exists`.
+- A street segment draws its carriageway and its gutters by the street rules
+  (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
+  horizontal surface dressed by the material record for its role. Terrain yields to both. A segment
+  whose centreline or kerb lines are bent, or whose curbs the tile does not carry, waits on
+  `bent_street` or `street_curbs`. In `nav_envelope` a segment waits on `support_clearance`: what a
+  person is supported by is the ground partition carved clear of obstructions, which comes with the
+  navigation table's obstruction axis.
 - In `nav_envelope`, for now, a terrain cell is drawn when its closed plan square meets no stated
   extent of a record that covers or stands on the ground (every kind with an extent but terrain and
   districts, an interim list in `src/core/expand.ts`), each grown by the capsule radius. It goes
@@ -131,8 +138,9 @@ Only terrain.
   no number.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
-`ring_triangulation`, `massing_faces`, `facade_layout`, `segment_surface`, `kerb_offset`,
-`junction_fill`, `crossing_band`, `marking_stripes` or `form_parts`. Relations, occupancies,
+`ring_triangulation`, `massing_faces`, `facade_layout`, `bent_street`, `street_curbs`,
+`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes`, `form_parts` or
+`support_clearance`. Relations, occupancies,
 lanes, nodes and dressings are not surfaces of their own, and say so.
 
 Every vertex of a drawn range must lie inside the extent its record states, or the tile is
@@ -192,13 +200,12 @@ by the expander that needs it, with a new tessellator version.
   (`document._corner_centre`), in BigInt. The segment count will come from the projection
   contract's `resolution_mm`: `filletSegmentsWithin` finds the least power of two whose chords keep
   within it. No number is chosen here.
-- `src/core/streets.ts` has the street rules, in straight pieces only. A segment's carriageway
-  and gutters lie on its camber plane between its two kerb lines. A curb's straight part is a
-  vertical kerb face, a kerb top and a footway rising by its crossfall. A junction's carriageway
-  fill is one ring over each leg's strip mouth, the kerb lines back to the node and the corner arcs
-  between legs, cut by the ring rule. Every point is placed by the grammar's corner rule measure.
-  A bent street, a curb its tile does not carry or a leg it cannot find draws nothing and names
-  the rule it waits on.
+- `src/core/streets.ts` has the street rules, in straight pieces only, and the segment rule is
+  wired (see "What draws today"). A curb's straight part is a vertical kerb face, a kerb top and a
+  footway rising by its crossfall. A junction's carriageway fill is one ring over each leg's strip
+  mouth, the kerb lines back to the node and the corner arcs between legs, cut by the ring rule.
+  Every point is placed by the grammar's corner rule measure. A bent street, a curb its tile does
+  not carry or a leg it cannot find draws nothing and names the rule it waits on.
 - `src/core/support-clearance.ts` has the support clearance rule. It carves support triangles
   away from obstruction boxes grown by the capsule radius. Each box is removed by clipping on the
   integer lines a millimetre outside it, so the pieces kept meet without cracks. Crossings are

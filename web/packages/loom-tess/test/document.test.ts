@@ -196,9 +196,12 @@ describe('the bake', () => {
     expect(await southEastCell(fixtureBytes())).toBe(true);
     expect(await southEastCell(nearEast(200))).toBe(false);
     expect(await southEastCell(nearEast(400))).toBe(true);
-    // Render draws the whole patch either way.
-    const render = (await bake(nearEast(200))).tessellation.projections[0]!;
-    expect(render.indices.length / 3).toBe(16 * 16 * 2);
+    // Render is untouched either way: a stated extent takes no ground from it, only drawn surfaces do.
+    const renderTriangles = async (bytes: Uint8Array): Promise<number> => {
+      const render = (await bake(bytes)).tessellation.projections[0]!;
+      return render.indices.length / 3;
+    };
+    expect(await renderTriangles(nearEast(200))).toBe(await renderTriangles(fixtureBytes()));
   });
 
   it('refuses a terrain grid that does not span its tile', async () => {
