@@ -80,6 +80,27 @@ def ceil_length(a: Point, b: Point) -> int:
     return ceil_sqrt(dx * dx + dy * dy)
 
 
+def _away_scaled(value: int, length_squared: int) -> int:
+    """``value / sqrt(length_squared)`` rounded away from zero, exactly.
+
+    The magnitude is the least integer whose square reaches ``value**2 / length_squared``, which
+    is the ceiling of the true quotient because the ceiling of a square root of a real number is
+    the ceiling square root of that number's ceiling.
+    """
+    magnitude = ceil_sqrt(-(-value * value // length_squared))
+    return magnitude if value >= 0 else -magnitude
+
+
+def _nearest_half_scaled(value: int, length_squared: int) -> int:
+    """``value / (2 sqrt(length_squared))`` rounded to the nearest integer, exactly.
+
+    ``isqrt(value**2 // length_squared)`` is the floor of twice the true quotient, and halving
+    that floor plus one rounds the quotient half up.
+    """
+    magnitude = (isqrt(value * value // length_squared) + 1) // 2
+    return magnitude if value >= 0 else -magnitude
+
+
 def offtracking_mm(radius_mm: int, wheelbase_mm: int) -> int:
     """How far a rigid wheelbase's rear axle tracks inside its front axle on a circle, rounded up.
 
@@ -247,15 +268,12 @@ def rectangle(a: Point, b: Point, left: int, right: int) -> tuple[Point, ...] | 
     length_squared = dot(direction, direction)
     if length_squared == 0:
         return None
-    length = isqrt(length_squared)
-
-    def away(value: int) -> int:
-        # Divide by the floored length and round away from zero, so no side comes out short.
-        magnitude = -(-abs(value) // length)
-        return magnitude if value >= 0 else -magnitude
-
-    lx, ly = away(-direction[1] * left), away(direction[0] * left)
-    rx, ry = away(direction[1] * right), away(-direction[0] * right)
+    # Each offset component is rounded away from zero, so no side comes out short, and by less
+    # than a millimetre, so a short piece is not inflated either.
+    lx = _away_scaled(-direction[1] * left, length_squared)
+    ly = _away_scaled(direction[0] * left, length_squared)
+    rx = _away_scaled(direction[1] * right, length_squared)
+    ry = _away_scaled(-direction[0] * right, length_squared)
     return (
         (a[0] + rx, a[1] + ry),
         (b[0] + rx, b[1] + ry),
@@ -311,16 +329,17 @@ def corridor_piece(a: Point, b: Point, left: int, right: int) -> tuple[Point, Po
     """A piece whose corridor reaches ``left`` and ``right`` of it, as a shifted symmetric one.
 
     Returns the piece moved sideways by half the difference and the half-width that, with the
-    1 mm the rounded shift can lose, still covers both sides.
+    under a millimetre the rounded shift can be off by, still covers both sides. The shift is
+    rounded from its exact value, not from a floored length, which on a short piece would move
+    it several millimetres too far.
     """
     if left == right:
         return a, b, left
     direction = _sub(b, a)
-    length = isqrt(dot(direction, direction))
+    length_squared = dot(direction, direction)
     shift = left - right
-    # Twice the shift over twice the length keeps the halving exact until the final rounding.
-    sx = round_half_down(-direction[1] * shift, 2 * length)
-    sy = round_half_down(direction[0] * shift, 2 * length)
+    sx = _nearest_half_scaled(-direction[1] * shift, length_squared)
+    sy = _nearest_half_scaled(direction[0] * shift, length_squared)
     half = -(-(left + right) // 2) + 2
     return (a[0] + sx, a[1] + sy), (b[0] + sx, b[1] + sy), half
 
