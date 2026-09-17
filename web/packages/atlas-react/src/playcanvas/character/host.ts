@@ -1,6 +1,7 @@
 /**
- * One character host per engine application: verified containers, shared materials and the
- * body variants each worn outfit needs, all reference-counted and released together.
+ * One character host per engine application: verified containers, material packs, shared
+ * materials and the body variants each worn outfit needs, all reference-counted and released
+ * together.
  *
  * Bytes arrive only through a loader the application registers, so authority over what may be
  * fetched stays with the composition that knows the session. Until a loader is registered a
@@ -13,13 +14,6 @@ import { hex, sha256Hex } from './digest.js';
 
 export type CharacterAssetLoader = (asset: CatalogAssetRef, signal: AbortSignal) => Promise<ArrayBuffer>;
 
-interface ContainerEntry {
-  references: number;
-  readonly controller: AbortController;
-  readonly promise: Promise<LoadedContainer>;
-  loaded: LoadedContainer | null;
-}
-
 export interface LoadedContainer {
   readonly asset: pc.Asset;
   readonly resource: pc.ContainerResource & { readonly textures: pc.Asset[]; readonly renders: pc.Asset[]; readonly animations: pc.Asset[] };
@@ -29,12 +23,25 @@ export interface LoadedContainer {
   readonly byteSize: number;
 }
 
+/** A material pack's textures, indexed as its glTF `textures` list is. */
+export interface LoadedPack {
+  readonly textures: readonly pc.Texture[];
+  readonly byteSize: number;
+}
+
 export interface GltfDocument {
   readonly accessors: readonly { bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string }[];
   readonly bufferViews: readonly { byteOffset?: number; byteLength: number; byteStride?: number }[];
   readonly meshes: readonly { name?: string; primitives: readonly { attributes: Readonly<Record<string, number>>; indices?: number }[] }[];
   readonly skins?: readonly { joints: readonly number[] }[];
   readonly nodes: readonly { name?: string }[];
+}
+
+interface PackDocument {
+  readonly bufferViews: readonly { byteOffset?: number; byteLength: number }[];
+  readonly images: readonly { bufferView: number; mimeType: string }[];
+  readonly textures: readonly { source: number; sampler?: number }[];
+  readonly samplers?: readonly { wrapS?: number; wrapT?: number }[];
 }
 
 export interface ContainerLease {
@@ -65,6 +72,7 @@ export function parseGlb(bytes: ArrayBuffer): { document: GltfDocument; binary: 
 
 const COMPONENT_BYTES: Readonly<Record<number, number>> = { 5121: 1, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_WIDTH: Readonly<Record<string, number>> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+const WRAP: Readonly<Record<number, number>> = { 33071: pc.ADDRESS_CLAMP_TO_EDGE, 33648: pc.ADDRESS_MIRRORED_REPEAT, 10497: pc.ADDRESS_REPEAT };
 
 /** Read a dense integer accessor (indices or the `_HIDE` bitmask). */
 export function integerAccessor(document: GltfDocument, binary: Uint8Array, index: number): Uint32Array {
@@ -103,18 +111,99 @@ class BodyVariant {
   }
 }
 
-interface MaterialEntry {
+interface SharedEntry<T> {
   references: number;
-  readonly promise: Promise<pc.StandardMaterial>;
-  material: pc.StandardMaterial | null;
-  lease: ContainerLease | null;
+  readonly controller: AbortController;
+  promise: Promise<T>;
+  value: T | null;
+}
+
+/**
+ * Reference-counted resources that load once however many people ask. A resource whose every
+ * requester has gone while it loaded is disposed the moment it arrives.
+ */
+class SharedResources<T> {
+  private readonly entries = new Map<string, SharedEntry<T>>();
+  constructor(private readonly dispose: (value: T) => void) {}
+
+  get size(): number {
+    return this.entries.size;
+  }
+
+  *loaded(): IterableIterator<T> {
+    for (const entry of this.entries.values()) if (entry.value !== null) yield entry.value;
+  }
+
+  async lease(key: string, create: (signal: AbortSignal) => Promise<T>, signal: AbortSignal): Promise<{ value: T; release(): void }> {
+    if (signal.aborted) throw cancelled();
+    let entry = this.entries.get(key);
+    if (!entry) {
+      const created: SharedEntry<T> = { references: 0, controller: new AbortController(), value: null, promise: Promise.resolve(null as T) };
+      created.promise = create(created.controller.signal).then((value) => {
+        if (created.references === 0 || created.controller.signal.aborted) {
+          this.dispose(value);
+          throw cancelled();
+        }
+        created.value = value;
+        return value;
+      });
+      created.promise.catch(() => {
+        if (this.entries.get(key) === created && created.references === 0) this.entries.delete(key);
+      });
+      entry = created;
+      this.entries.set(key, created);
+    }
+    const held = entry;
+    held.references += 1;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      held.references -= 1;
+      if (held.references > 0) return;
+      if (this.entries.get(key) === held) this.entries.delete(key);
+      held.controller.abort();
+      if (held.value !== null) this.dispose(held.value);
+      held.value = null;
+    };
+    const onAbort = () => release();
+    signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      const value = await Promise.race([
+        held.promise,
+        new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(cancelled()), { once: true })),
+      ]);
+      if (signal.aborted) throw cancelled();
+      return { value, release };
+    } catch (error) {
+      release();
+      throw error;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  clear(): void {
+    for (const entry of this.entries.values()) {
+      entry.controller.abort();
+      if (entry.value !== null) this.dispose(entry.value);
+      entry.value = null;
+    }
+    this.entries.clear();
+  }
+}
+
+interface BuiltMaterial {
+  readonly material: pc.StandardMaterial;
+  readonly pack: { release(): void };
 }
 
 const HOSTS = new WeakMap<pc.AppBase, CharacterHost>();
 
 export class CharacterHost {
-  private readonly containers = new Map<string, ContainerEntry>();
-  private readonly materials = new Map<string, MaterialEntry>();
+  private readonly containers = new SharedResources<LoadedContainer>((container) => this.disposeContainer(container));
+  private readonly packs = new SharedResources<LoadedPack>((pack) => { for (const texture of pack.textures) texture.destroy(); });
+  private readonly materials = new SharedResources<BuiltMaterial>((built) => { built.material.destroy(); built.pack.release(); });
   private readonly variants = new Map<string, BodyVariant>();
   private readonly loaderListeners = new Set<() => void>();
   private loader: CharacterAssetLoader | null = null;
@@ -148,19 +237,20 @@ export class CharacterHost {
   }
 
   get residentContainers(): number {
-    return this.containers.size;
+    return this.containers.size + this.packs.size;
   }
 
   get residentEncodedBytes(): number {
     let bytes = 0;
-    for (const entry of this.containers.values()) bytes += entry.loaded?.byteSize ?? 0;
+    for (const container of this.containers.loaded()) bytes += container.byteSize;
+    for (const pack of this.packs.loaded()) bytes += pack.byteSize;
     return bytes;
   }
 
   get residentGeometryBytes(): number {
     const meshes = new Set<pc.Mesh>();
-    for (const entry of this.containers.values()) {
-      for (const render of entry.loaded?.resource.renders ?? []) {
+    for (const container of this.containers.loaded()) {
+      for (const render of container.resource.renders) {
         for (const mesh of (render.resource as { meshes: pc.Mesh[] }).meshes) meshes.add(mesh);
       }
     }
@@ -171,12 +261,8 @@ export class CharacterHost {
   }
 
   get residentTextureBytes(): number {
-    const textures = new Set<pc.Texture>();
-    for (const entry of this.containers.values()) {
-      for (const texture of entry.loaded?.resource.textures ?? []) textures.add(texture.resource as pc.Texture);
-    }
     let bytes = 0;
-    for (const texture of textures) bytes += texture.gpuSize;
+    for (const pack of this.packs.loaded()) for (const texture of pack.textures) bytes += texture.gpuSize;
     return bytes;
   }
 
@@ -192,143 +278,111 @@ export class CharacterHost {
     return () => this.loaderListeners.delete(listener);
   }
 
-  async acquire(ref: CatalogAssetRef, signal: AbortSignal, keepDocument = false): Promise<ContainerLease> {
-    if (this.destroyed || signal.aborted) throw cancelled();
+  private async verifiedBytes(ref: CatalogAssetRef, signal: AbortSignal): Promise<ArrayBuffer> {
     const loader = this.loader;
     if (!loader) throw new Error('No character asset loader is registered');
-    const key = ref.contentSha256;
-    let entry = this.containers.get(key);
-    if (!entry) {
-      const pending: Omit<ContainerEntry, 'promise'> = { references: 0, controller: new AbortController(), loaded: null };
-      const created: ContainerEntry = Object.assign(pending, { promise: this.load(pending, ref, loader, keepDocument) });
-      entry = created;
-      this.containers.set(key, entry);
-      created.promise.catch(() => {
-        if (this.containers.get(key) === created && created.references === 0) this.containers.delete(key);
-      });
-    }
-    const held = entry;
-    held.references += 1;
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      held.references -= 1;
-      if (held.references > 0) return;
-      if (this.containers.get(key) === held) this.containers.delete(key);
-      held.controller.abort();
-      if (held.loaded) this.dispose(held.loaded.asset);
-      held.loaded = null;
-    };
-    const onAbort = () => release();
-    signal.addEventListener('abort', onAbort, { once: true });
-    try {
-      const container = await Promise.race([
-        held.promise,
-        new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(cancelled()), { once: true })),
-      ]);
-      if (signal.aborted || this.destroyed) throw cancelled();
-      return { container, release };
-    } catch (error) {
-      release();
-      throw error;
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
-  }
-
-  private async load(
-    entry: { readonly references: number; readonly controller: AbortController; loaded: LoadedContainer | null },
-    ref: CatalogAssetRef,
-    loader: CharacterAssetLoader,
-    keepDocument: boolean,
-  ): Promise<LoadedContainer> {
-    const { signal } = entry.controller;
     const bytes = await loader(ref, signal);
     if (bytes.byteLength !== ref.byteSize) throw new Error(`Character asset ${ref.assetKey} has the wrong length`);
     if ((await containerSha256(bytes)) !== ref.contentSha256) throw new Error(`Character asset ${ref.assetKey} failed its digest`);
-    if (signal.aborted) throw cancelled();
-    const parsed = keepDocument ? parseGlb(bytes) : null;
-    const asset = await createObjectContainerAsset(this.app, `character-${ref.contentSha256}`, keepDocument ? bytes.slice(0) : bytes);
-    if (entry.references === 0 || signal.aborted || this.destroyed) {
-      this.dispose(asset);
-      throw cancelled();
-    }
-    entry.loaded = {
-      asset,
-      resource: asset.resource as LoadedContainer['resource'],
-      document: parsed?.document ?? null,
-      binary: parsed?.binary ?? null,
-      byteSize: ref.byteSize,
-    };
-    return entry.loaded;
+    if (signal.aborted || this.destroyed) throw cancelled();
+    return bytes;
+  }
+
+  /** A body or worn part: a skinned glTF container. Bases keep their document for body variants. */
+  async acquire(ref: CatalogAssetRef, signal: AbortSignal, keepDocument = false): Promise<ContainerLease> {
+    if (this.destroyed) throw cancelled();
+    const { value, release } = await this.containers.lease(ref.contentSha256, async (own) => {
+      const bytes = await this.verifiedBytes(ref, own);
+      const parsed = keepDocument ? parseGlb(bytes) : null;
+      const asset = await createObjectContainerAsset(this.app, `character-${ref.contentSha256}`, keepDocument ? bytes.slice(0) : bytes);
+      return {
+        asset,
+        resource: asset.resource as LoadedContainer['resource'],
+        document: parsed?.document ?? null,
+        binary: parsed?.binary ?? null,
+        byteSize: ref.byteSize,
+      };
+    }, signal);
+    return { container: value, release };
+  }
+
+  /**
+   * A material pack's images as textures. Colour images decode as sRGB, and normal and opacity
+   * images stay linear, as the catalog material's roles say; nothing depends on how a general
+   * glTF loader guesses a colour space.
+   */
+  private async acquirePack(material: CatalogMaterial, signal: AbortSignal): Promise<{ value: LoadedPack; release(): void }> {
+    const ref = material.asset;
+    return this.packs.lease(ref.contentSha256, async (own) => {
+      const bytes = await this.verifiedBytes(ref, own);
+      const { document, binary } = parseGlb(bytes) as unknown as { document: PackDocument; binary: Uint8Array };
+      const device = this.app.graphicsDevice;
+      const created: pc.Texture[] = [];
+      try {
+        const bitmaps = await Promise.all(document.textures.map((texture) => {
+          const image = document.images[texture.source]!;
+          const view = document.bufferViews[image.bufferView]!;
+          const start = view.byteOffset ?? 0;
+          const blob = new Blob([binary.slice(start, start + view.byteLength)], { type: image.mimeType });
+          return createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+        }));
+        if (own.aborted || this.destroyed) throw cancelled();
+        bitmaps.forEach((bitmap, index) => {
+          const sampler = document.samplers?.[document.textures[index]!.sampler ?? -1];
+          const texture = new pc.Texture(device, {
+            name: `character:${ref.assetKey}:${index}`,
+            width: bitmap.width,
+            height: bitmap.height,
+            format: index === material.roles.baseColor ? pc.PIXELFORMAT_SRGBA8 : pc.PIXELFORMAT_RGBA8,
+            mipmaps: true,
+            minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+            magFilter: pc.FILTER_LINEAR,
+            addressU: WRAP[sampler?.wrapS ?? 10497] ?? pc.ADDRESS_REPEAT,
+            addressV: WRAP[sampler?.wrapT ?? 10497] ?? pc.ADDRESS_REPEAT,
+            anisotropy: Math.min(8, device.maxAnisotropy),
+          });
+          texture.setSource(bitmap as unknown as HTMLImageElement);
+          created.push(texture);
+        });
+        return { textures: created, byteSize: ref.byteSize };
+      } catch (error) {
+        for (const texture of created) texture.destroy();
+        throw error;
+      }
+    }, signal);
   }
 
   /** A shared material built from a reviewed pack, optionally tinted. */
   async material(material: CatalogMaterial, tint: string | null, signal: AbortSignal): Promise<{ material: pc.StandardMaterial; release(): void }> {
+    if (this.destroyed) throw cancelled();
     const key = `${material.asset.contentSha256}:${tint ?? ''}`;
-    let entry = this.materials.get(key);
-    if (!entry) {
-      const pending: Omit<MaterialEntry, 'promise'> = { references: 0, material: null, lease: null };
-      const created: MaterialEntry = Object.assign(pending, { promise: this.buildMaterial(pending, material, tint) });
-      created.promise.catch(() => {
-        created.lease?.release();
-        if (this.materials.get(key) === created) this.materials.delete(key);
-      });
-      entry = created;
-      this.materials.set(key, entry);
-    }
-    const held = entry;
-    held.references += 1;
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      held.references -= 1;
-      if (held.references > 0) return;
-      if (this.materials.get(key) === held) this.materials.delete(key);
-      held.material?.destroy();
-      held.material = null;
-      held.lease?.release();
-      held.lease = null;
-    };
-    try {
-      const built = await held.promise;
-      if (signal.aborted || this.destroyed) throw cancelled();
-      return { material: built, release };
-    } catch (error) {
-      release();
-      throw error;
-    }
-  }
-
-  private async buildMaterial(entry: Omit<MaterialEntry, 'promise'>, material: CatalogMaterial, tint: string | null): Promise<pc.StandardMaterial> {
-    const lease = await this.acquire(material.asset, new AbortController().signal);
-    if (entry.references === 0 || this.destroyed) {
-      // Everyone who asked has gone while the pack loaded.
-      lease.release();
-      throw cancelled();
-    }
-    entry.lease = lease;
-    const textures = lease.container.resource.textures.map((asset) => asset.resource as pc.Texture);
-    const built = new pc.StandardMaterial();
-    built.name = `character:${material.materialId}`;
-    built.diffuseMap = textures[material.roles.baseColor]!;
-    if (tint) built.diffuse.fromString(tint);
-    if (material.roles.normal !== undefined) built.normalMap = textures[material.roles.normal]!;
-    if (material.alphaMode === 'MASK') {
-      built.opacityMap = textures[material.roles.opacity ?? material.roles.baseColor]!;
-      built.opacityMapChannel = material.roles.opacity === undefined ? 'a' : 'r';
-      built.alphaTest = (material.alphaCutoffMilli ?? 500) / 1000;
-      built.alphaToCoverage = this.app.graphicsDevice.samples > 1;
-    }
-    built.cull = material.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
-    built.useMetalness = true;
-    built.metalness = 0;
-    built.gloss = 1 - material.roughnessMilli / 1000;
-    built.update();
-    entry.material = built;
-    return built;
+    const { value, release } = await this.materials.lease(key, async (own) => {
+      const pack = await this.acquirePack(material, own);
+      try {
+        const textures = pack.value.textures;
+        const built = new pc.StandardMaterial();
+        built.name = `character:${material.materialId}`;
+        built.diffuseMap = textures[material.roles.baseColor]!;
+        if (tint) built.diffuse.fromString(tint);
+        if (material.roles.normal !== undefined) built.normalMap = textures[material.roles.normal]!;
+        if (material.alphaMode === 'MASK') {
+          built.opacityMap = textures[material.roles.opacity ?? material.roles.baseColor]!;
+          built.opacityMapChannel = material.roles.opacity === undefined ? 'a' : 'r';
+          built.alphaTest = (material.alphaCutoffMilli ?? 500) / 1000;
+          built.alphaToCoverage = this.app.graphicsDevice.samples > 1;
+        }
+        built.cull = material.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
+        built.useMetalness = true;
+        built.metalness = 0;
+        built.gloss = 1 - material.roughnessMilli / 1000;
+        built.update();
+        return { material: built, pack };
+      } catch (error) {
+        pack.release();
+        throw error;
+      }
+    }, signal);
+    return { material: value.material, release };
   }
 
   /**
@@ -382,7 +436,8 @@ export class CharacterHost {
     };
   }
 
-  private dispose(asset: pc.Asset): void {
+  private disposeContainer(container: LoadedContainer): void {
+    const asset = container.asset;
     for (const [key, variant] of this.variants) {
       if (key.startsWith(`${asset.id}:`)) {
         variant.destroy();
@@ -397,17 +452,10 @@ export class CharacterHost {
     if (this.destroyed) return;
     this.destroyed = true;
     this.loaderListeners.clear();
-    for (const entry of this.materials.values()) entry.material?.destroy();
     this.materials.clear();
+    this.packs.clear();
     for (const variant of this.variants.values()) variant.destroy();
     this.variants.clear();
-    for (const entry of this.containers.values()) {
-      entry.controller.abort();
-      if (entry.loaded) {
-        entry.loaded.asset.unload();
-        this.app.assets.remove(entry.loaded.asset);
-      }
-    }
     this.containers.clear();
     if (HOSTS.get(this.app) === this) HOSTS.delete(this.app);
   }
