@@ -199,12 +199,17 @@ def run_adaptive(
     pedestrian_spacing_s: int = PEDESTRIAN_SPACING_S,
     observer: Any = None,
     keep_states: bool = False,
+    until_settled: bool = False,
 ) -> AdaptiveRun:
     """Drive a scenario with demand that asks only for trips that can be made.
 
     A parked vehicle whose seeded dwell is over asks to go to a seeded street whose parking has
     a free space for its class. Each request is appended to the recorded inputs before the
     second that consumes it, so the finished inputs replay the run exactly.
+
+    With ``until_settled`` the run stops at the first second after the demand ends at which
+    every trip has arrived or been recorded as blocked, and ``run_seconds`` is only a cap. A
+    congested run then drains for as long as it needs rather than being cut off mid-trip.
     """
     network, catalogs = fixture()
     scenario = build_scenario(
@@ -295,4 +300,10 @@ def run_adaptive(
             states.append(state)
         events.extend(step.events)
         receipts.append(step.receipt)
+        if (
+            until_settled
+            and state["second"] >= demand_seconds
+            and all(trip["status"] in ("arrived", "blocked") for trip in state["trips"])
+        ):
+            break
     return AdaptiveRun(scenario, inputs, state, events, receipts, states)

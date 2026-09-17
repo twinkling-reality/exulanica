@@ -1,12 +1,13 @@
 """The traffic simulation: property runs, replay, blocked trips, inputs, presentation and metrics.
 
 **Property runs.** A busy fleet on the synthetic network, with pedestrians crossing every
-crosswalk about every 45 seconds whatever the signals show, for 30 simulated minutes of which the
-first 15 take new trips. Every transition is checked by ``TransitionChecker``, written apart from
-the step, and the tests require: no overlap, no entry without a reservation, none on red, none
-without stopping, no gap refused to priority traffic, all-way stop order kept, no vehicle in a
-crossing a pedestrian is on, no vehicle over its speed cap, no internal breach recorded, and every
-trip either arrived or recorded as blocked with its reason.
+crosswalk about once a minute whatever the signals show. New trips are requested for 15 simulated
+minutes, and the run then drains until every trip has arrived or been recorded as blocked, for at
+most an hour. Every transition is checked by ``TransitionChecker``, written apart from the step,
+and the tests require: no overlap, no entry without a reservation, none on red, none without
+stopping, no gap refused to priority traffic, all-way stop order kept, no vehicle in a crossing a
+pedestrian is on, no vehicle over its speed cap, no internal breach recorded, and every trip
+either arrived or recorded as blocked with its reason, before the hour is out.
 
 **Replay.** The recorded inputs alone reproduce every receipt, event and state byte for byte, in
 this process and in a new one under another hash seed.
@@ -67,7 +68,9 @@ from traffic_scenarios import (
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMAND_S = 900
+#: The fixed-demand runs' length, and the cap on a busy run's drain.
 RUN_S = 1_800
+DRAIN_CAP_S = 3_600
 BUSY_PEDESTRIAN_SPACING_S = 45
 PROPERTY_LABELS = ("busy-1", "busy-2", "busy-3", "busy-4", "busy-5", "busy-6")
 
@@ -105,7 +108,7 @@ def _checked_busy_run(label: str) -> CheckedRun:
     feeds = build_scenario(
         label,
         demand_seconds=0,
-        run_seconds=RUN_S,
+        run_seconds=DRAIN_CAP_S,
         fleet=BUSY_FLEET,
         pedestrian_spacing_s=BUSY_PEDESTRIAN_SPACING_S,
     ).inputs
@@ -128,10 +131,11 @@ def _checked_busy_run(label: str) -> CheckedRun:
     result = run_adaptive(
         label,
         demand_seconds=DEMAND_S,
-        run_seconds=RUN_S,
+        run_seconds=DRAIN_CAP_S,
         fleet=BUSY_FLEET,
         pedestrian_spacing_s=BUSY_PEDESTRIAN_SPACING_S,
         observer=observe,
+        until_settled=True,
     )
     assert result.inputs.feeds == feeds.feeds
     return CheckedRun(result, violations, over_cap, metrics.report(result.state), parked_seconds)
@@ -154,6 +158,7 @@ def test_a_busy_run_keeps_every_rule_and_every_trip_ends_arrived_or_blocked(labe
     assert [breach for receipt in result.receipts for breach in receipt["breaches"]] == []
     trips = result.state["trips"]
     assert len(trips) >= 50
+    assert result.state["second"] < DRAIN_CAP_S, "the run did not settle within the cap"
     statuses = Counter(trip["status"] for trip in trips)
     assert set(statuses) <= {"arrived", "blocked"}, statuses
     assert all(trip["reason"] for trip in trips if trip["status"] == "blocked")
@@ -176,20 +181,21 @@ def test_the_metrics_report_accounts_for_every_entry_space_second_and_trip(label
     network, _ = fixture()
     checked = _checked_busy_run(label)
     result, report = checked.result, checked.metrics
-    assert report["profile"] == METRICS_PROFILE and report["seconds"] == RUN_S
+    seconds = len(result.receipts)
+    assert report["profile"] == METRICS_PROFILE and report["seconds"] == seconds
     entered = Counter(event["junction"] for event in _documents(result.events, "junction_entered"))
     delays = Counter()
     for event in _documents(result.events, "junction_entered"):
         delays[event["junction"]] += event["delay_ms"]
     for row in report["junctions"]:
         assert row["entries"] == entered[row["junction"]] > 0
-        assert row["entries_per_hour"] == row["entries"] * 3600 // RUN_S
+        assert row["entries_per_hour"] == row["entries"] * 3600 // seconds
         assert row["mean_delay_ms"] == delays[row["junction"]] // row["entries"]
     spaces = Counter(space.classes for space in network.spaces.values())
     for row in report["parking"]:
         classes = tuple(row["classes"])
         assert row["spaces"] == spaces[classes]
-        expected = checked.parked_seconds[classes] * 1_000_000 // (spaces[classes] * RUN_S)
+        expected = checked.parked_seconds[classes] * 1_000_000 // (spaces[classes] * seconds)
         assert row["occupancy_ppm"] == expected
         assert 0 < row["occupancy_ppm"] <= 1_000_000
     trips = report["trips"]
