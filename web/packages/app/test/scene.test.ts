@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { GraphSnapshot, OccurrenceRecord } from '@exulanica/graph-client';
 import {
   asMetricLocal,
-  atlasLandscapeHeight,
   atlasVec3,
   islandId,
   localVec3,
@@ -153,13 +152,13 @@ describe('graph data becomes a scene', () => {
     expect(built.scene.islands[0]!.anchors[0]!.occurrenceCount).toBe(1);
   });
 
-  it('stands a reconstructed region on the landscape so its ground, cameras and arrival agree', () => {
+  it('stands a reconstructed region on the same flat datum as every other region', () => {
     const reconstructions = new Map([[islandId('a'), {
       rung: 3 as const, viewpointLocal: localVec3(0, 1.6, 0), footprintRadiusLocal: 4,
     }]]);
     const built = buildScene(snapshotOf([island('a')], [occurrence('o1', 'a')]), 1, new Map(), new Map(), reconstructions);
     const placed = built.scene.islands[0]!.placement;
-    expect(placed.position.y).toBeCloseTo(atlasLandscapeHeight(placed.position.x, placed.position.z), 9);
+    expect(placed.position.y).toBe(0);
     const plain = buildScene(snapshotOf([island('a')], [occurrence('o1', 'a')])).scene.islands[0]!.placement;
     expect(plain.position.y).toBe(0);
     expect([placed.position.x, placed.position.z, placed.yaw, placed.scale])

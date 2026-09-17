@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
-  atlasLandscapeHeight,
   DEFAULT_WORLD_MODULES,
   DEFAULT_WORLD_RECIPES,
   WORLD_DECLARABLE_FORM_KINDS,
@@ -180,13 +179,13 @@ describe('the catalog and the renderer agree on what a world can be built from',
 });
 
 /*
- * Where a memory stands when the ground under it is not the ground it was authored for.
+ * Where a memory stands.
  *
- * `atInstance` added `atlasLandscapeHeight` to every module unconditionally. That is right when the
- * Atlas landscape is the surface you are standing on, and wrong over an owned district, which draws
- * its own flat street at y = 0 and does not draw the Atlas landscape at all. The height of an
- * invisible surface is not a small error: on the Flatiron district every region sampled between
- * -0.74 and -1.39 metres, so a 3.4 metre landmark arrived with a third of itself inside the road.
+ * `atInstance` used to add an authored landscape height to every module. Nothing recorded that
+ * landscape and an owned district does not draw it, so on the Flatiron district every region sat
+ * between 0.74 and 1.39 metres below the street and a 3.4 metre landmark arrived with a third of
+ * itself inside the road. The default ground is now the flat datum navigation stands on, and a
+ * caller holding a measured ground supplies it.
  */
 describe('composed world grounding', () => {
   const at: readonly [number, number, number] = [-12, 0, -4];
@@ -202,26 +201,21 @@ describe('composed world grounding', () => {
     return world.entity.findByName(target.instanceId)!.getPosition().y;
   }
 
-  it('stands on the authored Atlas landscape by default', () => {
+  it('stands on the flat datum by default', () => {
     const target = composeAtlasWorld(scene([region('r1', 0, at)]))
       .instances.find((value) => value.role === 'expansion-point')!;
-    expect(growthBaseY()).toBeCloseTo(
-      target.transform.position.y
-        + atlasLandscapeHeight(target.transform.position.x, target.transform.position.z),
-      5,
-    );
+    expect(growthBaseY()).toBeCloseTo(target.transform.position.y, 5);
   });
 
   it('stands on the caller\'s ground when the caller owns it', () => {
-    // The district's own street. Not "close to zero": a flat surface means exactly its own height.
+    // A flat surface means exactly its own height, not "close to zero".
     expect(growthBaseY(() => 0)).toBe(0);
-    // And the two differ by exactly the landscape this district does not draw, which is the whole
-    // displacement the fix removes. Asserted against the function rather than a chosen tolerance,
-    // so it stays true if the fixture moves.
+    // A measured ground moves the module by exactly what it measured.
+    const measured = (x: number, z: number) => 0.25 + x * 0.01 + z * 0.02;
     const target = composeAtlasWorld(scene([region('r1', 0, at)]))
       .instances.find((value) => value.role === 'expansion-point')!;
-    const buried = atlasLandscapeHeight(target.transform.position.x, target.transform.position.z);
-    expect(buried).not.toBe(0);
-    expect(growthBaseY() - growthBaseY(() => 0)).toBeCloseTo(buried, 5);
+    const expected = measured(target.transform.position.x, target.transform.position.z);
+    expect(expected).not.toBe(0);
+    expect(growthBaseY(measured) - growthBaseY()).toBeCloseTo(expected, 5);
   });
 });

@@ -40,36 +40,6 @@ export function flatNavigationSurface(height = 0): NavigationSurface {
   });
 }
 
-/**
- * The authored Atlas field: broad, gentle mineral undulations shared by navigation and rendering.
- * Its analytic derivatives keep the normal exact, and its maximum possible slope stays well
- * below the 12-degree comfort contract. It expresses landscape, never recovered geography.
- */
-export function atlasLandscapeHeight(x: number, z: number): number {
-  return 0.9 * Math.sin(x * 0.045) +
-    0.65 * Math.cos(z * 0.04) +
-    0.35 * Math.sin((x + z) * 0.03) +
-    0.18 * Math.sin(x * 0.12) * Math.cos(z * 0.1);
-}
-
-export function atlasLandscapeSurface(): NavigationSurface {
-  return Object.freeze({
-    sample(x: number, z: number): SurfaceSample {
-      const dx = 0.9 * 0.045 * Math.cos(x * 0.045) +
-        0.35 * 0.03 * Math.cos((x + z) * 0.03) +
-        0.18 * 0.12 * Math.cos(x * 0.12) * Math.cos(z * 0.1);
-      const dz = -0.65 * 0.04 * Math.sin(z * 0.04) +
-        0.35 * 0.03 * Math.cos((x + z) * 0.03) -
-        0.18 * 0.1 * Math.sin(x * 0.12) * Math.sin(z * 0.1);
-      const length = Math.hypot(dx, 1, dz);
-      return Object.freeze({
-        height: atlasLandscapeHeight(x, z),
-        normal: Object.freeze({ x: -dx / length, y: 1 / length, z: -dz / length }),
-      });
-    },
-  });
-}
-
 export interface CircleObstacle {
   readonly id: string;
   readonly centre: AtlasVec3;

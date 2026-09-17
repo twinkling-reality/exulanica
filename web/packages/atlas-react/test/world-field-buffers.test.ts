@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  atlasLandscapeSurface,
   atlasVec3,
   buildNavigationWorld,
   islandId,
@@ -25,7 +24,7 @@ describe('scalable world-field buffers', () => {
       anchors: [],
       layoutEntities: new Set(index < 2 ? ['shared' as never] : []),
     }));
-    const world = buildNavigationWorld(makeScene(islands, 1, 1), atlasLandscapeSurface());
+    const world = buildNavigationWorld(makeScene(islands, 1, 1));
     const shape = worldFieldBufferShape(world);
     expect(shape.regionCapacity).toBe(world.regions.length);
     expect(shape.regionFloats).toBe(world.regions.length * 4);

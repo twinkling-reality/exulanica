@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  atlasLandscapeSurface, atlasVec3, buildNavigationWorld,
+  atlasVec3, buildNavigationWorld,
   islandId, localVec3, makeIsland, makeScene, placement, planResidency,
 } from '@exulanica/atlas-core';
 import {
@@ -26,7 +26,7 @@ const scene = makeScene([island], 1, 1);
  */
 describe('a session opens looking at the ground, not above it', () => {
   it('never pitches the opening camera up', () => {
-    const world = buildNavigationWorld(scene, atlasLandscapeSurface());
+    const world = buildNavigationWorld(scene);
     const start = initialAtlasCameraState(scene, world);
     expect(start.pitch).toBe(-0.085);
     // Standing off the region rather than inside it, which is what makes a landmark visible.
@@ -48,7 +48,7 @@ describe('arrival at a reconstructed region', () => {
 
   it('starts where the first photograph was taken and looks where that camera looked', () => {
     const scene = makeScene([reconstructed], 1, 1);
-    const world = buildNavigationWorld(scene, atlasLandscapeSurface());
+    const world = buildNavigationWorld(scene);
     const start = initialAtlasCameraState(scene, world);
     const expected = recoveredCameraState(reconstructed, reconstructed.viewpointLocal, reconstructed.viewpointForwardLocal!);
     expect(start).toEqual(expected);
@@ -65,7 +65,7 @@ describe('arrival at a reconstructed region', () => {
   it('keeps the offset framing for regions without a recovered viewing direction', () => {
     const { viewpointForwardLocal: _omitted, ...withoutForward } = reconstructed;
     const scene = makeScene([makeIsland({ ...withoutForward, anchors: [] })], 1, 1);
-    const world = buildNavigationWorld(scene, atlasLandscapeSurface());
+    const world = buildNavigationWorld(scene);
     const start = initialAtlasCameraState(scene, world);
     expect(start.pitch).toBe(-0.085);
     expect(Math.hypot(start.x - reconstructed.placement.position.x, start.z - reconstructed.placement.position.z)).toBeGreaterThan(3);

@@ -46,8 +46,6 @@ import {
   EMPTY_TIER_STATE,
   INITIAL_FOCUS_STATE,
   applyViewManifestInto,
-  atlasLandscapeHeight,
-  atlasLandscapeSurface,
   atlasMapPose,
   atlasVec3,
   buildAnchorTable,
@@ -777,7 +775,7 @@ export class AtlasBinding {
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
     const navigationWorld = options.ownedDistrict === undefined
-      ? buildNavigationWorld(options.scene, atlasLandscapeSurface())
+      ? buildNavigationWorld(options.scene)
       // The district owns the ground and the blockers; the scene owns where the memories are. Both
       // are already drawn in the same coordinate space, so withholding the regions from the
       // navigation world did not keep them apart, it only made them unreachable.
@@ -874,10 +872,6 @@ export class AtlasBinding {
       topology,
       initialArtProfile,
       theme,
-      // Stand the memories on whichever ground is actually under them. A district draws its own
-      // flat street and hides the Atlas landscape, so the landscape's height here is the offset of
-      // an invisible surface and buries every landmark by about a metre.
-      options.ownedDistrict === undefined ? atlasLandscapeHeight : () => 0,
     );
     // What the Map looks down on. Built from the same anchors the ground view already draws, so
     // it cannot drift from what the world actually holds, and enabled only at the Map vantage.

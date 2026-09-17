@@ -1,6 +1,5 @@
 import * as pc from 'playcanvas';
 import {
-  atlasLandscapeHeight,
   type WorldModuleFormKind,
   type WorldModuleInstance,
   type WorldTopologySnapshot,
@@ -266,6 +265,9 @@ function addPrimitive(
 /** Where the ground is under a point. Authored Atlas terrain unless a caller owns the ground. */
 export type ComposedWorldGroundHeight = (x: number, z: number) => number;
 
+/** The flat datum navigation stands on. */
+const flatGroundHeight: ComposedWorldGroundHeight = () => 0;
+
 function atInstance(
   root: pc.Entity,
   instance: WorldModuleInstance,
@@ -351,14 +353,13 @@ export function createComposedWorld(
   /**
    * Where this world's ground actually is.
    *
-   * The default is the authored Atlas terrain, which is right when that terrain is the ground you
-   * are standing on. It is wrong over an owned district, where the visible ground is the district's
-   * own flat asphalt at y = 0 and the Atlas landscape is not drawn at all. Sinking a memory by the
-   * height of a surface nobody can see is not a subtle error: every one of the four regions on the
-   * Flatiron district sits between 0.74 and 1.39 metres below the street, so a 3.2 metre landmark
-   * arrives with a third of itself inside the road.
+   * The default is the flat datum at y = 0, which is the ground navigation stands on. There is no
+   * authored terrain to follow: the undulating landscape that used to be the default was drawn by
+   * nothing under an owned district and recorded by nothing anywhere, and sinking a memory by the
+   * height of that surface left every Flatiron region between 0.74 and 1.39 metres below the
+   * street. A caller that holds a measured ground passes it here.
    */
-  groundHeight: ComposedWorldGroundHeight = atlasLandscapeHeight,
+  groundHeight: ComposedWorldGroundHeight = flatGroundHeight,
 ): ComposedWorld {
   const entity = new pc.Entity('atlas-composed-world');
   const meshes: MeshCatalog = {

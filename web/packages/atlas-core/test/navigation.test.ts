@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CAMERA_RADIUS_AU,
-  atlasLandscapeSurface,
   atlasMapPose,
   atlasVec3,
   buildNavigationWorld,
@@ -28,16 +27,10 @@ const baseIsland = (key = 'memory') => island({
 });
 
 describe('the grounded memory field', () => {
-  it('keeps the authored landscape deterministic and inside the movement-comfort slope budget', () => {
-    const surface = atlasLandscapeSurface();
-    for (let x = -180; x <= 180; x += 12) {
-      for (let z = -180; z <= 180; z += 12) {
-        const a = surface.sample(x, z)!;
-        const b = atlasLandscapeSurface().sample(x, z)!;
-        expect(a).toEqual(b);
-        const slope = Math.acos(a.normal.y) * 180 / Math.PI;
-        expect(slope).toBeLessThan(6);
-      }
+  it('stands on the flat datum when no surface is supplied', () => {
+    const world = buildNavigationWorld(scene([baseIsland()]));
+    for (const [x, z] of [[0, 0], [-180, 90], [37.5, -12.25]] as const) {
+      expect(world.surface.sample(x, z)).toEqual({ height: 0, normal: { x: 0, y: 1, z: 0 } });
     }
   });
 

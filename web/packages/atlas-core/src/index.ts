@@ -225,8 +225,6 @@ export {
   FIELD_MARGIN_AU,
   RECOVERY_MARGIN_AU,
   REGION_APPROACH_AU,
-  atlasLandscapeHeight,
-  atlasLandscapeSurface,
   atlasMapPose,
   buildNavigationWorld,
   classifySpatialPhase,
