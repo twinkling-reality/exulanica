@@ -43,6 +43,27 @@ function containerMeshes(container: LoadedContainer): pc.Mesh[] {
   return container.resource.renders.flatMap((render) => (render.resource as { meshes: pc.Mesh[] }).meshes);
 }
 
+/** The slowest cadence a walk plays at, as a share of its calibrated speed; slower is a blend into standing. */
+export const SLOWEST_WALK_CADENCE = 0.5;
+
+/**
+ * Where on the idle, walk and run blend a speed sits, and how fast the clips play there.
+ *
+ * A planted foot moves backward at the clip's speed times its cadence, so the cadence is what keeps
+ * it still on the ground. Below the walk's calibrated speed the whole walk plays slower, down to
+ * half cadence, rather than being mixed with standing, which shortens the step without slowing the
+ * foot and makes it slide. Only below that does the walk fade into standing, still at half cadence.
+ * Between walk and run the two clips blend at full cadence, and beyond the run the cadence rises.
+ */
+export function gaitFor(speed: number, walk: number, run: number): { readonly blend: number; readonly cadence: number } {
+  if (speed <= 0) return { blend: 0, cadence: 1 };
+  const slowest = walk * SLOWEST_WALK_CADENCE;
+  if (speed < slowest) return { blend: walk * (speed / slowest), cadence: SLOWEST_WALK_CADENCE };
+  if (speed <= walk) return { blend: walk, cadence: speed / walk };
+  if (speed <= run) return { blend: speed, cadence: 1 };
+  return { blend: run, cadence: speed / run };
+}
+
 export class CharacterPerson {
   readonly root: pc.Entity;
   private model: pc.Entity | null = null;
@@ -238,9 +259,9 @@ export class CharacterPerson {
     // Acceleration and braking read as weight transfer rather than a snap between gaits.
     this.smoothedSpeed = pose.discontinuity ? 0 : this.smoothedSpeed + (target - this.smoothedSpeed) * (1 - Math.exp(-dt / 0.12));
     const speed = this.smoothedSpeed < 0.02 ? 0 : this.smoothedSpeed;
-    anim.setFloat(SPEED, Math.min(speed, this.runSpeed));
-    // Beyond the run clip's calibrated speed the cadence rises instead of the feet sliding.
-    anim.speed = pose.reducedMotion ? 0 : speed > this.runSpeed ? speed / this.runSpeed : 1;
+    const gait = gaitFor(speed, this.walkSpeed, this.runSpeed);
+    anim.setFloat(SPEED, gait.blend);
+    anim.speed = pose.reducedMotion ? 0 : gait.cadence;
     if (pose.discontinuity) this.footLock?.reset();
     else this.footLock?.apply(dt, speed);
   }
