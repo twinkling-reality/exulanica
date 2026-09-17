@@ -318,6 +318,7 @@ export {
 
 export type {
   LayoutConfig,
+  LayoutFrame,
   LayoutInputIsland,
   LayoutMove,
   LayoutResult,
@@ -325,6 +326,7 @@ export type {
 } from './layout/solver.js';
 export {
   DEFAULT_LAYOUT_CONFIG,
+  LAYOUT_FRAME,
   LAYOUT_GLIDE_MS,
   LayoutScopeError,
   MAX_ISLANDS,

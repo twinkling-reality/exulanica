@@ -34,7 +34,7 @@ function input(
 }
 
 const placements = (r: ReturnType<typeof solveLayout>): string =>
-  JSON.stringify([...r.placements.entries()].sort());
+  JSON.stringify([...r.nonmetric_arrangement.entries()].sort());
 
 describe('the layout solver is deterministic', () => {
   const three = [
@@ -61,7 +61,7 @@ describe('the layout solver is deterministic', () => {
     // relax into a symmetric triangle where radius carries no information. The seed is where the
     // ordering actually shows: phyllotaxis radius grows with index, so 'a' is innermost.
     const seeded = solveLayout(tied, 1, { strategy: 'seed-only' });
-    const byRadius = [...seeded.placements.entries()]
+    const byRadius = [...seeded.nonmetric_arrangement.entries()]
       .map(([id, p]) => [id, Math.hypot(p.position.x, p.position.z)] as const)
       .sort((x, y) => x[1] - y[1])
       .map(([id]) => id);
@@ -103,17 +103,17 @@ describe('semantic proximity, not geography', () => {
       ],
       1,
     );
-    const a = r.placements.get(islandId('a'))!.position;
-    const b = r.placements.get(islandId('b'))!.position;
-    const c = r.placements.get(islandId('c'))!.position;
+    const a = r.nonmetric_arrangement.get(islandId('a'))!.position;
+    const b = r.nonmetric_arrangement.get(islandId('b'))!.position;
+    const c = r.nonmetric_arrangement.get(islandId('c'))!.position;
     expect(atlasGroundDistance(a, b)).toBeLessThan(atlasGroundDistance(a, c));
     expect(atlasGroundDistance(a, b)).toBeLessThan(atlasGroundDistance(b, c));
   });
 
   it('never lets footprints overlap, however similar two islands are', () => {
     const r = solveLayout([input('a', 1, ['x']), input('b', 2, ['x'])], 1);
-    const a = r.placements.get(islandId('a'))!.position;
-    const b = r.placements.get(islandId('b'))!.position;
+    const a = r.nonmetric_arrangement.get(islandId('a'))!.position;
+    const b = r.nonmetric_arrangement.get(islandId('b'))!.position;
     expect(atlasGroundDistance(a, b)).toBeGreaterThan(60);
   });
 
@@ -165,13 +165,13 @@ describe('adding an island does not scramble the ones already there', () => {
       1,
     );
     const pinnedInputs = ['a', 'b', 'c'].map((k, i) =>
-      input(k, i + 1, i === 2 ? ['q'] : ['p'], first.placements.get(islandId(k))!),
+      input(k, i + 1, i === 2 ? ['q'] : ['p'], first.nonmetric_arrangement.get(islandId(k))!),
     );
     const second = solveLayout([...pinnedInputs, input('d', 4, ['p', 'q'])], 2);
 
     for (const k of ['a', 'b', 'c']) {
-      const before = first.placements.get(islandId(k))!.position;
-      const after = second.placements.get(islandId(k))!.position;
+      const before = first.nonmetric_arrangement.get(islandId(k))!.position;
+      const after = second.nonmetric_arrangement.get(islandId(k))!.position;
       expect(atlasGroundDistance(before, after)).toBeLessThanOrEqual(
         DEFAULT_LAYOUT_CONFIG.driftRadius + 1e-6,
       );
@@ -190,7 +190,7 @@ describe('adding an island does not scramble the ones already there', () => {
     const r = solveLayout([input('a', 1, ['p'], pinned), input('b', 2, ['p'])], 2, {
       driftRadius: 0,
     });
-    expect(r.placements.get(islandId('a'))).toEqual(pinned);
+    expect(r.nonmetric_arrangement.get(islandId('a'))).toEqual(pinned);
   });
 });
 
@@ -206,8 +206,8 @@ describe('the solver refuses to solve an infinite world', () => {
 
   it('accepts one island, because the single-photo path is the primary experience', () => {
     const r = solveLayout([input('solo', 1, [])], 1);
-    expect(r.placements.size).toBe(1);
-    expect(r.placements.get(islandId('solo'))!.yaw).toBe(0);
+    expect(r.nonmetric_arrangement.size).toBe(1);
+    expect(r.nonmetric_arrangement.get(islandId('solo'))!.yaw).toBe(0);
   });
 
   it('requires a placement for every island under the hand-placed strategy (experiment I-4)', () => {
@@ -225,7 +225,7 @@ describe('every island faces the middle of the Atlas', () => {
       [input('a', 1, ['p']), input('b', 2, ['p', 'q']), input('c', 3, ['q'])],
       1,
     );
-    const entries = [...r.placements.entries()];
+    const entries = [...r.nonmetric_arrangement.entries()];
     const cx = entries.reduce((s, [, p]) => s + p.position.x, 0) / entries.length;
     const cz = entries.reduce((s, [, p]) => s + p.position.z, 0) / entries.length;
 

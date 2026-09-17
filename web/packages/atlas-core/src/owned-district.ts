@@ -135,11 +135,16 @@ export function parseOwnedDistrict(value: unknown): OwnedDistrict {
  * landscape unreachable by anything except walking, and walking is 200-plus metres through 400
  * solid footprints at 1.65 m/s.
  *
- * A region is declared only when the district has ground under its centre. That is the honest
- * line: this district is a bounded rectangle of admitted geography, and a memory whose placement
- * falls outside it genuinely has nowhere here to stand. Declaring it anyway would trade one wrong
- * answer for another, since `safePoseAround` would then fail on a null surface sample and report
- * `no-safe-surface` about a region that is not missing a surface but is somewhere else entirely.
+ * A region is declared only when its placement is located and the district has ground under its
+ * centre. That is the honest line: this district is a bounded rectangle of admitted geography in
+ * real units, and a memory whose placement falls outside it genuinely has nowhere here to stand.
+ * Declaring it anyway would trade one wrong answer for another, since `safePoseAround` would then
+ * fail on a null surface sample and report `no-safe-surface` about a region that is not missing a
+ * surface but is somewhere else entirely.
+ *
+ * A region the layout solver arranged is not declared at all, wherever its centre happens to
+ * fall. Its centre is a `nonmetric_arrangement` coordinate, and reading it as a point in this
+ * district is how memories landed inside a 47 metre building and beyond the district's edge.
  */
 export function ownedDistrictNavigation(
   district: OwnedDistrict,
@@ -171,6 +176,7 @@ export function ownedDistrictNavigation(
     maximumStepHeight: 0.18,
     surfaceSampleSpacing: 0.25,
     regions: Object.freeze(regions.filter((region) =>
+      region.placement === 'located' &&
       region.centre.x >= west && region.centre.x <= east &&
       region.centre.z >= north && region.centre.z <= south)),
     obstacles: Object.freeze([]),

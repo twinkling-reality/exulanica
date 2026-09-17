@@ -150,6 +150,10 @@ export interface SceneBuild {
  * Consume durable presentation authority without making the graph transport own Atlas layout.
  * Missing regions receive deterministic draft ordinals and placements for this render, while the
  * coverage report makes the persistence debt explicit to the backend adapter.
+ *
+ * A stored layout pins placements so spatial memory survives, and that is all it does. It is the
+ * solver's arrangement written down, and the snapshot records no placement as a known place, so
+ * nothing restored here is located.
  */
 export function buildSceneFromLayout(
   snapshot: GraphSnapshot,
@@ -209,9 +213,16 @@ export function buildScene(
   persistedPlacements: ReadonlyMap<IslandId, IslandPlacement> = new Map(),
   creationOrdinals: ReadonlyMap<IslandId, number> = new Map(),
   reconstructions: ReadonlyMap<IslandId, ReconstructedGeometry> = new Map(),
+  /**
+   * Regions whose persisted placement is a known place rather than a kept arrangement. Only these
+   * are located, and only when a persisted placement is supplied for them; that placement is then
+   * used exactly, because relaxation may move an arrangement but never a place.
+   */
+  locatedIslands: ReadonlySet<IslandId> = new Set(),
 ): SceneBuild {
   const kept = snapshot.islands.slice(0, MAX_ISLANDS);
   const omitted = snapshot.islands.slice(MAX_ISLANDS);
+  const located = (id: IslandId): boolean => locatedIslands.has(id) && persistedPlacements.has(id);
   const resolvedOrdinals = resolveCreationOrdinals(kept, creationOrdinals);
 
   // Importance is driven by how often the linked entity appears across the WHOLE workspace,
@@ -275,20 +286,22 @@ export function buildScene(
       // A reconstruction's display ground is its local y = 0, and so is every region's: the layout
       // solver places them on the y = 0 plane, which is the flat datum navigation stands on. There
       // is no authored landscape to lift a reconstructed region onto.
-      placement: layout.placements.get(toIslandId(record.islandId)) ?? originPlacement(),
+      placement: located(toIslandId(record.islandId))
+        ? persistedPlacements.get(toIslandId(record.islandId))!
+        : layout.nonmetric_arrangement.get(toIslandId(record.islandId)) ?? originPlacement(),
       /*
-       * Located only when somebody supplied the placement.
+       * Located only when the caller says the persisted placement is a known place.
        *
-       * `persistedPlacements` is the one input to this function that carries a position anybody
-       * asserted. Everything else in `layout.placements` is the solver's own packing, and the
-       * comment eight lines down already says it: where a region sits "carries no real-world
-       * meaning". The composer refuses to give a body to a region whose position means nothing,
-       * so this flag is the whole difference between a landmark and a decoration.
+       * Everything in `layout.nonmetric_arrangement` is the solver's own packing, and a pinned
+       * placement is that packing kept for spatial memory: where a region sits there "carries no
+       * real-world meaning". The composer refuses to give a body to a region whose position means
+       * nothing, and an owned district refuses to declare one, so this flag is the whole difference
+       * between a landmark and a decoration.
        *
-       * The app passes an empty map today, so today every region is unlocated and the world
-       * carries no memory bodies at all. That is the intended reading, not a gap to paper over.
+       * The app names no located region today, so every region is unlocated and the world carries
+       * no memory bodies at all. That is the intended reading, not a gap to paper over.
        */
-      placementLocated: persistedPlacements.has(toIslandId(record.islandId)),
+      placementLocated: located(toIslandId(record.islandId)),
       // What is actually loaded decides this renderer rung. The record remains available on the
       // graph snapshot as a separate historical fact. A failed fetch therefore presents rung 4
       // source photographs without rewriting the rung 3 that the durable gate recorded.

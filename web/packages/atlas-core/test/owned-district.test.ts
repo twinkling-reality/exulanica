@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   atlasVec3,
+  makeIsland,
   navigationRegionForIsland,
   ownedDistrictNavigation,
   parseOwnedDistrict,
@@ -35,6 +36,8 @@ const fixture = {
     polygons: [[[[-100, -300], [100, -300], [100, 300], [-100, 300], [-100, -300]]]],
   }],
 };
+
+const world = ownedDistrictNavigation;
 
 describe('owned district contract', () => {
   it('builds bounded visible support and exact footprint collision', () => {
@@ -75,6 +78,26 @@ describe('owned district contract', () => {
     // Not a radius test. The surface is the district rectangle, so the question a declared region
     // has to answer is whether this district has ground under it, not how far out it sits.
     expect(world.surface.sample(beyond.placement.position.x, beyond.placement.position.z)).toBeNull();
+  });
+
+  /*
+   * A region the layout solver arranged has no place in this district, wherever its centre falls.
+   * Its centre is a nonmetric arrangement coordinate; read as metres it put one memory inside a
+   * 47 metre building and another beyond the district's edge.
+   */
+  it('declares no region whose placement is only an arrangement', () => {
+    const district = parseOwnedDistrict(fixture);
+    const arranged = makeIsland({
+      ...island({ key: 'arranged', createdAt: 1, anchors: [], position: [4, 0, -3] }),
+      placementLocated: false,
+    });
+    const region = navigationRegionForIsland(arranged);
+    expect(region.placement).toBe('nonmetric_arrangement');
+    expect(world(district, [region]).surface.sample(4, -3)).not.toBeNull();
+    expect(world(district, [region]).regions).toEqual([]);
+    const located = navigationRegionForIsland(island({ key: 'located', createdAt: 2, anchors: [], position: [4, 0, -3] }));
+    expect(located.placement).toBe('located');
+    expect(world(district, [located]).regions.map((held) => held.islandId)).toEqual([located.islandId]);
   });
 
   it('rejects an unadmitted source before rendering', () => {

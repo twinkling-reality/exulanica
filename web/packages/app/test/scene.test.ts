@@ -111,6 +111,39 @@ describe('graph data becomes a scene', () => {
     });
   });
 
+  it('restores a stored layout as pinned arrangement, not as known places', () => {
+    const pinned = placement(atlasVec3(42, 0, -18), 0.75, 1);
+    const stored = makeAtlasLayoutSnapshot({
+      layoutVersion: 2,
+      previousLayoutVersion: 1,
+      reason: 'initial',
+      entries: [{ islandId: islandId('a'), creationOrdinal: 0, placement: pinned }],
+    });
+    const built = buildSceneFromLayout(snapshotOf([island('a')], [occurrence('o1', 'a')]), stored);
+    expect(built.scene.islands[0]!.placementLocated).toBe(false);
+  });
+
+  it('locates a region only when the caller names its persisted placement as a place, and keeps it exactly', () => {
+    const known = placement(atlasVec3(3, 0, 4), 0.5, 1);
+    const persisted = new Map([[islandId('a'), known], [islandId('b'), placement(atlasVec3(-9, 0, 2), 0, 1)]]);
+    const built = buildScene(
+      snapshotOf([island('a'), island('b'), island('c')], [
+        occurrence('o1', 'a'), occurrence('o2', 'b'), occurrence('o3', 'c'),
+      ]),
+      1,
+      persisted,
+      new Map(),
+      new Map(),
+      new Set([islandId('a'), islandId('c')]),
+    );
+    const byId = new Map(built.scene.islands.map((value) => [value.islandId, value] as const));
+    expect(byId.get(islandId('a'))).toMatchObject({ placementLocated: true, placement: known });
+    // Pinned but not named: a kept arrangement.
+    expect(byId.get(islandId('b'))!.placementLocated).toBe(false);
+    // Named but with nothing persisted: there is no place to keep.
+    expect(byId.get(islandId('c'))!.placementLocated).toBe(false);
+  });
+
   it('marks a new region as a draft layout addition instead of pretending it was persisted', () => {
     const stored = makeAtlasLayoutSnapshot({
       layoutVersion: 3,

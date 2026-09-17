@@ -21,7 +21,7 @@ export interface SeedPoint {
 
 /**
  * @param count number of islands
- * @param spacing atlas units; the radius of point i is `spacing * sqrt(i + 0.5)`
+ * @param spacing arrangement units, not metres; the radius of point i is `spacing * sqrt(i + 0.5)`
  */
 export function phyllotaxisSeed(count: number, spacing: number): readonly SeedPoint[] {
   const out: SeedPoint[] = [];

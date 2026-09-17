@@ -170,7 +170,7 @@ export function buildFixtureScene(islandCount = 3): AtlasScene {
 
   const layout = solveLayout(inputs, 1);
   const placed = draft.map((island) =>
-    makeIsland({ ...island, placement: layout.placements.get(island.islandId)! }),
+    makeIsland({ ...island, placement: layout.nonmetric_arrangement.get(island.islandId)! }),
   );
 
   return makeScene(placed, layout.layoutVersion, 1);

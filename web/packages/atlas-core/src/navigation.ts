@@ -59,6 +59,12 @@ export interface NavigationRegion {
   readonly dissolveStartRadius: number;
   readonly approachRadius: number;
   readonly movement: MovementModel;
+  /**
+   * Whether `centre` is a place somebody supplied, or a position the layout solver arranged.
+   * An arranged centre is a `nonmetric_arrangement` coordinate and is no place in a world whose
+   * ground is measured.
+   */
+  readonly placement: 'located' | 'nonmetric_arrangement';
 }
 
 /**
@@ -78,6 +84,7 @@ export function navigationRegionForIsland(island: Island): NavigationRegion {
     dissolveStartRadius: footprintRadius * 0.8,
     approachRadius: footprintRadius + REGION_APPROACH_AU,
     movement: rungProperties(island.rung).movement,
+    placement: island.placementLocated === true ? 'located' : 'nonmetric_arrangement',
   });
 }
 

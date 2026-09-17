@@ -21,6 +21,12 @@ import { semanticSimilarity } from './similarity.js';
  *     first three."
  *   - "Speculative links must never move the world." Enforced upstream in `layoutEntitiesOf`.
  *
+ * FRAME. The output is a `nonmetric_arrangement`. The seed spacing, the separations and the drift
+ * radius are arrangement parameters, not distances anybody measured, so nothing read from a
+ * placement here is a length in metres. A consumer reads the placements through the frame's name,
+ * and a surface whose own frame carries real units must not take an arranged position as a place
+ * in it.
+ *
  * SCOPE. This solves 1 to 5 islands and refuses more. The brief says three to five; the product
  * says most users upload one or two photographs, and one photograph is one island, so the low
  * end has to work. Refusing at six is deliberate: "Do not solve infinite worlds." A force layout
@@ -29,6 +35,10 @@ import { semanticSimilarity } from './similarity.js';
  */
 
 export const MAX_ISLANDS = 5;
+
+/** The frame every solver placement is in. An arrangement, not a measurement. */
+export const LAYOUT_FRAME = 'nonmetric_arrangement' as const;
+export type LayoutFrame = typeof LAYOUT_FRAME;
 
 /** "Regions glide over about 1.2 s" when the persisted layout changes. Never a cut. */
 export const LAYOUT_GLIDE_MS = 1200;
@@ -58,11 +68,11 @@ export type LayoutStrategy =
 
 export interface LayoutConfig {
   readonly strategy: LayoutStrategy;
-  /** Atlas units. Sets the scale of the phyllotaxis seed. */
+  /** Arrangement units, not metres. Sets the scale of the phyllotaxis seed. */
   readonly seedSpacing: number;
-  /** Target separation at similarity 1 (identical entity sets). */
+  /** Target arrangement separation at similarity 1 (identical entity sets). Unitless. */
   readonly minSeparation: number;
-  /** Target separation at similarity 0 (nothing in common). */
+  /** Target arrangement separation at similarity 0 (nothing in common). Unitless. */
   readonly maxSeparation: number;
   /** Extra clearance between footprint boundaries, as a fraction of the summed radii. */
   readonly footprintGap: number;
@@ -72,7 +82,10 @@ export interface LayoutConfig {
   readonly stepSize: number;
   /** Spring pulling a pinned island back toward its stored position, per iteration. */
   readonly pinStrength: number;
-  /** Hard clamp. A pinned island may never end further than this from where it was. */
+  /**
+   * Hard clamp, in arrangement units. A pinned island may never end further than this from where
+   * it was in the arrangement. It bounds a rearrangement, not a distance on the ground.
+   */
   readonly driftRadius: number;
 }
 
@@ -90,14 +103,17 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = Object.freeze({
 
 export interface LayoutMove {
   readonly islandId: IslandId;
-  /** Atlas units moved from the pinned position. Presentation only; drives the glide and the copy. */
+  /** Arrangement units moved from the pinned position. Presentation only; drives the glide and the copy. */
   readonly distance: number;
 }
 
 export interface LayoutResult {
   readonly layoutVersion: number;
   readonly strategy: LayoutStrategy;
-  readonly placements: ReadonlyMap<IslandId, IslandPlacement>;
+  /** What the placements are. Never a metric frame. */
+  readonly frame: LayoutFrame;
+  /** The placements, read through the frame's own name so no caller can take them for places. */
+  readonly nonmetric_arrangement: ReadonlyMap<IslandId, IslandPlacement>;
   /**
    * Islands that moved from their pinned position, largest first.
    *
@@ -285,7 +301,8 @@ export function solveLayout(
   return Object.freeze({
     layoutVersion,
     strategy: cfg.strategy,
-    placements,
+    frame: LAYOUT_FRAME,
+    nonmetric_arrangement: placements,
     moved: Object.freeze(moved),
   });
 }
