@@ -19,15 +19,15 @@ the sets are the texture lane's, documented in [texture-package.md](texture-pack
 On the app's development server, `/?preview=1&tile=tile-conformance` opens the normal shell with
 the Companion and the reticle, but the owned district is replaced by the named tile. Today that
 tile is tess's city version 2 conformance fixture: a 128 m terrain patch, drawn whole (512
-triangles) in the stated unavailable pattern (a magenta hatch carrying the word UNAVAILABLE, unlit),
-because no material record dresses terrain and the tile says so. The player stands on the tile's
+triangles, one `terrain` surface) in the stated unavailable pattern (a magenta hatch carrying the
+word UNAVAILABLE, unlit), because no material record dresses terrain and the tile says so. The player stands on the tile's
 `nav_envelope`, eye 1.62 m above it, at the middle of its southern edge, and walking follows it; the
 envelope leaves out the ground around the tile's other records, so the middle of the patch is drawn
 but cannot be stood on. A panel at the bottom left says what this is ("Development evaluation of
 generated tile tile-conformance. Not part of any world."), what the player stands on, what is
 missing (no `collision_proxy`, so nothing blocks the capsule), how many of the records render_batch
-lists are drawn, and lists every record that is drawn as unavailable or not drawn yet, with the
-geometry it waits on.
+lists are drawn and how many surfaces are drawn as unavailable, and lists each such surface (record,
+role and orientation, with its reason) and every record not drawn yet, with the geometry it waits on.
 
 The eight texture sets are seen on real surfaces only on the test-only bench,
 `web/packages/atlas-react/test/generated-tile-bench/`: a few metres of hand-built street
@@ -87,11 +87,10 @@ v = (sin(theta) * s + cos(theta) * t + uv_offset_v_mm) / repeat_v
 
 So the size factor is a repeat length (2,000,000 draws the set twice as large), a positive theta
 turns +s toward +t, offsets apply after rotation, and a wall `w` mm wide at size 1,000,000 repeats
-the set `w / extent_u_mm` times. There is no other scale anywhere. A drawn range whose material is
+the set `w / extent_u_mm` times. There is no other scale anywhere. A surface whose material is
 `none-exists` (exact geometry no material record dresses) is drawn as the unavailable surface with
-that reason, never withheld. A `surface_material` version 1
-states no placement, so a range citing one is drawn as unavailable ("version 1 does not state how
-its texture is placed").
+that reason, never withheld. A `surface_material` version 1 states no placement, so a surface citing
+one is drawn as unavailable ("version 1 does not state how its texture is placed").
 
 The surface coordinates are tess's, in the frames the city vocabulary fixed: on horizontal faces
 `t` is to the left of `s`, and terrain, lot and roof use the plan (`s = x`, `t = y`); on vertical
@@ -106,20 +105,25 @@ Normal map sign: PlayCanvas derives its bitangent toward increasing v and the se
 `@exulanica/loom-tess/core`, the only tess entry shipping code may import (tess's rule in
 `web/.dependency-cruiser.cjs`). It calls `verifyOwd`, which decodes the container and bakes the
 header's records again, requiring every byte to match; there is no second reader and nothing is
-repaired. The container is tess's `owd/2`. It refuses a page with no `crypto.subtle`, a tile that
+repaired. The container is tess's `owd/3`. It refuses a page with no `crypto.subtle`, a tile that
 fails verification, a grammar frame other than `city_local` (section 5 has the capsule it also
 reads), and a tile with no `render_batch`, no surface coordinates or no drawn range.
 
-Only `render_batch` is drawn, and only its drawn ranges, exactly as stored. A drawn range is
-textured when it cites a version 2 `surface_material` record whose set is pinned and verifies; a
-range whose material is `none-exists`, or whose material does not resolve, is the unavailable
-surface with its reason. An `unavailable` entry is geometry tess has not produced yet: it has no
+Only `render_batch` is drawn, and only its drawn entries, exactly as stored. A drawn entry is a list
+of surfaces: contiguous runs of its triangles that share no vertex, each with one grammar role, one
+material and one orientation, so a kerb's vertical face and its horizontal top, or a facade's ten
+roles, are separate surfaces of one record. A surface is textured when its material is a version 2
+`surface_material` record whose set is pinned and verifies; a surface whose material is
+`none-exists`, or whose material does not resolve, is the unavailable surface with its reason. An
+`unavailable` entry is geometry tess has not produced yet: it has no
 triangles and is listed with the needs tess stated ("Not drawn yet: its geometry waits on
 massing_faces."). A `not_admitted` entry is listed too. A `halo` entry is a neighbouring record
 carried as context and is neither drawn nor listed, and neither is `not_in_projection`. Every set a
-tile cites, and only those, is
-fetched and verified before the renderer exists, so an attached tile is complete on its first frame.
-Ranges are batched by set: one draw per set and one for all unavailable surfaces.
+tile cites, and only those, is fetched and verified before the renderer exists, so an attached tile
+is complete on its first frame. `batchTileSurfaces` batches surfaces by what they are drawn with,
+across records: one draw per set and one for all unavailable surfaces. Each surface's UVs follow its
+own material and orientation, its normals are computed over its own triangles, and a surface
+triangle that reaches outside its surface's vertices is refused.
 
 Frames: records are `city_local`, integer millimetres, x east, y north, z up. The renderer draws a
 tile point (x, y, z) at (x, z, -y) / 1000 metres, a proper rotation, so winding is kept and north is
@@ -127,7 +131,7 @@ the camera's yaw 0.
 
 Identity for picking: `rangeAtTriangle(triangle)` returns the record a `render_batch` triangle
 belongs to, and `pick(origin, direction)` returns the nearest drawn triangle along a ray with its
-record. Version 2 records state their identity (the conformance terrain is
+record; both stay per entry, whatever surfaces it has. Version 2 records state their identity (the conformance terrain is
 `2f14328d-39f8-5bee-a06a-f963b701ccf3`), and every range carries it. Data view selection through
 `registerRepresentationSubjects` is not wired yet; it waits for the data view lane to merge.
 
