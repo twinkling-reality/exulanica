@@ -57,10 +57,11 @@ from exulanica.ingest.privacy import (
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages import depth as depth_stage
 from exulanica.ingest.stages import vision as vision_stage
+from exulanica.ingest.stages.person_regions import reads_pixels
 from exulanica.ingest.stages.segmentation import SEGMENTER_CONTRACT, Detections
 from exulanica.ingest.stages.segmentation import model_handoff as segmentation_handoff
 from exulanica.ingest.vision import NebiusVisionModel
-from exulanica.ingest.worker import DerivativeWorker, _bound_detector
+from exulanica.ingest.worker import DerivativeWorker
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import PROVIDER, Role, load_manifest
@@ -349,6 +350,7 @@ def test_each_stage_states_the_hand_over_its_model_makes(manifest, transport):
         transport=transport,
         budget=BudgetGuard(ceiling_usd=Decimal("1.00"), max_calls=10),
     )
+    assert NebiusVisionModel(client).model_handoff == HOSTED
     assert vision_stage.model_handoff(NebiusVisionModel(client)) == HOSTED
     assert vision_stage.model_handoff(CountingVisionModel()) is None
     assert vision_stage.model_handoff(HostedVisionDouble()) == HOSTED
@@ -1150,8 +1152,18 @@ def test_the_worker_sends_a_detection_pass_to_no_model_without_a_right(
     outcomes = _drain(subject, scratch, vision=vision, detector=detector)
     assert vision.calls == 0
     assert detector.calls == 0
-    assert outcomes[0].failed == 1
-    assert "does not state which model" in outcomes[0].errors[0]
+    assert outcomes[0].errors == []
+    reasons = {
+        row["stage_key"]: row["error_message"]
+        for row in repository.connection.execute(
+            "select e.stage_key, e.error_message from pipeline_event e "
+            "join pipeline_run r on r.run_id=e.run_id "
+            "where r.capture_id=%s and e.type='stage_unavailable'",
+            (subject.capture_id,),
+        ).fetchall()
+    }
+    assert "no personal model right" in reasons["vision"]
+    assert "does not state which model" in reasons["person_regions"]
 
 
 def test_the_worker_hands_each_model_only_what_its_right_names(personal, spine_schema):
@@ -1168,17 +1180,47 @@ def test_the_worker_hands_each_model_only_what_its_right_names(personal, spine_s
     assert detector.calls == 1
 
 
-def test_a_detector_that_reads_no_pixels_is_not_wrapped(personal):
-    recorded = RecordedObservationDetector()
-    assert _bound_detector(recorded, personal.repository, personal.capture_id, None) is recorded
-    assert _bound_detector(None, personal.repository, personal.capture_id, None) is None
-    reading = PixelReadingDetector()
-    bound = _bound_detector(reading, personal.repository, personal.capture_id, None)
-    assert bound is not reading
-    assert (bound.model_id, bound.requires_observation) == (reading.model_id, False)
-    with pytest.raises(PrivacyAdmissionError, match="no privacy screening"):
-        bound.detect(None, {})
-    assert reading.calls == 0
+def test_only_a_detector_that_discards_the_image_is_ungated():
+    """Exact types, so a subclass of a blind detector that reads the pixels is still gated."""
+
+    class Curious(RecordedObservationDetector):
+        pass
+
+    assert reads_pixels(RecordedObservationDetector()) is False
+    assert reads_pixels(PixelReadingDetector()) is True
+    assert reads_pixels(Curious()) is True
+
+
+def test_a_directly_built_pipeline_gates_its_person_detector(personal):
+    """No worker in between: the person-region stage asks for the right itself."""
+    identity = ModelIdentity.local("person_detector", "test/pixel-person", "6" * 40)
+    detector = PixelReadingDetector(ModelHandoff.local(identity))
+    pipeline = PhotoIngestPipeline(personal.repository, personal.store, detector=detector)
+
+    unscreened = pipeline.ingest_derivatives(personal.capture_id)
+    assert unscreened.error is None, unscreened.error
+    assert detector.calls == 0
+    assert "person_regions" in unscreened.stages_unavailable
+    assert "no privacy screening" in stage_reason(
+        personal.repository, unscreened.run_id, "person_regions"
+    )
+
+    refused = pipeline.ingest_derivatives(
+        personal.capture_id, privacy_screening_id=personal.detection_id
+    )
+    assert detector.calls == 0
+    assert "person_regions" in refused.stages_unavailable
+    assert "no model right lets" in stage_reason(
+        personal.repository, refused.run_id, "person_regions"
+    )
+
+    grant(personal, identity, LOCAL_PROCESS)
+    allowed = pipeline.ingest_derivatives(
+        personal.capture_id, privacy_screening_id=personal.detection_id
+    )
+    assert allowed.error is None, allowed.error
+    assert detector.calls == 1
+    assert "person_regions" in allowed.stages_run
 
 
 # -- the ordinary API path ------------------------------------------------------------------------

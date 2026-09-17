@@ -75,19 +75,19 @@ reader.
 
 **Where it is enforced.** The vision stage (hosted), the depth stage and the segmentation stage
 (local) call it immediately before their model; a refusal records `stage_unavailable` with the
-reason and sends nothing. The vision stage reads a `NebiusVisionModel`'s chain and endpoint from
-the manifest its client was built with; depth reads MoGe's `repo@revision`; segmentation reads the
-segmenter's pinned identity and adds the detector and its fallback only when the local detector
-will run. Any other model states its hand-over with a `model_handoff` attribute or is refused. The
-derivative worker binds any person detector that reads pixels to the same check, because the
-person-region stage asks for no receipt of its own; the recorded-observation detector and the
-test doubles that discard the image are not bound.
+reason and sends nothing. The person-region stage does the same for any person detector that
+reads pixels, asking first for a receipt that lets the bytes be looked at, so a pipeline built
+directly is gated as the derivative worker is; the recorded-observation detector and the test
+doubles that discard the image are exempt by exact type, and a subclass of one is not. Every model
+states its hand-over with a `model_handoff` attribute or is refused: `NebiusVisionModel` states its
+role's whole chain and the endpoint of the manifest its client was built with; depth states MoGe's
+`repo@revision`; segmentation states the segmenter's pinned identity and adds the detector and its
+fallback only when the local detector will run. The value types, `ModelIdentity` and
+`ModelHandoff`, live in `exulanica.models.handoff` so a model in any layer can state them.
 
 **Not covered yet.**
 
 - There is no HTTP route to withdraw a right. `withdraw_model_right` is the only withdrawal.
-- The person-region stage does not call the check itself; only the derivative worker binds a
-  pixel-reading detector. A pipeline built directly with such a detector is not gated.
 - The manifest states no depth role, so depth cannot be granted by role name through the batch
   path; a depth right names its checkpoint through `grant_model_right`.
 - Scene pose (COLMAP, classic feature matching with no learned weights) runs under the scene

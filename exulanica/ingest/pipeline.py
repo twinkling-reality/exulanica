@@ -598,6 +598,7 @@ class PhotoIngestPipeline:
             vision,
             ledger,
             outcome,
+            privacy_screening_id,
         )
         masked, masked_image, consent_digests, people = self._masked_source(
             prepared, ledger, outcome

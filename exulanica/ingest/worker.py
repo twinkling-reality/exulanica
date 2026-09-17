@@ -45,31 +45,22 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Final
+from typing import Final
 
 import psycopg
-from PIL import Image
 
-from exulanica.consent.regions import DetectedPerson, PersonDetector
+from exulanica.consent.regions import PersonDetector
 from exulanica.db.session import Database
-from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.continuity import run_continuity
 from exulanica.ingest.ledger import Ledger
-from exulanica.ingest.model_rights import ModelHandoff, require_model_right
-from exulanica.ingest.person_detectors import (
-    NoRegionDetector,
-    PathologicalRegionDetector,
-    RecordedObservationDetector,
-    StubRegionDetector,
-)
+from exulanica.ingest.person_detectors import RecordedObservationDetector
 from exulanica.ingest.pipeline import PhotoIngestPipeline
-from exulanica.ingest.privacy import require_observation_screening
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages.segmentation import ObjectSegmenter
 from exulanica.ingest.vision import VisionModel
@@ -231,71 +222,6 @@ class _LeaseKeeper:
             if not held:
                 self.lost.set()
                 return
-
-
-#: Person detectors that discard the image they are handed, by exact type. Each of these calls
-#: ``del image`` before doing anything, so a photograph given to one reaches no model. Any other
-#: detector is assumed to read the pixels, including a subclass of one of these.
-_DETECTORS_THAT_READ_NO_PIXELS: Final = frozenset(
-    {RecordedObservationDetector, StubRegionDetector, NoRegionDetector, PathologicalRegionDetector}
-)
-
-
-class _RightBoundDetector:
-    """A person detector that reads pixels, handed one photograph only under its model right.
-
-    ``person_regions`` calls its detector with the unmasked upright photograph and asks no
-    receipt of its own, so a detector that reads the pixels is wrapped here, where the worker
-    hands models their captures. The check runs inside ``detect``, immediately before the
-    detector is called, and a refusal raises: the stage records a failure and nothing is sent.
-    """
-
-    def __init__(
-        self,
-        detector: PersonDetector,
-        repository: IngestRepository,
-        capture_id: uuid.UUID,
-        screening_id: uuid.UUID | None,
-    ) -> None:
-        self._detector = detector
-        self._repository = repository
-        self._capture_id = capture_id
-        self._screening_id = screening_id
-
-    @property
-    def model_id(self) -> str:
-        return self._detector.model_id
-
-    @property
-    def requires_observation(self) -> bool:
-        return self._detector.requires_observation
-
-    def detect(self, image: Image.Image, context: Mapping[str, Any]) -> tuple[DetectedPerson, ...]:
-        if self._screening_id is None:
-            raise PrivacyAdmissionError(
-                "no privacy screening receipt permits showing these bytes to a person detector"
-            )
-        require_observation_screening(self._repository, self._capture_id, self._screening_id)
-        declared = getattr(self._detector, "model_handoff", None)
-        require_model_right(
-            self._repository,
-            self._capture_id,
-            self._screening_id,
-            declared if isinstance(declared, ModelHandoff) else None,
-        )
-        return self._detector.detect(image, context)
-
-
-def _bound_detector(
-    detector: PersonDetector | None,
-    repository: IngestRepository,
-    capture_id: uuid.UUID,
-    screening_id: uuid.UUID | None,
-) -> PersonDetector | None:
-    """The detector to hand one capture's pipeline: itself when it reads no pixels, else bound."""
-    if detector is None or type(detector) in _DETECTORS_THAT_READ_NO_PIXELS:
-        return detector
-    return _RightBoundDetector(detector, repository, capture_id, screening_id)
 
 
 class DerivativeWorker:
@@ -742,14 +668,12 @@ class DerivativeWorker:
             # Prefer current geometry permission. Otherwise offer observation only under an
             # explicit, current detection receipt. The SQL predicate owns expiry and source checks.
             #
-            # Neither receipt names a model, so neither is the whole permission. Every stage asks
-            # `require_model_right` for the exact models it is about to call, and a personal
-            # photograph with no current right naming them is not sent. The person-region stage
-            # asks nothing of its own, so a detector that reads pixels is bound to the same check
-            # here, for this capture and this receipt.
+            # Neither receipt names a model, so neither is the whole permission. Every stage,
+            # the person-region stage included, asks `require_model_right` for the exact models it
+            # is about to call, and a personal photograph with no current right naming them is not
+            # sent.
             screening = repository.latest_privacy_screening(capture_id)
-            detector = self._detector
-            geometry = True
+            capture_pipeline = pipeline
             if screening is None:
                 row = repository.connection.execute(
                     "select screening_id from reconstruction_privacy_screening "
@@ -762,30 +686,15 @@ class DerivativeWorker:
                 ).fetchone()
                 if row is not None:
                     screening = repository.privacy_screening(row["screening_id"])
-                    detector = self._detector or RecordedObservationDetector()
-                    geometry = False
+                    capture_pipeline = PhotoIngestPipeline(
+                        repository,
+                        self._store,
+                        vision=self._vision,
+                        detector=self._detector or RecordedObservationDetector(),
+                        # Detection permission cannot supply geometry models, even when this
+                        # worker also serves captures with eligible human screenings.
+                    )
             screening_id = None if screening is None else screening.screening_id
-            bound = _bound_detector(detector, repository, capture_id, screening_id)
-            if not geometry:
-                capture_pipeline = PhotoIngestPipeline(
-                    repository,
-                    self._store,
-                    vision=self._vision,
-                    detector=bound,
-                    # Detection permission cannot supply geometry models, even when this
-                    # worker also serves captures with eligible human screenings.
-                )
-            elif bound is self._detector:
-                capture_pipeline = pipeline
-            else:
-                capture_pipeline = PhotoIngestPipeline(
-                    repository,
-                    self._store,
-                    vision=self._vision,
-                    depth=self._depth,
-                    detector=bound,
-                    segmenter=self._segmenter,
-                )
             result = capture_pipeline.ingest_derivatives(
                 capture_id,
                 batch_id=claimed.batch_id,

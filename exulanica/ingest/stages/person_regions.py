@@ -40,16 +40,44 @@ from PIL import Image
 
 from exulanica.canonical import sha256_digest
 from exulanica.consent.regions import DetectedPerson, region_key
+from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import DisplayGeometry
 from exulanica.ingest.ledger import Ledger
+from exulanica.ingest.model_rights import ModelHandoff, require_model_right
+from exulanica.ingest.person_detectors import (
+    NoRegionDetector,
+    PathologicalRegionDetector,
+    RecordedObservationDetector,
+    StubRegionDetector,
+)
 from exulanica.ingest.person_receipts import person_region_list, region_edit_receipt
+from exulanica.ingest.privacy import require_observation_screening
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.stages import idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages.writes import StageResult, StageWrites
 from exulanica.ingest.vision import VisionObservation, validate_observation
 
-__all__ = ["ObservedTrace", "located_people", "observation_of", "run", "unlocated_people"]
+__all__ = [
+    "ObservedTrace",
+    "located_people",
+    "observation_of",
+    "reads_pixels",
+    "run",
+    "unlocated_people",
+]
+
+#: Detectors that discard the image they are handed, by exact type. Each calls ``del image``
+#: before doing anything, so a photograph given to one reaches no model. Any other detector is
+#: treated as reading the pixels, a subclass of one of these included.
+_DETECTORS_THAT_READ_NO_PIXELS = frozenset(
+    {RecordedObservationDetector, StubRegionDetector, NoRegionDetector, PathologicalRegionDetector}
+)
+
+
+def reads_pixels(detector: Any) -> bool:
+    """Whether handing ``detector`` the photograph hands the photograph to a model."""
+    return type(detector) not in _DETECTORS_THAT_READ_NO_PIXELS
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,8 +152,15 @@ def run(
     vision: StageResult | None,
     ledger: Ledger,
     outcome: IngestOutcome,
+    privacy_screening_id: uuid.UUID | None = None,
 ) -> StageResult | None:
-    """Propose regions for one photograph, or record honestly that nothing looked."""
+    """Propose regions for one photograph, or record honestly that nothing looked.
+
+    A detector that reads the pixels is a model receiving the unmasked photograph, so it is
+    gated like every other one: a receipt that lets these bytes be looked at, and a current model
+    right naming the detector and where the bytes go, asked immediately before it is called. A
+    refusal is unavailable, not failed, and nothing is sent.
+    """
     spec = stage("person_regions")
     if detector is None or (detector.requires_observation and vision is None):
         # "Nothing looked" and "looked and found nobody" are different facts and must stay
@@ -170,6 +205,13 @@ def run(
             "unlocated_people": unlocated_people(document),
         }
     inputs = [intake.artifact_id] if vision is None else [vision.artifact_id]
+    if reads_pixels(detector):
+        refusal = _pixel_refusal(writes, capture_id, privacy_screening_id, detector)
+        if refusal is not None:
+            outcome.stages_skipped.append(spec.key)
+            outcome.stages_unavailable.append(spec.key)
+            ledger.unavailable(spec, reason=refusal, input_blob=blob_id)
+            return None
     with ledger.stage(spec, input_artifact_ids=inputs, input_blob=blob_id) as recorder:
         display = DisplayGeometry(w=upright.width, h=upright.height)
         detections = detector.detect(upright, context)
@@ -204,6 +246,29 @@ def run(
                 unlocated=int(context["unlocated_people"]),
             )
         return result
+
+
+def _pixel_refusal(
+    writes: StageWrites,
+    capture_id: uuid.UUID,
+    privacy_screening_id: uuid.UUID | None,
+    detector: Any,
+) -> str | None:
+    """Why this detector may not see this photograph now, or None when it may."""
+    if privacy_screening_id is None:
+        return "no privacy screening receipt permits showing these bytes to a person detector"
+    declared = getattr(detector, "model_handoff", None)
+    try:
+        require_observation_screening(writes.repository, capture_id, privacy_screening_id)
+        require_model_right(
+            writes.repository,
+            capture_id,
+            privacy_screening_id,
+            declared if isinstance(declared, ModelHandoff) else None,
+        )
+    except PrivacyAdmissionError as refusal:
+        return f"the person detector may not receive these bytes: {refusal}"
+    return None
 
 
 def encode_region_list(
