@@ -9,7 +9,8 @@ migration 0066. What this module decides is the shape of an answer.
 *   ``POST /materials/recipes`` stores a recipe a person authored and the published maker
     accepts, or answers 422 with every reason. A client can only state ``authored``: a proposal or
     a photo-derived recipe carries the model that made it, and only the service that records that
-    model may write one, so either origin is a 422 here.
+    model may write one, so any other origin is a 422 with the code ``origin_not_authorable`` and
+    the origins this route accepts.
 *   ``POST /materials/recipes/{recipe_id}/withdraw`` hides a recipe and its bake at once.
 *   ``POST /materials/recipes/{recipe_id}/bake`` queues a bake and answers 202. The bake is made
     by the bake worker, never in this request, and a request past the workspace's quota is 429.
@@ -24,7 +25,7 @@ may not write material tables (the judge deployment) answers every write 403, wh
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 import psycopg
 from fastapi import APIRouter, Request
@@ -35,6 +36,7 @@ from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_ser
 from exulanica.materials import thaw
 from exulanica.selection.validation import Session
 from exulanica.world.material_recipes import (
+    AUTHORABLE_ORIGINS,
     BakeBytesMissing,
     BakeNotReady,
     BakeQuotaExceeded,
@@ -67,8 +69,10 @@ class PublishedSet(_Body):
 
 class RecipeBody(_Body):
     recipe: dict[str, Any]
-    #: What a client may say about where a recipe came from: that a person authored it.
-    origin: Literal["authored"] = "authored"
+    #: Where the recipe came from, as the client states it. A client may state only that a person
+    #: authored it; the route answers any other value with ``origin_not_authorable``, a code a
+    #: client can act on, rather than as a body of the wrong shape.
+    origin: str = "authored"
     based_on: PublishedSet | None = None
     label: Annotated[str, Field(max_length=400)] | None = None
 
@@ -245,6 +249,13 @@ def list_recipes(
 def create_recipe(
     body: RecipeBody, request: Request, connection: ScopedConnection, session: CurrentSession
 ) -> JSONResponse:
+    if body.origin not in AUTHORABLE_ORIGINS:
+        return _problem(
+            422,
+            "origin_not_authorable",
+            "a client may store only a recipe a person authored",
+            authorable=list(AUTHORABLE_ORIGINS),
+        )
     based_on = None if body.based_on is None else (body.based_on.set_id, body.based_on.version)
     try:
         record = _repository(request, connection, session).create_recipe(

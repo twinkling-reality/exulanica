@@ -171,7 +171,8 @@ def test_a_client_states_only_that_a_person_authored_the_recipe(api, materials, 
     refused = api.call(
         "owner", "POST", "/materials/recipes", json={"recipe": _small(), "origin": origin}
     )
-    assert refused.status_code == 422
+    assert (refused.status_code, refused.json()["code"]) == (422, "origin_not_authorable")
+    assert refused.json()["authorable"] == ["authored"]
     assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 0
     stated = api.call(
         "owner", "POST", "/materials/recipes", json={"recipe": _small(), "origin": "authored"}

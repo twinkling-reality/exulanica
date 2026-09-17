@@ -579,9 +579,18 @@ A recipe row never changes; a changed recipe is a new row.
 model's output, and a model's output is a claim about that model, which cannot be checked without
 the model's identity. So:
 
-- `POST /materials/recipes` accepts only `"origin": "authored"`. Any other origin is a 422,
-  because only the service that records a model's identity may write a model's output, never a
-  client.
+- `POST /materials/recipes` accepts only `"origin": "authored"`, the one origin a client may state
+  today. Any other value is a 422 with the code `origin_not_authorable` and the list of origins the
+  route accepts, because only the service that records a model's identity may write a model's
+  output, never a client. What makes the other two possible later, neither of them through this
+  route:
+  - `proposed` needs a proposal path: a service that writes the proposing model's provider, role,
+    id and revision with the recipe, and the migration that gives that record its columns and
+    replaces `tg_material_recipe_awaits_proposal_model`.
+  - `photo_derived` needs the migration after 0073 (below), which names a personal model right for
+    each source photograph and the model and destination on the recipe, and a world service that
+    asks `require_model_right` before it writes.
+  - No other value is an origin, and the column refuses it.
 - The repository refuses `proposed` (`ProposedRecipeInert`) and `photo_derived`
   (`PhotoDerivedRecipeInert`) before the database does.
 - The database refuses both, whatever writes them. `tg_material_recipe_awaits_proposal_model`
@@ -763,7 +772,7 @@ need `world.write`. The answers:
 | 410 | the recipe was withdrawn or deleted |
 | 403 | the deployment's database role may not write material tables (the judge deployment), for every write whatever the id |
 | 409 | the bake is not ready, or its bytes are missing |
-| 422 | the maker refuses the recipe, or the body states an origin other than `authored` |
+| 422 | the maker refuses the recipe (`invalid_recipe`), or the body states an origin other than `authored` (`origin_not_authorable`) |
 | 429 | the bake quota is spent |
 | 503 | the instance has no material catalog, or a delivery kept a write waiting through every retry (with `Retry-After`) |
 
