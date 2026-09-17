@@ -59,6 +59,7 @@ USE_CLASS_KINDS: Final = ("furniture", "residential", "workplace")
 POLICY_KEYS: Final = frozenset(
     {
         "commute_lead_minutes",
+        "footway_station_spacing_mm",
         "memory_limit",
         "occupancy_maximum_milli",
         "occupancy_target_milli",

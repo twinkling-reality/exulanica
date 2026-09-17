@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 PLACE_PROFILE: Final = "exulanica.society-place/v1"
-EDGE_KINDS: Final = ("crossing", "footway", "furniture_access", "premises_access", "sidewalk")
+EDGE_KINDS: Final = ("crossing", "footway", "furniture_access", "sidewalk")
 ORIGINS: Final = ("authored", "district", "furniture", "premises")
 _FIELDS: Final = frozenset(
     {

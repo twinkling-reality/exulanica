@@ -16,6 +16,18 @@
       }
     },
     {
+      "key": "footway_station_spacing_mm",
+      "value": 4000,
+      "reason": "A generated footway gets a standing station every 4 m, the grid spacing of the owned district's sidewalk graph.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
       "key": "memory_limit",
       "value": 16,
       "reason": "Each inhabitant keeps its sixteen most recent event references, as the v2 and v3 profiles do.",
